@@ -1402,5 +1402,166 @@ TEST(JSONSchemaParserTest, CanTranslateNestedBsonTypeArray) {
     )"));
 }
 
+TEST(JSONSchemaParserTest, DependenciesFailsToParseIfNotAnObject) {
+    BSONObj schema = fromjson("{dependencies: []}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, DependenciesFailsToParseIfTheEmptyObject) {
+    BSONObj schema = fromjson("{dependencies: {}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, DependenciesFailsToParseIfDependencyIsNotObjectOrArray) {
+    BSONObj schema = fromjson("{dependencies: {a: ['b'], bad: 1}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, DependenciesFailsToParseIfNestedSchemaIsInvalid) {
+    BSONObj schema = fromjson("{dependencies: {a: {invalid: 1}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, PropertyDependencyFailsToParseIfEmptyArray) {
+    BSONObj schema = fromjson("{dependencies: {a: []}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, PropertyDependencyFailsToParseIfArrayContainsNonStringElement) {
+    BSONObj schema = fromjson("{dependencies: {a: ['b', 1]}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, PropertyDependencyFailsToParseIfRepeatedArrayElement) {
+    BSONObj schema = fromjson("{dependencies: {a: ['b', 'b']}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, TopLevelSchemaDependencyTranslatesCorrectly) {
+    BSONObj schema = fromjson("{dependencies: {a: {properties: {b: {type: 'string'}}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $_internalSchemaCond: [
+                        {a: {$exists: true}},
+                        {
+                          $and: [{
+                              $and: [{
+                                  $or: [
+                                      {$nor: [{b: {$exists: true}}]},
+                                      {$and: [{b: {$_internalSchemaType: [2]}}]}
+                                  ]
+                              }]
+                          }]
+                        },
+                        {$alwaysTrue: 1}
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelPropertyDependencyTranslatesCorrectly) {
+    BSONObj schema = fromjson("{dependencies: {a: ['b', 'c']}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $_internalSchemaCond: [
+                        {a: {$exists: true}},
+                        {$and: [{b: {$exists: true}}, {c: {$exists: true}}]},
+                        {$alwaysTrue: 1}
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, NestedSchemaDependencyTranslatesCorrectly) {
+    BSONObj schema =
+        fromjson("{properties: {a: {dependencies: {b: {properties: {c: {type: 'object'}}}}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {$and: [{$and: [{
+            $or: [
+                {$nor: [{a: {$exists: true}}]},
+                {
+                  $and: [{$and: [{
+                      $_internalSchemaCond: [
+                          {a: {$_internalSchemaObjectMatch: {b: {$exists: true}}}},
+                          {
+                            $and: [{
+                                $or: [
+                                    {$nor: [{a: {$_internalSchemaType: [3]}}]},
+                                    {
+                                      a: {
+                                          $_internalSchemaObjectMatch: {
+                                              $and: [{
+                                                  $or: [
+                                                      {$nor: [{c: {$exists: true}}]},
+                                                      {
+                                                        $and: [{
+                                                            c: {
+                                                                $_internalSchemaType: [3]
+                                                            }
+                                                        }]
+                                                      }
+                                                  ]
+                                              }]
+                                          }
+                                      }
+                                    }
+                                ]
+                            }]
+                          },
+                          {$alwaysTrue: 1}
+                      ]
+                  }]}]
+                }
+            ]
+        }]
+    }]})"));
+}
+
+TEST(JSONSchemaParserTest, NestedPropertyDependencyTranslatesCorrectly) {
+    BSONObj schema = fromjson("{properties: {a: {dependencies: {b: ['c', 'd']}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {$and: [{$and: [{
+            $or: [
+                {$nor: [{a: {$exists: true}}]},
+                {
+                  $and: [{
+                      $and: [{
+                          $_internalSchemaCond: [
+                              {a: {$_internalSchemaObjectMatch: {b: {$exists: true}}}},
+                              {
+                                $and: [
+                                    {a: {$_internalSchemaObjectMatch: {c: {$exists: true}}}},
+                                    {a: {$_internalSchemaObjectMatch: {d: {$exists: true}}}}
+                                ]
+                              },
+                              {$alwaysTrue: 1}
+                          ]
+                      }]
+                  }]
+                }
+            ]
+        }]
+    }]})"));
+}
+
 }  // namespace
 }  // namespace mongo

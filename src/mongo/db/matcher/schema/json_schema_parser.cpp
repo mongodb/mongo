@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
@@ -57,6 +58,7 @@ namespace {
 constexpr StringData kSchemaAdditionalItemsKeyword = "additionalItems"_sd;
 constexpr StringData kSchemaAllOfKeyword = "allOf"_sd;
 constexpr StringData kSchemaAnyOfKeyword = "anyOf"_sd;
+constexpr StringData kSchemaDependenciesKeyword = "dependencies"_sd;
 constexpr StringData kSchemaExclusiveMaximumKeyword = "exclusiveMaximum"_sd;
 constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
 constexpr StringData kSchemaItemsKeyword = "items"_sd;
@@ -546,6 +548,133 @@ StatusWithMatchExpression parseNumProperties(StringData path,
     return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
 }
 
+StatusWithMatchExpression makeDependencyExistsClause(StringData path, StringData dependencyName) {
+    auto existsExpr = stdx::make_unique<ExistsMatchExpression>();
+    invariantOK(existsExpr->init(dependencyName));
+
+    if (path.empty()) {
+        return {std::move(existsExpr)};
+    }
+
+    auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>();
+    auto status = objectMatch->init(std::move(existsExpr), path);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return {std::move(objectMatch)};
+}
+
+StatusWithMatchExpression translateSchemaDependency(StringData path, BSONElement dependency) {
+    invariant(dependency.type() == BSONType::Object);
+
+    auto nestedSchemaMatch = _parse(path, dependency.embeddedObject());
+    if (!nestedSchemaMatch.isOK()) {
+        return nestedSchemaMatch.getStatus();
+    }
+
+    auto ifClause = makeDependencyExistsClause(path, dependency.fieldNameStringData());
+    if (!ifClause.isOK()) {
+        return ifClause.getStatus();
+    }
+
+    auto condExpr = stdx::make_unique<InternalSchemaCondMatchExpression>();
+    condExpr->init({std::move(ifClause.getValue()),
+                    std::move(nestedSchemaMatch.getValue()),
+                    stdx::make_unique<AlwaysTrueMatchExpression>()});
+    return {std::move(condExpr)};
+}
+
+StatusWithMatchExpression translatePropertyDependency(StringData path, BSONElement dependency) {
+    invariant(dependency.type() == BSONType::Array);
+
+    if (dependency.embeddedObject().isEmpty()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "property '" << dependency.fieldNameStringData()
+                              << "' in $jsonSchema keyword '"
+                              << kSchemaDependenciesKeyword
+                              << "' cannot be an empty array"};
+    }
+
+    auto propertyDependencyExpr = stdx::make_unique<AndMatchExpression>();
+    std::set<StringData> propertyDependencyNames;
+    for (auto&& propertyDependency : dependency.embeddedObject()) {
+        if (propertyDependency.type() != BSONType::String) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << "array '" << dependency.fieldNameStringData()
+                                  << "' in $jsonSchema keyword '"
+                                  << kSchemaDependenciesKeyword
+                                  << "' can only contain strings, but found element of type: "
+                                  << typeName(propertyDependency.type())};
+        }
+
+        auto insertionResult = propertyDependencyNames.insert(propertyDependency.valueStringData());
+        if (!insertionResult.second) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "array '" << dependency.fieldNameStringData()
+                                  << "' in $jsonSchema keyword '"
+                                  << kSchemaDependenciesKeyword
+                                  << "' contains duplicate element: "
+                                  << propertyDependency.valueStringData()};
+        }
+
+        auto propertyExistsExpr =
+            makeDependencyExistsClause(path, propertyDependency.valueStringData());
+        if (!propertyExistsExpr.isOK()) {
+            return propertyExistsExpr.getStatus();
+        }
+
+        propertyDependencyExpr->add(propertyExistsExpr.getValue().release());
+    }
+
+    auto ifClause = makeDependencyExistsClause(path, dependency.fieldNameStringData());
+    if (!ifClause.isOK()) {
+        return ifClause.getStatus();
+    }
+
+    auto condExpr = stdx::make_unique<InternalSchemaCondMatchExpression>();
+    condExpr->init({std::move(ifClause.getValue()),
+                    std::move(propertyDependencyExpr),
+                    stdx::make_unique<AlwaysTrueMatchExpression>()});
+    return {std::move(condExpr)};
+}
+
+StatusWithMatchExpression parseDependencies(StringData path, BSONElement dependencies) {
+    if (dependencies.type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "$jsonSchema keyword '" << kSchemaDependenciesKeyword
+                              << "' must be an object"};
+    }
+
+    if (dependencies.embeddedObject().isEmpty()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "$jsonSchema keyword '" << kSchemaDependenciesKeyword
+                              << "' must be a non-empty object"};
+    }
+
+    auto andExpr = stdx::make_unique<AndMatchExpression>();
+    for (auto&& dependency : dependencies.embeddedObject()) {
+        if (dependency.type() != BSONType::Object && dependency.type() != BSONType::Array) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << "property '" << dependency.fieldNameStringData()
+                                  << "' in $jsonSchema keyword '"
+                                  << kSchemaDependenciesKeyword
+                                  << "' must be either an object or an array"};
+        }
+
+        auto dependencyExpr = (dependency.type() == BSONType::Object)
+            ? translateSchemaDependency(path, dependency)
+            : translatePropertyDependency(path, dependency);
+        if (!dependencyExpr.isOK()) {
+            return dependencyExpr.getStatus();
+        }
+
+        andExpr->add(dependencyExpr.getValue().release());
+    }
+
+    return {std::move(andExpr)};
+}
+
 /**
  * Parses the logical keywords in 'keywordMap' to their equivalent match expressions
  * and, on success, adds the results to 'andExpr'.
@@ -649,7 +778,11 @@ Status translateArrayKeywords(StringMap<BSONElement>* keywordMap,
  * Returns a non-OK status if an error occurs during parsing.
  *
  * This function parses the following keywords:
+ *  - dependencies
+ *  - maxProperties
+ *  - minProperties
  *  - properties
+ *  - required
  */
 Status translateObjectKeywords(StringMap<BSONElement>* keywordMap,
                                StringData path,
@@ -696,6 +829,14 @@ Status translateObjectKeywords(StringMap<BSONElement>* keywordMap,
             return maxPropExpr.getStatus();
         }
         andExpr->add(maxPropExpr.getValue().release());
+    }
+
+    if (auto dependenciesElt = keywordMap->get(kSchemaDependenciesKeyword)) {
+        auto dependenciesExpr = parseDependencies(path, dependenciesElt);
+        if (!dependenciesExpr.isOK()) {
+            return dependenciesExpr.getStatus();
+        }
+        andExpr->add(dependenciesExpr.getValue().release());
     }
 
     return Status::OK();
@@ -815,6 +956,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         {kSchemaAllOfKeyword, {}},
         {kSchemaAnyOfKeyword, {}},
         {kSchemaBsonTypeKeyword, {}},
+        {kSchemaDependenciesKeyword, {}},
         {kSchemaExclusiveMaximumKeyword, {}},
         {kSchemaExclusiveMinimumKeyword, {}},
         {kSchemaMaxItemsKeyword, {}},
