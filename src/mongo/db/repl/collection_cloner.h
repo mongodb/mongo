@@ -237,7 +237,7 @@ private:
     /**
      * Pull all ready results from the ARM into a buffer to be inserted.
      */
-    Status _bufferNextBatchFromArm();
+    Status _bufferNextBatchFromArm(WithLock lock);
 
     /**
      * Called whenever there is a new batch of documents ready from the 'AsyncResultsMerger'.

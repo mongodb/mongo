@@ -612,7 +612,7 @@ StatusWith<std::vector<BSONElement>> CollectionCloner::_parseParallelCollectionS
     }
 }
 
-Status CollectionCloner::_bufferNextBatchFromArm() {
+Status CollectionCloner::_bufferNextBatchFromArm(WithLock lock) {
     while (_arm->ready()) {
         auto armResultStatus = _arm->nextReady();
         if (!armResultStatus.getStatus().isOK()) {
@@ -671,13 +671,20 @@ void CollectionCloner::_handleARMResultsCallback(
     }
 
     // Pull the documents from the ARM into a buffer until the entire batch has been processed.
-    auto nextBatchStatus = _bufferNextBatchFromArm();
-    if (!nextBatchStatus.isOK()) {
-        setResultAndCancelRemainingWork(onCompletionGuard, nextBatchStatus);
-        return;
+    bool lastBatch;
+    {
+        UniqueLock lk(_mutex);
+        auto nextBatchStatus = _bufferNextBatchFromArm(lk);
+        if (!nextBatchStatus.isOK()) {
+            onCompletionGuard->setResultAndCancelRemainingWork_inlock(lk, nextBatchStatus);
+            return;
+        }
+
+        // Check if this is the last batch of documents to clone.
+        lastBatch = _arm->remotesExhausted();
     }
 
-    bool lastBatch = _arm->remotesExhausted();
+    // Schedule the next document batch insertion.
     auto&& scheduleResult =
         _scheduleDbWorkFn(stdx::bind(&CollectionCloner::_insertDocumentsCallback,
                                      this,
