@@ -145,6 +145,8 @@ public:
      */
     Status isAdminDbValid(OperationContext* opCtx) override;
 
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) override;
+
 private:
     const NamespaceString _rollbackIdNss;
 };

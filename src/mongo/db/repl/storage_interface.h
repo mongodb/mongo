@@ -305,6 +305,13 @@ public:
      * The 'stable' timestamp is set by calling StorageInterface::setStableTimestamp.
      */
     virtual Status recoverToStableTimestamp(ServiceContext* serviceCtx) = 0;
+
+    /**
+     * Waits for oplog writes to be visible in the oplog.
+     * This function is used to ensure tests do not fail due to initial sync receiving an empty
+     * batch.
+     */
+    virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) = 0;
 };
 
 }  // namespace repl

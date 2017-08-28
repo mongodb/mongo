@@ -802,6 +802,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
     const StatusWith<Fetcher::QueryResponse>& result,
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     Timestamp oplogSeedDocTimestamp;
+    OpTimeWithHash optimeWithHash;
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         auto status = _checkForShutdownAndConvertStatus_inlock(
@@ -817,15 +818,11 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
                 lock, optimeWithHashStatus.getStatus());
             return;
         }
-        auto&& optimeWithHash = optimeWithHashStatus.getValue();
+        optimeWithHash = optimeWithHashStatus.getValue();
         oplogSeedDocTimestamp = _initialSyncState->stopTimestamp =
             optimeWithHash.opTime.getTimestamp();
 
-        if (_initialSyncState->beginTimestamp == _initialSyncState->stopTimestamp) {
-            _lastApplied = optimeWithHash;
-            log() << "No need to apply operations. (currently at "
-                  << _initialSyncState->stopTimestamp.toBSON() << ")";
-        } else {
+        if (_initialSyncState->beginTimestamp != _initialSyncState->stopTimestamp) {
             invariant(_lastApplied.opTime.isNull());
             _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(lock, onCompletionGuard);
             return;
@@ -854,9 +851,18 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
             return;
         }
+
+        // This is necessary to ensure that the seed doc is visible in the oplog prior to setting
+        // _lastApplied.  That way if any other node attempts to read from this node's oplog, it
+        // won't appear empty.
+        _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx.get());
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _lastApplied = optimeWithHash;
+    log() << "No need to apply operations. (currently at "
+          << _initialSyncState->stopTimestamp.toBSON() << ")";
+
     // This sets the error in 'onCompletionGuard' and shuts down the OplogFetcher on error.
     _scheduleRollbackCheckerCheckForRollback_inlock(lock, onCompletionGuard);
 }

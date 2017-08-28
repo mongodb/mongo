@@ -260,6 +260,10 @@ public:
         return isAdminDbValidFn(opCtx);
     };
 
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) override {
+        return;
+    }
+
     // Testing functions.
     CreateCollectionForBulkFn createCollectionForBulkFn =
         [](const NamespaceString& nss,

@@ -967,5 +967,10 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     return Status::OK();
 }
 
+void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) {
+    AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
+    oplog.getCollection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+}
+
 }  // namespace repl
 }  // namespace mongo
