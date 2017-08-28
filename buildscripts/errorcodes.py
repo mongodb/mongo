@@ -27,6 +27,7 @@ codes = []
 # Each AssertLocation identifies the C++ source location of an assertion
 AssertLocation = namedtuple( "AssertLocation", ['sourceFile', 'byteOffset', 'lines', 'code'] )
 
+list_files = False
 
 # Of historical interest only
 def assignErrorCodes():
@@ -65,6 +66,9 @@ def parseSourceFiles( callback ):
     bad = [ re.compile( r"^\s*assert *\(" ) ]
 
     for sourceFile in utils.getAllSourceFiles(prefix='src/mongo/'):
+        if list_files:
+            print 'scanning file: ' + sourceFile
+
         with open(sourceFile) as f:
             text = f.read()
 
@@ -252,7 +256,13 @@ def main():
     parser.add_option("-q", "--quiet", dest="quiet",
                       action="store_true", default=False,
                       help="Suppress output on success [default: %default]")
+    parser.add_option("--list-files", dest="list_files",
+                      action="store_true", default=False,
+                      help="Print the name of each file as it is scanned [default: %default]")
     (options, args) = parser.parse_args()
+
+    global list_files
+    list_files = options.list_files
 
     (codes, errors) = readErrorCodes()
     ok = len(errors) == 0
