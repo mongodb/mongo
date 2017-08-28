@@ -102,8 +102,35 @@ using NextAction = Fetcher::NextAction;
 namespace {
 
 const char kLocalDB[] = "local";
+// Overrides _canAcceptLocalWrites for the decorated OperationContext.
+const OperationContext::Decoration<bool> alwaysAllowNonLocalWrites =
+    OperationContext::declareDecoration<bool>();
 
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncAttempts, int, 10);
+
+/**
+ * Allows non-local writes despite _canAcceptNonlocalWrites being false on a single OperationContext
+ * while in scope.
+ *
+ * Resets to original value when leaving scope so it is safe to nest.
+ */
+class AllowNonLocalWritesBlock {
+    MONGO_DISALLOW_COPYING(AllowNonLocalWritesBlock);
+
+public:
+    AllowNonLocalWritesBlock(OperationContext* opCtx)
+        : _opCtx(opCtx), _initialState(alwaysAllowNonLocalWrites(_opCtx)) {
+        alwaysAllowNonLocalWrites(_opCtx) = true;
+    }
+
+    ~AllowNonLocalWritesBlock() {
+        alwaysAllowNonLocalWrites(_opCtx) = _initialState;
+    }
+
+private:
+    OperationContext* const _opCtx;
+    const bool _initialState;
+};
 
 void lockAndCall(stdx::unique_lock<stdx::mutex>* lk, const stdx::function<void()>& fn) {
     if (!lk->owns_lock()) {
@@ -899,22 +926,26 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         return;
     }
     _applierState = ApplierState::Stopped;
-    _drainFinishedCond.notify_all();
 
     invariant(_getMemberState_inlock().primary());
     invariant(!_canAcceptNonLocalWrites);
-    _canAcceptNonLocalWrites = true;
 
-    lk.unlock();
-    OpTime firstOpTime = _externalState->onTransitionToPrimary(opCtx, isV1ElectionProtocol());
-    lk.lock();
-    _topCoord->setFirstOpTimeOfMyTerm(firstOpTime);
+    {
+        lk.unlock();
+        AllowNonLocalWritesBlock writesAllowed(opCtx);
+        OpTime firstOpTime = _externalState->onTransitionToPrimary(opCtx, isV1ElectionProtocol());
+        lk.lock();
+        _topCoord->setFirstOpTimeOfMyTerm(firstOpTime);
+    }
 
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
     // our election in onTransitionToPrimary(), above.
     _updateLastCommittedOpTime_inlock();
 
+    invariant(!_canAcceptNonLocalWrites);
+    _canAcceptNonLocalWrites = true;
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
+    _drainFinishedCond.notify_all();
     _externalState->startNoopWriter(_getMyLastAppliedOpTime_inlock());
 }
 
@@ -1736,7 +1767,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationCont
     // accept writes.  Similarly, writes are always permitted to the "local" database.  Finally,
     // in the event that a node is started with --slave and --master, we allow writes unless the
     // master/slave system has set the replAllDead flag.
-    if (_canAcceptNonLocalWrites) {
+    if (_canAcceptNonLocalWrites || alwaysAllowNonLocalWrites(*opCtx)) {
         return true;
     }
     if (dbName == kLocalDB) {
@@ -1764,7 +1795,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
     // If we can accept non local writes (ie we're PRIMARY) then we must not be in ROLLBACK.
     // This check is redundant of the check of _memberState below, but since this can be checked
     // without locking, we do it as an optimization.
-    if (_canAcceptNonLocalWrites) {
+    if (_canAcceptNonLocalWrites || alwaysAllowNonLocalWrites(*opCtx)) {
         return true;
     }
 

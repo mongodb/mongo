@@ -168,7 +168,10 @@ Status waitForWriteConcern(OperationContext* opCtx,
            << ", write concern: " << writeConcern.toBSON();
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForWriteConcern);
+    if (!opCtx->getClient()->isInDirectClient()) {
+        // Respecting this failpoint for internal clients prevents stepup from working properly.
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForWriteConcern);
+    }
 
     // Next handle blocking on disk
     Timer syncTimer;
