@@ -30,6 +30,7 @@
 
 #include "mongo/platform/stack_locator.h"
 
+#include <pthread.h>
 #include <pthread_np.h>
 #include <sys/signal.h>
 
