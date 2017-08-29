@@ -205,6 +205,70 @@ public:
     }
 };
 
+// Test that finding entries in this collection works.
+class SessionsCollectionStandaloneFindTest : public SessionsCollectionStandaloneTest {
+public:
+    void run() {
+        DBDirectClient db(opCtx());
+        auto notInsertedRecord = makeRecord();
+
+        auto insertedRecord = makeRecord();
+        ASSERT(insertRecord(opCtx(), insertedRecord).isOK());
+
+        // if a record isn't there, it's been removed
+        {
+            LogicalSessionIdSet lsids{notInsertedRecord.getId()};
+
+            auto response = collection()->findRemovedSessions(opCtx(), lsids);
+            ASSERT_EQ(response.isOK(), true);
+            ASSERT_EQ(response.getValue().size(), 1u);
+            ASSERT(*(response.getValue().begin()) == notInsertedRecord.getId());
+        }
+
+        // if a record is there, it hasn't been removed
+        {
+            LogicalSessionIdSet lsids{insertedRecord.getId()};
+
+            auto response = collection()->findRemovedSessions(opCtx(), lsids);
+            ASSERT_EQ(response.isOK(), true);
+            ASSERT_EQ(response.getValue().size(), 0u);
+        }
+
+        // We can tell the difference with multiple records
+        {
+            LogicalSessionIdSet lsids{insertedRecord.getId(), notInsertedRecord.getId()};
+
+            auto response = collection()->findRemovedSessions(opCtx(), lsids);
+            ASSERT_EQ(response.isOK(), true);
+            ASSERT_EQ(response.getValue().size(), 1u);
+            ASSERT(*(response.getValue().begin()) == notInsertedRecord.getId());
+        }
+
+        // Batch logic works
+        {
+            LogicalSessionIdSet insertedRecords;
+            LogicalSessionIdSet uninsertedRecords;
+            LogicalSessionIdSet mixedRecords;
+
+            for (int i = 0; i < 5000; ++i) {
+                auto insertedRecord = makeRecord();
+                ASSERT(insertRecord(opCtx(), insertedRecord).isOK());
+                insertedRecords.insert(insertedRecord.getId());
+
+                auto uninsertedRecord = makeRecord();
+                uninsertedRecords.insert(uninsertedRecord.getId());
+
+                mixedRecords.insert(insertedRecord.getId());
+                mixedRecords.insert(uninsertedRecord.getId());
+            }
+
+            auto response = collection()->findRemovedSessions(opCtx(), mixedRecords);
+            ASSERT_EQ(response.isOK(), true);
+            ASSERT_EQ(response.getValue().size(), 5000u);
+            ASSERT(response.getValue() == uninsertedRecords);
+        }
+    }
+};
 class All : public Suite {
 public:
     All() : Suite("logical_sessions") {}
@@ -212,6 +276,7 @@ public:
     void setupTests() {
         add<SessionsCollectionStandaloneRemoveTest>();
         add<SessionsCollectionStandaloneRefreshTest>();
+        add<SessionsCollectionStandaloneFindTest>();
     }
 };
 

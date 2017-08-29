@@ -45,10 +45,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/cursor_server_params.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
@@ -70,8 +70,6 @@ static ServerStatusMetricField<Counter64> dCursorStatsOpenNoTimeout("cursor.open
                                                                     &cursorStatsOpenNoTimeout);
 static ServerStatusMetricField<Counter64> dCursorStatusTimedout("cursor.timedOut",
                                                                 &cursorStatsTimedOut);
-
-MONGO_EXPORT_SERVER_PARAMETER(clientCursorMonitorFrequencySecs, int, 4);
 
 long long ClientCursor::totalOpen() {
     return cursorStatsOpen.get();
@@ -287,7 +285,7 @@ public:
                     CursorManager::timeoutCursorsGlobal(opCtx.get(), now));
             }
             MONGO_IDLE_THREAD_BLOCK;
-            sleepsecs(clientCursorMonitorFrequencySecs.load());
+            sleepsecs(getClientCursorMonitorFrequencySecs());
         }
     }
 };

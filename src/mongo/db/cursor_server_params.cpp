@@ -28,39 +28,32 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/sessions_collection_standalone.h"
+#include "mongo/db/cursor_server_params.h"
 
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/client/query.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 
 namespace mongo {
-
 namespace {
 
-BSONObj lsidQuery(const LogicalSessionId& lsid) {
-    return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
-}
+static constexpr Minutes kDefaultCursorTimeoutMinutes{10};
+
+MONGO_EXPORT_SERVER_PARAMETER(clientCursorMonitorFrequencySecs, int, 4);
+MONGO_EXPORT_SERVER_PARAMETER(cursorTimeoutMillis,
+                              long long,
+                              durationCount<Milliseconds>(kDefaultCursorTimeoutMinutes));
+
 }  // namespace
 
-Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
-                                                     const LogicalSessionRecordSet& sessions,
-                                                     Date_t refreshTime) {
-    DBDirectClient client(opCtx);
-    return doRefresh(sessions, refreshTime, makeSendFnForBatchWrite(&client));
+int getClientCursorMonitorFrequencySecs() {
+    return clientCursorMonitorFrequencySecs.load();
 }
 
-Status SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
-                                                   const LogicalSessionIdSet& sessions) {
-    DBDirectClient client(opCtx);
-    return doRemove(sessions, makeSendFnForBatchWrite(&client));
+long long getCursorTimeoutMillis() {
+    return cursorTimeoutMillis.load();
 }
 
-StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSessions(
-    OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
-    DBDirectClient client(opCtx);
-    return doFetch(sessions, makeFindFnForCommand(&client));
+Milliseconds getDefaultCursorTimeoutMillis() {
+    return kDefaultCursorTimeoutMinutes;
 }
 
 }  // namespace mongo

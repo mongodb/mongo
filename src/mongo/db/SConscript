@@ -636,8 +636,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/logical_session_cache",
         "$BUILD_DIR/mongo/db/logical_session_id",
         "$BUILD_DIR/mongo/util/background_job",
-        "query/query",
+        "cursor_server_params",
         "background",
+        "query/query",
     ],
 )
 
@@ -1042,6 +1043,9 @@ env.Library(
         'logical_session_id',
         'sessions_collection',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/s/query/cluster_query',
+    ],
 )
 
 env.Library(
@@ -1444,6 +1448,16 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/s/client/sharding_client',
+    ],
+)
+
+env.Library(
+    target='cursor_server_params',
+    source=[
+        'cursor_server_params.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_parameters',
     ],
 )
 

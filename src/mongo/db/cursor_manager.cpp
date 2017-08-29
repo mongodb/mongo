@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/cursor_server_params.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/logical_session_cache.h"
@@ -54,13 +55,6 @@
 
 namespace mongo {
 using std::vector;
-
-constexpr Minutes CursorManager::kDefaultCursorTimeoutMinutes;
-
-MONGO_EXPORT_SERVER_PARAMETER(
-    cursorTimeoutMillis,
-    int,
-    durationCount<Milliseconds>(CursorManager::kDefaultCursorTimeoutMinutes));
 
 constexpr int CursorManager::kNumPartitions;
 
@@ -451,7 +445,7 @@ bool CursorManager::cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_
     if (cursor->isNoTimeout() || cursor->_isPinned) {
         return false;
     }
-    return (now - cursor->_lastUseDate) >= Milliseconds(cursorTimeoutMillis.load());
+    return (now - cursor->_lastUseDate) >= Milliseconds(getCursorTimeoutMillis());
 }
 
 std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {

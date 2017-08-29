@@ -26,41 +26,18 @@
  * then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/sessions_collection_standalone.h"
-
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/client/query.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
-namespace {
+int getClientCursorMonitorFrequencySecs();
 
-BSONObj lsidQuery(const LogicalSessionId& lsid) {
-    return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
-}
-}  // namespace
+// Period of time after which mortal cursors are killed for inactivity. Configurable with server
+// parameter "cursorTimeoutMillis".
+long long getCursorTimeoutMillis();
 
-Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
-                                                     const LogicalSessionRecordSet& sessions,
-                                                     Date_t refreshTime) {
-    DBDirectClient client(opCtx);
-    return doRefresh(sessions, refreshTime, makeSendFnForBatchWrite(&client));
-}
-
-Status SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
-                                                   const LogicalSessionIdSet& sessions) {
-    DBDirectClient client(opCtx);
-    return doRemove(sessions, makeSendFnForBatchWrite(&client));
-}
-
-StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSessions(
-    OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
-    DBDirectClient client(opCtx);
-    return doFetch(sessions, makeFindFnForCommand(&client));
-}
+Milliseconds getDefaultCursorTimeoutMillis();
 
 }  // namespace mongo

@@ -77,8 +77,6 @@ class PlanExecutor;
  */
 class CursorManager {
 public:
-    // The number of minutes a cursor is allowed to be idle before timing out.
-    static constexpr Minutes kDefaultCursorTimeoutMinutes{10};
     using RegistrationToken = Partitioned<unordered_set<PlanExecutor*>>::PartitionId;
 
     /**

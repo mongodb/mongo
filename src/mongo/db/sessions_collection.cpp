@@ -180,6 +180,19 @@ SessionsCollection::SendBatchFn SessionsCollection::makeSendFnForCommand(DBClien
     return send;
 }
 
+SessionsCollection::FindBatchFn SessionsCollection::makeFindFnForCommand(DBClientBase* client) {
+    auto send = [client](BSONObj cmd) -> StatusWith<BSONObj> {
+        BSONObj res;
+        if (!client->runCommand(SessionsCollection::kSessionsDb.toString(), cmd, res)) {
+            return getStatusFromCommandResult(res);
+        }
+
+        return res;
+    };
+
+    return send;
+}
+
 Status SessionsCollection::doRefresh(const LogicalSessionRecordSet& sessions,
                                      Date_t refreshTime,
                                      SendBatchFn send) {
@@ -230,6 +243,60 @@ Status SessionsCollection::doRemove(const LogicalSessionIdSet& sessions, SendBat
 Status SessionsCollection::doRemoveExternal(const LogicalSessionIdSet& sessions, SendBatchFn send) {
     // TODO SERVER-28335 Implement endSessions, with internal counterpart.
     return Status::OK();
+}
+
+StatusWith<LogicalSessionIdSet> SessionsCollection::doFetch(const LogicalSessionIdSet& sessions,
+                                                            FindBatchFn send) {
+    auto makeT = [] { return std::vector<LogicalSessionId>{}; };
+
+    auto add = [](std::vector<LogicalSessionId>& batch, const LogicalSessionId& record) {
+        batch.push_back(record);
+    };
+
+    LogicalSessionIdSet removed = sessions;
+
+    auto wrappedSend = [&](BSONObj batch) {
+        auto swBatchResult = send(batch);
+
+        if (!swBatchResult.isOK()) {
+            return swBatchResult.getStatus();
+        } else {
+            auto result = SessionsCollectionFetchResult::parse("SessionsCollectionFetchResult"_sd,
+                                                               swBatchResult.getValue());
+
+            for (const auto& lsid : result.getCursor().getFirstBatch()) {
+                removed.erase(lsid.get_id());
+            }
+
+            return Status::OK();
+        }
+    };
+
+    auto sendLocal = [&](std::vector<LogicalSessionId>& batch) {
+        SessionsCollectionFetchRequest request;
+
+        request.setFind(NamespaceString{SessionsCollection::kSessionsCollection});
+        request.setFilter({});
+        request.getFilter().set_id({});
+        request.getFilter().get_id().setIn(batch);
+
+        request.setProjection({});
+        request.getProjection().set_id(1);
+        request.setBatchSize(batch.size());
+        request.setLimit(batch.size());
+        request.setAllowPartialResults(true);
+        request.setSingleBatch(true);
+
+        return wrappedSend(request.toBSON());
+    };
+
+    auto status = runBulkGeneric(makeT, add, sendLocal, sessions);
+
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return removed;
 }
 
 }  // namespace mongo

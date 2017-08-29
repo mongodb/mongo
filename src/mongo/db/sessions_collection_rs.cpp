@@ -84,7 +84,8 @@ Status makePrimaryConnection(OperationContext* opCtx, boost::optional<ScopedDbCo
 }
 
 template <typename Callback>
-Status runIfStandaloneOrPrimary(OperationContext* opCtx, Callback callback) {
+auto runIfStandaloneOrPrimary(OperationContext* opCtx, Callback callback)
+    -> boost::optional<decltype(std::declval<Callback>()())> {
     Lock::DBLock lk(opCtx, SessionsCollection::kSessionsDb, MODE_IX);
     Lock::CollectionLock lock(opCtx->lockState(), SessionsCollection::kSessionsFullNS, MODE_IX);
 
@@ -93,7 +94,32 @@ Status runIfStandaloneOrPrimary(OperationContext* opCtx, Callback callback) {
         return callback();
     }
 
-    return {ErrorCodes::NotMaster, "Cannot perform a local write"};
+    return boost::none;
+}
+
+template <typename Callback>
+auto sendToPrimary(OperationContext* opCtx, Callback callback)
+    -> decltype(std::declval<Callback>()(static_cast<DBClientBase*>(nullptr))) {
+    boost::optional<ScopedDbConnection> conn;
+    auto res = makePrimaryConnection(opCtx, &conn);
+    if (!res.isOK()) {
+        return res;
+    }
+
+    return callback(conn->get());
+}
+
+template <typename LocalCallback, typename RemoteCallback>
+auto dispatch(OperationContext* opCtx, LocalCallback localCallback, RemoteCallback remoteCallback)
+    -> decltype(std::declval<RemoteCallback>()(static_cast<DBClientBase*>(nullptr))) {
+    // If we are the primary, write directly to ourself.
+    auto result = runIfStandaloneOrPrimary(opCtx, [&] { return localCallback(); });
+
+    if (result) {
+        return *result;
+    }
+
+    return sendToPrimary(opCtx, remoteCallback);
 }
 
 }  // namespace
@@ -101,53 +127,38 @@ Status runIfStandaloneOrPrimary(OperationContext* opCtx, Callback callback) {
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
                                              const LogicalSessionRecordSet& sessions,
                                              Date_t refreshTime) {
-    bool ran = false;
-
-    // If we are the primary, write directly to ourself.
-    auto status = runIfStandaloneOrPrimary(opCtx, [&] {
-        ran = true;
-        DBDirectClient client(opCtx);
-        return doRefresh(sessions, refreshTime, makeSendFnForBatchWrite(&client));
-    });
-
-    if (ran) {
-        return status;
-    }
-
-    // If we are not writeable, then send refreshSessions cmd to the primary.
-    boost::optional<ScopedDbConnection> conn;
-    auto res = makePrimaryConnection(opCtx, &conn);
-    if (!res.isOK()) {
-        return res;
-    }
-
-    return doRefreshExternal(sessions, refreshTime, makeSendFnForCommand(conn->get()));
+    return dispatch(opCtx,
+                    [&] {
+                        DBDirectClient client(opCtx);
+                        return doRefresh(sessions, refreshTime, makeSendFnForBatchWrite(&client));
+                    },
+                    [&](DBClientBase* client) {
+                        return doRefreshExternal(
+                            sessions, refreshTime, makeSendFnForCommand(client));
+                    });
 }
 
 Status SessionsCollectionRS::removeRecords(OperationContext* opCtx,
                                            const LogicalSessionIdSet& sessions) {
-    bool ran = false;
-
-    // If we are the primary, write directly to ourself.
-    auto status = runIfStandaloneOrPrimary(opCtx, [&] {
-        ran = true;
-        DBDirectClient client(opCtx);
-        return doRemove(sessions, makeSendFnForBatchWrite(&client));
-    });
-
-    if (ran) {
-        return status;
-    }
-
-    // If we are not writeable, then send endSessions cmd to the primary
-    boost::optional<ScopedDbConnection> conn;
-    auto res = makePrimaryConnection(opCtx, &conn);
-    if (!res.isOK()) {
-        return res;
-    }
-
-    return doRemoveExternal(sessions, makeSendFnForCommand(conn->get()));
+    return dispatch(opCtx,
+                    [&] {
+                        DBDirectClient client(opCtx);
+                        return doRemove(sessions, makeSendFnForBatchWrite(&client));
+                    },
+                    [&](DBClientBase* client) {
+                        return doRemoveExternal(sessions, makeSendFnForCommand(client));
+                    });
 }
 
+StatusWith<LogicalSessionIdSet> SessionsCollectionRS::findRemovedSessions(
+    OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
+    return dispatch(
+        opCtx,
+        [&] {
+            DBDirectClient client(opCtx);
+            return doFetch(sessions, makeFindFnForCommand(&client));
+        },
+        [&](DBClientBase* client) { return doFetch(sessions, makeFindFnForCommand(client)); });
+}
 
 }  // namespace mongo

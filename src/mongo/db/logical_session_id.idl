@@ -112,3 +112,53 @@ structs:
                       operation executes."
         type: TxnNumber
         optional: true
+
+  SessionsCollectionFetchResultIndividualResult:
+    description: "Individual result"
+    strict: true
+    fields:
+      _id: LogicalSessionId
+
+  SessionsCollectionFetchResultCursor:
+    description: "Cursor object"
+    strict: false
+    fields:
+      firstBatch: array<SessionsCollectionFetchResultIndividualResult>
+
+  SessionsCollectionFetchResult:
+    description: "Parser for pulling out the fetch results from SessionsCollection::fetch"
+    strict: false
+    fields:
+      cursor: SessionsCollectionFetchResultCursor
+
+  SessionsCollectionFetchRequestFilterId:
+    description: "Id"
+    strict: true
+    fields:
+      $in:
+        type: array<LogicalSessionId>
+        cpp_name: "in"
+
+  SessionsCollectionFetchRequestFilter:
+    description: "filter"
+    strict: true
+    fields:
+      _id: SessionsCollectionFetchRequestFilterId
+
+  SessionsCollectionFetchRequestProjection:
+    description: "projection"
+    strict: true
+    fields:
+      _id: int
+
+  SessionsCollectionFetchRequest:
+    description: "Parser for forming the fetch request for SessionsCollection::fetch"
+    strict: true
+    fields:
+      find: namespacestring
+      filter: SessionsCollectionFetchRequestFilter
+      projection: SessionsCollectionFetchRequestProjection
+      batchSize: int
+      singleBatch: bool
+      allowPartialResults: bool
+      limit: int

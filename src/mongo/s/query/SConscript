@@ -159,6 +159,7 @@ env.Library(
         "cluster_cursor_cleanup_job.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/cursor_server_params",
         "$BUILD_DIR/mongo/s/coreshard",
         "$BUILD_DIR/mongo/util/background_job",
     ],

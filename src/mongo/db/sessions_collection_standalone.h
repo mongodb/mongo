@@ -54,6 +54,9 @@ public:
      * Removes the authoritative records for the specified sessions.
      */
     Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+
+    StatusWith<LogicalSessionIdSet> findRemovedSessions(
+        OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
 };
 
 }  // namespace mongo

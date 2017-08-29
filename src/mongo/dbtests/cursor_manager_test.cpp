@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cursor_manager.h"
+#include "mongo/db/cursor_server_params.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -286,7 +287,7 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
 
     ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t()));
 
-    clock->advance(Milliseconds(CursorManager::kDefaultCursorTimeoutMinutes));
+    clock->advance(getDefaultCursorTimeoutMillis());
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
 
@@ -309,7 +310,7 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
         {makeFakePlanExecutor(), NamespaceString{"test.collection"}, {}, false, BSONObj()});
 
     // The pin is still in scope, so it should not time out.
-    clock->advance(Milliseconds(CursorManager::kDefaultCursorTimeoutMinutes));
+    clock->advance(getDefaultCursorTimeoutMillis());
     ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
 }
 
@@ -330,7 +331,7 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
         _opCtx.get(), collectionGoingAway, "KilledCursorsShouldTimeoutTest");
 
     // Advance the clock to simulate time passing.
-    clock->advance(Milliseconds(CursorManager::kDefaultCursorTimeoutMinutes));
+    clock->advance(getDefaultCursorTimeoutMillis());
 
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
@@ -352,7 +353,7 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsThatAreStillPinnedShouldNotTimeou
         _opCtx.get(), collectionGoingAway, "KilledCursorsShouldTimeoutTest");
 
     // Advance the clock to simulate time passing.
-    clock->advance(Milliseconds(CursorManager::kDefaultCursorTimeoutMinutes));
+    clock->advance(getDefaultCursorTimeoutMillis());
 
     // The pin is still in scope, so it should not time out.
     ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
@@ -384,7 +385,7 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
 
     // We should be able to time out the unused cursor, but the one we used should stay alive.
     ASSERT_EQ(2UL, cursorManager->numCursors());
-    clock->advance(Milliseconds(CursorManager::kDefaultCursorTimeoutMinutes) - Milliseconds(1));
+    clock->advance(getDefaultCursorTimeoutMillis() - Milliseconds(1));
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
     ASSERT_EQ(1UL, cursorManager->numCursors());
 
@@ -407,7 +408,7 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
         _opCtx.get(), {makeFakePlanExecutor(), kTestNss, {}, false, BSONObj()});
 
     // Advance the clock to simulate time passing.
-    clock->advance(CursorManager::kDefaultCursorTimeoutMinutes + Milliseconds(1));
+    clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));
 
     // Make sure the pinned cursor does not time out, before or after unpinning it.
     ASSERT_EQ(1UL, cursorManager->numCursors());
@@ -422,7 +423,7 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
 
     // Advance the clock to simulate more time passing, then assert that the now-inactive cursor
     // times out.
-    clock->advance(CursorManager::kDefaultCursorTimeoutMinutes + Milliseconds(1));
+    clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
 }

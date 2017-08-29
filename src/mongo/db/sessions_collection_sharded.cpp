@@ -30,8 +30,12 @@
 
 #include "mongo/db/sessions_collection_sharded.h"
 
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/s/commands/cluster_write.h"
+#include "mongo/s/query/cluster_find.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -93,5 +97,50 @@ Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
     return doRemove(sessions, send);
 }
 
+StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
+    OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
+
+    auto send = [&](BSONObj toSend) -> StatusWith<BSONObj> {
+        const NamespaceString nss(SessionsCollection::kSessionsFullNS);
+
+        auto qr = QueryRequest::makeFromFindCommand(nss, toSend, false);
+        if (!qr.isOK()) {
+            return qr.getStatus();
+        }
+
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
+        auto cq = CanonicalQuery::canonicalize(opCtx,
+                                               std::move(qr.getValue()),
+                                               expCtx,
+                                               ExtensionsCallbackNoop(),
+                                               MatchExpressionParser::kAllowAllSpecialFeatures &
+                                                   ~MatchExpressionParser::AllowedFeatures::kExpr);
+        if (!cq.isOK()) {
+            return cq.getStatus();
+        }
+
+        // Do the work to generate the first batch of results. This blocks waiting to get responses
+        // from the shard(s).
+        std::vector<BSONObj> batch;
+        BSONObj viewDefinition;
+        auto cursorId = ClusterFind::runQuery(
+            opCtx, *cq.getValue(), ReadPreferenceSetting::get(opCtx), &batch, &viewDefinition);
+
+        if (!cursorId.isOK()) {
+            return cursorId.getStatus();
+        }
+
+        BSONObjBuilder result;
+        CursorResponseBuilder firstBatch(/*firstBatch*/ true, &result);
+        for (const auto& obj : batch) {
+            firstBatch.append(obj);
+        }
+        firstBatch.done(cursorId.getValue(), nss.ns());
+
+        return result.obj();
+    };
+
+    return doFetch(sessions, send);
+}
 
 }  // namespace mongo

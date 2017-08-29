@@ -111,6 +111,11 @@ public:
         return _impl->removeRecords(sessions);
     }
 
+    StatusWith<LogicalSessionIdSet> findRemovedSessions(
+        OperationContext* opCtx, const LogicalSessionIdSet& sessions) override {
+        return LogicalSessionIdSet{};
+    }
+
 private:
     std::shared_ptr<MockSessionsCollectionImpl> _impl;
 };

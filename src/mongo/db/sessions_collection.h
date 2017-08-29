@@ -71,6 +71,14 @@ public:
      */
     virtual Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) = 0;
 
+    /**
+     * Checks a set of lsids and returns the set that no longer exists
+     *
+     * Returns an error if the fetch cannot occur, for example from a network error.
+     */
+    virtual StatusWith<LogicalSessionIdSet> findRemovedSessions(
+        OperationContext* opCtx, const LogicalSessionIdSet& sessions) = 0;
+
 protected:
     /**
      * Makes a send function for the given client.
@@ -78,6 +86,8 @@ protected:
     using SendBatchFn = stdx::function<Status(BSONObj batch)>;
     SendBatchFn makeSendFnForCommand(DBClientBase* client);
     SendBatchFn makeSendFnForBatchWrite(DBClientBase* client);
+    using FindBatchFn = stdx::function<StatusWith<BSONObj>(BSONObj batch)>;
+    FindBatchFn makeFindFnForCommand(DBClientBase* client);
 
     /**
      * Formats and sends batches of refreshes for the given set of sessions.
@@ -92,6 +102,11 @@ protected:
      */
     Status doRemove(const LogicalSessionIdSet& sessions, SendBatchFn send);
     Status doRemoveExternal(const LogicalSessionIdSet& sessions, SendBatchFn send);
+
+    /**
+     * Formats and sends batches of fetches for the given set of sessions.
+     */
+    StatusWith<LogicalSessionIdSet> doFetch(const LogicalSessionIdSet& sessions, FindBatchFn send);
 };
 
 }  // namespace mongo
