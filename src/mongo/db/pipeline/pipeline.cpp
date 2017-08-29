@@ -272,8 +272,7 @@ void Pipeline::dispose(OperationContext* opCtx) {
         pCtx->opCtx = opCtx;
 
         // Make sure all stages are connected, in case we are being disposed via an error path and
-        // were
-        // not stitched at the time of the error.
+        // were not stitched at the time of the error.
         stitch();
 
         if (!_sources.empty()) {
@@ -332,6 +331,7 @@ void Pipeline::unsplitFromSharded(
     _unsplitSources.reset();
 
     _splitForSharded = false;
+
     stitch();
 }
 
@@ -351,6 +351,8 @@ void Pipeline::Optimizations::Sharded::findSplitPoint(Pipeline* shardPipe, Pipel
             // split this source into Merge and Shard _sources
             intrusive_ptr<DocumentSource> shardSource = splittable->getShardSource();
             intrusive_ptr<DocumentSource> mergeSource = splittable->getMergeSource();
+            invariant(shardSource != mergeSource);
+
             if (shardSource)
                 shardPipe->_sources.push_back(shardSource);
             if (mergeSource)

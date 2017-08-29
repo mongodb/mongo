@@ -76,7 +76,7 @@
      * - The number of documents returned by the aggregation matches 'expectedCount'.
      * - The merge was performed on a mongoS if 'mergeType' is 'mongos', and on a shard otherwise.
      */
-    function assertMergeBehaviour({testName, pipeline, mergeType, expectedCount}) {
+    function assertMergeBehaviour({testName, pipeline, mergeType, batchSize, expectedCount}) {
         // Verify that the 'mergeOnMongoS' explain() output for this pipeline matches our
         // expectation.
         assert.eq(
@@ -84,7 +84,11 @@
                 .mergeType,
             mergeType);
 
-        assert.eq(mongosColl.aggregate(pipeline, {comment: testName}).itcount(), expectedCount);
+        assert.eq(
+            mongosColl
+                .aggregate(pipeline, {comment: testName, cursor: {batchSize: (batchSize || 101)}})
+                .itcount(),
+            expectedCount);
 
         // Verify that a $mergeCursors aggregation ran on the primary shard if 'mergeType' is not
         // 'mongos', and that no such aggregation ran otherwise.
@@ -103,11 +107,12 @@
      * Throws an assertion if the aggregation specified by 'pipeline' does not produce
      * 'expectedCount' results, or if the merge phase is not performed on the mongoS.
      */
-    function assertMergeOnMongoS({testName, pipeline, expectedCount}) {
+    function assertMergeOnMongoS({testName, pipeline, batchSize, expectedCount}) {
         assertMergeBehaviour({
             testName: testName,
             pipeline: pipeline,
             mergeType: "mongos",
+            batchSize: (batchSize || 101),
             expectedCount: expectedCount
         });
     }
@@ -116,11 +121,12 @@
      * Throws an assertion if the aggregation specified by 'pipeline' does not produce
      * 'expectedCount' results, or if the merge phase was not performed on a shard.
      */
-    function assertMergeOnMongoD({testName, pipeline, mergeType, expectedCount}) {
+    function assertMergeOnMongoD({testName, pipeline, mergeType, batchSize, expectedCount}) {
         assertMergeBehaviour({
             testName: testName,
             pipeline: pipeline,
             mergeType: (mergeType || "anyShard"),
+            batchSize: (batchSize || 101),
             expectedCount: expectedCount
         });
     }
@@ -135,6 +141,7 @@
     assertMergeOnMongoS({
         testName: "agg_mongos_merge_match_only",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}],
+        batchSize: 10,
         expectedCount: 400
     });
 
@@ -142,6 +149,7 @@
     assertMergeOnMongoS({
         testName: "agg_mongos_merge_sort_presorted",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}],
+        batchSize: 10,
         expectedCount: 400
     });
 
@@ -149,6 +157,7 @@
     assertMergeOnMongoD({
         testName: "agg_mongos_merge_sort_in_mem",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}, {$sort: {a: 1}}],
+        batchSize: 10,
         expectedCount: 400
     });
 
@@ -160,41 +169,45 @@
             {$_internalSplitPipeline: {mergeType: "primaryShard"}}
         ],
         mergeType: "primaryShard",
+        batchSize: 10,
         expectedCount: 400
     });
 
     // Test that $skip is merged on mongoS.
     assertMergeOnMongoS({
         testName: "agg_mongos_merge_skip",
-        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}, {$skip: 100}],
-        expectedCount: 300
+        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}, {$skip: 300}],
+        batchSize: 10,
+        expectedCount: 100
     });
 
     // Test that $limit is merged on mongoS.
     assertMergeOnMongoS({
         testName: "agg_mongos_merge_limit",
-        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$limit: 50}],
-        expectedCount: 50
+        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$limit: 300}],
+        batchSize: 10,
+        expectedCount: 300
     });
 
     // Test that $sample is merged on mongoS.
     assertMergeOnMongoS({
         testName: "agg_mongos_merge_sample",
-        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sample: {size: 50}}],
-        expectedCount: 50
+        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sample: {size: 300}}],
+        batchSize: 10,
+        expectedCount: 300
     });
 
     // Test that merge pipelines containing all mongos-runnable stages produce the expected output.
     assertMergeOnMongoS({
         testName: "agg_mongos_merge_all_mongos_runnable_stages",
         pipeline: [
-            {$match: {_id: {$gte: -5, $lte: 100}}},
-            {$sort: {_id: -1}},
-            {$skip: 95},
-            {$limit: 10},
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            {$sort: {_id: 1}},
+            {$skip: 150},
+            {$limit: 150},
             {$addFields: {d: true}},
             {$unwind: "$a"},
-            {$sample: {size: 5}},
+            {$sample: {size: 100}},
             {$project: {c: 0}},
             {
               $redact: {
@@ -204,14 +217,17 @@
             },
             {
               $match: {
-                  _id: {$gte: -4, $lte: 5},
-                  a: {$gte: -4, $lte: 5},
+                  _id: {$gte: -50, $lte: 100},
+                  a: {$gte: -50, $lte: 100},
                   b: {$exists: false},
                   c: {$exists: false},
                   d: true
               }
             }
         ],
-        expectedCount: 5
+        batchSize: 10,
+        expectedCount: 100
     });
+
+    st.stop();
 })();

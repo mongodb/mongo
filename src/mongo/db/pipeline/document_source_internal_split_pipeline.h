@@ -49,9 +49,10 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
 
-    DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        HostTypeRequirement mergeType)
-        : DocumentSource(expCtx), _mergeType(mergeType) {}
+    static boost::intrusive_ptr<DocumentSource> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, HostTypeRequirement mergeType) {
+        return new DocumentSourceInternalSplitPipeline(expCtx, mergeType);
+    }
 
     const char* getSourceName() const final {
         return kStageName.rawData();
@@ -62,7 +63,7 @@ public:
     }
 
     boost::intrusive_ptr<DocumentSource> getMergeSource() final {
-        return this;
+        return DocumentSourceInternalSplitPipeline::create(pExpCtx, _mergeType);
     }
 
     StageConstraints constraints() const final {
@@ -74,6 +75,10 @@ public:
     GetNextResult getNext() final;
 
 private:
+    DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        HostTypeRequirement mergeType)
+        : DocumentSource(expCtx), _mergeType(mergeType) {}
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     HostTypeRequirement _mergeType = HostTypeRequirement::kAnyShard;
 };

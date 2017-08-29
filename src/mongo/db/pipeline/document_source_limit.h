@@ -68,13 +68,22 @@ public:
     static boost::intrusive_ptr<DocumentSourceLimit> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
 
-    // Virtuals for SplittableDocumentSource
-    // Need to run on rounter. Running on shard as well is an optimization.
+    /**
+     * Returns the current DocumentSourceLimit for use in the shards pipeline. Running this stage on
+     * the shards is an optimization, but is not strictly necessary in order to produce correct
+     * pipeline output.
+     */
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
         return this;
     }
+
+    /**
+     * Returns a new DocumentSourceLimit with the same limit as the current stage, for use in the
+     * merge pipeline. Unlike the shards source, it is necessary for this stage to run on the
+     * merging host in order to produce correct pipeline output.
+     */
     boost::intrusive_ptr<DocumentSource> getMergeSource() final {
-        return this;
+        return DocumentSourceLimit::create(pExpCtx, _limit);
     }
 
     long long getLimit() const {

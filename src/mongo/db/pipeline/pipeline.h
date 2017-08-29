@@ -196,7 +196,7 @@ public:
      * Returns true if this pipeline is the part of a split pipeline which should be targeted to the
      * shards.
      */
-    bool isSplitForSharded() {
+    bool isSplitForSharded() const {
         return _splitForSharded;
     }
 
@@ -204,7 +204,7 @@ public:
      * Returns true if this pipeline is the part of a split pipeline which is responsible for
      * merging the results from the shards.
      */
-    bool isSplitForMerge() {
+    bool isSplitForMerge() const {
         return _splitForMerge;
     }
 
@@ -259,7 +259,7 @@ public:
      */
     DepsTracker getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const;
 
-    const SourceContainer& getSources() {
+    const SourceContainer& getSources() const {
         return _sources;
     }
 

@@ -529,14 +529,18 @@ public:
     /**
      * Returns a source to be run on the shards, or NULL if no work should be done on the shards for
      * this stage. Must not mutate the existing source object; if different behaviour is required in
-     * the split-pipeline case, a new source should be created and configured appropriately.
+     * the split-pipeline case, a new source should be created and configured appropriately. It is
+     * an error for getShardSource() to return a pointer to the same object as getMergeSource(),
+     * since this can result in the source being stitched into both the shard and merge pipelines
+     * when the latter is executed on mongoS.
      */
     virtual boost::intrusive_ptr<DocumentSource> getShardSource() = 0;
 
     /**
      * Returns a source that combines results from the shards, or NULL if no work should be done in
      * the merge pipeline for this stage. Must not mutate the existing source object; if different
-     * behaviour is required, a new source should be created and configured appropriately.
+     * behaviour is required, a new source should be created and configured appropriately. It is an
+     * error for getMergeSource() to return a pointer to the same object as getShardSource().
      */
     virtual boost::intrusive_ptr<DocumentSource> getMergeSource() = 0;
 
