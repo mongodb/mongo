@@ -64,8 +64,9 @@ __drop_colgroup(
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_colgroup(
 	    session, uri, force, &table, &colgroup)) == 0) {
-		table->cg_complete = false;
 		WT_TRET(__wt_schema_drop(session, colgroup->source, cfg));
+		if (ret == 0)
+			table->cg_complete = false;
 	}
 
 	WT_TRET(__wt_metadata_remove(session, uri));
@@ -107,6 +108,8 @@ __drop_table(
 	u_int i;
 	bool tracked;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));
+
 	name = uri;
 	WT_PREFIX_SKIP_REQUIRED(session, name, "table:");
 
@@ -114,18 +117,15 @@ __drop_table(
 	tracked = false;
 
 	/*
-	 * Open the table to check that it was setup correctly.  Keep the
-	 * handle exclusive until it is released at the end of the call.
+	 * Open the table so we can drop its column groups and indexes.
+	 *
+	 * Ideally we would keep the table locked exclusive across the drop,
+	 * but for now we rely on the global table lock to prevent the table
+	 * being reopened while it is being dropped.  One issue is that the
+	 * WT_WITHOUT_LOCKS macro can drop and reacquire the global table lock,
+	 * avoiding deadlocks while waiting for LSM operation to quiesce.
 	 */
-	WT_ERR(__wt_schema_get_table_uri(
-	    session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
-	F_SET(&table->iface, WT_DHANDLE_DISCARD);
-	if (WT_META_TRACKING(session)) {
-		WT_WITH_DHANDLE(session, &table->iface,
-		    ret = __wt_meta_track_handle_lock(session, false));
-		WT_ERR(ret);
-		tracked = true;
-	}
+	WT_ERR(__wt_schema_get_table_uri(session, uri, true, 0, &table));
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -155,7 +155,16 @@ __drop_table(
 	}
 
 	/* Make sure the table data handle is closed. */
+	WT_TRET(__wt_schema_release_table(session, table));
+	WT_ERR(__wt_schema_get_table_uri(
+	    session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
 	F_SET(&table->iface, WT_DHANDLE_DISCARD);
+	if (WT_META_TRACKING(session)) {
+		WT_WITH_DHANDLE(session, &table->iface,
+		    ret = __wt_meta_track_handle_lock(session, false));
+		WT_ERR(ret);
+		tracked = true;
+	}
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_ERR(__wt_metadata_remove(session, uri));

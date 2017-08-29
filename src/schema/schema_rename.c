@@ -206,12 +206,23 @@ __rename_table(WT_SESSION_IMPL *session,
 	WT_TABLE *table;
 	u_int i;
 	const char *oldname;
+	bool tracked;
 
 	oldname = uri;
 	(void)WT_PREFIX_SKIP(oldname, "table:");
+	tracked = false;
 
-	WT_RET(__wt_schema_get_table(session,
-	    oldname, strlen(oldname), false, WT_DHANDLE_EXCLUSIVE, &table));
+	/*
+	 * Open the table so we can rename its column groups and indexes.
+	 *
+	 * Ideally we would keep the table locked exclusive across the rename,
+	 * but for now we rely on the global table lock to prevent the table
+	 * being reopened while it is being renamed.  One issue is that the
+	 * WT_WITHOUT_LOCKS macro can drop and reacquire the global table lock,
+	 * avoiding deadlocks while waiting for LSM operation to quiesce.
+	 */
+	WT_RET(__wt_schema_get_table(
+	    session, oldname, strlen(oldname), false, 0, &table));
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
@@ -225,12 +236,21 @@ __rename_table(WT_SESSION_IMPL *session,
 		    table->indices[i]->name, cfg));
 
 	/* Make sure the table data handle is closed. */
+	WT_TRET(__wt_schema_release_table(session, table));
+	WT_ERR(__wt_schema_get_table_uri(
+	    session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
 	F_SET(&table->iface, WT_DHANDLE_DISCARD);
+	if (WT_META_TRACKING(session)) {
+		WT_WITH_DHANDLE(session, &table->iface,
+		    ret = __wt_meta_track_handle_lock(session, false));
+		WT_ERR(ret);
+		tracked = true;
+	}
 
 	/* Rename the table. */
 	WT_ERR(__metadata_rename(session, uri, newuri));
 
-err:	if (table != NULL)
+err:	if (table != NULL && !tracked)
 		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }
