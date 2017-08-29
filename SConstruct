@@ -1368,7 +1368,7 @@ if env['_LIBDEPS'] == '$_LIBDEPS_LIBS':
     # toolchain, or may be using it for the archiver but not the
     # linker, and binutils currently is the olny thing that supports
     # thin archives. Don't even try on those platforms.
-    if not env.TargetOSIs('solaris', 'darwin', 'windows'):
+    if not env.TargetOSIs('solaris', 'darwin', 'windows', 'openbsd'):
         env.Tool('thin_archive')
 
 if env.TargetOSIs('linux', 'freebsd', 'openbsd'):

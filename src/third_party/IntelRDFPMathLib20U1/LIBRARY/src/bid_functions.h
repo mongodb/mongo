@@ -112,7 +112,7 @@ typedef BID_UINT128 _Quad;
   #define SQRT80 sqrtl
 #else
   #define BINARY80 __float80
-  //#define BINARY128 __float128 
+  //#define BINARY128 __float128
   #define BINARY128 BID_UINT128
   #define SQRT80 sqrtw
 #endif
@@ -159,7 +159,7 @@ typedef unsigned    long fexcept_t;
 typedef unsigned bid__int64 fexcept_t;
 #endif
 #else
-#ifdef __QNX__
+#if defined(__QNX__) || defined(__OpenBSD__)
 #include <fenv.h>
 #else
 typedef unsigned short int fexcept_t;
