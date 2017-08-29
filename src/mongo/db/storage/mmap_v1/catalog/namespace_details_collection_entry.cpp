@@ -494,6 +494,11 @@ void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* o
                                                 << validationAction)));
 }
 
+void NamespaceDetailsCollectionCatalogEntry::setIsTemp(OperationContext* opCtx, bool isTemp) {
+    _updateSystemNamespaces(opCtx, BSON("$set" << BSON("options.temp" << isTemp)));
+}
+
+
 void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(OperationContext* opCtx,
                                                                    RecordId newId) {
     if (newId.isNull()) {

@@ -79,6 +79,8 @@ public:
                          StringData validationLevel,
                          StringData validationAction) final;
 
+    void setIsTemp(OperationContext* opCtx, bool isTemp);
+
     void updateCappedSize(OperationContext*, long long int) final;
 
     void addUUID(OperationContext* opCtx, CollectionUUID uuid, Collection* coll) final;

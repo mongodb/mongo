@@ -133,6 +133,12 @@ public:
                                  const BSONObj& validator,
                                  StringData validationLevel,
                                  StringData validationAction) = 0;
+
+    /**
+     * Updates the 'temp' setting for this collection.
+     */
+    virtual void setIsTemp(OperationContext* opCtx, bool isTemp) = 0;
+
     /**
      * Assigns a new UUID to this collection. This is to be called when the schemaVersion is set
      * to 3.6 and there are collections that still do not have UUIDs.

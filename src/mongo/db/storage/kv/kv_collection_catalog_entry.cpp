@@ -289,6 +289,12 @@ void KVCollectionCatalogEntry::updateValidator(OperationContext* opCtx,
     _catalog->putMetaData(opCtx, ns().toString(), md);
 }
 
+void KVCollectionCatalogEntry::setIsTemp(OperationContext* opCtx, bool isTemp) {
+    MetaData md = _getMetaData(opCtx);
+    md.options.temp = isTemp;
+    _catalog->putMetaData(opCtx, ns().toString(), md);
+}
+
 void KVCollectionCatalogEntry::updateCappedSize(OperationContext* opCtx, long long size) {
     MetaData md = _getMetaData(opCtx);
     md.options.cappedSize = size;

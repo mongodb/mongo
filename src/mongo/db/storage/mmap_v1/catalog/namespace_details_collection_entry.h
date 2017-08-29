@@ -109,6 +109,8 @@ public:
                          StringData validationLevel,
                          StringData validationAction) final;
 
+    void setIsTemp(OperationContext* opCtx, bool isTemp) final;
+
     void updateCappedSize(OperationContext* opCtx, long long size) final;
 
     // not part of interface, but available to my storage engine
