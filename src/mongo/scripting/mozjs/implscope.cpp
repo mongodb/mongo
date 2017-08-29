@@ -403,6 +403,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _connectState(ConnectState::Not),
       _status(Status::OK()),
       _generation(0),
+      _requireOwnedObjects(false),
       _hasOutOfMemoryException(false),
       _binDataProto(_context),
       _bsonProto(_context),
@@ -838,6 +839,7 @@ void MozJSImplScope::reset() {
     unregisterOperation();
     _pendingKill.store(false);
     _pendingGC.store(false);
+    _requireOwnedObjects = false;
     advanceGeneration();
 }
 
@@ -949,6 +951,14 @@ std::size_t MozJSImplScope::getGeneration() const {
 
 void MozJSImplScope::advanceGeneration() {
     _generation++;
+}
+
+void MozJSImplScope::requireOwnedObjects() {
+    _requireOwnedObjects = true;
+}
+
+bool MozJSImplScope::requiresOwnedObjects() const {
+    return _requireOwnedObjects;
 }
 
 const std::string& MozJSImplScope::getParentStack() const {
