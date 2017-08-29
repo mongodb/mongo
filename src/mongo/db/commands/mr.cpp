@@ -787,6 +787,7 @@ void State::init() {
         AuthorizationSession::get(ClientBasic::getCurrent())->getAuthenticatedUserNamesToken();
     _scope.reset(globalScriptEngine->newScopeForCurrentThread());
     _scope->registerOperation(_txn);
+    _scope->requireOwnedObjects();
     _scope->setLocalDB(_config.dbname);
     _scope->loadStored(_txn, true);
 
@@ -1435,6 +1436,7 @@ public:
                 BSONObj o;
                 PlanExecutor::ExecState execState;
                 while (PlanExecutor::ADVANCED == (execState = exec->getNext(&o, NULL))) {
+                    o = o.getOwned();  // we will be accessing outside of the lock
                     // check to see if this is a new object we don't own yet
                     // because of a chunk migration
                     if (collMetadata) {

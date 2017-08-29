@@ -129,6 +129,8 @@ public:
 
     void advanceGeneration() override;
 
+    void requireOwnedObjects() override;
+
     double getNumber(const char* field) override;
     int getNumberInt(const char* field) override;
     long long getNumberLongLong(const char* field) override;

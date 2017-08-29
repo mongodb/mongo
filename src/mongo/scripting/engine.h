@@ -105,6 +105,8 @@ public:
 
     virtual void advanceGeneration() = 0;
 
+    virtual void requireOwnedObjects() = 0;
+
     virtual ScriptingFunction createFunction(const char* code);
 
     /**

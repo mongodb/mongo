@@ -305,6 +305,10 @@ public:
 
     void advanceGeneration() override;
 
+    void requireOwnedObjects() override;
+
+    bool requiresOwnedObjects() const;
+
     JS::HandleId getInternedStringId(InternedString name) {
         return _internedStrings.getInternedString(name);
     }
@@ -373,6 +377,7 @@ private:
     bool _quickExit;
     std::string _parentStack;
     std::size_t _generation;
+    bool _requireOwnedObjects;
     bool _hasOutOfMemoryException;
 
     WrapType<BinDataInfo> _binDataProto;
