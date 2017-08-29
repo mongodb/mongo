@@ -59,13 +59,17 @@ namespace {
  * the appearance of mutable state on the read/write versions.
  */
 struct BSONHolder {
-    BSONHolder(const BSONObj& obj, const BSONObj* parent, std::size_t generation, bool ro)
+    BSONHolder(const BSONObj& obj, const BSONObj* parent, const MozJSImplScope* scope, bool ro)
         : _obj(obj),
-          _generation(generation),
+          _generation(scope->getGeneration()),
           _isOwned(obj.isOwned() || (parent && parent->isOwned())),
           _resolved(false),
           _readOnly(ro),
           _altered(false) {
+        uassert(
+            ErrorCodes::BadValue,
+            "Attempt to bind an unowned BSON Object to a JS scope marked as requiring ownership",
+            _isOwned || (!scope->requiresOwnedObjects()));
         if (parent) {
             _parent.emplace(*parent);
         }
@@ -107,7 +111,7 @@ void BSONInfo::make(
     auto scope = getScope(cx);
 
     scope->getProto<BSONInfo>().newObject(obj);
-    JS_SetPrivate(obj, scope->trackedNew<BSONHolder>(bson, parent, scope->getGeneration(), ro));
+    JS_SetPrivate(obj, scope->trackedNew<BSONHolder>(bson, parent, scope, ro));
 }
 
 void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {

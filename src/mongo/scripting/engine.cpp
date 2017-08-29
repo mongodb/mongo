@@ -440,6 +440,9 @@ public:
     void advanceGeneration() {
         _real->advanceGeneration();
     }
+    void requireOwnedObjects() override {
+        _real->requireOwnedObjects();
+    }
     bool isKillPending() const {
         return _real->isKillPending();
     }

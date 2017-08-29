@@ -123,6 +123,10 @@ void MozJSProxyScope::advanceGeneration() {
     run([&] { _implScope->advanceGeneration(); });
 }
 
+void MozJSProxyScope::requireOwnedObjects() {
+    run([&] { _implScope->requireOwnedObjects(); });
+}
+
 double MozJSProxyScope::getNumber(const char* field) {
     double out;
     run([&] { out = _implScope->getNumber(field); });

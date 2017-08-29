@@ -2368,6 +2368,49 @@ public:
     }
 };
 
+class RequiresOwnedObjects {
+public:
+    void run() {
+        char buf[] = {5, 0, 0, 0, 0};
+        BSONObj unowned(buf);
+        BSONObj owned = unowned.getOwned();
+
+        ASSERT(!unowned.isOwned());
+        ASSERT(owned.isOwned());
+
+        // Ensure that by default we can bind owned and unowned
+        {
+            unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+            s->setObject("unowned", unowned, true);
+            s->setObject("owned", owned, true);
+        }
+
+        // After we set the flag, we should only be able to set owned
+        {
+            unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+            s->requireOwnedObjects();
+            s->setObject("owned", owned, true);
+
+            bool threwException = false;
+            try {
+                s->setObject("unowned", unowned, true);
+            } catch (...) {
+                threwException = true;
+
+                auto status = exceptionToStatus();
+
+                ASSERT_EQUALS(status.code(), ErrorCodes::BadValue);
+            }
+
+            ASSERT(threwException);
+
+            // after resetting, we can set unowned's again
+            s->reset();
+            s->setObject("unowned", unowned, true);
+        }
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("js") {}
@@ -2424,6 +2467,7 @@ public:
 
         add<RecursiveInvoke>();
         add<ErrorCodeFromInvoke>();
+        add<RequiresOwnedObjects>();
 
         add<RoundTripTests::DBRefTest>();
         add<RoundTripTests::DBPointerTest>();
