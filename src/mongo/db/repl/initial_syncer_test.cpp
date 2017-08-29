@@ -216,6 +216,7 @@ public:
 protected:
     struct StorageInterfaceResults {
         bool createOplogCalled = false;
+        bool truncateCalled = false;
         bool insertedOplogEntries = false;
         int oplogEntriesInserted = 0;
         bool droppedUserDBs = false;
@@ -233,6 +234,12 @@ protected:
                                                   const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.createOplogCalled = true;
+            return Status::OK();
+        };
+        _storageInterface->truncateCollFn = [this](OperationContext* opCtx,
+                                                   const NamespaceString& nss) {
+            LockGuard lock(_storageInterfaceWorkDoneMutex);
+            _storageInterfaceWorkDone.truncateCalled = true;
             return Status::OK();
         };
         _storageInterface->insertDocumentFn = [this](
@@ -921,14 +928,13 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOnCompletionCallbackFunctionPointer
     ASSERT_TRUE(sharedCallbackStateDestroyed);
 }
 
-TEST_F(InitialSyncerTest, InitialSyncerRecreatesOplogAndDropsReplicatedDatabases) {
-    // We are not interested in proceeding beyond the oplog creation stage so we inject a failure
-    // after setting '_storageInterfaceWorkDone.createOplogCalled' to true.
-    auto oldCreateOplogFn = _storageInterface->createOplogFn;
-    _storageInterface->createOplogFn = [oldCreateOplogFn](OperationContext* opCtx,
-                                                          const NamespaceString& nss) {
-        oldCreateOplogFn(opCtx, nss).transitional_ignore();
-        return Status(ErrorCodes::OperationFailed, "oplog creation failed");
+TEST_F(InitialSyncerTest, InitialSyncerTruncatesOplogAndDropsReplicatedDatabases) {
+    // We are not interested in proceeding beyond the dropUserDB stage so we inject a failure
+    // after setting '_storageInterfaceWorkDone.droppedUserDBs' to true.
+    auto oldDropUserDBsFn = _storageInterface->dropUserDBsFn;
+    _storageInterface->dropUserDBsFn = [oldDropUserDBsFn](OperationContext* opCtx) {
+        ASSERT_OK(oldDropUserDBsFn(opCtx));
+        return Status(ErrorCodes::OperationFailed, "drop userdbs failed");
     };
 
     auto initialSyncer = &getInitialSyncer();
@@ -941,8 +947,8 @@ TEST_F(InitialSyncerTest, InitialSyncerRecreatesOplogAndDropsReplicatedDatabases
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
     LockGuard lock(_storageInterfaceWorkDoneMutex);
+    ASSERT_TRUE(_storageInterfaceWorkDone.truncateCalled);
     ASSERT_TRUE(_storageInterfaceWorkDone.droppedUserDBs);
-    ASSERT_TRUE(_storageInterfaceWorkDone.createOplogCalled);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetRollbackIdScheduleError) {
@@ -973,13 +979,13 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetRollbackIdScheduleError) 
 TEST_F(
     InitialSyncerTest,
     InitialSyncerReturnsShutdownInProgressIfSchedulingRollbackCheckerFailedDueToExecutorShutdown) {
-    // The rollback id request is sent immediately after oplog creation. We shut the task executor
-    // down before returning from createOplog() to make the scheduleRemoteCommand() call for
+    // The rollback id request is sent immediately after oplog truncation. We shut the task executor
+    // down before returning from truncate() to make the scheduleRemoteCommand() call for
     // replSetGetRBID fail.
-    auto oldCreateOplogFn = _storageInterface->createOplogFn;
-    _storageInterface->createOplogFn = [oldCreateOplogFn, this](OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
-        auto status = oldCreateOplogFn(opCtx, nss);
+    auto oldTruncateCollFn = _storageInterface->truncateCollFn;
+    _storageInterface->truncateCollFn = [oldTruncateCollFn, this](OperationContext* opCtx,
+                                                                  const NamespaceString& nss) {
+        auto status = oldTruncateCollFn(opCtx, nss);
         getExecutor().shutdown();
         return status;
     };
@@ -994,7 +1000,7 @@ TEST_F(
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _lastApplied);
 
     LockGuard lock(_storageInterfaceWorkDoneMutex);
-    ASSERT_TRUE(_storageInterfaceWorkDone.createOplogCalled);
+    ASSERT_TRUE(_storageInterfaceWorkDone.truncateCalled);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerCancelsRollbackCheckerOnShutdown) {

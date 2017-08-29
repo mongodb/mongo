@@ -505,7 +505,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
     // There is no need to schedule separate task to create oplog collection since we are already in
     // a callback and we are certain there's no existing operation context (required for creating
     // collections and dropping user databases) attached to the current thread.
-    status = _recreateOplogAndDropReplicatedDatabases();
+    status = _truncateOplogAndDropReplicatedDatabases();
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
@@ -527,9 +527,9 @@ void InitialSyncer::_chooseSyncSourceCallback(
     _getBaseRollbackIdHandle = scheduleResult.getValue();
 }
 
-Status InitialSyncer::_recreateOplogAndDropReplicatedDatabases() {
-    // drop/create oplog; drop user databases.
-    LOG(1) << "About to drop+create the oplog, if it exists, ns:" << _opts.localOplogNS
+Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
+    // truncate oplog; drop user databases.
+    LOG(1) << "About to truncate the oplog, if it exists, ns:" << _opts.localOplogNS
            << ", and drop all user databases (so that we can clone them).";
 
     auto opCtx = makeOpCtx();
@@ -537,23 +537,21 @@ Status InitialSyncer::_recreateOplogAndDropReplicatedDatabases() {
     // We are not replicating nor validating these writes.
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx.get());
 
-    // 1.) Drop the oplog.
-    LOG(2) << "Dropping the existing oplog: " << _opts.localOplogNS;
-    auto status = _storage->dropCollection(opCtx.get(), _opts.localOplogNS);
+    // 1.) Truncate the oplog.
+    LOG(2) << "Truncating the existing oplog: " << _opts.localOplogNS;
+    auto status = _storage->truncateCollection(opCtx.get(), _opts.localOplogNS);
     if (!status.isOK()) {
-        return status;
+        // 1a.) Create the oplog.
+        LOG(2) << "Creating the oplog: " << _opts.localOplogNS;
+        status = _storage->createOplog(opCtx.get(), _opts.localOplogNS);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     // 2.) Drop user databases.
-    LOG(2) << "Dropping  user databases";
-    status = _storage->dropReplicatedDatabases(opCtx.get());
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // 3.) Create the oplog.
-    LOG(2) << "Creating the oplog: " << _opts.localOplogNS;
-    return _storage->createOplog(opCtx.get(), _opts.localOplogNS);
+    LOG(2) << "Dropping user databases";
+    return _storage->dropReplicatedDatabases(opCtx.get());
 }
 
 void InitialSyncer::_rollbackCheckerResetCallback(

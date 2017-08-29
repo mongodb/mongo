@@ -464,8 +464,6 @@ private:
     // This is non-null if and only if the collection is a capped collection.
     const std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
-    const bool _mustTakeCappedLockOnInsert;
-
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<SnapshotName> _minVisibleSnapshot;
 

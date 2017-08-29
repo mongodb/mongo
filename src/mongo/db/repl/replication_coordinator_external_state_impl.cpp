@@ -224,6 +224,9 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OperationContext* opCtx, ReplicationCoordinator* replCoord) {
 
+    // Initialize the cached pointer to the oplog collection, for writing to the oplog.
+    acquireOplogCollectionForLogging(opCtx);
+
     LockGuard lk(_threadMutex);
     invariant(replCoord);
     invariant(!_bgSync);

@@ -311,20 +311,9 @@ void Lock::ResourceLock::unlock() {
     }
 }
 
-void synchronizeOnCappedInFlightResource(Locker* lockState, const NamespaceString& cappedNs) {
+void synchronizeOnOplogInFlightResource(Locker* lockState) {
     dassert(lockState->inAWriteUnitOfWork());
-    const ResourceId resource = cappedNs.db() == "local" ? resourceCappedInFlightForLocalDb
-                                                         : resourceCappedInFlightForOtherDb;
-
-    // It is illegal to acquire the capped in-flight lock for non-local dbs while holding the
-    // capped in-flight lock for the local db. (Unless we already hold the otherDb lock since
-    // reacquiring a lock in the same mode never blocks.)
-    if (resource == resourceCappedInFlightForOtherDb) {
-        dassert(!lockState->isLockHeldForMode(resourceCappedInFlightForLocalDb, MODE_IX) ||
-                lockState->isLockHeldForMode(resourceCappedInFlightForOtherDb, MODE_IX));
-    }
-
-    Lock::ResourceLock heldUntilEndOfWUOW{lockState, resource, MODE_IX};
+    Lock::ResourceLock heldUntilEndOfWUOW{lockState, resourceInFlightForOplog, MODE_IX};
 }
 
 }  // namespace mongo

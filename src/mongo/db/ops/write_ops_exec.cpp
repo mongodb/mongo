@@ -298,11 +298,32 @@ WriteResult performCreateIndexes(OperationContext* opCtx, const write_ops::Inser
 
 void insertDocuments(OperationContext* opCtx,
                      Collection* collection,
-                     std::vector<InsertStatement>::const_iterator begin,
-                     std::vector<InsertStatement>::const_iterator end) {
+                     std::vector<InsertStatement>::iterator begin,
+                     std::vector<InsertStatement>::iterator end) {
     // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to
     // oversized batches.
     WriteUnitOfWork wuow(opCtx);
+
+    // Acquire optimes and fill them in for each item in the batch.
+    // This must only be done for doc-locking storage engines, which are allowed to insert oplog
+    // documents out-of-timestamp-order.  For other storage engines, the oplog entries must be
+    // physically written in timestamp order, so we defer optime assignment until the oplog is about
+    // to be written.
+    auto batchSize = std::distance(begin, end);
+    std::unique_ptr<OplogSlot[]> slots(new OplogSlot[batchSize]);
+    if (supportsDocLocking()) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
+            // Populate 'slots' with new optimes for each insert.
+            // This also notifies the storage engine of each new timestamp.
+            repl::getNextOpTimes(opCtx, batchSize, slots.get());
+            OplogSlot* slot = slots.get();
+            for (auto it = begin; it != end; it++) {
+                it->oplogSlot = *slot++;
+            }
+        }
+    }
+
     uassertStatusOK(collection->insertDocuments(
         opCtx, begin, end, &CurOp::get(opCtx)->debug(), /*enforceQuota*/ true));
     wuow.commit();
@@ -313,7 +334,7 @@ void insertDocuments(OperationContext* opCtx,
  */
 bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 const write_ops::Insert& wholeOp,
-                                const std::vector<InsertStatement>& batch,
+                                std::vector<InsertStatement>& batch,
                                 LastOpFixer* lastOpFixer,
                                 WriteResult* out) {
     if (batch.empty())

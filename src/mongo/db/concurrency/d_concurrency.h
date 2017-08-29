@@ -384,8 +384,8 @@ public:
 
 /**
  * Takes a lock on resourceCappedInFlight in MODE_IX which will be held until the end of your
- * WUOW. This ensures that a MODE_X lock on this resource will wait for all in-flight capped
+ * WUOW. This ensures that a MODE_X lock on this resource will wait for all in-flight oplog
  * inserts to either commit or rollback and block new ones from starting.
  */
-void synchronizeOnCappedInFlightResource(Locker* opCtx, const NamespaceString& cappedNs);
+void synchronizeOnOplogInFlightResource(Locker* opCtx);
 }

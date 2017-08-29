@@ -133,7 +133,7 @@ TEST_F(LogicalClockTest, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
 
 // Verify writes to the oplog advance cluster time.
 TEST_F(LogicalClockTest, WritesToOplogAdvanceClusterTime) {
-    Timestamp tX(1);
+    Timestamp tX(1, 0);
     auto initialTime = LogicalTime(tX);
 
     getClock()->setClusterTimeFromTrustedSource(initialTime);

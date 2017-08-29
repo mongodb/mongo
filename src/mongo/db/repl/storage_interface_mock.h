@@ -99,6 +99,8 @@ public:
         stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
     using CreateCollectionFn = stdx::function<Status(
         OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options)>;
+    using TruncateCollectionFn =
+        stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
     using DropCollectionFn =
         stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
     using FindDocumentsFn =
@@ -167,6 +169,10 @@ public:
     Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) override {
         return dropCollFn(opCtx, nss);
     };
+
+    Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) override {
+        return truncateCollFn(opCtx, nss);
+    }
 
     Status renameCollection(OperationContext* opCtx,
                             const NamespaceString& fromNS,
@@ -292,6 +298,9 @@ public:
         [](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
             return Status{ErrorCodes::IllegalOperation, "CreateCollectionFn not implemented."};
         };
+    TruncateCollectionFn truncateCollFn = [](OperationContext* opCtx, const NamespaceString& nss) {
+        return Status{ErrorCodes::IllegalOperation, "TruncateCollectionFn not implemented."};
+    };
     DropCollectionFn dropCollFn = [](OperationContext* opCtx, const NamespaceString& nss) {
         return Status{ErrorCodes::IllegalOperation, "DropCollectionFn not implemented."};
     };

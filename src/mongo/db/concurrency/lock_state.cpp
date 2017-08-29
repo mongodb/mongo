@@ -964,9 +964,7 @@ const ResourceId resourceIdOplog = ResourceId(RESOURCE_COLLECTION, StringData("l
 const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
 const ResourceId resourceIdParallelBatchWriterMode =
     ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_PARALLEL_BATCH_WRITER_MODE);
-const ResourceId resourceCappedInFlightForLocalDb =
-    ResourceId(RESOURCE_METADATA, ResourceId::SINGLETON_CAPPED_IN_FLIGHT_LOCAL_DB);
-const ResourceId resourceCappedInFlightForOtherDb =
-    ResourceId(RESOURCE_METADATA, ResourceId::SINGLETON_CAPPED_IN_FLIGHT_OTHER_DB);
+const ResourceId resourceInFlightForOplog =
+    ResourceId(RESOURCE_METADATA, ResourceId::SINGLETON_IN_FLIGHT_OPLOG);
 
 }  // namespace mongo

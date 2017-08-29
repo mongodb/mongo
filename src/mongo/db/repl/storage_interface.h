@@ -144,9 +144,14 @@ public:
                                     const CollectionOptions& options) = 0;
 
     /**
-     * Drops a collection, like the oplog.
+     * Drops a collection.
      */
     virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
+
+    /**
+     * Truncates a collection.
+     */
+    virtual Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     /**
      * Renames a collection from the "fromNS" to the "toNS". Fails if the new collection already

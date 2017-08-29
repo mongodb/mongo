@@ -5,6 +5,24 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target='write_ops_exec',
+    source=[
+        'write_ops_exec.cpp',
+        ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/repl/oplog',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/db/write_ops',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/db_raii',
+    ],
+)
+
+
+
+env.Library(
     target='update',
     source=[
         'modifier_add_to_set.cpp',

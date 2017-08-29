@@ -385,9 +385,15 @@ StatusWith<RecordId> EphemeralForTestRecordStore::extractAndCheckLocForOplog(con
     if (!status.isOK())
         return status;
 
-    if (!_data->records.empty() && status.getValue() <= _data->records.rbegin()->first)
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "ts not higher than highest");
+    if (!_data->records.empty() && status.getValue() <= _data->records.rbegin()->first) {
 
+        return StatusWith<RecordId>(ErrorCodes::BadValue,
+                                    str::stream() << "attempted out-of-order oplog insert of "
+                                                  << status.getValue()
+                                                  << " (oplog last insert was "
+                                                  << _data->records.rbegin()->first
+                                                  << " )");
+    }
     return status;
 }
 
@@ -432,8 +438,8 @@ Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext*
     for (size_t i = 0; i < nDocs; i++) {
         const int len = docs[i]->documentSize();
         if (_isCapped && len > _cappedMaxSize) {
-            // We use dataSize for capped rollover and we don't want to delete everything if we know
-            // this won't fit.
+            // We use dataSize for capped rollover and we don't want to delete everything if we
+            // know this won't fit.
             return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
         }
 

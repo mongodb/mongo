@@ -170,7 +170,6 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
       _cursorManager(_ns),
       _cappedNotifier(_recordStore->isCapped() ? stdx::make_unique<CappedInsertNotifier>()
                                                : nullptr),
-      _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()),
       _this(_this_init) {}
 
 void CollectionImpl::init(OperationContext* opCtx) {
@@ -305,7 +304,6 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
     // because it would defeat the purpose of using DocWriter.
     invariant(!_validator);
     invariant(!_indexCatalog.haveAnyIndexes());
-    invariant(!_mustTakeCappedLockOnInsert);
 
     Status status = _recordStore->insertRecordsWithDocWriter(opCtx, docs, timestamps, nDocs);
     if (!status.isOK())
@@ -354,9 +352,6 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     }
 
     const SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();
-
-    if (_mustTakeCappedLockOnInsert)
-        synchronizeOnCappedInFlightResource(opCtx->lockState(), _ns);
 
     Status status = _insertDocuments(opCtx, begin, end, enforceQuota, opDebug);
     if (!status.isOK())
@@ -407,8 +402,6 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
 
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
-    if (_mustTakeCappedLockOnInsert)
-        synchronizeOnCappedInFlightResource(opCtx->lockState(), _ns);
     // TODO SERVER-30638: using timestamp 0 for these inserts, which are non-oplog so we don't yet
     // care about their correct timestamps.
     StatusWith<RecordId> loc = _recordStore->insertRecord(
@@ -425,7 +418,14 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     }
 
     vector<InsertStatement> inserts;
-    inserts.emplace_back(doc);
+    OplogSlot slot;
+    // Fetch a new optime now, if necessary.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->isOplogDisabledFor(opCtx, _ns)) {
+        // Populate 'slot' with a new optime.
+        repl::getNextOpTimes(opCtx, 1, &slot);
+    }
+    inserts.emplace_back(kUninitializedStmtId, doc, slot);
 
     getGlobalServiceContext()->getOpObserver()->onInserts(
         opCtx, ns(), uuid(), inserts.begin(), inserts.end(), false);
@@ -468,7 +468,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     for (auto it = begin; it != end; it++) {
         Record record = {RecordId(), RecordData(it->doc.objdata(), it->doc.objsize())};
         records.push_back(record);
-        Timestamp timestamp = Timestamp(it->timestamp.asU64());
+        Timestamp timestamp = Timestamp(it->oplogSlot.opTime.getTimestamp());
         timestamps.push_back(timestamp);
     }
     Status status =

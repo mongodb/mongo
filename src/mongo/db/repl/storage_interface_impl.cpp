@@ -411,10 +411,32 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
         }
         WriteUnitOfWork wunit(opCtx);
         const auto status = autoDB.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
-        if (status.isOK()) {
-            wunit.commit();
+        if (!status.isOK()) {
+            return status;
         }
-        return status;
+        wunit.commit();
+        return Status::OK();
+    });
+}
+
+Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
+    return writeConflictRetry(opCtx, "StorageInterfaceImpl::truncateCollection", nss.ns(), [&] {
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        auto collectionResult =
+            getCollection(autoColl, nss, "The collection must exist before truncating.");
+        if (!collectionResult.isOK()) {
+            return collectionResult.getStatus();
+        }
+        auto collection = collectionResult.getValue();
+
+        WriteUnitOfWork wunit(opCtx);
+        const auto status = collection->truncate(opCtx);
+        if (!status.isOK()) {
+            return status;
+        }
+        wunit.commit();
+        return Status::OK();
     });
 }
 

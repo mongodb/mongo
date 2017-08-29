@@ -34,10 +34,11 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -47,6 +48,30 @@ class NamespaceString;
 class OperationContext;
 class OperationSessionInfo;
 class Session;
+
+struct OplogSlot {
+    OplogSlot() {}
+    OplogSlot(repl::OpTime opTime, std::int64_t hash) : opTime(opTime), hash(hash) {}
+    repl::OpTime opTime;
+    std::int64_t hash = 0;
+};
+
+struct InsertStatement {
+public:
+    InsertStatement() = default;
+    explicit InsertStatement(BSONObj toInsert) : doc(toInsert) {}
+
+    InsertStatement(StmtId statementId, BSONObj toInsert) : stmtId(statementId), doc(toInsert) {}
+    InsertStatement(StmtId statementId, BSONObj toInsert, OplogSlot os)
+        : stmtId(statementId), oplogSlot(os), doc(toInsert) {}
+    InsertStatement(BSONObj toInsert, SnapshotName ts)
+        : oplogSlot(repl::OpTime(Timestamp(ts.asU64()), repl::OpTime::kUninitializedTerm), 0),
+          doc(toInsert) {}
+
+    StmtId stmtId = kUninitializedStmtId;
+    OplogSlot oplogSlot;
+    BSONObj doc;
+};
 
 namespace repl {
 class ReplSettings;
@@ -118,9 +143,14 @@ OpTime logOp(OperationContext* opCtx,
              StmtId stmtId,
              const OplogLink& oplogLink);
 
-// Flush out the cached pointers to the local database and oplog.
+// Flush out the cached pointer to the oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.
 void oplogCheckCloseDatabase(OperationContext* opCtx, Database* db);
+
+/**
+ * Establish the cached pointer to the local oplog.
+ */
+void acquireOplogCollectionForLogging(OperationContext* opCtx);
 
 using IncrementOpsAppliedStatsFn = stdx::function<void()>;
 /**
@@ -183,6 +213,12 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
+
+/**
+ * Allocates optimes for new entries in the oplog.  Returns an array of OplogSlots, which contain
+ * the new optimes along with their terms and newly calculated hash fields.
+ */
+void getNextOpTimes(OperationContext* opCtx, std::size_t count, OplogSlot* slotsOut);
 
 }  // namespace repl
 }  // namespace mongo

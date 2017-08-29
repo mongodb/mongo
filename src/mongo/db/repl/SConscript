@@ -9,25 +9,31 @@ env.Library(
     source=[
         'apply_ops.cpp',
         'oplog.cpp',
-        'oplogreader.cpp',
     ],
-    LIBDEPS=[
-        'dbcheck',
-        'repl_coordinator_interface',
-        'repl_coordinator_global',
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
-        '$BUILD_DIR/mongo/db/catalog/database',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/write_ops',
-        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/namespace_string',
+        'dbcheck',
+        'repl_coordinator_interface',
+    ],
+)
+
+env.Library(
+    target='oplogreader',
+    source=[
+        'oplogreader.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/auth/authcommon',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
@@ -37,12 +43,12 @@ env.CppUnitTest(
         'oplog_test.cpp',
     ],
     LIBDEPS=[
-        'oplog',
-        'oplog_entry',
-        'replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'oplog',
+        'oplog_entry',
+        'replmocks',
     ],
 )
 
@@ -54,6 +60,7 @@ env.Library(
     LIBDEPS=[
         'oplog',
         'oplog_interface_remote',
+        'oplogreader',
         'repl_coordinator_interface',
         'repl_coordinator_global',
         '$BUILD_DIR/mongo/base',
@@ -475,6 +482,7 @@ env.Library(
         'oplog',
         'replication_process',
         'roll_back_local_operations',
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/db/write_ops',

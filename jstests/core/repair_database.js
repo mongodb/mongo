@@ -4,6 +4,7 @@
  * 2.) Ensure repair works with single collection with an extra index. and one doc
  * 3.) Ensure repair works with no docs, same collection/index as above
  * 4.) Ensure repair works with 2 collections, one doc in each
+ * 5.) Ensure repair works on the local db (special cases)
  */
 
 // 1. Drop db
@@ -37,3 +38,9 @@ myColl2.insert(doc);
 assert.commandWorked(mydb.repairDatabase());
 assert.docEq(doc, myColl.findOne({a: doc.a}));
 assert.docEq(doc, myColl2.findOne({a: doc.a}));
+
+// 5
+var ldb = db.getSisterDB("local");
+assert.commandWorked(mydb.repairDatabase());
+// Check that inserting to a non-local db still works.
+myColl.insert(doc);

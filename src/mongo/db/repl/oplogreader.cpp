@@ -50,8 +50,6 @@ using std::string;
 
 namespace repl {
 
-const BSONObj reverseNaturalObj = BSON("$natural" << -1);
-
 bool replAuthenticate(DBClientBase* conn) {
     if (isInternalAuthSet())
         return conn->authenticateInternalUser();

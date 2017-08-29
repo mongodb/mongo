@@ -249,8 +249,11 @@ Status repairDatabase(OperationContext* opCtx,
 
     if (engine->isMmapV1()) {
         // MMAPv1 is a layering violation so it implements its own repairDatabase.
-        return static_cast<MMAPV1Engine*>(engine)->repairDatabase(
+        auto status = static_cast<MMAPV1Engine*>(engine)->repairDatabase(
             opCtx, dbName, preserveClonedFilesOnFailure, backupOriginalFiles);
+        // Restore oplog Collection pointer cache.
+        repl::acquireOplogCollectionForLogging(opCtx);
+        return status;
     }
 
     // These are MMAPv1 specific
@@ -278,6 +281,9 @@ Status repairDatabase(OperationContext* opCtx,
             for (auto&& collection : *db) {
                 collection->setMinimumVisibleSnapshot(snapshotName);
             }
+
+            // Restore oplog Collection pointer cache.
+            repl::acquireOplogCollectionForLogging(opCtx);
         } catch (...) {
             severe() << "Unexpected exception encountered while reopening database after repair.";
             std::terminate();  // Logs additional info about the specific error.

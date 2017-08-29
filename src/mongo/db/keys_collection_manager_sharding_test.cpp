@@ -63,6 +63,10 @@ protected:
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(true);
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
+        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
+        // real second.
+        clockSource->advance(Seconds(1));
+
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         auto catalogClient = Grid::get(operationContext())->catalogClient();
         _keyManager =

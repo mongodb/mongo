@@ -278,7 +278,7 @@ private:
      *         |
      *         |
      *         V
-     *    _recreateOplogAndDropReplicatedDatabases()
+     *    _truncateOplogAndDropReplicatedDatabases()
      *         |
      *         |
      *         V
@@ -368,11 +368,10 @@ private:
 
     /**
      * This function does the following:
-     *      1.) Drop oplog.
+     *      1.) Truncate oplog.
      *      2.) Drop user databases (replicated dbs).
-     *      3.) Create oplog.
      */
-    Status _recreateOplogAndDropReplicatedDatabases();
+    Status _truncateOplogAndDropReplicatedDatabases();
 
     /**
      * Callback for rollback checker's first replSetGetRBID command before starting data cloning.

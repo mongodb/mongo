@@ -37,9 +37,6 @@
 namespace mongo {
 namespace repl {
 
-// {"$natural": -1 }
-extern const BSONObj reverseNaturalObj;
-
 /**
  * Authenticates conn using the server's cluster-membership credentials.
  *

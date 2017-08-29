@@ -84,6 +84,8 @@ public:
 
     Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
+    Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) override;
+
     Status renameCollection(OperationContext* opCtx,
                             const NamespaceString& fromNS,
                             const NamespaceString& toNS,

@@ -594,11 +594,13 @@ env.Library(
         'curop_metrics',
         'diag_log',
         'lasterror',
-        'write_ops',
         'ops/write_ops_parsers',
         'rw_concern_d',
         's/sharding',
         'storage/storage_options',
+    ],
+    LIBDEPS_PRIVATE=[
+        'ops/write_ops_exec',
     ],
 )
 
@@ -734,6 +736,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/database',
         "$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/repl/oplog",
     ],
 )
 
@@ -1505,7 +1510,6 @@ env.Library(
         'ops/update.cpp',
         'ops/update_lifecycle_impl.cpp',
         'ops/update_result.cpp',
-        'ops/write_ops_exec.cpp',
         'ops/write_ops_retryability.cpp',
         'session.cpp',
         'session_catalog.cpp',
