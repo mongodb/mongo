@@ -1477,6 +1477,12 @@ var ReplSetTest = function(opts) {
             var rsSize = nodes.length;
             var firstReaderIndex;
             for (var i = 0; i < rsSize; i++) {
+                // Arbiters have no documents in the oplog.
+                const isArbiter = nodes[i].getDB('admin').isMaster('admin').arbiterOnly;
+                if (isArbiter) {
+                    continue;
+                }
+
                 readers[i] = new OplogReader(nodes[i]);
                 var currTS = readers[i].getFirstDoc().ts;
                 // Find the reader which has the smallestTS. This reader should have the most
@@ -1499,7 +1505,7 @@ var ReplSetTest = function(opts) {
                 for (i = 0; i < rsSize; i++) {
                     // Skip reading from this reader if the index is the same as firstReader or
                     // the cursor is exhausted.
-                    if (i === firstReaderIndex || !readers[i].hasNext()) {
+                    if (i === firstReaderIndex || !(readers[i] && readers[i].hasNext())) {
                         continue;
                     }
                     var otherOplogEntry = readers[i].next();
