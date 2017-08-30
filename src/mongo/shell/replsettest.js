@@ -1136,9 +1136,7 @@ var ReplSetTest = function(opts) {
 
         // Since we cannot determine if there is a background index in progress (SERVER-26624), we
         // use the "collMod" command to wait for any index builds that may be in progress on the
-        // primary or on one of the secondaries to complete. Running the "collMod" command with a
-        // write concern of w=<# nodes> on each collection will block until all background index
-        // builds have completed.
+        // primary or on one of the secondaries to complete.
         for (let dbName of primary.getDBNames()) {
             if (dbName === "local") {
                 continue;
@@ -1154,14 +1152,11 @@ var ReplSetTest = function(opts) {
                         // 'usePowerOf2Sizes' is ignored by the server so no actual collection
                         // modification takes place. We intentionally await replication without
                         // doing any I/O to avoid any overhead from allocating or deleting data
-                        // files when using the MMAPv1 storage engine.
+                        // files when using the MMAPv1 storage engine. We call awaitReplication()
+                        // later on to ensure the collMod is replicated to all nodes.
                         assert.commandWorked(dbHandle.runCommand({
                             collMod: collInfo.name,
                             usePowerOf2Sizes: true,
-                            writeConcern: {
-                                w: self.nodeList().length,
-                                wtimeout: self.kDefaultTimeoutMS,
-                            },
                         }));
                     }
                 });
