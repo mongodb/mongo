@@ -1595,5 +1595,35 @@ TEST(JSONSchemaParserTest, UnsupportedKeywordsFailNicely) {
                            "$jsonSchema keyword '$schema' is not currently supported");
 }
 
+TEST(JSONSchemaParserTest, FailsToParseIfDescriptionIsNotAString) {
+    auto result = JSONSchemaParser::parse(fromjson("{description: {}}"));
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, CorrectlyParsesDescriptionAsString) {
+    auto result = JSONSchemaParser::parse(fromjson("{description: 'str'}"));
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, CorrectlyParsesNestedDescriptionAsString) {
+    auto result = JSONSchemaParser::parse(fromjson("{properties: {a: {description: 'str'}}}"));
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfTitleIsNotAString) {
+    auto result = JSONSchemaParser::parse(fromjson("{title: {}}"));
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, CorrectlyParsesTitleAsString) {
+    auto result = JSONSchemaParser::parse(fromjson("{title: 'str'}"));
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, CorrectlyParsesNestedTitleAsString) {
+    auto result = JSONSchemaParser::parse(fromjson("{properties: {a: {title: 'str'}}}"));
+    ASSERT_OK(result.getStatus());
+}
+
 }  // namespace
 }  // namespace mongo

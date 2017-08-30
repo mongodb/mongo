@@ -59,6 +59,7 @@ constexpr StringData kSchemaAdditionalItemsKeyword = "additionalItems"_sd;
 constexpr StringData kSchemaAllOfKeyword = "allOf"_sd;
 constexpr StringData kSchemaAnyOfKeyword = "anyOf"_sd;
 constexpr StringData kSchemaDependenciesKeyword = "dependencies"_sd;
+constexpr StringData kSchemaDescriptionKeyword = "description"_sd;
 constexpr StringData kSchemaExclusiveMaximumKeyword = "exclusiveMaximum"_sd;
 constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
 constexpr StringData kSchemaItemsKeyword = "items"_sd;
@@ -76,6 +77,7 @@ constexpr StringData kSchemaOneOfKeyword = "oneOf"_sd;
 constexpr StringData kSchemaPatternKeyword = "pattern"_sd;
 constexpr StringData kSchemaPropertiesKeyword = "properties"_sd;
 constexpr StringData kSchemaRequiredKeyword = "required"_sd;
+constexpr StringData kSchemaTitleKeyword = "title"_sd;
 constexpr StringData kSchemaTypeKeyword = "type"_sd;
 constexpr StringData kSchemaUniqueItemsKeyword = "uniqueItems"_sd;
 
@@ -954,6 +956,30 @@ Status translateScalarKeywords(StringMap<BSONElement>* keywordMap,
     return Status::OK();
 }
 
+/**
+ * Validates that the following metadata keywords have the correct type:
+ *  - description
+ *  - title
+ */
+Status validateMetadataKeywords(StringMap<BSONElement>* keywordMap) {
+    if (auto descriptionElem = keywordMap->get(kSchemaDescriptionKeyword)) {
+        if (descriptionElem.type() != BSONType::String) {
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream() << "$jsonSchema keyword '" << kSchemaDescriptionKeyword
+                                        << "' must be of type string");
+        }
+    }
+
+    if (auto titleElem = keywordMap->get(kSchemaTitleKeyword)) {
+        if (titleElem.type() != BSONType::String) {
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream() << "$jsonSchema keyword '" << kSchemaTitleKeyword
+                                        << "' must be of type string");
+        }
+    }
+    return Status::OK();
+}
+
 StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
     // Map from JSON Schema keyword to the corresponding element from 'schema', or to an empty
     // BSONElement if the JSON Schema keyword is not specified.
@@ -961,6 +987,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         {kSchemaAllOfKeyword, {}},
         {kSchemaAnyOfKeyword, {}},
         {kSchemaBsonTypeKeyword, {}},
+        {kSchemaDescriptionKeyword, {}},
         {kSchemaDependenciesKeyword, {}},
         {kSchemaExclusiveMaximumKeyword, {}},
         {kSchemaExclusiveMinimumKeyword, {}},
@@ -978,6 +1005,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         {kSchemaPatternKeyword, {}},
         {kSchemaPropertiesKeyword, {}},
         {kSchemaRequiredKeyword, {}},
+        {kSchemaTitleKeyword, {}},
         {kSchemaTypeKeyword, {}},
     };
 
@@ -1001,6 +1029,11 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         }
 
         keywordMap[elt.fieldNameStringData()] = elt;
+    }
+
+    auto metadataStatus = validateMetadataKeywords(&keywordMap);
+    if (!metadataStatus.isOK()) {
+        return metadataStatus;
     }
 
     auto typeElem = keywordMap[kSchemaTypeKeyword];

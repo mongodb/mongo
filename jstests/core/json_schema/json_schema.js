@@ -1,5 +1,13 @@
+// listCollections tests expect that a collection is not implicitly created after a drop.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
+/**
+ * Tests for JSON Schema document validation.
+ */
 (function() {
     "use strict";
+
+    load("jstests/libs/assert_schema_match.js");
 
     let coll = db.jstests_json_schema;
     coll.drop();
@@ -272,4 +280,42 @@
         query: {$jsonSchema: {$schema: "http://json-schema.org/draft-04/schema#"}}
     });
     assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+
+    // Test that the following whitelisted keywords are verified as strings but otherwise ignored
+    // in a top-level schema:
+    // - description
+    // - title
+    assertSchemaMatch(coll, {description: "test"}, {}, true);
+    assertSchemaMatch(coll, {title: "insert title"}, {}, true);
+
+    // Repeat the test above with nested schema.
+    assertSchemaMatch(coll, {properties: {a: {description: "test"}}}, {a: {}}, true);
+    assertSchemaMatch(coll, {properties: {a: {title: "this is a's title"}}}, {a: {}}, true);
+
+    // Test that the $jsonSchema validator is correctly stored in the collection catalog.
+    coll.drop();
+    let schema = {properties: {a: {type: 'number'}, b: {minLength: 1}}};
+    assert.commandWorked(db.createCollection(coll.getName(), {validator: {$jsonSchema: schema}}));
+
+    let listCollectionsOutput = db.runCommand({listCollections: 1, filter: {name: coll.getName()}});
+    assert.commandWorked(listCollectionsOutput);
+    assert.eq(listCollectionsOutput.cursor.firstBatch[0].options.validator, {$jsonSchema: schema});
+
+    // Repeat the test above using the whitelisted metadata keywords.
+    coll.drop();
+    schema = {title: "Test schema", description: "Metadata keyword test"};
+    assert.commandWorked(db.createCollection(coll.getName(), {validator: {$jsonSchema: schema}}));
+
+    listCollectionsOutput = db.runCommand({listCollections: 1, filter: {name: coll.getName()}});
+    assert.commandWorked(listCollectionsOutput);
+    assert.eq(listCollectionsOutput.cursor.firstBatch[0].options.validator, {$jsonSchema: schema});
+
+    // Repeat again with a nested schema.
+    coll.drop();
+    schema = {properties: {a: {title: "Nested title", description: "Nested description"}}};
+    assert.commandWorked(db.createCollection(coll.getName(), {validator: {$jsonSchema: schema}}));
+
+    listCollectionsOutput = db.runCommand({listCollections: 1, filter: {name: coll.getName()}});
+    assert.commandWorked(listCollectionsOutput);
+    assert.eq(listCollectionsOutput.cursor.firstBatch[0].options.validator, {$jsonSchema: schema});
 }());
