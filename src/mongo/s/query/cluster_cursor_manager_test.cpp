@@ -140,7 +140,7 @@ TEST_F(ClusterCursorManagerTest, RegisterCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     auto nextResult = pinnedCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
@@ -172,7 +172,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorBasic) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(checkedOutCursor.getStatus());
     ASSERT_EQ(cursorId, checkedOutCursor.getValue().getCursorId());
     auto nextResult = checkedOutCursor.getValue().next();
@@ -200,7 +200,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorMultipleCursors) {
                                                    ClusterCursorManager::CursorLifetime::Mortal));
     }
     for (int i = 0; i < numCursors; ++i) {
-        auto pinnedCursor = getManager()->checkOutCursor(nss, cursorIds[i], nullptr);
+        auto pinnedCursor = getManager()->checkOutCursor(nss, cursorIds[i], _opCtx.get());
         ASSERT_OK(pinnedCursor.getStatus());
         auto nextResult = pinnedCursor.getValue().next();
         ASSERT_OK(nextResult.getStatus());
@@ -220,10 +220,10 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorPinned) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_EQ(ErrorCodes::CursorInUse,
-              getManager()->checkOutCursor(nss, cursorId, nullptr).getStatus());
+              getManager()->checkOutCursor(nss, cursorId, _opCtx.get()).getStatus());
 }
 
 // Test that checking out a killed cursor returns an error with code ErrorCodes::CursorNotFound.
@@ -236,7 +236,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorKilled) {
                                                ClusterCursorManager::CursorLifetime::Mortal));
     ASSERT_OK(getManager()->killCursor(nss, cursorId));
     ASSERT_EQ(ErrorCodes::CursorNotFound,
-              getManager()->checkOutCursor(nss, cursorId, nullptr).getStatus());
+              getManager()->checkOutCursor(nss, cursorId, _opCtx.get()).getStatus());
 }
 
 // Test that checking out an unknown cursor returns an error with code ErrorCodes::CursorNotFound.
@@ -270,7 +270,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorWrongCursorId) {
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
     ASSERT_EQ(ErrorCodes::CursorNotFound,
-              getManager()->checkOutCursor(nss, cursorId + 1, nullptr).getStatus());
+              getManager()->checkOutCursor(nss, cursorId + 1, _opCtx.get()).getStatus());
 }
 
 // Test that checking out a cursor updates the 'last active' time associated with the cursor to the
@@ -284,7 +284,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorUpdateActiveTime) {
                                                ClusterCursorManager::CursorLifetime::Mortal));
     Date_t cursorRegistrationTime = getClockSource()->now();
     getClockSource()->advance(Milliseconds(1));
-    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(checkedOutCursor.getStatus());
     checkedOutCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
     getManager()->killMortalCursorsInactiveSince(cursorRegistrationTime);
@@ -303,7 +303,7 @@ TEST_F(ClusterCursorManagerTest, ReturnCursorUpdateActiveTime) {
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
     Date_t cursorCheckOutTime = getClockSource()->now();
-    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(checkedOutCursor.getStatus());
     getClockSource()->advance(Milliseconds(1));
     checkedOutCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
@@ -320,7 +320,7 @@ TEST_F(ClusterCursorManagerTest, KillCursorBasic) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(getManager()->killCursor(nss, pinnedCursor.getValue().getCursorId()));
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
@@ -436,7 +436,7 @@ TEST_F(ClusterCursorManagerTest, ShouldNotKillPinnedCursors) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pin = assertGet(getManager()->checkOutCursor(nss, cursorId, nullptr));
+    auto pin = assertGet(getManager()->checkOutCursor(nss, cursorId, _opCtx.get()));
     getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors(nullptr);
@@ -523,7 +523,7 @@ TEST_F(ClusterCursorManagerTest, ReapZombieCursorsSkipPinned) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors(nullptr);
     ASSERT(!isMockCursorKilled(0));
@@ -577,7 +577,7 @@ TEST_F(ClusterCursorManagerTest, StatsPinCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::MultiTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
 }
 
@@ -640,7 +640,7 @@ TEST_F(ClusterCursorManagerTest, StatsKillPinnedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::MultiTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
     ASSERT_OK(getManager()->killCursor(nss, cursorId));
     ASSERT_EQ(0U, getManager()->stats().cursorsPinned);
@@ -654,7 +654,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustShardedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::MultiTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(pinnedCursor.getValue().next().getStatus());
     ASSERT_EQ(1U, getManager()->stats().cursorsMultiTarget);
@@ -670,7 +670,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustNotShardedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(pinnedCursor.getValue().next().getStatus());
     ASSERT_EQ(1U, getManager()->stats().cursorsSingleTarget);
@@ -687,7 +687,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustPinnedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(pinnedCursor.getValue().next().getStatus());
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
@@ -704,7 +704,7 @@ TEST_F(ClusterCursorManagerTest, StatsCheckInWithoutExhaustingPinnedCursor) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(pinnedCursor.getValue().next().getStatus());
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
@@ -791,13 +791,13 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorNotExhausted) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto registeredCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto registeredCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(registeredCursor.getStatus());
     ASSERT_EQ(cursorId, registeredCursor.getValue().getCursorId());
     ASSERT_NE(0, cursorId);
     registeredCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
     ASSERT_EQ(0, registeredCursor.getValue().getCursorId());
-    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(checkedOutCursor.getStatus());
 }
 
@@ -810,7 +810,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhausted) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto registeredCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto registeredCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(registeredCursor.getStatus());
     ASSERT_EQ(cursorId, registeredCursor.getValue().getCursorId());
     ASSERT_NE(0, cursorId);
@@ -821,7 +821,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhausted) {
     // Cursor should have been destroyed without ever being killed. To be sure that the cursor has
     // not been marked kill pending but not yet destroyed (i.e. that the cursor is not a zombie), we
     // reapZombieCursors() and check that the cursor still has not been killed.
-    ASSERT_NOT_OK(getManager()->checkOutCursor(nss, cursorId, nullptr).getStatus());
+    ASSERT_NOT_OK(getManager()->checkOutCursor(nss, cursorId, _opCtx.get()).getStatus());
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors(nullptr);
     ASSERT(!isMockCursorKilled(0));
@@ -842,7 +842,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhaustedWithNonExhaust
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto registeredCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto registeredCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(registeredCursor.getStatus());
     ASSERT_EQ(cursorId, registeredCursor.getValue().getCursorId());
     ASSERT_NE(0, cursorId);
@@ -851,7 +851,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhaustedWithNonExhaust
     ASSERT_EQ(0, registeredCursor.getValue().getCursorId());
 
     // Cursor should be kill pending, so it will be killed during reaping.
-    ASSERT_NOT_OK(getManager()->checkOutCursor(nss, cursorId, nullptr).getStatus());
+    ASSERT_NOT_OK(getManager()->checkOutCursor(nss, cursorId, _opCtx.get()).getStatus());
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors(nullptr);
     ASSERT(isMockCursorKilled(0));
@@ -866,7 +866,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorMoveAssignmentKill) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     pinnedCursor = ClusterCursorManager::PinnedCursor();
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors(nullptr);
@@ -882,7 +882,7 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorDestructorKill) {
                                                    nss,
                                                    ClusterCursorManager::CursorType::SingleTarget,
                                                    ClusterCursorManager::CursorLifetime::Mortal));
-        auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+        auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     }
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors(nullptr);
@@ -901,7 +901,7 @@ TEST_F(ClusterCursorManagerTest, RemotesExhausted) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_FALSE(pinnedCursor.getValue().remotesExhausted());
 }
@@ -914,7 +914,7 @@ TEST_F(ClusterCursorManagerTest, DoNotReapKilledPinnedCursors) {
                                                nss,
                                                ClusterCursorManager::CursorType::SingleTarget,
                                                ClusterCursorManager::CursorLifetime::Mortal));
-    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(getManager()->killCursor(nss, cursorId));
     ASSERT(!isMockCursorKilled(0));
@@ -964,7 +964,7 @@ TEST_F(ClusterCursorManagerTest, CannotCheckoutCursorDuringShutdown) {
     ASSERT(isMockCursorKilled(0));
 
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress,
-                  getManager()->checkOutCursor(nss, cursorId, nullptr).getStatus());
+                  getManager()->checkOutCursor(nss, cursorId, _opCtx.get()).getStatus());
 }
 
 /**

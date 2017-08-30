@@ -512,6 +512,13 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx, Cu
         delete cursor;
         return error;
     }
+
+    auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, cursor->getSessionId());
+
+    if (!cursorPrivilegeStatus.isOK()) {
+        return cursorPrivilegeStatus;
+    }
+
     cursor->_isPinned = true;
 
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefor,

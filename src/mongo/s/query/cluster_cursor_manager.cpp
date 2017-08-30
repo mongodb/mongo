@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 
 #include <set>
@@ -283,7 +284,13 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         return cursorInUseStatus(nss, cursorId);
     }
 
-    // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefor,
+    const auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, cursor->getLsid());
+
+    if (!cursorPrivilegeStatus.isOK()) {
+        return cursorPrivilegeStatus;
+    }
+
+    // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).
     if (cursor->getLsid()) {
         LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getLsid().get());

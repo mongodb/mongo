@@ -343,4 +343,10 @@ private:
     bool _impersonationFlag;
 };
 
+// Returns a status encoding whether the current session in the specified `opCtx` has privilege to
+// access a cursor in the specified `cursorSessionId` parameter.  Returns `Status::OK()`, when the
+// session is accessible.  Returns a `mongo::Status` with information regarding the nature of
+// session inaccessibility when the session is not accessible.
+Status checkCursorSessionPrivilege(OperationContext* const opCtx,
+                                   const boost::optional<LogicalSessionId> cursorSessionId);
 }  // namespace mongo

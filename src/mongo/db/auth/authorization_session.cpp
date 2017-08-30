@@ -975,3 +975,60 @@ bool AuthorizationSession::isImpersonating() const {
 }
 
 }  // namespace mongo
+
+auto mongo::checkCursorSessionPrivilege(OperationContext* const opCtx,
+                                        const boost::optional<LogicalSessionId> cursorSessionId)
+    -> Status {
+    if (!AuthorizationSession::exists(opCtx->getClient())) {
+        return Status::OK();
+    }
+    auto* const authSession = AuthorizationSession::get(opCtx->getClient());
+
+    auto nobodyIsLoggedIn = [authSession] {
+        return !authSession->getAuthenticatedUserNames().more();
+    };
+
+    auto authHasImpersonatePrivilege = [authSession] {
+        return authSession->isAuthorizedForPrivilege(
+            Privilege(ResourcePattern::forClusterResource(), ActionType::impersonate));
+    };
+
+    auto authIsOn = [authSession] {
+        return authSession->getAuthorizationManager().isAuthEnabled();
+    };
+
+    auto sessionIdToStringOrNone =
+        [](const boost::optional<LogicalSessionId>& sessionId) -> std::string {
+        if (sessionId) {
+            return str::stream() << *sessionId;
+        }
+        return "none";
+    };
+
+    // If the cursor has a session then one of the following must be true:
+    // 1: context session id must match cursor session id.
+    // 2: user must be magic special (__system, or background task, etc).
+
+    // We do not check the user's ID against the cursor's notion of a user ID, since higher level
+    // auth checks will check that for us anyhow.
+    if (authIsOn() &&  // If the authorization is not on, then we permit anybody to do anything.
+        cursorSessionId &&  // If the cursor is not assigned to a session, it is okay to work with
+                            // it from any session.
+        cursorSessionId != opCtx->getLogicalSessionId() &&  // If the cursor's session doesn't match
+                                                            // the Operation Context's session, then
+                                                            // we should forbid the operation
+        !nobodyIsLoggedIn() &&          // Unless, for some reason a user isn't actually using this
+                                        // Operation Context (which implies a background job
+        !authHasImpersonatePrivilege()  // Or if the user has an impersonation privilege, in which
+                                        // case, the user gets to sidestep certain checks.
+        ) {
+        return Status{ErrorCodes::Unauthorized,
+                      str::stream() << "Cursor session id ("
+                                    << sessionIdToStringOrNone(cursorSessionId)
+                                    << ") is not the same as the operation context's session id ("
+                                    << sessionIdToStringOrNone(opCtx->getLogicalSessionId())
+                                    << ")"};
+    }
+
+    return Status::OK();
+}
