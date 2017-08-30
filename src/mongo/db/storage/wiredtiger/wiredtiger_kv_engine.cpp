@@ -494,23 +494,15 @@ void WiredTigerKVEngine::cleanShutdown() {
             closeConfig = "leak_memory=true";
         }
 
-        const bool keepOldBehavior = true;
         const bool needsDowngrade = !_readOnly &&
             serverGlobalParams.featureCompatibility.version.load() ==
                 ServerGlobalParams::FeatureCompatibility::Version::k34;
-        if (keepOldBehavior && needsDowngrade) {
-            // When Recover to a timestamp is turned on (SERVER-30349), this block can go
-            // away. The 3.4 downgrade block below that restarts WT will run the following
-            // `reconfigure` at the very end after reverting all table logging.
-            log() << "Downgrading WiredTiger to 2.9";
-            invariantWTOK(_conn->reconfigure(_conn, "compatibility=(release=2.9)"));
-        }
 
         invariantWTOK(_conn->close(_conn, closeConfig));
         _conn = nullptr;
 
         // If FCV 3.4, enable WT logging on all tables.
-        if (!keepOldBehavior && needsDowngrade) {
+        if (needsDowngrade) {
             // Steps for downgrading:
             //
             // 1) Close and reopen WiredTiger. This clears out any leftover cursors that get in
