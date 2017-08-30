@@ -72,7 +72,8 @@ public:
     static bool compatible(const BSONElement& elt,
                            const IndexEntry& index,
                            MatchExpression* node,
-                           const CollatorInterface* collator);
+                           const CollatorInterface* collator,
+                           bool elemMatchChild = false);
 
     /**
      * Determine how useful all of our relevant 'indices' are to all predicates in the subtree

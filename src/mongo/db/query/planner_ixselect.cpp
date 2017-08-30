@@ -48,6 +48,28 @@
 
 namespace mongo {
 
+namespace {
+
+/**
+ * Checks whether the given index is compatible with each child of the given $elemMatch expression.
+ * Assumes that the match expression is of type ELEM_MATCH_VALUE.
+ */
+bool elemMatchValueCompatible(const BSONElement& elt,
+                              const IndexEntry& index,
+                              MatchExpression* elemMatch,
+                              const CollatorInterface* collator) {
+    invariant(elemMatch->matchType() == MatchExpression::ELEM_MATCH_VALUE);
+    for (size_t child = 0; child < elemMatch->numChildren(); ++child) {
+        if (!QueryPlannerIXSelect::compatible(
+                elt, index, elemMatch->getChild(child), collator, true)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
+
 static double fieldWithDefault(const BSONObj& infoObj, const string& name, double def) {
     BSONElement e = infoObj[name];
     if (e.isNumber()) {
@@ -168,7 +190,8 @@ void QueryPlannerIXSelect::findRelevantIndices(const unordered_set<string>& fiel
 bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
                                       const IndexEntry& index,
                                       MatchExpression* node,
-                                      const CollatorInterface* collator) {
+                                      const CollatorInterface* collator,
+                                      bool elemMatchChild) {
     if ((boundsGeneratingNodeContainsComparisonToType(node, BSONType::String) ||
          boundsGeneratingNodeContainsComparisonToType(node, BSONType::Array) ||
          boundsGeneratingNodeContainsComparisonToType(node, BSONType::Object)) &&
@@ -195,16 +218,18 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
     MatchExpression::MatchType exprtype = node->matchType();
 
     if (indexedFieldType.empty()) {
-        // Can't check for null w/a sparse index.
-        if (exprtype == MatchExpression::EQ && index.sparse) {
+        // Can't use a sparse index for $eq with a null element, unless the equality is within a
+        // $elemMatch expression since the latter implies a match on the literal element 'null'.
+        if (exprtype == MatchExpression::EQ && index.sparse && !elemMatchChild) {
             const EqualityMatchExpression* expr = static_cast<const EqualityMatchExpression*>(node);
             if (expr->getData().isNull()) {
                 return false;
             }
         }
 
-        // Can't check for $in w/ null element w/a sparse index.
-        if (exprtype == MatchExpression::MATCH_IN && index.sparse) {
+        // Can't use a sparse index for $in with a null element, unless the $eq is within a
+        // $elemMatch expression since the latter implies a match on the literal element 'null'.
+        if (exprtype == MatchExpression::MATCH_IN && index.sparse && !elemMatchChild) {
             const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
             if (expr->hasNull()) {
                 return false;
@@ -220,7 +245,10 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
         // the expression is a NOT.
         if (exprtype == MatchExpression::NOT) {
             // Don't allow indexed NOT on special index types such as geo or text indices.
-            if (INDEX_BTREE != index.type) {
+            // TODO: SERVER-30994 should remove this check entirely and allow $not on the
+            // 'non-special' fields of non-btree indices.
+            // (e.g. {a: 1, geo: "2dsphere"})
+            if (INDEX_BTREE != index.type && !elemMatchChild) {
                 return false;
             }
 
@@ -386,12 +414,19 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
             BSONObjIterator it(indices[i].keyPattern);
             BSONElement elt = it.next();
             if (elt.fieldName() == fullPath && compatible(elt, indices[i], node, collator)) {
-                rt->first.push_back(i);
+                if (node->matchType() != MatchExpression::ELEM_MATCH_VALUE ||
+                    elemMatchValueCompatible(elt, indices[i], node, collator)) {
+                    rt->first.push_back(i);
+                }
             }
             while (it.more()) {
                 elt = it.next();
-                if (elt.fieldName() == fullPath && compatible(elt, indices[i], node, collator)) {
-                    rt->notFirst.push_back(i);
+                if (elt.fieldName() == fullPath &&
+                    compatible(elt, indices[i], node, collator, false)) {
+                    if (node->matchType() != MatchExpression::ELEM_MATCH_VALUE ||
+                        elemMatchValueCompatible(elt, indices[i], node, collator)) {
+                        rt->notFirst.push_back(i);
+                    }
                 }
             }
         }

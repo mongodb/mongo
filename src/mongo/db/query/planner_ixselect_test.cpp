@@ -44,6 +44,8 @@ using namespace mongo;
 
 namespace {
 
+constexpr CollatorInterface* kSimpleCollator = nullptr;
+
 using std::unique_ptr;
 using std::string;
 using std::vector;
@@ -299,6 +301,83 @@ TEST(QueryPlannerIXSelectTest, RateIndicesTaggedNodePathsNegation) {
 TEST(QueryPlannerIXSelectTest, RateIndicesTaggedNodePathArrayNegation) {
     testRateIndicesTaggedNodePaths("{a: {$elemMatch: {b: {$ne: 1}}}}", "", "a.b,a.b");
     testRateIndicesTaggedNodePaths("{a: {$all: [{$elemMatch: {b: {$ne: 1}}}]}}", "", "a.b,a.b");
+}
+
+/**
+ * $not within $elemMatch should not attempt to use a sparse index for $exists:false.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchNotExistsShouldNotUseSparseIndex) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    idxEntry.sparse = true;
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$elemMatch: {$not: {$exists: true}}}}",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "",
+                    expectedIndices);
+}
+
+/**
+ * $in with a null value within $elemMatch can use a sparse index.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchInNullValueShouldUseSparseIndex) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    idxEntry.sparse = true;
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: {$elemMatch: {$in: [null]}}}", "", kSimpleCollator, indices, "a", expectedIndices);
+}
+
+/**
+ * $geo queries within $elemMatch should not use a normal B-tree index.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchGeoShouldNotUseBtreeIndex) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices;
+    testRateIndices(R"({a: {$elemMatch: {$geoWithin: {$geometry: {type: 'Polygon', 
+                      coordinates: [[[0,0],[0,1],[1,0],[0,0]]]}}}}})",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "a",
+                    expectedIndices);
+}
+
+/**
+ * $eq with a null value within $elemMatch can use a sparse index.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchEqNullValueShouldUseSparseIndex) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    idxEntry.sparse = true;
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: {$elemMatch: {$eq: null}}}", "", kSimpleCollator, indices, "a", expectedIndices);
+}
+
+/**
+ * $elemMatch with multiple children will not use an index if any child is incompatible.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchMultipleChildrenShouldRequireAllToBeCompatible) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    idxEntry.sparse = true;
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$elemMatch: {$eq: null, $not: {$exists: true}}}}",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "",
+                    expectedIndices);
 }
 
 /**
