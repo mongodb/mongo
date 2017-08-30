@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_sources_gen.h"
 
@@ -148,6 +149,25 @@ private:
     // It is illegal to construct a DocumentSourceChangeStream directly, use createFromBson()
     // instead.
     DocumentSourceChangeStream() = default;
+};
+
+/**
+ * A custom subclass of DocumentSourceMatch which does not serialize itself (since it came from an
+ * alias) and requires itself to be the first stage in the pipeline.
+ */
+class DocumentSourceOplogMatch final : public DocumentSourceMatch {
+public:
+    static boost::intrusive_ptr<DocumentSourceOplogMatch> create(
+        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    const char* getSourceName() const final;
+
+    StageConstraints constraints() const final;
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+
+private:
+    DocumentSourceOplogMatch(BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 };
 
 }  // namespace mongo

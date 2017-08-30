@@ -52,6 +52,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
@@ -392,6 +393,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     Collection* collection,
     const NamespaceString& nss,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
+    bool oplogReplay,
     BSONObj queryObj,
     BSONObj projectionObj,
     BSONObj sortObj,
@@ -406,6 +408,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
             qr->setAwaitData(true);
             break;
     }
+    qr->setOplogReplay(oplogReplay);
     qr->setFilter(queryObj);
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
@@ -442,8 +445,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         return {cq.getStatus()};
     }
 
-    return getExecutor(
-        opCtx, collection, std::move(cq.getValue()), PlanExecutor::YIELD_AUTO, plannerOpts);
+    return getExecutorFind(
+        opCtx, collection, nss, std::move(cq.getValue()), PlanExecutor::YIELD_AUTO, plannerOpts);
 }
 }  // namespace
 
@@ -500,9 +503,12 @@ void PipelineD::prepareCursorSource(Collection* collection,
 
     // Look for an initial match. This works whether we got an initial query or not. If not, it
     // results in a "{}" query, which will be what we want in that case.
+    bool oplogReplay = false;
     const BSONObj queryObj = pipeline->getInitialQuery();
     if (!queryObj.isEmpty()) {
-        if (dynamic_cast<DocumentSourceMatch*>(sources.front().get())) {
+        auto matchStage = dynamic_cast<DocumentSourceMatch*>(sources.front().get());
+        if (matchStage) {
+            oplogReplay = dynamic_cast<DocumentSourceOplogMatch*>(matchStage) != nullptr;
             // If a $match query is pulled into the cursor, the $match is redundant, and can be
             // removed from the pipeline.
             sources.pop_front();
@@ -543,6 +549,7 @@ void PipelineD::prepareCursorSource(Collection* collection,
                                                 nss,
                                                 pipeline,
                                                 expCtx,
+                                                oplogReplay,
                                                 sortStage,
                                                 deps,
                                                 queryObj,
@@ -571,6 +578,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     const NamespaceString& nss,
     Pipeline* pipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,
+    bool oplogReplay,
     const intrusive_ptr<DocumentSourceSort>& sortStage,
     const DepsTracker& deps,
     const BSONObj& queryObj,
@@ -597,12 +605,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     // order so we can then apply other optimizations there are tickets for, such as SERVER-4507.
     size_t plannerOpts = QueryPlannerParams::DEFAULT | QueryPlannerParams::NO_BLOCKING_SORT;
 
-    // If we are connecting directly to the shard rather than through a mongos, don't filter out
-    // orphaned documents.
-    if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, nss.ns())) {
-        plannerOpts |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    }
-
     if (deps.hasNoRequirements()) {
         // If we don't need any fields from the input document, performing a count is faster, and
         // will output empty documents, which is okay.
@@ -623,6 +625,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                    collection,
                                                    nss,
                                                    expCtx,
+                                                   oplogReplay,
                                                    queryObj,
                                                    emptyProjection,
                                                    *sortObj,
@@ -635,6 +638,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                               collection,
                                                               nss,
                                                               expCtx,
+                                                              oplogReplay,
                                                               queryObj,
                                                               *projectionObj,
                                                               *sortObj,
@@ -684,6 +688,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                collection,
                                                nss,
                                                expCtx,
+                                               oplogReplay,
                                                queryObj,
                                                *projectionObj,
                                                *sortObj,
@@ -706,6 +711,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                 collection,
                                 nss,
                                 expCtx,
+                                oplogReplay,
                                 queryObj,
                                 *projectionObj,
                                 *sortObj,

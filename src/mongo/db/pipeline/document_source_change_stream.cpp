@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -82,45 +81,40 @@ namespace {
 
 static constexpr StringData kOplogMatchExplainName = "$_internalOplogMatch"_sd;
 
+}  // namespace
+
+intrusive_ptr<DocumentSourceOplogMatch> DocumentSourceOplogMatch::create(
+    BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx) {
+    return new DocumentSourceOplogMatch(std::move(filter), expCtx);
+}
+
+const char* DocumentSourceOplogMatch::getSourceName() const {
+    // This is used in error reporting, particularly if we find this stage in a position other
+    // than first, so report the name as $changeStream.
+    return DocumentSourceChangeStream::kStageName.rawData();
+}
+
+DocumentSource::StageConstraints DocumentSourceOplogMatch::constraints() const {
+    StageConstraints constraints;
+    constraints.requiredPosition = PositionRequirement::kFirst;
+    constraints.isAllowedInsideFacetStage = false;
+    return constraints;
+}
+
 /**
- * A custom subclass of DocumentSourceMatch which does not serialize itself (since it came from an
- * alias) and requires itself to be the first stage in the pipeline.
+ * Only serialize this stage for explain purposes, otherwise keep it hidden so that we can
+ * properly alias.
  */
-class DocumentSourceOplogMatch final : public DocumentSourceMatch {
-public:
-    static intrusive_ptr<DocumentSourceOplogMatch> create(
-        BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceOplogMatch(std::move(filter), expCtx);
+Value DocumentSourceOplogMatch::serialize(optional<ExplainOptions::Verbosity> explain) const {
+    if (explain) {
+        return Value(Document{{kOplogMatchExplainName, Document{}}});
     }
+    return Value();
+}
 
-    const char* getSourceName() const final {
-        // This is used in error reporting, particularly if we find this stage in a position other
-        // than first, so report the name as $changeStream.
-        return DocumentSourceChangeStream::kStageName.rawData();
-    }
-
-    StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = PositionRequirement::kFirst;
-        constraints.isAllowedInsideFacetStage = false;
-        return constraints;
-    }
-
-    /**
-     * Only serialize this stage for explain purposes, otherwise keep it hidden so that we can
-     * properly alias.
-     */
-    Value serialize(optional<ExplainOptions::Verbosity> explain) const final {
-        if (explain) {
-            return Value(Document{{kOplogMatchExplainName, Document{}}});
-        }
-        return Value();
-    }
-
-private:
-    DocumentSourceOplogMatch(BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceMatch(std::move(filter), expCtx) {}
-};
+DocumentSourceOplogMatch::DocumentSourceOplogMatch(BSONObj filter,
+                                                   const intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSourceMatch(std::move(filter), expCtx) {}
 
 void checkValueType(const Value v, const StringData filedName, BSONType expectedType) {
     uassert(40532,
@@ -131,6 +125,7 @@ void checkValueType(const Value v, const StringData filedName, BSONType expected
             (v.getType() == expectedType));
 }
 
+namespace {
 /**
  * This stage is used internally for change notifications to close cursor after returning
  * "invalidate" entries.

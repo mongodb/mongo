@@ -39,6 +39,7 @@
 namespace mongo {
 class Collection;
 class DocumentSourceCursor;
+class DocumentSourceMatch;
 class DocumentSourceSort;
 class ExpressionContext;
 class OperationContext;
@@ -102,6 +103,7 @@ private:
         const NamespaceString& nss,
         Pipeline* pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        bool oplogReplay,
         const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
         const DepsTracker& deps,
         const BSONObj& queryObj,
