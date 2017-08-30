@@ -81,7 +81,7 @@ boost::optional<unsigned long> ProcessInfo::getNumAvailableCores() {
     DWORD_PTR process_mask, system_mask;
 
     if (GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask)) {
-        std::bitset<32> mask(process_mask);
+        std::bitset<sizeof(process_mask) * 8> mask(process_mask);
         if (mask.count() > 0)
             return mask.count();
     }
