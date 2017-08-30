@@ -30,6 +30,7 @@
 
 #include "mongo/db/ops/parsed_update.h"
 
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
@@ -148,8 +149,10 @@ Status ParsedUpdate::parseArrayFilters() {
         serverGlobalParams.featureCompatibility.version.load() ==
             ServerGlobalParams::FeatureCompatibility::Version::k34) {
         return Status(ErrorCodes::InvalidOptions,
-                      "The featureCompatibilityVersion must be 3.6 to use arrayFilters. See "
-                      "http://dochub.mongodb.org/core/3.6-feature-compatibility.");
+                      str::stream()
+                          << "The featureCompatibilityVersion must be 3.6 to use arrayFilters. See "
+                          << feature_compatibility_version::kDochubLink
+                          << ".");
     }
 
     for (auto rawArrayFilter : _request->getArrayFilters()) {

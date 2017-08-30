@@ -65,10 +65,13 @@ public:
     }
 
     virtual void help(std::stringstream& help) const {
-        help << "Set the API version for the cluster. If set to \"3.4\", then 3.6 features are "
-                "disabled. If \"3.6\", then 3.6 features are enabled, and all nodes in the cluster "
-                "must be version 3.6. See "
-                "http://dochub.mongodb.org/core/3.6-feature-compatibility.";
+        help << "Set the API version for the cluster. If set to \""
+             << FeatureCompatibilityVersionCommandParser::kVersion34
+             << "\", then 3.6 features are disabled. If \""
+             << FeatureCompatibilityVersionCommandParser::kVersion36
+             << "\", then 3.6 features are enabled, and all nodes in the cluster must be version "
+                "3.6. See "
+             << feature_compatibility_version::kDochubLink << ".";
     }
 
     Status checkAuthForCommand(Client* client,

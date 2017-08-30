@@ -97,69 +97,72 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
         } else if (fieldName == FeatureCompatibilityVersion::kVersionField) {
             foundVersionField = true;
             if (elem.type() != BSONType::String) {
-                return Status(
-                    ErrorCodes::TypeMismatch,
-                    str::stream()
-                        << FeatureCompatibilityVersion::kVersionField
-                        << " must be of type String, but was of type "
-                        << typeName(elem.type())
-                        << ". Contents of "
-                        << FeatureCompatibilityVersion::kParameterName
-                        << " document in "
-                        << FeatureCompatibilityVersion::kCollection
-                        << ": "
-                        << featureCompatibilityVersionDoc
-                        << ". See http://dochub.mongodb.org/core/3.6-feature-compatibility.");
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << FeatureCompatibilityVersion::kVersionField
+                                            << " must be of type String, but was of type "
+                                            << typeName(elem.type())
+                                            << ". Contents of "
+                                            << FeatureCompatibilityVersion::kParameterName
+                                            << " document in "
+                                            << FeatureCompatibilityVersion::kCollection
+                                            << ": "
+                                            << featureCompatibilityVersionDoc
+                                            << ". See "
+                                            << feature_compatibility_version::kDochubLink
+                                            << ".");
             }
             if (elem.String() == FeatureCompatibilityVersionCommandParser::kVersion36) {
                 version = ServerGlobalParams::FeatureCompatibility::Version::k36;
             } else if (elem.String() == FeatureCompatibilityVersionCommandParser::kVersion34) {
                 version = ServerGlobalParams::FeatureCompatibility::Version::k34;
             } else {
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream()
-                        << "Invalid value for "
-                        << FeatureCompatibilityVersion::kVersionField
-                        << ", found "
-                        << elem.String()
-                        << ", expected '"
-                        << FeatureCompatibilityVersionCommandParser::kVersion36
-                        << "' or '"
-                        << FeatureCompatibilityVersionCommandParser::kVersion34
-                        << "'. Contents of "
-                        << FeatureCompatibilityVersion::kParameterName
-                        << " document in "
-                        << FeatureCompatibilityVersion::kCollection
-                        << ": "
-                        << featureCompatibilityVersionDoc
-                        << ". See http://dochub.mongodb.org/core/3.6-feature-compatibility.");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "Invalid value for "
+                                            << FeatureCompatibilityVersion::kVersionField
+                                            << ", found "
+                                            << elem.String()
+                                            << ", expected '"
+                                            << FeatureCompatibilityVersionCommandParser::kVersion36
+                                            << "' or '"
+                                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                                            << "'. Contents of "
+                                            << FeatureCompatibilityVersion::kParameterName
+                                            << " document in "
+                                            << FeatureCompatibilityVersion::kCollection
+                                            << ": "
+                                            << featureCompatibilityVersionDoc
+                                            << ". See "
+                                            << feature_compatibility_version::kDochubLink
+                                            << ".");
             }
         } else {
-            return Status(
-                ErrorCodes::BadValue,
-                str::stream() << "Unrecognized field '" << elem.fieldName() << "''. Contents of "
-                              << FeatureCompatibilityVersion::kParameterName
-                              << " document in "
-                              << FeatureCompatibilityVersion::kCollection
-                              << ": "
-                              << featureCompatibilityVersionDoc
-                              << ". See http://dochub.mongodb.org/core/3.6-feature-compatibility.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Unrecognized field '" << elem.fieldName()
+                                        << "''. Contents of "
+                                        << FeatureCompatibilityVersion::kParameterName
+                                        << " document in "
+                                        << FeatureCompatibilityVersion::kCollection
+                                        << ": "
+                                        << featureCompatibilityVersionDoc
+                                        << ". See "
+                                        << feature_compatibility_version::kDochubLink
+                                        << ".");
         }
     }
 
     if (!foundVersionField) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Missing required field '"
-                          << FeatureCompatibilityVersion::kVersionField
-                          << "''. Contents of "
-                          << FeatureCompatibilityVersion::kParameterName
-                          << " document in "
-                          << FeatureCompatibilityVersion::kCollection
-                          << ": "
-                          << featureCompatibilityVersionDoc
-                          << ". See http://dochub.mongodb.org/core/3.6-feature-compatibility.");
+                      str::stream() << "Missing required field '"
+                                    << FeatureCompatibilityVersion::kVersionField
+                                    << "''. Contents of "
+                                    << FeatureCompatibilityVersion::kParameterName
+                                    << " document in "
+                                    << FeatureCompatibilityVersion::kCollection
+                                    << ": "
+                                    << featureCompatibilityVersionDoc
+                                    << ". See "
+                                    << feature_compatibility_version::kDochubLink
+                                    << ".");
     }
 
     return version;
@@ -167,8 +170,13 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
 
 void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData version) {
     uassert(40284,
-            "featureCompatibilityVersion must be '3.6' or '3.4'. See "
-            "http://dochub.mongodb.org/core/3.6-feature-compatibility.",
+            str::stream() << "featureCompatibilityVersion must be '"
+                          << FeatureCompatibilityVersionCommandParser::kVersion36
+                          << "' or '"
+                          << FeatureCompatibilityVersionCommandParser::kVersion34
+                          << "'. See "
+                          << feature_compatibility_version::kDochubLink
+                          << ".",
             version == FeatureCompatibilityVersionCommandParser::kVersion36 ||
                 version == FeatureCompatibilityVersionCommandParser::kVersion34);
 
@@ -299,14 +307,16 @@ public:
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << FeatureCompatibilityVersion::kParameterName
                                     << " cannot be set via setParameter. See "
-                                       "http://dochub.mongodb.org/core/3.6-feature-compatibility.");
+                                    << feature_compatibility_version::kDochubLink
+                                    << ".");
     }
 
     virtual Status setFromString(const std::string& str) {
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << FeatureCompatibilityVersion::kParameterName
                                     << " cannot be set via setParameter. See "
-                                       "http://dochub.mongodb.org/core/3.6-feature-compatibility.");
+                                    << feature_compatibility_version::kDochubLink
+                                    << ".");
     }
 } featureCompatibilityVersionParameter;
 

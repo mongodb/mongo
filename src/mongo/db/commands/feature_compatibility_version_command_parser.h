@@ -38,12 +38,15 @@ class BSONObj;
 template <typename T>
 class StatusWith;
 
+namespace feature_compatibility_version {
+constexpr StringData kDochubLink = "http://dochub.mongodb.org/core/3.6-feature-compatibility"_sd;
+}  // namespace feature_compatibility_version
+
 class FeatureCompatibilityVersionCommandParser {
 public:
     /**
      * Known server release versions.
      */
-    static constexpr StringData kVersion32 = "3.2"_sd;
     static constexpr StringData kVersion34 = "3.4"_sd;
     static constexpr StringData kVersion36 = "3.6"_sd;
 

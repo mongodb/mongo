@@ -66,7 +66,7 @@ public:
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "
                 "directly. Sets featureCompatibilityVersion on all shards. See "
-                "http://dochub.mongodb.org/core/3.6-feature-compatibility.";
+             << feature_compatibility_version::kDochubLink << ".";
     }
 
     bool slaveOk() const override {
@@ -99,9 +99,9 @@ public:
             FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
 
         uassert(ErrorCodes::IllegalOperation,
-                str::stream() << getName()
-                              << " can only be run on config servers. See "
-                                 "http://dochub.mongodb.org/core/3.6-feature-compatibility.",
+                str::stream() << getName() << " can only be run on config servers. See "
+                              << feature_compatibility_version::kDochubLink
+                              << ".",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
         // Remove after 3.4 -> 3.6 upgrade.
