@@ -373,7 +373,7 @@ functions:
       script: |
         set -o errexit
         set -o verbose
-        if [ "${build_cdriver|}" = "true" ]; then 
+        if [ "${build_cdriver|}" = "true" ]; then
         CDRIVER_VERSION=1.6.3
         rm -rf mongo-c-driver-$CDRIVER_VERSION
         rm -rf mongo-c-driver
@@ -873,7 +873,7 @@ functions:
             ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_capi_test"
             ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_transport_test"
         fi
- 
+
   "do multiversion setup" :
     command: shell.exec
     params:
@@ -3528,17 +3528,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: causally_consistent_jscore_passthrough_WT
-  depends_on:
-  - name: jsCore_WT
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=causally_consistent_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: session_jscore_passthrough_WT
   depends_on:
   - name: jsCore_WT
@@ -3547,6 +3536,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=session_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: causally_consistent_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=causally_consistent_jscore_passthrough --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -3569,6 +3569,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_causally_consistent_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: retryable_writes_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=retryable_writes_jscore_passthrough --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -5558,13 +5569,16 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jsonSchema
+  - name: master_slave
+  - name: master_slave_WT
+  - name: master_slave_jscore_passthrough
+  - name: master_slave_jscore_passthrough_WT
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
-  - name: session_jscore_passthrough_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -5643,10 +5657,10 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
     distros:
     - windows-64-vs2015-large
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_jscore_passthrough
-  - name: master_slave_jscore_passthrough_WT
+  - name: retryable_writes_jscore_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
+  - name: session_jscore_passthrough_WT
   - name: sharding
     distros:
     - windows-64-vs2015-large
@@ -6110,6 +6124,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  - name: retryable_writes_jscore_passthrough_WT
   - name: serial_run
   - name: serial_run_WT
   - name: session_jscore_passthrough_WT
@@ -6239,7 +6254,7 @@ buildvariants:
     build_cdriver: true
     cdriver_configure_flags: --host arm-apple-darwin CC="$(xcrun -f --sdk iphoneos clang)" CXX="$(xcrun -f --sdk iphoneos clang++)" CPPFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode"  CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode" CXXFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode" LDFLAGS="-miphoneos-version-min=10.2 -arch arm64"
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_ios.vars  CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib" all 
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_ios.vars  CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib" all
     python: python2.7
     disable_unit_tests: true
   tasks:
@@ -6256,7 +6271,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_ios_sim.vars CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib" all
     python: python2.7
-    disable_unit_tests: true 
+    disable_unit_tests: true
     enable_ios_sim_tests: true
   tasks:
   - name: compile_all
@@ -6403,6 +6418,11 @@ buildvariants:
   - name: jstestfuzz_sharded_WT
   - name: jstestfuzz_replication_initsync
   - name: jstestfuzz_replication_initsync_WT
+  - name: master_slave
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
+  - name: master_slave_jscore_passthrough_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -6418,7 +6438,6 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_linearizable_passthrough
-  - name: session_jscore_passthrough_WT
     distros:
     - rhel62-large
   - name: read_concern_linearizable_passthrough_WT
@@ -6473,14 +6492,13 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
     distros:
     - rhel62-large
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
-  - name: master_slave_jscore_passthrough_WT
+  - name: retryable_writes_jscore_passthrough_WT
+    distros:
+    - rhel62-large
   - name: rlp
   - name: rlp_WT
   - name: sasl
+  - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding
@@ -6610,6 +6628,11 @@ buildvariants:
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
+  - name: master_slave
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
+  - name: master_slave_jscore_passthrough_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -6645,12 +6668,9 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
-  - name: master_slave_jscore_passthrough_WT
+  - name: retryable_writes_jscore_passthrough_WT
   - name: sasl
+  - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding
@@ -8662,6 +8682,9 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -8673,9 +8696,7 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave_WT
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
+  - name: retryable_writes_jscore_passthrough_WT
   - name: rlp
   - name: sasl
   - name: session_jscore_passthrough_WT
@@ -9106,6 +9127,11 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
   - name: jsonSchema
+  - name: master_slave
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
+  - name: master_slave_jscore_passthrough_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -9141,11 +9167,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
-  - name: master_slave_jscore_passthrough_WT
+  - name: retryable_writes_jscore_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
@@ -9290,6 +9312,11 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
   - name: jsonSchema
+  - name: master_slave
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
+  - name: master_slave_jscore_passthrough_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -9325,11 +9352,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
-  - name: master_slave_jscore_passthrough_WT
+  - name: retryable_writes_jscore_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
