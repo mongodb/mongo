@@ -3,6 +3,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/concurrency/fsm_all_sharded*.js
+  exclude_files:
+  # Skip causal consistency tests because they're run in separate suites
+  - jstests/concurrency/fsm_all_sharded_causal_consistency*.js
 
 # Concurrency tests that run against a sharded cluster start one themselves.
 executor:

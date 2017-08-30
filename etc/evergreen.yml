@@ -3188,6 +3188,42 @@ tasks:
       resmoke_args: --suites=concurrency_sharded --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: concurrency_sharded_causal_consistency
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout for each test
+    vars:
+      resmoke_args: --suites=concurrency_sharded_causal_consistency --storageEngine=mmapv1
+
+- <<: *task_template
+  name: concurrency_sharded_causal_consistency_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout for each test
+    vars:
+      resmoke_args: --suites=concurrency_sharded_causal_consistency --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: concurrency_sharded_causal_consistency_and_balancer
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout for each test
+    vars:
+      resmoke_args: --suites=concurrency_sharded_causal_consistency_and_balancer --storageEngine=mmapv1
+
+- <<: *task_template
+  name: concurrency_sharded_causal_consistency_and_balancer_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout for each test
+    vars:
+      resmoke_args: --suites=concurrency_sharded_causal_consistency_and_balancer --storageEngine=wiredTiger
+
+- <<: *task_template
   name: concurrency_simultaneous
   commands:
   - func: "do setup"
@@ -5605,6 +5641,18 @@ buildvariants:
   - name: concurrency_sharded_WT
     distros:
     - windows-64-vs2015-large
+  - name: concurrency_sharded_causal_consistency
+    distros:
+    - windows-64-vs2015-large
+  - name: concurrency_sharded_causal_consistency_WT
+    distros:
+    - windows-64-vs2015-large
+  - name: concurrency_sharded_causal_consistency_and_balancer
+    distros:
+    - windows-64-vs2015-large
+  - name: concurrency_sharded_causal_consistency_and_balancer_WT
+    distros:
+    - windows-64-vs2015-large
   - name: concurrency_simultaneous
     distros:
     - windows-64-vs2015-large
@@ -6068,6 +6116,10 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_WT
+  - name: concurrency_sharded_causal_consistency_and_balancer
+  - name: concurrency_sharded_causal_consistency_and_balancer_WT
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
   - name: dbtest
@@ -6367,6 +6419,10 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_WT
+  - name: concurrency_sharded_causal_consistency_and_balancer
+  - name: concurrency_sharded_causal_consistency_and_balancer_WT
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
   - name: dbtest
@@ -6595,6 +6651,10 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_WT
+  - name: concurrency_sharded_causal_consistency_and_balancer
+  - name: concurrency_sharded_causal_consistency_and_balancer_WT
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
   - name: dbtest
@@ -8659,6 +8719,8 @@ buildvariants:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
   - name: concurrency_sharded
+  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_simultaneous
   - name: dbtest
   - name: failpoints
@@ -9092,6 +9154,10 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_WT
+  - name: concurrency_sharded_causal_consistency_and_balancer
+  - name: concurrency_sharded_causal_consistency_and_balancer_WT
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
   - name: dbtest
@@ -9277,6 +9343,10 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_WT
+  - name: concurrency_sharded_causal_consistency_and_balancer
+  - name: concurrency_sharded_causal_consistency_and_balancer_WT
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
   - name: dbtest
