@@ -93,14 +93,8 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	 *
 	 * For btree handles, closing the handle decrements the open file
 	 * count, meaning the close loop won't overrun the configured minimum.
-	 * For tables, we need to hold the table lock to avoid racing with
-	 * cursor opens.
 	 */
-	if (dhandle->type == WT_DHANDLE_TYPE_TABLE)
-		WT_WITH_TABLE_WRITE_LOCK(session,
-		    ret = __wt_conn_dhandle_close(session, false, true));
-	else
-		ret = __wt_conn_dhandle_close(session, false, true);
+	ret = __wt_conn_dhandle_close(session, false, true);
 
 err:	__wt_writeunlock(session, &dhandle->rwlock);
 
@@ -137,8 +131,17 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 		    conn->sweep_idle_time)
 			continue;
 
-		WT_WITH_DHANDLE(session, dhandle,
-		    ret = __sweep_expire_one(session));
+		/*
+		 * For tables, we need to hold the table lock to avoid racing
+		 * with cursor opens.
+		 */
+		if (dhandle->type == WT_DHANDLE_TYPE_TABLE)
+			WT_WITH_TABLE_WRITE_LOCK(session,
+			    WT_WITH_DHANDLE(session, dhandle,
+				ret = __sweep_expire_one(session)));
+		else
+			WT_WITH_DHANDLE(session, dhandle,
+			    ret = __sweep_expire_one(session));
 		WT_RET_BUSY_OK(ret);
 	}
 
