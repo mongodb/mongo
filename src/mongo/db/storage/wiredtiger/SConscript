@@ -82,16 +82,20 @@ if wiredtiger:
             'wiredtiger_parameters.cpp',
             'wiredtiger_record_store_mongod.cpp',
             'wiredtiger_server_status.cpp',
-            ],
-        LIBDEPS=['storage_wiredtiger_core',
-                 'storage_wiredtiger_customization_hooks',
-                 '$BUILD_DIR/mongo/db/db_raii',
-                 '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
-                 '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
-                 '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
-                 '$BUILD_DIR/mongo/db/commands/server_status',
-                 ],
-        )
+        ],
+        LIBDEPS=[
+            'storage_wiredtiger_core',
+            'storage_wiredtiger_customization_hooks',
+            '$BUILD_DIR/mongo/db/db_raii',
+            '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
+            '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
+            '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
+            '$BUILD_DIR/mongo/db/commands/server_status',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        ],
+    )
 
     wtEnv.Library(
         target='storage_wiredtiger_mock',

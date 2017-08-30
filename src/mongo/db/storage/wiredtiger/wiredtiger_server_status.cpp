@@ -35,6 +35,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -56,6 +57,8 @@ bool WiredTigerServerStatusSection::includeByDefault() const {
 
 BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
                                                        const BSONElement& configElement) const {
+    Lock::GlobalLock lk(opCtx, LockMode::MODE_IS, UINT_MAX);
+
     // The session does not open a transaction here as one is not needed and opening one would
     // mean that execution could become blocked when a new transaction cannot be allocated
     // immediately.
