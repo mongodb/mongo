@@ -350,7 +350,9 @@ main(int argc, char *argv[])
 		testutil_die(errno, "parent chdir: %s", home);
 
 	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "rm -rf ../%s.SAVE; cp -rp ../%s ../%s.SAVE;", home, home, home));
+	    "rm -rf ../%s.SAVE; mkdir ../%s.SAVE; "
+	    "cp -p WiredTigerLog.* ../%s.SAVE;",
+	    home, home, home));
 	if ((status = system(buf)) < 0)
 		testutil_die(status, "system: %s", buf);
 
