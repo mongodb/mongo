@@ -4,7 +4,12 @@
 (function() {
     "use strict";
 
-    db = db.getMongo().startSession().getDatabase(db.getName());
+    let sessionOptions = {};
+    if (typeof TestData !== "undefined" && TestData.hasOwnProperty("sessionOptions")) {
+        sessionOptions = TestData.sessionOptions;
+    }
+
+    db = db.getMongo().startSession(sessionOptions).getDatabase(db.getName());
 
     var originalStartParallelShell = startParallelShell;
     startParallelShell = function(jsCode, port, noConnect) {

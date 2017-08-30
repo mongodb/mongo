@@ -678,7 +678,7 @@ shellHelper.use = function(dbname) {
         print("bad use parameter");
         return;
     }
-    db = db.getMongo().getDB(dbname);
+    db = db.getSession().getSiblingDB(dbname);
     print("switched to db " + db.getName());
 };
 
@@ -775,7 +775,7 @@ shellHelper.show = function(what) {
     }
 
     if (what == "dbs" || what == "databases") {
-        var dbs = db.getMongo().getDBs();
+        var dbs = db.getMongo().getDBs(db.getSession());
         var dbinfo = [];
         var maxNameLength = 0;
         var maxGbDigits = 0;

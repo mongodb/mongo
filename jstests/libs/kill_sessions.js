@@ -212,7 +212,7 @@ var _kill_sessions_api_module = (function() {
     }
 
     CursorHandle.prototype.getLsid = function() {
-        return this._session._serverSession._id;
+        return this._session._serverSession.handle.getId();
     };
 
     CursorHandle.prototype.join = function() {
@@ -661,7 +661,7 @@ var _kill_sessions_api_module = (function() {
                 var session = fixture._clientToExecuteVia.startSession();
 
                 var obj = {};
-                obj[cmd] = [session._serverSession._id].map(genArg(execUserCred));
+                obj[cmd] = [session._serverSession.handle.getId()].map(genArg(execUserCred));
                 fixture.assertKillFailed("admin", obj);
                 session.endSession();
             },

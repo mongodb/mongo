@@ -6,6 +6,13 @@
 
     // Create a new DB object backed by a mock connection.
     function MockMongo() {
+        this.getMinWireVersion = function getMinWireVersion() {
+            return 0;
+        };
+
+        this.getMaxWireVersion = function getMaxWireVersion() {
+            return 0;
+        };
     }
     MockMongo.prototype = Mongo.prototype;
     MockMongo.prototype.runCommand = function(db, cmd, opts) {

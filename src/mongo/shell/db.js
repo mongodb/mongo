@@ -17,11 +17,7 @@ var DB;
     };
 
     DB.prototype.getSiblingDB = function(name) {
-        if (this.getSession()) {
-            return this.getSession().getDatabase(name);
-        } else {
-            return this.getMongo().getDB(name);
-        }
+        return this.getSession().getDatabase(name);
     };
 
     DB.prototype.getSisterDB = DB.prototype.getSiblingDB;
@@ -121,36 +117,32 @@ var DB;
 
         // Support users who call this function with a string commandName, e.g.
         // db.runReadCommand("commandName", {arg1: "value", arg2: "value"}).
-        var mergedObj = this._mergeCommandOptions(obj, extra);
-        var cmdObjWithReadPref =
-            this._attachReadPreferenceToCommand(mergedObj, this.getMongo().getReadPref());
+        obj = this._mergeCommandOptions(obj, extra);
+        queryOptions = queryOptions !== undefined ? queryOptions : this.getQueryOptions();
 
-        var options =
-            (typeof(queryOptions) !== "undefined") ? queryOptions : this.getQueryOptions();
-        var readPrefMode = this.getMongo().getReadPrefMode();
+        {
+            const session = this.getSession();
 
-        // Set slaveOk if readPrefMode has been explicitly set with a readPreference other than
-        // primary.
-        if (!!readPrefMode && readPrefMode !== "primary") {
-            options |= 4;
+            const readPreference = session._serverSession.client.getReadPreference(session);
+            if (readPreference !== null) {
+                obj = this._attachReadPreferenceToCommand(obj, readPreference);
+
+                if (readPreference.mode !== "primary") {
+                    // Set slaveOk if readPrefMode has been explicitly set with a readPreference
+                    // other than primary.
+                    queryOptions |= 4;
+                }
+            }
         }
 
         // The 'extra' parameter is not used as we have already created a merged command object.
-        return this.runCommand(cmdObjWithReadPref, null, options);
-    };
-
-    DB.prototype._attachSessionInfo = function(obj) {
-        var withSessionInfo = Object.extend({}, obj);
-        if (this._session) {
-            withSessionInfo.lsid = this._session._serverSession._id;
-        }
-
-        return withSessionInfo;
+        return this.runCommand(obj, null, queryOptions);
     };
 
     // runCommand uses this impl to actually execute the command
     DB.prototype._runCommandImpl = function(name, obj, options) {
-        return this.getMongo().runCommand(name, this._attachSessionInfo(obj), options);
+        const session = this.getSession();
+        return session._serverSession.client.runCommand(session, name, obj, options);
     };
 
     DB.prototype.runCommand = function(obj, extra, queryOptions) {
@@ -180,8 +172,9 @@ var DB;
     };
 
     DB.prototype.runCommandWithMetadata = function(commandArgs, metadata) {
-        return this.getMongo().runCommandWithMetadata(
-            this._name, metadata, this._attachSessionInfo(commandArgs));
+        const session = this.getSession();
+        return session._serverSession.client.runCommandWithMetadata(
+            session, this._name, metadata, commandArgs);
     };
 
     DB.prototype._dbCommand = DB.prototype.runCommand;
@@ -562,6 +555,7 @@ var DB;
 
         // Use the copyDatabase native helper for SCRAM-SHA-1
         if (mechanism == "SCRAM-SHA-1") {
+            // TODO SERVER-30886: Add session support for Mongo.prototype.copyDatabaseWithSCRAM().
             return this.getMongo().copyDatabaseWithSCRAM(
                 fromdb, todb, fromhost, username, password, slaveOk);
         }
@@ -1003,12 +997,13 @@ var DB;
         var res = this.adminCommand(commandObj);
         if (commandUnsupported(res)) {
             // always send legacy currentOp with default (null) read preference (SERVER-17951)
-            var _readPref = this.getMongo().getReadPrefMode();
+            const session = this.getSession();
+            const readPreference = session.getOptions().getReadPreference();
             try {
-                this.getMongo().setReadPref(null);
+                session.getOptions().setReadPreference(null);
                 res = this.getSiblingDB("admin").$cmd.sys.inprog.findOne(q);
             } finally {
-                this.getMongo().setReadPref(_readPref);
+                session.getOptions().setReadPreference(readPreference);
             }
         }
         return res;
@@ -1021,12 +1016,13 @@ var DB;
         var res = this.adminCommand({'killOp': 1, 'op': op});
         if (commandUnsupported(res)) {
             // fall back for old servers
-            var _readPref = this.getMongo().getReadPrefMode();
+            const session = this.getSession();
+            const readPreference = session.getOptions().getReadPreference();
             try {
-                this.getMongo().setReadPref(null);
+                session.getOptions().setReadPreference(null);
                 res = this.getSiblingDB("admin").$cmd.sys.killop.findOne({'op': op});
             } finally {
-                this.getMongo().setReadPref(_readPref);
+                session.getOptions().setReadPreference(readPreference);
             }
         }
         return res;
@@ -1311,12 +1307,13 @@ var DB;
     DB.prototype.fsyncUnlock = function() {
         var res = this.adminCommand({fsyncUnlock: 1});
         if (commandUnsupported(res)) {
-            var _readPref = this.getMongo().getReadPrefMode();
+            const session = this.getSession();
+            const readPreference = session.getOptions().getReadPreference();
             try {
-                this.getMongo().setReadPref(null);
+                session.getOptions().setReadPreference(null);
                 res = this.getSiblingDB("admin").$cmd.sys.unlock.findOne();
             } finally {
-                this.getMongo().setReadPref(_readPref);
+                session.getOptions().setReadPreference(readPreference);
             }
         }
         return res;
@@ -1494,6 +1491,7 @@ var DB;
     };
 
     DB.prototype.logout = function() {
+        // Logging out doesn't require a session since it manipulates connection state.
         return this.getMongo().logout(this.getName());
     };
 
@@ -1604,6 +1602,7 @@ var DB;
             params.serviceName = this._defaultGssapiServiceName;
         }
 
+        // Logging in doesn't require a session since it manipulates connection state.
         params.db = this.getName();
         var good = this.getMongo().auth(params);
         if (good) {
@@ -1833,10 +1832,10 @@ var DB;
         if (this._writeConcern)
             return this._writeConcern;
 
-        if (this._mongo.getWriteConcern())
-            return this._mongo.getWriteConcern();
-
-        return null;
+        {
+            const session = this.getSession();
+            return session._serverSession.client.getWriteConcern(session);
+        }
     };
 
     DB.prototype.unsetWriteConcern = function() {
@@ -1844,15 +1843,24 @@ var DB;
     };
 
     DB.prototype.getLogComponents = function() {
-        return this.getMongo().getLogComponents();
+        return this.getMongo().getLogComponents(this.getSession());
     };
 
     DB.prototype.setLogLevel = function(logLevel, component) {
-        return this.getMongo().setLogLevel(logLevel, component);
+        return this.getMongo().setLogLevel(logLevel, component, this.getSession());
     };
 
-    DB.prototype.getSession = function() {
-        return this._session;
-    };
+    // Writing `this.hasOwnProperty` would cause DB.prototype.getCollection() to be called since the
+    // DB's getProperty() handler in C++ takes precedence when a property isn't defined on the DB
+    // instance directly. The "hasOwnProperty" property is defined on Object.prototype, so we must
+    // resort to using the function explicitly ourselves.
+    (function(hasOwnProperty) {
+        DB.prototype.getSession = function() {
+            if (!hasOwnProperty.call(this, "_session")) {
+                this._session = new _DummyDriverSession(this.getMongo());
+            }
+            return this._session;
+        };
+    })(Object.prototype.hasOwnProperty);
 
 }());

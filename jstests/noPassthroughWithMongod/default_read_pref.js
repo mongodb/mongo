@@ -19,8 +19,16 @@
             },
             runCommand: function(db, cmd, opts) {
                 commandsRan.push({db: db, cmd: cmd, opts: opts});
-            }
+                return {ok: 1};
+            },
+            getMinWireVersion: function() {
+                return mongo.getMinWireVersion();
+            },
+            getMaxWireVersion: function() {
+                return mongo.getMaxWireVersion();
+            },
         };
+        db._session = new _DummyDriverSession(db._mongo);
 
         db.runReadCommand({ping: 1});
         assert.eq(commandsRan.length, 1);
@@ -30,6 +38,7 @@
 
     } finally {
         db._mongo = mongo;
+        db._session = new _DummyDriverSession(mongo);
     }
 
 })();

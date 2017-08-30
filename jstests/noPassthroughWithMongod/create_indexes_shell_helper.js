@@ -10,10 +10,10 @@
         var insertsRan = [];
         var mockMongo = {
             forceWriteMode: function(mode) {
-                _writeMode = mode;
+                this._writeMode = mode;
             },
             writeMode: function() {
-                return _writeMode;
+                return this._writeMode;
             },
             getSlaveOk: function() {
                 return true;
@@ -34,10 +34,17 @@
             },
             hasWriteCommands: function() {
                 return true;
-            }
+            },
+            getMinWireVersion: function() {
+                return mongo.getMinWireVersion();
+            },
+            getMaxWireVersion: function() {
+                return mongo.getMaxWireVersion();
+            },
         };
 
         db._mongo = mockMongo;
+        db._session = new _DummyDriverSession(mockMongo);
 
         mockMongo.forceWriteMode("commands");
 
@@ -75,5 +82,6 @@
         assert(commandsRan[0].cmd.hasOwnProperty("getlasterror"));
     } finally {
         db._mongo = mongo;
+        db._session = new _DummyDriverSession(mongo);
     }
 }());

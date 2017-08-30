@@ -77,8 +77,11 @@ Mongo.prototype.getDB = function(name) {
     return new DB(this, name);
 };
 
-Mongo.prototype.getDBs = function() {
-    var res = this.adminCommand({"listDatabases": 1});
+Mongo.prototype.getDBs = function(driverSession = new _DummyDriverSession(this)) {
+    var cmdObj = {listDatabases: 1};
+    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+
+    var res = this.adminCommand(cmdObj);
     if (!res.ok)
         throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));
     return res;
@@ -226,8 +229,11 @@ Mongo.prototype.adminCommand = function(cmd) {
 /**
  * Returns all log components and current verbosity values
  */
-Mongo.prototype.getLogComponents = function() {
-    var res = this.adminCommand({getParameter: 1, logComponentVerbosity: 1});
+Mongo.prototype.getLogComponents = function(driverSession = new _DummyDriverSession(this)) {
+    var cmdObj = {getParameter: 1, logComponentVerbosity: 1};
+    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+
+    var res = this.adminCommand(cmdObj);
     if (!res.ok)
         throw _getErrorWithCode(res, "getLogComponents failed:" + tojson(res));
     return res.logComponentVerbosity;
@@ -237,7 +243,8 @@ Mongo.prototype.getLogComponents = function() {
  * Accepts optional second argument "component",
  * string of form "storage.journaling"
  */
-Mongo.prototype.setLogLevel = function(logLevel, component) {
+Mongo.prototype.setLogLevel = function(
+    logLevel, component, driverSession = new _DummyDriverSession(this)) {
     componentNames = [];
     if (typeof component === "string") {
         componentNames = component.split(".");
@@ -253,7 +260,11 @@ Mongo.prototype.setLogLevel = function(logLevel, component) {
         obj[key] = vDoc;
         vDoc = obj;
     }
-    var res = this.adminCommand({setParameter: 1, logComponentVerbosity: vDoc});
+
+    var cmdObj = {setParameter: 1, logComponentVerbosity: vDoc};
+    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+
+    var res = this.adminCommand(cmdObj);
     if (!res.ok)
         throw _getErrorWithCode(res, "setLogLevel failed:" + tojson(res));
     return res;
