@@ -82,16 +82,22 @@ constexpr StringData kRollbackViaRefetch = "rollbackViaRefetch"_sd;
 constexpr StringData kRollbackToCheckpoint = "default"_sd;
 
 // Set this to force rollback to use a particular implementation.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(rollbackMethod,
-                                      std::string,
-                                      kRollbackViaRefetchNoUUID.toString());
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(rollbackMethod, std::string, kRollbackViaRefetch.toString());
 
 // Checks that only the valid strings above can be used as a rollbackMethod
 // parameter. Throws an error if an invalid string is passed to the server parameter.
 MONGO_INITIALIZER(rollbackMethod)(InitializerContext*) {
-    if ((rollbackMethod != kRollbackViaRefetchNoUUID) && (rollbackMethod != kRollbackViaRefetch) &&
-        (rollbackMethod != kRollbackToCheckpoint)) {
-        return Status(ErrorCodes::BadValue, "Unsupported rollback method: " + rollbackMethod);
+    std::set<StringData> supportedRollbackMethods = {
+        kRollbackViaRefetchNoUUID, kRollbackViaRefetch, kRollbackToCheckpoint};
+
+    // Unsupported rollback method.
+    if (supportedRollbackMethods.count(rollbackMethod) == 0) {
+        std::string errMsg = str::stream()
+            << "Unsupported rollback method: '" + rollbackMethod + "'. "
+            << "Supported rollback methods: "
+            << "'" << kRollbackViaRefetchNoUUID << "' | '" << kRollbackViaRefetch << "' | '"
+            << kRollbackToCheckpoint << "'";
+        return Status(ErrorCodes::BadValue, errMsg);
     }
     return Status::OK();
 }
@@ -665,7 +671,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         // we use the "roll back to a checkpoint" algorithm, regardless of the feature
         // compatibility version (FCV). If the user specifies a different rollback method,
         // we will fall back to that.
-        log() << "Rollback using 'roll back to a checkpoint' algorithm.";
+        log() << "Rollback using the 'roll back to a checkpoint' method.";
         _runRollbackViaRecoverToCheckpoint(
             opCtx, source, &localOplog, storageInterface, getConnection);
 
@@ -677,12 +683,12 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
         if (rollbackMethod == kRollbackToCheckpoint) {
             invariant(!supportsCheckpointRollback);
-            log() << "Rollback falling back on 'rollback via refetch' because this storage "
+            log() << "Rollback using the 'rollbackViaRefetch' method because this storage "
                      "engine does not support 'roll back to a checkpoint'.";
         } else {
             invariant(rollbackMethod == kRollbackViaRefetch);
-            log() << "Rollback falling back on 'rollback via refetch' due to startup "
-                     "server parameter.";
+            log() << "Rollback using the 'rollbackViaRefetch' method due to startup server "
+                     "parameter.";
         }
         _fallBackOnRollbackViaRefetch(
             opCtx, source, requiredRBID, &localOplog, true, getConnection);
@@ -691,18 +697,18 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             invariant(!supportsCheckpointRollback);
             invariant(serverGlobalParams.featureCompatibility.version.load() ==
                       ServerGlobalParams::FeatureCompatibility::Version::k34);
-            log() << "Rollback falling back on 'rollback via refetch' without UUID support "
-                     "because this storage engine does not support 'roll back to a checkpoint' and "
-                     "we are in featureCompatibilityVersion 3.4.";
+            log() << "Rollback using the 'rollbackViaRefetchNoUUID' method because this storage "
+                     "engine does not support 'roll back to a checkpoint' and we are "
+                     "in featureCompatibilityVersion 3.4.";
         } else if (rollbackMethod == kRollbackViaRefetch) {
             invariant(serverGlobalParams.featureCompatibility.version.load() ==
                       ServerGlobalParams::FeatureCompatibility::Version::k34);
-            log() << "Rollback falling back on 'rollback via refetch' without UUID support. "
-                     "'Rollback via refetch' with UUID support is not feature compatible with "
-                     "featureCompatabilityVersion 3.4.";
+            log() << "Rollback using the 'rollbackViaRefetchNoUUID' method. 'rollbackViaRefetch' "
+                     "with UUID support is not feature compatible with featureCompatabilityVersion "
+                     "3.4.";
         } else {
             invariant(rollbackMethod == kRollbackViaRefetchNoUUID);
-            log() << "Rollback falling back on 'rollback via refetch' without UUID support due to "
+            log() << "Rollback using the 'rollbackViaRefetchNoUUID' method due to "
                      "startup server parameter.";
         }
         _fallBackOnRollbackViaRefetch(
