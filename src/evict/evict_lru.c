@@ -2566,7 +2566,6 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 	WT_RET(__wt_msg(session,
 	    "total dirty bytes: %" PRIu64 "MB",
 	    total_dirty_bytes / WT_MEGABYTE));
-	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
 
 	return (0);
 }

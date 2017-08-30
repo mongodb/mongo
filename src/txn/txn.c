@@ -1184,7 +1184,6 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 		    "EMPTY" : sess->name));
 		WT_RET(__wt_verbose_dump_txn_one(sess, &sess->txn));
 	}
-	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
 
 	return (0);
 }

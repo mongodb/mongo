@@ -829,7 +829,7 @@ __wt_verbose_dump_handles(WT_SESSION_IMPL *session)
 		WT_WITH_HANDLE_LIST_READ_LOCK(session,
 		    WT_DHANDLE_NEXT(session, dhandle, &conn->dhqh, q));
 		if (dhandle == NULL)
-			return (0);
+			break;
 		WT_RET(__wt_msg(session, "Name: %s", dhandle->name));
 		if (dhandle->checkpoint != NULL)
 			WT_RET(__wt_msg(session,
@@ -847,6 +847,5 @@ __wt_verbose_dump_handles(WT_SESSION_IMPL *session)
 		WT_RET(__wt_msg(session,
 		    "  Flags: 0x%08" PRIx32, dhandle->flags));
 	}
-	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
 	return (0);
 }
