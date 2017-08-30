@@ -18,6 +18,7 @@ var workerThread = (function() {
     // args.seed = seed for the random number generator
     // args.globalAssertLevel = the global assertion level to use
     // args.errorLatch = CountDownLatch instance that threads count down when they error
+    // args.sessionOptions = the options to start a session with
     // run = callback that takes a map of workloads to their associated $config
     function main(workloads, args, run) {
         var myDB;
@@ -36,7 +37,13 @@ var workerThread = (function() {
                     gc();
                 }
 
-                myDB = new Mongo(args.host).getDB(args.dbName);
+                if (typeof args.sessionOptions !== 'undefined') {
+                    myDB = new Mongo(args.host)
+                               .startSession(args.sessionOptions)
+                               .getDatabase(args.dbName);
+                } else {
+                    myDB = new Mongo(args.host).getDB(args.dbName);
+                }
             }
 
             if (Cluster.isReplication(args.clusterOptions)) {

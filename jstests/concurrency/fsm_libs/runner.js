@@ -42,8 +42,13 @@ var runner = (function() {
     }
 
     function validateExecutionOptions(mode, options) {
-        var allowedKeys =
-            ['backgroundWorkloads', 'dbNamePrefix', 'iterationMultiplier', 'threadMultiplier'];
+        var allowedKeys = [
+            'backgroundWorkloads',
+            'dbNamePrefix',
+            'iterationMultiplier',
+            'sessionOptions',
+            'threadMultiplier'
+        ];
 
         if (mode.parallel || mode.composed) {
             allowedKeys.push('numSubsets');
