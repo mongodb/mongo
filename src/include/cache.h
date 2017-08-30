@@ -14,15 +14,6 @@
 #define	WT_EVICT_WALK_BASE	300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR	100	/* Pages added each walk */
 
-/* Ways to position when starting an eviction walk. */
-typedef enum {
-	WT_EVICT_WALK_NEXT,
-	WT_EVICT_WALK_PREV,
-	WT_EVICT_WALK_RAND_NEXT,
-	WT_EVICT_WALK_RAND_PREV
-} WT_EVICT_WALK_START;
-#define	WT_EVICT_WALK_START_NUM	(WT_EVICT_WALK_RAND_PREV + 1)
-
 /*
  * WT_EVICT_ENTRY --
  *	Encapsulation of an eviction candidate.

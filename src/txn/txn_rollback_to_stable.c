@@ -307,13 +307,12 @@ __txn_rollback_to_stable_btree_walk(
  *	Called for each open handle - choose to either skip or wipe the commits
  */
 static int
-__txn_rollback_to_stable_btree(
-    WT_SESSION_IMPL *session, const char *cfg[])
+__txn_rollback_to_stable_btree(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_DECL_TIMESTAMP(rollback_timestamp)
-	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
 
 	WT_UNUSED(cfg);

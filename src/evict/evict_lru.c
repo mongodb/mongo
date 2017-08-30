@@ -1730,7 +1730,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	 * eviction fairly visits all pages in trees with a lot of in-cache
 	 * content.
 	 */
-	switch ((WT_EVICT_WALK_START)btree->evict_start_type) {
+	switch (btree->evict_start_type) {
 	case WT_EVICT_WALK_NEXT:
 		break;
 	case WT_EVICT_WALK_PREV:
@@ -1788,9 +1788,23 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 			 * Try a different walk start point next time if a
 			 * walk gave up.
 			 */
-			btree->evict_start_type =
-			    (btree->evict_start_type + 1) %
-			    WT_EVICT_WALK_START_NUM;
+			switch (btree->evict_start_type) {
+			case WT_EVICT_WALK_NEXT:
+				btree->evict_start_type = WT_EVICT_WALK_PREV;
+				break;
+			case WT_EVICT_WALK_PREV:
+				btree->evict_start_type =
+				    WT_EVICT_WALK_RAND_PREV;
+				break;
+			case WT_EVICT_WALK_RAND_PREV:
+				btree->evict_start_type =
+				    WT_EVICT_WALK_RAND_NEXT;
+				break;
+			case WT_EVICT_WALK_RAND_NEXT:
+				btree->evict_start_type = WT_EVICT_WALK_NEXT;
+				break;
+			}
+
 			/*
 			 * We differentiate the reasons we gave up on this walk
 			 * and increment the stats accordingly.

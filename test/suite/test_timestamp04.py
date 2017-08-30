@@ -88,7 +88,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
             self.skipTest('requires a timestamp build')
 
         # Configure small page sizes to ensure eviction comes through and we have a
-       #  somewhat complex tree
+        # somewhat complex tree
         self.session.create(self.uri,
             'key_format=i,value_format=i,memory_page_max=32k,leaf_page_max=8k,internal_page_max=8k'
                 + self.extra_config)
@@ -130,7 +130,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         self.check(self.session, 'read_timestamp=' + timestamp_str(2 * key_range),
             dict((k, 2) for k in keys[:]))
 
-        # Rollback a quater of the new commits
+        # Rollback a quarter of the new commits
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1 + key_range + key_range / 4))
         self.conn.rollback_to_stable()
 

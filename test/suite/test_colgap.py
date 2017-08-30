@@ -169,7 +169,7 @@ class test_colmax(wttest.WiredTigerTestCase):
             bulk_config = "bulk"
         cursor = self.session.open_cursor(uri, None, bulk_config)
 
-        # Optionaly make the big record the only record in the table.
+        # Optionally make the big record the only record in the table.
         if not self.single:
             for i in range(1, 723):
                 cursor[simple_key(cursor, i)] = simple_value(cursor, i)

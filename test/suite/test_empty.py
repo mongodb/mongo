@@ -53,7 +53,7 @@ class test_empty(wttest.WiredTigerTestCase):
             name = name + '.wt'
         self.assertEquals(os.stat(name).st_size, 4*1024)
 
-    # Open a new sesssion, add a few rows to an object and then remove them,
+    # Open a new session, add a few rows to an object and then remove them,
     # then close the object.  We open/close the object so it's flushed from
     # the underlying cache each time.
     def empty(self):

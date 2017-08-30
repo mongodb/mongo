@@ -82,7 +82,7 @@ class test_alter02(wttest.WiredTigerTestCase):
         self.session = self.conn.open_session()
 
     # Verify the metadata string for this URI and that its setting in the
-    # metdata file is correct.
+    # metadata file is correct.
     def verify_metadata(self, metastr):
         if metastr == '':
             return

@@ -42,7 +42,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
 
     # For tests that are mismatching, we use a secretkey. The 'rotn'
     # encryptor without a secretkey is too simple, and may leave
-    # substantional portions of its input unchanged - a root page decoded
+    # substantial portions of its input unchanged - a root page decoded
     # with simply the wrong keyid may appear valid when initially verified,
     # but may result in error on first use. The odds that a real encryptor
     # would leave a lot of its input unchanged is infinitesimally small.
@@ -175,7 +175,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         self.create_records(cursor, r, 0, self.nrecords)
         cursor.close()
 
-        # Now intentially expose the test to mismatched configuration
+        # Now intentionally expose the test to mismatched configuration
         self.part = 2
         self.name = self.name2
         self.keyid = self.keyid2

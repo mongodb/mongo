@@ -432,11 +432,9 @@ __schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	WT_RET(__wt_config_gets(session, table_cfg, "columns", &cval));
-	WT_RET(__wt_config_gets(
-	    session, table_cfg, "key_format", &cval));
+	WT_RET(__wt_config_gets(session, table_cfg, "key_format", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &table->key_format));
-	WT_RET(__wt_config_gets(
-	    session, table_cfg, "value_format", &cval));
+	WT_RET(__wt_config_gets(session, table_cfg, "value_format", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &table->value_format));
 
 	/* Point to some items in the copy to save re-parsing. */

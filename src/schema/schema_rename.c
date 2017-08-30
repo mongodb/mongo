@@ -248,9 +248,9 @@ __rename_table(WT_SESSION_IMPL *session,
 	}
 
 	/* Rename the table. */
-	WT_ERR(__metadata_rename(session, uri, newuri));
+	ret = __metadata_rename(session, uri, newuri);
 
-err:	if (table != NULL && !tracked)
+err:	if (!tracked)
 		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }

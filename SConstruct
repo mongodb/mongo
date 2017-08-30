@@ -469,39 +469,6 @@ t = env.Program("t_manydbs",
     LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
-# t_readonly doesn't currently build/run.
-#t = env.Program("t_readonly",
-#    "test/readonly/readonly.c",
-#    LIBS=[wtlib, shim, testutil] + wtlibs)
-#Default(t)
-
-# t_random-abort doesn't currently build/run.
-#t = env.Program("t_random-abort",
-#    "test/recovery/random-abort.c",
-#    LIBS=[wtlib, shim, testutil] + wtlibs)
-#Default(t)
-
-# t_truncated-log doesn't currently build/run.
-#t = env.Program("t_truncated-log",
-#    "test/recovery/truncated-log.c",
-#    LIBS=[wtlib, shim, testutil] + wtlibs)
-#Default(t)
-
-# t_salvage-log doesn't currently build/run.
-#t = env.Program("t_salvage",
-#    "test/salvage/salvage.c",
-#    LIBS=[wtlib, shim, testutil] + wtlibs)
-#Default(t)
-
-# t_thread doesn't currently build/run.
-#t = env.Program("t_thread",
-#    ["test/thread/file.c",
-#    "test/thread/rw.c",
-#    "test/thread/stats.c",
-#    "test/thread/t.c"],
-#    LIBS=[wtlib, shim, testutil] + wtlibs)
-#Default(t)
-
 t = env.Program("wtperf", [
     "bench/wtperf/config.c",
     "bench/wtperf/idle_table_cycle.c",
