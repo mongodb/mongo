@@ -678,7 +678,7 @@ shellHelper.use = function(dbname) {
         print("bad use parameter");
         return;
     }
-    db = db.getSession().getSiblingDB(dbname);
+    db = db.getSiblingDB(dbname);
     print("switched to db " + db.getName());
 };
 
