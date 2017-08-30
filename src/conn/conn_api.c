@@ -1093,6 +1093,49 @@ err:	/*
 }
 
 /*
+ * __conn_debug_info --
+ *	WT_CONNECTION->debug_info method.
+ */
+static int
+__conn_debug_info(WT_CONNECTION *wt_conn, const char *config)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+
+	CONNECTION_API_CALL(conn, session, debug_info, config, cfg);
+
+	WT_ERR(__wt_config_gets(session, cfg, "cache", &cval));
+	if (cval.val != 0)
+		WT_ERR(__wt_verbose_dump_cache(session));
+
+	WT_ERR(__wt_config_gets(session, cfg, "cursors", &cval));
+	if (cval.val != 0)
+		WT_ERR(__wt_verbose_dump_sessions(session, true));
+
+	WT_ERR(__wt_config_gets(session, cfg, "handles", &cval));
+	if (cval.val != 0)
+		WT_ERR(__wt_verbose_dump_handles(session));
+
+	WT_ERR(__wt_config_gets(session, cfg, "log", &cval));
+	if (cval.val != 0)
+		WT_ERR(__wt_verbose_dump_log(session));
+
+	WT_ERR(__wt_config_gets(session, cfg, "sessions", &cval));
+	if (cval.val != 0)
+		WT_ERR(__wt_verbose_dump_sessions(session, false));
+
+	WT_ERR(__wt_config_gets(session, cfg, "txn", &cval));
+	if (cval.val != 0)
+		WT_ERR(__wt_verbose_dump_txn(session));
+err:
+	API_END_RET(session, ret);
+}
+
+/*
  * __conn_reconfigure --
  *	WT_CONNECTION->reconfigure method.
  */
@@ -1780,6 +1823,120 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __wt_verbose_dump_sessions --
+ *	Print out debugging information about sessions.
+ */
+int
+__wt_verbose_dump_sessions(WT_SESSION_IMPL *session, bool show_cursors)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CURSOR *cursor;
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+	WT_SESSION_IMPL *s;
+	uint32_t i, internal;
+
+	conn = S2C(session);
+	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+	WT_RET(__wt_msg(session, "Active sessions: %" PRIu32 " Max: %" PRIu32,
+	    conn->session_cnt, conn->session_size));
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	internal = 0;
+	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i) {
+		/*
+		 * If it is not active or it is an internal session
+		 * it is not interesting.
+		 */
+		if (!s->active)
+			continue;
+		if (F_ISSET(s, WT_SESSION_INTERNAL)) {
+			++internal;
+			continue;
+		}
+		WT_ASSERT(session, i == s->id);
+		WT_ERR(__wt_msg(session,
+		    "Session: ID: %" PRIu32 " @: 0x%p", i, (void *)s));
+		WT_ERR(__wt_msg(session, "  Name: %s",
+		    s->name == NULL ? "EMPTY" : s->name));
+		if (!show_cursors) {
+			WT_ERR(__wt_msg(session, "  Last operation: %s",
+			    s->lastop == NULL ? "NONE" : s->lastop));
+			WT_ERR(__wt_msg(session, "  Current dhandle: %s",
+			    s->dhandle == NULL ? "NONE" : s->dhandle->name));
+			WT_ERR(__wt_msg(session, "  Backup in progress: %s",
+			    s->bkp_cursor == NULL ? "no" : "yes"));
+			WT_ERR(__wt_msg(session, "  Compact state: %s",
+			    s->compact_state == WT_COMPACT_NONE ? "none" :
+			    (s->compact_state == WT_COMPACT_RUNNING ?
+			     "running" : "success")));
+			WT_ERR(__wt_msg(session,
+			    "  Flags: 0x%" PRIx32, s->flags));
+			WT_ERR(__wt_msg(session, "  Isolation level: %s",
+			    s->isolation == WT_ISO_READ_COMMITTED ?
+			    "read-committed" :
+			    (s->isolation == WT_ISO_READ_UNCOMMITTED ?
+			     "read-uncommitted" : "snapshot")));
+			WT_ERR(__wt_msg(session, "  Transaction:"));
+			WT_ERR(__wt_verbose_dump_txn_one(session, &s->txn));
+		} else {
+			WT_ERR(__wt_msg(session,
+			    "  Number of positioned cursors: %u", s->ncursors));
+			TAILQ_FOREACH(cursor, &s->cursors, q) {
+				WT_ERR(__wt_msg(session,
+				    "Cursor @ %p:", (void *)cursor));
+				WT_ERR(__wt_msg(session,
+				    "  URI: %s, Internal URI: %s",
+				    cursor->uri == NULL ? "EMPTY" : cursor->uri,
+				    cursor->internal_uri == NULL ? "EMPTY" :
+				    cursor->internal_uri));
+				if (F_ISSET(cursor, WT_CURSTD_OPEN)) {
+					WT_ERR(__wt_buf_fmt(
+					    session, buf, "OPEN"));
+					if (F_ISSET(cursor,
+					    WT_CURSTD_KEY_SET) ||
+					    F_ISSET(cursor,
+					    WT_CURSTD_VALUE_SET))
+						WT_ERR(__wt_buf_catfmt(session,
+						    buf, ", POSITIONED"));
+					else
+						WT_ERR(__wt_buf_catfmt(session,
+						    buf, ", RESET"));
+					if (F_ISSET(cursor, WT_CURSTD_APPEND))
+						WT_ERR(__wt_buf_catfmt(session,
+						    buf, ", APPEND"));
+					if (F_ISSET(cursor, WT_CURSTD_BULK))
+						WT_ERR(__wt_buf_catfmt(session,
+						    buf, ", BULK"));
+					if (F_ISSET(cursor,
+					    WT_CURSTD_META_INUSE))
+						WT_ERR(__wt_buf_catfmt(session,
+						    buf, ", META_INUSE"));
+					if (F_ISSET(cursor,
+					    WT_CURSTD_OVERWRITE))
+						WT_ERR(__wt_buf_catfmt(session,
+						    buf, ", OVERWRITE"));
+					WT_ERR(__wt_msg(session,
+					    "  %s", (const char *)buf->data));
+				}
+				WT_ERR(__wt_msg(session,
+				    "  Flags: 0x%" PRIx32, cursor->flags));
+				WT_ERR(__wt_msg(session,
+				    "  Key_format: %s, Value_format: %s",
+				    cursor->key_format == NULL ? "EMPTY" :
+				    cursor->key_format,
+				    cursor->value_format == NULL ? "EMPTY" :
+				    cursor->value_format));
+			}
+		}
+	}
+	if (!show_cursors)
+		WT_ERR(__wt_msg(session,
+		    "Internal sessions: %" PRIu32, internal));
+err:	__wt_scr_free(session, &buf);
+	return (ret);
+}
+
+/*
  * __wt_timing_stress_config --
  *	Set timing stress for test delay configuration.
  */
@@ -2045,6 +2202,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_async_flush,
 		__conn_async_new_op,
 		__conn_close,
+		__conn_debug_info,
 		__conn_reconfigure,
 		__conn_get_home,
 		__conn_configure_method,

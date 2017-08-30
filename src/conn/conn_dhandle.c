@@ -810,3 +810,43 @@ restart:
 
 	return (ret);
 }
+
+/*
+ * __wt_verbose_dump_handles --
+ *	Dump information about all data handles.
+ */
+int
+__wt_verbose_dump_handles(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+
+	conn = S2C(session);
+
+	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+	WT_RET(__wt_msg(session, "Data handle dump:"));
+	for (dhandle = NULL;;) {
+		WT_WITH_HANDLE_LIST_READ_LOCK(session,
+		    WT_DHANDLE_NEXT(session, dhandle, &conn->dhqh, q));
+		if (dhandle == NULL)
+			return (0);
+		WT_RET(__wt_msg(session, "Name: %s", dhandle->name));
+		if (dhandle->checkpoint != NULL)
+			WT_RET(__wt_msg(session,
+			    "Checkpoint: %s", dhandle->checkpoint));
+		WT_RET(__wt_msg(session, "  Sessions referencing handle: %"
+		    PRIu32, dhandle->session_ref));
+		WT_RET(__wt_msg(session, "  Sessions using handle: %"
+		    PRId32, dhandle->session_inuse));
+		WT_RET(__wt_msg(session, "  Exclusive references to handle: %"
+		    PRIu32, dhandle->excl_ref));
+		if (dhandle->excl_ref != 0)
+			WT_RET(__wt_msg(session,
+			    "  Session with exclusive use: %p",
+			    (void *)dhandle->excl_session));
+		WT_RET(__wt_msg(session,
+		    "  Flags: 0x%08" PRIx32, dhandle->flags));
+	}
+	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+	return (0);
+}

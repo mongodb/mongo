@@ -1980,6 +1980,33 @@ struct __wt_connection {
 	int __F(close)(WT_HANDLE_CLOSED(WT_CONNECTION) *connection,
 	    const char *config);
 
+#ifndef DOXYGEN
+	/*!
+	 * Output debug information for various subsystems. The output format
+	 * may change over time, gathering the debug information may be
+	 * invasive, and the information reported may not provide a point in
+	 * time view of the system.
+	 *
+	 * @param connection the connection handle
+	 * @configstart{WT_CONNECTION.debug_info, see dist/api_data.py}
+	 * @config{cache, print cache information., a boolean flag; default \c
+	 * false.}
+	 * @config{cursors, print all open cursor information., a boolean flag;
+	 * default \c false.}
+	 * @config{handles, print open handles information., a boolean flag;
+	 * default \c false.}
+	 * @config{log, print log information., a boolean flag; default \c
+	 * false.}
+	 * @config{sessions, print open session information., a boolean flag;
+	 * default \c false.}
+	 * @config{txn, print global txn information., a boolean flag; default
+	 * \c false.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(debug_info)(WT_CONNECTION *connection, const char *config);
+#endif
+
 	/*!
 	 * Reconfigure a connection handle.
 	 *

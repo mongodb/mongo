@@ -58,6 +58,13 @@ union __wt_lsn {
 #define	WT_IS_ZERO_LSN(l)	((l)->file_offset == 0)
 
 /*
+ * Macro to print an LSN.
+ */
+#define	WT_LSN_MSG(lsn, msg)						\
+	__wt_msg(session, "%s LSN: [%" PRIu32 "][%" PRIu32 "]",		\
+	    (msg), (lsn)->l.file, (lsn)->l.offset)
+
+/*
  * Both of the macros below need to change if the content of __wt_lsn
  * ever changes.  The value is the following:
  * txnid, record type, operation type, file id, operation key, operation value

@@ -85,3 +85,64 @@ __wt_log_recover_system(WT_SESSION_IMPL *session,
 
 	return (0);
 }
+
+/*
+ * __wt_verbose_dump_log --
+ *	Dump information about the logging subsystem.
+ */
+int
+__wt_verbose_dump_log(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+
+	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+	WT_RET(__wt_msg(session, "Logging subsystem: Enabled: %s",
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ? "yes" : "no"));
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+		return (0);
+	/*
+	 * Logging is enabled, print out the other information.
+	 */
+	WT_RET(__wt_msg(session, "Archiving: %s",
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE) ? "yes" : "no"));
+	WT_RET(__wt_msg(session, "Running downgraded: %s",
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_DOWNGRADED) ? "yes" : "no"));
+	WT_RET(__wt_msg(session, "Zero fill files: %s",
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ZERO_FILL) ? "yes" : "no"));
+	WT_RET(__wt_msg(session, "Pre-allocate files: %s",
+	    conn->log_prealloc > 0 ? "yes" : "no"));
+	WT_RET(__wt_msg(session, "Logging directory: %s", conn->log_path));
+	WT_RET(__wt_msg(session, "Logging maximum file size: %" PRId64,
+	    (int64_t)conn->log_file_max));
+	WT_RET(__wt_msg(session, "Log sync setting: %s",
+	    !FLD_ISSET(conn->txn_logsync, WT_LOG_SYNC_ENABLED) ? "none" :
+	    FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC) ? "dsync" :
+	    FLD_ISSET(conn->txn_logsync, WT_LOG_FLUSH) ? "write to OS" :
+	    FLD_ISSET(conn->txn_logsync, WT_LOG_FSYNC) ?
+	    "fsync to disk": "unknown sync setting"));
+	WT_RET(__wt_msg(session, "Log record allocation alignment: %" PRIu32,
+	    log->allocsize));
+	WT_RET(__wt_msg(session, "Current log file number: %" PRIu32,
+	    log->fileid));
+	WT_RET(__wt_msg(session, "Current log version number: %" PRIu16,
+	    log->log_version));
+	WT_RET(WT_LSN_MSG(&log->alloc_lsn, "Next allocation"));
+	WT_RET(WT_LSN_MSG(&log->bg_sync_lsn, "Last background sync"));
+	WT_RET(WT_LSN_MSG(&log->ckpt_lsn, "Last checkpoint"));
+	WT_RET(WT_LSN_MSG(&log->sync_dir_lsn, "Last directory sync"));
+	WT_RET(WT_LSN_MSG(&log->sync_lsn, "Last sync"));
+	WT_RET(WT_LSN_MSG(&log->trunc_lsn, "Recovery truncate"));
+	WT_RET(WT_LSN_MSG(&log->write_lsn, "Last written"));
+	WT_RET(WT_LSN_MSG(&log->write_start_lsn, "Start of last written"));
+	/*
+	 * If we wanted a dump of the slots, it would go here. Walking
+	 * the slot pool may not require a lock since they're statically
+	 * allocated, but output could be inconsistent without it.
+	 */
+
+	return (0);
+}

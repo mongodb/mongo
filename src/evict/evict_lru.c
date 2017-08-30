@@ -2418,7 +2418,6 @@ __wt_evict_priority_clear(WT_SESSION_IMPL *session)
 	S2BT(session)->evict_priority = 0;
 }
 
-#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 /*
  * __verbose_dump_cache_single --
  *	Output diagnostic information about a single file in the cache.
@@ -2571,4 +2570,3 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 
 	return (0);
 }
-#endif
