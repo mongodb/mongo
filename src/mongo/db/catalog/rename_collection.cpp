@@ -244,6 +244,13 @@ Status renameCollectionCommon(OperationContext* opCtx,
                                     << tmpNameResult.getStatus().reason());
     }
     const auto& tmpName = tmpNameResult.getValue();
+
+    // Check if all the source collection's indexes can be recreated in the temporary collection.
+    status = tmpName.checkLengthForRename(longestIndexNameLength);
+    if (!status.isOK()) {
+        return status;
+    }
+
     Collection* tmpColl = nullptr;
     OptionalCollectionUUID newUUID;
     bool isSourceCollectionTemporary = false;
@@ -301,7 +308,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
             }
             indexesToCopy.push_back(newIndex.obj());
         }
-        indexer.init(indexesToCopy).status_with_transitional_ignore();
+        status = indexer.init(indexesToCopy).getStatus();
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     {

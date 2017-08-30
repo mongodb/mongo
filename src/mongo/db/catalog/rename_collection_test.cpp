@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -229,6 +230,34 @@ bool _isTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
     return options.temp;
 }
 
+/**
+ * Creates an index using the given index name with a bogus key spec.
+ */
+void _createIndex(OperationContext* opCtx,
+                  const NamespaceString& nss,
+                  const std::string& indexName) {
+    writeConflictRetry(opCtx, "_createIndex", nss.ns(), [=] {
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        auto collection = autoColl.getCollection();
+        ASSERT_TRUE(collection) << "Cannot create index in collection " << nss
+                                << " because collection " << nss.ns() << " does not exist.";
+
+        auto indexInfoObj = BSON(
+            "v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("a" << 1) << "name"
+                << indexName
+                << "ns"
+                << nss.ns());
+
+        MultiIndexBlock indexer(opCtx, collection);
+        ASSERT_OK(indexer.init(indexInfoObj).getStatus());
+        WriteUnitOfWork wuow(opCtx);
+        indexer.commit();
+        wuow.commit();
+    });
+
+    ASSERT_TRUE(AutoGetCollectionForRead(opCtx, nss).getCollection());
+}
+
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {
     ASSERT_FALSE(AutoGetDb(_opCtx.get(), _sourceNss.db(), MODE_X).getDb());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
@@ -242,6 +271,41 @@ TEST_F(RenameCollectionTest, RenameCollectionReturnsNotMasterIfNotPrimary) {
     ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _sourceNss.db()));
     ASSERT_EQUALS(ErrorCodes::NotMaster,
                   renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
+}
+
+TEST_F(RenameCollectionTest, IndexNameTooLongForTargetCollection) {
+    ASSERT_GREATER_THAN(_targetNssDifferentDb.size(), _sourceNss.size());
+    std::size_t longestIndexNameAllowedForSource =
+        NamespaceString::MaxNsLen - 2U /*strlen(".$")*/ - _sourceNss.size();
+    ASSERT_OK(_sourceNss.checkLengthForRename(longestIndexNameAllowedForSource));
+    ASSERT_EQUALS(ErrorCodes::InvalidLength,
+                  _targetNssDifferentDb.checkLengthForRename(longestIndexNameAllowedForSource));
+
+    _createCollection(_opCtx.get(), _sourceNss);
+    const std::string indexName(longestIndexNameAllowedForSource, 'a');
+    _createIndex(_opCtx.get(), _sourceNss, indexName);
+    ASSERT_EQUALS(ErrorCodes::InvalidLength,
+                  renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
+}
+
+TEST_F(RenameCollectionTest, IndexNameTooLongForTemporaryCollectionForRenameAcrossDatabase) {
+    ASSERT_GREATER_THAN(_targetNssDifferentDb.size(), _sourceNss.size());
+    std::size_t longestIndexNameAllowedForTarget =
+        NamespaceString::MaxNsLen - 2U /*strlen(".$")*/ - _targetNssDifferentDb.size();
+    ASSERT_OK(_sourceNss.checkLengthForRename(longestIndexNameAllowedForTarget));
+    ASSERT_OK(_targetNssDifferentDb.checkLengthForRename(longestIndexNameAllowedForTarget));
+
+    // Using XXXXX to check namespace length. Each 'X' will be replaced by a random character in
+    // renameCollection().
+    const NamespaceString tempNss(_targetNssDifferentDb.getSisterNS("tmpXXXXX.renameCollection"));
+    ASSERT_EQUALS(ErrorCodes::InvalidLength,
+                  tempNss.checkLengthForRename(longestIndexNameAllowedForTarget));
+
+    _createCollection(_opCtx.get(), _sourceNss);
+    const std::string indexName(longestIndexNameAllowedForTarget, 'a');
+    _createIndex(_opCtx.get(), _sourceNss, indexName);
+    ASSERT_EQUALS(ErrorCodes::InvalidLength,
+                  renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithoutUuid) {

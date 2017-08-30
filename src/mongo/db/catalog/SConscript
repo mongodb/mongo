@@ -279,6 +279,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
+        'index_create',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/optime',
