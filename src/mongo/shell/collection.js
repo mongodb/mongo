@@ -776,6 +776,19 @@ DBCollection.prototype.findAndModify = function(args) {
         cmd[key] = args[key];
     }
 
+    {
+        const kWireVersionSupportingRetryableWrites = 6;
+        const serverSupportsRetryableWrites =
+            this.getMongo().getMinWireVersion() <= kWireVersionSupportingRetryableWrites &&
+            kWireVersionSupportingRetryableWrites <= this.getMongo().getMaxWireVersion();
+
+        const session = this.getDB().getSession();
+        if (serverSupportsRetryableWrites && session.getOptions().shouldRetryWrites() &&
+            session._serverSession.canRetryWrites(cmd)) {
+            cmd = session._serverSession.assignTransactionNumber(cmd);
+        }
+    }
+
     var ret = this._db.runCommand(cmd);
     if (!ret.ok) {
         if (ret.errmsg == "No matching object found") {

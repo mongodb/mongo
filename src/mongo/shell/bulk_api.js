@@ -892,6 +892,19 @@ var _bulk_api_module = (function() {
                 cmd.writeConcern = writeConcern;
             }
 
+            {
+                const kWireVersionSupportingRetryableWrites = 6;
+                const serverSupportsRetryableWrites =
+                    coll.getMongo().getMinWireVersion() <= kWireVersionSupportingRetryableWrites &&
+                    kWireVersionSupportingRetryableWrites <= coll.getMongo().getMaxWireVersion();
+
+                const session = collection.getDB().getSession();
+                if (serverSupportsRetryableWrites && session.getOptions().shouldRetryWrites() &&
+                    session._serverSession.canRetryWrites(cmd)) {
+                    cmd = session._serverSession.assignTransactionNumber(cmd);
+                }
+            }
+
             return cmd;
         };
 
