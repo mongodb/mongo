@@ -243,7 +243,7 @@ class test_stat_cursor_dsrc_cache_walk(wttest.WiredTigerTestCase):
         self.assertGreater(c[stat.dsrc.btree_entries][2], 0)
         c.close()
 
-        # Verify that cache and tree walk can operate independantly
+        # Verify that cache and tree walk can operate independently
         self.conn.reconfigure('statistics=(all,clear)')
         c = self.session.open_cursor(
             'statistics:' + self.uri, None, 'statistics=(cache_walk,fast)')

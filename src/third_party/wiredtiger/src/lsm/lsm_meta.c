@@ -309,12 +309,10 @@ __lsm_meta_read_v1(
 			continue;
 		}
 		WT_ERR(__wt_realloc_def(session,
-		    &lsm_tree->old_alloc, nchunks + 1,
-		    &lsm_tree->old_chunks));
+		    &lsm_tree->old_alloc, nchunks + 1, &lsm_tree->old_chunks));
 		WT_ERR(__wt_calloc_one(session, &chunk));
 		lsm_tree->old_chunks[nchunks++] = chunk;
-		WT_ERR(__wt_strndup(session,
-		    lk.str, lk.len, &chunk->uri));
+		WT_ERR(__wt_strndup(session, lk.str, lk.len, &chunk->uri));
 		F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 	}
 	WT_ERR_NOTFOUND_OK(ret);

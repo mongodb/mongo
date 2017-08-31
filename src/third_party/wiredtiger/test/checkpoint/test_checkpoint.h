@@ -57,8 +57,6 @@ typedef struct {
 	WT_CONNECTION *conn;			/* WiredTiger connection */
 	u_int nkeys;				/* Keys to load */
 	u_int nops;				/* Operations per thread */
-	uint64_t timestamp;			/* Current timestamp */
-	bool use_timestamps;			/* Test with timestamps */
 	FILE *logfp;				/* Message log file. */
 	int nworkers;				/* Number workers configured */
 	int ntables;				/* Number tables configured */

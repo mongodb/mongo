@@ -53,6 +53,10 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 		    &las_txnid, &las_timestamp, &las_key));
 
 		/* Check the file ID so we can skip durable tables */
+		if (las_id >= conn->stable_rollback_maxfile)
+			WT_PANIC_RET(session, EINVAL, "file ID %" PRIu32
+			    " in lookaside table larger than max %" PRIu32,
+			    las_id, conn->stable_rollback_maxfile);
 		if (__bit_test(conn->stable_rollback_bitstring, las_id))
 			continue;
 
@@ -303,18 +307,19 @@ __txn_rollback_to_stable_btree_walk(
  *	Called for each open handle - choose to either skip or wipe the commits
  */
 static int
-__txn_rollback_to_stable_btree(
-    WT_SESSION_IMPL *session, const char *cfg[])
+__txn_rollback_to_stable_btree(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_DECL_TIMESTAMP(rollback_timestamp)
-	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
 
 	WT_UNUSED(cfg);
 
 	btree = S2BT(session);
-	txn_global = &S2C(session)->txn_global;
+	conn = S2C(session);
+	txn_global = &conn->txn_global;
 
 	/*
 	 * Immediately durable files don't get their commits wiped. This case
@@ -329,7 +334,11 @@ __txn_rollback_to_stable_btree(
 		 * Add the btree ID to the bitstring, so we can exclude any
 		 * lookaside entries for this btree.
 		 */
-		__bit_set(S2C(session)->stable_rollback_bitstring, btree->id);
+		if (btree->id >= conn->stable_rollback_maxfile)
+			WT_PANIC_RET(session, EINVAL, "btree file ID %" PRIu32
+			    " larger than max %" PRIu32,
+			    btree->id, conn->stable_rollback_maxfile);
+		__bit_set(conn->stable_rollback_bitstring, btree->id);
 		return (0);
 	}
 
@@ -415,9 +424,14 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 	WT_RET(__txn_rollback_to_stable_check(session));
 
-	/* Allocate a non-durable btree bitstring */
+	/*
+	 * Allocate a non-durable btree bitstring.  We increment the global
+	 * value before using it, so the current value is already in use, and
+	 * hence we need to add one here.
+	 */
+	conn->stable_rollback_maxfile = conn->next_file_id + 1;
 	WT_RET(__bit_alloc(session,
-	    conn->next_file_id, &conn->stable_rollback_bitstring));
+	    conn->stable_rollback_maxfile, &conn->stable_rollback_bitstring));
 	WT_ERR(__wt_conn_btree_apply(session,
 	    NULL, __txn_rollback_to_stable_btree, NULL, cfg));
 

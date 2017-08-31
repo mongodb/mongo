@@ -26,12 +26,10 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	WT_INDEX *idx;
 	WT_SESSION *wt_session;
 	WT_TABLE *table;
-	const char *tablename;
 	u_int i;
 	bool skip;
 
 	table = NULL;
-	tablename = uri;
 
 	skip = false;
 	if (name_func != NULL)
@@ -59,7 +57,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			    session, uri, cfg, open_flags));
 			WT_SAVE_DHANDLE(session,
 			    ret = file_func(session, cfg));
-			WT_TRET(__wt_session_release_btree(session));
+			WT_TRET(__wt_session_release_dhandle(session));
 			WT_ERR(ret);
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
@@ -67,18 +65,23 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		    session, uri, false, NULL, &colgroup));
 		WT_ERR(__wt_schema_worker(session,
 		    colgroup->source, file_func, name_func, cfg, open_flags));
-	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
+	} else if (WT_PREFIX_MATCH(uri, "index:")) {
 		idx = NULL;
-		WT_ERR(__wt_schema_get_index(session, uri, false, NULL, &idx));
+		WT_ERR(__wt_schema_get_index(session, uri, false, false, &idx));
 		WT_ERR(__wt_schema_worker(session, idx->source,
 		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
 		WT_ERR(__wt_lsm_tree_worker(session,
 		    uri, file_func, name_func, cfg, open_flags));
-	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
-		WT_ERR(__wt_schema_get_table(session,
-		    tablename, strlen(tablename), false, &table));
-		WT_ASSERT(session, session->dhandle == NULL);
+	} else if (WT_PREFIX_MATCH(uri, "table:")) {
+		/*
+		 * Note: we would like to use open_flags here (e.g., to lock
+		 * the table exclusive during schema-changing operations), but
+		 * that is currently problematic because we get the table again
+		 * in order to discover column groups and indexes.
+		 */
+		WT_ERR(__wt_schema_get_table_uri(
+		    session, uri, false, 0, &table));
 
 		/*
 		 * We could make a recursive call for each colgroup or index
@@ -128,6 +131,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_bad_object_type(session, uri));
 
 err:	if (table != NULL)
-		__wt_schema_release_table(session, table);
+		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }

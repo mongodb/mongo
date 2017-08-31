@@ -1028,7 +1028,70 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 	return (0);
 }
 
-#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
+/*
+ * __wt_verbose_dump_txn_one --
+ *	Output diagnostic information about a transaction structure.
+ */
+int
+__wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
+{
+#ifdef HAVE_TIMESTAMPS
+	char hex_timestamp[3][2 * WT_TIMESTAMP_SIZE + 1];
+#endif
+	const char *iso_tag;
+
+	iso_tag = "INVALID";
+	switch (txn->isolation) {
+	case WT_ISO_READ_COMMITTED:
+		iso_tag = "WT_ISO_READ_COMMITTED";
+		break;
+	case WT_ISO_READ_UNCOMMITTED:
+		iso_tag = "WT_ISO_READ_UNCOMMITTED";
+		break;
+	case WT_ISO_SNAPSHOT:
+		iso_tag = "WT_ISO_SNAPSHOT";
+		break;
+	}
+#ifdef HAVE_TIMESTAMPS
+	WT_RET(__wt_timestamp_to_hex_string(
+	    session, hex_timestamp[0], &txn->commit_timestamp));
+	WT_RET(__wt_timestamp_to_hex_string(
+	    session, hex_timestamp[1], &txn->first_commit_timestamp));
+	WT_RET(__wt_timestamp_to_hex_string(
+	    session, hex_timestamp[2], &txn->read_timestamp));
+	WT_RET(__wt_msg(session,
+	    "mod count: %u"
+	    ", snap min: %" PRIu64
+	    ", snap max: %" PRIu64
+	    ", commit_timestamp: %s"
+	    ", first_commit_timestamp: %s"
+	    ", read_timestamp: %s"
+	    ", flags: 0x%08" PRIx32
+	    ", isolation: %s",
+	    txn->mod_count,
+	    txn->snap_min,
+	    txn->snap_max,
+	    hex_timestamp[0],
+	    hex_timestamp[1],
+	    hex_timestamp[2],
+	    txn->flags,
+	    iso_tag));
+#else
+	WT_RET(__wt_msg(session,
+	    "mod count: %u"
+	    ", snap min: %" PRIu64
+	    ", snap max: %" PRIu64
+	    ", flags: 0x%08" PRIx32
+	    ", isolation: %s",
+	    txn->mod_count,
+	    txn->snap_min,
+	    txn->snap_max,
+	    txn->flags,
+	    iso_tag));
+#endif
+	return (0);
+}
+
 /*
  * __wt_verbose_dump_txn --
  *	Output diagnostic information about the global transaction state.
@@ -1037,15 +1100,15 @@ int
 __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *sess;
 	WT_TXN_GLOBAL *txn_global;
-	WT_TXN *txn;
 	WT_TXN_STATE *s;
-	const char *iso_tag;
 	uint64_t id;
 	uint32_t i, session_cnt;
 #ifdef HAVE_TIMESTAMPS
 	char hex_timestamp[3][2 * WT_TIMESTAMP_SIZE + 1];
 #endif
+
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 
@@ -1110,78 +1173,17 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 		/* Skip sessions with no active transaction */
 		if ((id = s->id) == WT_TXN_NONE && s->pinned_id == WT_TXN_NONE)
 			continue;
-
-		txn = &conn->sessions[i].txn;
-		iso_tag = "INVALID";
-		switch (txn->isolation) {
-		case WT_ISO_READ_COMMITTED:
-			iso_tag = "WT_ISO_READ_COMMITTED";
-			break;
-		case WT_ISO_READ_UNCOMMITTED:
-			iso_tag = "WT_ISO_READ_UNCOMMITTED";
-			break;
-		case WT_ISO_SNAPSHOT:
-			iso_tag = "WT_ISO_SNAPSHOT";
-			break;
-		}
-#ifdef HAVE_TIMESTAMPS
-		WT_RET(__wt_timestamp_to_hex_string(
-		    session, hex_timestamp[0], &txn->commit_timestamp));
-		WT_RET(__wt_timestamp_to_hex_string(
-		    session, hex_timestamp[1], &txn->first_commit_timestamp));
-		WT_RET(__wt_timestamp_to_hex_string(
-		    session, hex_timestamp[2], &txn->read_timestamp));
+		sess = &conn->sessions[i];
 		WT_RET(__wt_msg(session,
-		    "ID: %8" PRIu64
-		    ", mod count: %u"
-		    ", pinned ID: %8" PRIu64
-		    ", snap min: %" PRIu64
-		    ", snap max: %" PRIu64
-		    ", commit_timestamp: %s"
-		    ", first_commit_timestamp: %s"
-		    ", read_timestamp: %s"
-		    ", metadata pinned ID: %" PRIu64
-		    ", flags: 0x%08" PRIx32
-		    ", name: %s"
-		    ", isolation: %s",
-		    id,
-		    txn->mod_count,
-		    s->pinned_id,
-		    txn->snap_min,
-		    txn->snap_max,
-		    hex_timestamp[0],
-		    hex_timestamp[1],
-		    hex_timestamp[2],
-		    s->metadata_pinned,
-		    txn->flags,
-		    conn->sessions[i].name == NULL ?
-		    "EMPTY" : conn->sessions[i].name,
-		    iso_tag));
-#else
-		WT_RET(__wt_msg(session,
-		    "ID: %6" PRIu64
-		    ", mod count: %u"
+		    "ID: %" PRIu64
 		    ", pinned ID: %" PRIu64
-		    ", snap min: %" PRIu64
-		    ", snap max: %" PRIu64
 		    ", metadata pinned ID: %" PRIu64
-		    ", flags: 0x%08" PRIx32
-		    ", name: %s"
-		    ", isolation: %s",
-		    id,
-		    txn->mod_count,
-		    s->pinned_id,
-		    txn->snap_min,
-		    txn->snap_max,
-		    s->metadata_pinned,
-		    txn->flags,
-		    conn->sessions[i].name == NULL ?
-		    "EMPTY" : conn->sessions[i].name,
-		    iso_tag));
-#endif
+		    ", name: %s",
+		    id, s->pinned_id, s->metadata_pinned,
+		    sess->name == NULL ?
+		    "EMPTY" : sess->name));
+		WT_RET(__wt_verbose_dump_txn_one(sess, &sess->txn));
 	}
-	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
 
 	return (0);
 }
-#endif

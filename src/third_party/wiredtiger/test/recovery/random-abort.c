@@ -233,7 +233,7 @@ main(int argc, char *argv[])
 	uint32_t i, nth, timeout;
 	int ch, status, ret;
 	const char *working_dir;
-	char fname[64], kname[64], statname[1024];
+	char buf[1024], fname[64], kname[64];
 	bool fatal, rand_th, rand_time, verify_only;
 
 	(void)testutil_set_progname(argv);
@@ -326,8 +326,8 @@ main(int argc, char *argv[])
 		 * don't stay in this loop forever.
 		 */
 		testutil_check(__wt_snprintf(
-		    statname, sizeof(statname), "%s/%s", home, fs_main));
-		while (stat(statname, &sb) != 0 && kill(pid, 0) == 0)
+		    buf, sizeof(buf), "%s/%s", home, fs_main));
+		while (stat(buf, &sb) != 0 && kill(pid, 0) == 0)
 			sleep(1);
 		sleep(timeout);
 
@@ -348,6 +348,14 @@ main(int argc, char *argv[])
 	 */
 	if (chdir(home) != 0)
 		testutil_die(errno, "parent chdir: %s", home);
+
+	testutil_check(__wt_snprintf(buf, sizeof(buf),
+	    "rm -rf ../%s.SAVE; mkdir ../%s.SAVE; "
+	    "cp -p WiredTigerLog.* ../%s.SAVE;",
+	    home, home, home));
+	if ((status = system(buf)) < 0)
+		testutil_die(status, "system: %s", buf);
+
 	printf("Open database, run recovery and verify content\n");
 	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");

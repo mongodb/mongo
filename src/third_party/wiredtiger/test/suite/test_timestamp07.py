@@ -27,14 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_timestamp07.py
-#   Timestamps: checkpoints and eviction
+#   Timestamps: checkpoints.
 #
 
 from helper import copy_wiredtiger_home
 import random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
-from wiredtiger import stat
 from wtscenario import make_scenarios
 
 def timestamp_str(t):
@@ -51,19 +50,17 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     conncfg = [
-        ('nolog', dict(conn_config='create,cache_size=1M,statistics=(fast)', using_log=False)),
-        ('log', dict(conn_config='create,log=(enabled),cache_size=1M,statistics=(fast)', using_log=True)),
+        ('nolog', dict(conn_config='create,cache_size=1M', using_log=False)),
+        ('log', dict(conn_config='create,log=(enabled),cache_size=1M', using_log=True)),
     ]
 
     nkeys = [
-        ('100keys', dict(nkeys=100,evicts=False)),
-        ('500keys', dict(nkeys=500,evicts=True)),
-#        ('1000keys', dict(nkeys=1000,evicts=True)),
+        ('100keys', dict(nkeys=100)),
+#        ('500keys', dict(nkeys=500)),
+#        ('1000keys', dict(nkeys=1000)),
     ]
 
     scenarios = make_scenarios(types, conncfg, nkeys)
-
-    modified_evicted = 0
 
     # Binary values.
     value = u'\u0001\u0002abcd\u0007\u0004'
@@ -74,16 +71,9 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     # expected values.
     def check(self, session, txn_config, expected):
         if txn_config:
-            #print "Check: txn_config:"
-            #print txn_config
             session.begin_transaction(txn_config)
         c = session.open_cursor(self.uri + self.tablename, None)
         actual = dict((k, v) for k, v in c if v != 0)
-        self.maxDiff = None
-        #print "Expected:"
-        #print expected
-        #print "Actual:"
-        #print actual
         self.assertEqual(actual, expected)
         # Search for the expected items as well as iterating
         for k, v in expected.iteritems():
@@ -135,26 +125,6 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(count2, valcnt2)
         self.assertEqual(count3, valcnt3)
 
-    # Return whether or not eviction happened since the last call.
-    def check_eviction(self):
-        # Get a statistics cursor and look at the number of dirty pages
-        # evicted.  Keep track of the last read value so we can determine
-        # if the value changed since the last call to this function.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        evict_dirty = stat_cursor[stat.conn.cache_eviction_dirty][2]
-
-        # Return True if the new value is more, False otherwise.
-        #print "Old: " + str(self.modified_evicted)
-        # print "New: " + str(evict_dirty)
-        did_eviction = self.modified_evicted < evict_dirty
-        stat_cursor.close()
-        self.modified_evicted = evict_dirty
-        # print "Evict ret: " + str(ret)
-
-        # XXX we can't guarantee that eviction will always happen, but make
-        # sure it doesn't happen if not expected.
-        self.assertTrue(not did_eviction or self.evicts)
-
     # Check that a cursor sees the expected values after a checkpoint.
     def ckpt_backup(self, check_value, valcnt, valcnt2, valcnt3):
 
@@ -196,7 +166,6 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             c3[k] = self.value
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k))
 
-        self.check_eviction()
         # Now check that we see the expected state when reading at each
         # timestamp.
         for i, t in enumerate(orig_keys):
@@ -227,8 +196,6 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.commit_transaction('commit_timestamp=' + ts)
             # print "Commit key " + str(k) + " ts " + ts
             count += 1
-
-        self.check_eviction()
 
         # print "Updated " + str(count) + " keys to value2"
 
@@ -266,7 +233,6 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             # print "Commit key " + str(k) + " ts " + ts
             count += 1
 
-        self.check_eviction()
         # print "Updated " + str(count) + " keys to value3"
 
         # Flush the log but don't checkpoint

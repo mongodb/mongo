@@ -63,9 +63,6 @@ err:	__wt_free(session, config);
 	if (ret == WT_NOTFOUND)
 		ret = ENOENT;
 
-	/* Bump the schema generation so that stale data is ignored. */
-	(void)__wt_gen_next(session, WT_GEN_SCHEMA);
-
 	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
 	return (ret);

@@ -7,10 +7,10 @@
  */
 
 /*
- * Default hash table size; use a prime number of buckets rather than assuming
- * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
+ * Default hash table size; we don't need a prime number of buckets
+ * because we always use a good hash function.
  */
-#define	WT_HASH_ARRAY_SIZE	509
+#define	WT_HASH_ARRAY_SIZE	512
 
 /*******************************************
  * Global per-process structure.
@@ -336,6 +336,7 @@ struct __wt_connection_impl {
 	bool		 log_wrlsn_tid_set;/* Log write lsn thread set */
 	WT_LOG		*log;		/* Logging structure */
 	WT_COMPRESSOR	*log_compressor;/* Logging compressor */
+	uint32_t	 log_cursors;	/* Log cursor count */
 	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
 	uint32_t	 log_prealloc;	/* Log file pre-allocation */
@@ -379,6 +380,7 @@ struct __wt_connection_impl {
 
 	/* Set of btree IDs not being rolled back */
 	uint8_t *stable_rollback_bitstring;
+	uint32_t stable_rollback_maxfile;
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

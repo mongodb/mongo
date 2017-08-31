@@ -153,7 +153,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 			WT_RET_MSG(session, EINVAL,
 			    "Column '%.*s' in '%s' does not appear in a "
 			    "column group",
-			    (int)k.len, k.str, table->name);
+			    (int)k.len, k.str, table->iface.name);
 		/*
 		 * Column groups can't store key columns in their value:
 		 * __wt_struct_reformat should have already detected this case.

@@ -52,9 +52,10 @@ struct __wt_index {
  *	in an index key that can be used to reconstruct the primary key.
  */
 struct __wt_table {
-	const char *name, *config, *plan;
+	WT_DATA_HANDLE iface;
+
+	const char *plan;
 	const char *key_format, *value_format;
-	uint64_t name_hash;		/* Hash of name */
 
 	WT_CONFIG_ITEM cgconf, colconf;
 
@@ -62,14 +63,8 @@ struct __wt_table {
 	WT_INDEX **indices;
 	size_t idx_alloc;
 
-	TAILQ_ENTRY(__wt_table) q;
-	TAILQ_ENTRY(__wt_table) hashq;
-
 	bool cg_complete, idx_complete, is_simple;
 	u_int ncolgroups, nindices, nkey_columns;
-
-	uint32_t refcnt;		/* Number of open cursors */
-	uint64_t schema_gen;		/* Cached schema generation number */
 };
 
 /*

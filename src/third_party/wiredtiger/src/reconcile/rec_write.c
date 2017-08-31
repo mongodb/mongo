@@ -3131,7 +3131,7 @@ no_slots:
 		 */
 		if (F_ISSET(r, WT_EVICT_SCRUB) ||
 		    (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && r->supd_next > 0)) {
-			WT_RET(__wt_strndup(session, dsk,
+			WT_RET(__wt_memdup(session, dsk,
 			    dsk_dst->mem_size, &last->disk_image));
 			disk_image = last->disk_image;
 			disk_image->recno = last->max_bnd_recno;
@@ -3674,7 +3674,7 @@ supd_check_complete:
 #ifdef HAVE_DIAGNOSTIC
 	verify_image = false;
 #endif
-	WT_ERR(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
+	WT_ERR(__wt_memdup(session, addr, addr_size, &bnd->addr.addr));
 	bnd->addr.size = (uint8_t)addr_size;
 
 	/*
@@ -3711,7 +3711,7 @@ copy_image:
 		    __wt_verify_dsk_image(
 		    session, "[reconcile-image]", buf->data, 0, true) == 0);
 #endif
-		WT_ERR(__wt_strndup(
+		WT_ERR(__wt_memdup(
 		    session, buf->data, buf->size, &bnd->disk_image));
 	}
 	if (!need_image)

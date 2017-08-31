@@ -809,7 +809,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
+		if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
 			WT_WITH_DHANDLE(session, dhandle,
 			    WT_TRET(__evict_clear_walk(session)));
 	return (ret);
@@ -1399,8 +1399,8 @@ retry:	while (slot < max_entries) {
 		if (dhandle == NULL)
 			break;
 
-		/* Ignore non-file handles, or handles that aren't open. */
-		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
+		/* Ignore non-btree handles, or handles that aren't open. */
+		if (dhandle->type != WT_DHANDLE_TYPE_BTREE ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
 
@@ -1730,7 +1730,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	 * eviction fairly visits all pages in trees with a lot of in-cache
 	 * content.
 	 */
-	switch ((WT_EVICT_WALK_START)btree->evict_start_type) {
+	switch (btree->evict_start_type) {
 	case WT_EVICT_WALK_NEXT:
 		break;
 	case WT_EVICT_WALK_PREV:
@@ -1788,9 +1788,23 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 			 * Try a different walk start point next time if a
 			 * walk gave up.
 			 */
-			btree->evict_start_type =
-			    (btree->evict_start_type + 1) %
-			    WT_EVICT_WALK_START_NUM;
+			switch (btree->evict_start_type) {
+			case WT_EVICT_WALK_NEXT:
+				btree->evict_start_type = WT_EVICT_WALK_PREV;
+				break;
+			case WT_EVICT_WALK_PREV:
+				btree->evict_start_type =
+				    WT_EVICT_WALK_RAND_PREV;
+				break;
+			case WT_EVICT_WALK_RAND_PREV:
+				btree->evict_start_type =
+				    WT_EVICT_WALK_RAND_NEXT;
+				break;
+			case WT_EVICT_WALK_RAND_NEXT:
+				btree->evict_start_type = WT_EVICT_WALK_NEXT;
+				break;
+			}
+
 			/*
 			 * We differentiate the reasons we gave up on this walk
 			 * and increment the stats accordingly.
@@ -2404,7 +2418,6 @@ __wt_evict_priority_clear(WT_SESSION_IMPL *session)
 	S2BT(session)->evict_priority = 0;
 }
 
-#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 /*
  * __verbose_dump_cache_single --
  *	Output diagnostic information about a single file in the cache.
@@ -2527,7 +2540,7 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 		    WT_DHANDLE_NEXT(session, dhandle, &conn->dhqh, q));
 		if (dhandle == NULL)
 			break;
-		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
+		if (dhandle->type != WT_DHANDLE_TYPE_BTREE ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
 
@@ -2553,8 +2566,6 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 	WT_RET(__wt_msg(session,
 	    "total dirty bytes: %" PRIu64 "MB",
 	    total_dirty_bytes / WT_MEGABYTE));
-	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
 
 	return (0);
 }
-#endif

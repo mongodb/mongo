@@ -550,7 +550,7 @@ __posix_open_file_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
 	if ((f = fcntl(fd, F_GETFD)) == -1 ||
 	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1)
 		WT_RET_MSG(session, __wt_errno(),
-		    "%s: handle-open: fcntl", name);
+		    "%s: handle-open: fcntl(FD_CLOEXEC)", name);
 	return (0);
 #else
 	WT_UNUSED(session);
@@ -602,7 +602,8 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 		WT_SYSCALL_RETRY((
 		    (pfh->fd = open(name, f, 0444)) == -1 ? -1 : 0), ret);
 		if (ret != 0)
-			WT_ERR_MSG(session, ret, "%s: handle-open: open", name);
+			WT_ERR_MSG(session, ret,
+			    "%s: handle-open: open-directory", name);
 		WT_ERR(__posix_open_file_cloexec(session, pfh->fd, name));
 		goto directory_open;
 	}

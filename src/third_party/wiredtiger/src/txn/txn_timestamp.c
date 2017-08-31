@@ -262,8 +262,7 @@ __wt_txn_global_query_timestamp(
 	WT_UNUSED(cfg);
 
 	WT_RET_MSG(session, ENOTSUP,
-	    "WT_CONNECTION.query_timestamp requires a version of WiredTiger "
-	    "built with timestamp support");
+	    "requires a version of WiredTiger built with timestamp support");
 #endif
 }
 
@@ -408,7 +407,7 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	    __wt_timestamp_cmp(&oldest_ts, &stable_ts) > 0) {
 		__wt_writeunlock(session, &txn_global->rwlock);
 		WT_RET_MSG(session, EINVAL,
-		    "set_timestamp: oldest timestamp must be later than "
+		    "set_timestamp: oldest timestamp must not be later than "
 		    "stable timestamp");
 	}
 
@@ -454,7 +453,7 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET(__wt_txn_update_pinned_timestamp(session));
 	}
 #else
-		WT_RET_MSG(session, EINVAL, "set_timestamp requires a "
+		WT_RET_MSG(session, ENOTSUP, "set_timestamp requires a "
 		    "version of WiredTiger built with timestamp support");
 #endif
 	return (0);
@@ -478,11 +477,15 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_TIMESTAMPS
 		WT_TXN *txn = &session->txn;
 
+		if (!F_ISSET(txn, WT_TXN_RUNNING))
+			WT_RET_MSG(session, EINVAL,
+			    "Transaction must be running "
+			    "to set a commit_timestamp");
 		WT_RET(__wt_txn_parse_timestamp(
 		    session, "commit", &txn->commit_timestamp, &cval));
 		__wt_txn_set_commit_timestamp(session);
 #else
-		WT_RET_MSG(session, EINVAL, "commit_timestamp requires a "
+		WT_RET_MSG(session, ENOTSUP, "commit_timestamp requires a "
 		    "version of WiredTiger built with timestamp support");
 #endif
 	}

@@ -9,78 +9,35 @@
 #include "wt_internal.h"
 
 /*
- * __schema_add_table --
- *	Add a table handle to the session's cache.
+ * __wt_schema_get_table_uri --
+ *	Get the table handle for the named table.
  */
-static int
-__schema_add_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
+int
+__wt_schema_get_table_uri(WT_SESSION_IMPL *session,
+    const char *uri, bool ok_incomplete, uint32_t flags,
+    WT_TABLE **tablep)
 {
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	WT_TABLE *table;
-	uint64_t bucket;
 
-	table = NULL;			/* -Wconditional-uninitialized */
+	saved_dhandle = session->dhandle;
 
-	/* Make sure the metadata is open before getting other locks. */
-	WT_RET(__wt_metadata_cursor(session, NULL));
+	*tablep = NULL;
 
-	WT_WITH_TABLE_READ_LOCK(session,
-	    ret = __wt_schema_open_table(
-	    session, name, namelen, ok_incomplete, &table));
-	WT_RET(ret);
-
-	bucket = table->name_hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_INSERT_HEAD(&session->tables, table, q);
-	TAILQ_INSERT_HEAD(&session->tablehash[bucket], table, hashq);
+	WT_ERR(__wt_session_get_dhandle(session, uri, NULL, NULL, flags));
+	table = (WT_TABLE *)session->dhandle;
+	if (!ok_incomplete && !table->cg_complete) {
+		ret = EINVAL;
+		WT_TRET(__wt_session_release_dhandle(session));
+		WT_ERR_MSG(session, ret, "'%s' cannot be used "
+		    "until all column groups are created",
+		    table->iface.name);
+	}
 	*tablep = table;
 
-	return (0);
-}
-
-/*
- * __schema_find_table --
- *	Find the table handle for the named table in the session cache.
- */
-static int
-__schema_find_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, WT_TABLE **tablep)
-{
-	WT_TABLE *table;
-	const char *tablename;
-	uint64_t bucket;
-
-	bucket = __wt_hash_city64(name, namelen) % WT_HASH_ARRAY_SIZE;
-
-restart:
-	TAILQ_FOREACH(table, &session->tablehash[bucket], hashq) {
-		tablename = table->name;
-		(void)WT_PREFIX_SKIP(tablename, "table:");
-		if (WT_STRING_MATCH(tablename, name, namelen)) {
-			/*
-			 * Ignore stale tables.
-			 *
-			 * XXX: should be managed the same as btree handles,
-			 * with a local cache in each session and a shared list
-			 * in the connection.  There is still a race here
-			 * between checking the generation and opening the
-			 * first column group.
-			 */
-			if (table->schema_gen !=
-			    __wt_gen(session, WT_GEN_SCHEMA)) {
-				if (table->refcnt == 0) {
-					WT_RET(__wt_schema_remove_table(
-					    session, table));
-					goto restart;
-				}
-				continue;
-			}
-			*tablep = table;
-			return (0);
-		}
-	}
-
-	return (WT_NOTFOUND);
+err:	session->dhandle = saved_dhandle;
+	return (ret);
 }
 
 /*
@@ -89,23 +46,20 @@ restart:
  */
 int
 __wt_schema_get_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
+    const char *name, size_t namelen, bool ok_incomplete, uint32_t flags,
+    WT_TABLE **tablep)
 {
 	WT_DECL_RET;
-	WT_TABLE *table;
+	WT_DECL_ITEM(namebuf);
 
-	*tablep = table = NULL;
-	ret = __schema_find_table(session, name, namelen, &table);
+	WT_RET(__wt_scr_alloc(session, namelen + 1, &namebuf));
+	WT_ERR(__wt_buf_fmt(
+	    session, namebuf, "table:%.*s", (int)namelen, name));
 
-	if (ret == WT_NOTFOUND)
-		ret = __schema_add_table(
-		    session, name, namelen, ok_incomplete, &table);
+	WT_ERR(__wt_schema_get_table_uri(
+	    session, namebuf->data, ok_incomplete, flags, tablep));
 
-	if (ret == 0) {
-		++table->refcnt;
-		*tablep = table;
-	}
-
+err:	__wt_scr_free(session, &namebuf);
 	return (ret);
 }
 
@@ -113,11 +67,15 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
  * __wt_schema_release_table --
  *	Release a table handle.
  */
-void
+int
 __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
-	WT_ASSERT(session, table->refcnt > 0);
-	--table->refcnt;
+	WT_DECL_RET;
+
+	WT_WITH_DHANDLE(session, &table->iface,
+	    ret = __wt_session_release_dhandle(session));
+
+	return (ret);
 }
 
 /*
@@ -185,22 +143,15 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
 }
 
 /*
- * __wt_schema_destroy_table --
- *	Free a table handle.
+ * __wt_schema_close_table --
+ *	Close a table handle.
  */
 int
-__wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
+__wt_schema_close_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_DECL_RET;
-	WT_TABLE *table;
 	u_int i;
 
-	if ((table = *tablep) == NULL)
-		return (0);
-	*tablep = NULL;
-
-	__wt_free(session, table->name);
-	__wt_free(session, table->config);
 	__wt_free(session, table->plan);
 	__wt_free(session, table->key_format);
 	__wt_free(session, table->value_format);
@@ -216,70 +167,11 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
 			    session, &table->indices[i]));
 		__wt_free(session, table->indices);
 	}
-	__wt_free(session, table);
-	return (ret);
-}
+	table->idx_alloc = 0;
 
-/*
- * __wt_schema_remove_table --
- *	Remove the table handle from the session, closing if necessary.
- */
-int
-__wt_schema_remove_table(WT_SESSION_IMPL *session, WT_TABLE *table)
-{
-	uint64_t bucket;
-	WT_ASSERT(session, table->refcnt <= 1);
-
-	bucket = table->name_hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_REMOVE(&session->tables, table, q);
-	TAILQ_REMOVE(&session->tablehash[bucket], table, hashq);
-	return (__wt_schema_destroy_table(session, &table));
-}
-
-/*
- * __wt_schema_close_tables --
- *	Close all of the tables in a session.
- */
-int
-__wt_schema_close_tables(WT_SESSION_IMPL *session)
-{
-	WT_DECL_RET;
-	WT_TABLE *table, *table_tmp;
-
-	WT_TAILQ_SAFE_REMOVE_BEGIN(table, &session->tables, q, table_tmp) {
-		WT_TRET(__wt_schema_remove_table(session, table));
-	} WT_TAILQ_SAFE_REMOVE_END
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE) ||
+	    F_ISSET(S2C(session), WT_CONN_CLOSING));
+	table->cg_complete = table->idx_complete = false;
 
 	return (ret);
-}
-
-/*
- * __wt_schema_sweep_tables --
- *	Close all idle, obsolete tables in a session.
- */
-int
-__wt_schema_sweep_tables(WT_SESSION_IMPL *session)
-{
-	WT_TABLE *table, *next;
-	uint64_t schema_gen;
-	bool old_table_busy;
-
-	schema_gen = __wt_gen(session, WT_GEN_SCHEMA);
-	if (schema_gen == session->table_sweep_gen)
-		return (0);
-
-	old_table_busy = false;
-	TAILQ_FOREACH_SAFE(table, &session->tables, q, next)
-		if (table->schema_gen != schema_gen) {
-			if (table->refcnt == 0)
-				WT_RET(__wt_schema_remove_table(
-				    session, table));
-			else
-				old_table_busy = true;
-		}
-
-	if (!old_table_busy)
-		session->table_sweep_gen = schema_gen;
-
-	return (0);
 }

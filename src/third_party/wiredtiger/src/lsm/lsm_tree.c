@@ -282,8 +282,8 @@ __wt_lsm_tree_setup_chunk(
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 	__wt_epoch(session, &chunk->create_time);
 
-	__wt_spin_init(session,
-	    &chunk->timestamp_spinlock, "LSM chunk timestamp");
+	WT_RET(__wt_spin_init(session,
+	    &chunk->timestamp_spinlock, "LSM chunk timestamp"));
 	WT_RET(__wt_lsm_tree_chunk_name(
 	    session, lsm_tree, chunk->id, &chunk->uri));
 

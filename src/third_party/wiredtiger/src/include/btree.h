@@ -154,8 +154,12 @@ struct __wt_btree {
 	u_int	    evict_walk_skips;	/* Number of walks skipped */
 	int32_t	    evict_disabled;	/* Eviction disabled count */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-	int	    evict_start_type;	/* Start position for eviction walk
-					   (see WT_EVICT_WALK_START). */
+	enum {				/* Start position for eviction walk */
+		WT_EVICT_WALK_NEXT,
+		WT_EVICT_WALK_PREV,
+		WT_EVICT_WALK_RAND_NEXT,
+		WT_EVICT_WALK_RAND_PREV
+	} evict_start_type;
 
 	/*
 	 * We flush pages from the tree (in order to make checkpoint faster),

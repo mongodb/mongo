@@ -382,7 +382,7 @@ __curindex_close(WT_CURSOR *cursor)
 	if (cindex->child != NULL)
 		WT_TRET(cindex->child->close(cindex->child));
 
-	__wt_schema_release_table(session, cindex->table);
+	WT_TRET(__wt_schema_release_table(session, cindex->table));
 	/* The URI is owned by the index. */
 	cursor->internal_uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
@@ -472,7 +472,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	++idxname;
 
 	if ((ret = __wt_schema_get_table(session,
-	    tablename, namesize, false, &table)) != 0) {
+	    tablename, namesize, false, 0, &table)) != 0) {
 		if (ret == WT_NOTFOUND)
 			WT_RET_MSG(session, EINVAL,
 			    "Cannot open cursor '%s' on unknown table", uri);
@@ -487,7 +487,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	if ((ret = __wt_schema_open_index(
 	    session, table, idxname, namesize, &idx)) != 0) {
-		__wt_schema_release_table(session, table);
+		WT_TRET(__wt_schema_release_table(session, table));
 		return (ret);
 	}
 	WT_RET(__wt_calloc_one(session, &cindex));

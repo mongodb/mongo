@@ -118,7 +118,7 @@
 #ifdef HAVE_DIAGNOSTIC
 #define	WT_ASSERT(session, exp) do {					\
 	if (!(exp))							\
-		__wt_assert(session, 0, __FILE__, __LINE__, "%s", #exp);\
+		__wt_assert(session, 0, __func__, __LINE__, "%s", #exp);\
 } while (0)
 #else
 #define	WT_ASSERT(session, exp)						\

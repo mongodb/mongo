@@ -132,7 +132,7 @@ __ovfl_cache(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 	WT_ERR(__wt_realloc_def(session,
 	    &track->remove_allocated, track->remove_next + 1, &track->remove));
 	track->remove[track->remove_next].cell = unpack->cell;
-	WT_ERR(__wt_strndup(session,
+	WT_ERR(__wt_memdup(session,
 	    tmp->data, tmp->size, &track->remove[track->remove_next].data));
 	track->remove[track->remove_next].size = tmp->size;
 	++track->remove_next;

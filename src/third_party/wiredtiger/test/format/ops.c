@@ -76,7 +76,7 @@ wts_ops(int lastrun)
 	TINFO **tinfo_list, *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	wt_thread_t alter_tid, backup_tid, compact_tid, compat_tid, lrt_tid;
+	wt_thread_t alter_tid, backup_tid, compact_tid, lrt_tid;
 	int64_t fourths, thread_ops;
 	uint32_t i;
 	int running;
@@ -87,7 +87,6 @@ wts_ops(int lastrun)
 	memset(&alter_tid, 0, sizeof(alter_tid));
 	memset(&backup_tid, 0, sizeof(backup_tid));
 	memset(&compact_tid, 0, sizeof(compact_tid));
-	memset(&compat_tid, 0, sizeof(compat_tid));
 	memset(&lrt_tid, 0, sizeof(lrt_tid));
 
 	modify_repl_init();
@@ -155,9 +154,6 @@ wts_ops(int lastrun)
 	if (g.c_compact)
 		testutil_check(
 		    __wt_thread_create(NULL, &compact_tid, compact, NULL));
-	if (g.c_compat_flag != COMPAT_NONE)
-		testutil_check(
-		    __wt_thread_create(NULL, &compat_tid, compat, NULL));
 	if (!SINGLETHREADED && g.c_long_running_txn)
 		testutil_check(__wt_thread_create(NULL, &lrt_tid, lrt, NULL));
 
@@ -225,8 +221,6 @@ wts_ops(int lastrun)
 		testutil_check(__wt_thread_join(NULL, backup_tid));
 	if (g.c_compact)
 		testutil_check(__wt_thread_join(NULL, compact_tid));
-	if (g.c_compat_flag != COMPAT_NONE)
-		testutil_check(__wt_thread_join(NULL, compat_tid));
 	if (!SINGLETHREADED && g.c_long_running_txn)
 		testutil_check(__wt_thread_join(NULL, lrt_tid));
 	g.workers_finished = 0;

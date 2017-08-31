@@ -187,7 +187,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         if not wiredtiger.diagnostic_build():
             self.skipTest('requires a diagnostic build')
 
-        # Close explicitly, there's going to be a fallure.
+        # Close explicitly, there's going to be a failure.
         msg = '/are incorrectly sorted/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.conn.close(), msg)

@@ -403,7 +403,7 @@ main(int argc, char *argv[])
 	uint32_t i, nth, timeout;
 	int ch, status, ret;
 	const char *working_dir;
-	char buf[128], fname[64], kname[64], statname[1024];
+	char buf[512], fname[64], kname[64], statname[1024];
 	bool fatal, rand_th, rand_time, verify_only;
 
 	(void)testutil_set_progname(argv);
@@ -523,7 +523,8 @@ main(int argc, char *argv[])
 	if (chdir(home) != 0)
 		testutil_die(errno, "parent chdir: %s", home);
 	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && cp -rp * ../%s.SAVE",
+	    "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && "
+	    "cp -p WiredTigerLog.* ../%s.SAVE",
 	     home, home, home));
 	(void)system(buf);
 	printf("Open database, run recovery and verify content\n");

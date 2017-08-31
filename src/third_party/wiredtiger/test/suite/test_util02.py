@@ -178,7 +178,7 @@ class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
         else:
                 self.check_empty_file(errfile)
 
-    # Empty arguments should suceed.
+    # Empty arguments should succeed.
     def test_load_commandline_1(self):
         self.load_commandline([], False)
 
@@ -199,7 +199,7 @@ class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
         self.load_commandline([self.uri, "block_allocation=first"], False)
         self.load_commandline(["table:bar", "block_allocation=first"], True)
 
-    # You can specify multipleconfiguration arguments for the same object.
+    # You can specify multiple configuration arguments for the same object.
     def test_load_commandline_5(self):
         self.load_commandline([
             self.uri, "block_allocation=first",

@@ -550,48 +550,6 @@ alter(void *arg)
 	return (WT_THREAD_RET_VALUE);
 }
 
-#define	COMPATSTR_V1	"compatibility=(release=2.6)"
-#define	COMPATSTR_V2	"compatibility=(release=3.0)"
-
-/*
- * compat --
- *	Periodically reconfigure the compatibility option.
- */
-WT_THREAD_RET
-compat(void *arg)
-{
-	WT_CONNECTION *conn;
-	WT_DECL_RET;
-	u_int count, period;
-	const char *str;
-
-	(void)(arg);
-
-	conn = g.wts_conn;
-	str = NULL;
-	/*
-	 * Perform compatibility swaps at somewhere under 10 seconds (so we
-	 * get at least one done), and then at 7 second intervals.
-	 */
-	for (period = mmrand(NULL, 1, 10), count = 0;; ++count, period = 7) {
-		if (count % 2 == 0)
-			str = COMPATSTR_V1;
-		else
-			str = COMPATSTR_V2;
-		if ((ret = conn->reconfigure(conn, str)) != 0)
-			testutil_die(ret, "conn.reconfigure");
-
-		/* Sleep for short periods so we don't make the run wait. */
-		while (period > 0 && !g.workers_finished) {
-			--period;
-			sleep(1);
-		}
-		if (g.workers_finished)
-			break;
-	}
-	return (WT_THREAD_RET_VALUE);
-}
-
 /*
  * print_item_data --
  *	Display a single data/size pair, with a tag.

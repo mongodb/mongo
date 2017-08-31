@@ -20,8 +20,8 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 {
 	const char *tablename;
 
-	tablename = table->name;
-	(void)WT_PREFIX_SKIP(tablename, "table:");
+	tablename = table->iface.name;
+	WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 
 	return ((table->ncolgroups == 0) ?
 	    __wt_buf_fmt(session, buf, "colgroup:%s", tablename) :
@@ -284,8 +284,8 @@ __schema_open_index(WT_SESSION_IMPL *session,
 	match = false;
 
 	/* Build a search key. */
-	tablename = table->name;
-	(void)WT_PREFIX_SKIP(tablename, "table:");
+	tablename = table->iface.name;
+	WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 	WT_ERR(__wt_scr_alloc(session, 512, &tmp));
 	WT_ERR(__wt_buf_fmt(session, tmp, "index:%s:", tablename));
 
@@ -412,57 +412,34 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 /*
  * __schema_open_table --
- *	Open a named table (internal version).
+ *	Open the data handle for a table (internal version).
  */
 static int
-__schema_open_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
+__schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
-	WT_CURSOR *cursor;
-	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_TABLE *table;
-	const char *tconfig;
+	const char *tablename;
+	const char **table_cfg;
 
-	*tablep = NULL;
-
-	cursor = NULL;
-	table = NULL;
+	table = (WT_TABLE *)session->dhandle;
+	table_cfg = table->iface.cfg;
+	tablename = table->iface.name;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
+	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_calloc_one(session, &table));
-	table->name_hash = __wt_hash_city64(name, namelen);
-
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));
-	WT_ERR(__wt_strndup(session, buf->data, buf->size, &table->name));
-
-	/*
-	 * Don't hold the metadata cursor pinned, we call functions that use it
-	 * to retrieve column group information.
-	 */
-	WT_ERR(__wt_metadata_cursor(session, &cursor));
-	cursor->set_key(cursor, table->name);
-	if ((ret = cursor->search(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &tconfig)) == 0)
-		ret = __wt_strdup(session, tconfig, &table->config);
-	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
-	WT_ERR(ret);
-
-	WT_ERR(__wt_config_getones(session, table->config, "columns", &cval));
-	WT_ERR(__wt_config_getones(
-	    session, table->config, "key_format", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->key_format));
-	WT_ERR(__wt_config_getones(
-	    session, table->config, "value_format", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->value_format));
+	WT_RET(__wt_config_gets(session, table_cfg, "columns", &cval));
+	WT_RET(__wt_config_gets(session, table_cfg, "key_format", &cval));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &table->key_format));
+	WT_RET(__wt_config_gets(session, table_cfg, "value_format", &cval));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &table->value_format));
 
 	/* Point to some items in the copy to save re-parsing. */
-	WT_ERR(__wt_config_getones(session, table->config,
-	    "columns", &table->colconf));
+	WT_RET(__wt_config_gets(
+	    session, table_cfg, "columns", &table->colconf));
 
 	/*
 	 * Count the number of columns: tables are "simple" if the columns
@@ -472,49 +449,32 @@ __schema_open_table(WT_SESSION_IMPL *session,
 	table->is_simple = true;
 	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
 		table->is_simple = false;
-	if (ret != WT_NOTFOUND)
-		goto err;
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Check that the columns match the key and value formats. */
 	if (!table->is_simple)
-		WT_ERR(__wt_schema_colcheck(session,
+		WT_RET(__wt_schema_colcheck(session,
 		    table->key_format, table->value_format, &table->colconf,
 		    &table->nkey_columns, NULL));
 
-	WT_ERR(__wt_config_getones(session, table->config,
-	    "colgroups", &table->cgconf));
+	WT_RET(__wt_config_gets(
+	    session, table_cfg, "colgroups", &table->cgconf));
 
 	/* Count the number of column groups. */
 	__wt_config_subinit(session, &cparser, &table->cgconf);
 	table->ncolgroups = 0;
 	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
 		++table->ncolgroups;
-	if (ret != WT_NOTFOUND)
-		goto err;
+	WT_RET_NOTFOUND_OK(ret);
 
 	if (table->ncolgroups > 0 && table->is_simple)
-		WT_ERR_MSG(session, EINVAL,
-		    "%s requires a table with named columns", table->name);
+		WT_RET_MSG(session, EINVAL,
+		    "%s requires a table with named columns", tablename);
 
-	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
-	WT_ERR(__wt_schema_open_colgroups(session, table));
+	WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
+	WT_RET(__wt_schema_open_colgroups(session, table));
 
-	if (!ok_incomplete && !table->cg_complete)
-		WT_ERR_MSG(session, EINVAL, "'%s' cannot be used "
-		    "until all column groups are created",
-		    table->name);
-
-	/* Copy the schema generation into the new table. */
-	table->schema_gen = __wt_gen(session, WT_GEN_SCHEMA);
-
-	*tablep = table;
-
-	if (0) {
-err:		WT_TRET(__wt_schema_destroy_table(session, &table));
-	}
-
-	__wt_scr_free(session, &buf);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -542,7 +502,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 		tend = tablename + strlen(tablename);
 
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, WT_PTRDIFF(tend, tablename), false, &table));
+	    tablename, WT_PTRDIFF(tend, tablename), false, 0, &table));
 
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		colgroup = table->cgroups[i];
@@ -551,12 +511,13 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 			if (tablep != NULL)
 				*tablep = table;
 			else
-				__wt_schema_release_table(session, table);
+				WT_RET(
+				    __wt_schema_release_table(session, table));
 			return (0);
 		}
 	}
 
-	__wt_schema_release_table(session, table);
+	WT_RET(__wt_schema_release_table(session, table));
 	if (quiet)
 		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
@@ -568,7 +529,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
  */
 int
 __wt_schema_get_index(WT_SESSION_IMPL *session,
-    const char *uri, bool quiet, WT_TABLE **tablep, WT_INDEX **indexp)
+    const char *uri, bool invalidate, bool quiet, WT_INDEX **indexp)
 {
 	WT_DECL_RET;
 	WT_INDEX *idx;
@@ -576,8 +537,6 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 	const char *tablename, *tend;
 	u_int i;
 
-	if (tablep != NULL)
-		*tablep = NULL;
 	*indexp = NULL;
 
 	tablename = uri;
@@ -586,28 +545,25 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 		return (__wt_bad_object_type(session, uri));
 
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, WT_PTRDIFF(tend, tablename), false, &table));
+	    tablename, WT_PTRDIFF(tend, tablename), false, 0, &table));
 
 	/* Try to find the index in the table. */
 	for (i = 0; i < table->nindices; i++) {
 		idx = table->indices[i];
 		if (idx != NULL && strcmp(idx->name, uri) == 0) {
-			if (tablep != NULL)
-				*tablep = table;
-			else
-				__wt_schema_release_table(session, table);
 			*indexp = idx;
-			return (0);
+			goto done;
 		}
 	}
 
 	/* Otherwise, open it. */
 	WT_ERR(__wt_schema_open_index(
 	    session, table, tend + 1, strlen(tend + 1), indexp));
-	if (tablep != NULL)
-		*tablep = table;
 
-err:	__wt_schema_release_table(session, table);
+done:	if (invalidate)
+		table->idx_complete = false;
+
+err:	WT_TRET(__wt_schema_release_table(session, table));
 	WT_RET(ret);
 
 	if (*indexp != NULL)
@@ -623,13 +579,13 @@ err:	__wt_schema_release_table(session, table);
  *	Open a named table.
  */
 int
-__wt_schema_open_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
+__wt_schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DECL_RET;
 
-	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
-	    ret = __schema_open_table(
-	    session, name, namelen, ok_incomplete, tablep));
+	WT_WITH_TABLE_WRITE_LOCK(session,
+	    WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		ret = __schema_open_table(session, cfg)));
+
 	return (ret);
 }

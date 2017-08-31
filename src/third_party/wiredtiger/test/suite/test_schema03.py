@@ -133,7 +133,7 @@ class tabconfig:
         rand = suite_random.suite_random(ncolumns, totalindices)
 
         # Initially, all indices get one column from the collist.
-        # Overlaps are allowed.  Then probalistically, add some
+        # Overlaps are allowed.  Then probabalistically, add some
         # more columns.
         for idx in self.idxlist:
             prob = 1.0

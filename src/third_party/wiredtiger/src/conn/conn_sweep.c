@@ -63,8 +63,8 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	btree = S2BT(session);
 	dhandle = session->dhandle;
+	btree = dhandle->type == WT_DHANDLE_TYPE_BTREE ? dhandle->handle : NULL;
 
 	/*
 	 * Acquire an exclusive lock on the handle and mark it dead.
@@ -84,16 +84,17 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	WT_RET(__wt_try_writelock(session, &dhandle->rwlock));
 
 	/* Only sweep clean trees where all updates are visible. */
-	if (btree->modified || !__wt_txn_visible_all(session,
-	    btree->rec_max_txn, WT_TIMESTAMP_NULL(&btree->rec_max_timestamp)))
+	if (btree != NULL && (btree->modified || !__wt_txn_visible_all(session,
+	    btree->rec_max_txn, WT_TIMESTAMP_NULL(&btree->rec_max_timestamp))))
 		goto err;
 
 	/*
-	 * Mark the handle dead and close the underlying file handle.
-	 * Closing the handle decrements the open file count, meaning the close
-	 * loop won't overrun the configured minimum.
+	 * Mark the handle dead and close the underlying handle.
+	 *
+	 * For btree handles, closing the handle decrements the open file
+	 * count, meaning the close loop won't overrun the configured minimum.
 	 */
-	ret = __wt_conn_btree_sync_and_close(session, false, true);
+	ret = __wt_conn_dhandle_close(session, false, true);
 
 err:	__wt_writeunlock(session, &dhandle->rwlock);
 
@@ -130,8 +131,17 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 		    conn->sweep_idle_time)
 			continue;
 
-		WT_WITH_DHANDLE(session, dhandle,
-		    ret = __sweep_expire_one(session));
+		/*
+		 * For tables, we need to hold the table lock to avoid racing
+		 * with cursor opens.
+		 */
+		if (dhandle->type == WT_DHANDLE_TYPE_TABLE)
+			WT_WITH_TABLE_WRITE_LOCK(session,
+			    WT_WITH_DHANDLE(session, dhandle,
+				ret = __sweep_expire_one(session)));
+		else
+			WT_WITH_DHANDLE(session, dhandle,
+			    ret = __sweep_expire_one(session));
 		WT_RET_BUSY_OK(ret);
 	}
 
@@ -163,7 +173,7 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
 
 		/* If the handle is marked dead, flush it from cache. */
 		WT_WITH_DHANDLE(session, dhandle, ret =
-		    __wt_conn_btree_sync_and_close(session, false, false));
+		    __wt_conn_dhandle_close(session, false, false));
 
 		/* We closed the btree handle. */
 		if (ret == 0) {
@@ -230,8 +240,13 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		if (!WT_DHANDLE_CAN_DISCARD(dhandle))
 			continue;
 
-		WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
-		    ret = __sweep_remove_one(session, dhandle));
+		if (dhandle->type == WT_DHANDLE_TYPE_TABLE)
+			WT_WITH_TABLE_WRITE_LOCK(session,
+			    WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
+				ret = __sweep_remove_one(session, dhandle)));
+		else
+			WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
+			    ret = __sweep_remove_one(session, dhandle));
 		if (ret == 0)
 			WT_STAT_CONN_INCR(session, dh_sweep_remove);
 		else

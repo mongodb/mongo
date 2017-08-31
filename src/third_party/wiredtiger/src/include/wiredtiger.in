@@ -911,40 +911,6 @@ struct __wt_session {
 #endif
 
 	/*!
-	 * Alter a table.
-	 *
-	 * This will allow modification of some table settings after
-	 * creation.
-	 *
-	 * @snippet ex_all.c Alter a table
-	 *
-	 * @param session the session handle
-	 * @param name the URI of the object to alter, such as \c "table:stock"
-	 * @configstart{WT_SESSION.alter, see dist/api_data.py}
-	 * @config{access_pattern_hint, It is recommended that workloads that
-	 * consist primarily of updates and/or point queries specify \c random.
-	 * Workloads that do many cursor scans through large ranges of data
-	 * specify \c sequential and other workloads specify \c none.  The
-	 * option leads to an advisory call to an appropriate operating system
-	 * API where available., a string\, chosen from the following options:
-	 * \c "none"\, \c "random"\, \c "sequential"; default \c none.}
-	 * @config{cache_resident, do not ever evict the object's pages from
-	 * cache.  Not compatible with LSM tables; see @ref
-	 * tuning_cache_resident for more information., a boolean flag; default
-	 * \c false.}
-	 * @config{log = (, the transaction log configuration for this object.
-	 * Only valid if log is enabled in ::wiredtiger_open., a set of related
-	 * configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has
-	 * checkpoint-level durability., a boolean flag; default \c true.}
-	 * @config{ ),,}
-	 * @configend
-	 * @errors
-	 */
-	int __F(alter)(WT_HANDLE_CLOSED(WT_SESSION) *session,
-	    const char *name, const char *config);
-
-	/*!
 	 * Close the session handle.
 	 *
 	 * This will release the resources associated with the session handle,
@@ -1130,6 +1096,42 @@ struct __wt_session {
 	 * @name Table operations
 	 * @{
 	 */
+	/*!
+	 * Alter a table.
+	 *
+	 * This will allow modification of some table settings after
+	 * creation.
+	 *
+	 * @exclusive
+	 *
+	 * @snippet ex_all.c Alter a table
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the object to alter, such as \c "table:stock"
+	 * @configstart{WT_SESSION.alter, see dist/api_data.py}
+	 * @config{access_pattern_hint, It is recommended that workloads that
+	 * consist primarily of updates and/or point queries specify \c random.
+	 * Workloads that do many cursor scans through large ranges of data
+	 * specify \c sequential and other workloads specify \c none.  The
+	 * option leads to an advisory call to an appropriate operating system
+	 * API where available., a string\, chosen from the following options:
+	 * \c "none"\, \c "random"\, \c "sequential"; default \c none.}
+	 * @config{cache_resident, do not ever evict the object's pages from
+	 * cache.  Not compatible with LSM tables; see @ref
+	 * tuning_cache_resident for more information., a boolean flag; default
+	 * \c false.}
+	 * @config{log = (, the transaction log configuration for this object.
+	 * Only valid if log is enabled in ::wiredtiger_open., a set of related
+	 * configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has
+	 * checkpoint-level durability., a boolean flag; default \c true.}
+	 * @config{ ),,}
+	 * @configend
+	 * @errors
+	 */
+	int __F(alter)(WT_SESSION *session,
+	    const char *name, const char *config);
+
 	/*!
 	 * Create a table, column group, index or file.
 	 *
@@ -1391,6 +1393,8 @@ struct __wt_session {
 	/*!
 	 * Drop (delete) an object.
 	 *
+	 * @exclusive
+	 *
 	 * @snippet ex_all.c Drop a table
 	 *
 	 * @param session the session handle
@@ -1504,7 +1508,9 @@ struct __wt_session {
 	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);
 
 	/*!
-	 * Rebalance a table, see @ref rebalance.
+	 * Rebalance a table or file, see @ref rebalance.
+	 *
+	 * @exclusive
 	 *
 	 * @snippet ex_all.c Rebalance a table
 	 *
@@ -1521,6 +1527,8 @@ struct __wt_session {
 	 *
 	 * @snippet ex_all.c Rename a table
 	 *
+	 * @exclusive
+	 *
 	 * @param session the session handle
 	 * @param uri the current URI of the object, such as \c "table:old"
 	 * @param newuri the new URI of the object, such as \c "table:new"
@@ -1533,12 +1541,10 @@ struct __wt_session {
 	/*!
 	 * Reset the session handle.
 	 *
-	 * This will reset all cursors associated with this session and clear
-	 * any buffers that each cursor held. After this the buffers associated
-	 * with the session will be discarded. The session can be re-used
-	 * immediately after this call returns. If a transaction is running on
-	 * this session, then this call will take no action and return a busy
-	 * error.
+	 * This method resets all cursors associated with this session and
+	 * discards cached resources.  The session can be re-used immediately
+	 * after this call returns. If a transaction is running on this
+	 * session, then this call takes no action and return an error.
 	 *
 	 * @snippet ex_all.c Reset the session
 	 *
@@ -1548,7 +1554,7 @@ struct __wt_session {
 	int __F(reset)(WT_SESSION *session);
 
 	/*!
-	 * Salvage a file or table
+	 * Salvage a table or file.
 	 *
 	 * Salvage rebuilds the file, or files of which a table is comprised,
 	 * discarding any corrupted file blocks.
@@ -1556,16 +1562,18 @@ struct __wt_session {
 	 * Previously deleted records may re-appear, and inserted records may
 	 * disappear, when salvage is done, so salvage should not be run
 	 * unless it is known to be necessary.  Normally, salvage should be
-	 * called after a file or table has been corrupted, as reported by the
+	 * called after a table or file has been corrupted, as reported by the
 	 * WT_SESSION::verify method.
 	 *
 	 * Files are rebuilt in place, the salvage method overwrites the
 	 * existing files.
 	 *
+	 * @exclusive
+	 *
 	 * @snippet ex_all.c Salvage a table
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the file or table to salvage
+	 * @param name the URI of the table or file to salvage
 	 * @configstart{WT_SESSION.salvage, see dist/api_data.py}
 	 * @config{force, force salvage even of files that do not appear to be
 	 * WiredTiger files., a boolean flag; default \c false.}
@@ -1578,7 +1586,7 @@ struct __wt_session {
 	/*!
 	 * Truncate a file, table or cursor range.
 	 *
-	 * Truncate a file or table.
+	 * Truncate a table or file.
 	 * @snippet ex_all.c Truncate a table
 	 *
 	 * Truncate a cursor range.  When truncating based on a cursor position,
@@ -1593,7 +1601,7 @@ struct __wt_session {
 	 * beginning (end) of the table.
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the file or table to truncate
+	 * @param name the URI of the table or file to truncate
 	 * @param start optional cursor marking the first record discarded;
 	 * if <code>NULL</code>, the truncate starts from the beginning of
 	 * the object
@@ -1610,14 +1618,16 @@ struct __wt_session {
 	    const char *config);
 
 	/*!
-	 * Upgrade a file or table.
+	 * Upgrade a table or file.
 	 *
-	 * Upgrade upgrades a file or table, if upgrade is required.
+	 * Upgrade upgrades a table or file, if upgrade is required.
+	 *
+	 * @exclusive
 	 *
 	 * @snippet ex_all.c Upgrade a table
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the file or table to upgrade
+	 * @param name the URI of the table or file to upgrade
 	 * @configempty{WT_SESSION.upgrade, see dist/api_data.py}
 	 * @ebusy_errors
 	 */
@@ -1625,7 +1635,7 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Verify a file or table.
+	 * Verify a table or file.
 	 *
 	 * Verify reports if a file, or the files of which a table is
 	 * comprised, have been corrupted.  The WT_SESSION::salvage method
@@ -1633,8 +1643,10 @@ struct __wt_session {
 	 *
 	 * @snippet ex_all.c Verify a table
 	 *
+	 * @exclusive
+	 *
 	 * @param session the session handle
-	 * @param name the URI of the file or table to verify
+	 * @param name the URI of the table or file to verify
 	 * @configstart{WT_SESSION.verify, see dist/api_data.py}
 	 * @config{dump_address, Display addresses and page types as pages are
 	 * verified\, using the application's message handler\, intended for
@@ -1677,8 +1689,7 @@ struct __wt_session {
 	 * before the transaction ends, will operate in the context of the
 	 * transaction.
 	 *
-	 * WT_SESSION::begin_transaction will fail if a transaction is already
-	 * in progress in the session.
+	 * @requires_notransaction
 	 *
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
@@ -1713,6 +1724,8 @@ struct __wt_session {
 	 * If WT_SESSION::commit_transaction returns an error, the transaction
 	 * was rolled back, not committed.
 	 *
+	 * @requires_transaction
+	 *
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
@@ -1741,6 +1754,8 @@ struct __wt_session {
 	 *
 	 * All cursors are reset.
 	 *
+	 * @requires_transaction
+	 *
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
@@ -1753,6 +1768,8 @@ struct __wt_session {
 	 * Set a timestamp on a transaction.
 	 *
 	 * @snippet ex_all.c transaction timestamp
+	 *
+	 * @requires_transaction
 	 *
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.timestamp_transaction, see dist/api_data.py}
@@ -1780,6 +1797,8 @@ struct __wt_session {
 	 *
 	 * Additionally, existing named checkpoints may optionally be
 	 * discarded.
+	 *
+	 * @requires_notransaction
 	 *
 	 * @snippet ex_all.c Checkpoint examples
 	 *
@@ -1863,8 +1882,9 @@ struct __wt_session {
 	/*!
 	 * Wait for a transaction to become synchronized.  This method is
 	 * only useful when ::wiredtiger_open is configured with the
-	 * \c transaction_sync setting disabled.  This method must be called
-	 * when no transactions are active in the session.
+	 * \c transaction_sync setting disabled.
+	 *
+	 * @requires_notransaction
 	 *
 	 * @snippet ex_all.c Transaction sync
 	 *
@@ -1959,6 +1979,33 @@ struct __wt_connection {
 	 */
 	int __F(close)(WT_HANDLE_CLOSED(WT_CONNECTION) *connection,
 	    const char *config);
+
+#ifndef DOXYGEN
+	/*!
+	 * Output debug information for various subsystems. The output format
+	 * may change over time, gathering the debug information may be
+	 * invasive, and the information reported may not provide a point in
+	 * time view of the system.
+	 *
+	 * @param connection the connection handle
+	 * @configstart{WT_CONNECTION.debug_info, see dist/api_data.py}
+	 * @config{cache, print cache information., a boolean flag; default \c
+	 * false.}
+	 * @config{cursors, print all open cursor information., a boolean flag;
+	 * default \c false.}
+	 * @config{handles, print open handles information., a boolean flag;
+	 * default \c false.}
+	 * @config{log, print log information., a boolean flag; default \c
+	 * false.}
+	 * @config{sessions, print open session information., a boolean flag;
+	 * default \c false.}
+	 * @config{txn, print global txn information., a boolean flag; default
+	 * \c false.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(debug_info)(WT_CONNECTION *connection, const char *config);
+#endif
 
 	/*!
 	 * Reconfigure a connection handle.

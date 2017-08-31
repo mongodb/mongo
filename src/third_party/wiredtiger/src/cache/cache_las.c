@@ -288,9 +288,10 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
-	WT_ITEM las_addr, las_key, las_timestamp;
 	WT_DECL_RET;
+	WT_DECL_TIMESTAMP(timestamp)
 	WT_ITEM *key;
+	WT_ITEM las_addr, las_key, las_timestamp;
 	uint64_t cnt, las_counter, las_txnid, remove_cnt;
 	uint32_t las_id, session_flags;
 	int notused;
@@ -300,7 +301,6 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	key = &conn->las_sweep_key;
 	remove_cnt = 0;
 	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
-	WT_CLEAR(las_timestamp);
 
 	__wt_las_cursor(session, &cursor, &session_flags);
 
@@ -359,6 +359,11 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 				    session, key, key->data, key->size));
 		}
 
+		/*
+		 * Cursor opened overwrite=true: won't return WT_NOTFOUND should
+		 * another thread remove the record before we do, and the cursor
+		 * remains positioned in that case.
+		 */
 		WT_ERR(cursor->get_key(cursor, &las_id, &las_addr, &las_counter,
 		    &las_txnid, &las_timestamp, &las_key));
 
@@ -366,16 +371,14 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * If the on-page record transaction ID associated with the
 		 * record is globally visible, the record can be discarded.
 		 *
-		 * Cursor opened overwrite=true: won't return WT_NOTFOUND should
-		 * another thread remove the record before we do, and the cursor
-		 * remains positioned in that case.
-		 *
-		 * We clear the las_timestamp structure above to avoid reading
-		 * uninitialized memory here when timestamps are disabled (even
-		 * though it is unused in that case).
+		 * Copy the timestamp from the cursor to avoid unaligned reads.
 		 */
+#ifdef HAVE_TIMESTAMPS
+		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
+		memcpy(&timestamp, las_timestamp.data, las_timestamp.size);
+#endif
 		if (__wt_txn_visible_all(
-		    session, las_txnid, las_timestamp.data)) {
+		    session, las_txnid, WT_TIMESTAMP_NULL(&timestamp))) {
 			WT_ERR(cursor->remove(cursor));
 			++remove_cnt;
 		}

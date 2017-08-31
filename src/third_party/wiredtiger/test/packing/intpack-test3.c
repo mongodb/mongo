@@ -35,17 +35,20 @@ void
 test_value(int64_t val)
 {
 	const uint8_t *cp;
-	uint8_t buf[WT_INTPACK64_MAXSIZE], *p;
+	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
+	uint8_t *p;
 	int64_t sinput, soutput;
 	uint64_t uinput, uoutput;
 	size_t used_len;
 
-	soutput = 0;	/* -Werror=maybe-uninitialized */
+	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
 	sinput = val;
-	soutput = 0;	/* Make GCC happy. */
+	soutput = 0;	/* -Werror=maybe-uninitialized */
+
 	p = buf;
 	testutil_check(__wt_vpack_int(&p, sizeof(buf), sinput));
 	used_len = (size_t)(p - buf);
+	testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
 	cp = buf;
 	testutil_check(__wt_vunpack_int(&cp, used_len, &soutput));
 	/* Ensure we got the correct value back */
@@ -70,6 +73,8 @@ test_value(int64_t val)
 
 	p = buf;
 	testutil_check(__wt_vpack_uint(&p, sizeof(buf), uinput));
+	used_len = (size_t)(p - buf);
+	testutil_assert(used_len <= WT_INTPACK64_MAXSIZE);
 	cp = buf;
 	testutil_check(__wt_vunpack_uint(&cp, sizeof(buf), &uoutput));
 	/* Ensure we got the correct value back */
