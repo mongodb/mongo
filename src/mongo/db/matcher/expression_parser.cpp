@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
@@ -576,6 +577,15 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 return _parseTopLevelInternalSchemaSingleIntegerArgument<
                     InternalSchemaMaxPropertiesMatchExpression>(e);
             } else if (mongoutils::str::equals("jsonSchema", rest)) {
+                if ((allowedFeatures & AllowedFeatures::kJSONSchema) == 0u) {
+                    return Status(
+                        ErrorCodes::BadValue,
+                        str::stream()
+                            << "The featureCompatiblityVersion must be 3.6 to use $jsonSchema. See "
+                            << feature_compatibility_version::kDochubLink
+                            << ".");
+                }
+
                 if (e.type() != BSONType::Object) {
                     return {Status(ErrorCodes::TypeMismatch, "$jsonSchema must be an object")};
                 }

@@ -92,11 +92,13 @@ public:
         kGeoNear = 1 << 1,
         kJavascript = 1 << 2,
         kExpr = 1 << 3,
+        kJSONSchema = 1 << 4,
     };
     using AllowedFeatureSet = unsigned long long;
     static constexpr AllowedFeatureSet kBanAllSpecialFeatures = 0;
     static constexpr AllowedFeatureSet kAllowAllSpecialFeatures =
         std::numeric_limits<unsigned long long>::max();
+    static constexpr AllowedFeatureSet kDefaultSpecialFeatures = AllowedFeatures::kJSONSchema;
 
     /**
      * Constant double representation of 2^63.
@@ -122,7 +124,7 @@ public:
         const CollatorInterface* collator,
         const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
-        AllowedFeatureSet allowedFeatures = kBanAllSpecialFeatures) {
+        AllowedFeatureSet allowedFeatures = kDefaultSpecialFeatures) {
         // A non-null ExpressionContext is required for parsing $expr.
         if (!expCtx) {
             invariant((allowedFeatures & AllowedFeatures::kExpr) == 0u);

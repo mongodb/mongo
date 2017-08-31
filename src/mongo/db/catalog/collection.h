@@ -315,7 +315,9 @@ public:
 
         virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) = 0;
 
-        virtual StatusWithMatchExpression parseValidator(const BSONObj& validator) const = 0;
+        virtual StatusWithMatchExpression parseValidator(
+            const BSONObj& validator,
+            MatchExpressionParser::AllowedFeatureSet allowedFeatures) const = 0;
 
         virtual Status setValidator(OperationContext* opCtx, BSONObj validator) = 0;
 
@@ -638,8 +640,9 @@ public:
     /**
      * Returns a non-ok Status if validator is not legal for this collection.
      */
-    inline StatusWithMatchExpression parseValidator(const BSONObj& validator) const {
-        return this->_impl().parseValidator(validator);
+    inline StatusWithMatchExpression parseValidator(
+        const BSONObj& validator, MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
+        return this->_impl().parseValidator(validator, allowedFeatures);
     }
 
     static StatusWith<ValidationLevel> parseValidationLevel(StringData);

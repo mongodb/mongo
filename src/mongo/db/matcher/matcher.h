@@ -54,12 +54,12 @@ public:
     /**
      * 'collator' must outlive the returned Matcher and any MatchExpression cloned from it.
      */
-    explicit Matcher(const BSONObj& pattern,
-                     const CollatorInterface* collator,
-                     const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
-                     const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
-                     MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                         MatchExpressionParser::kBanAllSpecialFeatures);
+    Matcher(const BSONObj& pattern,
+            const CollatorInterface* collator,
+            const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
+            const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
+            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+                MatchExpressionParser::kDefaultSpecialFeatures);
 
     bool matches(const BSONObj& doc, MatchDetails* details = NULL) const;
 

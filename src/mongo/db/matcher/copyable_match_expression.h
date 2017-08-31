@@ -56,7 +56,7 @@ public:
                             std::unique_ptr<const ExtensionsCallback> extensionsCallback =
                                 stdx::make_unique<ExtensionsCallbackNoop>(),
                             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                                MatchExpressionParser::kBanAllSpecialFeatures)
+                                MatchExpressionParser::kDefaultSpecialFeatures)
         : _matchAST(matchAST), _extensionsCallback(std::move(extensionsCallback)) {
         StatusWithMatchExpression parseResult = MatchExpressionParser::parse(
             _matchAST, collator, expCtx, *_extensionsCallback, allowedFeatures);

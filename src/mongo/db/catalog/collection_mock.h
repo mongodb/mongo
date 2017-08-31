@@ -220,7 +220,8 @@ public:
         std::abort();
     }
 
-    StatusWithMatchExpression parseValidator(const BSONObj& validator) const {
+    StatusWithMatchExpression parseValidator(
+        const BSONObj& validator, MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
         std::abort();
     }
 

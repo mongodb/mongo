@@ -159,7 +159,10 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
       _indexCatalog(_this_init, this->getCatalogEntry()->getMaxAllowedIndexes()),
       _collator(parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation)),
       _validatorDoc(_details->getCollectionOptions(opCtx).validator.getOwned()),
-      _validator(uassertStatusOK(parseValidator(_validatorDoc))),
+      _validator(
+          uassertStatusOK(parseValidator(_validatorDoc,
+                                         MatchExpressionParser::kAllowAllSpecialFeatures &
+                                             ~MatchExpressionParser::AllowedFeatures::kExpr))),
       _validationAction(uassertStatusOK(
           parseValidationAction(_details->getCollectionOptions(opCtx).validationAction))),
       _validationLevel(uassertStatusOK(
@@ -265,7 +268,8 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
     return {ErrorCodes::DocumentValidationFailure, "Document failed validation"};
 }
 
-StatusWithMatchExpression CollectionImpl::parseValidator(const BSONObj& validator) const {
+StatusWithMatchExpression CollectionImpl::parseValidator(
+    const BSONObj& validator, MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
     if (validator.isEmpty())
         return {nullptr};
 
@@ -282,7 +286,8 @@ StatusWithMatchExpression CollectionImpl::parseValidator(const BSONObj& validato
                               << " database"};
     }
 
-    auto statusWithMatcher = MatchExpressionParser::parse(validator, _collator.get());
+    auto statusWithMatcher = MatchExpressionParser::parse(
+        validator, _collator.get(), nullptr, ExtensionsCallbackNoop(), allowedFeatures);
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 
@@ -887,7 +892,11 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
     if (!validatorDoc.isOwned())
         validatorDoc = validatorDoc.getOwned();
 
-    auto statusWithMatcher = parseValidator(validatorDoc);
+    // Note that, by the time we reach this, we should have already done a pre-parse that checks for
+    // banned features, so we don't need to include that check again.
+    auto statusWithMatcher = parseValidator(validatorDoc,
+                                            MatchExpressionParser::kAllowAllSpecialFeatures &
+                                                ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 

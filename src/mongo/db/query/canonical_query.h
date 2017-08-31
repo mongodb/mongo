@@ -59,7 +59,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-            MatchExpressionParser::kBanAllSpecialFeatures);
+            MatchExpressionParser::kDefaultSpecialFeatures);
 
     /**
      * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
@@ -74,7 +74,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-            MatchExpressionParser::kBanAllSpecialFeatures);
+            MatchExpressionParser::kDefaultSpecialFeatures);
 
     /**
      * For testing or for internal clients to use.

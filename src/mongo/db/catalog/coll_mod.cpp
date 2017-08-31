@@ -169,7 +169,17 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
         } else if (fieldName == "validator" && !isView) {
-            auto statusW = coll->parseValidator(e.Obj());
+            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+                MatchExpressionParser::kBanAllSpecialFeatures;
+            if (!serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() ||
+                serverGlobalParams.featureCompatibility.version.load() !=
+                    ServerGlobalParams::FeatureCompatibility::Version::k34) {
+                // Allow $jsonSchema only if the feature compatibility version is newer than 3.4.
+                // Note that we don't enforce this restriction on the secondary or on backup
+                // instances, as indicated by !validateFeaturesAsMaster.
+                allowedFeatures |= MatchExpressionParser::kJSONSchema;
+            }
+            auto statusW = coll->parseValidator(e.Obj(), allowedFeatures);
             if (!statusW.isOK())
                 return statusW.getStatus();
 
