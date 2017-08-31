@@ -117,6 +117,8 @@ selector:
   - jstests/core/bypass_doc_validation.js
   - jstests/core/capped_max1.js
   - jstests/core/commands_namespace_parsing.js
+  - jstests/core/tailable_cursor_invalidation.js
+  - jstests/core/tailable_getmore_batch_size.js
   - jstests/core/tailable_skip_limit.js
   - jstests/core/constructors.js
   - jstests/core/index_stats.js

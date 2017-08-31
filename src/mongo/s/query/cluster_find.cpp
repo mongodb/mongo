@@ -444,8 +444,12 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         }
 
         if (next.getValue().isEOF()) {
-            // We reached end-of-stream.
-            if (!pinnedCursor.getValue().isTailable()) {
+            // We reached end-of-stream. If the cursor is not tailable, then we mark it as
+            // exhausted. If it is tailable, usually we keep it open (i.e. "NotExhausted") even when
+            // we reach end-of-stream. However, if all the remote cursors are exhausted, there is no
+            // hope of returning data and thus we need to close the mongos cursor as well.
+            if (!pinnedCursor.getValue().isTailable() ||
+                pinnedCursor.getValue().remotesExhausted()) {
                 cursorState = ClusterCursorManager::CursorState::Exhausted;
             }
             break;

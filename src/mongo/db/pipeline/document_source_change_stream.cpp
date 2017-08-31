@@ -228,7 +228,10 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             !expCtx->getCollator());
 
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-    uassert(40573, "The $changeStream stage is only supported on replica sets", replCoord);
+    uassert(40573,
+            "The $changeStream stage is only supported on replica sets",
+            replCoord &&
+                replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet);
     Timestamp startFrom = replCoord->getMyLastAppliedOpTime().getTimestamp();
 
     intrusive_ptr<DocumentSource> resumeStage = nullptr;
