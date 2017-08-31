@@ -60,10 +60,20 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
                           << " collection has been manually deleted.",
             autoColl.getCollection());
 
-    const auto updateResult = update(opCtx, autoColl.getDb(), updateRequest);
+    try {
+        const auto updateResult = update(opCtx, autoColl.getDb(), updateRequest);
 
-    if (!updateResult.numDocsModified && updateResult.upserted.isEmpty()) {
-        throw WriteConflictException();
+        if (!updateResult.numDocsModified && updateResult.upserted.isEmpty()) {
+            throw WriteConflictException();
+        }
+    } catch (const DBException& excep) {
+        if (excep.code() == ErrorCodes::DuplicateKey) {
+            // Duplicate key means that another thread already created the session this is trying
+            // to upsert. Throw WriteCoflict to make it retry and check the current state again.
+            throw WriteConflictException();
+        }
+
+        throw;
     }
 }
 

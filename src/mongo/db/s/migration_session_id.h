@@ -61,6 +61,12 @@ public:
     static StatusWith<MigrationSessionId> extractFromBSON(const BSONObj& obj);
 
     /**
+     * Same as extractFromBSON, but throws on error.
+     * Function signature is compatible for idl.
+     */
+    static MigrationSessionId parseFromBSON(const BSONObj& obj);
+
+    /**
      * Compares two session identifiers. Two idendifiers match only if they are the same.
      */
     bool matches(const MigrationSessionId& other) const;
