@@ -543,7 +543,8 @@ __log_file_server(void *arg)
 				if (!conn->hot_backup) {
 					__wt_readlock(
 					    session, &conn->hot_backup_lock);
-					if (!conn->hot_backup)
+					if (!conn->hot_backup &&
+					    conn->log_cursors == 0)
 						WT_ERR_ERROR_OK(
 						    __wt_ftruncate(session,
 						    close_fh,
