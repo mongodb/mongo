@@ -46,6 +46,7 @@
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -88,9 +89,10 @@ public:
 
     /**
      * Returns an ExpressionContext that is identical to 'this' that can be used to execute a
-     * separate aggregation pipeline on 'ns'.
+     * separate aggregation pipeline on 'ns' with the optional 'uuid'.
      */
-    boost::intrusive_ptr<ExpressionContext> copyWith(NamespaceString ns) const;
+    boost::intrusive_ptr<ExpressionContext> copyWith(
+        NamespaceString ns, boost::optional<UUID> uuid = boost::none) const;
 
     /**
      * Returns the ResolvedNamespace corresponding to 'nss'. It is an error to call this method on a
@@ -125,6 +127,7 @@ public:
     bool from34Mongos = false;
 
     NamespaceString ns;
+    boost::optional<UUID> uuid;
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.
 
     OperationContext* opCtx;

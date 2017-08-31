@@ -74,9 +74,11 @@ void ExpressionContext::setCollator(std::unique_ptr<CollatorInterface> coll) {
     _valueComparator = ValueComparator(_collator.get());
 }
 
-intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns) const {
+intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns,
+                                                             boost::optional<UUID> uuid) const {
     intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(std::move(ns));
 
+    expCtx->uuid = std::move(uuid);
     expCtx->explain = explain;
     expCtx->needsMerge = needsMerge;
     expCtx->fromMongos = fromMongos;

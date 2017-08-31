@@ -637,6 +637,8 @@ public:
          * for execution. The returned pipeline is optimized and has a cursor source prepared.
          *
          * This function returns a non-OK status if parsing the pipeline failed.
+         * NamespaceNotFound will be returned if ExpressionContext has a UUID and that UUID doesn't
+         * exist anymore. That should be the only case where NamespaceNotFound gets returned.
          */
         virtual StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
             const std::vector<BSONObj>& rawPipeline,

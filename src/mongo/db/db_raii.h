@@ -268,6 +268,12 @@ public:
     AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss)
         : AutoGetCollectionForRead(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
 
+    AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss, Lock::DBLock lock)
+        : AutoGetCollectionForRead(
+              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock)) {}
+
+    AutoGetCollectionForRead(OperationContext* opCtx, const StringData dbName, const UUID& uuid);
+
     /**
      * This constructor is intended for internal use and should not be used outside this file.
      * AutoGetCollectionForReadCommand and AutoGetCollectionOrViewForReadCommand use 'viewMode' to
@@ -283,10 +289,16 @@ public:
                              AutoGetCollection::ViewMode viewMode,
                              Lock::DBLock lock);
     Database* getDb() const {
+        if (!_autoColl) {
+            return nullptr;
+        }
         return _autoColl->getDb();
     }
 
     Collection* getCollection() const {
+        if (!_autoColl) {
+            return nullptr;
+        }
         return _autoColl->getCollection();
     }
 
@@ -324,6 +336,10 @@ public:
                                     Lock::DBLock lock)
         : AutoGetCollectionForReadCommand(
               opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock)) {}
+
+    AutoGetCollectionForReadCommand(OperationContext* opCtx,
+                                    const StringData dbName,
+                                    const UUID& uuid);
 
     Database* getDb() const {
         return _autoCollForRead->getDb();

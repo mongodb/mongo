@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -134,6 +135,25 @@ AutoStatsTracker::~AutoStatsTracker() {
 }
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
+                                                   const StringData dbName,
+                                                   const UUID& uuid) {
+    // Lock the database since a UUID will always be in the same database even though its
+    // collection name may change.
+    Lock::DBLock dbSLock(opCtx, dbName, MODE_IS);
+
+    auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+
+    // If the UUID doesn't exist, we leave _autoColl to be boost::none.
+    if (!nss.isEmpty()) {
+        _autoColl.emplace(
+            opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsForbidden, std::move(dbSLock));
+
+        // Note: this can yield.
+        _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
+    }
+}
+
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    AutoGetCollection::ViewMode viewMode) {
     _autoColl.emplace(opCtx, nss, MODE_IS, MODE_IS, viewMode);
@@ -225,6 +245,23 @@ AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
       _view(_autoCollForRead->getDb() && !getCollection()
                 ? _autoCollForRead->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
                 : nullptr) {}
+
+AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(OperationContext* opCtx,
+                                                                 const StringData dbName,
+                                                                 const UUID& uuid) {
+    _autoCollForRead.emplace(opCtx, dbName, uuid);
+    if (_autoCollForRead->getCollection()) {
+        _statsTracker.emplace(opCtx,
+                              _autoCollForRead->getCollection()->ns(),
+                              Top::LockType::ReadLocked,
+                              _autoCollForRead->getDb()->getProfilingLevel());
+
+        // We have both the DB and collection locked, which is the prerequisite to do a stable shard
+        // version check, but we'd like to do the check after we have a satisfactory snapshot.
+        auto css = CollectionShardingState::get(opCtx, _autoCollForRead->getCollection()->ns());
+        css->checkShardVersionOrThrow(opCtx);
+    }
+}
 
 void AutoGetCollectionOrViewForReadCommand::releaseLocksForView() noexcept {
     invariant(_view);

@@ -204,7 +204,17 @@ public:
 
         pipeline.getValue()->optimizePipeline();
 
-        AutoGetCollectionForReadCommand autoColl(expCtx->opCtx, expCtx->ns);
+        boost::optional<AutoGetCollectionForReadCommand> autoColl;
+        if (expCtx->uuid) {
+            autoColl.emplace(expCtx->opCtx, expCtx->ns.db(), *expCtx->uuid);
+            if (autoColl->getCollection() == nullptr) {
+                // The UUID doesn't exist anymore.
+                return {ErrorCodes::NamespaceNotFound,
+                        "No namespace with UUID " + expCtx->uuid->toString()};
+            }
+        } else {
+            autoColl.emplace(expCtx->opCtx, expCtx->ns);
+        }
 
         // makePipeline() is only called to perform secondary aggregation requests and expects the
         // collection representing the document source to be not-sharded. We confirm sharding state
@@ -217,7 +227,7 @@ public:
         uassert(4567, "from collection cannot be sharded", !bool(css->getMetadata()));
 
         PipelineD::prepareCursorSource(
-            autoColl.getCollection(), expCtx->ns, nullptr, pipeline.getValue().get());
+            autoColl->getCollection(), expCtx->ns, nullptr, pipeline.getValue().get());
 
         return pipeline;
     }
