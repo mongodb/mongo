@@ -87,7 +87,7 @@ constexpr auto kExecutorLabel = "executor";
 constexpr auto kExecutorName = "adaptive";
 
 int64_t ticksToMicros(TickSource::Tick ticks, TickSource* tickSource) {
-    invariant(tickSource->getTicksPerSecond() > 1000000);
+    invariant(tickSource->getTicksPerSecond() >= 1000000);
     static const auto ticksPerMicro = tickSource->getTicksPerSecond() / 1000000;
     return ticks / ticksPerMicro;
 }
