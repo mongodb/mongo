@@ -70,7 +70,7 @@ using DocumentSourceGroupTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     auto expCtx = getExpCtx();
-    expCtx->inRouter = true;  // Disallow external sort.
+    expCtx->inMongos = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
     AccumulationStatement countStatement{"count",
                                          ExpressionConstant::create(expCtx, Value(1)),
@@ -142,7 +142,7 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
 TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSetIsTooLarge) {
     auto expCtx = getExpCtx();
     const size_t maxMemoryUsageBytes = 1000;
-    expCtx->inRouter = true;  // Disallow external sort.
+    expCtx->inMongos = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
 
     VariablesParseState vps = expCtx->variablesParseState;
@@ -164,7 +164,7 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
 TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto expCtx = getExpCtx();
     const size_t maxMemoryUsageBytes = 1000;
-    expCtx->inRouter = true;  // Disallow external sort.
+    expCtx->inMongos = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
 
     VariablesParseState vps = expCtx->variablesParseState;
@@ -206,15 +206,15 @@ public:
           _tempDir("DocumentSourceGroupTest") {}
 
 protected:
-    void createGroup(const BSONObj& spec, bool inShard = false, bool inRouter = false) {
+    void createGroup(const BSONObj& spec, bool inShard = false, bool inMongos = false) {
         BSONObj namedSpec = BSON("$group" << spec);
         BSONElement specElement = namedSpec.firstElement();
 
         intrusive_ptr<ExpressionContextForTest> expressionContext =
             new ExpressionContextForTest(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}));
-        // For $group, 'inShard' implies 'fromRouter' and 'needsMerge'.
-        expressionContext->fromRouter = expressionContext->needsMerge = inShard;
-        expressionContext->inRouter = inRouter;
+        // For $group, 'inShard' implies 'fromMongos' and 'needsMerge'.
+        expressionContext->fromMongos = expressionContext->needsMerge = inShard;
+        expressionContext->inMongos = inMongos;
         // Won't spill to disk properly if it needs to.
         expressionContext->tempDir = _tempDir.path();
 
@@ -1012,7 +1012,7 @@ public:
 
         // We pretend to be in the router so that we don't spill to disk, because this produces
         // inconsistent output on debug vs. non-debug builds.
-        const bool inRouter = true;
+        const bool inMongos = true;
         const bool inShard = false;
 
         createGroup(BSON("_id" << BSON("x"
@@ -1020,7 +1020,7 @@ public:
                                        << "y"
                                        << "$b")),
                     inShard,
-                    inRouter);
+                    inMongos);
         group()->setSource(source.get());
 
         group()->getNext();
@@ -1039,7 +1039,7 @@ public:
 
         // We pretend to be in the router so that we don't spill to disk, because this produces
         // inconsistent output on debug vs. non-debug builds.
-        const bool inRouter = true;
+        const bool inMongos = true;
         const bool inShard = false;
 
         createGroup(BSON("_id" << BSON("a"
@@ -1047,7 +1047,7 @@ public:
                                        << "b"
                                        << "$a")),
                     inShard,
-                    inRouter);
+                    inMongos);
         group()->setSource(source.get());
 
         group()->getNext();
@@ -1066,10 +1066,10 @@ public:
 
         // We pretend to be in the router so that we don't spill to disk, because this produces
         // inconsistent output on debug vs. non-debug builds.
-        const bool inRouter = true;
+        const bool inMongos = true;
         const bool inShard = false;
 
-        createGroup(fromjson("{_id: {$sum: ['$a', '$b']}}"), inShard, inRouter);
+        createGroup(fromjson("{_id: {$sum: ['$a', '$b']}}"), inShard, inMongos);
         group()->setSource(source.get());
 
         group()->getNext();

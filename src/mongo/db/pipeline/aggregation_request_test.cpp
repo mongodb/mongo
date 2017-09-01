@@ -56,14 +56,14 @@ const Document kDefaultCursorOptionDocument{
 TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
-        "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromRouter: true, "
+        "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromMongos: true, "
         "needsMerge: true, bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: "
         "{batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
         "$queryOptions: {$readPreference: 'nearest'}, comment: 'agg_comment'}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
-    ASSERT_TRUE(request.isFromRouter());
+    ASSERT_TRUE(request.isFromMongos());
     ASSERT_TRUE(request.needsMerge());
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
     ASSERT_EQ(request.getBatchSize(), 10);
@@ -79,6 +79,16 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_BSONOBJ_EQ(request.getUnwrappedReadPref(),
                       BSON("$readPreference"
                            << "nearest"));
+}
+
+TEST(AggregationRequestTest, ShouldParseNeedsMerge34) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: true}");
+    auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
+    ASSERT_TRUE(request.needsMerge());
+    ASSERT_TRUE(request.isFromMongos());
+    ASSERT_TRUE(request.isFrom34Mongos());
 }
 
 TEST(AggregationRequestTest, ShouldParseExplicitExplainTrue) {
@@ -136,7 +146,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     AggregationRequest request(nss, {});
     request.setExplain(boost::none);
     request.setAllowDiskUse(false);
-    request.setFromRouter(false);
+    request.setFromMongos(false);
     request.setNeedsMerge(false);
     request.setBypassDocumentValidation(false);
     request.setCollation(BSONObj());
@@ -157,7 +167,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     NamespaceString nss("a.collection");
     AggregationRequest request(nss, {});
     request.setAllowDiskUse(true);
-    request.setFromRouter(true);
+    request.setFromMongos(true);
     request.setNeedsMerge(true);
     request.setBypassDocumentValidation(true);
     request.setBatchSize(10);
@@ -180,7 +190,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         Document{{AggregationRequest::kCommandName, nss.coll()},
                  {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
                  {AggregationRequest::kAllowDiskUseName, true},
-                 {AggregationRequest::kFromRouterName, true},
+                 {AggregationRequest::kFromMongosName, true},
                  {AggregationRequest::kNeedsMergeName, true},
                  {bypassDocumentValidationCommandOption(), true},
                  {AggregationRequest::kCollationName, collationObj},
@@ -317,17 +327,46 @@ TEST(AggregationRequestTest, ShouldRejectExplainIfObject) {
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
-TEST(AggregationRequestTest, ShouldRejectNonBoolFromRouter) {
+TEST(AggregationRequestTest, ShouldRejectNonBoolFromMongos) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: 1}");
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMongos: 1}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: 1}");
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: 1, fromMongos: true}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfFromMongosNotPresent) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: true}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge34) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: 1}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfNeedsMerge34AlsoPresent) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson(
+        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: true, fromMongos: true, "
+        "fromRouter: true}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectFromMongosIfNeedsMerge34AlsoPresent) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson(
+        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMongos: true, fromRouter: true}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 

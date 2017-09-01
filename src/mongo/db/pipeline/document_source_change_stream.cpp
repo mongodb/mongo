@@ -222,7 +222,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     // TODO: Add sharding support here (SERVER-29141).
     uassert(
-        40470, "The $changeStream stage is not supported on sharded systems.", !expCtx->inRouter);
+        40470, "The $changeStream stage is not supported on sharded systems.", !expCtx->inMongos);
     uassert(40471,
             "Only default collation is allowed when using a $changeStream stage.",
             !expCtx->getCollator());

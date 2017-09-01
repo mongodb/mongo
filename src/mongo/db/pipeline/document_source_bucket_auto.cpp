@@ -91,7 +91,7 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
     if (!_sorter) {
         SortOptions opts;
         opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
-        if (pExpCtx->extSortAllowed && !pExpCtx->inRouter) {
+        if (pExpCtx->extSortAllowed && !pExpCtx->inMongos) {
             opts.extSortAllowed = true;
             opts.tempDir = pExpCtx->tempDir;
         }

@@ -273,14 +273,14 @@ constexpr StringData Document::metaFieldTextScore;
 constexpr StringData Document::metaFieldRandVal;
 constexpr StringData Document::metaFieldSortKey;
 
-BSONObj Document::toBsonWithMetaData() const {
+BSONObj Document::toBsonWithMetaData(bool includeSortKey) const {
     BSONObjBuilder bb;
     toBson(&bb);
     if (hasTextScore())
         bb.append(metaFieldTextScore, getTextScore());
     if (hasRandMetaField())
         bb.append(metaFieldRandVal, getRandMetaField());
-    if (hasSortKeyMetaField())
+    if (includeSortKey && hasSortKeyMetaField())
         bb.append(metaFieldSortKey, getSortKeyMetaField());
     return bb.obj();
 }

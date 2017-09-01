@@ -185,7 +185,7 @@ BSONObj createCommandForTargetedShards(
     const std::unique_ptr<Pipeline, Pipeline::Deleter>& pipelineForTargetedShards) {
     // Create the command for the shards.
     MutableDocument targetedCmd(request.serializeToCommandObj());
-    targetedCmd[AggregationRequest::kFromRouterName] = Value(true);
+    targetedCmd[AggregationRequest::kFromMongosName] = Value(true);
 
     // If 'pipelineForTargetedShards' is 'nullptr', this is an unsharded direct passthrough.
     if (pipelineForTargetedShards) {
@@ -221,7 +221,7 @@ BSONObj createCommandForMergingShard(
     MutableDocument mergeCmd(request.serializeToCommandObj());
 
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
-    mergeCmd[AggregationRequest::kFromRouterName] = Value(true);
+    mergeCmd[AggregationRequest::kFromMongosName] = Value(true);
     mergeCmd["writeConcern"] = Value(originalCmdObj["writeConcern"]);
 
     // If the user didn't specify a collation already, make sure there's a collation attached to
@@ -451,7 +451,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     boost::intrusive_ptr<ExpressionContext> mergeCtx =
         new ExpressionContext(opCtx, request, std::move(collation), std::move(resolvedNamespaces));
-    mergeCtx->inRouter = true;
+    mergeCtx->inMongos = true;
     // explicitly *not* setting mergeCtx->tempDir
 
     auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), mergeCtx));
@@ -678,7 +678,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     }
     auto shard = std::move(swShard.getValue());
 
-    // Format the command for the shard. This adds the 'fromRouter' field, wraps the command as an
+    // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     cmdObj = Command::filterCommandRequestForPassthrough(
         createCommandForTargetedShards(aggRequest, cmdObj, nullptr));

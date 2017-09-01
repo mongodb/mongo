@@ -94,6 +94,12 @@ private:
     std::vector<BSONObj> _stash;
     const bool _includeMetaData;
 
+    // When the aggregation request is from a 3.4 mongos, the merge may happen on a 3.4 shard (which
+    // does not understand sort key metadata), so we should not serialize the sort key, and
+    // '_includeSortKey' is set to false.
+    // TODO SERVER-30924: remove this.
+    const bool _includeSortKey;
+
     // Not owned by us.
     WorkingSet* _ws;
 };

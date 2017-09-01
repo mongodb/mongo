@@ -95,18 +95,18 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
 
         _opsIter = _ops.begin();
 
-        if (pExpCtx->fromRouter) {
+        if (pExpCtx->fromMongos) {
             _shardName = _mongod->getShardName(pExpCtx->opCtx);
 
             uassert(40465,
-                    "Aggregation request specified 'fromRouter' but unable to retrieve shard name "
+                    "Aggregation request specified 'fromMongos' but unable to retrieve shard name "
                     "for $currentOp pipeline stage.",
                     !_shardName.empty());
         }
     }
 
     if (_opsIter != _ops.end()) {
-        if (!pExpCtx->fromRouter) {
+        if (!pExpCtx->fromMongos) {
             return Document(*_opsIter++);
         }
 

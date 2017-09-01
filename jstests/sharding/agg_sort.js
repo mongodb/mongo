@@ -49,7 +49,7 @@
     function assertResultsEqual({actual, expected}) {
         const resultsAsString = "  actual: " + tojson(actual) + "\n  expected: " + tojson(expected);
         assert.eq(
-            actual.length, expected.length, `different number of results:\n" + ${resultsAsString}`);
+            actual.length, expected.length, `different number of results:\n${resultsAsString}`);
         for (let i = 0; i < actual.length; i++) {
             assert.eq(
                 actual[i], expected[i], `different results at index ${i}:\n${resultsAsString}`);

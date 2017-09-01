@@ -113,11 +113,17 @@ public:
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 
-    bool fromRouter = false;
+    bool fromMongos = false;
     bool needsMerge = false;
-    bool inRouter = false;
+    bool inMongos = false;
     bool extSortAllowed = false;
     bool bypassDocumentValidation = false;
+
+    // We track whether the aggregation request came from a 3.4 mongos. If so, the merge may occur
+    // on a 3.4 shard (which does not understand sort key metadata), and we should not serialize the
+    // sort key.
+    // TODO SERVER-30924: remove this.
+    bool from34Mongos = false;
 
     NamespaceString ns;
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.

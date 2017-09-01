@@ -50,8 +50,9 @@ namespace mongo {
 constexpr StringData AggregationRequest::kCommandName;
 constexpr StringData AggregationRequest::kCursorName;
 constexpr StringData AggregationRequest::kBatchSizeName;
-constexpr StringData AggregationRequest::kFromRouterName;
+constexpr StringData AggregationRequest::kFromMongosName;
 constexpr StringData AggregationRequest::kNeedsMergeName;
+constexpr StringData AggregationRequest::kNeedsMerge34Name;
 constexpr StringData AggregationRequest::kPipelineName;
 constexpr StringData AggregationRequest::kCollationName;
 constexpr StringData AggregationRequest::kExplainName;
@@ -106,6 +107,10 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
     bool hasCursorElem = false;
     bool hasExplainElem = false;
+
+    bool hasFromMongosElem = false;
+    bool hasNeedsMergeElem = false;
+    bool hasNeedsMerge34Elem = false;
 
     // Parse optional parameters.
     for (auto&& elem : cmdObj) {
@@ -180,20 +185,35 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             if (elem.Bool()) {
                 request.setExplain(ExplainOptions::Verbosity::kQueryPlanner);
             }
-        } else if (kFromRouterName == fieldName) {
+        } else if (kFromMongosName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << kFromRouterName << " must be a boolean, not a "
+                        str::stream() << kFromMongosName << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
-            request.setFromRouter(elem.Bool());
+
+            hasFromMongosElem = true;
+            request.setFromMongos(elem.Bool());
         } else if (kNeedsMergeName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << kNeedsMergeName << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
+
+            hasNeedsMergeElem = true;
             request.setNeedsMerge(elem.Bool());
+        } else if (kNeedsMerge34Name == fieldName) {
+            if (elem.type() != BSONType::Bool) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << kNeedsMerge34Name << " must be a boolean, not a "
+                                      << typeName(elem.type())};
+            }
+
+            hasNeedsMerge34Elem = true;
+            request.setNeedsMerge(elem.Bool());
+            request.setFromMongos(elem.Bool());
+            request.setFrom34Mongos(elem.Bool());
         } else if (kAllowDiskUseName == fieldName) {
             if (storageGlobalParams.readOnly) {
                 return {ErrorCodes::IllegalOperation,
@@ -248,6 +268,30 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                               << "' option"};
     }
 
+    if (hasNeedsMergeElem && !hasFromMongosElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Cannot specify '" << kNeedsMergeName << "' without '"
+                              << kFromMongosName
+                              << "'"};
+    }
+
+    // If 'fromRouter' is specified, the request is from a 3.4 mongos, so we do not expect
+    // 'fromMongos' or 'needsMerge' to be specified.
+    if (hasNeedsMerge34Elem) {
+        if (hasNeedsMergeElem) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "Cannot specify both '" << kNeedsMergeName << "' and '"
+                                  << kNeedsMerge34Name
+                                  << "'"};
+        }
+        if (hasFromMongosElem) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "Cannot specify both '" << kFromMongosName << "' and '"
+                                  << kNeedsMerge34Name
+                                  << "'"};
+        }
+    }
+
     return request;
 }
 
@@ -284,7 +328,7 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kPipelineName, _pipeline},
         // Only serialize booleans if different than their default.
         {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},
-        {kFromRouterName, _fromRouter ? Value(true) : Value()},
+        {kFromMongosName, _fromMongos ? Value(true) : Value()},
         {kNeedsMergeName, _needsMerge ? Value(true) : Value()},
         {bypassDocumentValidationCommandOption(),
          _bypassDocumentValidation ? Value(true) : Value()},

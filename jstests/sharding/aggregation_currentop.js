@@ -570,7 +570,7 @@
     // Test that attempting to 'spoof' a sharded request on non-shardsvr mongoD fails.
     assert.commandFailedWithCode(
         shardAdminDB.runCommand(
-            {aggregate: 1, pipeline: [{$currentOp: {}}], fromRouter: true, cursor: {}}),
+            {aggregate: 1, pipeline: [{$currentOp: {}}], fromMongos: true, cursor: {}}),
         40465);
 
     // Test that an operation which is at the BSON user size limit does not throw an error when the

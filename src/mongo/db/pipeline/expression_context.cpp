@@ -44,10 +44,11 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      std::unique_ptr<CollatorInterface> collator,
                                      StringMap<ResolvedNamespace> resolvedNamespaces)
     : explain(request.getExplain()),
-      fromRouter(request.isFromRouter()),
+      fromMongos(request.isFromMongos()),
       needsMerge(request.needsMerge()),
       extSortAllowed(request.shouldAllowDiskUse()),
       bypassDocumentValidation(request.shouldBypassDocumentValidation()),
+      from34Mongos(request.isFrom34Mongos()),
       ns(request.getNamespaceString()),
       opCtx(opCtx),
       collation(request.getCollation()),
@@ -78,8 +79,9 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns)
 
     expCtx->explain = explain;
     expCtx->needsMerge = needsMerge;
-    expCtx->fromRouter = fromRouter;
-    expCtx->inRouter = inRouter;
+    expCtx->fromMongos = fromMongos;
+    expCtx->from34Mongos = from34Mongos;
+    expCtx->inMongos = inMongos;
     expCtx->extSortAllowed = extSortAllowed;
     expCtx->bypassDocumentValidation = bypassDocumentValidation;
 

@@ -266,7 +266,7 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
       _initialized(false),
       _groups(pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false),
-      _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inRouter) {}
+      _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inMongos) {}
 
 void DocumentSourceGroup::addAccumulator(AccumulationStatement accumulationStatement) {
     _accumulatedFields.push_back(accumulationStatement);
@@ -530,7 +530,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         if (kDebugBuild && !storageGlobalParams.readOnly) {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
             if (!inserted &&                 // is a dup
-                !pExpCtx->inRouter &&        // can't spill to disk in router
+                !pExpCtx->inMongos &&        // can't spill to disk in mongos
                 !_extSortAllowed &&          // don't change behavior when testing external sort
                 _sortedFiles.size() < 20) {  // don't open too many FDs
 

@@ -191,7 +191,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
 
 TEST_F(DocumentSourceCurrentOpTest,
        ShouldAddShardNameModifyOpIDAndClientFieldNameInShardedContext) {
-    getExpCtx()->fromRouter = true;
+    getExpCtx()->fromMongos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
     const auto mongod = std::make_shared<MockMongodImplementation>(ops);
@@ -209,7 +209,7 @@ TEST_F(DocumentSourceCurrentOpTest,
 
 TEST_F(DocumentSourceCurrentOpTest,
        ShouldReturnOpIDAndClientFieldNameUnmodifiedWhenNotInShardedContext) {
-    getExpCtx()->fromRouter = false;
+    getExpCtx()->fromMongos = false;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
     const auto mongod = std::make_shared<MockMongodImplementation>(ops);
@@ -224,7 +224,7 @@ TEST_F(DocumentSourceCurrentOpTest,
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRequest) {
-    getExpCtx()->fromRouter = true;
+    getExpCtx()->fromMongos = true;
 
     const auto mongod = std::make_shared<MockMongodImplementation>(false);
 
@@ -235,7 +235,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRe
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInShardedContext) {
-    getExpCtx()->fromRouter = true;
+    getExpCtx()->fromMongos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 'string' }")};
     const auto mongod = std::make_shared<MockMongodImplementation>(ops);

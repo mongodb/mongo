@@ -648,15 +648,15 @@ TEST_F(BucketAutoTests, ShouldFailIfBufferingTooManyDocuments) {
     auto expCtx = getExpCtx();
 
     expCtx->extSortAllowed = false;
-    expCtx->inRouter = false;
+    expCtx->inMongos = false;
     assertCannotSpillToDisk(expCtx);
 
     expCtx->extSortAllowed = true;
-    expCtx->inRouter = true;
+    expCtx->inMongos = true;
     assertCannotSpillToDisk(expCtx);
 
     expCtx->extSortAllowed = false;
-    expCtx->inRouter = true;
+    expCtx->inMongos = true;
     assertCannotSpillToDisk(expCtx);
 }
 
