@@ -455,7 +455,7 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    "must be at least %" PRIu64 " (%" PRIu64 "MB)",
 		    S2C(session)->cache_size,
 		    S2C(session)->cache_size / WT_MEGABYTE,
-		    required, required / WT_MEGABYTE);
+		    required, (required + (WT_MEGABYTE - 1))/ WT_MEGABYTE);
 	return (0);
 }
 

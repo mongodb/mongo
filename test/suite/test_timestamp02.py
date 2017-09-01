@@ -63,7 +63,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
             session.begin_transaction(txn_config)
         c = session.open_cursor(self.uri, None)
         actual = dict((k, v) for k, v in c if v != 0)
-        self.assertEqual(actual, expected)
+        self.assertTrue(actual == expected)
         # Search for the expected items as well as iterating
         for k, v in expected.iteritems():
             self.assertEqual(c[k], v, "for key " + str(k))

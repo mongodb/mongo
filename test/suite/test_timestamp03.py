@@ -87,7 +87,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
 
         cur = session.open_cursor(self.uri + tablename, None)
         actual = dict((k, v) for k, v in cur if v != 0)
-        self.assertEqual(actual, expected)
+        self.assertTrue(actual == expected)
         # Search for the expected items as well as iterating
         for k, v in expected.iteritems():
             self.assertEqual(cur[k], v, "for key " + str(k))
