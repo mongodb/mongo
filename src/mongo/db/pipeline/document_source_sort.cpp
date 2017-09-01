@@ -517,7 +517,12 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::getMergeSource() {
     verify(!_mergingPresorted);
     intrusive_ptr<DocumentSourceSort> other = new DocumentSourceSort(pExpCtx);
     other->_sortPattern = _sortPattern;
+    other->_sortKeyGen = SortKeyGenerator{
+        other->sortKeyPattern(SortKeySerialization::kForPipelineSerialization).toBson(),
+        pExpCtx->getCollator()};
+    other->_paths = _paths;
     other->limitSrc = limitSrc;
+    other->_maxMemoryUsageBytes = _maxMemoryUsageBytes;
     other->_mergingPresorted = true;
     other->_rawSort = _rawSort;
     return other;
