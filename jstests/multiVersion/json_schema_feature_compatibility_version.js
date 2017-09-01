@@ -1,5 +1,10 @@
-// Test that mongod will not allow creationg of JSON schema validators when the
-// feature compatibility version is older than 3.6.
+/**
+ * Test that mongod will not allow creationg of JSON schema validators when the feature
+ * compatibility version is older than 3.6.
+ *
+ * We restart mongod during the test and expect it to have the same data after restarting.
+ * @tags: [requires_persistence]
+ */
 
 (function() {
     "use strict";

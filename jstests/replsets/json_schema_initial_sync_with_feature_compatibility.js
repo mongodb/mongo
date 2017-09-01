@@ -1,6 +1,10 @@
 /**
  * Test that a new replica set member can successfully sync a collection with a $jsonSchema
  * validator, even when the replica set was downgraded to feature compatibility version 3.4.
+ *
+ * We restart the secondary as part of this test with the expecation that it still has the same
+ * data after the restart.
+ * @tags: [requires_persistence]
  */
 
 load("jstests/replsets/rslib.js");
