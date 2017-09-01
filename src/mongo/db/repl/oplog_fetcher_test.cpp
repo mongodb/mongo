@@ -98,6 +98,8 @@ protected:
     Fetcher::Documents lastEnqueuedDocuments;
     OplogFetcher::DocumentsInfo lastEnqueuedDocumentsInfo;
     OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn;
+
+    std::unique_ptr<OplogFetcher> makeOplogFetcher(ReplSetConfig config);
 };
 
 void OplogFetcherTest::setUp() {
@@ -203,22 +205,25 @@ void _checkDefaultCommandObjectFields(BSONObj cmdObj) {
     ASSERT_EQUALS(60000, cmdObj.getIntField("maxTimeMS"));
 }
 
+std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcher(ReplSetConfig config) {
+    return stdx::make_unique<OplogFetcher>(&getExecutor(),
+                                           lastFetched,
+                                           source,
+                                           nss,
+                                           config,
+                                           0,
+                                           -1,
+                                           true,
+                                           dataReplicatorExternalState.get(),
+                                           enqueueDocumentsFn,
+                                           [](Status) {},
+                                           defaultBatchSize);
+}
+
 TEST_F(
     OplogFetcherTest,
     FindQueryContainsTermAndStartTimestampIfGetCurrentTermAndLastCommittedOpTimeReturnsValidTerm) {
-    OplogFetcher oplogFetcher(&getExecutor(),
-                              lastFetched,
-                              source,
-                              nss,
-                              _createConfig(true),
-                              0,
-                              -1,
-                              true,
-                              dataReplicatorExternalState.get(),
-                              enqueueDocumentsFn,
-                              [](Status) {},
-                              defaultBatchSize);
-    auto cmdObj = oplogFetcher.getFindQuery_forTest();
+    auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
                       cmdObj["filter"].Obj());
@@ -229,19 +234,7 @@ TEST_F(
 TEST_F(OplogFetcherTest,
        FindQueryDoesNotContainTermIfGetCurrentTermAndLastCommittedOpTimeReturnsUninitializedTerm) {
     dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
-    OplogFetcher oplogFetcher(&getExecutor(),
-                              lastFetched,
-                              source,
-                              nss,
-                              _createConfig(true),
-                              0,
-                              -1,
-                              true,
-                              dataReplicatorExternalState.get(),
-                              enqueueDocumentsFn,
-                              [](Status) {},
-                              defaultBatchSize);
-    auto cmdObj = oplogFetcher.getFindQuery_forTest();
+    auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
                       cmdObj["filter"].Obj());
@@ -250,74 +243,83 @@ TEST_F(OplogFetcherTest,
 }
 
 TEST_F(OplogFetcherTest, MetadataObjectContainsMetadataFieldsUnderProtocolVersion1) {
-    auto metadataObj = OplogFetcher(&getExecutor(),
-                                    lastFetched,
-                                    source,
-                                    nss,
-                                    _createConfig(true),
-                                    0,
-                                    -1,
-                                    true,
-                                    dataReplicatorExternalState.get(),
-                                    enqueueDocumentsFn,
-                                    [](Status) {},
-                                    defaultBatchSize)
-                           .getMetadataObject_forTest();
+    auto metadataObj = makeOplogFetcher(_createConfig(true))->getMetadataObject_forTest();
     ASSERT_EQUALS(3, metadataObj.nFields());
     ASSERT_EQUALS(1, metadataObj[rpc::kReplSetMetadataFieldName].numberInt());
     ASSERT_EQUALS(1, metadataObj[rpc::kOplogQueryMetadataFieldName].numberInt());
 }
 
 TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {
-    auto metadataObj = OplogFetcher(&getExecutor(),
-                                    lastFetched,
-                                    source,
-                                    nss,
-                                    _createConfig(false),
-                                    0,
-                                    -1,
-                                    true,
-                                    dataReplicatorExternalState.get(),
-                                    enqueueDocumentsFn,
-                                    [](Status) {},
-                                    defaultBatchSize)
-                           .getMetadataObject_forTest();
+    auto metadataObj = makeOplogFetcher(_createConfig(false))->getMetadataObject_forTest();
     ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(), metadataObj);
 }
 
 TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldEqualHalfElectionTimeoutUnderProtocolVersion1) {
     auto config = _createConfig(true);
-    auto timeout = OplogFetcher(&getExecutor(),
-                                lastFetched,
-                                source,
-                                nss,
-                                config,
-                                0,
-                                -1,
-                                true,
-                                dataReplicatorExternalState.get(),
-                                enqueueDocumentsFn,
-                                [](Status) {},
-                                defaultBatchSize)
-                       .getAwaitDataTimeout_forTest();
+    auto timeout = makeOplogFetcher(config)->getAwaitDataTimeout_forTest();
     ASSERT_EQUALS(config.getElectionTimeoutPeriod() / 2, timeout);
 }
 
 TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldBeAConstantUnderProtocolVersion0) {
-    auto timeout = OplogFetcher(&getExecutor(),
-                                lastFetched,
-                                source,
-                                nss,
-                                _createConfig(false),
-                                0,
-                                -1,
-                                true,
-                                dataReplicatorExternalState.get(),
-                                enqueueDocumentsFn,
-                                [](Status) {},
-                                defaultBatchSize)
-                       .getAwaitDataTimeout_forTest();
+    auto timeout = makeOplogFetcher(_createConfig(false))->getAwaitDataTimeout_forTest();
     ASSERT_EQUALS(OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout, timeout);
+}
+
+class EnsureFCV {
+public:
+    using Version = ServerGlobalParams::FeatureCompatibility::Version;
+    EnsureFCV(Version version)
+        : _version(version), _origVersion(serverGlobalParams.featureCompatibility.version.load()) {
+        serverGlobalParams.featureCompatibility.version.store(_version);
+    }
+    ~EnsureFCV() {
+        serverGlobalParams.featureCompatibility.version.store(_origVersion);
+    }
+
+private:
+    const Version _version;
+    const Version _origVersion;
+};
+
+TEST_F(OplogFetcherTest, FindQueryHasNoReadconcernIfTermNotLastFetched) {
+    auto uninitializedTerm = OpTime::kUninitializedTerm;
+    ASSERT_NOT_EQUALS(dataReplicatorExternalState->currentTerm, uninitializedTerm);
+    dataReplicatorExternalState->currentTerm++;
+    auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
+    ASSERT_FALSE(cmdObj.hasField("readConcern"));
+}
+
+TEST_F(OplogFetcherTest, FindQueryHasNoReadconcernIfTermUninitialized) {
+    dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
+    auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
+    ASSERT_FALSE(cmdObj.hasField("readConcern"));
+}
+
+TEST_F(OplogFetcherTest, FindQueryHasAfterOpTimeWithFeatureCompatibilityVersion34) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k34);
+    ASSERT(serverGlobalParams.featureCompatibility.version.load() ==
+           ServerGlobalParams::FeatureCompatibility::Version::k34);
+    auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
+    auto readConcernElem = cmdObj["readConcern"];
+    ASSERT_EQUALS(mongo::BSONType::Object, readConcernElem.type());
+    ASSERT_FALSE(readConcernElem.Obj().hasField("afterClusterTime"));
+    ASSERT_BSONOBJ_EQ(readConcernElem.Obj(), BSON("afterOpTime" << lastFetched.opTime));
+
+    _checkDefaultCommandObjectFields(cmdObj);
+}
+
+TEST_F(OplogFetcherTest, FindQueryHasAfterOpTimeWithFeatureCompatibilityVersion36) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+    ASSERT(serverGlobalParams.featureCompatibility.version.load() !=
+           ServerGlobalParams::FeatureCompatibility::Version::k34);
+    auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
+    auto readConcernElem = cmdObj["readConcern"];
+    ASSERT_EQUALS(mongo::BSONType::Object, readConcernElem.type());
+    ASSERT_FALSE(readConcernElem.Obj().hasField("afterOpTime"));
+    ASSERT_BSONOBJ_EQ(readConcernElem.Obj(),
+                      BSON("afterClusterTime" << lastFetched.opTime.getTimestamp()));
+
+    _checkDefaultCommandObjectFields(cmdObj);
 }
 
 TEST_F(OplogFetcherTest, InvalidReplSetMetadataInResponseStopsTheOplogFetcher) {
