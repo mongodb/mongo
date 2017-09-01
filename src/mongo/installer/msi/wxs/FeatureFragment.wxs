@@ -81,7 +81,7 @@
           <?if $(var.Edition) = SSL ?>
             <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
-        </Feature>     
+        </Feature>
         <Feature Id="MiscellaneousTools"
                 Title ="Miscellaneous Tools"
                 Description="!(wix.MiscToolsDesc)"
@@ -101,6 +101,13 @@
         </Feature>
       </Feature>
     </FeatureGroup>
+
+    <!-- This feature only includes the powershell script in installation. WIX
+         requires all components to have a feature and the component is required
+         to bundle the script in the MSI. Display is set to hidden because this
+         feature does not enable or disable anything. -->
+    <Feature Id="InstallCompassFeature" Display="hidden">
+      <ComponentRef Id="InstallCompass" />
+    </Feature>
   </Fragment>
 </Wix>
-

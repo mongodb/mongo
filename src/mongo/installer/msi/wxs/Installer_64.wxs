@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="$(var.ProductId)" 
-           Name="!(wix.ProductName)" 
-           Language="1033" 
-           Version="$(var.MongoDBVersion)" 
-           Manufacturer="MongoDB" 
+  <Product Id="$(var.ProductId)"
+           Name="!(wix.ProductName)"
+           Language="1033"
+           Version="$(var.MongoDBVersion)"
+           Manufacturer="MongoDB"
            UpgradeCode="$(var.UpgradeCode)">
 
     <Package InstallerVersion="405" Compressed="yes" Platform="x64"/>
@@ -12,30 +12,30 @@
     <WixVariable Id="InstallFolder" Value="$(var.MongoDBMajorVersion)"/>
 
     <?if $(var.Edition) = Enterprise ?>
-      <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) Enterprise (64 bit)" />
-      <WixVariable Id="ProductMajorName" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Flavor) Enterprise (64 bit)" />
+    <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) Enterprise (64 bit)" />
+    <WixVariable Id="ProductMajorName" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Flavor) Enterprise (64 bit)" />
     <?elseif $(var.Edition) = SSL ?>
-      <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) SSL (64 bit)" />
-      <WixVariable Id="ProductMajorName" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Flavor) SSL (64 bit)" />
+    <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) SSL (64 bit)" />
+    <WixVariable Id="ProductMajorName" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Flavor) SSL (64 bit)" />
     <?else?>
-      <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) (64 bit)" />
-      <WixVariable Id="ProductMajorName" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Flavor) (64 bit)" />
+    <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) (64 bit)" />
+    <WixVariable Id="ProductMajorName" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Flavor) (64 bit)" />
     <?endif?>
 
     <MajorUpgrade
-      DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
+        DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
 
     <Directory Id="TARGETDIR" Name="SourceDir">
-        <Directory Id="ProgramFiles64Folder">
-            <Directory Id="MongoDB" Name="MongoDB">
-                <Directory Id="Server" Name="Server">
-                    <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
-                      <Directory Id="BIN" Name="bin" />
-                      <Directory Id="SNMP" Name="snmp" />
-                    </Directory>
-                </Directory>
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="MongoDB" Name="MongoDB">
+          <Directory Id="Server" Name="Server">
+            <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
+              <Directory Id="BIN" Name="bin" />
+              <Directory Id="SNMP" Name="snmp" />
             </Directory>
+          </Directory>
         </Directory>
+      </Directory>
     </Directory>
 
     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
@@ -44,9 +44,9 @@
     <WixVariable Id="WixUIInfoIco" Value="$(var.ProjectDir)Installer_Icon_32x32.ico" />
     <WixVariable Id="WixUIExclamationIco" Value="$(var.ProjectDir)Installer_Icon_32x32.ico" />
     <!--
-    <WixVariable Id="WixUINewIco" Value="Installer_Icon_16x16.ico" />
-    <WixVariable Id="WixUIUpIco" Value="Installer_Icon_16x16.ico" />
-  More information can be found at http://wix.tramontana.co.hu/tutorial/user-interface/ui-wizardry
+        <WixVariable Id="WixUINewIco" Value="Installer_Icon_16x16.ico" />
+        <WixVariable Id="WixUIUpIco" Value="Installer_Icon_16x16.ico" />
+        More information can be found at http://wix.tramontana.co.hu/tutorial/user-interface/ui-wizardry
     -->
 
     <Property Id="ARPPRODUCTICON" Value="MongoDBIcon" />
@@ -62,16 +62,58 @@
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" />
 
     <Property Id="MONGO_MULTIPLE_SKU" >
-        <RegistrySearch Id="Mongo_Multiple_Sku"
-            Root="HKLM"
-            Key="Software\MongoDB\Server\$(var.MongoDBMajorVersion)"
-            Name="Edition"
-            Type="raw" />
+      <RegistrySearch Id="Mongo_Multiple_Sku"
+                      Root="HKLM"
+                      Key="Software\MongoDB\Server\$(var.MongoDBMajorVersion)"
+                      Name="Edition"
+                      Type="raw" />
     </Property>
 
     <Condition Message="You cannot install multiple editions for the same version of MongoDB. Already installed product '[MONGO_MULTIPLE_SKU]' conflicts with this product.">
-        Installed OR (NOT MONGO_MULTIPLE_SKU OR MONGO_MULTIPLE_SKU = "!(wix.ProductMajorName)")
+      Installed OR (NOT MONGO_MULTIPLE_SKU OR MONGO_MULTIPLE_SKU = "!(wix.ProductMajorName)")
     </Condition>
 
+    <Property Id="SHOULD_INSTALL_COMPASS" Secure="yes" Value="1" />
+
+    <Property Id="POWERSHELLVERSION">
+      <RegistrySearch
+          Id="POWERSHELLVERSION"
+          Type="raw"
+          Root="HKLM"
+          Key="SOFTWARE\Microsoft\PowerShell\3\PowerShellEngine\PowerShellVersion"
+          Name="Path" />
+    </Property>
+    <Condition Message="You must have PowerShell 3.0 or higher.">
+      <![CDATA[Installed OR POWERSHELLVERSION >= 3.0]]>
+    </Condition>
+
+    <Property Id="POWERSHELLEXE">
+      <RegistrySearch
+          Id="POWERSHELLEXE"
+          Type="raw"
+          Root="HKLM"
+          Key="SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell"
+          Name="Path" />
+    </Property>
+
+    <SetProperty
+        Id="InstallCompassScript"
+        Before="InstallCompassScript"
+        Sequence="execute"
+        Value ="&quot;[POWERSHELLEXE]&quot; -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;&amp; '[#InstallCompassScript]' ; exit $$($Error.Count)&quot;" />
+
+    <CustomAction
+        Id="InstallCompassScript"
+        BinaryKey="WixCA"
+        DllEntry="WixQuietExec64"
+        Execute="deferred"
+        Return="check"
+        Impersonate="yes" />
+
+    <InstallExecuteSequence>
+      <Custom Action='InstallCompassScript' After='InstallFiles'>
+        (NOT Installed) AND (SHOULD_INSTALL_COMPASS = 1)
+      </Custom>
+    </InstallExecuteSequence>
   </Product>
 </Wix>

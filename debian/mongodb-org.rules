@@ -57,6 +57,7 @@ clean:
 	rm -f mongorestore
 	rm -f mongodump
 	rm -f mongofiles
+	rm -f install_compass
 	rm -f .sconsign.dblite
 	rm -f libmongoclient.a
 	rm -rf client/*.o
@@ -83,6 +84,7 @@ install: build
 	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-org-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-org-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-org-mongos/usr/bin
+	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-org-tools/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \

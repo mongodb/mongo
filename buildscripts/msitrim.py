@@ -35,8 +35,8 @@ db = msilib.OpenDatabase(args.file.name, msilib.MSIDBOPEN_DIRECT)
 
 exec_delete("select * from ControlEvent WHERE Dialog_ = 'LicenseAgreementDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'")
 exec_delete("select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'LicenseAgreementDlg'")
-
-exec_update("select * from ControlEvent WHERE Dialog_ = 'VerifyReadyDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'", 5, "WixUI_InstallMode = \"InstallCustom\"")
+exec_delete("select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'VerifyReadyDlg'")
+exec_delete("select * from ControlEvent WHERE Dialog_ = 'VerifyReadyDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'")
 
 db.Commit()
 

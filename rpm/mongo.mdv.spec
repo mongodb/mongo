@@ -132,6 +132,7 @@ fi
 %defattr(-,root,root,-)
 %doc README GNU-AGPL-3.0.txt
 
+%{_bindir}/install_compass
 %{_bindir}/mongo
 %{_bindir}/mongodump
 %{_bindir}/mongoexport

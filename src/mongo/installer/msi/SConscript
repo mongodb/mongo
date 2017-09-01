@@ -13,6 +13,7 @@ env['WIXHEAT'] = r'$WIXPATH\heat.exe'
 env['WIXCANDLE'] = r'$WIXPATH\candle.exe'
 env['WIXLIGHT'] = r'$WIXPATH\light.exe'
 env['WIXUIEXT'] = r'$WIXPATH\WixUIExtension.dll'
+env['WIXUTILEXT'] = r'$WIXPATH\WixUtilExtension.dll'
 env['MERGEMODULESBASEPATH'] = os.environ.get('MERGEMODULESBASEPATH')
 if env['MERGEMODULESBASEPATH'] == None and os.environ.get('ProgramFiles(x86)') != None:
     env['MERGEMODULESBASEPATH'] = (os.environ.get('ProgramFiles(x86)') +
@@ -118,6 +119,7 @@ env.Command(objects,
             ' -dFlavor=' + msi_flavor +
             r' -dProjectDir=buildscripts\packaging\msi\\'
             ' -dProjectName=MongoDB'
+            ' -dCompassDir=src\mongo\installer\compass'
             ' -dTargetDir=' + buildDir + r'\msi'
             ' -dTargetExt=.msi'
             ' -dTargetFileName=${SERVER_ARCHIVE}'
@@ -142,7 +144,7 @@ pre_msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.pre.msi"
 pre_msi_cmd = env.Command(pre_msi,
             objects,
             '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null -sice:ICE82 -sice:ICE03'
-            ' -ext "$WIXUIEXT"'
+            ' -ext "$WIXUIEXT" -ext "$WIXUTILEXT"'
             ' ${SOURCES}')
 
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongo.exe')
@@ -161,4 +163,3 @@ env.Command(msi,
 env.AlwaysBuild(msi)
 
 env.Alias( "msi" , msi )
-
