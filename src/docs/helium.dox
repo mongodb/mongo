@@ -52,9 +52,9 @@ strings are supported:
 <table>
 @hrow{String, Type, Meaning}
 @row{helium_devices, list, WiredTiger URI to Helium volume mapping}
-@row{helium_env_read_cache_size, int, struct he_env read_cache_size value}
-@row{helium_env_write_cache_size, int, struct he_env write_cache_size value}
 @row{helium_o_volume_truncate, boolean, HE_O_VOLUME_TRUNCATE flag}
+@row{helium_read_cache, int, struct he_env read_cache value}
+@row{helium_write_cache, int, struct he_env write_cache value}
 </table>
 
 With the exception of the configuration string \c helium_devices (which

@@ -34,8 +34,9 @@ static void	   config_compression(const char *);
 static void	   config_encryption(void);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
+static void	   config_helium_reset(void);
 static void	   config_in_memory(void);
-static void	   config_in_memory_check(void);
+static void	   config_in_memory_reset(void);
 static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
 static void	   config_lrt(void);
@@ -143,13 +144,12 @@ config_setup(void)
 
 	/* Required shared libraries. */
 	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
-		testutil_die(errno,
-		    "Levyx/helium shared library: %s", HELIUM_PATH);
+		testutil_die(errno, "Helium shared library: %s", HELIUM_PATH);
 	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
 		testutil_die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
 
 	/* Some data-sources don't support user-specified collations. */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb"))
 		config_single("reverse=off", 0);
 
 	/*
@@ -179,8 +179,13 @@ config_setup(void)
 			g.c_cache = g.c_threads;
 	}
 
+	/* Give Helium configuration a final review. */
+	if (DATASOURCE("helium"))
+		config_helium_reset();
+
 	/* Give in-memory configuration a final review. */
-	config_in_memory_check();
+	if (g.c_in_memory != 0)
+		config_in_memory_reset();
 
 	/*
 	 * Run-length configured by a number of operations and a timer. If the
@@ -338,6 +343,36 @@ config_encryption(void)
 }
 
 /*
+ * config_helium_reset --
+ *	Helium configuration review.
+ */
+static void
+config_helium_reset(void)
+{
+	/* Turn off a lot of stuff. */
+	if (!config_is_perm("alter"))
+		config_single("alter=off", 0);
+	if (!config_is_perm("backups"))
+		config_single("backups=off", 0);
+	if (!config_is_perm("checkpoints"))
+		config_single("checkpoints=off", 0);
+	if (!config_is_perm("compression"))
+		config_single("compression=none", 0);
+	if (!config_is_perm("in_memory"))
+		config_single("in_memory=off", 0);
+	if (!config_is_perm("logging"))
+		config_single("logging=off", 0);
+	if (!config_is_perm("rebalance"))
+		config_single("rebalance=off", 0);
+	if (!config_is_perm("reverse"))
+		config_single("reverse=off", 0);
+	if (!config_is_perm("salvage"))
+		config_single("salvage=off", 0);
+	if (!config_is_perm("transaction_timestamps"))
+		config_single("transaction_timestamps=off", 0);
+}
+
+/*
  * config_in_memory --
  *	Periodically set up an in-memory configuration.
  */
@@ -372,16 +407,13 @@ config_in_memory(void)
 }
 
 /*
- * config_in_memory_check --
+ * config_in_memory_reset --
  *	In-memory configuration review.
  */
 static void
-config_in_memory_check(void)
+config_in_memory_reset(void)
 {
 	uint32_t cache;
-
-	if (g.c_in_memory == 0)
-		return;
 
 	/* Turn off a lot of stuff. */
 	if (!config_is_perm("alter"))

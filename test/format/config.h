@@ -139,7 +139,7 @@ static CONFIG c[] = {
 
 	{ "direct_io",
 	  "if direct I/O is configured for data objects",	/* 0% */
-	  C_IGNORE, 0, 0, 1, &g.c_direct_io, NULL },
+	  C_IGNORE|C_BOOL, 0, 0, 1, &g.c_direct_io, NULL },
 
 	{ "encryption",
 	  "type of encryption (none | rotn-7)",
@@ -167,7 +167,7 @@ static CONFIG c[] = {
 
 	{ "in_memory",
 	  "if in-memory configured",
-	  C_IGNORE, 0, 0, 1, &g.c_in_memory, NULL },
+	  C_IGNORE|C_BOOL, 0, 0, 1, &g.c_in_memory, NULL },
 
 	{ "insert_pct",
 	  "percent operations that are inserts",
