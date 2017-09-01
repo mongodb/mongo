@@ -9,6 +9,7 @@ from ... import config
 from ... import core
 from ... import utils
 
+
 class JSONSchemaTestCase(interface.TestCase):
     """
     A JSON Schema test to execute.
@@ -35,9 +36,6 @@ class JSONSchemaTestCase(interface.TestCase):
     def configure(self, fixture, *args, **kwargs):
         interface.TestCase.configure(self, fixture, *args, **kwargs)
 
-        if self.fixture.port is not None:
-            self.shell_options["port"] = self.fixture.port
-
         global_vars = self.shell_options.get("global_vars", {}).copy()
 
         test_data = global_vars.get("TestData", {}).copy()
@@ -58,7 +56,9 @@ class JSONSchemaTestCase(interface.TestCase):
             raise
 
     def _make_process(self):
-        return core.programs.mongo_shell_program(self.logger,
-                                                 executable=self.shell_executable,
-                                                 filename=JSONSchemaTestCase.TEST_RUNNER_FILE,
-                                                 **self.shell_options)
+        return core.programs.mongo_shell_program(
+            self.logger,
+            executable=self.shell_executable,
+            connection_string=self.fixture.get_driver_connection_url(),
+            filename=JSONSchemaTestCase.TEST_RUNNER_FILE,
+            **self.shell_options)

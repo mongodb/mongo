@@ -5,14 +5,13 @@ Master/slave fixture for executing JSTests against.
 from __future__ import absolute_import
 
 import os.path
-import socket
 
 import pymongo
+import pymongo.errors
 
 from . import interface
 from . import standalone
 from ... import config
-from ... import logging
 from ... import utils
 
 
@@ -47,7 +46,7 @@ class MasterSlaveFixture(interface.ReplFixture):
         dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
         dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
         self._dbpath_prefix = os.path.join(dbpath_prefix,
-                                           "job%d" % (self.job_num),
+                                           "job{}".format(self.job_num),
                                            config.FIXTURE_SUBDIR)
 
         self.master = None
@@ -57,7 +56,6 @@ class MasterSlaveFixture(interface.ReplFixture):
         if self.master is None:
             self.master = self._new_mongod_master()
         self.master.setup()
-        self.port = self.master.port
 
         if self.slave is None:
             self.slave = self._new_mongod_slave()
@@ -69,7 +67,7 @@ class MasterSlaveFixture(interface.ReplFixture):
 
         # Do a replicated write to ensure that the slave has finished with its initial sync before
         # starting to run any tests.
-        client = utils.new_mongo_client(self.port)
+        client = self.master.mongo_client()
 
         # Keep retrying this until it times out waiting for replication.
         def insert_fn(remaining_secs):
@@ -158,7 +156,7 @@ class MasterSlaveFixture(interface.ReplFixture):
         mongod_options = self.mongod_options.copy()
         mongod_options.update(self.slave_options)
         mongod_options["slave"] = ""
-        mongod_options["source"] = "%s:%d" % (socket.gethostname(), self.port)
+        mongod_options["source"] = self.master.get_internal_connection_string()
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "slave")
         return self._new_mongod(mongod_logger, mongod_options)
 

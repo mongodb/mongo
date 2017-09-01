@@ -7,10 +7,10 @@ from __future__ import absolute_import
 import os
 import os.path
 import shutil
-import socket
 import time
 
 import pymongo
+import pymongo.errors
 
 from . import interface
 from ... import config
@@ -53,11 +53,12 @@ class MongoDFixture(interface.Fixture):
             dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
             dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
             self.mongod_options["dbpath"] = os.path.join(dbpath_prefix,
-                                                         "job%d" % (self.job_num),
+                                                         "job{}".format(self.job_num),
                                                          config.FIXTURE_SUBDIR)
         self._dbpath = self.mongod_options["dbpath"]
 
         self.mongod = None
+        self.port = None
 
     def setup(self):
         if not self.preserve_dbpath:
@@ -96,20 +97,21 @@ class MongoDFixture(interface.Fixture):
             # Check whether the mongod exited for some reason.
             exit_code = self.mongod.poll()
             if exit_code is not None:
-                raise errors.ServerFailure("Could not connect to mongod on port %d, process ended"
-                                           " unexpectedly with code %d." % (self.port, exit_code))
+                raise errors.ServerFailure("Could not connect to mongod on port {}, process ended"
+                                           " unexpectedly with code {}.".format(
+                                                self.port, exit_code))
 
             try:
                 # Use a shorter connection timeout to more closely satisfy the requested deadline.
-                client = utils.new_mongo_client(self.port, timeout_millis=500)
+                client = self.mongo_client(timeout_millis=500)
                 client.admin.command("ping")
                 break
             except pymongo.errors.ConnectionFailure:
                 remaining = deadline - time.time()
                 if remaining <= 0.0:
                     raise errors.ServerFailure(
-                        "Failed to connect to mongod on port %d after %d seconds"
-                        % (self.port, MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
+                        "Failed to connect to mongod on port {} after {} seconds".format(
+                            self.port, MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
 
                 self.logger.info("Waiting to connect to mongod on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.
@@ -151,7 +153,7 @@ class MongoDFixture(interface.Fixture):
         if self.mongod is None:
             raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
-        return "%s:%d" % (socket.gethostname(), self.port)
+        return "localhost:%d" % self.port
 
     def get_driver_connection_url(self):
         return "mongodb://" + self.get_internal_connection_string()

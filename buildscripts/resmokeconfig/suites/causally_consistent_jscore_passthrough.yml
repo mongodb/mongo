@@ -185,7 +185,6 @@ executor:
   fixture:
     class: ShardedClusterFixture
     mongos_options:
-      bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:
@@ -196,7 +195,6 @@ executor:
             asio: 2
           tracking: 0
     mongod_options:
-      bind_ip_all: ''
       nopreallocj: ''
       enableMajorityReadConcern: ''
       set_parameters:

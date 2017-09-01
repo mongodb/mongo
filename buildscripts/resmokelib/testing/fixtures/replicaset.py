@@ -8,11 +8,12 @@ import os.path
 import time
 
 import pymongo
+import pymongo.errors
 
 from . import interface
 from . import standalone
 from ... import config
-from ... import logging
+from ... import errors
 from ... import utils
 
 
@@ -36,7 +37,8 @@ class ReplicaSetFixture(interface.ReplFixture):
                  write_concern_majority_journal_default=None,
                  auth_options=None,
                  replset_config_options=None,
-                 voting_secondaries=True):
+                 voting_secondaries=True,
+                 all_nodes_electable=False):
 
         interface.ReplFixture.__init__(self, logger, job_num)
 
@@ -49,6 +51,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.auth_options = auth_options
         self.replset_config_options = utils.default_if_none(replset_config_options, {})
         self.voting_secondaries = voting_secondaries
+        self.all_nodes_electable = all_nodes_electable
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -60,7 +63,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
             dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
             self._dbpath_prefix = os.path.join(dbpath_prefix,
-                                               "job%d" % (self.job_num),
+                                               "job{}".format(self.job_num),
                                                config.FIXTURE_SUBDIR)
 
         self.nodes = []
@@ -87,18 +90,17 @@ class ReplicaSetFixture(interface.ReplFixture):
             self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
 
-        self.port = self.get_primary().port
-
         # We need only to wait to connect to the first node of the replica set because we first
         # initiate it as a single node replica set.
-        self.get_primary().await_ready()
+        self.nodes[0].await_ready()
 
         # Initiate the replica set.
         members = []
         for (i, node) in enumerate(self.nodes):
             member_info = {"_id": i, "host": node.get_internal_connection_string()}
             if i > 0:
-                member_info["priority"] = 0
+                if not self.all_nodes_electable:
+                    member_info["priority"] = 0
                 if i >= 7 or not self.voting_secondaries:
                     # Only 7 nodes in a replica set can vote, so the other members must still be
                     # non-voting when this fixture is configured to have voting secondaries.
@@ -112,7 +114,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                             "votes": 0})
 
         config = {"_id": self.replset_name}
-        client = utils.new_mongo_client(port=self.port)
+        client = self.nodes[0].mongo_client()
 
         if self.auth_options is not None:
             auth_db = client[self.auth_options["authenticationDatabase"]]
@@ -146,10 +148,10 @@ class ReplicaSetFixture(interface.ReplFixture):
         self._configure_repl_set(client, {"replSetInitiate": config})
         self._await_primary()
 
-        if self.get_secondaries():
+        if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig
             # command.
-            for node in self.get_secondaries():
+            for node in self.nodes[1:]:
                 node.await_ready()
             config["version"] = 2
             config["members"] = members
@@ -184,24 +186,28 @@ class ReplicaSetFixture(interface.ReplFixture):
 
     def _await_primary(self):
         # Wait for the primary to be elected.
-        client = utils.new_mongo_client(port=self.port)
+        # Since this method is called at startup we expect the first node to be primary even when
+        # self.all_nodes_electable is True.
+        primary = self.nodes[0]
+        client = primary.mongo_client()
         while True:
-            self.logger.info("Waiting for primary on port %d to be elected.", self.port)
+            self.logger.info("Waiting for primary on port %d to be elected.", primary.port)
             is_master = client.admin.command("isMaster")["ismaster"]
             if is_master:
                 break
             time.sleep(0.1)  # Wait a little bit before trying again.
-        self.logger.info("Primary on port %d successfully elected.", self.port)
+        self.logger.info("Primary on port %d successfully elected.", primary.port)
 
     def _await_secondaries(self):
         # Wait for the secondaries to become available.
-        secondaries = self.get_secondaries()
+        # Since this method is called at startup we expect the nodes 1 to n to be secondaries even
+        # when self.all_nodes_electable is True.
+        secondaries = self.nodes[1:]
         if self.initial_sync_node:
             secondaries.append(self.initial_sync_node)
 
         for secondary in secondaries:
-            client = utils.new_mongo_client(port=secondary.port,
-                                            read_preference=pymongo.ReadPreference.SECONDARY)
+            client = secondary.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
             while True:
                 self.logger.info("Waiting for secondary on port %d to become available.",
                                  secondary.port)
@@ -241,13 +247,38 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         return running
 
-    def get_primary(self):
-        # The primary is always the first element of the 'nodes' list because all other members of
-        # the replica set are configured with priority=0.
-        return self.nodes[0]
+    def get_primary(self, timeout_secs=30):
+        if not self.all_nodes_electable:
+            # The primary is always the first element of the 'nodes' list because all other members
+            # of the replica set are configured with priority=0.
+            return self.nodes[0]
+
+        start = time.time()
+        clients = {}
+        while True:
+            for node in self.nodes:
+                self._check_get_primary_timeout(start, timeout_secs)
+                client = clients.get(node.port)
+                if not client:
+                    client = node.mongo_client()
+                    clients[node.port] = client
+                is_master = client.admin.command("isMaster")["ismaster"]
+                if is_master:
+                    self.logger.info("The node on port %d is primary of replica set '%s'",
+                                     node.port, self.replset_name)
+                    return node
+
+    def _check_get_primary_timeout(self, start, timeout_secs):
+        now = time.time()
+        if (now - start) >= timeout_secs:
+            msg = "Timed out while waiting for a primary for replica set '{}'.".format(
+                self.replset_name)
+            self.logger.error(msg)
+            raise errors.ServerFailure(msg)
 
     def get_secondaries(self):
-        return self.nodes[1:]
+        primary = self.get_primary()
+        return [node for node in self.nodes if node.port != primary.port]
 
     def get_initial_sync_node(self):
         return self.initial_sync_node
@@ -261,7 +292,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         mongod_logger = self._get_logger_for_mongod(index)
         mongod_options = self.mongod_options.copy()
         mongod_options["replSet"] = replset_name
-        mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node%d" % (index))
+        mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node{}".format(index))
 
         return standalone.MongoDFixture(mongod_logger,
                                         self.job_num,
@@ -275,13 +306,15 @@ class ReplicaSetFixture(interface.ReplFixture):
         sync member of a replica-set.
         """
 
-        if index == 0:
-            node_name = "primary"
-        elif index == self.initial_sync_node_idx:
+        if index == self.initial_sync_node_idx:
             node_name = "initsync"
+        elif self.all_nodes_electable:
+            node_name = "node{}".format(index)
+        elif index == 0:
+            node_name = "primary"
         else:
             suffix = str(index - 1) if self.num_nodes > 2 else ""
-            node_name = "secondary%s" % suffix
+            node_name = "secondary{}".format(suffix)
 
         return self.logger.new_fixture_node_logger(node_name)
 
@@ -298,8 +331,14 @@ class ReplicaSetFixture(interface.ReplFixture):
         if self.replset_name is None:
             raise ValueError("Must call setup() before calling get_driver_connection_url()")
 
-        conn_strs = [node.get_internal_connection_string() for node in self.nodes]
-        if self.initial_sync_node:
-            conn_strs.append(self.initial_sync_node.get_internal_connection_string())
-
-        return "mongodb://" + ",".join(conn_strs) + "/?replicaSet=" + self.replset_name
+        if self.all_nodes_electable:
+            # We use a replica set connection string when all nodes are electable because we
+            # anticipate the client will want to gracefully handle any failovers.
+            conn_strs = [node.get_internal_connection_string() for node in self.nodes]
+            if self.initial_sync_node:
+                conn_strs.append(self.initial_sync_node.get_internal_connection_string())
+            return "mongodb://" + ",".join(conn_strs) + "/?replicaSet=" + self.replset_name
+        else:
+            # We return a direct connection to the expected pimary when only the first node is
+            # electable because we want the client to error out if a stepdown occurs.
+            return self.nodes[0].get_driver_connection_url()

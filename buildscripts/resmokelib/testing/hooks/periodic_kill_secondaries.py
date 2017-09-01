@@ -19,7 +19,6 @@ from ..fixtures import interface as fixture
 from ..fixtures import replicaset
 from ..testcases import interface as testcase
 from ... import errors
-from ... import utils
 
 
 class PeriodicKillSecondaries(interface.CustomBehavior):
@@ -31,19 +30,18 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
 
     DEFAULT_PERIOD_SECS = 30
 
-    def __init__(self, hook_logger, fixture, period_secs=DEFAULT_PERIOD_SECS):
-        if not isinstance(fixture, replicaset.ReplicaSetFixture):
-            raise TypeError("%s either does not support replication or does not support writing to"
-                            " its oplog early"
-                            % (fixture.__class__.__name__))
+    def __init__(self, hook_logger, rs_fixture, period_secs=DEFAULT_PERIOD_SECS):
+        if not isinstance(rs_fixture, replicaset.ReplicaSetFixture):
+            raise TypeError("{} either does not support replication or does not support writing to"
+                            " its oplog early".format(rs_fixture.__class__.__name__))
 
-        if fixture.num_nodes <= 1:
+        if rs_fixture.num_nodes <= 1:
             raise ValueError("PeriodicKillSecondaries requires the replica set to contain at least"
                              " one secondary")
 
         description = ("PeriodicKillSecondaries (kills the secondary after running tests for a"
                        " configurable period of time)")
-        interface.CustomBehavior.__init__(self, hook_logger, fixture, description)
+        interface.CustomBehavior.__init__(self, hook_logger, rs_fixture, description)
 
         self._period_secs = period_secs
         self._start_time = None
@@ -59,20 +57,10 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
             # The "rsSyncApplyStop" failpoint is already enabled.
             return
 
-        # Enable the "rsSyncApplyStop" failpoint on each of the secondaries to prevent them from
-        # applying any oplog entries while the test is running.
         for secondary in self.fixture.get_secondaries():
-            client = utils.new_mongo_client(port=secondary.port)
-            try:
-                client.admin.command(bson.SON([
-                    ("configureFailPoint", "rsSyncApplyStop"),
-                    ("mode", "alwaysOn")]))
-            except pymongo.errors.OperationFailure as err:
-                self.logger.exception(
-                    "Unable to disable oplog application on the mongod on port %d", secondary.port)
-                raise errors.ServerFailure(
-                    "Unable to disable oplog application on the mongod on port %d: %s"
-                    % (secondary.port, err.args[0]))
+            # Enable the "rsSyncApplyStop" failpoint on the secondary to prevent them from
+            # applying any oplog entries while the test is running.
+            self._enable_rssyncapplystop(secondary)
 
         self._start_time = time.time()
 
@@ -91,7 +79,7 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
         self.hook_test_case = testcase.TestCase(
             self.logger,
             "Hook",
-            "%s:%s" % (self._last_test_name, self.logger_name))
+            "{}:{}".format(self._last_test_name, self.logger_name))
         interface.CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
 
         try:
@@ -127,19 +115,7 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
         for secondary in self.fixture.get_secondaries():
             # Disable the "rsSyncApplyStop" failpoint on the secondary to have it resume applying
             # oplog entries.
-            for secondary in self.fixture.get_secondaries():
-                client = utils.new_mongo_client(port=secondary.port)
-                try:
-                    client.admin.command(bson.SON([
-                        ("configureFailPoint", "rsSyncApplyStop"),
-                        ("mode", "off")]))
-                except pymongo.errors.OperationFailure as err:
-                    self.logger.exception(
-                        "Unable to re-enable oplog application on the mongod on port %d",
-                        secondary.port)
-                    raise errors.ServerFailure(
-                        "Unable to re-enable oplog application on the mongod on port %d: %s"
-                        % (secondary.port, err.args[0]))
+            self._disable_rssyncapplystop(secondary)
 
             # Wait a little bit for the secondary to start apply oplog entries so that we are more
             # likely to kill the mongod process while it is partway into applying a batch.
@@ -149,12 +125,11 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
             # we still detect some cases in which the secondary has already crashed.
             if not secondary.is_running():
                 raise errors.ServerFailure(
-                    "mongod on port %d was expected to be running in"
-                    " PeriodicKillSecondaries.after_test(), but wasn't."
-                    % (secondary.port))
+                    "mongod on port {} was expected to be running in"
+                    " PeriodicKillSecondaries.after_test(), but wasn't.".format(secondary.port))
 
             self.hook_test_case.logger.info(
-                "Killing the secondary on port %d..." % (secondary.port))
+                "Killing the secondary on port %d...", secondary.port)
             secondary.mongod.stop(kill=True)
 
         # Teardown may or may not be considered a success as a result of killing a secondary, so we
@@ -179,7 +154,8 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
             teardown_success = secondary.teardown()
             if not teardown_success:
                 raise errors.ServerFailure(
-                    "%s did not exit cleanly after reconciling the end of its oplog" % (secondary))
+                    "{} did not exit cleanly after reconciling the end of its oplog".format(
+                        secondary))
 
         self.hook_test_case.logger.info(
             "Starting the fixture back up again with its data files intact...")
@@ -217,8 +193,7 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
         teardown_success = self.fixture.teardown()
         if not teardown_success:
             raise errors.ServerFailure(
-                "%s did not exit cleanly after verifying data consistency"
-                % (self.fixture))
+                "{} did not exit cleanly after verifying data consistency".format(self.fixture))
 
         self.hook_test_case.logger.info("Starting the fixture back up again...")
         self.fixture.setup()
@@ -232,7 +207,7 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
             secondary.setup()
             secondary.await_ready()
 
-            client = utils.new_mongo_client(port=secondary.port)
+            client = secondary.mongo_client()
             minvalid_doc = client.local["replset.minvalid"].find_one()
 
             latest_oplog_doc = client.local["oplog.rs"].find_one(
@@ -261,26 +236,27 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
 
                 if not begin_ts <= minvalid_ts:
                     raise errors.ServerFailure(
-                        "The condition begin <= minValid (%s <= %s) doesn't hold: minValid"
-                        " document=%s, latest oplog entry=%s"
-                        % (begin_ts, minvalid_ts, minvalid_doc, latest_oplog_doc))
+                        "The condition begin <= minValid ({} <= {}) doesn't hold: minValid"
+                        " document={}, latest oplog entry={}".format(
+                            begin_ts, minvalid_ts, minvalid_doc, latest_oplog_doc))
 
                 if not minvalid_ts <= oplog_delete_point_ts:
                     raise errors.ServerFailure(
-                        "The condition minValid <= oplogDeletePoint (%s <= %s) doesn't hold:"
-                        " minValid document=%s, latest oplog entry=%s"
-                        % (minvalid_ts, oplog_delete_point_ts, minvalid_doc, latest_oplog_doc))
+                        "The condition minValid <= oplogDeletePoint ({} <= {}) doesn't hold:"
+                        " minValid document={}, latest oplog entry={}".format(
+                            minvalid_ts, oplog_delete_point_ts, minvalid_doc, latest_oplog_doc))
 
                 if not minvalid_ts <= latest_oplog_entry_ts:
                     raise errors.ServerFailure(
-                        "The condition minValid <= top of oplog (%s <= %s) doesn't hold: minValid"
-                        " document=%s, latest oplog entry=%s"
-                        % (minvalid_ts, latest_oplog_entry_ts, minvalid_doc, latest_oplog_doc))
+                        "The condition minValid <= top of oplog ({} <= {}) doesn't hold: minValid"
+                        " document={}, latest oplog entry={}".format(
+                            minvalid_ts, latest_oplog_entry_ts, minvalid_doc, latest_oplog_doc))
 
             teardown_success = secondary.teardown()
             if not teardown_success:
                 raise errors.ServerFailure(
-                    "%s did not exit cleanly after being started up as a standalone" % (secondary))
+                    "{} did not exit cleanly after being started up as a standalone".format(
+                        secondary))
         except pymongo.errors.OperationFailure as err:
             self.hook_test_case.logger.exception(
                 "Failed to read the minValid document or the latest oplog entry from the mongod on"
@@ -288,14 +264,13 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
                 secondary.port)
             raise errors.ServerFailure(
                 "Failed to read the minValid document or the latest oplog entry from the mongod on"
-                " port %d: %s"
-                % (secondary.port, err.args[0]))
+                " port {}: {}".format(secondary.port, err.args[0]))
         finally:
             # Set the secondary's options back to their original values.
             secondary.mongod_options["replSet"] = replset_name
 
     def _await_secondary_state(self, secondary):
-        client = utils.new_mongo_client(port=secondary.port)
+        client = secondary.mongo_client()
         try:
             client.admin.command(bson.SON([
                 ("replSetTest", 1),
@@ -307,5 +282,36 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
                 secondary.port,
                 fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
             raise errors.ServerFailure(
-                "mongod on port %d failed to reach state SECONDARY after %d seconds: %s"
-                % (secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))
+                "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".format(
+                    secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))
+
+    def _enable_rssyncapplystop(self, secondary):
+        # Enable the "rsSyncApplyStop" failpoint on the secondary to prevent them from
+        # applying any oplog entries while the test is running.
+        client = secondary.mongo_client()
+        try:
+            client.admin.command(bson.SON([
+                ("configureFailPoint", "rsSyncApplyStop"),
+                ("mode", "alwaysOn")]))
+        except pymongo.errors.OperationFailure as err:
+            self.logger.exception(
+                "Unable to disable oplog application on the mongod on port %d", secondary.port)
+            raise errors.ServerFailure(
+                "Unable to disable oplog application on the mongod on port {}: {}".format(
+                    secondary.port, err.args[0]))
+
+    def _disable_rssyncapplystop(self, secondary):
+        # Disable the "rsSyncApplyStop" failpoint on the secondary to have it resume applying
+        # oplog entries.
+        client = secondary.mongo_client()
+        try:
+            client.admin.command(bson.SON([
+                ("configureFailPoint", "rsSyncApplyStop"),
+                ("mode", "off")]))
+        except pymongo.errors.OperationFailure as err:
+            self.logger.exception(
+                "Unable to re-enable oplog application on the mongod on port %d",
+                secondary.port)
+            raise errors.ServerFailure(
+                "Unable to re-enable oplog application on the mongod on port {}: {}".format(
+                    secondary.port, err.args[0]))

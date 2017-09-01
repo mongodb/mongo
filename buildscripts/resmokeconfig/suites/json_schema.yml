@@ -39,6 +39,5 @@ executor:
   fixture:
     class: MongoDFixture
     mongod_options:
-      bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1

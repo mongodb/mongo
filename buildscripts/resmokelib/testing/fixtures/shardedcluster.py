@@ -10,6 +10,7 @@ import socket
 import time
 
 import pymongo
+import pymongo.errors
 
 from . import interface
 from . import standalone
@@ -115,9 +116,8 @@ class ShardedClusterFixture(interface.Fixture):
 
         # Wait for the mongos
         self.mongos.await_ready()
-        self.port = self.mongos.port
 
-        client = utils.new_mongo_client(port=self.port)
+        client = self.mongo_client()
         if self.auth_options is not None:
             auth_db = client[self.auth_options["authenticationDatabase"]]
             auth_db.authenticate(self.auth_options["username"],
@@ -184,7 +184,7 @@ class ShardedClusterFixture(interface.Fixture):
         if self.mongos is None:
             raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
-        return "%s:%d" % (socket.gethostname(), self.mongos.port)
+        return self.mongos.get_internal_connection_string()
 
     def get_driver_connection_url(self):
         return "mongodb://" + self.get_internal_connection_string()
@@ -261,16 +261,11 @@ class ShardedClusterFixture(interface.Fixture):
         mongos_logger = self.logger.new_fixture_node_logger("mongos")
 
         mongos_options = copy.deepcopy(self.mongos_options)
-        configdb_hostname = socket.gethostname()
 
         if self.separate_configsvr:
-            configdb_replset = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
-            configdb_port = self.configsvr.port
-            mongos_options["configdb"] = "%s/%s:%d" % (configdb_replset,
-                                                       configdb_hostname,
-                                                       configdb_port)
+            mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
         else:
-            mongos_options["configdb"] = "%s:%d" % (configdb_hostname, self.shards[0].port)
+            mongos_options["configdb"] = "localhost:%d" % self.shards[0].port
 
         return _MongoSFixture(mongos_logger,
                               self.job_num,
@@ -312,6 +307,7 @@ class _MongoSFixture(interface.Fixture):
         self.mongos_options = utils.default_if_none(mongos_options, {}).copy()
 
         self.mongos = None
+        self.port = None
 
     def setup(self):
         if "port" not in self.mongos_options:
@@ -346,7 +342,7 @@ class _MongoSFixture(interface.Fixture):
 
             try:
                 # Use a shorter connection timeout to more closely satisfy the requested deadline.
-                client = utils.new_mongo_client(self.port, timeout_millis=500)
+                client = self.mongo_client(timeout_millis=500)
                 client.admin.command("ping")
                 break
             except pymongo.errors.ConnectionFailure:
@@ -391,3 +387,12 @@ class _MongoSFixture(interface.Fixture):
 
     def is_running(self):
         return self.mongos is not None and self.mongos.poll() is None
+
+    def get_internal_connection_string(self):
+        if self.mongos is None:
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
+
+        return "localhost:%d" % self.port
+
+    def get_driver_connection_url(self):
+        return "mongodb://" + self.get_internal_connection_string()

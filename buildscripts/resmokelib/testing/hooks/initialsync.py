@@ -69,7 +69,7 @@ class BackgroundInitialSync(jsfile.JsCustomBehavior):
     def _after_test_impl(self, test, test_report, description):
         self.tests_run += 1
         sync_node = self.fixture.get_initial_sync_node()
-        sync_node_conn = utils.new_mongo_client(port=sync_node.port)
+        sync_node_conn = sync_node.mongo_client()
 
         # If it's been 'n' tests so far, wait for the initial sync node to finish syncing.
         if self.tests_run >= self.n:
@@ -163,7 +163,7 @@ class IntermediateInitialSync(jsfile.JsCustomBehavior):
 
     def _after_test_impl(self, test, test_report, description):
         sync_node = self.fixture.get_initial_sync_node()
-        sync_node_conn = utils.new_mongo_client(port=sync_node.port)
+        sync_node_conn = sync_node.mongo_client()
 
         if self.use_resync:
             self.hook_test_case.logger.info("Calling resync on initial sync node...")

@@ -232,7 +232,6 @@ executor:
   fixture:
     class: ShardedClusterFixture
     mongos_options:
-      bind_ip_all: ''
       keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
@@ -244,7 +243,6 @@ executor:
             asio: 2
           tracking: 0
     mongod_options:
-      bind_ip_all: ''
       nopreallocj: ''
       enableMajorityReadConcern: ''
       auth: ''
