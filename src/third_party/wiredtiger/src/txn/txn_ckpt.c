@@ -309,7 +309,17 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 		ret = __wt_curfile_insert_check(meta_cursor);
 		if (ret == WT_ROLLBACK) {
 			metadata_race = true;
+			/*
+			 * Disable this check and assertion for now - it is
+			 * possible that a schema operation with a timestamp in
+			 * the future is in the metadata, but not part of the
+			 * the checkpoint now that checkpoints can be created
+			 * at the stable timestamp.
+			 * See WT-3559 for context on re-adding this assertion.
+			 */
+#if 0
 			ret = 0;
+#endif
 		} else
 			metadata_race = false;
 		WT_TRET(__wt_metadata_cursor_release(session, &meta_cursor));
