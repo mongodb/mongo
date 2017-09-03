@@ -85,9 +85,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
     boost::optional<Lock::DBLock> dbWriteLock;
 
     // If the rename is known not to be a cross-database rename, just a database lock suffices.
+    auto lockState = opCtx->lockState();
     if (source.db() == target.db())
         dbWriteLock.emplace(opCtx, source.db(), MODE_X);
-    else
+    else if (!lockState->isW())
         globalWriteLock.emplace(opCtx);
 
     // We stay in source context the whole time. This is mostly to set the CurOp namespace.
@@ -334,6 +335,25 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     {
         // Copy over all the data from source collection to temporary collection.
+        // We do not need global write exclusive access after obtaining the collection locks on the
+        // source and temporary collections. After copying the documents, each remaining stage of
+        // the cross-database rename will be responsible for its own lock management.
+        // Therefore, unless the caller has already acquired the global write lock prior to invoking
+        // this function, we relinquish global write access to the database after acquiring the
+        // collection locks.
+        // Collection locks must be obtained while holding the global lock to avoid any possibility
+        // of a deadlock.
+        AutoGetCollectionForRead autoSourceColl(opCtx, source);
+        AutoGetCollection autoTmpColl(opCtx, tmpName, MODE_IX);
+        ctx.reset();
+        if (globalWriteLock) {
+            const ResourceId globalLockResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+            lockState->downgrade(globalLockResourceId, MODE_IX);
+            invariant(!lockState->isW());
+        } else {
+            invariant(lockState->isW());
+        }
+
         auto cursor = sourceColl->getCursor(opCtx);
         while (auto record = cursor->next()) {
             opCtx->checkForInterrupt();
@@ -356,6 +376,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
             }
         }
     }
+    globalWriteLock.reset();
 
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.

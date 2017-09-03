@@ -106,6 +106,7 @@ public:
     std::vector<std::string> oplogEntries;
 
     bool onInsertsThrows = false;
+    bool onInsertsIsGlobalWriteLockExclusive = false;
 
     bool onRenameCollectionCalled = false;
     repl::OpTime renameOpTime = {Timestamp(Seconds(100), 1U), 1LL};
@@ -137,6 +138,11 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
     if (onInsertsThrows) {
         uasserted(ErrorCodes::OperationFailed, "insert failed");
     }
+
+    // Check global lock state.
+    auto lockState = opCtx->lockState();
+    ASSERT_TRUE(lockState->isWriteLocked());
+    onInsertsIsGlobalWriteLockExclusive = lockState->isW();
 
     _logOp(opCtx, nss, "inserts");
     OpObserverNoop::onInserts(opCtx, nss, uuid, begin, end, fromMigrate);
@@ -766,6 +772,25 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseDropsTemporaryCollect
         AssertionException,
         ErrorCodes::OperationFailed);
     _checkOplogEntries(_opObserver->oplogEntries, {"create", "index", "drop"});
+}
+
+TEST_F(RenameCollectionTest,
+       RenameCollectionAcrossDatabaseDowngradesGlobalWriteLockToNonExclusive) {
+    _createCollection(_opCtx.get(), _sourceNss);
+    _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
+    ASSERT_FALSE(_opObserver->onInsertsIsGlobalWriteLockExclusive);
+}
+
+TEST_F(RenameCollectionTest,
+       RenameCollectionAcrossDatabaseKeepsGlobalWriteLockExclusiveIfCallerHasGlobalWriteLock) {
+    // This simulates the case when renameCollection is called using the applyOps command (different
+    // from secondary oplog application).
+    _createCollection(_opCtx.get(), _sourceNss);
+    _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
+    Lock::GlobalWrite globalWrite(_opCtx.get());
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
+    ASSERT_TRUE(_opObserver->onInsertsIsGlobalWriteLockExclusive);
 }
 
 }  // namespace
