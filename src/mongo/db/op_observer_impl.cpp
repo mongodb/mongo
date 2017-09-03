@@ -490,7 +490,6 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
                                                 OptionalCollectionUUID uuid,
                                                 bool dropTarget,
                                                 OptionalCollectionUUID dropTargetUUID,
-                                                OptionalCollectionUUID dropSourceUUID,
                                                 bool stayTemp) {
     const NamespaceString cmdNss = fromCollection.getCommandNS();
     BSONObjBuilder builder;
@@ -501,9 +500,6 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
     } else {
         builder.append("dropTarget", dropTarget);
-    }
-    if (dropSourceUUID && enableCollectionUUIDs && !isMasterSlave()) {
-        dropSourceUUID->appendToBuilder(&builder, "dropSource");
     }
     BSONObj cmdObj = builder.done();
 

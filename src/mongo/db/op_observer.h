@@ -202,7 +202,6 @@ public:
                                             OptionalCollectionUUID uuid,
                                             bool dropTarget,
                                             OptionalCollectionUUID dropTargetUUID,
-                                            OptionalCollectionUUID dropSourceUUID,
                                             bool stayTemp) = 0;
     virtual void onApplyOps(OperationContext* opCtx,
                             const std::string& dbName,

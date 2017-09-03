@@ -182,7 +182,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    futureColl->uuid(),
                                                    /*dropTarget*/ false,
                                                    /*dropTargetUUID*/ {},
-                                                   /*dropSourceUUID*/ {},
                                                    stayTemp);
                 }
 
@@ -199,7 +198,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    uuid,
                                                    /*dropTarget*/ false,
                                                    /*dropTargetUUID*/ {},
-                                                   /*dropSourceUUID*/ {},
                                                    stayTemp);
 
                     wunit.commit();

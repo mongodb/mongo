@@ -88,7 +88,6 @@ public:
                                     OptionalCollectionUUID uuid,
                                     bool dropTarget,
                                     OptionalCollectionUUID dropTargetUUID,
-                                    OptionalCollectionUUID dropSourceUUID,
                                     bool stayTemp) override;
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,

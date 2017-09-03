@@ -180,7 +180,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                     }
                 }
                 opObserver->onRenameCollection(
-                    opCtx, source, target, sourceUUID, options.dropTarget, {}, {}, stayTemp);
+                    opCtx, source, target, sourceUUID, options.dropTarget, {}, stayTemp);
                 wunit.commit();
                 return Status::OK();
             }
@@ -189,7 +189,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
             invariant(options.dropTarget);
             auto dropTargetUUID = targetColl->uuid();
             auto renameOpTime = opObserver->onRenameCollection(
-                opCtx, source, target, sourceUUID, true, dropTargetUUID, {}, options.stayTemp);
+                opCtx, source, target, sourceUUID, true, dropTargetUUID, options.stayTemp);
 
             if (!renameOpTimeFromApplyOps.isNull()) {
                 // 'renameOpTime' must be null because a valid 'renameOpTimeFromApplyOps' implies
@@ -415,7 +415,6 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
 
     const auto sourceNsElt = cmd.firstElement();
     const auto targetNsElt = cmd["to"];
-    const auto dropSourceElt = cmd["dropSource"];
     uassert(ErrorCodes::TypeMismatch,
             "'renameCollection' must be of type String",
             sourceNsElt.type() == BSONType::String);
@@ -426,38 +425,10 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     NamespaceString sourceNss(sourceNsElt.valueStringData());
     NamespaceString targetNss(targetNsElt.valueStringData());
     NamespaceString uiNss(getNamespaceFromUUID(opCtx, ui));
-    NamespaceString dropSourceNss(getNamespaceFromUUID(opCtx, dropSourceElt));
 
     // If the UUID we're targeting already exists, rename from there no matter what.
-    // When dropSource is specified, the rename is accross databases. In that case, ui indicates
-    // the UUID of the new target collection and the dropSourceNss specifies the sourceNss.
     if (!uiNss.isEmpty()) {
         sourceNss = uiNss;
-        // The cross-database rename was already done and just needs a local rename, but we may
-        // still need to actually remove the source collection.
-        auto dropSourceNss = getNamespaceFromUUID(opCtx, dropSourceElt);
-        if (!dropSourceNss.isEmpty()) {
-            BSONObjBuilder unusedBuilder;
-            dropCollection(opCtx,
-                           dropSourceNss,
-                           unusedBuilder,
-                           repl::OpTime(),
-                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops)
-                .ignore();
-        }
-    } else if (!dropSourceNss.isEmpty()) {
-        sourceNss = dropSourceNss;
-    } else {
-        // When replaying cross-database renames, both source and target collections may no longer
-        // exist. Attempting a rename anyway could result in removing a newer collection of the
-        // same name.
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "source collection (UUID "
-                              << uassertStatusOK(UUID::parse(dropSourceElt))
-                              << ") for rename to "
-                              << targetNss.ns()
-                              << " no longer exists",
-                !dropSourceElt);
     }
 
     OptionalCollectionUUID targetUUID;

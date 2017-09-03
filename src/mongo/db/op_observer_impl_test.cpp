@@ -223,7 +223,7 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
         AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         renameOpTime = opObserver.onRenameCollection(
-            opCtx.get(), sourceNss, targetNss, {}, dropTarget, {}, {}, stayTemp);
+            opCtx.get(), sourceNss, targetNss, {}, dropTarget, {}, stayTemp);
         wunit.commit();
     }
 

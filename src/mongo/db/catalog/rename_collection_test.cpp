@@ -98,7 +98,6 @@ public:
                                     OptionalCollectionUUID uuid,
                                     bool dropTarget,
                                     OptionalCollectionUUID dropTargetUUID,
-                                    OptionalCollectionUUID dropSourceUUID,
                                     bool stayTemp) override;
 
     // Operations written to the oplog. These are operations for which
@@ -170,17 +169,10 @@ repl::OpTime OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                                 OptionalCollectionUUID uuid,
                                                 bool dropTarget,
                                                 OptionalCollectionUUID dropTargetUUID,
-                                                OptionalCollectionUUID dropSourceUUID,
                                                 bool stayTemp) {
     _logOp(opCtx, fromCollection, "rename");
-    OpObserverNoop::onRenameCollection(opCtx,
-                                       fromCollection,
-                                       toCollection,
-                                       uuid,
-                                       dropTarget,
-                                       dropTargetUUID,
-                                       dropSourceUUID,
-                                       stayTemp);
+    OpObserverNoop::onRenameCollection(
+        opCtx, fromCollection, toCollection, uuid, dropTarget, dropTargetUUID, stayTemp);
     onRenameCollectionCalled = true;
     return renameOpTime;
 }

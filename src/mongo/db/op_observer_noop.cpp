@@ -116,7 +116,6 @@ repl::OpTime OpObserverNoop::onRenameCollection(OperationContext* opCtx,
                                                 OptionalCollectionUUID uuid,
                                                 bool dropTarget,
                                                 OptionalCollectionUUID dropTargetUUID,
-                                                OptionalCollectionUUID dropSourceUUID,
                                                 bool stayTemp) {
     // Evict namespace entry from the namespace/uuid cache if it exists.
     NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
