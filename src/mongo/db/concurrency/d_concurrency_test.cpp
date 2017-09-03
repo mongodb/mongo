@@ -279,6 +279,152 @@ TEST_F(DConcurrencyTestFixture, GlobalWriteAndGlobalRead) {
     ASSERT(lockState->isW());
 }
 
+TEST_F(DConcurrencyTestFixture,
+       GlobalWriteRequiresExplicitDowngradeToIntentWriteModeIfDestroyedWhileHoldingDatabaseLock) {
+    auto opCtx = makeOpCtx();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    auto lockState = opCtx->lockState();
+
+    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    const ResourceId mmapId(RESOURCE_MMAPV1_FLUSH, ResourceId::SINGLETON_MMAPV1_FLUSH);
+
+    auto globalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
+    ASSERT(lockState->isW());
+    ASSERT(MODE_X == lockState->getLockMode(globalId))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_IX == lockState->getLockMode(mmapId)) << "unexpected MMAPv1 flush lock mode "
+                                                      << modeName(lockState->getLockMode(mmapId));
+
+    {
+        Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
+        ASSERT(lockState->isW());
+        ASSERT(MODE_X == lockState->getLockMode(globalId))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(mmapId))
+            << "unexpected MMAPv1 flush lock mode " << modeName(lockState->getLockMode(mmapId));
+
+        // If we destroy the GlobalWrite out of order relative to the DBLock, we will leave the
+        // global lock resource locked in MODE_X. We have to explicitly downgrade this resource to
+        // MODE_IX to allow other write operations to make progress.
+        // This test case illustrates non-recommended usage of the RAII types. See SERVER-30948.
+        globalWrite = {};
+        ASSERT(lockState->isW());
+        lockState->downgrade(globalId, MODE_IX);
+        ASSERT_FALSE(lockState->isW());
+        ASSERT(lockState->isWriteLocked());
+        ASSERT(MODE_IX == lockState->getLockMode(globalId))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(mmapId))
+            << "unexpected MMAPv1 flush lock mode " << modeName(lockState->getLockMode(mmapId));
+    }
+
+
+    ASSERT_FALSE(lockState->isW());
+    ASSERT_FALSE(lockState->isWriteLocked());
+    ASSERT(MODE_NONE == lockState->getLockMode(globalId))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_NONE == lockState->getLockMode(mmapId)) << "unexpected MMAPv1 flush lock mode "
+                                                        << modeName(lockState->getLockMode(mmapId));
+}
+
+TEST_F(DConcurrencyTestFixture,
+       GlobalWriteRequiresSupportsDowngradeToIntentWriteModeWhileHoldingDatabaseLock) {
+    auto opCtx = makeOpCtx();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    auto lockState = opCtx->lockState();
+
+    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    const ResourceId mmapId(RESOURCE_MMAPV1_FLUSH, ResourceId::SINGLETON_MMAPV1_FLUSH);
+
+    auto globalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
+    ASSERT(lockState->isW());
+    ASSERT(MODE_X == lockState->getLockMode(globalId))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_IX == lockState->getLockMode(mmapId)) << "unexpected MMAPv1 flush lock mode "
+                                                      << modeName(lockState->getLockMode(mmapId));
+
+    {
+        Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
+        ASSERT(lockState->isW());
+        ASSERT(MODE_X == lockState->getLockMode(globalId))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(mmapId))
+            << "unexpected MMAPv1 flush lock mode " << modeName(lockState->getLockMode(mmapId));
+
+        // Downgrade global lock resource to MODE_IX to allow other write operations to make
+        // progress.
+        lockState->downgrade(globalId, MODE_IX);
+        ASSERT_FALSE(lockState->isW());
+        ASSERT(lockState->isWriteLocked());
+        ASSERT(MODE_IX == lockState->getLockMode(globalId))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(mmapId))
+            << "unexpected MMAPv1 flush lock mode " << modeName(lockState->getLockMode(mmapId));
+    }
+
+    ASSERT_FALSE(lockState->isW());
+    ASSERT(lockState->isWriteLocked());
+
+    globalWrite = {};
+    ASSERT_FALSE(lockState->isW());
+    ASSERT_FALSE(lockState->isWriteLocked());
+    ASSERT(MODE_NONE == lockState->getLockMode(globalId))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_NONE == lockState->getLockMode(mmapId)) << "unexpected MMAPv1 flush lock mode "
+                                                        << modeName(lockState->getLockMode(mmapId));
+}
+
+TEST_F(DConcurrencyTestFixture,
+       NestedGlobalWriteSupportsDowngradeToIntentWriteModeWhileHoldingDatabaseLock) {
+    auto opCtx = makeOpCtx();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    auto lockState = opCtx->lockState();
+
+    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    const ResourceId mmapId(RESOURCE_MMAPV1_FLUSH, ResourceId::SINGLETON_MMAPV1_FLUSH);
+
+    auto outerGlobalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
+    auto innerGlobalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
+
+    {
+        Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
+        ASSERT(lockState->isW());
+        ASSERT(MODE_X == lockState->getLockMode(globalId))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(mmapId))
+            << "unexpected MMAPv1 flush lock mode " << modeName(lockState->getLockMode(mmapId));
+
+        // Downgrade global lock resource to MODE_IX to allow other write operations to make
+        // progress.
+        lockState->downgrade(globalId, MODE_IX);
+        ASSERT_FALSE(lockState->isW());
+        ASSERT(lockState->isWriteLocked());
+        ASSERT(MODE_IX == lockState->getLockMode(globalId))
+            << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT(MODE_IX == lockState->getLockMode(mmapId))
+            << "unexpected MMAPv1 flush lock mode " << modeName(lockState->getLockMode(mmapId));
+    }
+
+    ASSERT_FALSE(lockState->isW());
+    ASSERT(lockState->isWriteLocked());
+
+    innerGlobalWrite = {};
+    ASSERT_FALSE(lockState->isW());
+    ASSERT(lockState->isWriteLocked());
+    ASSERT(MODE_IX == lockState->getLockMode(globalId))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_IX == lockState->getLockMode(mmapId)) << "unexpected MMAPv1 flush lock mode "
+                                                      << modeName(lockState->getLockMode(mmapId));
+
+    outerGlobalWrite = {};
+    ASSERT_FALSE(lockState->isW());
+    ASSERT_FALSE(lockState->isWriteLocked());
+    ASSERT(MODE_NONE == lockState->getLockMode(globalId))
+        << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT(MODE_NONE == lockState->getLockMode(mmapId)) << "unexpected MMAPv1 flush lock mode "
+                                                        << modeName(lockState->getLockMode(mmapId));
+}
+
 TEST_F(DConcurrencyTestFixture, GlobalLockS_Timeout) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
 
