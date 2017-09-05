@@ -375,19 +375,12 @@ AutoGetCollectionForDbCheck::AutoGetCollectionForDbCheck(OperationContext* opCtx
                                                          const OplogEntriesEnum& type)
     : _agd(opCtx, nss), _collLock(opCtx->lockState(), nss.ns(), MODE_S) {
     std::string msg;
-    if (!_agd.getDb()) {
-        msg = "Database under dbCheck no longer exists";
-    } else if (_agd.getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
-        msg = "Collection under dbCheck renamed to view";
-    } else {
-        msg = "Collection under dbCheck no longer exists";
-    }
 
-    _collection = _agd.getDb()->getCollection(opCtx, nss);
+    _collection = _agd.getDb() ? _agd.getDb()->getCollection(opCtx, nss) : nullptr;
 
     // If the collection gets deleted after the check is launched, record that in the health log.
     if (!_collection) {
-        std::string msg;
+        msg = "Collection under dbCheck no longer exists";
 
         auto entry = dbCheckHealthLogEntry(nss,
                                            SeverityEnum::Error,

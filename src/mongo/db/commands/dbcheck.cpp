@@ -321,8 +321,12 @@ private:
             return true;
         }
 
-        auto collection = agd.getDb()->getCollection(opCtx, info.nss);
+        auto db = agd.getDb();
+        if (!db) {
+            return false;
+        }
 
+        auto collection = db->getCollection(opCtx, info.nss);
         if (!collection) {
             return false;
         }
