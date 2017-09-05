@@ -59,23 +59,6 @@ TEST(MatchExpressionParserGeo, WithinBox) {
     ASSERT(result.getValue()->matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
 }
 
-TEST(MatchExpressionParserGeo, RejectsExprAsGeometry) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto varId = expCtx->variablesParseState.defineVariable("userVar");
-    expCtx->variables.setValue(varId, Value(fromjson("{type: 'Point', coordinates:[0,0]}}")));
-
-    BSONObj query = fromjson("{a:{$geoIntersects:{$geometry: {$expr: '$$userVar'} }}}");
-
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query,
-                                     collator,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_NOT_OK(result.getStatus());
-}
-
 TEST(MatchExpressionParserGeoNear, ParseNear) {
     BSONObj query = fromjson(
         "{loc:{$near:{$maxDistance:100, "

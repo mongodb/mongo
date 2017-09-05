@@ -172,9 +172,12 @@ TEST(ParsedProjectionTest, InvalidElemMatchGeoNearProjection) {
         "{a: {$elemMatch: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}");
 }
 
+// TODO SERVER-30951: Convert this test to use top-level $expr and enable it.
+/*
 TEST(ParsedProjectionTest, InvalidElemMatchExprProjection) {
     assertInvalidProjection("{}", "{a: {$elemMatch: {$expr: 5}}}");
 }
+*/
 
 TEST(ParsedProjectionTest, ValidPositionalOperatorProjections) {
     createParsedProjection("{a: 1}", "{'a.$': 1}");

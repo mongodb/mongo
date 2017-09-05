@@ -295,6 +295,8 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
     };
     assertErrorCode(local, pipeline, 40186, "cannot use $near inside $graphLookup at any depth");
 
+    // TODO SERVER-30951: Convert this test to use top-level $expr and enable it.
+    /*
     pipeline = {
         $graphLookup: {
             from: 'foreign',
@@ -306,6 +308,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
         }
     };
     assertErrorCode(local, pipeline, 40186, "cannot use $expr inside $graphLookup");
+    */
 
     // $graphLookup can only consume at most 100MB of memory.
     var foreign = db.foreign;

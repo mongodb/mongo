@@ -115,20 +115,9 @@ StatusWithMatchExpression MatchExpressionParser::_parseComparison(
         return {Status(ErrorCodes::BadValue, ss)};
     }
 
-    if (_isAggExpression(e, expCtx)) {
-        auto expr = _parseAggExpression(e, expCtx, allowedFeatures);
-        if (!expr.isOK()) {
-            return expr.getStatus();
-        }
-        auto s = temp->init(name, expr.getValue());
-        if (!s.isOK()) {
-            return s;
-        }
-    } else {
-        auto s = temp->init(name, e);
-        if (!s.isOK()) {
-            return s;
-        }
+    auto s = temp->init(name, e);
+    if (!s.isOK()) {
+        return s;
     }
 
     temp->setCollator(collator);
@@ -278,10 +267,10 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
         }
 
         case PathAcceptingKeyword::TYPE:
-            return _parseType<TypeMatchExpression>(name, e, expCtx);
+            return _parseType<TypeMatchExpression>(name, e);
 
         case PathAcceptingKeyword::MOD:
-            return _parseMOD(name, e, expCtx);
+            return _parseMOD(name, e);
 
         case PathAcceptingKeyword::OPTIONS: {
             // TODO: try to optimize this
@@ -299,7 +288,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
         }
 
         case PathAcceptingKeyword::REGEX: {
-            return _parseRegexDocument(name, context, expCtx);
+            return _parseRegexDocument(name, context);
         }
 
         case PathAcceptingKeyword::ELEM_MATCH:
@@ -319,19 +308,19 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
 
         // Handles bitwise query operators.
         case PathAcceptingKeyword::BITS_ALL_SET: {
-            return _parseBitTest<BitsAllSetMatchExpression>(name, e, expCtx);
+            return _parseBitTest<BitsAllSetMatchExpression>(name, e);
         }
 
         case PathAcceptingKeyword::BITS_ALL_CLEAR: {
-            return _parseBitTest<BitsAllClearMatchExpression>(name, e, expCtx);
+            return _parseBitTest<BitsAllClearMatchExpression>(name, e);
         }
 
         case PathAcceptingKeyword::BITS_ANY_SET: {
-            return _parseBitTest<BitsAnySetMatchExpression>(name, e, expCtx);
+            return _parseBitTest<BitsAnySetMatchExpression>(name, e);
         }
 
         case PathAcceptingKeyword::BITS_ANY_CLEAR: {
-            return _parseBitTest<BitsAnyClearMatchExpression>(name, e, expCtx);
+            return _parseBitTest<BitsAnyClearMatchExpression>(name, e);
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD:
@@ -452,7 +441,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_TYPE: {
-            return _parseType<InternalSchemaTypeExpression>(name, e, expCtx);
+            return _parseType<InternalSchemaTypeExpression>(name, e);
         }
     }
 
@@ -623,7 +612,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
             continue;
         }
 
-        if (_isExpressionDocument(e, false, expCtx)) {
+        if (_isExpressionDocument(e, false)) {
             Status s = _parseSub(e.fieldName(),
                                  e.Obj(),
                                  root.get(),
@@ -637,7 +626,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
         }
 
         if (e.type() == RegEx) {
-            StatusWithMatchExpression result = _parseRegexElement(e.fieldName(), e, expCtx);
+            StatusWithMatchExpression result = _parseRegexElement(e.fieldName(), e);
             if (!result.isOK())
                 return result;
             root->add(result.getValue().release());
@@ -712,10 +701,7 @@ Status MatchExpressionParser::_parseSub(const char* name,
     return Status::OK();
 }
 
-bool MatchExpressionParser::_isExpressionDocument(
-    const BSONElement& e,
-    bool allowIncompleteDBRef,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+bool MatchExpressionParser::_isExpressionDocument(const BSONElement& e, bool allowIncompleteDBRef) {
     if (e.type() != Object)
         return false;
 
@@ -728,10 +714,6 @@ bool MatchExpressionParser::_isExpressionDocument(
         return false;
 
     if (_isDBRefDocument(o, allowIncompleteDBRef)) {
-        return false;
-    }
-
-    if (_isAggExpression(e, expCtx)) {
         return false;
     }
 
@@ -779,8 +761,7 @@ bool MatchExpressionParser::_isDBRefDocument(const BSONObj& obj, bool allowIncom
     return hasRef && hasID;
 }
 
-StatusWithMatchExpression MatchExpressionParser::_parseMOD(
-    const char* name, const BSONElement& e, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWithMatchExpression MatchExpressionParser::_parseMOD(const char* name, const BSONElement& e) {
     if (e.type() != Array)
         return {Status(ErrorCodes::BadValue, "malformed mod, needs to be an array")};
 
@@ -808,8 +789,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseMOD(
     return {std::move(temp)};
 }
 
-StatusWithMatchExpression MatchExpressionParser::_parseRegexElement(
-    const char* name, const BSONElement& e, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWithMatchExpression MatchExpressionParser::_parseRegexElement(const char* name,
+                                                                    const BSONElement& e) {
     if (e.type() != RegEx)
         return {Status(ErrorCodes::BadValue, "not a regex")};
 
@@ -820,8 +801,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseRegexElement(
     return {std::move(temp)};
 }
 
-StatusWithMatchExpression MatchExpressionParser::_parseRegexDocument(
-    const char* name, const BSONObj& doc, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWithMatchExpression MatchExpressionParser::_parseRegexDocument(const char* name,
+                                                                     const BSONObj& doc) {
     string regex;
     string regexOptions;
 
@@ -874,7 +855,7 @@ Status MatchExpressionParser::_parseInExpression(
         BSONElement e = i.next();
 
         // Allow DBRefs, but reject all fields with names starting with $.
-        if (_isExpressionDocument(e, false, expCtx)) {
+        if (_isExpressionDocument(e, false)) {
             return Status(ErrorCodes::BadValue, "cannot nest $ under $in");
         }
 
@@ -887,10 +868,6 @@ Status MatchExpressionParser::_parseInExpression(
             if (!s.isOK())
                 return s;
         } else {
-            if (_isAggExpression(e, expCtx)) {
-                return Status(ErrorCodes::BadValue, "$expr not supported for $in");
-            }
-
             equalities.push_back(e);
         }
     }
@@ -898,10 +875,8 @@ Status MatchExpressionParser::_parseInExpression(
 }
 
 template <class T>
-StatusWithMatchExpression MatchExpressionParser::_parseType(
-    const char* name,
-    const BSONElement& elt,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWithMatchExpression MatchExpressionParser::_parseType(const char* name,
+                                                            const BSONElement& elt) {
     auto typeSet = MatcherTypeSet::parse(elt, MatcherTypeSet::kTypeAliasMap);
     if (!typeSet.isOK()) {
         return typeSet.getStatus();
@@ -943,7 +918,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
     //     3) expression is not a WHERE operator. WHERE works on objects instead
     //        of specific field.
     bool isElemMatchValue = false;
-    if (_isExpressionDocument(e, true, expCtx)) {
+    if (_isExpressionDocument(e, true)) {
         BSONObj o = e.Obj();
         BSONElement elt = o.firstElement();
         invariant(!elt.eoo());
@@ -1086,8 +1061,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(
 }
 
 template <class T>
-StatusWithMatchExpression MatchExpressionParser::_parseBitTest(
-    const char* name, const BSONElement& e, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWithMatchExpression MatchExpressionParser::_parseBitTest(const char* name,
+                                                               const BSONElement& e) {
     std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression = stdx::make_unique<T>();
 
     if (e.type() == BSONType::Array) {
@@ -1670,39 +1645,6 @@ StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
             return StatusWithMatchExpression(s);
         return {std::move(e)};
     }
-}
-
-bool MatchExpressionParser::_isAggExpression(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (!expCtx) {
-        return false;
-    }
-
-    if (BSONType::Object != elem.type()) {
-        return false;
-    }
-
-    auto obj = elem.embeddedObject();
-    if (obj.nFields() != 1) {
-        return false;
-    }
-
-    return obj.firstElementFieldName() == kAggExpression;
-}
-
-StatusWith<boost::intrusive_ptr<Expression>> MatchExpressionParser::_parseAggExpression(
-    BSONElement elem,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    AllowedFeatureSet allowedFeatures) {
-    invariant(expCtx);
-
-    if ((allowedFeatures & AllowedFeatures::kExpr) == 0u) {
-        return {Status(ErrorCodes::BadValue, "$expr is not allowed in this context")};
-    }
-
-    auto expr = Expression::parseOperand(
-        expCtx, elem.embeddedObject().firstElement(), expCtx->variablesParseState);
-    return expr->optimize();
 }
 
 namespace {

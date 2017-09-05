@@ -372,6 +372,8 @@ TEST(MatchExpressionParserTest, NearParsesSuccessfullyWhenAllowed) {
                   .getStatus());
 }
 
+// TODO SERVER-30951: Convert these tests to use top-level $expr and enable them.
+/*
 TEST(MatchExpressionParserTest, ExprFailsToParseWhenDisallowed) {
     auto query = fromjson("{a: {$expr: 5}}");
     const CollatorInterface* collator = nullptr;
@@ -389,4 +391,5 @@ TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWhenAllowed) {
                                            MatchExpressionParser::AllowedFeatures::kExpr)
                   .getStatus());
 }
+*/
 }

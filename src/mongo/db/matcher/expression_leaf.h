@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_map.h"
@@ -69,7 +68,6 @@ public:
     explicit ComparisonMatchExpression(MatchType type) : LeafMatchExpression(type) {}
 
     Status init(StringData path, const BSONElement& rhs);
-    Status init(StringData path, const boost::intrusive_ptr<Expression>& rhsExpr);
 
     virtual ~ComparisonMatchExpression() {}
 
@@ -77,19 +75,12 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    /**
-     * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
-     */
-    virtual void _doSetCollator(const CollatorInterface* collator) {
-        _collator = collator;
-    }
-
     virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
     const BSONElement& getData() const {
-        return _rhsElem;
+        return _rhs;
     }
 
     const CollatorInterface* getCollator() const {
@@ -113,11 +104,14 @@ public:
     }
 
 protected:
-    Status _validate();
+    /**
+     * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
+     */
+    virtual void _doSetCollator(const CollatorInterface* collator) {
+        _collator = collator;
+    }
 
-    BSONElement _rhsElem;
-
-    BSONObj _resolvedRhsExpr;
+    BSONElement _rhs;
 
     // Collator used to compare elements. By default, simple binary comparison will be used.
     const CollatorInterface* _collator = nullptr;
@@ -128,7 +122,7 @@ public:
     EqualityMatchExpression() : ComparisonMatchExpression(EQ) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<EqualityMatchExpression>();
-        invariantOK(e->init(path(), _rhsElem));
+        invariantOK(e->init(path(), _rhs));
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -142,7 +136,7 @@ public:
     LTEMatchExpression() : ComparisonMatchExpression(LTE) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<LTEMatchExpression>();
-        invariantOK(e->init(path(), _rhsElem));
+        invariantOK(e->init(path(), _rhs));
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -156,7 +150,7 @@ public:
     LTMatchExpression() : ComparisonMatchExpression(LT) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<LTMatchExpression>();
-        invariantOK(e->init(path(), _rhsElem));
+        invariantOK(e->init(path(), _rhs));
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -170,7 +164,7 @@ public:
     GTMatchExpression() : ComparisonMatchExpression(GT) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<GTMatchExpression>();
-        invariantOK(e->init(path(), _rhsElem));
+        invariantOK(e->init(path(), _rhs));
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -184,7 +178,7 @@ public:
     GTEMatchExpression() : ComparisonMatchExpression(GTE) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<GTEMatchExpression>();
-        invariantOK(e->init(path(), _rhsElem));
+        invariantOK(e->init(path(), _rhs));
         if (getTag()) {
             e->setTag(getTag()->clone());
         }

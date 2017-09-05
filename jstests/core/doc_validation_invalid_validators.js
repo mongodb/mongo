@@ -47,7 +47,9 @@
         db.runCommand({"collMod": collName, "validator": {$geoNear: {place: "holder"}}}));
     assert.commandFailed(
         db.runCommand({"collMod": collName, "validator": {$nearSphere: {place: "holder"}}}));
-    assert.commandFailed(db.runCommand({"collMod": collName, "validator": {a: {$expr: 5}}}));
+
+    // TODO SERVER-30951: Convert this test to use top-level $expr and enable it.
+    // assert.commandFailed(db.runCommand({"collMod": collName, "validator": {a: {$expr: 5}}}));
 
     coll.drop();
 

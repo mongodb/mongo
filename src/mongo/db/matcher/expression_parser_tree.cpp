@@ -73,7 +73,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(
     AllowedFeatureSet allowedFeatures,
     bool topLevel) {
     if (e.type() == RegEx) {
-        StatusWithMatchExpression s = _parseRegexElement(name, e, expCtx);
+        StatusWithMatchExpression s = _parseRegexElement(name, e);
         if (!s.isOK())
             return s;
         std::unique_ptr<NotMatchExpression> n = stdx::make_unique<NotMatchExpression>();

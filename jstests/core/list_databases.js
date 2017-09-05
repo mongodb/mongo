@@ -76,5 +76,7 @@
         listDatabases: 1,
         filter: {a: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}
     }));
-    assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {a: {$expr: 5}}}));
+
+    // TODO SERVER-30951: Convert this test to use top-level $expr and enable it.
+    // assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {a: {$expr: 5}}}));
 }());

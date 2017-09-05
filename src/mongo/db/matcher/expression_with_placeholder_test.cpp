@@ -236,12 +236,15 @@ TEST(ExpressionWithPlaceholderTest, GeoNearExpressionFailsToParse) {
     ASSERT_NOT_OK(status.getStatus());
 }
 
+// TODO SERVER-30951: Convert this test to use top-level $expr and enable it.
+/*
 TEST(ExpressionWithPlaceholderTest, ExprExpressionFailsToParse) {
     const CollatorInterface* collator = nullptr;
     auto rawFilter = fromjson("{i: {$expr: 5}}");
     auto status = ExpressionWithPlaceholder::parse(rawFilter, collator);
     ASSERT_NOT_OK(status.getStatus());
 }
+*/
 
 TEST(ExpressionWithPlaceholderTest, EquivalentIfPlaceholderAndExpressionMatch) {
     constexpr auto collator = nullptr;

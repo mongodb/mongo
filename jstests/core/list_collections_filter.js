@@ -99,7 +99,11 @@
         mydb.getCollectionInfos(
             {a: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}});
     });
+
+    // TODO SERVER-30951: Convert this test to use top-level $expr and enable it.
+    /*
     assert.throws(function() {
         mydb.getCollectionInfos({a: {$expr: 5}});
     });
+    */
 }());

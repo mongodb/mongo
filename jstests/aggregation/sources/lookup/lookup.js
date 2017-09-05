@@ -495,7 +495,9 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
         ];
         testPipeline(pipeline, expectedResults, coll);
 
+        // TODO SERVER-30951: Convert these tests to use top-level $expr and enable them.
         // Basic non-equi theta join via $match.
+        /*
         pipeline = [
             {
               $lookup: {
@@ -578,6 +580,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
             {"_id": 3, "x": 3, "c": []}
         ];
         testPipeline(pipeline, expectedResults, coll);
+        */
 
         // Multiple variables.
         pipeline = [

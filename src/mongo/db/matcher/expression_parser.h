@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/stdx/functional.h"
 
@@ -170,9 +171,7 @@ private:
      * { $id : "x" } = false (if incomplete DBRef is allowed)
      * { $db : "mydb" } = false (if incomplete DBRef is allowed)
      */
-    bool _isExpressionDocument(const BSONElement& e,
-                               bool allowIncompleteDBRef,
-                               const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    bool _isExpressionDocument(const BSONElement& e, bool allowIncompleteDBRef);
 
     /**
      * { $ref: "s", $id: "x" } = true
@@ -232,19 +231,11 @@ private:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         AllowedFeatureSet allowedFeatures);
 
-    StatusWithMatchExpression _parseMOD(const char* name,
-                                        const BSONElement& e,
-                                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    StatusWithMatchExpression _parseMOD(const char* name, const BSONElement& e);
 
-    StatusWithMatchExpression _parseRegexElement(
-        const char* name,
-        const BSONElement& e,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    StatusWithMatchExpression _parseRegexElement(const char* name, const BSONElement& e);
 
-    StatusWithMatchExpression _parseRegexDocument(
-        const char* name,
-        const BSONObj& doc,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    StatusWithMatchExpression _parseRegexDocument(const char* name, const BSONObj& doc);
 
     Status _parseInExpression(InMatchExpression* entries,
                               const BSONObj& theArray,
@@ -252,9 +243,7 @@ private:
                               const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     template <class T>
-    StatusWithMatchExpression _parseType(const char* name,
-                                         const BSONElement& elt,
-                                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    StatusWithMatchExpression _parseType(const char* name, const BSONElement& elt);
 
     StatusWithMatchExpression _parseGeo(const char* name,
                                         PathAcceptingKeyword type,
@@ -297,9 +286,7 @@ private:
      * Parses 'e' into a BitTestMatchExpression.
      */
     template <class T>
-    StatusWithMatchExpression _parseBitTest(const char* name,
-                                            const BSONElement& e,
-                                            const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    StatusWithMatchExpression _parseBitTest(const char* name, const BSONElement& e);
 
     /**
      * Converts 'theArray', a BSONArray of integers, into a std::vector of integers.
@@ -340,13 +327,6 @@ private:
      */
     StatusWithMatchExpression _parseInternalSchemaMatchArrayIndex(
         const char* path, const BSONElement& elem, const CollatorInterface* collator);
-
-    bool _isAggExpression(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    StatusWith<boost::intrusive_ptr<Expression>> _parseAggExpression(
-        BSONElement elem,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        AllowedFeatureSet allowedFeatures);
 
     StatusWithMatchExpression _parseInternalSchemaAllowedProperties(
         const BSONElement& elem, const CollatorInterface* collator);
