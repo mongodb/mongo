@@ -179,6 +179,7 @@
         dropUser: {skip: "primary only"},
         emptycapped: {skip: "primary only"},
         enableSharding: {skip: "primary only"},
+        endSessions: {skip: "does not return user data"},
         eval: {skip: "primary only"},
         explain: {skip: "TODO SERVER-30068"},
         features: {skip: "does not return user data"},

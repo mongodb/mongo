@@ -132,8 +132,7 @@ auto dispatch(const NamespaceString& ns,
 }  // namespace
 
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
-                                             const LogicalSessionRecordSet& sessions,
-                                             Date_t refreshTime) {
+                                             const LogicalSessionRecordSet& sessions) {
     return dispatch(
         kSessionsNamespaceString,
         MODE_IX,
@@ -142,13 +141,11 @@ Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
             DBDirectClient client(opCtx);
             return doRefresh(kSessionsNamespaceString,
                              sessions,
-                             refreshTime,
                              makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
         },
         [&](DBClientBase* client) {
             return doRefreshExternal(kSessionsNamespaceString,
                                      sessions,
-                                     refreshTime,
                                      makeSendFnForCommand(kSessionsNamespaceString, client));
         });
 }

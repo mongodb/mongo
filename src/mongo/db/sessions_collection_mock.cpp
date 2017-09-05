@@ -103,4 +103,16 @@ Status MockSessionsCollectionImpl::_removeRecords(const LogicalSessionIdSet& ses
     return Status::OK();
 }
 
+StatusWith<LogicalSessionIdSet> MockSessionsCollectionImpl::findRemovedSessions(
+    OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
+    LogicalSessionIdSet lsids;
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    for (auto& lsid : sessions) {
+        if (_sessions.find(lsid) == _sessions.end()) {
+            lsids.emplace(lsid);
+        }
+    }
+    return lsids;
+}
+
 }  // namespace mongo

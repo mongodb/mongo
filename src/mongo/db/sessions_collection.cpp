@@ -55,15 +55,15 @@ BSONObj lsidQuery(const LogicalSessionRecord& record) {
     return lsidQuery(record.getId());
 }
 
-BSONObj updateQuery(const LogicalSessionRecord& record, Date_t refreshTime) {
+BSONObj updateQuery(const LogicalSessionRecord& record) {
     // { $max : { lastUse : <time> }, $setOnInsert : { user : <user> } }
 
     // Build our update doc.
     BSONObjBuilder updateBuilder;
 
     {
-        BSONObjBuilder maxBuilder(updateBuilder.subobjStart("$max"));
-        maxBuilder.append(LogicalSessionRecord::kLastUseFieldName, refreshTime);
+        BSONObjBuilder maxBuilder(updateBuilder.subobjStart("$currentDate"));
+        maxBuilder.append(LogicalSessionRecord::kLastUseFieldName, true);
     }
 
     if (record.getUser()) {
@@ -200,17 +200,15 @@ SessionsCollection::FindBatchFn SessionsCollection::makeFindFnForCommand(const N
 
 Status SessionsCollection::doRefresh(const NamespaceString& ns,
                                      const LogicalSessionRecordSet& sessions,
-                                     Date_t refreshTime,
                                      SendBatchFn send) {
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("update", ns.coll());
         batch->append("ordered", false);
     };
 
-    auto add = [&refreshTime](BSONArrayBuilder* entries, const LogicalSessionRecord& record) {
-        entries->append(BSON("q" << lsidQuery(record) << "u" << updateQuery(record, refreshTime)
-                                 << "upsert"
-                                 << true));
+    auto add = [](BSONArrayBuilder* entries, const LogicalSessionRecord& record) {
+        entries->append(
+            BSON("q" << lsidQuery(record) << "u" << updateQuery(record) << "upsert" << true));
     };
 
     return runBulkCmd("updates", init, add, send, sessions);
@@ -218,12 +216,12 @@ Status SessionsCollection::doRefresh(const NamespaceString& ns,
 
 Status SessionsCollection::doRefreshExternal(const NamespaceString& ns,
                                              const LogicalSessionRecordSet& sessions,
-                                             Date_t refreshTime,
                                              SendBatchFn send) {
     auto makeT = [] { return std::vector<LogicalSessionRecord>{}; };
 
-    auto add = [&refreshTime](std::vector<LogicalSessionRecord>& batch,
-                              const LogicalSessionRecord& record) { batch.push_back(record); };
+    auto add = [](std::vector<LogicalSessionRecord>& batch, const LogicalSessionRecord& record) {
+        batch.push_back(record);
+    };
 
     auto sendLocal = [&](std::vector<LogicalSessionRecord>& batch) {
         RefreshSessionsCmdFromClusterMember idl;

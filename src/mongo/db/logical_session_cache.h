@@ -31,6 +31,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/commands/end_sessions_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/refresh_sessions_gen.h"
 
@@ -67,7 +68,7 @@ public:
      * should only be used when starting new sessions and should not be used to
      * insert records for existing sessions.
      */
-    virtual Status startSession(OperationContext* opCtx, LogicalSessionRecord record) = 0;
+    virtual void startSession(OperationContext* opCtx, LogicalSessionRecord record) = 0;
 
     /**
      * Refresh the given sessions. Updates the timestamps of these records in
@@ -83,6 +84,11 @@ public:
      * is.
      */
     virtual void vivify(OperationContext* opCtx, const LogicalSessionId& lsid) = 0;
+
+    /**
+     * enqueues LogicalSessionIds for removal during the next _refresh()
+     */
+    virtual void endSessions(const LogicalSessionIdSet& lsids) = 0;
 
     /**
      * Removes all local records in this cache. Does not remove the corresponding

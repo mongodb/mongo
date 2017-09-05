@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-LogicalSessionIdSet ServiceLiasonMongod::getActiveSessions() const {
+LogicalSessionIdSet ServiceLiasonMongod::getActiveOpSessions() const {
     LogicalSessionIdSet activeSessions;
 
     invariant(hasGlobalServiceContext());
@@ -62,25 +62,26 @@ LogicalSessionIdSet ServiceLiasonMongod::getActiveSessions() const {
             activeSessions.insert(*lsid);
         }
     }
-
-    // Append any in-use session ids from the global and collection-level cursor managers
-    {
-        boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
-        auto client = Client::getCurrent();
-
-        auto* const opCtx = [&client, &uniqueCtx] {
-            if (client->getOperationContext()) {
-                return client->getOperationContext();
-            }
-
-            uniqueCtx.emplace(client->makeOperationContext());
-            return uniqueCtx->get();
-        }();
-
-        CursorManager::appendAllActiveSessions(opCtx, &activeSessions);
-    }
-
     return activeSessions;
+}
+
+LogicalSessionIdSet ServiceLiasonMongod::getOpenCursorSessions() const {
+    LogicalSessionIdSet cursorSessions;
+    // Append any in-use session ids from the global and collection-level cursor managers
+    boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
+    auto client = Client::getCurrent();
+
+    auto* const opCtx = [&client, &uniqueCtx] {
+        if (client->getOperationContext()) {
+            return client->getOperationContext();
+        }
+
+        uniqueCtx.emplace(client->makeOperationContext());
+        return uniqueCtx->get();
+    }();
+
+    CursorManager::appendAllActiveSessions(opCtx, &cursorSessions);
+    return cursorSessions;
 }
 
 void ServiceLiasonMongod::scheduleJob(PeriodicRunner::PeriodicJob job) {
@@ -100,6 +101,11 @@ Date_t ServiceLiasonMongod::now() const {
 
 ServiceContext* ServiceLiasonMongod::_context() {
     return getGlobalServiceContext();
+}
+
+Status ServiceLiasonMongod::killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                            const SessionKiller::Matcher& matcher) {
+    return CursorManager::getGlobalCursorManager()->killCursorsWithMatchingSessions(opCtx, matcher);
 }
 
 }  // namespace mongo

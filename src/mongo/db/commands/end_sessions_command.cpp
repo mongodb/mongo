@@ -29,27 +29,20 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/stats/top.h"
 
 namespace mongo {
 
-class StartSessionCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(StartSessionCommand);
+class EndSessionsCommand final : public BasicCommand {
+    MONGO_DISALLOW_COPYING(EndSessionsCommand);
 
 public:
-    StartSessionCommand() : BasicCommand("startSession") {}
+    EndSessionsCommand() : BasicCommand("endSessions") {}
 
     bool slaveOk() const override {
         return true;
@@ -61,14 +54,22 @@ public:
         return false;
     }
     void help(std::stringstream& help) const override {
-        help << "start a logical session";
+        help << "end a set of logical sessions";
     }
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
-        // Anybody may start a session. The command body below checks
-        // that only a single user is logged in.
-        return Status::OK();
+
+        // It is always ok to run this command, as long as you are authenticated
+        // as some user, if auth is enabled.
+        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+        try {
+            auto user = authSession->getSingleUser();
+            invariant(user);
+            return Status::OK();
+        } catch (...) {
+            return exceptionToStatus();
+        }
     }
 
     virtual bool run(OperationContext* opCtx,
@@ -76,26 +77,13 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
 
-        auto client = opCtx->getClient();
-        ServiceContext* serviceContext = client->getServiceContext();
+        auto lsCache = LogicalSessionCache::get(opCtx);
 
-        auto lsCache = LogicalSessionCache::get(serviceContext);
-        boost::optional<LogicalSessionRecord> record;
+        auto cmd = EndSessionsCmdFromClient::parse("EndSessionsCmdFromClient"_sd, cmdObj);
 
-        try {
-            record = makeLogicalSessionRecord(opCtx, lsCache->now());
-        } catch (...) {
-            auto status = exceptionToStatus();
-
-            return appendCommandStatus(result, status);
-        }
-
-        lsCache->startSession(opCtx, record.get());
-
-        makeLogicalSessionToClient(record->getId()).serialize(&result);
-
+        lsCache->endSessions(makeLogicalSessionIds(cmd.getEndSessions(), opCtx));
         return true;
     }
-} startSessionCommand;
+} endSessionsCommand;
 
 }  // namespace mongo

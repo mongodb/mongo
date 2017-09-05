@@ -45,7 +45,6 @@ class Client;
 class OperationContext;
 class ServiceContext;
 
-extern int logicalSessionRecordCacheSize;
 extern int logicalSessionRefreshMinutes;
 
 /**
@@ -56,7 +55,6 @@ extern int logicalSessionRefreshMinutes;
  */
 class LogicalSessionCacheImpl final : public LogicalSessionCache {
 public:
-    static constexpr int kLogicalSessionCacheDefaultCapacity = 10000;
     static constexpr Minutes kLogicalSessionDefaultRefresh = Minutes(5);
 
     /**
@@ -64,13 +62,6 @@ public:
      */
     struct Options {
         Options(){};
-
-        /**
-         * The number of session records to keep in the cache.
-         *
-         * May be set with --setParameter logicalSessionRecordCacheSize=X.
-         */
-        int capacity = logicalSessionRecordCacheSize;
 
         /**
          * A timeout value to use for sessions in the cache, in minutes.
@@ -108,7 +99,7 @@ public:
 
     Status promote(LogicalSessionId lsid) override;
 
-    Status startSession(OperationContext* opCtx, LogicalSessionRecord record) override;
+    void startSession(OperationContext* opCtx, LogicalSessionRecord record) override;
 
     Status refreshSessions(OperationContext* opCtx,
                            const RefreshSessionsCmdFromClient& cmd) override;
@@ -134,13 +125,15 @@ public:
 
     boost::optional<LogicalSessionRecord> peekCached(const LogicalSessionId& id) const override;
 
+    void endSessions(const LogicalSessionIdSet& sessions) override;
+
 private:
     /**
      * Internal methods to handle scheduling and perform refreshes for active
      * session records contained within the cache.
      */
     void _periodicRefresh(Client* client);
-    Status _refresh(Client* client);
+    void _refresh(Client* client);
 
     void _periodicReap(Client* client);
     Status _reap(Client* client);
@@ -153,7 +146,7 @@ private:
     /**
      * Takes the lock and inserts the given record into the cache.
      */
-    boost::optional<LogicalSessionRecord> _addToCache(LogicalSessionRecord record);
+    void _addToCache(LogicalSessionRecord record);
 
     const Minutes _refreshInterval;
     const Minutes _sessionTimeout;
@@ -165,7 +158,12 @@ private:
     std::shared_ptr<TransactionReaper> _transactionReaper;
 
     mutable stdx::mutex _cacheMutex;
-    LRUCache<LogicalSessionId, LogicalSessionRecord, LogicalSessionIdHash> _cache;
+
+    LogicalSessionIdMap<LogicalSessionRecord> _activeSessions;
+
+    LogicalSessionIdSet _endingSessions;
+
+    Date_t lastRefreshTime;
 };
 
 }  // namespace mongo

@@ -45,9 +45,7 @@ public:
         return Status::OK();
     }
 
-    Status startSession(OperationContext* opCtx, LogicalSessionRecord record) override {
-        return Status::OK();
-    }
+    void startSession(OperationContext* opCtx, LogicalSessionRecord record) override {}
 
     Status refreshSessions(OperationContext* opCtx,
                            const RefreshSessionsCmdFromClient& cmd) override {
@@ -90,6 +88,8 @@ public:
     boost::optional<LogicalSessionRecord> peekCached(const LogicalSessionId& id) const override {
         return boost::none;
     }
+
+    void endSessions(const LogicalSessionIdSet& lsids) override {}
 };
 
 }  // namespace mongo

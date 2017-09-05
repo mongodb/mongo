@@ -153,27 +153,27 @@ public:
         auto thePast = now - Minutes(5);
 
         // Attempt to refresh with no active records, should succeed (and do nothing).
-        auto resRefresh = collection()->refreshSessions(opCtx(), LogicalSessionRecordSet{}, now);
+        auto resRefresh = collection()->refreshSessions(opCtx(), LogicalSessionRecordSet{});
         ASSERT(resRefresh.isOK());
 
         // Attempt to refresh one active record, should succeed.
         auto record1 = makeRecord(thePast);
         auto res = insertRecord(opCtx(), record1);
         ASSERT_OK(res);
-        resRefresh = collection()->refreshSessions(opCtx(), {record1}, now);
+        resRefresh = collection()->refreshSessions(opCtx(), {record1});
         ASSERT(resRefresh.isOK());
 
         // The timestamp on the refreshed record should be updated.
         auto swRecord = fetchRecord(opCtx(), record1.getId());
         ASSERT(swRecord.isOK());
-        ASSERT_EQ(swRecord.getValue().getLastUse(), now);
+        ASSERT_GTE(swRecord.getValue().getLastUse(), now);
 
         // Clear the collection.
         db.remove(ns(), BSONObj());
 
         // Attempt to refresh a record that is not present, should upsert it.
         auto record2 = makeRecord(thePast);
-        resRefresh = collection()->refreshSessions(opCtx(), {record2}, now);
+        resRefresh = collection()->refreshSessions(opCtx(), {record2});
         ASSERT(resRefresh.isOK());
 
         swRecord = fetchRecord(opCtx(), record2.getId());
@@ -185,23 +185,26 @@ public:
         // Attempt a refresh of many records, split into batches.
         LogicalSessionRecordSet toRefresh;
         int recordCount = 5000;
+        unsigned int notRefreshed = 0;
         for (int i = 0; i < recordCount; i++) {
-            auto record = makeRecord(thePast);
+            auto record = makeRecord(now);
             res = insertRecord(opCtx(), record);
 
             // Refresh some of these records.
             if (i % 4 == 0) {
                 toRefresh.insert(record);
+            } else {
+                notRefreshed++;
             }
         }
 
         // Run the refresh, should succeed.
-        resRefresh = collection()->refreshSessions(opCtx(), toRefresh, now);
+        resRefresh = collection()->refreshSessions(opCtx(), toRefresh);
         ASSERT(resRefresh.isOK());
 
         // Ensure that the right number of timestamps were updated.
         auto n = db.count(ns(), BSON("lastUse" << now));
-        ASSERT_EQ(n, toRefresh.size());
+        ASSERT_EQ(n, notRefreshed);
     }
 };
 

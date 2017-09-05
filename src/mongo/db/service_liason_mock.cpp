@@ -42,9 +42,14 @@ MockServiceLiasonImpl::MockServiceLiasonImpl() {
     _runner->startup().transitional_ignore();
 }
 
-LogicalSessionIdSet MockServiceLiasonImpl::getActiveSessions() const {
+LogicalSessionIdSet MockServiceLiasonImpl::getActiveOpSessions() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _activeSessions;
+}
+
+LogicalSessionIdSet MockServiceLiasonImpl::getOpenCursorSessions() const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _cursorSessions;
 }
 
 void MockServiceLiasonImpl::join() {
@@ -60,9 +65,25 @@ void MockServiceLiasonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
     return;
 }
 
+
+void MockServiceLiasonImpl::addCursorSession(LogicalSessionId lsid) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _cursorSessions.insert(std::move(lsid));
+}
+
+void MockServiceLiasonImpl::removeCursorSession(LogicalSessionId lsid) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _cursorSessions.erase(lsid);
+}
+
+void MockServiceLiasonImpl::clearCursorSession() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _cursorSessions.clear();
+}
+
 void MockServiceLiasonImpl::add(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _activeSessions.insert(std::move(lsid));
+    _cursorSessions.insert(std::move(lsid));
 }
 
 void MockServiceLiasonImpl::remove(LogicalSessionId lsid) {
@@ -81,6 +102,17 @@ void MockServiceLiasonImpl::fastForward(Milliseconds time) {
 
 int MockServiceLiasonImpl::jobs() {
     return _timerFactory->jobs();
+}
+
+const KillAllSessionsByPattern* MockServiceLiasonImpl::matchKilled(const LogicalSessionId& lsid) {
+    return _matcher->match(lsid);
+}
+
+Status MockServiceLiasonImpl::killCursorsWithMatchingSessions(
+    OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
+
+    _matcher = matcher;
+    return Status::OK();
 }
 
 }  // namespace mongo

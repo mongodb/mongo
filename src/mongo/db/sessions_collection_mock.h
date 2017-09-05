@@ -79,6 +79,9 @@ public:
     void clearSessions();
     const SessionMap& sessions() const;
 
+    StatusWith<LogicalSessionIdSet> findRemovedSessions(OperationContext* opCtx,
+                                                        const LogicalSessionIdSet& sessions);
+
 private:
     // Default implementations, may be overridden with custom hooks.
     Status _refreshSessions(const LogicalSessionRecordSet& sessions);
@@ -102,8 +105,7 @@ public:
         : _impl(std::move(impl)) {}
 
     Status refreshSessions(OperationContext* opCtx,
-                           const LogicalSessionRecordSet& sessions,
-                           Date_t refreshTime) override {
+                           const LogicalSessionRecordSet& sessions) override {
         return _impl->refreshSessions(sessions);
     }
 
@@ -113,7 +115,7 @@ public:
 
     StatusWith<LogicalSessionIdSet> findRemovedSessions(
         OperationContext* opCtx, const LogicalSessionIdSet& sessions) override {
-        return LogicalSessionIdSet{};
+        return _impl->findRemovedSessions(opCtx, sessions);
     }
 
     Status removeTransactionRecords(OperationContext* opCtx,

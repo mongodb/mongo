@@ -45,12 +45,10 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 }  // namespace
 
 Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
-                                                     const LogicalSessionRecordSet& sessions,
-                                                     Date_t refreshTime) {
+                                                     const LogicalSessionRecordSet& sessions) {
     DBDirectClient client(opCtx);
     return doRefresh(kSessionsNamespaceString,
                      sessions,
-                     refreshTime,
                      makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
 }
 
