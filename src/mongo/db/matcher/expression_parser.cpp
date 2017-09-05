@@ -86,6 +86,15 @@ bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
     return false;
 }
 
+const boost::container::flat_set<StringData> topLevelOperators{"$_internalSchemaAllowedProperties",
+                                                               "$_internalSchemaMaxProperties",
+                                                               "$_internalSchemaMinProperties",
+                                                               "$_internalSchemaXor",
+                                                               "$and",
+                                                               "$nor",
+                                                               "$or",
+                                                               "$where"};
+
 }  // namespace
 
 namespace mongo {
@@ -923,14 +932,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
         BSONElement elt = o.firstElement();
         invariant(!elt.eoo());
 
-        isElemMatchValue = !mongoutils::str::equals("$and", elt.fieldName()) &&
-            !mongoutils::str::equals("$nor", elt.fieldName()) &&
-            !mongoutils::str::equals("$_internalSchemaXor", elt.fieldName()) &&
-            !mongoutils::str::equals("$or", elt.fieldName()) &&
-            !mongoutils::str::equals("$where", elt.fieldName()) &&
-            !mongoutils::str::equals("$_internalSchemaMinProperties", elt.fieldName()) &&
-            !mongoutils::str::equals("$_internalSchemaMaxProperties", elt.fieldName()) &&
-            !mongoutils::str::equals("$_internalSchemaAllowedProperties", elt.fieldName());
+        isElemMatchValue =
+            topLevelOperators.find(elt.fieldNameStringData()) == topLevelOperators.end();
     }
 
     if (isElemMatchValue) {
