@@ -3,8 +3,10 @@
     "use strict";
 
     load('jstests/libs/uuid_util.js');
+    load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 
     const oplogProjection = {$project: {"_id.clusterTime": 0}};
+
     function getCollectionNameFromFullNamespace(ns) {
         return ns.split(/\.(.+)/)[1];
     }
@@ -27,7 +29,7 @@
         }));
 
         // Waiting for replication assures no previous operations will be included.
-        replTest.awaitReplication();
+        FixtureHelpers.awaitReplication();
         let res = assert.commandWorked(
             db.runCommand({aggregate: collection.getName(), "pipeline": pipeline, cursor: {}}));
         assert.neq(res.cursor.id, 0);
@@ -40,10 +42,12 @@
             find: "foo",
             readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
         }));
-        replTest.awaitReplication();
+        FixtureHelpers.awaitReplication();
         if (expectedBatch.length == 0)
-            assert.commandWorked(db.adminCommand(
-                {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+            FixtureHelpers.runCommandOnEachPrimary({
+                dbName: "admin",
+                cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}
+            });
         let res = assert.commandWorked(db.runCommand({
             getMore: cursor.id,
             collection: getCollectionNameFromFullNamespace(cursor.ns),
@@ -51,20 +55,15 @@
             batchSize: (expectedBatch.length + 1)
         }));
         if (expectedBatch.length == 0)
-            assert.commandWorked(db.adminCommand(
-                {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+            FixtureHelpers.runCommandOnEachPrimary({
+                dbName: "admin",
+                cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}
+            });
         assert.docEq(res.cursor.nextBatch, expectedBatch);
     }
 
-    let replTest = new ReplSetTest({name: 'changeStreamTest', nodes: 1});
-    let nodes = replTest.startSet();
-    replTest.initiate();
-    replTest.awaitReplication();
-
-    db = replTest.getPrimary().getDB('test');
-    db.getMongo().forceReadMode('commands');
-
     jsTestLog("Testing single insert");
+    db.t1.drop();
     let cursor = startWatchingChanges([{$changeStream: {}}], db.t1);
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
     const t1Uuid = getUUIDFromListCollections(db, db.t1.getName());
@@ -182,12 +181,15 @@
     // Should still see the previous change from t2, shouldn't see anything about 'dropping'.
 
     jsTestLog("Testing rename");
+    db.t3.drop();
     t2cursor = startWatchingChanges([{$changeStream: {}}], db.t2);
     assert.writeOK(db.t2.renameCollection("t3"));
     expected = {_id: {uuid: t2Uuid}, operationType: "invalidate"};
     assertNextBatchMatches({cursor: t2cursor, expectedBatch: [expected]});
 
     jsTestLog("Testing insert that looks like rename");
+    db.dne1.drop();
+    db.dne2.drop();
     const dne1cursor = startWatchingChanges([{$changeStream: {}}], db.dne1);
     const dne2cursor = startWatchingChanges([{$changeStream: {}}], db.dne2);
     assert.writeOK(db.t3.insert({_id: 101, renameCollection: "test.dne1", to: "test.dne2"}));
@@ -196,6 +198,7 @@
 
     // Now make sure the cursor behaves like a tailable awaitData cursor.
     jsTestLog("Testing tailability");
+    db.tailable1.drop();
     const tailableCursor = db.tailable1.aggregate([{$changeStream: {}}, oplogProjection]);
     assert(!tailableCursor.hasNext());
     assert.writeOK(db.tailable1.insert({_id: 101, a: 1}));
@@ -213,6 +216,7 @@
     });
 
     jsTestLog("Testing awaitdata");
+    db.tailable2.drop();
     db.createCollection("tailable2");
     const tailable2Uuid = getUUIDFromListCollections(db, db.tailable2.getName());
     let res = assert.commandWorked(db.runCommand(
@@ -261,13 +265,17 @@
     // Wait for insert shell to terminate.
     insertshell();
 
-    jsTestLog("Ensuring attempt to read with legacy operations fails.");
-    db.getMongo().forceReadMode('legacy');
-    const legacyCursor =
-        db.tailable2.aggregate([{$changeStream: {}}, oplogProjection], {cursor: {batchSize: 0}});
-    assert.throws(function() {
-        legacyCursor.next();
-    }, [], "Legacy getMore expected to fail on changeStream cursor.");
+    const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+    if (!isMongos) {
+        jsTestLog("Ensuring attempt to read with legacy operations fails.");
+        db.getMongo().forceReadMode('legacy');
+        const legacyCursor = db.tailable2.aggregate([{$changeStream: {}}, oplogProjection],
+                                                    {cursor: {batchSize: 0}});
+        assert.throws(function() {
+            legacyCursor.next();
+        }, [], "Legacy getMore expected to fail on changeStream cursor.");
+        db.getMongo().forceReadMode('commands');
+    }
 
     /**
      * Gets one document from the cursor using getMore with awaitData disabled. Asserts if no
@@ -279,22 +287,27 @@
             find: "foo",
             readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
         }));
-        replTest.awaitReplication();
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+        FixtureHelpers.awaitReplication();
+        FixtureHelpers.runCommandOnEachPrimary({
+            dbName: "admin",
+            cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}
+        });
         let res = assert.commandWorked(db.runCommand({
             getMore: cursor.id,
             collection: getCollectionNameFromFullNamespace(cursor.ns),
             batchSize: 1
         }));
         assert.eq(res.cursor.nextBatch.length, 1);
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+        FixtureHelpers.runCommandOnEachPrimary({
+            dbName: "admin",
+            cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}
+        });
         return res.cursor.nextBatch[0];
     }
 
     /**
-     * Attempts to get a document from the cursor with awaitData disabled, and asserts if a document
+     * Attempts to get a document from the cursor with awaitData disabled, and asserts if a
+     * document
      * is present.
      */
     function assertNextBatchIsEmpty(cursor) {
@@ -303,20 +316,25 @@
             find: "foo",
             readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
         }));
-        replTest.awaitReplication();
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+        FixtureHelpers.awaitReplication();
+        FixtureHelpers.runCommandOnEachPrimary({
+            dbName: "admin",
+            cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}
+        });
         let res = assert.commandWorked(db.runCommand({
             getMore: cursor.id,
             collection: getCollectionNameFromFullNamespace(cursor.ns),
             batchSize: 1
         }));
         assert.eq(res.cursor.nextBatch.length, 0);
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+        FixtureHelpers.runCommandOnEachPrimary({
+            dbName: "admin",
+            cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}
+        });
     }
 
     jsTestLog("Testing resumability");
+    db.resume1.drop();
     assert.commandWorked(db.createCollection("resume1"));
 
     // Note we do not project away 'id.ts' as it is part of the resume token.
@@ -369,6 +387,4 @@
     resumeCursor = res.cursor;
     assert.docEq(getOneDoc(resumeCursor), thirdInsertChangeDoc);
     assertNextBatchIsEmpty(resumeCursor);
-
-    replTest.stopSet();
 }());

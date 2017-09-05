@@ -3,12 +3,8 @@
     "use strict";
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
-    let testName = "change_stream_required_as_first_stage";
-    var rst = new ReplSetTest({name: testName, nodes: 1});
-    rst.startSet();
-    rst.initiate();
-
-    const coll = rst.getPrimary().getDB("test").getCollection(testName);
+    const coll = db.change_stream_required_as_first_stage;
+    coll.drop();
 
     assertErrorCode(coll, [{$indexStats: {}}, {$changeStream: {}}], 40602);
     assertErrorCode(

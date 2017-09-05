@@ -29,8 +29,7 @@
     // Make sure the database exists before running any commands.
     const mongosDB = clusterWithStandalones.getDB("test");
     assert.writeOK(mongosDB.unrelated.insert({}));
-    // TODO SERVER-29142 This error code will change to match the others.
-    assertErrorCode(mongosDB.non_existent, [{$changeStream: {}}], 40567);
+    assertChangeStreamNotSupportedOnConnection(clusterWithStandalones.s);
     assertChangeStreamNotSupportedOnConnection(clusterWithStandalones.shard0);
     assertChangeStreamNotSupportedOnConnection(clusterWithStandalones.shard1);
 }());

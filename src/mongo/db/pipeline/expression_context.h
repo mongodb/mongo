@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/tailable_mode.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
 
@@ -57,8 +58,6 @@ public:
         NamespaceString ns;
         std::vector<BSONObj> pipeline;
     };
-
-    enum class TailableMode { kNormal, kTailableAndAwaitData };
 
     /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
@@ -107,7 +106,7 @@ public:
      * Convenience call that returns true if the tailableMode indicate a tailable query.
      */
     bool isTailable() const {
-        return tailableMode == ExpressionContext::TailableMode::kTailableAndAwaitData;
+        return tailableMode == TailableMode::kTailableAndAwaitData;
     }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.

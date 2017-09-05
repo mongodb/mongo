@@ -4,13 +4,7 @@
     "use strict";
 
     load('jstests/libs/uuid_util.js');
-
-    const replTest = new ReplSetTest({name: "changeStreamTest", nodes: 1});
-    const nodes = replTest.startSet();
-    replTest.initiate();
-    replTest.awaitReplication();
-
-    db = replTest.getPrimary().getDB("test");
+    load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 
     /**
      * Uses a parallel shell to execute the javascript function 'event' at the same time as an
@@ -28,7 +22,8 @@
         const shellSentinelCollection = db.shell_sentinel;
         shellSentinelCollection.drop();
 
-        const awaitShellDoingEventDuringGetMore = startParallelShell(`
+        const awaitShellDoingEventDuringGetMore =
+            startParallelShell(`
 // Signal that the parallel shell has started.
 assert.writeOK(db.getCollection("${ shellSentinelCollection.getName() }").insert({}));
 
@@ -40,7 +35,7 @@ assert.soon(function() {
 
 const eventFn = ${ event.toString() };
 eventFn();`,
-                                                                     replTest.getPrimary().port);
+                               FixtureHelpers.getPrimaryForNodeHostingDatabase(db).port);
 
         // Wait for the shell to start.
         assert.soon(() => shellSentinelCollection.findOne() != null);
@@ -104,6 +99,7 @@ eventFn();`,
 
     const changesCollection = db.changes;
     changesCollection.drop();
+    assert.commandWorked(db.createCollection(changesCollection.getName()));
 
     // Start a change stream cursor.
     let res = assert.commandWorked(db.runCommand({
@@ -135,6 +131,7 @@ eventFn();`,
 
     // Test that an insert to an unrelated collection will not cause the change stream to wake up
     // and return an empty batch before reaching the maxTimeMS.
+    db.unrelated_collection.drop();
     assertEventDoesNotWakeCursor({
         collection: changesCollection,
         awaitDataCursorId: changeCursorId,
@@ -158,6 +155,4 @@ eventFn();`,
         awaitDataCursorId: res.cursor.id,
         event: () => assert.writeOK(db.changes.insert({_id: "should not appear"}))
     });
-
-    replTest.stopSet();
 }());

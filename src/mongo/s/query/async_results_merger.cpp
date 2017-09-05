@@ -102,7 +102,7 @@ bool AsyncResultsMerger::remotesExhausted_inlock() {
 Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (!_params->isTailable || !_params->isAwaitData) {
+    if (_params->tailableMode != TailableMode::kTailableAndAwaitData) {
         return Status(ErrorCodes::BadValue,
                       "maxTimeMS can only be used with getMore for tailable, awaitData cursors");
     }
@@ -155,7 +155,7 @@ bool AsyncResultsMerger::ready_inlock() {
 
 bool AsyncResultsMerger::readySorted_inlock() {
     // Tailable cursors cannot have a sort.
-    invariant(!_params->isTailable);
+    invariant(_params->tailableMode == TailableMode::kNormal);
 
     for (const auto& remote : _remotes) {
         if (!remote.hasNext() && !remote.exhausted()) {
@@ -203,7 +203,7 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
 
 ClusterQueryResult AsyncResultsMerger::nextReadySorted() {
     // Tailable cursors cannot have a sort.
-    invariant(!_params->isTailable);
+    invariant(_params->tailableMode == TailableMode::kNormal);
 
     if (_mergeQueue.empty()) {
         return {};
@@ -237,7 +237,8 @@ ClusterQueryResult AsyncResultsMerger::nextReadyUnsorted() {
             ClusterQueryResult front = _remotes[_gettingFromRemote].docBuffer.front();
             _remotes[_gettingFromRemote].docBuffer.pop();
 
-            if (_params->isTailable && !_remotes[_gettingFromRemote].hasNext()) {
+            if (_params->tailableMode != TailableMode::kNormal &&
+                !_remotes[_gettingFromRemote].hasNext()) {
                 // The cursor is tailable and we're about to return the last buffered result. This
                 // means that the next value returned should be boost::none to indicate the end of
                 // the batch.
@@ -413,6 +414,10 @@ void AsyncResultsMerger::handleBatchResponse(
         cbData.response.isOK() ? parseCursorResponse(cbData.response.data, remote)
                                : cbData.response.status);
     if (!cursorResponseStatus.isOK()) {
+        if (cursorResponseStatus == ErrorCodes::ExceededTimeLimit &&
+            _params->tailableMode != TailableMode::kNormal) {
+            // We timed out before hearing back from the shard,
+        }
         remote.status = cursorResponseStatus.getStatus();
         // Unreachable host errors are swallowed if the 'allowPartialResults' option is set. We
         // remove the unreachable host entirely from consideration by marking it as exhausted.
@@ -444,7 +449,7 @@ void AsyncResultsMerger::handleBatchResponse(
     // be boost::none in order to indicate the end of the batch.
     // (Note: tailable cursors are only valid on unsharded collections, so the end of the batch from
     // one shard means the end of the overall batch).
-    if (_params->isTailable && !remote.hasNext()) {
+    if (_params->tailableMode != TailableMode::kNormal && !remote.hasNext()) {
         _eofNext = true;
     }
 
@@ -453,7 +458,8 @@ void AsyncResultsMerger::handleBatchResponse(
     //
     // We do not ask for the next batch if the cursor is tailable, as batches received from remote
     // tailable cursors should be passed through to the client without asking for more batches.
-    if (!_params->isTailable && !remote.hasNext() && !remote.exhausted()) {
+    if (_params->tailableMode == TailableMode::kNormal && !remote.hasNext() &&
+        !remote.exhausted()) {
         remote.status = askForNextBatch_inlock(remoteIndex);
         if (!remote.status.isOK()) {
             return;

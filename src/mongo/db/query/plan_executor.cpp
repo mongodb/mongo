@@ -422,7 +422,7 @@ PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* o
 bool PlanExecutor::shouldWaitForInserts() {
     // If this is an awaitData-respecting operation and we have time left and we're not interrupted,
     // we should wait for inserts.
-    if (_cq && _cq->getQueryRequest().isTailable() && _cq->getQueryRequest().isAwaitData() &&
+    if (_cq && _cq->getQueryRequest().isTailableAndAwaitData() &&
         mongo::shouldWaitForInserts(_opCtx) && _opCtx->checkForInterruptNoAssert().isOK() &&
         _opCtx->getRemainingMaxTimeMicros() > Microseconds::zero()) {
         // We expect awaitData cursors to be yielding.
@@ -689,9 +689,9 @@ void PlanExecutor::enqueue(const BSONObj& obj) {
 PlanExecutor::ExecState PlanExecutor::swallowTimeoutIfAwaitData(
     Status yieldError, Snapshotted<BSONObj>* errorObj) const {
     if (yieldError == ErrorCodes::ExceededTimeLimit) {
-        if (_cq && _cq->getQueryRequest().isTailable() && _cq->getQueryRequest().isAwaitData()) {
-            // If the cursor is tailable then exceeding the time limit should not
-            // destroy this PlanExecutor, we should just stop waiting for inserts.
+        if (_cq && _cq->getQueryRequest().isTailableAndAwaitData()) {
+            // If the cursor is tailable then exceeding the time limit should not destroy this
+            // PlanExecutor, we should just stop waiting for inserts.
             return PlanExecutor::IS_EOF;
         }
     }

@@ -127,8 +127,7 @@ protected:
             _params->limit = qr->getLimit();
             _params->batchSize = getMoreBatchSize ? getMoreBatchSize : qr->getBatchSize();
             _params->skip = qr->getSkip();
-            _params->isTailable = qr->isTailable();
-            _params->isAwaitData = qr->isAwaitData();
+            _params->tailableMode = qr->getTailableMode();
             _params->isAllowPartialResults = qr->isAllowPartialResults();
         }
 

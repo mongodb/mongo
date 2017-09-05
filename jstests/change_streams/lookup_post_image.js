@@ -5,12 +5,7 @@
 (function() {
     "use strict";
 
-    const replTest = new ReplSetTest({name: "changePostImage", nodes: 1});
-    const nodes = replTest.startSet();
-    replTest.initiate();
-    replTest.awaitReplication();
-
-    db = replTest.getPrimary().getDB("test");
+    load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
     const coll = db.change_post_image;
 
     /**
@@ -47,7 +42,7 @@
             find: "foo",
             readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
         }));
-        replTest.awaitReplication();
+        FixtureHelpers.awaitReplication();
         // TODO: SERVER-29126
         // While change streams still uses read concern level local instead of read concern level
         // majority, we need to use causal consistency to be able to immediately read our own writes
@@ -57,22 +52,26 @@
             find: "foo",
             readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
         }));
-
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+        FixtureHelpers.runCommandOnEachPrimary({
+            dbName: "admin",
+            cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}
+        });
         let res = assert.commandWorked(db.runCommand({
             getMore: cursor.id,
             collection: getCollectionNameFromFullNamespace(cursor.ns),
             batchSize: 1
         }));
         assert.eq(res.cursor.nextBatch.length, 1);
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+        FixtureHelpers.runCommandOnEachPrimary({
+            dbName: "admin",
+            cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}
+        });
         return res.cursor.nextBatch[0];
     }
 
     // Dummy document to give a resumeAfter point.
-    db.createCollection(coll.getName());
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName()));
     let res = assert.commandWorked(
         db.runCommand({aggregate: coll.getName(), pipeline: [{$changeStream: {}}], cursor: {}}));
     assert.writeOK(coll.insert({_id: "dummy"}));
@@ -203,13 +202,14 @@
     assert.eq(latestChange.fullDocument, null);
 
     // Test that invalidate entries don't have 'fullDocument' even if 'updateLookup' is specified.
-    db.createCollection(db.collInvalidate.getName());
+    db.collInvalidate.drop();
+    assert.commandWorked(db.createCollection(db.collInvalidate.getName()));
     res = assert.commandWorked(db.runCommand({
         aggregate: db.collInvalidate.getName(),
         pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
         cursor: {batchSize: 0}
     }));
-    db.collInvalidate.insert({_id: "testing invalidate"});
+    assert.writeOK(db.collInvalidate.insert({_id: "testing invalidate"}));
     assert.neq(res.cursor.id, 0);
     db.collInvalidate.drop();
     latestChange = getOneDoc(res.cursor);
@@ -220,11 +220,12 @@
 
     // TODO(russotto): Can just use "coll" here once read majority is working.
     // For now, using the old collection results in us reading stale data sometimes.
-    const coll2 = db.real_get_more;
     jsTestLog("Testing full document lookup with a real getMore");
+    const coll2 = db.real_get_more;
+    coll2.drop();
     assert.commandWorked(db.createCollection(coll2.getName()));
     assert.writeOK(coll2.insert({_id: "getMoreEnabled"}));
-    replTest.awaitReplication();
+    FixtureHelpers.awaitReplication();
     // TODO: SERVER-29126
     // While change streams still uses read concern level local instead of read concern level
     // majority, we need to use causal consistency to be able to immediately read our own writes
@@ -241,6 +242,17 @@
         cursor: {}
     }));
     assert.writeOK(coll2.update({_id: "getMoreEnabled"}, {$set: {updated: true}}));
+
+    // TODO: SERVER-29126
+    // While change streams still uses read concern level local instead of read concern level
+    // majority, we need to use causal consistency to be able to immediately read our own writes
+    // out of the oplog.  Once change streams read from the majority snapshot, we can remove
+    // these synchronization points from this test.
+    assert.commandWorked(db.runCommand({
+        find: "foo",
+        readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+    }));
+
     res = assert.commandWorked(db.runCommand({
         getMore: res.cursor.id,
         collection: getCollectionNameFromFullNamespace(res.cursor.ns),
@@ -248,6 +260,4 @@
     }));
     assert.eq(res.cursor.nextBatch.length, 1);
     assert.docEq(res.cursor.nextBatch[0]["fullDocument"], {_id: "getMoreEnabled", updated: true});
-
-    replTest.stopSet();
 }());

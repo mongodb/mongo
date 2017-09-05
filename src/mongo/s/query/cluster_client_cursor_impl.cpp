@@ -109,7 +109,7 @@ void ClusterClientCursorImpl::detachFromOperationContext() {
 }
 
 bool ClusterClientCursorImpl::isTailable() const {
-    return _params.isTailable;
+    return _params.tailableMode != TailableMode::kNormal;
 }
 
 UserNameIterator ClusterClientCursorImpl::getAuthenticatedUsers() const {

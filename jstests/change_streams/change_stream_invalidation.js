@@ -28,12 +28,6 @@
         return res.cursor;
     }
 
-    const replTest = new ReplSetTest({name: 'changeStreamTest', nodes: 1});
-    const nodes = replTest.startSet();
-    replTest.initiate();
-    replTest.awaitReplication();
-
-    db = replTest.getPrimary().getDB('test');
     db.getMongo().forceReadMode('commands');
 
     // Write a document to the collection and test that the change stream returns it
@@ -103,6 +97,4 @@
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}, oplogProjection],
         cursor: {}
     }));
-
-    replTest.stopSet();
 }());

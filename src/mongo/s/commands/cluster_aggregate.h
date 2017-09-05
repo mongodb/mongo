@@ -43,6 +43,7 @@
 
 namespace mongo {
 
+class LiteParsedPipeline;
 class OperationContext;
 class ShardId;
 
@@ -98,11 +99,12 @@ private:
                                  const AggregationRequest& aggRequest,
                                  BSONObj cmd);
 
-    static Status aggPassthrough(OperationContext* opCtx,
-                                 const Namespaces& namespaces,
-                                 const ShardId& shardId,
-                                 const AggregationRequest& aggRequest,
+    static Status aggPassthrough(OperationContext*,
+                                 const Namespaces&,
+                                 const ShardId&,
                                  BSONObj cmd,
+                                 const AggregationRequest&,
+                                 const LiteParsedPipeline&,
                                  BSONObjBuilder* result);
 };
 

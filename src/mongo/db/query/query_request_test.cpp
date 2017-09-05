@@ -444,7 +444,7 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     ASSERT(!qr->isSlaveOk());
     ASSERT(qr->isOplogReplay());
     ASSERT(qr->isNoCursorTimeout());
-    ASSERT(qr->isAwaitData());
+    ASSERT(qr->isTailableAndAwaitData());
     ASSERT(qr->isAllowPartialResults());
 }
 
@@ -1047,7 +1047,7 @@ TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
     ASSERT_EQUALS(false, qr->isSlaveOk());
     ASSERT_EQUALS(false, qr->isOplogReplay());
     ASSERT_EQUALS(false, qr->isNoCursorTimeout());
-    ASSERT_EQUALS(false, qr->isAwaitData());
+    ASSERT_EQUALS(false, qr->isTailableAndAwaitData());
     ASSERT_EQUALS(false, qr->isExhaust());
     ASSERT_EQUALS(false, qr->isAllowPartialResults());
 }
@@ -1220,7 +1220,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithSnapshotFails) {
 
 TEST(QueryRequestTest, ConvertToAggregationWithTailableFails) {
     QueryRequest qr(testns);
-    qr.setTailable(true);
+    qr.setTailableMode(TailableMode::kTailable);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 
@@ -1238,7 +1238,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithNoCursorTimeoutFails) {
 
 TEST(QueryRequestTest, ConvertToAggregationWithAwaitDataFails) {
     QueryRequest qr(testns);
-    qr.setAwaitData(true);
+    qr.setTailableMode(TailableMode::kTailableAndAwaitData);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 
@@ -1388,7 +1388,7 @@ TEST(QueryRequestTest, ParseFromLegacyQuery) {
     ASSERT_EQ(qr->isSlaveOk(), false);
     ASSERT_EQ(qr->isOplogReplay(), false);
     ASSERT_EQ(qr->isNoCursorTimeout(), false);
-    ASSERT_EQ(qr->isAwaitData(), false);
+    ASSERT_EQ(qr->isTailable(), false);
     ASSERT_EQ(qr->isExhaust(), true);
     ASSERT_EQ(qr->isAllowPartialResults(), false);
     ASSERT_EQ(qr->getOptions(), QueryOption_Exhaust);

@@ -435,9 +435,18 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // If this aggregation is on an unsharded collection, pass through to the primary shard.
     if (!executionNsRoutingInfo.cm() && !namespaces.executionNss.isCollectionlessAggregateNS() &&
         liteParsedPipeline.allowedToPassthroughFromMongos()) {
-        return aggPassthrough(
-            opCtx, namespaces, executionNsRoutingInfo.primary()->getId(), request, cmdObj, result);
+        return aggPassthrough(opCtx,
+                              namespaces,
+                              executionNsRoutingInfo.primary()->getId(),
+                              cmdObj,
+                              request,
+                              liteParsedPipeline,
+                              result);
     }
+    // TODO SERVER-29141 support $changeStream on sharded collections.
+    uassert(40622,
+            "$changeStream is not yet supported on sharded collections",
+            !liteParsedPipeline.hasChangeStream());
 
     std::unique_ptr<CollatorInterface> collation;
     if (!request.getCollation().isEmpty()) {
@@ -668,8 +677,9 @@ void ClusterAggregate::uassertAllShardsSupportExplain(
 Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const Namespaces& namespaces,
                                         const ShardId& shardId,
-                                        const AggregationRequest& aggRequest,
                                         BSONObj cmdObj,
+                                        const AggregationRequest& aggRequest,
+                                        const LiteParsedPipeline& liteParsedPipeline,
                                         BSONObjBuilder* out) {
     // Temporary hack. See comment on declaration for details.
     auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
@@ -704,14 +714,16 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         // The merging shard is remote, so if a response was received, a HostAndPort must have been
         // set.
         invariant(cmdResponse.hostAndPort);
-        result = uassertStatusOK(
-            storePossibleCursor(opCtx,
-                                shard->getId(),
-                                *cmdResponse.hostAndPort,
-                                cmdResponse.response,
-                                namespaces.requestedNss,
-                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                Grid::get(opCtx)->getCursorManager()));
+        result = uassertStatusOK(storePossibleCursor(
+            opCtx,
+            shard->getId(),
+            *cmdResponse.hostAndPort,
+            cmdResponse.response,
+            namespaces.requestedNss,
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            Grid::get(opCtx)->getCursorManager(),
+            liteParsedPipeline.hasChangeStream() ? TailableMode::kTailableAndAwaitData
+                                                 : TailableMode::kNormal));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped

@@ -190,8 +190,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
     params.limit = query.getQueryRequest().getLimit();
     params.batchSize = query.getQueryRequest().getEffectiveBatchSize();
     params.skip = query.getQueryRequest().getSkip();
-    params.isTailable = query.getQueryRequest().isTailable();
-    params.isAwaitData = query.getQueryRequest().isAwaitData();
+    params.tailableMode = query.getQueryRequest().getTailableMode();
     params.isAllowPartialResults = query.getQueryRequest().isAllowPartialResults();
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
@@ -209,7 +208,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
     }
 
     // Tailable cursors can't have a sort, which should have already been validated.
-    invariant(params.sort.isEmpty() || !params.isTailable);
+    invariant(params.sort.isEmpty() || !query.getQueryRequest().isTailable());
 
     const auto qrToForward = transformQueryForShards(query.getQueryRequest());
     if (!qrToForward.isOK()) {

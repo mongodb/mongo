@@ -409,7 +409,7 @@ Status runAggregate(OperationContext* opCtx,
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
         if (liteParsedPipeline.hasChangeStream()) {
-            expCtx->tailableMode = ExpressionContext::TailableMode::kTailableAndAwaitData;
+            expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
         }
 
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
@@ -471,7 +471,7 @@ Status runAggregate(OperationContext* opCtx,
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
         opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
         cmdObj);
-    if (expCtx->tailableMode == ExpressionContext::TailableMode::kTailableAndAwaitData) {
+    if (expCtx->tailableMode == TailableMode::kTailableAndAwaitData) {
         cursorParams.setTailable(true);
         cursorParams.setAwaitData(true);
     }

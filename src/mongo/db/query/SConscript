@@ -241,7 +241,8 @@ env.Library(
 env.Library(
     target="query_request",
     source=[
-        "query_request.cpp"
+        "query_request.cpp",
+        "tailable_mode.cpp"
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

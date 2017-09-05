@@ -30,6 +30,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/tailable_mode.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -72,6 +73,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
-                                        ClusterCursorManager* cursorManager);
+                                        ClusterCursorManager* cursorManager,
+                                        TailableMode tailableMode = TailableMode::kNormal);
 
 }  // namespace mongo
