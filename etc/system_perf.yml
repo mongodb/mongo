@@ -362,6 +362,50 @@ tasks:
       vars:
         script_flags: --ycsb-throughput-analysis reports
 
+- name: industry_benchmarks_wmajority_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "ycsb-wmajority"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "ycsb-wmajority"
+    - func: "make test log artifact"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
+- name: industry_benchmarks_wmajority_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "ycsb-wmajority"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "ycsb-wmajority"
+    - func: "make test log artifact"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
 - name: core_workloads_WT
   depends_on:
     - name: compile
@@ -757,6 +801,8 @@ buildvariants:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
+    - name: industry_benchmarks_wmajority_WT
+    - name: industry_benchmarks_wmajority_MMAPv1
     - name: core_workloads_MMAPv1
     - name: mongos_workloads_WT
     - name: mongos_workloads_MMAPv1
@@ -780,6 +826,8 @@ buildvariants:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
+    - name: industry_benchmarks_wmajority_WT
+    - name: industry_benchmarks_wmajority_MMAPv1
     - name: core_workloads_MMAPv1
     - name: secondary_performance_WT
     - name: secondary_performance_MMAPv1
