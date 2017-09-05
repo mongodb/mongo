@@ -57,6 +57,13 @@
 
 namespace mongo {
 namespace {
+void dropCollection(OperationContext* opCtx, Database* db, StringData collName) {
+    WriteUnitOfWork wunit(opCtx);
+    if (db->dropCollection(opCtx, collName).isOK()) {
+        // ignoring failure case
+        wunit.commit();
+    }
+}
 
 NamespaceString getNamespaceFromUUID(OperationContext* opCtx, const BSONElement& ui) {
     if (ui.eoo())
@@ -91,8 +98,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
         globalWriteLock.emplace(opCtx);
 
     // We stay in source context the whole time. This is mostly to set the CurOp namespace.
-    boost::optional<OldClientContext> ctx;
-    ctx.emplace(opCtx, source.ns());
+    OldClientContext ctx(opCtx, source.ns());
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, source);
@@ -247,11 +253,14 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     Collection* tmpColl = nullptr;
     OptionalCollectionUUID newUUID;
+    bool isSourceCollectionTemporary = false;
     {
         auto collectionOptions = sourceColl->getCatalogEntry()->getCollectionOptions(opCtx);
+        isSourceCollectionTemporary = collectionOptions.temp;
 
         // Renaming across databases will result in a new UUID, as otherwise we'd require
         // two collections with the same uuid (temporarily).
+        collectionOptions.temp = true;
         if (targetUUID)
             newUUID = targetUUID;
         else if (collectionOptions.uuid && enableCollectionUUIDs)
@@ -261,43 +270,32 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
         writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            tmpColl = targetDB->createCollection(opCtx, tmpName.ns(), collectionOptions);
+
+            // No logOp necessary because the entire renameCollection command is one logOp.
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            tmpColl = targetDB->createCollection(opCtx,
+                                                 tmpName.ns(),
+                                                 collectionOptions,
+                                                 false);  // _id index build with others later.
+
             wunit.commit();
         });
     }
 
     // Dismissed on success
-    auto tmpCollectionDropper = MakeGuard([&] {
-        BSONObjBuilder unusedResult;
-        auto status =
-            dropCollection(opCtx,
-                           tmpName,
-                           unusedResult,
-                           renameOpTimeFromApplyOps,
-                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-        if (!status.isOK()) {
-            // Ignoring failure case when dropping the temporary collection during cleanup because
-            // the rename operation has already failed for another reason.
-            log() << "Unable to drop temporary collection " << tmpName << " while renaming from "
-                  << source << " to " << target << ": " << status;
-        }
-    });
+    ScopeGuard tmpCollectionDropper = MakeGuard(dropCollection, opCtx, targetDB, tmpName.ns());
+
+    MultiIndexBlock indexer(opCtx, tmpColl);
+    indexer.allowInterruption();
+    std::vector<MultiIndexBlock*> indexers{&indexer};
 
     // Copy the index descriptions from the source collection, adjusting the ns field.
     {
-        MultiIndexBlock indexer(opCtx, tmpColl);
-        indexer.allowInterruption();
-
         std::vector<BSONObj> indexesToCopy;
         IndexCatalog::IndexIterator sourceIndIt =
             sourceColl->getIndexCatalog()->getIndexIterator(opCtx, true);
         while (sourceIndIt.more()) {
-            auto descriptor = sourceIndIt.next();
-            if (descriptor->isIdIndex()) {
-                continue;
-            }
-
-            const BSONObj currIndex = descriptor->infoObj();
+            const BSONObj currIndex = sourceIndIt.next()->infoObj();
 
             // Process the source index, adding fields in the same order as they were originally.
             BSONObjBuilder newIndex;
@@ -310,30 +308,14 @@ Status renameCollectionCommon(OperationContext* opCtx,
             }
             indexesToCopy.push_back(newIndex.obj());
         }
-
         status = indexer.init(indexesToCopy).getStatus();
         if (!status.isOK()) {
             return status;
         }
-
-        status = indexer.doneInserting();
-        if (!status.isOK()) {
-            return status;
-        }
-
-        writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
-            WriteUnitOfWork wunit(opCtx);
-            indexer.commit();
-            for (auto&& infoObj : indexesToCopy) {
-                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, tmpName, newUUID, infoObj, false);
-            }
-            wunit.commit();
-        });
     }
 
     {
-        // Copy over all the data from source collection to temporary collection.
+        // Copy over all the data from source collection to target collection.
         auto cursor = sourceColl->getCursor(opCtx);
         while (auto record = cursor->next()) {
             opCtx->checkForInterrupt();
@@ -342,9 +324,9 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
             status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
-                const InsertStatement stmt(obj);
-                OpDebug* const opDebug = nullptr;
-                auto status = tmpColl->insertDocument(opCtx, stmt, opDebug, true);
+                // No logOp necessary because the entire renameCollection command is one logOp.
+                repl::UnreplicatedWritesBlock uwb(opCtx);
+                Status status = tmpColl->insertDocument(opCtx, obj, indexers, true);
                 if (!status.isOK())
                     return status;
                 wunit.commit();
@@ -357,24 +339,60 @@ Status renameCollectionCommon(OperationContext* opCtx,
         }
     }
 
-    // Getting here means we successfully built the target copy. We now do the final
-    // in-place rename and remove the source collection.
-    invariant(tmpName.db() == target.db());
-    status = renameCollectionCommon(
-        opCtx, tmpName, target, targetUUID, renameOpTimeFromApplyOps, options);
+    status = indexer.doneInserting();
     if (!status.isOK()) {
         return status;
     }
+
+    // Getting here means we successfully built the target copy. We now do the final
+    // in-place rename and remove the source collection.
+    status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
+        WriteUnitOfWork wunit(opCtx);
+        indexer.commit();
+        OptionalCollectionUUID dropTargetUUID;
+        {
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            Status status = Status::OK();
+            if (targetColl) {
+                dropTargetUUID = targetColl->uuid();
+                status = targetDB->dropCollection(opCtx, target.ns());
+            }
+            if (status.isOK()) {
+                // When renaming the temporary collection in the target database, we have to take
+                // into account the CollectionOptions.temp value of the source collection and the
+                // 'stayTemp' option requested by the caller.
+                // If the source collection is not temporary, the resulting target collection must
+                // not be temporary.
+                auto stayTemp = isSourceCollectionTemporary && options.stayTemp;
+                status = targetDB->renameCollection(opCtx, tmpName.ns(), target.ns(), stayTemp);
+            }
+            if (status.isOK())
+                status = sourceDB->dropCollection(opCtx, source.ns());
+
+            if (!status.isOK())
+                return status;
+        }
+
+        getGlobalServiceContext()->getOpObserver()->onRenameCollection(opCtx,
+                                                                       source,
+                                                                       target,
+                                                                       newUUID,
+                                                                       options.dropTarget,
+                                                                       dropTargetUUID,
+                                                                       sourceUUID,
+                                                                       options.stayTemp);
+
+        wunit.commit();
+        return Status::OK();
+    });
+
+    if (!status.isOK()) {
+        return status;
+    }
+
     tmpCollectionDropper.Dismiss();
-
-    BSONObjBuilder unusedResult;
-    return dropCollection(opCtx,
-                          source,
-                          unusedResult,
-                          renameOpTimeFromApplyOps,
-                          DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+    return Status::OK();
 }
-
 }  // namespace
 
 Status renameCollection(OperationContext* opCtx,

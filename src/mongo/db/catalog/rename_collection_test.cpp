@@ -29,8 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include <set>
-#include <string>
-#include <vector>
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -56,7 +54,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stringutils.h"
 
 namespace {
 
@@ -69,29 +66,6 @@ using namespace mongo;
  */
 class OpObserverMock : public OpObserverNoop {
 public:
-    void onCreateIndex(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       OptionalCollectionUUID uuid,
-                       BSONObj indexDoc,
-                       bool fromMigrate) override;
-
-    void onInserts(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   OptionalCollectionUUID uuid,
-                   std::vector<InsertStatement>::const_iterator begin,
-                   std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) override;
-
-    void onCreateCollection(OperationContext* opCtx,
-                            Collection* coll,
-                            const NamespaceString& collectionName,
-                            const CollectionOptions& options,
-                            const BSONObj& idIndex) override;
-
-    repl::OpTime onDropCollection(OperationContext* opCtx,
-                                  const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid) override;
-
     repl::OpTime onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
@@ -101,62 +75,9 @@ public:
                                     OptionalCollectionUUID dropSourceUUID,
                                     bool stayTemp) override;
 
-    // Operations written to the oplog. These are operations for which
-    // ReplicationCoordinator::isOplogDisabled() returns false.
-    std::vector<std::string> oplogEntries;
-
-    bool onInsertsThrows = false;
-
     bool onRenameCollectionCalled = false;
     repl::OpTime renameOpTime = {Timestamp(Seconds(100), 1U), 1LL};
-
-private:
-    /**
-     * Pushes 'operationName' into 'oplogEntries' if we can write to the oplog for this namespace.
-     */
-    void _logOp(OperationContext* opCtx,
-                const NamespaceString& nss,
-                const std::string& operationName);
 };
-
-void OpObserverMock::onCreateIndex(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   OptionalCollectionUUID uuid,
-                                   BSONObj indexDoc,
-                                   bool fromMigrate) {
-    _logOp(opCtx, nss, "index");
-    OpObserverNoop::onCreateIndex(opCtx, nss, uuid, indexDoc, fromMigrate);
-}
-
-void OpObserverMock::onInserts(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               OptionalCollectionUUID uuid,
-                               std::vector<InsertStatement>::const_iterator begin,
-                               std::vector<InsertStatement>::const_iterator end,
-                               bool fromMigrate) {
-    if (onInsertsThrows) {
-        uasserted(ErrorCodes::OperationFailed, "insert failed");
-    }
-
-    _logOp(opCtx, nss, "inserts");
-    OpObserverNoop::onInserts(opCtx, nss, uuid, begin, end, fromMigrate);
-}
-
-void OpObserverMock::onCreateCollection(OperationContext* opCtx,
-                                        Collection* coll,
-                                        const NamespaceString& collectionName,
-                                        const CollectionOptions& options,
-                                        const BSONObj& idIndex) {
-    _logOp(opCtx, collectionName, "create");
-    OpObserverNoop::onCreateCollection(opCtx, coll, collectionName, options, idIndex);
-}
-
-repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
-                                              const NamespaceString& collectionName,
-                                              OptionalCollectionUUID uuid) {
-    _logOp(opCtx, collectionName, "drop");
-    return OpObserverNoop::onDropCollection(opCtx, collectionName, uuid);
-}
 
 repl::OpTime OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                                 const NamespaceString& fromCollection,
@@ -166,26 +87,8 @@ repl::OpTime OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                                 OptionalCollectionUUID dropTargetUUID,
                                                 OptionalCollectionUUID dropSourceUUID,
                                                 bool stayTemp) {
-    _logOp(opCtx, fromCollection, "rename");
-    OpObserverNoop::onRenameCollection(opCtx,
-                                       fromCollection,
-                                       toCollection,
-                                       uuid,
-                                       dropTarget,
-                                       dropTargetUUID,
-                                       dropSourceUUID,
-                                       stayTemp);
     onRenameCollectionCalled = true;
     return renameOpTime;
-}
-
-void OpObserverMock::_logOp(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const std::string& operationName) {
-    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
-        return;
-    }
-    oplogEntries.push_back(operationName);
 }
 
 class RenameCollectionTest : public ServiceContextMongoDTest {
@@ -353,24 +256,6 @@ void _createIndex(OperationContext* opCtx,
     });
 
     ASSERT_TRUE(AutoGetCollectionForRead(opCtx, nss).getCollection());
-}
-
-/**
- * Inserts a single document into a collection.
- */
-void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
-    writeConflictRetry(opCtx, "_insertDocument", nss.ns(), [=] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
-        auto collection = autoColl.getCollection();
-        ASSERT_TRUE(collection) << "Cannot insert document " << doc << " into collection " << nss
-                                << " because collection " << nss.ns() << " does not exist.";
-
-        WriteUnitOfWork wuow(opCtx);
-        OpDebug* const opDebug = nullptr;
-        bool enforceQuota = true;
-        ASSERT_OK(collection->insertDocument(opCtx, InsertStatement(doc), opDebug, enforceQuota));
-        wuow.commit();
-    });
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {
@@ -635,137 +520,6 @@ TEST_F(RenameCollectionTest, RenameDifferentDatabaseStayTempFalseSourceNotTempor
 
 TEST_F(RenameCollectionTest, RenameDifferentDatabaseStayTempTrueSourceNotTemporary) {
     _testRenameCollectionStayTemp(_opCtx.get(), _sourceNss, _targetNssDifferentDb, true, false);
-}
-
-/**
- * Checks oplog entries written by the OpObserver to the oplog.
- */
-void _checkOplogEntries(const std::vector<std::string>& actualOplogEntries,
-                        const std::vector<std::string>& expectedOplogEntries) {
-    std::string actualOplogEntriesStr;
-    joinStringDelim(actualOplogEntries, &actualOplogEntriesStr, ',');
-    std::string expectedOplogEntriesStr;
-    joinStringDelim(expectedOplogEntries, &expectedOplogEntriesStr, ',');
-    ASSERT_EQUALS(expectedOplogEntries.size(), actualOplogEntries.size())
-        << str::stream()
-        << "Incorrect number of oplog entries written to oplog. Actual: " << actualOplogEntriesStr
-        << ". Expected: " << expectedOplogEntriesStr;
-    std::vector<std::string>::size_type i = 0;
-    for (const auto& actualOplogEntry : actualOplogEntries) {
-        const auto& expectedOplogEntry = expectedOplogEntries[i++];
-        ASSERT_EQUALS(expectedOplogEntry, actualOplogEntry)
-            << str::stream() << "Mismatch in oplog entry at index " << i
-            << ". Actual: " << actualOplogEntriesStr << ". Expected: " << expectedOplogEntriesStr;
-    }
-}
-
-/**
- * Runs a rename across database operation and checks oplog entries writtent to the oplog.
- */
-void _testRenameCollectionAcrossDatabaseOplogEntries(
-    OperationContext* opCtx,
-    const NamespaceString& sourceNss,
-    const NamespaceString& targetNss,
-    std::vector<std::string>* oplogEntries,
-    bool forApplyOps,
-    const std::vector<std::string>& expectedOplogEntries) {
-    ASSERT_NOT_EQUALS(sourceNss.db(), targetNss.db());
-    _createCollection(opCtx, sourceNss);
-    _createIndex(opCtx, sourceNss, "a_1");
-    _insertDocument(opCtx, sourceNss, BSON("_id" << 0));
-    oplogEntries->clear();
-    if (forApplyOps) {
-        auto cmd = BSON(
-            "renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "dropTarget" << true);
-        ASSERT_OK(renameCollectionForApplyOps(opCtx, sourceNss.db().toString(), {}, cmd, {}));
-    } else {
-        RenameCollectionOptions options;
-        options.dropTarget = true;
-        ASSERT_OK(renameCollection(opCtx, sourceNss, targetNss, options));
-    }
-    _checkOplogEntries(*oplogEntries, expectedOplogEntries);
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntries) {
-    bool forApplyOps = false;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntries) {
-    bool forApplyOps = true;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesDropTarget) {
-    _createCollection(_opCtx.get(), _targetNssDifferentDb);
-    bool forApplyOps = false;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseOplogEntriesDropTarget) {
-    _createCollection(_opCtx.get(), _targetNssDifferentDb);
-    bool forApplyOps = true;
-    _testRenameCollectionAcrossDatabaseOplogEntries(
-        _opCtx.get(),
-        _sourceNss,
-        _targetNssDifferentDb,
-        &_opObserver->oplogEntries,
-        forApplyOps,
-        {"create", "index", "inserts", "rename", "drop"});
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseOplogEntriesWritesNotReplicated) {
-    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-    bool forApplyOps = false;
-    _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
-                                                    _sourceNss,
-                                                    _targetNssDifferentDb,
-                                                    &_opObserver->oplogEntries,
-                                                    forApplyOps,
-                                                    {});
-}
-
-TEST_F(RenameCollectionTest,
-       RenameCollectionForApplyOpsAcrossDatabaseOplogEntriesWritesNotReplicated) {
-    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-    bool forApplyOps = true;
-    _testRenameCollectionAcrossDatabaseOplogEntries(_opCtx.get(),
-                                                    _sourceNss,
-                                                    _targetNssDifferentDb,
-                                                    &_opObserver->oplogEntries,
-                                                    forApplyOps,
-                                                    {});
-}
-
-TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseDropsTemporaryCollectionOnException) {
-    _createCollection(_opCtx.get(), _sourceNss);
-    _createIndex(_opCtx.get(), _sourceNss, "a_1");
-    _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
-    _opObserver->onInsertsThrows = true;
-    _opObserver->oplogEntries.clear();
-    ASSERT_THROWS_CODE(
-        renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}).ignore(),
-        AssertionException,
-        ErrorCodes::OperationFailed);
-    _checkOplogEntries(_opObserver->oplogEntries, {"create", "index", "drop"});
 }
 
 }  // namespace
