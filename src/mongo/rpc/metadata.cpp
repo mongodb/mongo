@@ -176,6 +176,8 @@ OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
         cmdObj = bodyBuilder.obj();
     }
 
+    uassert(40621, "$db is not allowed in OP_QUERY requests", !cmdObj.hasField("$db"));
+
     // Try to move supported array fields into document sequences.
     auto docSequenceIt = docSequenceFieldsForCommands.find(cmdObj.firstElementFieldName());
     auto docSequenceElem = docSequenceIt == docSequenceFieldsForCommands.end()
