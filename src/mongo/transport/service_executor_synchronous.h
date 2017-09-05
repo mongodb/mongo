@@ -48,7 +48,7 @@ public:
     explicit ServiceExecutorSynchronous(ServiceContext* ctx);
 
     Status start() override;
-    Status shutdown() override;
+    Status shutdown(Milliseconds timeout) override;
     Status schedule(Task task, ScheduleFlags flags) override;
 
     Mode transportMode() const override {

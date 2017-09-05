@@ -96,6 +96,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool shutdown(Milliseconds timeout) override {
+        return true;
+    }
+
     Stats sessionStats() const override {
         return {};
     }

@@ -77,6 +77,10 @@ public:
 
     void endAllSessions(transport::Session::TagMask tags) override {}
 
+    bool shutdown(Milliseconds timeout) override {
+        return true;
+    }
+
     Stats sessionStats() const override {
         return {};
     }

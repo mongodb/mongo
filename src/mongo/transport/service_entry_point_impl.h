@@ -31,6 +31,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/service_entry_point.h"
@@ -60,6 +61,8 @@ public:
 
     void endAllSessions(transport::Session::TagMask tags) final;
 
+    bool shutdown(Milliseconds timeout) final;
+
     Stats sessionStats() const final;
 
     size_t numOpenSessions() const final {
@@ -74,6 +77,7 @@ private:
     AtomicWord<std::size_t> _nWorkers;
 
     mutable stdx::mutex _sessionsMutex;
+    stdx::condition_variable _shutdownCondition;
     SSMList _sessions;
 
     size_t _maxNumConnections{DEFAULT_MAX_CONN};

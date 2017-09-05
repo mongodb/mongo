@@ -123,6 +123,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             connectionCount = _sessions.size();
             _currentConnections.store(connectionCount);
         }
+        _shutdownCondition.notify_one();
         const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
         log() << "end connection " << remote << " (" << connectionCount << word << " now open)";
 
@@ -140,6 +141,38 @@ void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
             ssm->terminateIfTagsDontMatch(tags);
         }
     }
+}
+
+bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
+    using logger::LogComponent;
+
+    // Request that all sessions end.
+    endAllSessions(transport::Session::kEmptyTagMask);
+
+    // Close all sockets and then wait for the number of active connections to reach zero with a
+    // condition_variable that notifies in the session cleanup hook. If we haven't closed drained
+    // all active operations within the deadline, just keep going with shutdown: the OS will do it
+    // for us when the process terminates.
+    auto timeSpent = Milliseconds(0);
+    const auto checkInterval = std::min(Milliseconds(250), timeout);
+
+    auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
+    std::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
+    while (timeSpent < timeout &&
+           !_shutdownCondition.wait_for(lk, checkInterval.toSystemDuration(), noWorkersLeft)) {
+        log(LogComponent::kNetwork) << "shutdown: still waiting on " << numOpenSessions()
+                                    << " active workers to drain... ";
+        timeSpent += checkInterval;
+    }
+
+    bool result = noWorkersLeft();
+    if (result) {
+        log(LogComponent::kNetwork) << "shutdown: no running workers found...";
+    } else {
+        log(LogComponent::kNetwork) << "shutdown: exhausted grace period for" << numOpenSessions()
+                                    << " active workers to drain; continuing with shutdown... ";
+    }
+    return result;
 }
 
 ServiceEntryPoint::Stats ServiceEntryPointImpl::sessionStats() const {

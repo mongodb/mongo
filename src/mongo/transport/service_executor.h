@@ -33,6 +33,7 @@
 #include "mongo/platform/bitwise_enum_operators.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/transport_mode.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 // This needs to be forward declared here because the service_context.h is a circular dependency.
@@ -85,7 +86,7 @@ public:
      *
      * This should only be called during server shutdown to gracefully destroy the ServiceExecutor
      */
-    virtual Status shutdown() = 0;
+    virtual Status shutdown(Milliseconds timeout) = 0;
 
     /*
      * Returns if this service executor is using asynchronous or synchronous networking.

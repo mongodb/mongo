@@ -1093,55 +1093,32 @@ void shutdownTask() {
     }
 
 #if __has_feature(address_sanitizer)
-    auto sep = serviceContext->getServiceEntryPoint();
-    auto tl = serviceContext->getTransportLayer();
-    if (sep && tl) {
-        // When running under address sanitizer, we get false positive leaks due to disorder around
-        // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
-        // harder to dry up the server from active connections before going on to really shut down.
+    // When running under address sanitizer, we get false positive leaks due to disorder around
+    // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
+    // harder to dry up the server from active connections before going on to really shut down.
 
+    // Shutdown the TransportLayer so that new connections aren't accepted
+    if (auto tl = serviceContext->getTransportLayer()) {
         log(LogComponent::kNetwork)
             << "shutdown: going to close all sockets because ASAN is active...";
 
-        // Shutdown the TransportLayer so that new connections aren't accepted
         tl->shutdown();
+    }
 
-        // Request that all sessions end.
-        sep->endAllSessions(transport::Session::kEmptyTagMask);
-
-        // Close all sockets in a detached thread, and then wait for the number of active
-        // connections to reach zero. Give the detached background thread a 10 second deadline. If
-        // we haven't closed drained all active operations within that deadline, just keep going
-        // with shutdown: the OS will do it for us when the process terminates.
-        stdx::packaged_task<void()> dryOutTask([sep] {
-            // There isn't currently a way to wait on the TicketHolder to have all its tickets back,
-            // unfortunately. So, busy wait in this detached thread.
-            while (true) {
-                const auto runningWorkers = sep->numOpenSessions();
-
-                if (runningWorkers == 0) {
-                    log(LogComponent::kNetwork) << "shutdown: no running workers found...";
-                    break;
-                }
-                log(LogComponent::kNetwork) << "shutdown: still waiting on " << runningWorkers
-                                            << " active workers to drain... ";
-                mongo::sleepFor(Milliseconds(250));
-            }
-        });
-
-        auto dryNotification = dryOutTask.get_future();
-        stdx::thread(std::move(dryOutTask)).detach();
-        if (dryNotification.wait_for(Seconds(10).toSystemDuration()) !=
-            stdx::future_status::ready) {
-            log(LogComponent::kNetwork) << "shutdown: exhausted grace period for"
-                                        << " active workers to drain; continuing with shutdown... ";
+    // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
+    if (auto sep = serviceContext->getServiceEntryPoint()) {
+        if (!sep->shutdown(Seconds(10))) {
+            log(LogComponent::kNetwork)
+                << "Service entry point failed to shutdown within timelimit.";
         }
+    }
 
-        // Shutdown and wait for the service executor to exit
-        Status status = serviceContext->getServiceExecutor()->shutdown();
+    // Shutdown and wait for the service executor to exit
+    if (auto svcExec = serviceContext->getServiceExecutor()) {
+        Status status = svcExec->shutdown(Seconds(5));
         if (!status.isOK()) {
-            log(LogComponent::kExecutor) << "shutdown: service executor failed with: "
-                                         << status.reason();
+            log(LogComponent::kNetwork) << "Service executor failed to shutdown within timelimit: "
+                                        << status.reason();
         }
     }
 #endif

@@ -72,14 +72,13 @@ Status ServiceExecutorSynchronous::start() {
     return Status::OK();
 }
 
-Status ServiceExecutorSynchronous::shutdown() {
+Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
     LOG(3) << "Shutting down passthrough executor";
 
     _stillRunning.store(false);
 
-    // TODO pass a time into this function
     stdx::unique_lock<stdx::mutex> lock(_shutdownMutex);
-    bool result = _shutdownCondition.wait_for(lock, Seconds(10).toSystemDuration(), [this]() {
+    bool result = _shutdownCondition.wait_for(lock, timeout.toSystemDuration(), [this]() {
         return _numRunningWorkerThreads.load() == 0;
     });
 

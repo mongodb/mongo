@@ -165,7 +165,7 @@ Status ServiceExecutorAdaptive::start() {
     return Status::OK();
 }
 
-Status ServiceExecutorAdaptive::shutdown() {
+Status ServiceExecutorAdaptive::shutdown(Milliseconds timeout) {
     if (!_isRunning.load())
         return Status::OK();
 
@@ -176,9 +176,13 @@ Status ServiceExecutorAdaptive::shutdown() {
 
     stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
     _ioContext->stop();
-    _deathCondition.wait(lk, [&] { return _threads.empty(); });
+    bool result =
+        _deathCondition.wait_for(lk, timeout.toSystemDuration(), [&] { return _threads.empty(); });
 
-    return Status::OK();
+    return result
+        ? Status::OK()
+        : Status(ErrorCodes::Error::ExceededTimeLimit,
+                 "adaptive executor couldn't shutdown all worker threads within time limit.");
 }
 
 Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task, ScheduleFlags flags) {

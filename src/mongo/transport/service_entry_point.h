@@ -81,6 +81,11 @@ public:
     virtual void endAllSessions(transport::Session::TagMask tags) = 0;
 
     /**
+    * Shuts down the service entry point.
+    */
+    virtual bool shutdown(Milliseconds timeout) = 0;
+
+    /**
     * Returns high-level stats about current sessions.
     */
     virtual Stats sessionStats() const = 0;

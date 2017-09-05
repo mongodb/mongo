@@ -61,6 +61,10 @@ public:
         _sessions.clear();
     }
 
+    bool shutdown(Milliseconds timeout) override {
+        return true;
+    }
+
     Stats sessionStats() const override {
         return {};
     }

@@ -45,7 +45,7 @@ public:
     Status start() override {
         return Status::OK();
     }
-    Status shutdown() override {
+    Status shutdown(Milliseconds timeout) override {
         return Status::OK();
     }
     Status schedule(Task task, ScheduleFlags flags) override {

@@ -90,7 +90,7 @@ public:
     virtual ~ServiceExecutorAdaptive();
 
     Status start() final;
-    Status shutdown() final;
+    Status shutdown(Milliseconds timeout) final;
     Status schedule(Task task, ScheduleFlags flags) final;
 
     Mode transportMode() const final {
