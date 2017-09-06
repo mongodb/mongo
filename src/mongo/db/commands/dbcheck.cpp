@@ -331,8 +331,13 @@ private:
             return false;
         }
 
-        auto prev = UUIDCatalog::get(opCtx).prev(_dbName, *collection->uuid());
-        auto next = UUIDCatalog::get(opCtx).next(_dbName, *collection->uuid());
+        auto uuid = collection->uuid();
+        // Check if UUID exists.
+        if (!uuid) {
+            return false;
+        }
+        auto prev = UUIDCatalog::get(opCtx).prev(_dbName, *uuid);
+        auto next = UUIDCatalog::get(opCtx).next(_dbName, *uuid);
 
         // Find and report collection metadata.
         auto indices = collectionIndexInfo(opCtx, collection);
