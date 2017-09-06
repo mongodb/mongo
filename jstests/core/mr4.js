@@ -9,7 +9,7 @@ t.save({x: 4, tags: ["b", "c"]});
 
 m = function() {
     this.tags.forEach(function(z) {
-        emit(z, {count: xx});
+        emit(z, {count: xx.val});
     });
 };
 
@@ -21,7 +21,7 @@ r = function(key, values) {
     return {count: total};
 };
 
-res = t.mapReduce(m, r, {out: "mr4_out", scope: {xx: 1}});
+res = t.mapReduce(m, r, {out: "mr4_out", scope: {xx: {val: 1}}});
 z = res.convertToSingleObject();
 
 assert.eq(3, Object.keySet(z).length, "A1");
@@ -31,7 +31,7 @@ assert.eq(3, z.c.count, "A4");
 
 res.drop();
 
-res = t.mapReduce(m, r, {scope: {xx: 2}, out: "mr4_out"});
+res = t.mapReduce(m, r, {scope: {xx: {val: 2}}, out: "mr4_out"});
 z = res.convertToSingleObject();
 
 assert.eq(3, Object.keySet(z).length, "A1");
