@@ -161,7 +161,8 @@ let ContinuousStepdown;
      * stopping a stepdown thread for the test's config server replica set and each of the shard
      * replica sets, as specified by the given stepdownOptions object.
      */
-    ContinuousStepdown.configure = function(stepdownOptions) {
+    ContinuousStepdown.configure = function(stepdownOptions,
+                                            {verbositySetting: verbositySetting = {}} = {}) {
         const defaultOptions = {
             configStepdown: true,
             electionTimeoutMS: 5 * 1000,
@@ -171,17 +172,12 @@ let ContinuousStepdown;
         };
         stepdownOptions = Object.merge(defaultOptions, stepdownOptions);
 
+        verbositySetting = tojson(verbositySetting);
+
         // Preserve the original ReplSetTest and ShardingTest constructors, because they are being
         // overriden.
         const originalReplSetTest = ReplSetTest;
         const originalShardingTest = ShardingTest;
-
-        const verbositySetting = tojson({
-            verbosity: 0,
-            command: {verbosity: 1},
-            network: {verbosity: 1, asio: {verbosity: 2}},
-            tracking: {verbosity: 0}
-        });
 
         /**
          * Overrides the ReplSetTest constructor to start the continuous primary stepdown thread.

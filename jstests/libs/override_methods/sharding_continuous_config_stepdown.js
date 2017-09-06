@@ -10,7 +10,15 @@
         shardStepdown: false,
         stepdownDurationSecs: 10,
         stepdownIntervalMS: 8 * 1000,
-    });
+    },
+                                 {
+                                   verbositySetting: {
+                                       verbosity: 0,
+                                       command: {verbosity: 1},
+                                       network: {verbosity: 1, asio: {verbosity: 2}},
+                                       tracking: {verbosity: 0}
+                                   }
+                                 });
 
     const originalShardingTest = ShardingTest;
     ShardingTest = function() {
