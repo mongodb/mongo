@@ -3,7 +3,20 @@
 (function() {
     'use strict';
 
-    const st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 1}});
+    // For supportsMajorityReadConcern().
+    load("jstests/multiVersion/libs/causal_consistency_helpers.js");
+
+    if (!supportsMajorityReadConcern()) {
+        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        return;
+    }
+
+    const st = new ShardingTest({
+        shards: 2,
+        mongos: 1,
+        rs: {nodes: 1},
+        other: {rsOptions: {enableMajorityReadConcern: ""}}
+    });
 
     const mongos = st.s;
     const admin = mongos.getDB('admin');

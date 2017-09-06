@@ -4,8 +4,16 @@
     "use strict";
 
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode().
+    // For supportsMajorityReadConcern().
+    load("jstests/multiVersion/libs/causal_consistency_helpers.js");
 
-    const shardingTest = new ShardingTest({nodes: 1, rs: {nodes: 1}, config: 1});
+    if (!supportsMajorityReadConcern()) {
+        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        return;
+    }
+
+    const shardingTest = new ShardingTest(
+        {nodes: 1, rs: {nodes: 1}, other: {rsOptions: {enableMajorityReadConcern: ""}}, config: 1});
 
     const testDB = shardingTest.getDB("test");
 

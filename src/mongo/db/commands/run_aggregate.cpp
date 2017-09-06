@@ -56,6 +56,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
@@ -288,6 +289,25 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
     }
     return Status::OK();
 }
+
+Status waitForMajorityReadConcern(OperationContext* opCtx) {
+    const repl::ReadConcernArgs& originalRC = repl::ReadConcernArgs::get(opCtx);
+    if (!originalRC.hasLevel()) {
+        // If the read concern level is not specified, upgrade it to "majority".
+        const repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kMajorityReadConcern);
+        auto rcStatus = waitForReadConcern(opCtx, readConcern);
+        if (!rcStatus.isOK()) {
+            return rcStatus;
+        }
+    } else if (originalRC.getLevel() != repl::ReadConcernLevel::kMajorityReadConcern) {
+        // Otherwise, only "majority" is allowed for change streams.
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "Read concern " << originalRC.toString()
+                              << " is not supported for change streams. "
+                                 "Only read concern level \"majority\" is supported."};
+    }
+    return Status::OK();
+}
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
@@ -320,6 +340,9 @@ Status runAggregate(OperationContext* opCtx,
         const LiteParsedPipeline liteParsedPipeline(request);
         if (liteParsedPipeline.hasChangeStream()) {
             nss = NamespaceString::kRsOplogNamespace;
+
+            // Require $changeNotification to run with readConcern:majority.
+            uassertStatusOK(waitForMajorityReadConcern(opCtx));
         }
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();

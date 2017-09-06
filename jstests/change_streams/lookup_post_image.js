@@ -5,7 +5,6 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/fixture_helpers.js");           // For 'FixtureHelpers'.
     load("jstests/replsets/libs/two_phase_drops.js");  // For 'TwoPhaseDropCollectionTest'.
 
     const coll = db.change_post_image;
@@ -14,16 +13,6 @@
      * Returns the last result from the first batch of the aggregation pipeline 'pipeline'.
      */
     function getLastResultFromFirstBatch({collection, pipeline}) {
-        // TODO: SERVER-29126
-        // While change streams still uses read concern level local instead of read concern level
-        // majority, we need to use causal consistency to be able to immediately read our own writes
-        // out of the oplog.  Once change streams read from the majority snapshot, we can remove
-        // these synchronization points from this test.
-        assert.commandWorked(db.runCommand({
-            find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
-        }));
-
         const cmdResponse = assert.commandWorked(
             db.runCommand({aggregate: collection.getName(), pipeline: pipeline, cursor: {}}));
         assert.neq(cmdResponse.cursor.firstBatch.length, 0);
@@ -41,21 +30,6 @@
      * document is present.
      */
     function getOneDoc(cursor) {
-        // TODO: SERVER-29126
-        assert.commandWorked(db.runCommand({
-            find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
-        }));
-        FixtureHelpers.awaitReplication();
-        // TODO: SERVER-29126
-        // While change streams still uses read concern level local instead of read concern level
-        // majority, we need to use causal consistency to be able to immediately read our own writes
-        // out of the oplog.  Once change streams read from the majority snapshot, we can remove
-        // these synchronization points from this test.
-        assert.commandWorked(db.runCommand({
-            find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
-        }));
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
         let res = assert.commandWorked(db.runCommand({
@@ -279,16 +253,6 @@
     coll2.drop();
     assert.commandWorked(db.createCollection(coll2.getName()));
     assert.writeOK(coll2.insert({_id: "getMoreEnabled"}));
-    FixtureHelpers.awaitReplication();
-    // TODO: SERVER-29126
-    // While change streams still uses read concern level local instead of read concern level
-    // majority, we need to use causal consistency to be able to immediately read our own writes
-    // out of the oplog.  Once change streams read from the majority snapshot, we can remove
-    // these synchronization points from this test.
-    assert.commandWorked(db.runCommand({
-        find: "foo",
-        readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
-    }));
 
     res = assert.commandWorked(db.runCommand({
         aggregate: coll2.getName(),
@@ -296,16 +260,6 @@
         cursor: {}
     }));
     assert.writeOK(coll2.update({_id: "getMoreEnabled"}, {$set: {updated: true}}));
-
-    // TODO: SERVER-29126
-    // While change streams still uses read concern level local instead of read concern level
-    // majority, we need to use causal consistency to be able to immediately read our own writes
-    // out of the oplog.  Once change streams read from the majority snapshot, we can remove
-    // these synchronization points from this test.
-    assert.commandWorked(db.runCommand({
-        find: "foo",
-        readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
-    }));
 
     res = assert.commandWorked(db.runCommand({
         getMore: res.cursor.id,

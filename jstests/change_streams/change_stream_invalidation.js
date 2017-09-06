@@ -13,16 +13,6 @@
     // with the pipeline, then insert the changes, then run assertNextBatchMatches with the result
     // of startWatchingChanges and the expected set of results.
     function startWatchingChanges(pipeline, collection) {
-        // TODO: SERVER-29126
-        // While change streams still uses read concern level local instead of read concern level
-        // majority, we need to use causal consistency to be able to immediately read our own writes
-        // out of the oplog.  Once change streams read from the majority snapshot, we can remove
-        // these synchronization points from this test.
-        assert.commandWorked(db.runCommand({
-            find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
-        }));
-
         let res = assert.commandWorked(
             db.runCommand({aggregate: collection.getName(), "pipeline": pipeline, cursor: {}}));
         assert.neq(res.cursor.id, 0);
@@ -75,16 +65,6 @@
     assert.eq(aggcursor.firstBatch.length, 0);
 
     assert.writeOK(collAgg.insert({_id: 1}, {writeConcern: {w: "majority"}}));
-    // TODO: SERVER-29126
-    // While change streams still uses read concern level local instead of read concern level
-    // majority, we need to use causal consistency to be able to immediately read our own writes
-    // out of the oplog.  Once change streams read from the majority snapshot, we can remove
-    // these synchronization points from this test.
-    assert.commandWorked(db.runCommand({
-        find: "foo",
-        readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
-    }));
-
     res =
         assert.commandWorked(db.runCommand({getMore: aggcursor.id, collection: collAgg.getName()}));
     aggcursor = res.cursor;

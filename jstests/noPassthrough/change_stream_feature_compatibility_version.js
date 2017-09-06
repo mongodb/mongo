@@ -3,8 +3,13 @@
 (function() {
     "use strict";
 
-    const rst = new ReplSetTest({nodes: 1});
-    rst.startSet();
+    load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
+
+    const rst = new ReplSetTest({nodes: 1, nodeOptions: {enableMajorityReadConcern: ""}});
+    if (!startSetIfSupportsReadMajority(rst)) {
+        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        return;
+    }
     rst.initiate();
     const conn = rst.getPrimary();
 

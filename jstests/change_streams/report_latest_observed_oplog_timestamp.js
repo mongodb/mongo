@@ -44,16 +44,6 @@
         assert.writeOK(cursorCollection.insert({_id: i}, {writeConcern: {w: 1}}));
     }
 
-    // TODO: SERVER-29126
-    // While change streams still uses read concern level local instead of read concern level
-    // majority, we need to use causal consistency to be able to immediately read our own writes out
-    // of the oplog.  Once change streams read from the majority snapshot, we can remove this
-    // synchronization point from this test.
-    assert.commandWorked(db.runCommand({
-        find: "foo",
-        readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
-    }));
-
     // Look at one batch's worth.
     jsTestLog("Testing that operation time is present on initial aggregate command.");
     const cursorResponse = assert.commandWorked(cursorCollection.runCommand({
