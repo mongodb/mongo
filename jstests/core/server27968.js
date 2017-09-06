@@ -268,6 +268,17 @@
             .toArray();
     assert.eq(result, [{name: "MultiPolygon2"}]);
 
+    // Test for centerSphere as big as earth radius (should return all)
+    result = coll.find({
+                     boundary: {
+                         $geoWithin:
+                             {$centerSphere: [[151.20936119647115, -33.875266834633265], 6378.1]}
+                     }
+                 },
+                       {"name": 1, "_id": 0})
+                 .toArray();
+    assert.eq(result, [{name: "Polygon2"}, {name: "MultiPolygon1"}, {name: "MultiPolygon2"}]);
+
     // Test for a MultiPolygon with holes intersecting with geowithin sphere (should not return a
     // match)
     result =
