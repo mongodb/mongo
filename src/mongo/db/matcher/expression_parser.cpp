@@ -1605,10 +1605,14 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaAllowedProp
 
     auto allowedPropertiesExpr =
         stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>();
-    allowedPropertiesExpr->init(std::move(properties.getValue()),
-                                namePlaceholder.getValue(),
-                                std::move(patternProperties.getValue()),
-                                std::move(otherwise.getValue()));
+    auto status = allowedPropertiesExpr->init(std::move(properties.getValue()),
+                                              namePlaceholder.getValue(),
+                                              std::move(patternProperties.getValue()),
+                                              std::move(otherwise.getValue()));
+    if (!status.isOK()) {
+        return status;
+    }
+
     return {std::move(allowedPropertiesExpr)};
 }
 

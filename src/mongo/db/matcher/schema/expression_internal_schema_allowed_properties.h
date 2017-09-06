@@ -111,10 +111,10 @@ public:
     explicit InternalSchemaAllowedPropertiesMatchExpression()
         : MatchExpression(MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES) {}
 
-    void init(boost::container::flat_set<StringData> properties,
-              StringData namePlaceholder,
-              std::vector<PatternSchema> patternProperties,
-              std::unique_ptr<ExpressionWithPlaceholder> otherwise);
+    Status init(boost::container::flat_set<StringData> properties,
+                StringData namePlaceholder,
+                std::vector<PatternSchema> patternProperties,
+                std::unique_ptr<ExpressionWithPlaceholder> otherwise);
 
     void debugString(StringBuilder& debug, int level) const final;
 

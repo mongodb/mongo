@@ -1625,5 +1625,205 @@ TEST(JSONSchemaParserTest, CorrectlyParsesNestedTitleAsString) {
     ASSERT_OK(result.getStatus());
 }
 
+TEST(JSONSchemaParserTest, PatternPropertiesFailsToParseIfNotObject) {
+    BSONObj schema = fromjson("{patternProperties: 1}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, PatternPropertiesFailsToParseIfOnePropertyIsNotObject) {
+    BSONObj schema = fromjson("{patternProperties: {a: {}, b: 1}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, PatternPropertiesFailsToParseIfNestedSchemaIsInvalid) {
+    BSONObj schema = fromjson("{patternProperties: {a: {invalid: 1}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, PatternPropertiesFailsToParseIfPropertyNameIsAnInvalidRegex) {
+    BSONObj schema = fromjson("{patternProperties: {'[': {}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, AdditionalPropertiesFailsToParseIfNotBoolOrString) {
+    BSONObj schema = fromjson("{additionalProperties: 1}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, AdditionalPropertiesFailsToParseIfNestedSchemaIsInvalid) {
+    BSONObj schema = fromjson("{additionalProperties: {invalid: 1}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, TopLevelPatternPropertiesTranslatesCorrectly) {
+    BSONObj schema =
+        fromjson("{patternProperties: {'^a': {type: 'number'}, '^b': {type: 'string'}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $_internalSchemaAllowedProperties: {
+                    properties: [],
+                    namePlaceholder: 'i',
+                    patternProperties: [
+                        {regex: /^a/, expression: {$and:[{i: {$_internalSchemaType: ['number']}}]}},
+                        {regex: /^b/, expression: {$and:[{i: {$_internalSchemaType: [2]}}]}}
+                    ],
+                    otherwise: {$alwaysTrue: 1}
+                }
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelAdditionalPropertiesFalseTranslatesCorrectly) {
+    BSONObj schema = fromjson("{additionalProperties: false}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $_internalSchemaAllowedProperties: {
+                    properties: [],
+                    namePlaceholder: 'i',
+                    patternProperties: [],
+                    otherwise: {$alwaysFalse: 1}
+                }
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelAdditionalPropertiesTrueTranslatesCorrectly) {
+    BSONObj schema = fromjson("{additionalProperties: true}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $_internalSchemaAllowedProperties: {
+                    properties: [],
+                    namePlaceholder: 'i',
+                    patternProperties: [],
+                    otherwise: {$alwaysTrue: 1}
+                }
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelAdditionalPropertiesTypeNumberTranslatesCorrectly) {
+    BSONObj schema = fromjson("{additionalProperties: {type: 'number'}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+         {
+            $and: [{
+                $_internalSchemaAllowedProperties: {
+                    properties: [],
+                    namePlaceholder: "i",
+                    patternProperties: [],
+                    otherwise: {$and: [{i: {$_internalSchemaType: ["number"]}}]}
+                }
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest, NestedAdditionalPropertiesTranslatesCorrectly) {
+    BSONObj schema = fromjson("{properties: {obj: {additionalProperties: {type: 'number'}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [{
+                $and: [{
+                    $or: [
+                        {$nor: [{obj: {$exists: true}}]},
+                        {
+                          $and: [{
+                              $or: [
+                                  {$nor: [{obj: {$_internalSchemaType: [3]}}]},
+                                  {
+                                    obj: {
+                                        $_internalSchemaObjectMatch: {
+                                            $_internalSchemaAllowedProperties: {
+                                                properties: [],
+                                                namePlaceholder: 'i',
+                                                patternProperties: [],
+                                                otherwise: {
+                                                    $and: [{
+                                                        i: {
+                                                            $_internalSchemaType: ['number']
+                                                        }
+                                                    }]
+                                                }
+                                            }
+                                        }
+                                    }
+                                  }
+                              ]
+                          }]
+                        }
+                    ]
+                }]
+            }]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest,
+     PropertiesPatternPropertiesAndAdditionalPropertiesTranslateCorrectlyTogether) {
+    BSONObj schema = fromjson(
+        "{properties: {a: {}, b: {}}, patternProperties: {'^c': {}}, additionalProperties: false}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [
+                {
+                  $and: [
+                      {$or: [{$nor: [{a: {$exists: true}}]}, {}]},
+                      {$or: [{$nor: [{b: {$exists: true}}]}, {}]}
+                  ]
+                },
+                {
+                  $_internalSchemaAllowedProperties: {
+                      properties: ['a', 'b'],
+                      namePlaceholder: 'i',
+                      patternProperties: [{regex: /^c/, expression: {}}],
+                      otherwise: {$alwaysFalse: 1}
+                  }
+                }
+            ]
+        }
+    )"));
+}
+
+TEST(JSONSchemaParserTest,
+     PropertiesPatternPropertiesAdditionalPropertiesAndRequiredTranslateCorrectlyTogether) {
+    BSONObj schema = fromjson(
+        "{properties: {a: {}, b: {}}, required: ['a'], patternProperties: {'^c': {}}, "
+        "additionalProperties: false}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {
+            $and: [
+                {$and: [{}, {$or: [{$nor: [{b: {$exists: true}}]}, {}]}]},
+                {
+                  $_internalSchemaAllowedProperties: {
+                      properties: ['a', 'b'],
+                      namePlaceholder: 'i',
+                      patternProperties: [{regex: /^c/, expression: {}}],
+                      otherwise: {$alwaysFalse: 1}
+                  }
+                },
+                {$and: [{a: {$exists: true}}]}
+            ]
+        }
+    )"));
+}
+
 }  // namespace
 }  // namespace mongo

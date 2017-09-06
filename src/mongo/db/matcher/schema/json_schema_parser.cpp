@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
@@ -53,9 +54,13 @@
 
 namespace mongo {
 
+using PatternSchema = InternalSchemaAllowedPropertiesMatchExpression::PatternSchema;
+using Pattern = InternalSchemaAllowedPropertiesMatchExpression::Pattern;
+
 namespace {
 // Standard JSON Schema keyword constants.
 constexpr StringData kSchemaAdditionalItemsKeyword = "additionalItems"_sd;
+constexpr StringData kSchemaAdditionalPropertiesKeyword = "additionalProperties"_sd;
 constexpr StringData kSchemaAllOfKeyword = "allOf"_sd;
 constexpr StringData kSchemaAnyOfKeyword = "anyOf"_sd;
 constexpr StringData kSchemaDependenciesKeyword = "dependencies"_sd;
@@ -75,6 +80,7 @@ constexpr StringData kSchemaMultipleOfKeyword = "multipleOf"_sd;
 constexpr StringData kSchemaNotKeyword = "not"_sd;
 constexpr StringData kSchemaOneOfKeyword = "oneOf"_sd;
 constexpr StringData kSchemaPatternKeyword = "pattern"_sd;
+constexpr StringData kSchemaPatternPropertiesKeyword = "patternProperties"_sd;
 constexpr StringData kSchemaPropertiesKeyword = "properties"_sd;
 constexpr StringData kSchemaRequiredKeyword = "required"_sd;
 constexpr StringData kSchemaTitleKeyword = "title"_sd;
@@ -88,6 +94,8 @@ constexpr StringData kSchemaBsonTypeKeyword = "bsonType"_sd;
 const std::set<StringData> unsupportedKeywords{
     "$ref"_sd, "$schema"_sd, "default"_sd, "definitions"_sd, "format"_sd, "id"_sd,
 };
+
+constexpr StringData kNamePlaceholder = "i"_sd;
 
 /**
  * Parses 'schema' to the semantically equivalent match expression. If the schema has an associated
@@ -522,6 +530,134 @@ StatusWithMatchExpression parseProperties(
     return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
 }
 
+StatusWith<std::vector<PatternSchema>> parsePatternProperties(BSONElement patternPropertiesElt) {
+    std::vector<PatternSchema> patternProperties;
+    if (!patternPropertiesElt) {
+        return {std::move(patternProperties)};
+    }
+
+    if (patternPropertiesElt.type() != BSONType::Object) {
+        return {Status(ErrorCodes::TypeMismatch,
+                       str::stream() << "$jsonSchema keyword '" << kSchemaPatternPropertiesKeyword
+                                     << "' must be an object")};
+    }
+
+    for (auto&& patternSchema : patternPropertiesElt.embeddedObject()) {
+        if (patternSchema.type() != BSONType::Object) {
+            return {Status(ErrorCodes::TypeMismatch,
+                           str::stream() << "$jsonSchema keyword '"
+                                         << kSchemaPatternPropertiesKeyword
+                                         << "' has property '"
+                                         << patternSchema.fieldNameStringData()
+                                         << "' which is not an object")};
+        }
+
+        // Parse the nested schema using a placeholder as the path, since we intend on using the
+        // resulting match expression inside an ExpressionWithPlaceholder.
+        auto nestedSchemaMatch = _parse(kNamePlaceholder, patternSchema.embeddedObject());
+        if (!nestedSchemaMatch.isOK()) {
+            return nestedSchemaMatch.getStatus();
+        }
+
+        auto exprWithPlaceholder = stdx::make_unique<ExpressionWithPlaceholder>(
+            kNamePlaceholder.toString(), std::move(nestedSchemaMatch.getValue()));
+        Pattern pattern{patternSchema.fieldNameStringData()};
+        patternProperties.emplace_back(std::move(pattern), std::move(exprWithPlaceholder));
+    }
+
+    return {std::move(patternProperties)};
+}
+
+StatusWithMatchExpression parseAdditionalProperties(BSONElement additionalPropertiesElt) {
+    if (!additionalPropertiesElt) {
+        // The absence of the 'additionalProperties' keyword is identical in meaning to the presence
+        // of 'additionalProperties' with a value of true.
+        return {stdx::make_unique<AlwaysTrueMatchExpression>()};
+    }
+
+    if (additionalPropertiesElt.type() != BSONType::Bool &&
+        additionalPropertiesElt.type() != BSONType::Object) {
+        return {Status(ErrorCodes::TypeMismatch,
+                       str::stream() << "$jsonSchema keyword '"
+                                     << kSchemaAdditionalPropertiesKeyword
+                                     << "' must be an object or a boolean")};
+    }
+
+    if (additionalPropertiesElt.type() == BSONType::Bool) {
+        if (additionalPropertiesElt.boolean()) {
+            return {stdx::make_unique<AlwaysTrueMatchExpression>()};
+        } else {
+            return {stdx::make_unique<AlwaysFalseMatchExpression>()};
+        }
+    }
+
+    // Parse the nested schema using a placeholder as the path, since we intend on using the
+    // resulting match expression inside an ExpressionWithPlaceholder.
+    auto nestedSchemaMatch = _parse(kNamePlaceholder, additionalPropertiesElt.embeddedObject());
+    if (!nestedSchemaMatch.isOK()) {
+        return nestedSchemaMatch.getStatus();
+    }
+
+    return {std::move(nestedSchemaMatch.getValue())};
+}
+
+/**
+ * Returns a match expression which handles both the 'additionalProperties' and 'patternProperties'
+ * keywords.
+ */
+StatusWithMatchExpression parseAllowedProperties(StringData path,
+                                                 BSONElement propertiesElt,
+                                                 BSONElement patternPropertiesElt,
+                                                 BSONElement additionalPropertiesElt,
+                                                 InternalSchemaTypeExpression* typeExpr) {
+    // Collect the set of properties named by the 'properties' keyword.
+    boost::container::flat_set<StringData> propertyNames;
+    if (propertiesElt) {
+        std::vector<StringData> propertyNamesVec;
+        for (auto&& elem : propertiesElt.embeddedObject()) {
+            propertyNamesVec.push_back(elem.fieldNameStringData());
+        }
+        propertyNames = boost::container::flat_set<StringData>(propertyNamesVec.begin(),
+                                                               propertyNamesVec.end());
+    }
+
+    auto patternProperties = parsePatternProperties(patternPropertiesElt);
+    if (!patternProperties.isOK()) {
+        return patternProperties.getStatus();
+    }
+
+    auto otherwiseExpr = parseAdditionalProperties(additionalPropertiesElt);
+    if (!otherwiseExpr.isOK()) {
+        return otherwiseExpr.getStatus();
+    }
+    auto otherwiseWithPlaceholder = stdx::make_unique<ExpressionWithPlaceholder>(
+        kNamePlaceholder.toString(), std::move(otherwiseExpr.getValue()));
+
+    auto allowedPropertiesExpr =
+        stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>();
+    auto status = allowedPropertiesExpr->init(std::move(propertyNames),
+                                              kNamePlaceholder,
+                                              std::move(patternProperties.getValue()),
+                                              std::move(otherwiseWithPlaceholder));
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // If this is a top-level schema, then we have no path and there is no need for an explicit
+    // object match node.
+    if (path.empty()) {
+        return {std::move(allowedPropertiesExpr)};
+    }
+
+    auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>();
+    auto objectMatchStatus = objectMatch->init(std::move(allowedPropertiesExpr), path);
+    if (!objectMatchStatus.isOK()) {
+        return objectMatchStatus;
+    }
+
+    return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
+}
+
 /**
  * Parses 'minProperties' and 'maxProperties' JSON Schema keywords.
  */
@@ -785,9 +921,11 @@ Status translateArrayKeywords(StringMap<BSONElement>* keywordMap,
  * Returns a non-OK status if an error occurs during parsing.
  *
  * This function parses the following keywords:
+ *  - additionalProperties
  *  - dependencies
  *  - maxProperties
  *  - minProperties
+ *  - patternProperties
  *  - properties
  *  - required
  */
@@ -810,6 +948,21 @@ Status translateObjectKeywords(StringMap<BSONElement>* keywordMap,
             return propertiesExpr.getStatus();
         }
         andExpr->add(propertiesExpr.getValue().release());
+    }
+
+    {
+        auto propertiesElt = keywordMap->get(kSchemaPropertiesKeyword);
+        auto patternPropertiesElt = keywordMap->get(kSchemaPatternPropertiesKeyword);
+        auto additionalPropertiesElt = keywordMap->get(kSchemaAdditionalPropertiesKeyword);
+
+        if (patternPropertiesElt || additionalPropertiesElt) {
+            auto allowedPropertiesExpr = parseAllowedProperties(
+                path, propertiesElt, patternPropertiesElt, additionalPropertiesElt, typeExpr);
+            if (!allowedPropertiesExpr.isOK()) {
+                return allowedPropertiesExpr.getStatus();
+            }
+            andExpr->add(allowedPropertiesExpr.getValue().release());
+        }
     }
 
     if (!requiredProperties.empty()) {
@@ -984,6 +1137,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
     // Map from JSON Schema keyword to the corresponding element from 'schema', or to an empty
     // BSONElement if the JSON Schema keyword is not specified.
     StringMap<BSONElement> keywordMap{
+        {kSchemaAdditionalPropertiesKeyword, {}},
         {kSchemaAllOfKeyword, {}},
         {kSchemaAnyOfKeyword, {}},
         {kSchemaBsonTypeKeyword, {}},
@@ -1003,6 +1157,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         {kSchemaNotKeyword, {}},
         {kSchemaOneOfKeyword, {}},
         {kSchemaPatternKeyword, {}},
+        {kSchemaPatternPropertiesKeyword, {}},
         {kSchemaPropertiesKeyword, {}},
         {kSchemaRequiredKeyword, {}},
         {kSchemaTitleKeyword, {}},

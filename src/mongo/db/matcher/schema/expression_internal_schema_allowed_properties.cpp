@@ -33,7 +33,7 @@
 namespace mongo {
 constexpr StringData InternalSchemaAllowedPropertiesMatchExpression::kName;
 
-void InternalSchemaAllowedPropertiesMatchExpression::init(
+Status InternalSchemaAllowedPropertiesMatchExpression::init(
     boost::container::flat_set<StringData> properties,
     StringData namePlaceholder,
     std::vector<PatternSchema> patternProperties,
@@ -42,6 +42,16 @@ void InternalSchemaAllowedPropertiesMatchExpression::init(
     _namePlaceholder = namePlaceholder;
     _patternProperties = std::move(patternProperties);
     _otherwise = std::move(otherwise);
+
+    for (auto&& constraint : _patternProperties) {
+        const auto& errorStr = constraint.first.regex->error();
+        if (!errorStr.empty()) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Invalid regular expression: " << errorStr};
+        }
+    }
+
+    return Status::OK();
 }
 
 void InternalSchemaAllowedPropertiesMatchExpression::debugString(StringBuilder& debug,
@@ -156,10 +166,10 @@ std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression:
     }
 
     auto clone = stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>();
-    clone->init(_properties,
-                _namePlaceholder,
-                std::move(clonedPatternProperties),
-                _otherwise->shallowClone());
+    invariantOK(clone->init(_properties,
+                            _namePlaceholder,
+                            std::move(clonedPatternProperties),
+                            _otherwise->shallowClone()));
     return {std::move(clone)};
 }
 }  // namespace mongo

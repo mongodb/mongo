@@ -5,7 +5,6 @@ selector:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/**/*.json
   exclude_files:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/additionalItems.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/additionalProperties.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/allOf.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/anyOf.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/default.json
