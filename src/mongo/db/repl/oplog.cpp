@@ -438,10 +438,11 @@ OpTime logOp(OperationContext* opCtx,
         return {};
     }
 
-    Collection* oplog = getLocalOplogCollection(opCtx, _oplogCollectionName);
-    Lock::DBLock lk(opCtx, "local", MODE_IX);
+    Lock::DBLock lk(opCtx, NamespaceString::kLocalDb, MODE_IX);
     Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
-    auto replMode = replCoord->getReplicationMode();
+    auto const oplog = getLocalOplogCollection(opCtx, _oplogCollectionName);
+    auto const replMode = replCoord->getReplicationMode();
+
     OplogSlot slot;
     WriteUnitOfWork wuow(opCtx);
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);

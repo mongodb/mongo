@@ -75,16 +75,9 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::shared_ptr;
-using std::set;
-using std::string;
-using std::stringstream;
-
 namespace {
 
-const std::string kOperationTime = "operationTime";
+const auto kOperationTime = "operationTime"_sd;
 
 /**
  * Extract and process metadata from the command request body.
@@ -246,26 +239,9 @@ void execCommandClient(OperationContext* opCtx,
     }
 }
 
-void runAgainstRegistered(OperationContext* opCtx,
-                          const OpMsgRequest& request,
-                          BSONObjBuilder& anObjBuilder) {
-    const auto commandName = request.getCommandName();
-    Command* c = Command::findCommand(commandName);
-    if (!c) {
-        Command::appendCommandStatus(
-            anObjBuilder,
-            {ErrorCodes::CommandNotFound, str::stream() << "no such cmd: " << commandName});
-        Command::unknownCommands.increment();
-        return;
-    }
-
-    initializeOperationSessionInfo(opCtx, request.body, c->requiresAuth());
-
-    execCommandClient(opCtx, c, request, anObjBuilder);
-}
-
 void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder&& builder) {
-    // Handle command option maxTimeMS.
+    // Handle command option maxTimeMS first thing while processing the command so that the
+    // subsequent code has the deadline available
     uassert(ErrorCodes::InvalidOptions,
             "no such command option $maxTimeMs; use maxTimeMS instead",
             request.body[QueryRequest::queryOptionMaxTimeMS].eoo());
@@ -276,12 +252,24 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
         opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
     }
 
+    auto const commandName = request.getCommandName();
+    auto const command = Command::findCommand(commandName);
+    if (!command) {
+        Command::appendCommandStatus(
+            builder,
+            {ErrorCodes::CommandNotFound, str::stream() << "no such cmd: " << commandName});
+        Command::unknownCommands.increment();
+        return;
+    }
+
+    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth());
+
     int loops = 5;
 
     while (true) {
         builder.resetToEmpty();
         try {
-            runAgainstRegistered(opCtx, request, builder);
+            execCommandClient(opCtx, command, request, builder);
             return;
         } catch (const StaleConfigException& e) {
             if (e.getns().empty()) {
@@ -304,12 +292,14 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
                     Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNSS);
                 }
             }
+
             continue;
         } catch (const DBException& e) {
             builder.resetToEmpty();
             Command::appendCommandStatus(builder, e.toStatus());
             return;
         }
+
         MONGO_UNREACHABLE;
     }
 }
@@ -455,9 +445,9 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
 }
 
 void Strategy::commandOp(OperationContext* opCtx,
-                         const string& db,
+                         const std::string& db,
                          const BSONObj& command,
-                         const string& versionedNS,
+                         const std::string& versionedNS,
                          const BSONObj& targetingQuery,
                          const BSONObj& targetingCollation,
                          std::vector<CommandResult>* results) {
@@ -469,7 +459,7 @@ void Strategy::commandOp(OperationContext* opCtx,
     // Initialize the cursor
     cursor.init(opCtx);
 
-    set<ShardId> shardIds;
+    std::set<ShardId> shardIds;
     cursor.getQueryShardIds(shardIds);
 
     for (const ShardId& shardId : shardIds) {
