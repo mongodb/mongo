@@ -106,7 +106,7 @@ void Session::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
         {
             stdx::lock_guard<stdx::mutex> lg(_mutex);
             startGeneration = _generation;
-            txnRecord = _lastWrittenTxnRecord;
+            txnRecord = _txnRecord;
         }
 
         // Do I/O outside of the lock.
@@ -121,7 +121,7 @@ void Session::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
             }
 
             stdx::lock_guard<stdx::mutex> lg(_mutex);
-            _lastWrittenTxnRecord = txnRecord;
+            _txnRecord = txnRecord;
         }
 
         uassert(40528,
@@ -144,11 +144,11 @@ void Session::begin(OperationContext* opCtx, const TxnNumber& txnNumber) {
             // Reload if the session was modified since the beginning of this loop, e.g. by
             // rollback.
             if (startGeneration != _generation) {
-                _lastWrittenTxnRecord.reset();
+                _txnRecord.reset();
                 continue;
             }
 
-            _lastWrittenTxnRecord = std::move(txnRecord);
+            _txnRecord = std::move(txnRecord);
             return;
         }
     }
@@ -184,19 +184,19 @@ void Session::saveTxnProgress(OperationContext* opCtx, Timestamp opTimeTs) {
             updateResult.numDocsModified >= 1);
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _lastWrittenTxnRecord->setLastWriteOpTimeTs(opTimeTs);
+    _txnRecord->setLastWriteOpTimeTs(opTimeTs);
 }
 
 TxnNumber Session::getTxnNum() const {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    invariant(_lastWrittenTxnRecord);
-    return _lastWrittenTxnRecord->getTxnNum();
+    invariant(_txnRecord);
+    return _txnRecord->getTxnNum();
 }
 
 Timestamp Session::getLastWriteOpTimeTs() const {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    invariant(_lastWrittenTxnRecord);
-    return _lastWrittenTxnRecord->getLastWriteOpTimeTs();
+    invariant(_txnRecord);
+    return _txnRecord->getLastWriteOpTimeTs();
 }
 
 TransactionHistoryIterator Session::getWriteHistory(OperationContext* opCtx) const {
@@ -205,7 +205,7 @@ TransactionHistoryIterator Session::getWriteHistory(OperationContext* opCtx) con
 
 void Session::reset() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _lastWrittenTxnRecord.reset();
+    _txnRecord.reset();
     _generation += 1;
 }
 

@@ -152,7 +152,7 @@ private:
      * or more times before returning. The returned 'SessionRuntimeInfo' is guaranteed to be linked
      * on the catalog's _txnTable as long as the lock is held.
      */
-    std::shared_ptr<SessionRuntimeInfo> _getOrCreateSessionRuntimeInfo(
+    std::shared_ptr<SessionRuntimeInfo> _getOrCreateSessionRuntimeInfo_inlock(
         OperationContext* opCtx, const LogicalSessionId& lsid, stdx::unique_lock<stdx::mutex>& ul);
 
     /**

@@ -119,7 +119,7 @@ private:
     // Protects the member variables below.
     mutable stdx::mutex _mutex;
 
-    boost::optional<SessionTxnRecord> _lastWrittenTxnRecord;
+    boost::optional<SessionTxnRecord> _txnRecord;
 
     /**
      * Incremented each time the session is externally modified. Used to determine if the session
