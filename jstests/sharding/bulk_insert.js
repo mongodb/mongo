@@ -249,20 +249,24 @@
     assert.writeOK(staleCollSh.insert(inserts));
 
     //
-    // Test when the objects to be bulk inserted are 10MB, and so can't be inserted
-    // together with WBL.
+    // Test when the legacy batch exceeds the BSON object size limit
     //
 
-    jsTest.log("Testing bulk insert (no COE) with WBL and large objects...");
+    jsTest.log("Testing bulk insert (no COE) with large objects...");
     resetColls();
 
-    var data10MB = 'x'.repeat(10 * 1024 * 1024);
-    var inserts = [
-        {ukey: 1, data: data10MB},
-        {ukey: 2, data: data10MB},
-        {ukey: -1, data: data10MB},
-        {ukey: -2, data: data10MB}
-    ];
+    var inserts = (function() {
+        var data = 'x'.repeat(10 * 1024 * 1024);
+        return [
+            {ukey: 1, data: data},
+            {ukey: 2, data: data},
+            {ukey: -1, data: data},
+            {ukey: -2, data: data}
+        ];
+    })();
+
+    var staleMongosWithLegacyWrites = new Mongo(staleMongos.name);
+    staleMongosWithLegacyWrites.forceWriteMode('legacy');
 
     staleCollSh = staleMongos.getCollection(collSh + "");
     assert.eq(null, staleCollSh.findOne(), 'Collections should be empty');
@@ -272,8 +276,8 @@
     assert.commandWorked(admin.runCommand(
         {moveChunk: collSh + "", find: {ukey: 0}, to: st.shard0.shardName, _waitForDelete: true}));
 
-    assert.writeOK(staleCollSh.insert(inserts));
+    staleCollSh.insert(inserts);
+    staleCollSh.getDB().getLastError();
 
     st.stop();
-
 })();
