@@ -5,7 +5,7 @@
 // Integration tests for collation-aware updates.
 (function() {
     'use strict';
-    var coll = db.coll;
+    var coll = db.getCollection("collation_update_test");
 
     const caseInsensitive = {collation: {locale: "en_US", strength: 2}};
     const caseSensitive = {collation: {locale: "en_US", strength: 3}};
