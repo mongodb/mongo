@@ -82,6 +82,11 @@ constexpr StringData kSchemaUniqueItemsKeyword = "uniqueItems"_sd;
 // MongoDB-specific (non-standard) JSON Schema keyword constants.
 constexpr StringData kSchemaBsonTypeKeyword = "bsonType"_sd;
 
+// Explicitly unsupported JSON Schema keywords.
+const std::set<StringData> unsupportedKeywords{
+    "$ref"_sd, "$schema"_sd, "default"_sd, "definitions"_sd, "format"_sd, "id"_sd,
+};
+
 /**
  * Parses 'schema' to the semantically equivalent match expression. If the schema has an associated
  * path, e.g. if we are parsing the nested schema for property "myProp" in
@@ -979,6 +984,11 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
     for (auto&& elt : schema) {
         auto it = keywordMap.find(elt.fieldNameStringData());
         if (it == keywordMap.end()) {
+            if (unsupportedKeywords.find(elt.fieldNameStringData()) != unsupportedKeywords.end()) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "$jsonSchema keyword '" << elt.fieldNameStringData()
+                                            << "' is not currently supported");
+            }
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Unknown $jsonSchema keyword: "
                                         << elt.fieldNameStringData());

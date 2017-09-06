@@ -1563,5 +1563,37 @@ TEST(JSONSchemaParserTest, NestedPropertyDependencyTranslatesCorrectly) {
     }]})"));
 }
 
+TEST(JSONSchemaParserTest, UnsupportedKeywordsFailNicely) {
+    auto result = JSONSchemaParser::parse(fromjson("{default: {}}"));
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword 'default' is not currently supported");
+
+    result = JSONSchemaParser::parse(fromjson("{definitions: {numberField: {type: 'number'}}}"));
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword 'definitions' is not currently supported");
+
+    result = JSONSchemaParser::parse(fromjson("{format: 'email'}"));
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword 'format' is not currently supported");
+
+    result = JSONSchemaParser::parse(fromjson("{id: 'someschema.json'}"));
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword 'id' is not currently supported");
+
+    result = JSONSchemaParser::parse(BSON("$ref"
+                                          << "#/definitions/positiveInt"));
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword '$ref' is not currently supported");
+
+    result = JSONSchemaParser::parse(fromjson("{$schema: 'hyper-schema'}"));
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword '$schema' is not currently supported");
+
+    result =
+        JSONSchemaParser::parse(fromjson("{$schema: 'http://json-schema.org/draft-04/schema#'}"));
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword '$schema' is not currently supported");
+}
+
 }  // namespace
 }  // namespace mongo
