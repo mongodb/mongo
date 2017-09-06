@@ -314,7 +314,7 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
         // scope and code
 
         if (cmdObj["scope"].type() == Object)
-            scopeSetup = cmdObj["scope"].embeddedObjectUserCheck();
+            scopeSetup = cmdObj["scope"].embeddedObjectUserCheck().getOwned();
 
         mapper.reset(new JSMapper(cmdObj["map"]));
         reducer.reset(new JSReducer(cmdObj["reduce"]));
@@ -322,7 +322,7 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
             finalizer.reset(new JSFinalizer(cmdObj["finalize"]));
 
         if (cmdObj["mapparams"].type() == Array) {
-            mapParams = cmdObj["mapparams"].embeddedObjectUserCheck();
+            mapParams = cmdObj["mapparams"].embeddedObjectUserCheck().getOwned();
         }
     }
 
