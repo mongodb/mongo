@@ -24,18 +24,18 @@
     /**
      *  Apply ops on mydb, asserting success.
      */
-    function assertApplyOpsWorks(mydb, ops) {
+    function assertApplyOpsWorks(testdbs, ops) {
         // Remaining operations in ops must still be applied
         while (ops.length) {
             let cmd = {applyOps: ops};
-            let res = mydb.adminCommand(cmd);
+            let res = testdbs[0].adminCommand(cmd);
             if (debug) {
                 printjson({applyOps: ops, res});
             }
 
             // Wait for any drop-pending collections to be removed by the reaper before proceeding.
             assert.soon(function() {
-                return !containsDropPendingCollection(mydb);
+                return !testdbs.find(mydb => containsDropPendingCollection(mydb));
             });
 
             // If the entire operation succeeded, we're done.
@@ -149,7 +149,7 @@
         let dbname = (new Date()).toISOString().match(/[-0-9T]/g).join('');  // 2017-05-30T155055713
         let mydb = primary.getDB(dbname);
 
-        // Allow testFun to return the array databases to check (default is mydb).
+        // Allow testFun to return the array of databases to check (default is mydb).
         let testdbs = testFun(mydb) || [mydb];
         let expectedInfo = dbInfo(testdbs);
 
@@ -168,7 +168,7 @@
 
         for (let j = 0; j < ops.length; j++) {
             let replayOps = ops.slice(j);
-            assertApplyOpsWorks(mydb, replayOps);
+            assertApplyOpsWorks(testdbs, replayOps);
             let actualInfo = dbInfo(testdbs);
             assert.eq(actualInfo,
                       expectedInfo,
