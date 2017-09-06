@@ -834,7 +834,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     UpdateLifecycle* lifecycle = request->getLifecycle();
 
     if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-        uassert(10156, "cannot update a system namespace", nss.isLegalClientSystemNS());
+        uassert(10156,
+                str::stream() << "cannot update a system namespace: " << nss.ns(),
+                nss.isLegalClientSystemNS());
     }
     if (nss.isVirtualized()) {
         log() << "cannot update a virtual collection: " << nss;
