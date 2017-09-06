@@ -102,11 +102,22 @@ public:
      */
     bool insertDocument(BSONObj obj);
 
+    /**
+     * Get the number of dropped writes due to a full buffer since the last log
+     */
+    int64_t getDroppedEntries();
+
 private:
     /**
      * Log failure, but only if a certain interval has passed since the last log.
      */
     void _logFailure(const Status& status);
+
+    /**
+     * Log number of entries dropped because of a full buffer. Rate limited and
+     * each successful log resets the counter.
+     */
+    void _logDroppedEntry();
 
     /**
      * Create the backing collection if it doesn't exist.
@@ -153,12 +164,19 @@ private:
     int64_t _numBytes;
 
     /**
+     * The number of deffered entries that have been dropped. Resets when the
+     * rate-limited system log is written out.
+     */
+    int64_t _droppedEntries;
+
+    /**
      * Time we last logged that we can't write to the underlying collection.
      *
      * Ensures we don't flood the log with such entries.
      */
     using TimePoint = stdx::chrono::time_point<stdx::chrono::system_clock>;
     TimePoint _lastLogged;
+    TimePoint _lastLoggedDrop;
 };
 
 }  // namespace mongo

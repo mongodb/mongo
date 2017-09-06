@@ -41,13 +41,23 @@
 namespace mongo {
 
 namespace {
-auto kLogInterval = stdx::chrono::hours(1);
+auto kLogInterval = stdx::chrono::minutes(1);
 }
 
 void DeferredWriter::_logFailure(const Status& status) {
     if (TimePoint::clock::now() - _lastLogged > kLogInterval) {
         log() << "Unable to write to collection " << _nss.toString() << ": " << status.toString();
         _lastLogged = stdx::chrono::system_clock::now();
+    }
+}
+
+void DeferredWriter::_logDroppedEntry() {
+    _droppedEntries += 1;
+    if (TimePoint::clock::now() - _lastLoggedDrop > kLogInterval) {
+        log() << "Deferred write buffer for " << _nss.toString() << " is full. " << _droppedEntries
+              << " entries have been dropped.";
+        _lastLoggedDrop = stdx::chrono::system_clock::now();
+        _droppedEntries = 0;
     }
 }
 
@@ -122,6 +132,7 @@ DeferredWriter::DeferredWriter(NamespaceString nss, CollectionOptions opts, int6
       _maxNumBytes(maxSize),
       _nss(nss),
       _numBytes(0),
+      _droppedEntries(0),
       _lastLogged(TimePoint::clock::now() - kLogInterval) {}
 
 DeferredWriter::~DeferredWriter() {}
@@ -160,6 +171,7 @@ bool DeferredWriter::insertDocument(BSONObj obj) {
     if (_numBytes + obj.objsize() >= _maxNumBytes) {
         // If not, drop it.  We always drop new entries rather than old ones; that way the caller
         // knows at the time of the call that the entry was dropped.
+        _logDroppedEntry();
         return false;
     }
 
@@ -169,5 +181,10 @@ bool DeferredWriter::insertDocument(BSONObj obj) {
                     _pool->schedule([this, obj] { _worker(InsertStatement(obj.getOwned())); }));
     return true;
 }
+
+int64_t DeferredWriter::getDroppedEntries() {
+    return _droppedEntries;
+}
+
 
 }  // namespace mongo

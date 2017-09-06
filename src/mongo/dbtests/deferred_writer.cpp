@@ -282,6 +282,10 @@ public:
 
 /**
  * Test that the DeferredWriter rejects documents over the buffer size.
+ * When this happens, check that the logging counter resets after the first
+ * write.
+ * Note: This test assumes that the logging interval is sufficiently large
+ * and that the first dropped write is the ONLY one logged.
  */
 class DeferredWriterTestCap : public DeferredWriterTestBase {
 public:
@@ -294,12 +298,16 @@ public:
         // Keep track of what we add.
         int bytesAdded = 0;
         int nAdded = 0;
-        bool hitCap = false;
+        int nDropped = 0;
 
         ensureEmpty();
         {
             auto gw = getWriter(CollectionOptions(), bufferSize);
             auto writer = gw.get();
+
+            // Start with 0 dropped entries
+            ASSERT_EQ(0, writer->getDroppedEntries());
+
             // Don't let it flush the buffer while we're working.
             Lock::GlobalWrite lock(_opCtx.get());
             for (int i = 0; i < maxDocs; ++i) {
@@ -308,19 +316,21 @@ public:
                 if (bytesAdded + obj.objsize() > bufferSize) {
                     // Should return false when we exceed the buffer size.
                     ASSERT(!writer->insertDocument(obj));
-                    hitCap = true;
+                    ++nDropped;
                 } else {
                     ASSERT(writer->insertDocument(obj));
                     bytesAdded += obj.objsize();
                     ++nAdded;
                 }
+                // Check that the first dropped write (assuming a long
+                // interval) resets the internal counter by 1.
+                if (nDropped >= 1) {
+                    ASSERT_EQ(nDropped, 1 + writer->getDroppedEntries());
+                }
             }
-
-            // These documents should definitely exceed the buffer size.
-            ASSERT(hitCap);
         }
         // Make sure it didn't add any of the rejected documents.
-        ASSERT_EQ(readCollection().size(), (size_t)nAdded);
+        ASSERT_EQ(readCollection().size(), static_cast<size_t>(nAdded));
     }
 };
 
