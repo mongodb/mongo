@@ -52,4 +52,9 @@ assert.soon(function() {
         -1 != s.getDB(second).getCollectionNames().indexOf("two") &&
         s.getDB(second).two.findOne() && 1 == s.getDB(second).two.findOne().a;
 });
-assert.eq(-1, s.getDB(first).getCollectionNames().indexOf("one"));
+
+// Renaming a collection across databases is replicated as multiple operations so we have to wait
+// for source collection drop to be applied on the slave.
+assert.soon(function() {
+    return -1 == s.getDB(first).getCollectionNames().indexOf("one");
+});
