@@ -137,13 +137,15 @@ ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx)
     invariant(!opCtx->lockState()->isLocked());
     invariant(opCtx->getLogicalSessionId());
 
+    const auto& lsid = *opCtx->getLogicalSessionId();
+
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
-    auto sri = _getOrCreateSessionRuntimeInfo_inlock(opCtx, *opCtx->getLogicalSessionId(), ul);
+    auto sri = _getOrCreateSessionRuntimeInfo(opCtx, lsid, ul);
 
     // Wait until the session is no longer in use
     opCtx->waitForConditionOrInterrupt(
-        sri->availableCondVar, ul, [sri]() { return sri->state != SessionRuntimeInfo::kInUse; });
+        sri->availableCondVar, ul, [&sri]() { return sri->state != SessionRuntimeInfo::kInUse; });
 
     invariant(sri->state == SessionRuntimeInfo::kAvailable);
     sri->state = SessionRuntimeInfo::kInUse;
@@ -155,7 +157,7 @@ ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
                                                  const LogicalSessionId& lsid) {
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
-    return ScopedSession(_getOrCreateSessionRuntimeInfo_inlock(opCtx, lsid, ul));
+    return ScopedSession(_getOrCreateSessionRuntimeInfo(opCtx, lsid, ul));
 }
 
 void SessionCatalog::resetSessions() {
@@ -165,10 +167,8 @@ void SessionCatalog::resetSessions() {
     }
 }
 
-std::shared_ptr<SessionCatalog::SessionRuntimeInfo>
-SessionCatalog::_getOrCreateSessionRuntimeInfo_inlock(OperationContext* opCtx,
-                                                      const LogicalSessionId& lsid,
-                                                      stdx::unique_lock<stdx::mutex>& ul) {
+std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreateSessionRuntimeInfo(
+    OperationContext* opCtx, const LogicalSessionId& lsid, stdx::unique_lock<stdx::mutex>& ul) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     auto it = _txnTable.find(lsid);
