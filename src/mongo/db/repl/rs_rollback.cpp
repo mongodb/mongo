@@ -185,35 +185,6 @@ Status FixUpInfo::recordDropTargetInfo(const BSONElement& dropTarget,
     return Status::OK();
 }
 
-Status FixUpInfo::recordCrossDatabaseRenameRollbackInfo(const BSONElement& dropSource,
-                                                        const BSONObj& obj,
-                                                        const NamespaceString& nss,
-                                                        UUID uuid,
-                                                        OpTime opTime) {
-
-    StatusWith<UUID> uuidWithStatus = UUID::parse(dropSource);
-    if (!uuidWithStatus.isOK()) {
-        std::string message = str::stream()
-            << "Unable to roll back cross database renameCollection. Cannot parse "
-            << "dropSource UUID. Returned status: " << redact(uuidWithStatus.getStatus())
-            << ", oplog entry: " << redact(obj);
-        error() << message;
-        return uuidWithStatus.getStatus();
-    }
-    UUID dropSourceUUID = uuidWithStatus.getValue();
-
-    // If a cross-database rename has occurred, we record it as separate
-    // createCollection and dropCollection commands. First, we record the
-    // necessary information for the source collection to be un-dropped.
-    recordRollingBackDrop(nss, opTime, dropSourceUUID);
-
-    // Next, we need to drop the new collection that was created due to the rename.
-    // Dropping this collection will effectively drop all the documents inserted into
-    // the collection, rolling back the copy portion of the renameCollection command.
-    collectionsToDrop.insert(uuid);
-    return Status::OK();
-}
-
 Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo,
                                                              const BSONObj& ourObj) {
 
@@ -399,13 +370,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 //        to: "foo.y",
                 //        stayTemp: false,
                 //        dropTarget: BinData(...),
-                //        dropSource: BinData(...),
                 //   }
 
                 // dropTarget will be false if no collection is dropped during the rename.
-                // dropSource is only present during a cross-database rename, and contains
-                // the UUID of the collection that is being renamed over. The ui field will
-                // contain the UUID of the new collection that is created.
+                // The ui field will contain the UUID of the new collection that is created.
 
                 BSONObj cmd = obj;
 
@@ -427,16 +395,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                     if (!status.isOK()) {
                         return status;
                     }
-                }
-
-                // Checks if the renameCollection is a cross-database rename. If the dropSource
-                // field is present in the oplog entry then the renameCollection must be a
-                // cross-database rename. The field will be absent in renames in the same
-                // database.
-                auto dropSource = obj.getField("dropSource");
-                if (!dropSource.eoo()) {
-                    return fixUpInfo.recordCrossDatabaseRenameRollbackInfo(
-                        dropSource, obj, NamespaceString(ns), *uuid, oplogEntry.getOpTime());
                 }
 
                 RenameCollectionInfo info;

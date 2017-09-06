@@ -335,20 +335,6 @@ struct FixUpInfo {
      * and collectionsToRename by calling recordRollingBackDrop().
      */
     Status recordDropTargetInfo(const BSONElement& dropTarget, const BSONObj& obj, OpTime opTime);
-
-    /**
-     * This function handles adding the necessary information into the fixUpInfo struct to
-     * roll back cross database renames. We handle cross database renames differently from
-     * within database renames. We add the collection that was created during the renameCollection
-     * to collectionsToDrop, and add the source collection that was dropped into
-     * collectionsToRemoveFromDropPendingCollections and collectionsToRename by calling
-     * recordRollingBackDrop(). We handle the dropTarget in the rename in a separate step.
-     */
-    Status recordCrossDatabaseRenameRollbackInfo(const BSONElement& dropSource,
-                                                 const BSONObj& obj,
-                                                 const NamespaceString& nss,
-                                                 UUID uuid,
-                                                 OpTime opTime);
 };
 
 // Indicates that rollback cannot complete and the server must abort.
