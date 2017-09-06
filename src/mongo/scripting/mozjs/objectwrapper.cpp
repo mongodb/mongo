@@ -564,7 +564,12 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
             ids.infallibleAppend(rid);
         }
     } else {
-        JS::AutoIdArray rids(cx, JS_Enumerate(cx, thisv));
+        auto ridArrayPtr = JS_Enumerate(cx, thisv);
+        if (!ridArrayPtr) {
+            throwCurrentJSException(
+                cx, ErrorCodes::JSInterpreterFailure, "Failure to enumerate object");
+        }
+        JS::AutoIdArray rids(cx, ridArrayPtr);
 
         if (!ids.reserve(rids.length())) {
             throwCurrentJSException(
