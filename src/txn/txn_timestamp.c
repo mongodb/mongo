@@ -209,7 +209,12 @@ __txn_global_query_timestamp(
 			WT_ASSERT(session, !__wt_timestamp_iszero(&ts));
 		}
 		__wt_readunlock(session, &txn_global->commit_timestamp_rwlock);
-	} else if (WT_STRING_MATCH("oldest_reader", cval.str, cval.len)) {
+	} else if (WT_STRING_MATCH("oldest", cval.str, cval.len)) {
+		if (!txn_global->has_oldest_timestamp)
+			return (WT_NOTFOUND);
+		WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+		    __wt_timestamp_set(&ts, &txn_global->oldest_timestamp));
+	} else if (WT_STRING_MATCH("pinned", cval.str, cval.len)) {
 		if (!txn_global->has_oldest_timestamp)
 			return (WT_NOTFOUND);
 		__wt_readlock(session, &txn_global->rwlock);
@@ -279,7 +284,7 @@ __wt_txn_update_pinned_timestamp(WT_SESSION_IMPL *session)
 	WT_TXN_GLOBAL *txn_global;
 	wt_timestamp_t active_timestamp, oldest_timestamp, pinned_timestamp;
 	const char *query_cfg[] = { WT_CONFIG_BASE(session,
-	    WT_CONNECTION_query_timestamp), "get=oldest_reader", NULL };
+	    WT_CONNECTION_query_timestamp), "get=pinned", NULL };
 
 	txn_global = &S2C(session)->txn_global;
 
@@ -459,6 +464,57 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	return (0);
 }
 
+#ifdef HAVE_TIMESTAMPS
+/*
+ * __wt_timestamp_validate --
+ *	Validate a timestamp to be not older than the global oldest and/or
+ *	global stable and/or running transaction commit timestamp.
+ */
+int
+__wt_timestamp_validate(WT_SESSION_IMPL *session, wt_timestamp_t *ts,
+    WT_CONFIG_ITEM *cval, bool cmp_oldest, bool cmp_stable, bool cmp_commit)
+{
+	WT_TXN *txn = &session->txn;
+	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+	bool older_than_oldest_ts, older_than_stable_ts;
+
+	/*
+	 * Compare against the oldest and the stable timestamp. Return an error
+	 * if the given timestamp is older than oldest and/or stable timestamp.
+	 */
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    older_than_oldest_ts = (cmp_oldest &&
+		txn_global->has_oldest_timestamp &&
+		__wt_timestamp_cmp(ts, &txn_global->oldest_timestamp) < 0);
+	    older_than_stable_ts = (cmp_stable &&
+		txn_global->has_stable_timestamp &&
+		__wt_timestamp_cmp(ts, &txn_global->stable_timestamp) < 0));
+
+	if (older_than_oldest_ts)
+		WT_RET_MSG(session, EINVAL,
+		    "commit timestamp %.*s older than oldest timestamp",
+		    (int)cval->len, cval->str);
+	if (older_than_stable_ts)
+		WT_RET_MSG(session, EINVAL,
+		    "commit timestamp %.*s older than stable timestamp",
+		    (int)cval->len, cval->str);
+
+	/*
+	 * Compare against the commit timestamp of the current transaction.
+	 * Return an error if the given timestamp is older than the commit
+	 * timestamp.
+	 */
+	if (cmp_commit && F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
+	    __wt_timestamp_cmp(ts, &txn->commit_timestamp) < 0)
+		WT_RET_MSG(session, EINVAL,
+		    "commit timestamp %.*s older than the current "
+		    "commit timestamp set for this transaction",
+		    (int)cval->len, cval->str);
+
+	return (0);
+}
+#endif
+
 /*
  * __wt_txn_set_timestamp --
  *	Set a transaction's timestamp.
@@ -476,13 +532,16 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	if (ret == 0 && cval.len != 0) {
 #ifdef HAVE_TIMESTAMPS
 		WT_TXN *txn = &session->txn;
+		wt_timestamp_t ts;
 
 		if (!F_ISSET(txn, WT_TXN_RUNNING))
 			WT_RET_MSG(session, EINVAL,
 			    "Transaction must be running "
 			    "to set a commit_timestamp");
-		WT_RET(__wt_txn_parse_timestamp(
-		    session, "commit", &txn->commit_timestamp, &cval));
+		WT_RET(__wt_txn_parse_timestamp(session, "commit", &ts, &cval));
+		WT_RET(__wt_timestamp_validate(session,
+		    &ts, &cval, true, true, true));
+		__wt_timestamp_set(&txn->commit_timestamp, &ts);
 		__wt_txn_set_commit_timestamp(session);
 #else
 		WT_RET_MSG(session, ENOTSUP, "commit_timestamp requires a "

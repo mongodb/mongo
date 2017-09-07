@@ -63,7 +63,8 @@ static const char * const uri_collection = "table:collection";
 static const char * const stable_store = "table:stable";
 static const char * const ckpt_file = "checkpoint_done";
 static bool compat, inmem, use_ts;
-static uint64_t global_ts = 1;
+static volatile uint64_t global_ts = 1;
+static pthread_rwlock_t commit_ts_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 #define	MAX_TH		12
 #define	MAX_TIME	40
@@ -214,9 +215,17 @@ thread_run(void *arg)
 	 */
 	printf("Thread %" PRIu32 " starts at %" PRIu64 "\n", td->id, td->start);
 	for (i = td->start; ; ++i) {
-		if (use_ts)
-			stable_ts = global_ts++;
-		else
+		if (use_ts) {
+			/*
+			 * There can be multiple threads doing transactions
+			 * simultaneously requiring us to do some co-ordination
+			 * so that a thread doesn't try to commit with a
+			 * timestamp older than the oldest_timestamp just bumped
+			 * by another thread.
+			 */
+			testutil_check(pthread_rwlock_rdlock(&commit_ts_lock));
+			stable_ts = __wt_atomic_addv64(&global_ts, 1);
+		} else
 			stable_ts = 0;
 		testutil_check(__wt_snprintf(
 		    kname, sizeof(kname), "%" PRIu64, i));
@@ -253,6 +262,7 @@ thread_run(void *arg)
 			    "commit_timestamp=%" PRIx64, stable_ts));
 			testutil_check(
 			    session->commit_transaction(session, tscfg));
+			testutil_check(pthread_rwlock_unlock(&commit_ts_lock));
 		} else
 			testutil_check(
 			    session->commit_transaction(session, NULL));
@@ -277,6 +287,8 @@ thread_run(void *arg)
 				 * so that we don't need to maintain read
 				 * availability at older timestamps.
 				 */
+				testutil_check(
+				    pthread_rwlock_wrlock(&commit_ts_lock));
 				testutil_check(__wt_snprintf(
 				    tscfg, sizeof(tscfg),
 				    "oldest_timestamp=%" PRIx64
@@ -284,6 +296,8 @@ thread_run(void *arg)
 				    stable_ts, stable_ts));
 				testutil_check(
 				    td->conn->set_timestamp(td->conn, tscfg));
+				testutil_check(
+				    pthread_rwlock_unlock(&commit_ts_lock));
 			}
 			cur_stable->set_key(cur_stable, td->id);
 			cur_stable->set_value(cur_stable, stable_ts);

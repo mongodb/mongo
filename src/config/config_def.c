@@ -44,7 +44,8 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_open_session[] = {
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_query_timestamp[] = {
 	{ "get", "string",
-	    NULL, "choices=[\"all_committed\"]",
+	    NULL, "choices=[\"all_committed\",\"oldest\",\"pinned\","
+	    "\"stable\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };

@@ -137,6 +137,10 @@ typedef struct {
 
 	pthread_rwlock_t death_lock;		/* Single-thread failure */
 
+	/* Synchronize setting commit timestamp with oldest timestamp */
+	pthread_rwlock_t commit_ts_lock;
+	uint64_t oldest_ts;
+
 	char *uri;				/* Object name */
 
 	char *config_open;			/* Command-line configuration */

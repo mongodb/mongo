@@ -454,6 +454,13 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 	conn = g.wts_conn;
 
 	if (g.c_txn_timestamps) {
+		/*
+		 * There can be multiple threads doing transactions
+		 * simultaneously requiring us to do some co-ordination so that
+		 * a thread doesn't try to commit with a timestamp older than
+		 * the oldest_timestamp just bumped by another thread.
+		 */
+		testutil_check(pthread_rwlock_rdlock(&g.commit_ts_lock));
 		ts = __wt_atomic_addv64(&g.timestamp, 1);
 
 		/* Periodically bump the oldest timestamp. */
@@ -461,6 +468,27 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 			testutil_check(__wt_snprintf(
 			    config_buf, sizeof(config_buf),
 			    "oldest_timestamp=%" PRIx64, ts));
+			testutil_check(
+			    pthread_rwlock_unlock(&g.commit_ts_lock));
+			testutil_check(
+			    pthread_rwlock_wrlock(&g.commit_ts_lock));
+			if (g.oldest_ts >= ts) {
+				/*
+				 * This thread is too late to the party and is
+				 * trying to update the oldest_timestamp when
+				 * another thread has already updated it with a
+				 * more recent one. This would have been a no-op
+				 * but committing with this timestamp isn't
+				 * allowed anymore. Let's call commit without a
+				 * timestamp and then bail out.
+				 */
+				testutil_check(pthread_rwlock_unlock(
+				    &g.commit_ts_lock));
+				testutil_check(session->commit_transaction(
+				    session, NULL));
+				return;
+			}
+			g.oldest_ts = ts;
 			testutil_check(conn->set_timestamp(conn, config_buf));
 		}
 
@@ -472,6 +500,7 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 		commit_conf = NULL;
 
 	testutil_check(session->commit_transaction(session, commit_conf));
+	testutil_check(pthread_rwlock_unlock(&g.commit_ts_lock));
 	++tinfo->commit;
 }
 

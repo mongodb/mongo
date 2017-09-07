@@ -94,10 +94,5 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
                 'commit_timestamp=' + timestamp_str(1)),
                 '/requires a version of WiredTiger built with timestamp support/')
 
-        # calling for a checkpoint with use_timestamp should fail
-        # self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-        #     lambda: self.session.checkpoint('use_timestamp=true'),
-        #         '/requires a version of WiredTiger built with timestamp support/')
-
 if __name__ == '__main__':
     wttest.run()
