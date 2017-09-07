@@ -51,8 +51,19 @@ class TestSuiteExecutor(object):
 
         self._suite = suite
 
+        # Only start as many jobs as we need. Note this means that the number of jobs we run may not
+        # actually be _config.JOBS.
+        jobs_to_start = _config.JOBS
+        num_tests = len(suite.tests)
+
+        if num_tests < jobs_to_start:
+            self.logger.info("Reducing the number of jobs from %d to %d since there are only %d "
+                             "test(s) to run.",
+                _config.JOBS, num_tests, num_tests)
+            jobs_to_start = num_tests
+
         # Must be done after getting buildlogger configuration.
-        self._jobs = [self._make_job(job_num) for job_num in xrange(_config.JOBS)]
+        self._jobs = [self._make_job(job_num) for job_num in xrange(jobs_to_start)]
 
     def run(self):
         """
@@ -272,7 +283,7 @@ class TestSuiteExecutor(object):
             queue.put(test_case)
 
         # Add sentinel value for each job to indicate when there are no more items to process.
-        for _ in xrange(_config.JOBS):
+        for _ in xrange(len(self._jobs)):
             queue.put(None)
 
         return queue
