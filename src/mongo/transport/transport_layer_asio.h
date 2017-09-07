@@ -123,17 +123,35 @@ private:
     using ConstASIOSessionHandle = std::shared_ptr<const ASIOSession>;
     using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
 
-    ASIOSessionHandle createSession();
     void _acceptConnection(GenericAcceptor& acceptor);
 
     stdx::mutex _mutex;
 
+    // There are two IO contexts that are used by TransportLayerASIO. The _workerIOContext
+    // contains all the accepted sockets and all normal networking activity. The
+    // _acceptorIOContext contains all the sockets in _acceptors.
+    //
+    // TransportLayerASIO should never call run() on the _workerIOContext.
+    // In synchronous mode, this will cause a massive performance degradation due to
+    // unnecessary wakeups on the asio thread for sockets we don't intend to interact
+    // with asynchronously. The additional IO context avoids registering those sockets
+    // with the acceptors epoll set, thus avoiding those wakeups.  Calling run will
+    // undo that benefit.
+    //
+    // TransportLayerASIO should run its own thread that calls run() on the _acceptorIOContext
+    // to process calls to async_accept - this is the equivalent of the "listener" thread in
+    // other TransportLayers.
+    //
+    // The underlying problem that caused this is here:
+    // https://github.com/chriskohlhoff/asio/issues/240
+    //
     // It is important that the io_context be declared before the
     // vector of acceptors (or any other state that is associated with
     // the io_context), so that we destroy any existing acceptors or
     // other io_service associated state before we drop the refcount
     // on the io_context, which may destroy it.
-    std::shared_ptr<asio::io_context> _ioContext;
+    std::shared_ptr<asio::io_context> _workerIOContext;
+    std::unique_ptr<asio::io_context> _acceptorIOContext;
 
 #ifdef MONGO_CONFIG_SSL
     std::unique_ptr<asio::ssl::context> _sslContext;
