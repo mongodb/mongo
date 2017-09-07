@@ -503,13 +503,17 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_OP *op;
 	u_int i;
-	bool did_update;
+	bool did_update, locked;
 
 	txn = &session->txn;
 	conn = S2C(session);
+	txn_global = &conn->txn_global;
 	did_update = txn->mod_count != 0;
+	locked = false;
+
 	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || !did_update);
 
 	if (!F_ISSET(txn, WT_TXN_RUNNING))
@@ -580,6 +584,14 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		 * This is particularly important for checkpoints.
 		 */
 		__wt_txn_release_snapshot(session);
+		/*
+		 * We hold the visibility lock for reading from the time
+		 * we write our log record until the time we release our
+		 * transaction so that the LSN any checkpoint gets will
+		 * always reflect visible data.
+		 */
+		__wt_readlock(session, &txn_global->visibility_rwlock);
+		locked = true;
 		ret = __wt_txn_log_commit(session, cfg);
 	}
 
@@ -590,6 +602,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Nothing can fail after this point.
 	 */
 	if (ret != 0) {
+		if (locked)
+			__wt_readunlock(session,
+			    &txn_global->visibility_rwlock);
 		WT_TRET(__wt_txn_rollback(session, cfg));
 		return (ret);
 	}
@@ -600,6 +615,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->mod_count = 0;
 
 	__wt_txn_release(session);
+	if (locked)
+		__wt_readunlock(session, &txn_global->visibility_rwlock);
 	return (0);
 }
 
@@ -770,6 +787,7 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	    &txn_global->id_lock, "transaction id lock"));
 	WT_RET(__wt_rwlock_init(session, &txn_global->scan_rwlock));
 	WT_RET(__wt_rwlock_init(session, &txn_global->nsnap_rwlock));
+	WT_RET(__wt_rwlock_init(session, &txn_global->visibility_rwlock));
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
 	TAILQ_INIT(&txn_global->nsnaph);
 
@@ -801,6 +819,7 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &txn_global->id_lock);
 	__wt_rwlock_destroy(session, &txn_global->scan_rwlock);
 	__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock);
+	__wt_rwlock_destroy(session, &txn_global->visibility_rwlock);
 	__wt_free(session, txn_global->states);
 }
 

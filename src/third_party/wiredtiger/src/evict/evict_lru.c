@@ -941,6 +941,13 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
+	/*
+	 * If we have a fixed number of eviction threads, there is no value in
+	 * calculating if we should do any tuning.
+	 */
+       if (conn->evict_threads_max == conn->evict_threads_min)
+		return (0);
+
 	WT_ASSERT(session, conn->evict_threads.threads[0]->session == session);
 	pgs_evicted_cur = pgs_evicted_persec_cur = 0;
 
@@ -1640,26 +1647,16 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	    QUEUE_FILLS_PER_PASS;
 
 	/*
-	 * Randomly walk trees with a small fraction of the cache in case there
-	 * are so many trees that none of them use enough of the cache to be
-	 * allocated slots.
-	 *
-	 * The chance of walking a tree is equal to the chance that a random
-	 * byte in cache belongs to the tree, weighted by how many times we
-	 * want to fill queues during a pass through all the trees in cache.
+	 * Walk trees with a small fraction of the cache in case there are so
+	 * many trees that none of them use enough of the cache to be allocated
+	 * slots.  Only skip a tree if it has no bytes of interest.
 	 */
 	if (target_pages == 0) {
-		if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN)) {
-			btree_inuse = __wt_btree_bytes_evictable(session);
-			cache_inuse = __wt_cache_bytes_inuse(cache);
-		} else {
-			btree_inuse = __wt_btree_dirty_leaf_inuse(session);
-			cache_inuse = __wt_cache_dirty_leaf_inuse(cache);
-		}
-		if (btree_inuse == 0 || cache_inuse == 0)
-			return (0);
-		if (__wt_random64(&session->rnd) % cache_inuse >
-		    btree_inuse * QUEUE_FILLS_PER_PASS)
+		btree_inuse = F_ISSET(cache, WT_CACHE_EVICT_CLEAN) ?
+		    __wt_btree_bytes_evictable(session) :
+		    __wt_btree_dirty_leaf_inuse(session);
+
+		if (btree_inuse == 0)
 			return (0);
 	}
 
