@@ -74,6 +74,10 @@ public:
         // Threads that spend less than this threshold doing work during their workerThreadRunTime
         // period will exit
         virtual int idlePctThreshold() const = 0;
+
+        // The maximum allowable depth of recursion for tasks scheduled with the MayRecurse flag
+        // before stack unwinding is forced.
+        virtual int recursionLimit() const = 0;
     };
 
     explicit ServiceExecutorAdaptive(ServiceContext* ctx, std::shared_ptr<asio::io_context> ioCtx);
@@ -129,8 +133,6 @@ private:
 
         TickSource::Tick markStopped() {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
-            if (--_recurseDepth > 0)
-                return _timer.sinceStartTicks();
             invariant(_running);
             _running = false;
             auto curTime = _timer.sinceStartTicks();
@@ -140,8 +142,6 @@ private:
 
         void markRunning() {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
-            if (_recurseDepth++ > 0)
-                return;
             invariant(!_running);
             _timer.reset();
             _running = true;
@@ -159,14 +159,15 @@ private:
         mutable stdx::mutex _mutex;
         TickSource::Tick _accumulator = 0;
         bool _running = false;
-        int _recurseDepth = 0;
     };
 
     struct ThreadState {
         ThreadState(TickSource* ts) : running(ts), executing(ts) {}
+
         CumulativeTickTimer running;
         TickSource::Tick executingCurRun;
         CumulativeTickTimer executing;
+        int recursionDepth = 0;
         stdx::thread thread;
     };
 
@@ -175,7 +176,7 @@ private:
     void _startWorkerThread();
     void _workerThreadRoutine(int threadId, ThreadList::iterator it);
     void _controllerThreadRoutine();
-    bool _isStarved(int pending = -1) const;
+    bool _isStarved() const;
     Milliseconds _getThreadJitter() const;
 
     enum class ThreadTimer { Running, Executing };
@@ -197,6 +198,7 @@ private:
     AtomicWord<int> _threadsPending{0};
     AtomicWord<int> _tasksExecuting{0};
     AtomicWord<int> _tasksQueued{0};
+    AtomicWord<int> _deferredTasksQueued{0};
     TickTimer _lastScheduleTimer;
     AtomicWord<TickSource::Tick> _pastThreadsSpentExecuting{0};
     AtomicWord<TickSource::Tick> _pastThreadsSpentRunning{0};
@@ -205,7 +207,7 @@ private:
     // These counters are only used for reporting in serverStatus.
     AtomicWord<int64_t> _totalQueued{0};
     AtomicWord<int64_t> _totalExecuted{0};
-    AtomicWord<TickSource::Tick> _totalSpentScheduled{0};
+    AtomicWord<TickSource::Tick> _totalSpentQueued{0};
 
     // Threads signal this condition variable when they exit so we can gracefully shutdown
     // the executor.

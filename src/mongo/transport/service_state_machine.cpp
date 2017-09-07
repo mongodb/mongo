@@ -208,7 +208,7 @@ void ServiceStateMachine::_sourceCallback(Status status) {
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
         return _scheduleFunc([this, status] { _sourceCallback(status); },
-                             ServiceExecutor::DeferredTask);
+                             ServiceExecutor::kDeferredTask);
     }
 
     // Make sure we just called sourceMessage();
@@ -225,8 +225,7 @@ void ServiceStateMachine::_sourceCallback(Status status) {
         // If this callback doesn't own the ThreadGuard, then we're being called recursively,
         // and the executor shouldn't start a new thread to process the message - it can use this
         // one just after this returns.
-        auto flags = guard.isOwner() ? ServiceExecutor::EmptyFlags : ServiceExecutor::DeferredTask;
-        return scheduleNext(flags);
+        return scheduleNext(ServiceExecutor::kMayRecurse);
     } else if (ErrorCodes::isInterruption(status.code()) ||
                ErrorCodes::isNetworkError(status.code())) {
         LOG(2) << "Session from " << remote << " encountered a network error during SourceMessage";
@@ -255,7 +254,7 @@ void ServiceStateMachine::_sinkCallback(Status status) {
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
         return _scheduleFunc([this, status] { _sinkCallback(status); },
-                             ServiceExecutor::DeferredTask);
+                             ServiceExecutor::kDeferredTask);
     }
 
     invariant(state() == State::SinkWait);
@@ -276,16 +275,7 @@ void ServiceStateMachine::_sinkCallback(Status status) {
         _state.store(State::Source);
     }
 
-    // If the session ended, then runNext to clean it up
-    if (state() == State::EndSession) {
-        _runNextInGuard(guard);
-    } else {  // Otherwise scheduleNext to unwind the stack and run the next step later
-        // If this callback doesn't own the ThreadGuard, then we're being called recursively,
-        // and the executor shouldn't start a new thread to process the message - it can use this
-        // one just after this returns.
-        auto flags = guard.isOwner() ? ServiceExecutor::EmptyFlags : ServiceExecutor::DeferredTask;
-        return scheduleNext(flags);
-    }
+    return scheduleNext(ServiceExecutor::kDeferredTask);
 }
 
 void ServiceStateMachine::_processMessage(ThreadGuard& guard) {
@@ -356,7 +346,7 @@ void ServiceStateMachine::_processMessage(ThreadGuard& guard) {
     } else {
         _state.store(State::Source);
         _inMessage.reset();
-        return scheduleNext(ServiceExecutor::DeferredTask);
+        return scheduleNext(ServiceExecutor::kDeferredTask);
     }
 }
 
@@ -368,7 +358,7 @@ void ServiceStateMachine::runNext() {
     // runNext() so that this thread can do other useful work with its timeslice instead of going
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
-        return scheduleNext(ServiceExecutor::DeferredTask);
+        return scheduleNext(ServiceExecutor::kDeferredTask);
     }
     return _runNextInGuard(guard);
 }
@@ -400,8 +390,8 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard& guard) {
                 } else {
                     _session()->getTransportLayer()->asyncWait(
                         std::move(ticket), [this](Status status) { _sourceCallback(status); });
-                    break;
                 }
+                break;
             }
             case State::Process:
                 _processMessage(guard);

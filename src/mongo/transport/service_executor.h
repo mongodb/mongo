@@ -46,8 +46,15 @@ public:
     virtual ~ServiceExecutor() = default;
     using Task = stdx::function<void()>;
     enum ScheduleFlags {
-        EmptyFlags = 0,
-        DeferredTask = 1,
+        // No flags (kEmptyFlags) specifies that this is a normal task and that the executor should
+        // launch new threads as needed to run the task.
+        kEmptyFlags = 1 << 0,
+
+        // Deferred tasks will never get a new thread launched to run them.
+        kDeferredTask = 1 << 1,
+
+        // MayRecurse indicates that a task may be run recursively.
+        kMayRecurse = 1 << 2,
     };
 
     /*

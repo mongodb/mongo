@@ -108,7 +108,7 @@ public:
      * guaranteed that runNext() will run after this returns.
      */
     void scheduleNext(
-        transport::ServiceExecutor::ScheduleFlags flags = transport::ServiceExecutor::EmptyFlags);
+        transport::ServiceExecutor::ScheduleFlags flags = transport::ServiceExecutor::kEmptyFlags);
 
     /*
      * Gets the current state of connection for testing/diagnostic purposes.
