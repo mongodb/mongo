@@ -45,6 +45,12 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     if "shardsvr" in kwargs and "orphanCleanupDelaySecs" not in suite_set_parameters:
         suite_set_parameters["orphanCleanupDelaySecs"] = 0
 
+    # The LogicalSessionCache does automatic background refreshes in the server. This is
+    # race-y for tests, since tests trigger their own immediate refreshes instead. Turn off
+    # background refreshing for tests. Set in the .yml file to override this.
+    if "disableLogicalSessionCacheRefresh" not in suite_set_parameters:
+        suite_set_parameters["disableLogicalSessionCacheRefresh"] = True
+
     _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {

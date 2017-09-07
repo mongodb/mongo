@@ -53,6 +53,8 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(
     int,
     LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh.count());
 
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(disableLogicalSessionCacheRefresh, bool, false);
+
 constexpr int LogicalSessionCacheImpl::kLogicalSessionCacheDefaultCapacity;
 constexpr Minutes LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
 
@@ -64,9 +66,11 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(std::unique_ptr<ServiceLiason> 
       _service(std::move(service)),
       _sessionsColl(std::move(collection)),
       _cache(options.capacity) {
-    PeriodicRunner::PeriodicJob job{[this](Client* client) { _periodicRefresh(client); },
-                                    duration_cast<Milliseconds>(_refreshInterval)};
-    _service->scheduleJob(std::move(job));
+    if (!disableLogicalSessionCacheRefresh) {
+        PeriodicRunner::PeriodicJob job{[this](Client* client) { _periodicRefresh(client); },
+                                        duration_cast<Milliseconds>(_refreshInterval)};
+        _service->scheduleJob(std::move(job));
+    }
 }
 
 LogicalSessionCacheImpl::~LogicalSessionCacheImpl() {

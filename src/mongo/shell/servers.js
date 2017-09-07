@@ -1055,12 +1055,17 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 argArray.push(...['--setParameter', "enableLocalhostAuthBypass=false"]);
             }
 
-            if (jsTest.options().serviceExecutor &&
-                (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
-                                     parseInt(programVersion.split(".")[1]) >= 5))) {
-                if (!argArrayContains("--serviceExecutor")) {
-                    argArray.push(...["--serviceExecutor", jsTest.options().serviceExecutor]);
+            // New options in 3.5.x
+            if (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
+                                    parseInt(programVersion.split(".")[1]) >= 5)) {
+                if (jsTest.options().serviceExecutor) {
+                    if (!argArrayContains("--serviceExecutor")) {
+                        argArray.push(...["--serviceExecutor", jsTest.options().serviceExecutor]);
+                    }
                 }
+
+                // Disable background cache refreshing to avoid races in tests
+                argArray.push(...['--setParameter', "disableLogicalSessionCacheRefresh=true"]);
             }
 
             // Since options may not be backward compatible, mongos options are not
