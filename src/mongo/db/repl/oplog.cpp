@@ -296,31 +296,29 @@ Collection* getLocalOplogCollection(OperationContext* opCtx,
 void appendSessionInfo(OperationContext* opCtx,
                        BSONObjBuilder* builder,
                        StmtId statementId,
-                       const Timestamp& prevTs) {
-    auto txnNum = opCtx->getTxnNumber();
-
-    if (!txnNum) {
+                       const OperationSessionInfo& sessionInfo,
+                       const OplogLink& oplogLink) {
+    if (!sessionInfo.getTxnNumber()) {
         return;
     }
-
-    auto logicalSessionId = opCtx->getLogicalSessionId();
-    invariant(logicalSessionId);
 
     // Note: certain operations, like implicit collection creation will not have a stmtId.
     if (statementId == kUninitializedStmtId) {
         return;
     }
 
-    OperationSessionInfo sessionInfo;
-    sessionInfo.setSessionId(*logicalSessionId);
-    sessionInfo.setTxnNumber(txnNum);
     sessionInfo.serialize(builder);
 
     builder->append(OplogEntryBase::kStatementIdFieldName, statementId);
+    builder->append(OplogEntryBase::kPrevWriteTsInTransactionFieldName, oplogLink.prevTs);
 
-    auto session = OperationContextSession::get(opCtx);
-    invariant(session);
-    builder->append(OplogEntryBase::kPrevWriteTsInTransactionFieldName, prevTs);
+    if (!oplogLink.preImageTs.isNull()) {
+        builder->append(OplogEntryBase::kPreImageTsFieldName, oplogLink.preImageTs);
+    }
+
+    if (!oplogLink.postImageTs.isNull()) {
+        builder->append(OplogEntryBase::kPostImageTsFieldName, oplogLink.postImageTs);
+    }
 }
 
 OplogDocWriter _logOpWriter(OperationContext* opCtx,
@@ -333,9 +331,9 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             OpTime optime,
                             long long hashNew,
                             Date_t wallTime,
+                            const OperationSessionInfo& sessionInfo,
                             StmtId statementId,
-                            const Timestamp& prevTs,
-                            const PreAndPostImageTimestamps& preAndPostTs) {
+                            const OplogLink& oplogLink) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -360,15 +358,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
         b.appendDate("wall", wallTime);
     }
 
-    appendSessionInfo(opCtx, &b, statementId, prevTs);
-
-    if (!preAndPostTs.preImageTs.isNull()) {
-        b.append(OplogEntryBase::kPreImageTsFieldName, preAndPostTs.preImageTs);
-    }
-
-    if (!preAndPostTs.postImageTs.isNull()) {
-        b.append(OplogEntryBase::kPostImageTsFieldName, preAndPostTs.postImageTs);
-    }
+    appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
@@ -430,8 +420,9 @@ OpTime logOp(OperationContext* opCtx,
              const BSONObj& obj,
              const BSONObj* o2,
              bool fromMigrate,
+             const OperationSessionInfo& sessionInfo,
              StmtId statementId,
-             const PreAndPostImageTimestamps& preAndPostTs) {
+             const OplogLink& oplogLink) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
         invariant(statementId == kUninitializedStmtId);
@@ -447,11 +438,6 @@ OpTime logOp(OperationContext* opCtx,
     WriteUnitOfWork wuow(opCtx);
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
 
-    Timestamp prevTs;
-    if (opCtx->getTxnNumber()) {
-        prevTs = OperationContextSession::get(opCtx)->getLastWriteOpTimeTs();
-    }
-
     auto writer = _logOpWriter(opCtx,
                                opstr,
                                nss,
@@ -462,9 +448,9 @@ OpTime logOp(OperationContext* opCtx,
                                slot.opTime,
                                slot.hash,
                                Date_t::now(),
+                               sessionInfo,
                                statementId,
-                               prevTs,
-                               preAndPostTs);
+                               oplogLink);
     const DocWriter* basePtr = &writer;
     auto timestamp = slot.opTime.getTimestamp();
     _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, replMode, slot.opTime);
@@ -475,6 +461,7 @@ OpTime logOp(OperationContext* opCtx,
 repl::OpTime logInsertOps(OperationContext* opCtx,
                           const NamespaceString& nss,
                           OptionalCollectionUUID uuid,
+                          Session* session,
                           std::vector<InsertStatement>::const_iterator begin,
                           std::vector<InsertStatement>::const_iterator end,
                           bool fromMigrate) {
@@ -499,9 +486,13 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
     getNextOpTime(opCtx, oplog, replCoord, replMode, count, slots.get());
     auto wallTime = Date_t::now();
 
-    Timestamp prevTs;
-    if (opCtx->getTxnNumber()) {
-        prevTs = OperationContextSession::get(opCtx)->getLastWriteOpTimeTs();
+    OplogLink oplogLink;
+    OperationSessionInfo sessionInfo;
+
+    if (session) {
+        oplogLink.prevTs = session->getLastWriteOpTimeTs();
+        sessionInfo.setSessionId(session->getSessionId());
+        sessionInfo.setTxnNumber(session->getTxnNum());
     }
 
     auto timestamps = stdx::make_unique<Timestamp[]>(count);
@@ -517,10 +508,10 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
                                           slots[i].opTime,
                                           slots[i].hash,
                                           wallTime,
+                                          sessionInfo,
                                           insertStatement.stmtId,
-                                          prevTs,
-                                          {}));
-        prevTs = slots[i].opTime.getTimestamp();
+                                          oplogLink));
+        oplogLink.prevTs = slots[i].opTime.getTimestamp();
         timestamps[i] = slots[i].opTime.getTimestamp();
     }
 

@@ -45,15 +45,16 @@ class Collection;
 class Database;
 class NamespaceString;
 class OperationContext;
+class OperationSessionInfo;
+class Session;
 
 namespace repl {
 class ReplSettings;
 
-struct PreAndPostImageTimestamps {
-    PreAndPostImageTimestamps() = default;
-    PreAndPostImageTimestamps(Timestamp _preImageTs, Timestamp _postImageTs)
-        : preImageTs(std::move(_preImageTs)), postImageTs(std::move(_postImageTs)) {}
+struct OplogLink {
+    OplogLink() = default;
 
+    Timestamp prevTs;
     Timestamp preImageTs;
     Timestamp postImageTs;
 };
@@ -82,6 +83,7 @@ extern int OPLOG_VERSION;
 OpTime logInsertOps(OperationContext* opCtx,
                     const NamespaceString& nss,
                     OptionalCollectionUUID uuid,
+                    Session* session,
                     std::vector<InsertStatement>::const_iterator begin,
                     std::vector<InsertStatement>::const_iterator end,
                     bool fromMigrate);
@@ -98,7 +100,8 @@ OpTime logInsertOps(OperationContext* opCtx,
  * For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
  *
- * preAndPostImageTs this contains the timestamp of the oplog entry that contains the document
+ * oplogLink this contains the timestamp that points to the previous write that will be
+ *   linked via prevTs, and the timestamps of the oplog entry that contains the document
  *   before/after update was applied. The timestamps are ignored if isNull() is true.
  *
  * Returns the optime of the oplog entry written to the oplog.
@@ -111,8 +114,9 @@ OpTime logOp(OperationContext* opCtx,
              const BSONObj& obj,
              const BSONObj* o2,
              bool fromMigrate,
+             const OperationSessionInfo& sessionInfo,
              StmtId stmtId,
-             const PreAndPostImageTimestamps& preAndPostTs);
+             const OplogLink& oplogLink);
 
 // Flush out the cached pointers to the local database and oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.

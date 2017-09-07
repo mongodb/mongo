@@ -100,7 +100,8 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
     {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opTime = logOp(opCtx.get(), "n", nss, {}, msgObj, nullptr, false, kUninitializedStmtId, {});
+        opTime =
+            logOp(opCtx.get(), "n", nss, {}, msgObj, nullptr, false, {}, kUninitializedStmtId, {});
         ASSERT_FALSE(opTime.isNull());
         wunit.commit();
     }
@@ -204,7 +205,7 @@ void _testConcurrentLogOp(const MakeTaskFunction& makeTaskFunction,
  */
 OpTime _logOpNoopWithMsg(OperationContext* opCtx, const NamespaceString& nss) {
     const auto msgObj = BSON("msg" << nss.ns());
-    auto opTime = logOp(opCtx, "n", nss, {}, msgObj, nullptr, false, kUninitializedStmtId, {});
+    auto opTime = logOp(opCtx, "n", nss, {}, msgObj, nullptr, false, {}, kUninitializedStmtId, {});
     ASSERT_FALSE(opTime.isNull());
     return opTime;
 }

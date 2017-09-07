@@ -462,15 +462,8 @@ private:
         return writeConflictRetry(
             opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace.ns(), [&] {
                 WriteUnitOfWork uow(opCtx);
-                repl::OpTime result = repl::logOp(opCtx,
-                                                  "c",
-                                                  nss,
-                                                  uuid,
-                                                  obj,
-                                                  nullptr,
-                                                  false,
-                                                  kUninitializedStmtId,
-                                                  repl::PreAndPostImageTimestamps());
+                repl::OpTime result = repl::logOp(
+                    opCtx, "c", nss, uuid, obj, nullptr, false, {}, kUninitializedStmtId, {});
                 uow.commit();
                 return result;
             });
