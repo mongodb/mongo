@@ -72,6 +72,19 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
+    size_t numChildren() const final {
+        return 1;
+    }
+
+    MatchExpression* getChild(size_t i) const final {
+        invariant(i == 0);
+        return _query.get();
+    }
+
 private:
     long long _index;
     std::unique_ptr<MatchExpression> _query;

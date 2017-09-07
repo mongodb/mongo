@@ -31,6 +31,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -114,5 +115,29 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, EquivalentToClone) {
     ASSERT_OK(expr.getStatus());
     clone = expr.getValue()->shallowClone();
     ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));
+}
+
+TEST(InternalSchemaAllowedPropertiesMatchExpression, HasCorrectNumberOfChilden) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: ['a'], namePlaceholder: 'i',"
+        "patternProperties: [{regex: /a/, expression: {i: 1}}], otherwise: {i: 7}}}");
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    ASSERT_EQ(objMatch.getValue()->numChildren(), 2U);
+    ASSERT(objMatch.getValue()->getChild(0));
+}
+
+DEATH_TEST(InternalSchemaAllowedPropertiesMatchExpression,
+           GetChildFailsOnIndexLargerThanChildSet,
+           "i < numChildren()") {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: ['a'], namePlaceholder: 'i',"
+        "patternProperties: [{regex: /a/, expression: {i: 1}}], otherwise: {i: 7}}}");
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    const size_t numChildren = 2;
+    objMatch.getValue()->getChild(numChildren);
 }
 }  // namespace mongo

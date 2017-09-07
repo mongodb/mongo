@@ -49,6 +49,18 @@ public:
         return setPath(path);
     }
 
+    size_t numChildren() const final {
+        return 0;
+    }
+
+    MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
     bool matchesArray(const BSONObj& array, MatchDetails*) const final {
         auto set = _comparator.makeBSONEltSet();
         for (auto&& elem : array) {

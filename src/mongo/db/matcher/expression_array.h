@@ -90,6 +90,10 @@ public:
 
     virtual void serialize(BSONObjBuilder* out) const;
 
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
     virtual size_t numChildren() const {
         return 1;
     }
@@ -168,6 +172,18 @@ public:
             e->setTag(getTag()->clone());
         }
         return std::move(e);
+    }
+
+    size_t numChildren() const override {
+        return 0;
+    }
+
+    MatchExpression* getChild(size_t i) const override {
+        return nullptr;
+    }
+
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
     }
 
     virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;

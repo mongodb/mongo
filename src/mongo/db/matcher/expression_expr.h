@@ -70,6 +70,18 @@ public:
         return MatchCategory::kOther;
     }
 
+    size_t numChildren() const final {
+        return 0;
+    }
+
+    MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
 private:
     void _doAddDependencies(DepsTracker* deps) const final {
         if (_expression) {

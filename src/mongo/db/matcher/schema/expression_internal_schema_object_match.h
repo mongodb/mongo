@@ -53,6 +53,15 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
+    size_t numChildren() const final {
+        invariant(_sub);
+        return 1;
+    }
+
     MatchExpression* getChild(size_t i) const final {
         // 'i' must be 0 since there's always exactly one child.
         invariant(i == 0);

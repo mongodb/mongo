@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -193,6 +194,31 @@ TEST(InternalSchemaObjectMatchExpression, RejectsArraysContainingMatchingSubObje
     ASSERT_TRUE(objMatch.getValue()->matchesBSON(fromjson("{a: {b: 1}}")));
     ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: [{b: 1}]}")));
     ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: [{b: 1}, {b: 2}]}")));
+}
+
+TEST(InternalSchemaObjectMatchExpression, HasSingleChild) {
+    auto query = fromjson(
+        "    {a: {$_internalSchemaObjectMatch: {"
+        "        c: {$eq: 3}"
+        "    }}}");
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    ASSERT_EQ(objMatch.getValue()->numChildren(), 1U);
+    ASSERT(objMatch.getValue()->getChild(0));
+}
+
+DEATH_TEST(InternalSchemaObjectMatchExpression,
+           GetChildFailsIndexGreaterThanZero,
+           "Invariant failure i == 0") {
+    auto query = fromjson(
+        "    {a: {$_internalSchemaObjectMatch: {"
+        "        c: {$eq: 3}"
+        "    }}}");
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    objMatch.getValue()->getChild(1);
 }
 
 }  // namespace

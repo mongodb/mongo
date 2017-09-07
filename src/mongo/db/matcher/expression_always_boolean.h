@@ -69,6 +69,18 @@ public:
         return MatchCategory::kOther;
     }
 
+    size_t numChildren() const override {
+        return 0;
+    }
+
+    MatchExpression* getChild(size_t i) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::vector<MatchExpression*>* getChildVector() override {
+        return nullptr;
+    }
+
 private:
     bool _value;
 };

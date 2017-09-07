@@ -44,9 +44,17 @@ public:
 
     WhereMatchExpressionBase(WhereParams params);
 
-    //
-    // Methods inherited from MatchExpression.
-    //
+    size_t numChildren() const final {
+        return 0;
+    }
+
+    MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
         return false;

@@ -133,30 +133,24 @@ public:
     }
 
     /**
-     * How many children does the node have?  Most nodes are leaves so the default impl. is for
-     * a leaf.
+     * Returns the number of child MatchExpression nodes contained by this node. It is expected that
+     * a node that does not support child nodes will return 0.
      */
-    virtual size_t numChildren() const {
-        return 0;
-    }
+    virtual size_t numChildren() const = 0;
 
     /**
-     * Get the i-th child.
+     * Returns the child of the current node at zero-based position 'index'. 'index' must be within
+     * the range of [0, numChildren()).
      */
-    virtual MatchExpression* getChild(size_t i) const {
-        return NULL;
-    }
+    virtual MatchExpression* getChild(size_t index) const = 0;
 
     /**
-     * Returns the underlying vector storing the children of a logical node. Note that this is not
-     * guaranteed to return all children. It can be used to modify the children of logical nodes
-     * like AND/OR, but it cannot be used to traverse the MatchExpression tree. Traversing the
-     * MatchExpression tree should instead be achieved using numChildren() and getChild(), which are
-     * guaranteed to be accurate.
+     * For MatchExpression nodes that can participate in tree restructuring (like AND/OR), returns a
+     * non-const vector of MatchExpression* child nodes.
+     * Do not use to traverse the MatchExpression tree. Use numChildren() and getChild(), which
+     * provide access to all nodes.
      */
-    virtual std::vector<MatchExpression*>* getChildVector() {
-        return NULL;
-    }
+    virtual std::vector<MatchExpression*>* getChildVector() = 0;
 
     /**
      * Get the path of the leaf.  Returns StringData() if there is no path (node is logical).
@@ -232,7 +226,7 @@ public:
         return _tagData.get();
     }
     virtual void resetTag() {
-        setTag(NULL);
+        setTag(nullptr);
         for (size_t i = 0; i < numChildren(); ++i) {
             getChild(i)->resetTag();
         }

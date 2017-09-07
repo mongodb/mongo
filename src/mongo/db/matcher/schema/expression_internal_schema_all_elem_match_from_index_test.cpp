@@ -32,6 +32,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -90,6 +91,25 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchedQueriesWithDotte
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(
         expr.getValue()->matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2 << 3 << 4)))));
+}
+
+TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, HasSingleChild) {
+    auto query = fromjson("{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    ASSERT_EQ(objMatch.getValue()->numChildren(), 1U);
+    ASSERT(objMatch.getValue()->getChild(0));
+}
+
+DEATH_TEST(InternalSchemaAllElemMatchFromIndexMatchExpression,
+           GetChildFailsIndexGreaterThanOne,
+           "Invariant failure i == 0") {
+    auto query = fromjson("{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    objMatch.getValue()->getChild(1);
 }
 
 }  // namespace

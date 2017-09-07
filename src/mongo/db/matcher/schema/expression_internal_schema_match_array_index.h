@@ -75,6 +75,19 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
+    size_t numChildren() const final {
+        return 1;
+    }
+
+    MatchExpression* getChild(size_t i) const final {
+        invariant(i == 0);
+        return _expression->getFilter();
+    }
+
 private:
     long long _index = 0;
     std::unique_ptr<ExpressionWithPlaceholder> _expression;

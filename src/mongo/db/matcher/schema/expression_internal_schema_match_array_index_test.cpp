@@ -33,6 +33,7 @@
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -107,6 +108,29 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, EquivalentToClone) {
     ASSERT_OK(expr.getStatus());
     auto clone = expr.getValue()->shallowClone();
     ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));
+}
+
+TEST(InternalSchemaMatchArrayIndexMatchExpression, HasSingleChild) {
+    auto query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'number'}}}}}");
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    ASSERT_EQ(objMatch.getValue()->numChildren(), 1U);
+    ASSERT(objMatch.getValue()->getChild(0));
+}
+
+DEATH_TEST(InternalSchemaMatchArrayIndexMatchExpression,
+           GetChildFailsIndexGreaterThanZero,
+           "Invariant failure i == 0") {
+    auto query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'number'}}}}}");
+    auto objMatch = MatchExpressionParser::parse(query, nullptr);
+    ASSERT_OK(objMatch.getStatus());
+
+    objMatch.getValue()->getChild(1);
 }
 }  // namespace
 }  // namespace mongo

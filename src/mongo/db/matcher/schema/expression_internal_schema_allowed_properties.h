@@ -140,6 +140,24 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
+    size_t numChildren() const final {
+        return _patternProperties.size() + 1;
+    }
+
+    MatchExpression* getChild(size_t i) const final {
+        invariant(i < numChildren());
+
+        if (i == 0) {
+            return _otherwise->getFilter();
+        }
+
+        return _patternProperties[i - 1].second->getFilter();
+    }
+
 private:
     /**
      * Helper function for matches() and matchesSingleElement().

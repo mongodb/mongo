@@ -302,7 +302,7 @@ TEST_F(DocumentSourceMatchTest,
     auto match = DocumentSourceMatch::create(query, getExpCtx());
     DepsTracker dependencies;
     ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
-    ASSERT_EQUALS(0U, dependencies.fields.size());
+    ASSERT_EQUALS(1U, dependencies.fields.size());
     ASSERT_EQUALS(true, dependencies.needWholeDocument);
     ASSERT_EQUALS(false, dependencies.getNeedTextScore());
 }

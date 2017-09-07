@@ -79,6 +79,19 @@ public:
             [](const auto& expr1, const auto& expr2) { return expr1->equivalent(expr2.get()); });
     }
 
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
+
+    size_t numChildren() const final {
+        return nargs;
+    }
+
+    MatchExpression* getChild(size_t i) const final {
+        invariant(i < nargs);
+        return _expressions[i].get();
+    }
+
     /**
      * Takes ownership of the MatchExpressions in 'expressions'.
      */
