@@ -102,6 +102,10 @@ BSONObj makeFindCommandObject(const NamespaceString& nss,
     if (currentTerm != OpTime::kUninitializedTerm) {
         cmdBob.append("term", currentTerm);
     }
+    if (serverGlobalParams.featureCompatibility.version.load() ==
+        ServerGlobalParams::FeatureCompatibility::Version::k34) {
+        cmdBob.append("readConcern", BSON("afterOpTime" << lastOpTimeFetched.toBSON()));
+    }
     return cmdBob.obj();
 }
 
