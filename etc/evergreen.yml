@@ -240,7 +240,7 @@ functions:
       background: true
       system_log: true
       script: |
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/collect_resource_info.py -o system_resource_info_${task_id}.json -i 5
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/collect_resource_info.py -o system_resource_info.json -i 5
 
   # Run a monitor process as a background, system task to periodically
   # display how many threads interesting processes are using.

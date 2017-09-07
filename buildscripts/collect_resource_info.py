@@ -28,7 +28,12 @@ def open_or_use_stdout(filename):
         return
 
     line_buffered = 1
-    fp = open(filename, "w", line_buffered)
+    try:
+        fp = open(filename, "w", line_buffered)
+    except IOError:
+        print("Could not open file {}".format(filename), file=sys.stderr)
+        sys.exit(1)
+
     try:
         yield fp
     finally:
