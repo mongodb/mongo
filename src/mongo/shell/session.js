@@ -212,7 +212,10 @@ var {
                 cmdName = Object.keys(cmdObj)[0];
             }
 
-            const numRetries = cmdObj.hasOwnProperty("txnNumber") ? 1 : 0;
+            let numRetries =
+                (cmdObj.hasOwnProperty("txnNumber") && !jsTest.options().skipRetryOnNetworkError)
+                ? 1
+                : 0;
 
             do {
                 try {

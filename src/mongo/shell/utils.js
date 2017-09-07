@@ -39,7 +39,8 @@ function _getErrorWithCode(codeOrObj, message) {
 
 // Checks if a javascript exception is a network error.
 function isNetworkError(error) {
-    return error.message.indexOf("error doing query") >= 0 ||
+    return error.message.indexOf("network error") >= 0 ||
+        error.message.indexOf("error doing query") >= 0 ||
         error.message.indexOf("socket exception") >= 0;
 }
 
@@ -241,6 +242,7 @@ jsTestOptions = function() {
             mongosBinVersion: TestData.mongosBinVersion || "",
             shardMixedBinVersions: TestData.shardMixedBinVersions || false,
             networkMessageCompressors: TestData.networkMessageCompressors,
+            skipRetryOnNetworkError: TestData.skipRetryOnNetworkError,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
             // We default skipValidationOnNamespaceNotFound to true because mongod can end up

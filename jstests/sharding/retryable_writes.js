@@ -238,7 +238,9 @@
 
         try {
             // If ran against mongos, the command will actually succeed, but only one of the writes
-            // would be executed
+            // would be executed. Set skipRetryOnNetworkError so the shell doesn't automatically
+            // retry, since the command has a txnNumber.
+            TestData.skipRetryOnNetworkError = true;
             var res = assert.commandWorked(testDb.runCommand({
                 insert: 'user',
                 documents: [{x: 0}, {x: 1}],
@@ -250,8 +252,9 @@
             assert.eq(1, res.writeErrors.length);
         } catch (e) {
             var exceptionMsg = e.toString();
-            assert(exceptionMsg.indexOf("network error") > -1,
-                   'Incorrect exception thrown: ' + exceptionMsg);
+            assert(isNetworkError(e), 'Incorrect exception thrown: ' + exceptionMsg);
+        } finally {
+            TestData.skipRetryOnNetworkError = false;
         }
 
         assert.eq(2, testDb.user.find({}).itcount());
