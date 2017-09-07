@@ -67,7 +67,7 @@ public:
     }
 
     virtual void help(stringstream& help) const {
-        help << "resize oplog size";
+        help << "resize oplog size in MB";
     }
 
     Status checkAuthForCommand(Client* client,
@@ -107,8 +107,9 @@ public:
                 Status(ErrorCodes::InvalidOptions, "invalid size field, size should be a number"));
         }
 
-        long long size = jsobj["size"].numberLong();
-        if (size < 990LL * 1024 * 1024) {
+        long long sizeMb = jsobj["size"].numberLong();
+        long long size = sizeMb * 1024 * 1024;
+        if (sizeMb < 990L) {
             return appendCommandStatus(
                 result, Status(ErrorCodes::InvalidOptions, "oplog size should be 990MB at least"));
         }
