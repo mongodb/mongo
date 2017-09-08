@@ -449,20 +449,17 @@ bool GeometryContainer::contains(const S2Polyline& otherLine) const {
     }
 
     if (NULL != _cap && (_cap->crs == SPHERE)) {
-        // If the distance of any line points to the complement cap is shorter
-        // than the arc length of the complement cap, then the line is not
-        // within center sphere.
+        // If the radian distance of a line to the complement spherical cap 
+        // is less than the arc radian of the complement cap, then the line 
+        // is not within the spherical cap.
         S2Cap complementSphere = _cap->cap.Complement();
-        double arcLength = kRadiusOfEarthInMeters * complementSphere.angle().radians();
-        if (arcLength > M_PI) {
-            arcLength = M_PI;
+        double arcRad =  complementSphere.angle().radians();
+        if (arcRad > M_PI) {
+            arcRad = M_PI;
         }
-        for (size_t i = 0; i < (size_t)otherLine.num_vertices(); ++i) {
-            if ((kRadiusOfEarthInMeters *
-                 S2Distance::minDistanceRad(otherLine.vertex(i), complementSphere)) < arcLength) {
-                return false;
-            }
-        }
+        if (S2Distance::minDistanceRad(complementSphere.axis(), otherLine) < arcRad) {
+            return false;
+        } 
         return true;
     }
 
@@ -512,22 +509,16 @@ bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
     }
 
     if (NULL != _cap && (_cap->crs == SPHERE)) {
-        // If the distance of any polygon points to the complement cap is shorter
-        // than the arc length of the complement cap, then the polygon is not
-        // within center sphere.
+        // If the radian distance of a polygon to the complement spherical cap 
+        // is less than the arc radian of the complement cap, then the polygon 
+        // is not within the spherical cap.
         S2Cap complementSphere = _cap->cap.Complement();
-        double arcLength = kRadiusOfEarthInMeters * complementSphere.angle().radians();
-        if (arcLength > M_PI) {
-            arcLength = M_PI;
+        double arcRad = complementSphere.angle().radians();
+        if (arcRad > M_PI) {
+            arcRad = M_PI;
         }
-        for (size_t i = 0; i < (size_t)otherPolygon.num_loops(); ++i) {
-            for (size_t j = 0; j < (size_t)otherPolygon.loop(i)->num_vertices(); ++j) {
-                if ((kRadiusOfEarthInMeters *
-                     S2Distance::minDistanceRad(otherPolygon.loop(i)->vertex(j),
-                                                complementSphere)) < arcLength) {
-                    return false;
-                }
-            }
+        if (S2Distance::minDistanceRad(complementSphere.axis(), otherPolygon) < arcRad) {
+            return false;
         }
         return true;
     }
