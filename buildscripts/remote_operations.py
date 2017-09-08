@@ -60,6 +60,7 @@ class RemoteOperations(object):
                  retries=0,
                  retry_sleep=0,
                  debug=False,
+                 shell_binary="/bin/bash",
                  use_shell=False):
 
         self.user_host = user_host
@@ -67,6 +68,7 @@ class RemoteOperations(object):
         self.retries = retries
         self.retry_sleep = retry_sleep
         self.debug = debug
+        self.shell_binary = shell_binary
         self.use_shell = use_shell
         # Check if we can remotely access the host.
         self._access_code, self._access_buff = self._remote_access()
@@ -143,9 +145,10 @@ class RemoteOperations(object):
                 operation_param = "{}".format(operation_param.replace("'", r"\'"))
                 operation_param = "{}".format(operation_param.replace("\"", r"\""))
                 dollar = "$"
-            cmd = "ssh {} {} /bin/bash -c \"{}'{}'\"".format(
+            cmd = "ssh {} {} {} -c \"{}'{}'\"".format(
                 self.ssh_options,
                 self.user_host,
+                self.shell_binary,
                 dollar,
                 operation_param)
             cmds.append(cmd)

@@ -21,7 +21,9 @@ class RemoteOperationsTestCase(unittest.TestCase):
         self.temp_local_dir = tempfile.mkdtemp()
         self.temp_remote_dir = tempfile.mkdtemp()
         self.rop = rop.RemoteOperations(user_host="localhost")
-        self.rop_use_shell = rop.RemoteOperations(user_host="localhost")
+        self.rop_use_shell = rop.RemoteOperations(user_host="localhost", use_shell=True)
+        self.rop_sh_shell_binary = rop.RemoteOperations(
+            user_host="localhost", shell_binary="/bin/sh")
         self.rop_ssh_opts = rop.RemoteOperations(
             user_host="localhost", ssh_options="-v -o ConnectTimeout=10 -o ConnectionAttempts=10")
 
@@ -87,6 +89,10 @@ class RemoteOperationShell(RemoteOperationsTestCase):
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
+        ret, buff = self.rop_sh_shell_binary.shell("uname")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
         ret, buff = self.rop.operation("shell", "uname")
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
@@ -102,6 +108,10 @@ class RemoteOperationShell(RemoteOperationsTestCase):
         self.assertIsNotNone(buff)
 
         ret, buff = self.rop_use_shell.shell("date; whoami; ls")
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ret, buff = self.rop_sh_shell_binary.shell("date; whoami; ls")
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
