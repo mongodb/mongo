@@ -1408,12 +1408,6 @@ TEST(JSONSchemaParserTest, DependenciesFailsToParseIfNotAnObject) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(JSONSchemaParserTest, DependenciesFailsToParseIfTheEmptyObject) {
-    BSONObj schema = fromjson("{dependencies: {}}");
-    auto result = JSONSchemaParser::parse(schema);
-    ASSERT_NOT_OK(result.getStatus());
-}
-
 TEST(JSONSchemaParserTest, DependenciesFailsToParseIfDependencyIsNotObjectOrArray) {
     BSONObj schema = fromjson("{dependencies: {a: ['b'], bad: 1}}");
     auto result = JSONSchemaParser::parse(schema);
@@ -1561,6 +1555,12 @@ TEST(JSONSchemaParserTest, NestedPropertyDependencyTranslatesCorrectly) {
             ]
         }]
     }]})"));
+}
+
+TEST(JSONSchemaParserTest, EmptyDependenciesTranslatesCorrectly) {
+    BSONObj schema = fromjson("{dependencies: {}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$and: [{}]}"));
 }
 
 TEST(JSONSchemaParserTest, UnsupportedKeywordsFailNicely) {

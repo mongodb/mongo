@@ -789,12 +789,6 @@ StatusWithMatchExpression parseDependencies(StringData path, BSONElement depende
                               << "' must be an object"};
     }
 
-    if (dependencies.embeddedObject().isEmpty()) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << "$jsonSchema keyword '" << kSchemaDependenciesKeyword
-                              << "' must be a non-empty object"};
-    }
-
     auto andExpr = stdx::make_unique<AndMatchExpression>();
     for (auto&& dependency : dependencies.embeddedObject()) {
         if (dependency.type() != BSONType::Object && dependency.type() != BSONType::Array) {

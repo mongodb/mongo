@@ -116,4 +116,8 @@
                       {properties: {obj: {dependencies: {a: ["b"], c: {required: ["d"]}}}}},
                       {obj: {a: 1, b: 1, c: 1, d: 1}},
                       true);
+
+    // Empty dependencies matches everything.
+    assertSchemaMatch(coll, {dependencies: {}}, {}, true);
+    assertSchemaMatch(coll, {properties: {obj: {dependencies: {}}}}, {obj: {}}, true);
 }());
