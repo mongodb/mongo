@@ -95,6 +95,10 @@
     if (res) {
         assert.commandWorked(res);
     }
+    // Node 0 will go into rollback after it steps down.  We want to wait for that to happen, and
+    // then complete, in order to get a clean shutdown.
+    jsTestLog("Waiting for node 0 to roll back the failed write.");
+    rst.awaitReplication();
 
     rst.stopSet();
 }());
