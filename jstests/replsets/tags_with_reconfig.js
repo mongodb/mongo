@@ -31,7 +31,7 @@
     replTest.initiate(conf);
     replTest.awaitReplication();
 
-    var wtimeout = 60 * 1000 * 5;
+    var wtimeout = ReplSetTest.kDefaultTimeoutMS;
     var master = replTest.getPrimary();
     var db = master.getDB("test");
 

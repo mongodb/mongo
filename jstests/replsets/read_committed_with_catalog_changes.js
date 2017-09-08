@@ -262,8 +262,8 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
     // This DB won't be used by any tests so it should always be unblocked.
     var otherDB = primary.getDB('otherDB');
     var otherDBCollection = otherDB.collection;
-    assert.writeOK(
-        otherDBCollection.insert({}, {writeConcern: {w: "majority", wtimeout: 60 * 1000}}));
+    assert.writeOK(otherDBCollection.insert(
+        {}, {writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
     assertReadsSucceed(otherDBCollection);
 
     for (var testName in testCases) {

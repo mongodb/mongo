@@ -39,7 +39,8 @@ if (false) {
     assert(a_conn.host == master.host);
 
     // create an oplog entry with an insert
-    assert.writeOK(A.foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: 60000}}));
+    assert.writeOK(
+        A.foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     print("******************** starting load for 30 secs *********************");
     var work = function() {

@@ -40,7 +40,7 @@
     assert.eq(nodes[0], rst.getPrimary());
     // Wait for all data bearing nodes to get up to date.
     assert.writeOK(nodes[0].getDB(dbName).getCollection(collName).insert(
-        {a: 1}, {writeConcern: {w: 3, wtimeout: 5 * 60 * 1000}}));
+        {a: 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     jsTestLog("Create two partitions: [1] and [0,2,3,4].");
     nodes[1].disconnect(nodes[0]);
@@ -50,7 +50,7 @@
 
     jsTestLog("Do a write that is replicated to [0,2,3,4].");
     assert.writeOK(nodes[0].getDB(dbName).getCollection(collName + "2").insert({a: 2}, {
-        writeConcern: {w: 2, wtimeout: 5 * 60 * 1000}
+        writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}
     }));
 
     jsTestLog("Repartition to: [0,2] and [1,3,4].");
@@ -137,7 +137,7 @@
 
     // Node 1 should still be primary, and should now be able to satisfy majority writes again.
     assert.writeOK(nodes[1].getDB(dbName).getCollection(collName + "4").insert({a: 4}, {
-        writeConcern: {w: 3, wtimeout: 5 * 60 * 1000}
+        writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}
     }));
 
 }());

@@ -45,7 +45,8 @@
     var BID = replTest.getNodeId(b_conn);
 
     // create an oplog entry with an insert
-    assert.writeOK(A.foo.insert({x: 1}, {writeConcern: {w: 2, wtimeout: 60000}}));
+    assert.writeOK(
+        A.foo.insert({x: 1}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
     assert.eq(B.foo.findOne().x, 1);
 
     // run resync and wait for it to happen
@@ -83,7 +84,7 @@
         }
 
         // wait for secondary to also have its oplog cycle
-        assert.writeOK(bulk.execute({w: 1, wtimeout: 60000}));
+        assert.writeOK(bulk.execute({w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}));
 
         if (hasCycled())
             break;

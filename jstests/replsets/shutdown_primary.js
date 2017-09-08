@@ -24,7 +24,7 @@
 
     var primary = replTest.getPrimary();
     var testDB = primary.getDB(name);
-    var timeout = 5 * 60 * 1000;
+    var timeout = ReplSetTest.kDefaultTimeoutMS;
     assert.writeOK(testDB.foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: timeout}}));
 
     jsTestLog("Blocking replication to secondaries.");

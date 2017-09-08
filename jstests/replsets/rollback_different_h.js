@@ -42,7 +42,7 @@ replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 var master = replTest.getPrimary();
 assert(master === conns[0], "conns[0] assumed to be master");
 assert(a_conn.host === master.host, "a_conn assumed to be master");
-var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
+var options = {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}, upsert: true};
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
 
 // shut down master
@@ -52,7 +52,7 @@ replTest.stop(AID);
 master = replTest.getPrimary();
 assert(b_conn.host === master.host, "b_conn assumed to be master");
 options = {
-    writeConcern: {w: 1, wtimeout: 60000},
+    writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
     upsert: true
 };
 var oplog_entry = b_conn.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
@@ -72,7 +72,7 @@ assert(a_conn.host === master.host, "a_conn assumed to be master");
 
 // do a write so that B will have to roll back
 options = {
-    writeConcern: {w: 1, wtimeout: 60000},
+    writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
     upsert: true
 };
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));

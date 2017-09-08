@@ -47,7 +47,7 @@
     assert.eq(nodes[0], rst.getPrimary());
     // Wait for all data bearing nodes to get up to date.
     assert.writeOK(nodes[0].getCollection(collName).insert(
-        {a: counter++}, {writeConcern: {w: 3, wtimeout: 5 * 60 * 1000}}));
+        {a: counter++}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     jsTestLog("Create two partitions: [1] and [0,2,3,4].");
     nodes[1].disconnect(nodes[0]);
@@ -57,7 +57,7 @@
 
     jsTestLog("Do a write that is replicated to [0,2,3,4].");
     assert.writeOK(nodes[0].getCollection(collName).insert(
-        {a: counter++}, {writeConcern: {w: 2, wtimeout: 5 * 60 * 1000}}));
+        {a: counter++}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     jsTestLog("Repartition to: [0,2] and [1,3,4].");
     nodes[1].reconnect(nodes[3]);
@@ -118,7 +118,7 @@
 
     jsTestLog("w:2 write to node 0 (replicated to node 2)");
     assert.writeOK(nodes[0].getCollection(collName).insert(
-        {a: counter++}, {writeConcern: {w: 2, wtimeout: 5 * 60 * 1000}}));
+        {a: counter++}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     // At this point node 2 has failed rollback before making any durable changes, including writing
     // to minValid. That means that it is free to pick any sync source and will pick node 0 where it

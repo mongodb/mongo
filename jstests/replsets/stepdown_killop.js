@@ -38,8 +38,8 @@
 
     // do a write then ask the PRIMARY to stepdown
     jsTestLog("Initiating stepdown");
-    assert.writeOK(primary.getDB(name).foo.insert({myDoc: true, x: 1},
-                                                  {writeConcern: {w: 1, wtimeout: 60000}}));
+    assert.writeOK(primary.getDB(name).foo.insert(
+        {myDoc: true, x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
     var stepDownCmd = function() {
         var res = db.getSiblingDB('admin').runCommand(
             {replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60});

@@ -65,7 +65,7 @@
     jsTestLog("Doing a write to primary.");
     var testDB = replTest.getPrimary().getDB('testdb');
     var coll = testDB.stepdown_needs_electable_secondary;
-    var timeout = 5 * 60 * 1000;
+    var timeout = ReplSetTest.kDefaultTimeoutMS;
     assert.writeOK(
         coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 1, wtimeout: timeout}}));
 

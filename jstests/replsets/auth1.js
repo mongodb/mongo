@@ -74,8 +74,8 @@ load("jstests/replsets/rslib.js");
     var mId = rs.getNodeId(master);
     var slave = rs.liveNodes.slaves[0];
     assert.eq(1, master.getDB("admin").auth("foo", "bar"));
-    assert.writeOK(
-        master.getDB("test").foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: 60000}}));
+    assert.writeOK(master.getDB("test").foo.insert(
+        {x: 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     print("try some legal and illegal reads");
     var r = master.getDB("test").foo.findOne();
@@ -116,7 +116,7 @@ load("jstests/replsets/rslib.js");
     for (var i = 0; i < 1000; i++) {
         bulk.insert({x: i, foo: "bar"});
     }
-    assert.writeOK(bulk.execute({w: 3, wtimeout: 60000}));
+    assert.writeOK(bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}));
 
     print("fail over");
     rs.stop(mId);
@@ -140,7 +140,7 @@ load("jstests/replsets/rslib.js");
     for (var i = 0; i < 1000; i++) {
         bulk.insert({x: i, foo: "bar"});
     }
-    bulk.execute({w: 3, wtimeout: 60000});
+    bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS});
 
     print("add member with wrong key");
     var conn = MongoRunner.runMongod({

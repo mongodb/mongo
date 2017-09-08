@@ -52,7 +52,8 @@ load('jstests/libs/write_concern_util.js');
 
     // Do a write to have something to read.
     assert.writeOK(primary.getDB("test").foo.insert(
-        {"number": 7}, {"writeConcern": {"w": "majority", "wtimeout": 60000}}));
+        {"number": 7},
+        {"writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}}));
 
     jsTestLog("Testing linearizable readConcern parsing");
     // This command is sent to the primary, and the primary is fully connected so it should work.

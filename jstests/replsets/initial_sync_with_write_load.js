@@ -35,7 +35,8 @@ assert(master == conns[0], "conns[0] assumed to be master");
 assert(a_conn.host == master.host);
 
 // create an oplog entry with an insert
-assert.writeOK(A.foo.insert({x: 1}, {writeConcern: {w: 1, wtimeout: 60000}}));
+assert.writeOK(
+    A.foo.insert({x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 replTest.stop(BID);
 
 print("******************** starting load for 30 secs *********************");

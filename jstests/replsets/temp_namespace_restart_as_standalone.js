@@ -25,7 +25,7 @@
     assert.commandWorked(primaryDB.runCommand({
         create: "temp_collection",
         temp: true,
-        writeConcern: {w: 2, wtimeout: 60000},
+        writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS},
     }));
 
     // Verify that the temporary collection exists on the primary and has temp=true.
@@ -80,7 +80,8 @@
 
     // Verify that writes are replicated to the temporary collection and can successfully be applied
     // by the secondary after having restarted it.
-    assert.writeOK(primaryDB.temp_collection.insert({}, {writeConcern: {w: 2, wtimeout: 60000}}));
+    assert.writeOK(primaryDB.temp_collection.insert(
+        {}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     rst.stopSet();
 })();

@@ -44,7 +44,7 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
         {
           insert: "foo",
           documents: [{_id: 1, state: 0}],
-          writeConcern: {w: "majority", wtimeout: 60 * 1000}
+          writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}
         },
         {"$replData": 1});
     assert.commandWorked(res.commandReply);
