@@ -183,6 +183,10 @@ Status _applyOps(OperationContext* opCtx,
                             BSONObj infoObj;
                             client.runCommand(nsToDatabase(ns), commandObj, infoObj);
                             status = getStatusFromCommandResult(infoObj);
+
+                            // Only uassert to stop applyOps only when building indexes,
+                            // but not for CRUD ops.
+                            uassertStatusOK(status);
                         } else {
                             status =
                                 repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
