@@ -372,16 +372,14 @@ TEST(MatchExpressionParserTest, NearParsesSuccessfullyWhenAllowed) {
                   .getStatus());
 }
 
-// TODO SERVER-30951: Convert these tests to use top-level $expr and enable them.
-/*
 TEST(MatchExpressionParserTest, ExprFailsToParseWhenDisallowed) {
-    auto query = fromjson("{a: {$expr: 5}}");
+    auto query = fromjson("{$expr: {$eq: ['$a', 5]}}");
     const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(query, collator).getStatus());
 }
 
 TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWhenAllowed) {
-    auto query = fromjson("{a: {$expr: 5}}");
+    auto query = fromjson("{$expr: {$eq: ['$a', 5]}}");
     const CollatorInterface* collator = nullptr;
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(MatchExpressionParser::parse(query,
@@ -391,5 +389,28 @@ TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWhenAllowed) {
                                            MatchExpressionParser::AllowedFeatures::kExpr)
                   .getStatus());
 }
-*/
+
+TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWithAdditionalTopLevelPredicates) {
+    auto query = fromjson("{x: 1, $expr: {$eq: ['$a', 5]}, y: 1}");
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query,
+                                           collator,
+                                           expCtx,
+                                           ExtensionsCallbackNoop(),
+                                           MatchExpressionParser::AllowedFeatures::kExpr)
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserTest, ExprFailsToParseWithinTopLevelOr) {
+    auto query = fromjson("{$or: [{x: 1}, {$expr: {$eq: ['$a', 5]}}]}");
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query,
+                                               collator,
+                                               expCtx,
+                                               ExtensionsCallbackNoop(),
+                                               MatchExpressionParser::AllowedFeatures::kExpr)
+                      .getStatus());
+}
 }

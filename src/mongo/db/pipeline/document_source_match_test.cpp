@@ -235,15 +235,75 @@ TEST_F(DocumentSourceMatchTest, ShouldOnlyAddOuterFieldAsDependencyOfImplicitEqu
     ASSERT_EQUALS(false, dependencies.getNeedTextScore());
 }
 
-TEST_F(DocumentSourceMatchTest, ShouldAddDependenciesOfClausesWithinElemMatchAsDottedPaths) {
+TEST_F(DocumentSourceMatchTest, ShouldOnlyAddOuterFieldAsDependencyOfClausesWithinElemMatch) {
     auto match =
         DocumentSourceMatch::create(fromjson("{a: {$elemMatch: {c: {$gte: 4}}}}"), getExpCtx());
     DepsTracker dependencies;
     ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
-    ASSERT_EQUALS(1U, dependencies.fields.count("a.c"));
     ASSERT_EQUALS(1U, dependencies.fields.count("a"));
-    ASSERT_EQUALS(2U, dependencies.fields.size());
+    ASSERT_EQUALS(1U, dependencies.fields.size());
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest,
+       ShouldOnlyAddOuterFieldAsDependencyOfClausesWithinInternalSchemaObjectMatch) {
+    auto query = fromjson(
+        "    {a: {$_internalSchemaObjectMatch: {"
+        "       b: {$_internalSchemaObjectMatch: {"
+        "           $or: [{c: {$type: 'string'}}, {c: {$gt: 0}}]"
+        "       }}}"
+        "    }}}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(1U, dependencies.fields.size());
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest,
+       ShouldAddWholeDocumentAsDependencyOfClausesWithinInternalSchemaMinProperties) {
+    auto query = fromjson("{$_internalSchemaMinProperties: 1}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(0U, dependencies.fields.size());
+    ASSERT_EQUALS(true, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest,
+       ShouldAddWholeDocumentAsDependencyOfClausesWithinInternalSchemaMaxProperties) {
+    auto query = fromjson("{$_internalSchemaMaxProperties: 1}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies1;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies1));
+    ASSERT_EQUALS(0U, dependencies1.fields.size());
+    ASSERT_EQUALS(true, dependencies1.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies1.getNeedTextScore());
+
+    query = fromjson("{a: {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 1}}}");
+    match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies2;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies2));
+    ASSERT_EQUALS(1U, dependencies2.fields.size());
+    ASSERT_EQUALS(1U, dependencies2.fields.count("a"));
+    ASSERT_EQUALS(false, dependencies2.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies2.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest,
+       ShouldAddWholeDocumentAsDependencyOfClausesWithinInternalSchemaAllowedProperties) {
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: ['a', 'b'],"
+        "namePlaceholder: 'i', patternProperties: [], otherwise: {i: 0}}}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(0U, dependencies.fields.size());
+    ASSERT_EQUALS(true, dependencies.needWholeDocument);
     ASSERT_EQUALS(false, dependencies.getNeedTextScore());
 }
 

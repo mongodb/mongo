@@ -31,6 +31,7 @@ env.Library(
     source=[
         'expression.cpp',
         'expression_array.cpp',
+        'expression_expr.cpp',
         'expression_geo.cpp',
         'expression_leaf.cpp',
         'expression_parser.cpp',
@@ -80,6 +81,7 @@ env.CppUnitTest(
     source=[
         'expression_always_boolean_test.cpp',
         'expression_array_test.cpp',
+        'expression_expr_test.cpp',
         'expression_geo_test.cpp',
         'expression_leaf_test.cpp',
         'expression_parser_geo_test.cpp',

@@ -121,10 +121,8 @@ TEST(SimpleMod, InitWithGeoNearObjectFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-// TODO SERVER-30951: Convert these tests to use top-level $expr and enable them.
-/*
 TEST(SimpleMod, InitWithExprElemFails) {
-    auto update = fromjson("{$pull: {a: {$expr: 5}}}");
+    auto update = fromjson("{$pull: {a: {$expr: {$eq: ['$a', 5]}}}}");
     const CollatorInterface* collator = nullptr;
     ModifierPull node;
     auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
@@ -133,14 +131,13 @@ TEST(SimpleMod, InitWithExprElemFails) {
 }
 
 TEST(SimpleMod, InitWithExprObjectFails) {
-    auto update = fromjson("{$pull: {a: {b: {$expr: 5}}}}");
+    auto update = fromjson("{$pull: {a: {$expr: {$eq: ['$a', {$literal: {b: 5}}]}}}}");
     const CollatorInterface* collator = nullptr;
     ModifierPull node;
     auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
-*/
 
 TEST(SimpleMod, PrepareOKTargetNotFound) {
     Document doc(fromjson("{}"));

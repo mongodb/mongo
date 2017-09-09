@@ -156,8 +156,6 @@ protected:
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    void addDependencies(DepsTracker* deps) const;
-
     std::unique_ptr<MatchExpression> _expression;
 
     BSONObj _predicate;

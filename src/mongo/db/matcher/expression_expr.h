@@ -28,28 +28,39 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include <vector>
+
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 
 /**
- * MatchExpression for internal JSON Schema keywords that validate the number of properties in an
- * object.
+ * MatchExpression for the top-level $expr keyword. Take an expression as an argument, evaluates and
+ * coerces to boolean form which determines whether a document is a match.
  */
-class InternalSchemaNumPropertiesMatchExpression : public MatchExpression {
+class ExprMatchExpression final : public MatchExpression {
 public:
-    InternalSchemaNumPropertiesMatchExpression(MatchType type, std::string name)
-        : MatchExpression(type), _name(name) {}
+    ExprMatchExpression(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    virtual ~InternalSchemaNumPropertiesMatchExpression() {}
+    ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : MatchExpression(MatchType::EXPRESSION), _expCtx(expCtx), _expression(expr) {}
 
-    Status init(long long numProperties) {
-        _numProperties = numProperties;
-        return Status::OK();
+    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
+        MONGO_UNREACHABLE;
     }
 
-    void debugString(StringBuilder& debug, int level) const final;
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+
+    std::unique_ptr<MatchExpression> shallowClone() const final;
+
+    void debugString(StringBuilder& debug, int level = 0) const final {
+        _debugAddSpace(debug, level);
+        debug << "$expr " << _expression->serialize(false).toString();
+    }
 
     void serialize(BSONObjBuilder* out) const final;
 
@@ -59,17 +70,18 @@ public:
         return MatchCategory::kOther;
     }
 
-protected:
-    long long numProperties() const {
-        return _numProperties;
-    }
-
-    void _doAddDependencies(DepsTracker* deps) const final {
-        deps->needWholeDocument = true;
-    }
-
 private:
-    long long _numProperties;
-    std::string _name;
+    void _doAddDependencies(DepsTracker* deps) const final {
+        if (_expression) {
+            _expression->addDependencies(deps);
+        }
+    }
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+
+    // TODO SERVER-30991: '_expression' should be optimized as part of MatchExpression::optimize().
+    boost::intrusive_ptr<Expression> _expression;
 };
+
+
 }  // namespace mongo

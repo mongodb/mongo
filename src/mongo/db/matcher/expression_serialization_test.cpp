@@ -1255,6 +1255,29 @@ TEST(SerializeBasic, ExpressionWhereWithScopeSerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
+TEST(SerializeBasic, ExpressionExprSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$expr: {$eq: ['$a', 2]}}"),
+                     kSimpleCollator,
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$expr: {$eq: ['$a', {$const: 2}]}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{a: 2}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+
+    obj = fromjson("{a: 3}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
 TEST(SerializeBasic, ExpressionCommentSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{$comment: 'Hello'}"),

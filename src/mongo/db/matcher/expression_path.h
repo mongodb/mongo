@@ -85,6 +85,13 @@ public:
         return Status::OK();
     }
 
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final {
+        if (!_path.empty()) {
+            deps->fields.insert(_path.toString());
+        }
+    }
+
 private:
     StringData _path;
     ElementPath _elementPath;

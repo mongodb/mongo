@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -84,6 +85,7 @@ public:
         TYPE_OPERATOR,
         GEO,
         WHERE,
+        EXPRESSION,
 
         // Boolean expressions.
         ALWAYS_FALSE,
@@ -244,6 +246,11 @@ public:
     void setCollator(const CollatorInterface* collator);
 
     /**
+     * Add the fields required for matching to 'deps'.
+     */
+    void addDependencies(DepsTracker* deps) const;
+
+    /**
      * Serialize the MatchExpression to BSON, appending to 'out'. Output of this method is expected
      * to be a valid query object, that, when parsed, produces a logically equivalent
      * MatchExpression.
@@ -262,6 +269,8 @@ protected:
      * to the collator that occur after initialization time.
      */
     virtual void _doSetCollator(const CollatorInterface* collator){};
+
+    virtual void _doAddDependencies(DepsTracker* deps) const {}
 
     void _debugAddSpace(StringBuilder& debug, int level) const;
 

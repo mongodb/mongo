@@ -174,6 +174,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::BITS_ANY_CLEAR:
             return "yc";
 
+        case MatchExpression::EXPRESSION:
+            return "xp";
+
         case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             return "internalSchemaAllElemMatchFromIndex";
 

@@ -250,6 +250,10 @@ private:
                                         const BSONObj& section,
                                         AllowedFeatureSet allowedFeatures);
 
+    StatusWithMatchExpression _parseExpr(BSONElement elem,
+                                         AllowedFeatureSet allowedFeatures,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
     // arrays
 
     StatusWithMatchExpression _parseElemMatch(const char* name,

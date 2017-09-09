@@ -478,18 +478,8 @@ DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* 
         return EXHAUSTIVE_FIELDS;
     }
 
-    addDependencies(deps);
+    _expression->addDependencies(deps);
     return SEE_NEXT;
-}
-
-void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
-    expression::mapOver(_expression.get(), [deps](MatchExpression* node, std::string path) -> void {
-        if (!path.empty() &&
-            (node->numChildren() == 0 || node->matchType() == MatchExpression::ELEM_MATCH_VALUE ||
-             node->matchType() == MatchExpression::ELEM_MATCH_OBJECT)) {
-            deps->fields.insert(path);
-        }
-    });
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,

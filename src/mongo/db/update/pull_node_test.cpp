@@ -101,10 +101,8 @@ TEST(PullNodeTest, InitWithGeoNearObjectFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-// TODO SERVER-30951: Convert these tests to use top-level $expr and enable them.
-/*
 TEST(PullNodeTest, InitWithExprElemFails) {
-    auto update = fromjson("{$pull: {a: {$expr: 5}}}");
+    auto update = fromjson("{$pull: {a: {$expr: {$eq: [5, 5]}}}}");
     const CollatorInterface* collator = nullptr;
     PullNode node;
     auto status = node.init(update["$pull"]["a"], collator);
@@ -113,14 +111,13 @@ TEST(PullNodeTest, InitWithExprElemFails) {
 }
 
 TEST(PullNodeTest, InitWithExprObjectFails) {
-    auto update = fromjson("{$pull: {a: {b: {$expr: 5}}}}");
+    auto update = fromjson("{$pull: {a: {$expr: {$eq: ['$a', {$literal: {b: 5}}]}}}}");
     const CollatorInterface* collator = nullptr;
     PullNode node;
     auto status = node.init(update["$pull"]["a"], collator);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
-*/
 
 TEST_F(PullNodeTest, TargetNotFound) {
     auto update = fromjson("{$pull : {a: {$lt: 1}}}");

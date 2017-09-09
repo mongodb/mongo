@@ -42,6 +42,7 @@
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -516,6 +517,15 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 if (!s.isOK())
                     return s;
                 root->add(s.getValue().release());
+            } else if (mongoutils::str::equals("expr", rest)) {
+                if (!topLevel) {
+                    return {Status(ErrorCodes::BadValue, "$expr has to be at the top level")};
+                }
+
+                auto status = _parseExpr(e, allowedFeatures, expCtx);
+                if (!status.isOK())
+                    return status;
+                root->add(status.getValue().release());
             } else if (mongoutils::str::equals("text", rest)) {
                 if ((allowedFeatures & AllowedFeatures::kText) == 0u) {
                     return {Status(ErrorCodes::BadValue, "$text is not allowed in this context")};
@@ -1652,6 +1662,19 @@ StatusWithMatchExpression MatchExpressionParser::_parseGeo(const char* name,
             return StatusWithMatchExpression(s);
         return {std::move(e)};
     }
+}
+
+StatusWithMatchExpression MatchExpressionParser::_parseExpr(
+    BSONElement elem,
+    AllowedFeatureSet allowedFeatures,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if ((allowedFeatures & AllowedFeatures::kExpr) == 0u) {
+        return {Status(ErrorCodes::BadValue, "$expr is not allowed in this context")};
+    }
+
+    invariant(expCtx);
+
+    return {stdx::make_unique<ExprMatchExpression>(std::move(elem), expCtx)};
 }
 
 namespace {

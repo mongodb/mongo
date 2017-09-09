@@ -113,6 +113,8 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
         qr->setCollation(_defaultCollator->getSpec().toBSON());
     }
 
+    // TODO SERVER-30731: Allow AllowedFeatures::kExpr here so that $expr can be used in queries
+    // against sharded collections.
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto cq = uassertStatusOK(
         CanonicalQuery::canonicalize(opCtx,
