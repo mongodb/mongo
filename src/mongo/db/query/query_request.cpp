@@ -114,10 +114,14 @@ QueryRequest::QueryRequest(NamespaceString nss) : _nss(std::move(nss)) {}
 QueryRequest::QueryRequest(CollectionUUID uuid) : _uuid(std::move(uuid)) {}
 
 void QueryRequest::refreshNSS(OperationContext* opCtx) {
-    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
     if (_uuid) {
-        invariant(catalog.lookupCollectionByUUID(_uuid.get()));
-        _nss = catalog.lookupNSSByUUID(_uuid.get());
+        const UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+        auto foundColl = catalog.lookupCollectionByUUID(_uuid.get());
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "UUID " << _uuid.get() << " specified in query request not found",
+                foundColl);
+        dassert(opCtx->lockState()->isDbLockedForMode(foundColl->ns().db(), MODE_IS));
+        _nss = foundColl->ns();
     }
     invariant(!_nss.isEmpty());
 }
