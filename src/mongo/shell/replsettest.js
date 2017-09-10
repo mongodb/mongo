@@ -1511,7 +1511,7 @@ var ReplSetTest = function(opts) {
                     var otherOplogEntry = readers[i].next();
                     if (!bsonBinaryEqual(oplogEntry, otherOplogEntry)) {
                         var query = prevOplogEntry ? {ts: {$lte: prevOplogEntry.ts}} : {};
-                        rst.nodes.forEach(node => this.dumpOplog(node, query, 100));
+                        rst.nodes.forEach(node => this.dumpOplog(node, query));
                         assert(false,
                                msgPrefix + ", non-matching oplog entry for nodes: " +
                                    firstReader.mongo.host + " " + readers[i].mongo.host);
