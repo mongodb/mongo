@@ -48,6 +48,13 @@ TEST(JSONSchemaParserTest, FailsToParseIfTypeIsNotAString) {
     ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
 
+TEST(JSONSchemaParserTest, FailsToParseNicelyIfTypeIsKnownUnsupportedAlias) {
+    BSONObj schema = fromjson("{type: 'integer'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema type 'integer' is not currently supported");
+}
+
 TEST(JSONSchemaParserTest, FailsToParseUnknownKeyword) {
     BSONObj schema = fromjson("{unknown: 1}");
     auto result = JSONSchemaParser::parse(schema);
@@ -1336,6 +1343,13 @@ TEST(JSONSchemaParserTest, FailsToParseIfTypeArrayContainsUnknownAlias) {
     BSONObj schema = fromjson("{properties: {obj: {type: ['objectId']}}}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseNicelyIfTypeArrayContainsKnownUnsupportedAlias) {
+    BSONObj schema = fromjson("{properties: {obj: {type: ['number', 'integer']}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema type 'integer' is not currently supported");
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfBsonTypeArrayContainsUnknownAlias) {

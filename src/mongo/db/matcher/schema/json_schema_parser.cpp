@@ -177,6 +177,11 @@ StatusWith<std::unique_ptr<InternalSchemaTypeExpression>> parseType(
 
     std::set<StringData> aliases;
     if (typeElt.type() == BSONType::String) {
+        if (typeElt.valueStringData() == JSONSchemaParser::kSchemaTypeInteger) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "$jsonSchema type '" << JSONSchemaParser::kSchemaTypeInteger
+                                  << "' is not currently supported."};
+        }
         aliases.insert(typeElt.valueStringData());
     } else {
         for (auto&& typeArrayEntry : typeElt.embeddedObject()) {
@@ -184,6 +189,13 @@ StatusWith<std::unique_ptr<InternalSchemaTypeExpression>> parseType(
                 return {Status(ErrorCodes::TypeMismatch,
                                str::stream() << "$jsonSchema keyword '" << keywordName
                                              << "' array elements must be strings")};
+            }
+
+            if (typeArrayEntry.valueStringData() == JSONSchemaParser::kSchemaTypeInteger) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << "$jsonSchema type '"
+                                      << JSONSchemaParser::kSchemaTypeInteger
+                                      << "' is not currently supported."};
             }
 
             auto insertionResult = aliases.insert(typeArrayEntry.valueStringData());
@@ -1271,6 +1283,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
 
 constexpr StringData JSONSchemaParser::kSchemaTypeArray;
 constexpr StringData JSONSchemaParser::kSchemaTypeBoolean;
+constexpr StringData JSONSchemaParser::kSchemaTypeInteger;
 constexpr StringData JSONSchemaParser::kSchemaTypeNull;
 constexpr StringData JSONSchemaParser::kSchemaTypeObject;
 constexpr StringData JSONSchemaParser::kSchemaTypeString;

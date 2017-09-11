@@ -39,6 +39,12 @@
         coll.find({$jsonSchema: {type: {}}}).itcount();
     });
 
+    // Test that $jsonSchema fails to parse if the value for the "type" keyword is an unsupported
+    // alias.
+    assert.throws(function() {
+        coll.find({$jsonSchema: {type: 'integer'}}).itcount();
+    });
+
     // Test that $jsonSchema fails to parse if the value for the properties keyword is not an
     // object.
     assert.throws(function() {

@@ -43,6 +43,9 @@ public:
     static constexpr StringData kSchemaTypeObject = "object"_sd;
     static constexpr StringData kSchemaTypeString = "string"_sd;
 
+    // Explicitly unsupported type name constants.
+    static constexpr StringData kSchemaTypeInteger = "integer"_sd;
+
     /**
      * Converts a JSON schema, represented as BSON, into a semantically equivalent match expression
      * tree. Returns a non-OK status if the schema is invalid or cannot be parsed.

@@ -163,8 +163,7 @@
     assert.throws(
         () => coll.find({$jsonSchema: {properties: {num: {bsonType: "integer"}}}}).itcount());
 
-    // TODO SERVER-30742: Currently we do not support JSON Schema "integer". Should we (or can we)
-    // support it?
+    // type "integer" is explicitly unsupported and should fail.
     assert.throws(() => coll.find({$jsonSchema: {properties: {num: {type: "integer"}}}}).itcount());
 
     // bsonType "timestamp".

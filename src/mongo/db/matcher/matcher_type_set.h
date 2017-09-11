@@ -53,9 +53,8 @@ struct MatcherTypeSet {
     static const StringMap<BSONType> kTypeAliasMap;
 
     // Maps from the set of JSON Schema primitive types to the corresponding BSON types. Excludes
-    // "number", since this alias maps to a set of BSON types.
-    //
-    // TODO SERVER-30742: Should we (or can we) support the JSON Schema "integer" type?
+    // "number" since this alias maps to a set of BSON types, and "integer" since it is not
+    // supported.
     static const StringMap<BSONType> kJsonSchemaTypeAliasMap;
 
     /**
