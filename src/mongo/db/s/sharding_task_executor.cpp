@@ -93,6 +93,10 @@ void ShardingTaskExecutor::waitForEvent(const EventHandle& event) {
     _executor->waitForEvent(event);
 }
 
+Status ShardingTaskExecutor::waitForEvent(OperationContext* opCtx, const EventHandle& event) {
+    return _executor->waitForEvent(opCtx, event);
+}
+
 StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWork(
     const CallbackFn& work) {
     return _executor->scheduleWork(work);

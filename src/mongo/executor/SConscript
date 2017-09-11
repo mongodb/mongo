@@ -273,6 +273,7 @@ env.Library(
         'task_executor_test_fixture.cpp'
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/unittest/unittest',
         'network_interface_mock',
         'task_executor_interface',
@@ -287,6 +288,7 @@ env.Library(
     LIBDEPS=[
         'task_executor_interface',
         '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/db/service_context',
     ]
 )
 
@@ -334,8 +336,9 @@ env.CppUnitTest(
         'thread_pool_task_executor_test.cpp',
     ],
     LIBDEPS=[
-        'thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/unittest/concurrency',
+        'thread_pool_task_executor_test_fixture',
     ]
 )
 

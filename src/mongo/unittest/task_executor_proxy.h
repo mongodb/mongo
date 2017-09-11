@@ -60,6 +60,7 @@ public:
     virtual StatusWith<CallbackHandle> onEvent(const EventHandle& event,
                                                const CallbackFn& work) override;
     virtual void waitForEvent(const EventHandle& event) override;
+    virtual Status waitForEvent(OperationContext* opCtx, const EventHandle& event) override;
     virtual StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) override;
     virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) override;
     virtual StatusWith<CallbackHandle> scheduleRemoteCommand(

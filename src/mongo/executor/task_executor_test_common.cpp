@@ -35,6 +35,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
@@ -43,6 +44,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -262,8 +264,10 @@ void EventChainAndWaitingTest::run() {
     executor->waitForEvent(event3);
 
     TaskExecutor::EventHandle neverSignaledEvent = unittest::assertGet(executor->makeEvent());
-    neverSignaledWaiter =
-        stdx::thread(stdx::bind(&TaskExecutor::waitForEvent, executor, neverSignaledEvent));
+    auto waitForeverCallback = [this, neverSignaledEvent]() {
+        executor->waitForEvent(neverSignaledEvent);
+    };
+    neverSignaledWaiter = stdx::thread(waitForeverCallback);
     TaskExecutor::CallbackHandle shutdownCallback = unittest::assertGet(
         executor->scheduleWork(stdx::bind(setStatusAndShutdown, stdx::placeholders::_1, &status5)));
     executor->wait(shutdownCallback);
@@ -321,6 +325,28 @@ void EventChainAndWaitingTest::onGoAfterTriggered(const TaskExecutor::CallbackAr
         return;
     }
     cbData.executor->signalEvent(triggerEvent);
+}
+
+COMMON_EXECUTOR_TEST(EventWaitingWithTimeoutTest) {
+    TaskExecutor& executor = getExecutor();
+    launchExecutorThread();
+
+    auto eventThatWillNeverBeTriggered = unittest::assertGet(executor.makeEvent());
+
+    auto serviceContext = getGlobalServiceContext();
+
+    serviceContext->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+    auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
+
+    auto client = serviceContext->makeClient("for testing");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setDeadlineAfterNowBy(Milliseconds{1});
+    mockClock->advance(Milliseconds(2));
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit,
+              executor.waitForEvent(opCtx.get(), eventThatWillNeverBeTriggered));
+    executor.shutdown();
+    joinExecutorThread();
 }
 
 COMMON_EXECUTOR_TEST(ScheduleWorkAt) {

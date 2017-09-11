@@ -174,15 +174,22 @@ public:
                                                const CallbackFn& work) = 0;
 
     /**
-     * Blocks the calling thread until after "event" is signaled.  Also returns
-     * if the event is never signaled but shutdown() is called on the executor.
+     * Blocks the calling thread until "event" is signaled. Also returns if the event is never
+     * signaled but shutdown() is called on the executor.
+     *
+     * TODO(schwerin): Return ErrorCodes::ShutdownInProgress when shutdown() has been called so that
+     * the caller can know which of the two reasons led to this method returning.
      *
      * NOTE: Do not call from a callback running in the executor.
-     *
-     * TODO(schwerin): Change return type so that the caller can know which of the two reasons
-     * led to this method returning.
      */
     virtual void waitForEvent(const EventHandle& event) = 0;
+
+    /**
+     * Same as waitForEvent without an OperationContext, but returns an error if the event was not
+     * triggered but the operation was killed - see OperationContext::checkForInterruptNoAssert()
+     * for expected error codes.
+     */
+    virtual Status waitForEvent(OperationContext* opCtx, const EventHandle& event) = 0;
 
     /**
      * Schedules "work" to be run by the executor ASAP.

@@ -82,6 +82,10 @@ void TaskExecutorProxy::waitForEvent(const EventHandle& event) {
     _executor->waitForEvent(event);
 }
 
+Status TaskExecutorProxy::waitForEvent(OperationContext* opCtx, const EventHandle& event) {
+    return _executor->waitForEvent(opCtx, event);
+}
+
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWork(
     const CallbackFn& work) {
     return _executor->scheduleWork(work);
