@@ -439,6 +439,12 @@ bool Pipeline::canRunOnMongos() const {
     });
 }
 
+bool Pipeline::allowedToForwardFromMongos() const {
+    return std::all_of(_sources.begin(), _sources.end(), [](const auto& stage) {
+        return stage->constraints().allowedToForwardFromMongos;
+    });
+}
+
 std::vector<NamespaceString> Pipeline::getInvolvedCollections() const {
     std::vector<NamespaceString> collections;
     for (auto&& source : _sources) {

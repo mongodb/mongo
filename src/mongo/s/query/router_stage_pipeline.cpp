@@ -31,6 +31,8 @@
 #include "mongo/s/query/router_stage_pipeline.h"
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_list_local_sessions.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/expression_context.h"
 
@@ -91,10 +93,15 @@ private:
 RouterStagePipeline::RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
                                          std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline)
     : RouterExecStage(mergePipeline->getContext()->opCtx),
-      _mergePipeline(std::move(mergePipeline)) {
-    // Add an adapter to the front of the pipeline to draw results from 'child'.
-    _mergePipeline->addInitialSource(
-        DocumentSourceRouterAdapter::create(_mergePipeline->getContext(), std::move(child)));
+      _mergePipeline(std::move(mergePipeline)),
+      _mongosOnly(!_mergePipeline->allowedToForwardFromMongos()) {
+    if (_mongosOnly) {
+        invariant(_mergePipeline->canRunOnMongos());
+    } else {
+        // Add an adapter to the front of the pipeline to draw results from 'child'.
+        _mergePipeline->addInitialSource(
+            DocumentSourceRouterAdapter::create(_mergePipeline->getContext(), std::move(child)));
+    }
 }
 
 StatusWith<ClusterQueryResult> RouterStagePipeline::next() {
@@ -124,8 +131,9 @@ void RouterStagePipeline::kill(OperationContext* opCtx) {
 }
 
 bool RouterStagePipeline::remotesExhausted() {
-    return static_cast<DocumentSourceRouterAdapter*>(_mergePipeline->getSources().front().get())
-        ->remotesExhausted();
+    return _mongosOnly ||
+        static_cast<DocumentSourceRouterAdapter*>(_mergePipeline->getSources().front().get())
+            ->remotesExhausted();
 }
 
 Status RouterStagePipeline::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {

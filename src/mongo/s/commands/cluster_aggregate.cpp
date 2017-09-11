@@ -419,11 +419,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     LiteParsedPipeline liteParsedPipeline(request);
 
-    // TODO SERVER-29141 support forcing pipeline to run on Mongos.
-    uassert(40567,
-            "Unable to force mongos-only stage to run on mongos",
-            liteParsedPipeline.allowedToForwardFromMongos());
-
     for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         const auto resolvedNsRoutingInfo =
             uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
@@ -432,8 +427,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
 
-    // If this aggregation is on an unsharded collection, pass through to the primary shard.
+    // If this pipeline is on an unsharded collection,
+    // is allowed to be forwarded on to shards,
+    // and doesn't need transformation via DocumentSoruce::serialize(),
+    // then go ahead and pass it through to the owning shard unmodified.
     if (!executionNsRoutingInfo.cm() && !namespaces.executionNss.isCollectionlessAggregateNS() &&
+        liteParsedPipeline.allowedToForwardFromMongos() &&
         liteParsedPipeline.allowedToPassthroughFromMongos()) {
         return aggPassthrough(opCtx,
                               namespaces,
@@ -465,6 +464,17 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), mergeCtx));
     pipeline->optimizePipeline();
+
+    if (!liteParsedPipeline.allowedToForwardFromMongos()) {
+        // Pipeline must be run locally.
+        uassert(40567,
+                "Aggregation pipeline contains both mongos-only and non-mongos stages",
+                pipeline->canRunOnMongos());
+        auto cursorResponse = establishMergingMongosCursor(
+            opCtx, request, namespaces.requestedNss, std::move(pipeline), {});
+        Command::filterCommandReplyForPassthrough(cursorResponse, result);
+        return getStatusFromCommandResult(result->asTempObj());
+    }
 
     // Begin shard targeting. The process is as follows:
     // - First, determine whether we need to target more than one shard. If so, we split the

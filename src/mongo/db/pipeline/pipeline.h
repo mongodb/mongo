@@ -224,6 +224,12 @@ public:
     bool canRunOnMongos() const;
 
     /**
+     * Returns whether or not every DocumentSource in the pipeline is allowed to forward from a
+     * mongos.
+     */
+    bool allowedToForwardFromMongos() const;
+
+    /**
      * Modifies the pipeline, optimizing it by combining and swapping stages.
      */
     void optimizePipeline();

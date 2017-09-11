@@ -58,6 +58,7 @@ protected:
 
 private:
     std::unique_ptr<Pipeline, Pipeline::Deleter> _mergePipeline;
+    bool _mongosOnly;
 };
 
 }  // namespace mongo

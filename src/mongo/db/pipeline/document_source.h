@@ -156,6 +156,11 @@ public:
         // must also override getModifiedPaths() to provide information about which particular
         // $match predicates be swapped before itself.
         bool canSwapWithMatch = false;
+
+        // Extends HostTypeRequirement::kAnyShardOrMongos to indicate that a document source
+        // must run on whatever node initially received the pipeline.
+        // This can be a mongod directly, but mongos must not forward to a mongod.
+        bool allowedToForwardFromMongos = true;
     };
 
     using HostTypeRequirement = StageConstraints::HostTypeRequirement;

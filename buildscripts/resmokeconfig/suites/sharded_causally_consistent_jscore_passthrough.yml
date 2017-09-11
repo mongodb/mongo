@@ -189,8 +189,6 @@ selector:
   - jstests/core/explain_shell_helpers.js
   - jstests/core/sort_array.js
   - jstests/core/explain_multi_plan.js
-  - jstests/core/list_local_sessions.js # SERVER-29628 needs MongoSOnly support
-  - jstests/core/list_all_local_sessions.js # SERVER-29628 needs MongoSOnly support
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop

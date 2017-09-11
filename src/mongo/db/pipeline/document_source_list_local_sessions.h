@@ -100,6 +100,7 @@ public:
         constraints.requiresInputDocSource = false;
         constraints.isAllowedInsideFacetStage = false;
         constraints.isIndependentOfAnyCollection = true;
+        constraints.allowedToForwardFromMongos = false;
         return constraints;
     }
 
