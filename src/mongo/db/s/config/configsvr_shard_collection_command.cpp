@@ -425,7 +425,7 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             nss.db().toString(),
             createIndexesCmd,
-            Shard::RetryPolicy::kNotIdempotent);
+            Shard::RetryPolicy::kNoRetry);
         auto createIndexesStatus = swResponse.getStatus();
         if (createIndexesStatus.isOK()) {
             const auto response = swResponse.getValue();

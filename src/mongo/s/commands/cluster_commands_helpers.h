@@ -95,6 +95,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
     const boost::optional<NamespaceString> nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
     const ShardTargetingPolicy targetPolicy = ShardTargetingPolicy::UseRoutingTable,
     const boost::optional<BSONObj> query = boost::none,
     const boost::optional<BSONObj> collation = boost::none,

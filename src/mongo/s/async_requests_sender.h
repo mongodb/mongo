@@ -125,7 +125,8 @@ public:
                         executor::TaskExecutor* executor,
                         const std::string db,
                         const std::vector<AsyncRequestsSender::Request>& requests,
-                        const ReadPreferenceSetting& readPreference);
+                        const ReadPreferenceSetting& readPreference,
+                        Shard::RetryPolicy retryPolicy);
 
     /**
      * Ensures pending network I/O for any outstanding requests has been canceled and waits for
@@ -262,6 +263,9 @@ private:
 
     // The readPreference to use for all requests.
     ReadPreferenceSetting _readPreference;
+
+    // The policy to use when deciding whether to retry on an error.
+    Shard::RetryPolicy _retryPolicy;
 
     // Is set to a non-OK status if the client operation is interrupted.
     // When waiting for a remote to be ready, we only check for interrupt if the _interruptStatus

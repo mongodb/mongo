@@ -536,6 +536,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                            namespaces.executionNss,
                                            targetedCommand,
                                            ReadPreferenceSetting::get(opCtx),
+                                           Shard::RetryPolicy::kIdempotent,
                                            namespaces.executionNss.isCollectionlessAggregateNS()
                                                ? ShardTargetingPolicy::BroadcastToAllShards
                                                : ShardTargetingPolicy::UseRoutingTable,

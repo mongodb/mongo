@@ -118,7 +118,8 @@ Status enforceLegacyWriteConcern(OperationContext* opCtx,
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                             dbName.toString(),
                             requests,
-                            readPref);
+                            readPref,
+                            Shard::RetryPolicy::kIdempotent);
 
     // Receive the responses.
 

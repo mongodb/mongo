@@ -133,6 +133,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponses(
     const std::string& dbName,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests,
     BSONObj* viewDefinition) {
 
@@ -143,7 +144,8 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponses(
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                             dbName,
                             requests,
-                            readPref);
+                            readPref,
+                            retryPolicy);
 
     // Get the responses.
 
@@ -226,6 +228,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
     const boost::optional<NamespaceString> nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
+    const Shard::RetryPolicy retryPolicy,
     const ShardTargetingPolicy targetPolicy,
     const boost::optional<BSONObj> query,
     const boost::optional<BSONObj> collation,
@@ -240,7 +243,8 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
         case ShardTargetingPolicy::BroadcastToAllShards: {
             // Send unversioned commands to all shards.
             auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-            return gatherResponses(opCtx, dbName, cmdObj, readPref, requests, viewDefinition);
+            return gatherResponses(
+                opCtx, dbName, cmdObj, readPref, retryPolicy, requests, viewDefinition);
         }
 
         case ShardTargetingPolicy::UseRoutingTable: {
@@ -266,8 +270,8 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
                     opCtx, routingInfo, cmdObj, query, collation, appendShardVersion);
 
                 // Retrieve the responses from the shards.
-                swResponses =
-                    gatherResponses(opCtx, dbName, cmdObj, readPref, requests, viewDefinition);
+                swResponses = gatherResponses(
+                    opCtx, dbName, cmdObj, readPref, retryPolicy, requests, viewDefinition);
                 ++numAttempts;
 
                 // If any shard returned a stale shardVersion error, invalidate the routing table

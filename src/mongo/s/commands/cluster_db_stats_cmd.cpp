@@ -74,6 +74,7 @@ public:
                                           boost::none,
                                           filterCommandRequestForPassthrough(cmdObj),
                                           ReadPreferenceSetting::get(opCtx),
+                                          Shard::RetryPolicy::kIdempotent,
                                           ShardTargetingPolicy::BroadcastToAllShards));
         if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
             return false;

@@ -54,8 +54,13 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          executor::TaskExecutor* executor,
                                          const std::string db,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
-                                         const ReadPreferenceSetting& readPreference)
-    : _opCtx(opCtx), _executor(executor), _db(std::move(db)), _readPreference(readPreference) {
+                                         const ReadPreferenceSetting& readPreference,
+                                         Shard::RetryPolicy retryPolicy)
+    : _opCtx(opCtx),
+      _executor(executor),
+      _db(std::move(db)),
+      _readPreference(readPreference),
+      _retryPolicy(retryPolicy) {
     for (const auto& request : requests) {
         _remotes.emplace_back(request.shardId, request.cmdObj);
     }
@@ -192,7 +197,7 @@ void AsyncRequestsSender::_scheduleRequests_inlock() {
                     if (remote.shardHostAndPort) {
                         shard->updateReplSetMonitor(*remote.shardHostAndPort, status);
                     }
-                    if (shard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent) &&
+                    if (shard->isRetriableError(status.code(), _retryPolicy) &&
                         remote.retryCount < kMaxNumFailedHostRetryAttempts) {
                         LOG(1) << "Command to remote " << remote.shardId << " at host "
                                << *remote.shardHostAndPort
