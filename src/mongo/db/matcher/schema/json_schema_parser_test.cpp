@@ -1825,5 +1825,74 @@ TEST(JSONSchemaParserTest,
     )"));
 }
 
+TEST(JSONSchemaParserTest, FailsToParseIfUniqueItemsIsNotABoolean) {
+    auto schema = BSON("uniqueItems" << 1);
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, NoMatchExpressionGeneratedIfUniqueItemsFalse) {
+    auto schema = fromjson("{properties: {a: {uniqueItems: false}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+    {$and: [
+        {$and: [
+            {$or: [
+                {$nor: [{a: {$exists: true}}]},
+                {}
+            ]}
+        ]}
+    ]})"));
+}
+
+TEST(JSONSchemaParserTest, UniqueItemsTranslatesCorrectlyWithNoType) {
+    auto schema = BSON("uniqueItems" << true);
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$and: [{$alwaysTrue: 1}]}"));
+
+    schema = fromjson("{properties: {a: {uniqueItems: true}}}");
+    result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+        {$and:
+            [{
+               $and : [ {
+                   $or : [
+                       {$nor : [ {a : {$exists : true}} ]},
+                       {
+                         $and : [ {
+                             $or : [
+                                 {$nor : [ {a : {$_internalSchemaType : [4]}} ]},
+                                 {a : {$_internalSchemaUniqueItems : true}}
+                             ]
+                         } ]
+                       }
+                   ]
+               } ]
+            }]
+        })"));
+}
+
+TEST(JSONSchemaParserTest, UniqueItemsTranslatesCorrectlyWithTypeArray) {
+    auto schema = fromjson("{properties: {a: {type: 'array', uniqueItems: true}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"(
+	{$and: [{
+		$and: [{
+		    $or: [
+			{$nor: [{a: {$exists: true}}]},
+			{
+			  $and: [
+			      {a: {$_internalSchemaUniqueItems: true}},
+			      {a: {$_internalSchemaType: [4]}}
+			  ]
+			}
+		    ]
+		}]
+	    }]
+	})"));
+}
 }  // namespace
 }  // namespace mongo

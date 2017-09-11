@@ -907,6 +907,25 @@ Status translateArrayKeywords(StringMap<BSONElement>* keywordMap,
         andExpr->add(maxItemsExpr.getValue().release());
     }
 
+    if (auto uniqueItemsElt = keywordMap->get(kSchemaUniqueItemsKeyword)) {
+        if (!uniqueItemsElt.isBoolean()) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << "$jsonSchema keyword '" << kSchemaUniqueItemsKeyword
+                                  << "' must be a boolean"};
+        } else if (path.empty()) {
+            andExpr->add(stdx::make_unique<AlwaysTrueMatchExpression>().release());
+        } else if (uniqueItemsElt.boolean()) {
+            auto uniqueItemsExpr = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>();
+            auto status = uniqueItemsExpr->init(path);
+            if (!status.isOK()) {
+                return status;
+            }
+            andExpr->add(
+                makeRestriction(BSONType::Array, path, std::move(uniqueItemsExpr), typeExpr)
+                    .release());
+        }
+    }
+
     return Status::OK();
 }
 
@@ -1135,8 +1154,8 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         {kSchemaAllOfKeyword, {}},
         {kSchemaAnyOfKeyword, {}},
         {kSchemaBsonTypeKeyword, {}},
-        {kSchemaDescriptionKeyword, {}},
         {kSchemaDependenciesKeyword, {}},
+        {kSchemaDescriptionKeyword, {}},
         {kSchemaExclusiveMaximumKeyword, {}},
         {kSchemaExclusiveMinimumKeyword, {}},
         {kSchemaMaxItemsKeyword, {}},
@@ -1156,6 +1175,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         {kSchemaRequiredKeyword, {}},
         {kSchemaTitleKeyword, {}},
         {kSchemaTypeKeyword, {}},
+        {kSchemaUniqueItemsKeyword, {}},
     };
 
     for (auto&& elt : schema) {

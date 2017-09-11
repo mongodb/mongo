@@ -46,4 +46,23 @@
                               [{_id: 0}, {_id: 1}, {_id: 4}]);
     assertFindResultsSortedEq({$jsonSchema: {properties: {a: {maxItems: 2}}}},
                               [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 4}]);
+
+    // Test that the JSON Schema fails to parse if "uniqueItems" is not a boolean.
+    assert.throws(() => coll.find({$jsonSchema: {uniqueItems: 1}}).itcount());
+    assert.throws(() => coll.find({$jsonSchema: {uniqueItems: 1.0}}).itcount());
+    assert.throws(() => coll.find({$jsonSchema: {uniqueItems: "true"}}).itcount());
+
+    // Test that "uniqueItems" only enforces uniqueness when specified.
+    assertFindResultsSortedEq({$jsonSchema: {uniqueItems: true}},
+                              [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]);
+    assertFindResultsSortedEq({$jsonSchema: {properties: {a: {uniqueItems: false}}}},
+                              [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]);
+    assertFindResultsSortedEq({$jsonSchema: {properties: {a: {uniqueItems: true}}}},
+                              [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 4}]);
+
+    // TODO (SERVER-30178): uniqueItems should compare objects in a field order-insensitive way when
+    // testing for uniqueness.
+    assert.writeOK(coll.insert({_id: 5, a: [{x: 1, y: 1}, {y: 1, x: 1}]}));
+    assertFindResultsSortedEq({$jsonSchema: {properties: {a: {uniqueItems: true}}}},
+                              [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 4}, {_id: 5}]);
 }());

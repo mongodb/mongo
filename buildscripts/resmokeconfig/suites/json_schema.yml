@@ -25,7 +25,6 @@ selector:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/ref.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/refRemote.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/type.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/uniqueItems.json
 
 executor:
   config:
