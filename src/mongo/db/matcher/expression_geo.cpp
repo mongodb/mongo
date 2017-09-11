@@ -329,13 +329,21 @@ Status GeoNearExpression::parseFrom(const BSONObj& obj) {
 // Geo queries we don't need an index to answer: geoWithin and geoIntersects
 //
 
-Status GeoMatchExpression::init(StringData path,
-                                const GeoExpression* query,
-                                const BSONObj& rawObj) {
-    _query.reset(query);
-    _rawObj = rawObj;
-    return setPath(path);
-}
+/**
+* Takes ownership of the passed-in GeoExpression.
+*/
+GeoMatchExpression::GeoMatchExpression(StringData path,
+                                       const GeoExpression* query,
+                                       const BSONObj& rawObj)
+    : LeafMatchExpression(GEO, path), _rawObj(rawObj), _query(query), _canSkipValidation(false) {}
+
+/**
+* Takes shared ownership of the passed-in GeoExpression.
+*/
+GeoMatchExpression::GeoMatchExpression(StringData path,
+                                       std::shared_ptr<const GeoExpression> query,
+                                       const BSONObj& rawObj)
+    : LeafMatchExpression(GEO, path), _rawObj(rawObj), _query(query), _canSkipValidation(false) {}
 
 bool GeoMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     if (!e.isABSONObj())
@@ -398,9 +406,8 @@ bool GeoMatchExpression::equivalent(const MatchExpression* other) const {
 }
 
 std::unique_ptr<MatchExpression> GeoMatchExpression::shallowClone() const {
-    std::unique_ptr<GeoMatchExpression> next = stdx::make_unique<GeoMatchExpression>();
-    next->init(path(), NULL, _rawObj).transitional_ignore();
-    next->_query = _query;
+    std::unique_ptr<GeoMatchExpression> next =
+        stdx::make_unique<GeoMatchExpression>(path(), _query, _rawObj);
     next->_canSkipValidation = _canSkipValidation;
     if (getTag()) {
         next->setTag(getTag()->clone());
@@ -412,13 +419,15 @@ std::unique_ptr<MatchExpression> GeoMatchExpression::shallowClone() const {
 // Parse-only geo expressions: geoNear (formerly known as near).
 //
 
-Status GeoNearMatchExpression::init(StringData path,
-                                    const GeoNearExpression* query,
-                                    const BSONObj& rawObj) {
-    _query.reset(query);
-    _rawObj = rawObj;
-    return setPath(path);
-}
+GeoNearMatchExpression::GeoNearMatchExpression(StringData path,
+                                               const GeoNearExpression* query,
+                                               const BSONObj& rawObj)
+    : LeafMatchExpression(GEO_NEAR, path), _rawObj(rawObj), _query(query) {}
+
+GeoNearMatchExpression::GeoNearMatchExpression(StringData path,
+                                               std::shared_ptr<const GeoNearExpression> query,
+                                               const BSONObj& rawObj)
+    : LeafMatchExpression(GEO_NEAR, path), _rawObj(rawObj), _query(query) {}
 
 bool GeoNearMatchExpression::matchesSingleElement(const BSONElement& e,
                                                   MatchDetails* details) const {
@@ -455,9 +464,8 @@ bool GeoNearMatchExpression::equivalent(const MatchExpression* other) const {
 }
 
 std::unique_ptr<MatchExpression> GeoNearMatchExpression::shallowClone() const {
-    std::unique_ptr<GeoNearMatchExpression> next = stdx::make_unique<GeoNearMatchExpression>();
-    next->init(path(), NULL, _rawObj).transitional_ignore();
-    next->_query = _query;
+    std::unique_ptr<GeoNearMatchExpression> next =
+        stdx::make_unique<GeoNearMatchExpression>(path(), _query, _rawObj);
     if (getTag()) {
         next->setTag(getTag()->clone());
     }

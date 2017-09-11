@@ -40,7 +40,7 @@ namespace mongo {
  */
 class WhereNoOpMatchExpression final : public WhereMatchExpressionBase {
 public:
-    WhereNoOpMatchExpression(WhereParams params);
+    explicit WhereNoOpMatchExpression(WhereParams params);
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 

@@ -35,11 +35,10 @@
 
 namespace mongo {
 
-Status ElementPath::init(StringData path) {
+void ElementPath::init(StringData path) {
     _shouldTraverseNonleafArrays = true;
     _shouldTraverseLeafArray = true;
     _fieldRef.parse(path);
-    return Status::OK();
 }
 
 // -----
@@ -194,10 +193,8 @@ bool BSONElementIterator::subCursorHasMore() {
             }
 
             _subCursorPath.reset(new ElementPath());
-            _subCursorPath
-                ->init(_arrayIterationState.restOfPath.substr(
-                    _arrayIterationState.nextPieceOfPath.size() + 1))
-                .transitional_ignore();
+            _subCursorPath->init(_arrayIterationState.restOfPath.substr(
+                _arrayIterationState.nextPieceOfPath.size() + 1));
             _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
 
             // If we're here, we must be able to traverse nonleaf arrays.
@@ -277,7 +274,7 @@ bool BSONElementIterator::more() {
                 // The current array element is a subdocument.  See if the subdocument generates
                 // any elements matching the remaining subpath.
                 _subCursorPath.reset(new ElementPath());
-                _subCursorPath->init(_arrayIterationState.restOfPath).transitional_ignore();
+                _subCursorPath->init(_arrayIterationState.restOfPath);
                 _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
 
                 _subCursor.reset(new BSONElementIterator(_subCursorPath.get(), eltInArray.Obj()));
@@ -303,10 +300,8 @@ bool BSONElementIterator::more() {
                     // The current array element is itself an array.  See if the nested array
                     // has any elements matching the remainihng.
                     _subCursorPath.reset(new ElementPath());
-                    _subCursorPath
-                        ->init(_arrayIterationState.restOfPath.substr(
-                            _arrayIterationState.nextPieceOfPath.size() + 1))
-                        .transitional_ignore();
+                    _subCursorPath->init(_arrayIterationState.restOfPath.substr(
+                        _arrayIterationState.nextPieceOfPath.size() + 1));
                     _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
                     BSONElementIterator* real = new BSONElementIterator(
                         _subCursorPath.get(), _arrayIterationState._current.Obj());

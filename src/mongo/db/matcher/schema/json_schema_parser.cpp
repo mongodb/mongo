@@ -160,11 +160,9 @@ std::unique_ptr<MatchExpression> makeRestriction(const MatcherTypeSet& restricti
     //
     // We need to do this because restriction keywords do not apply when a field is either not
     // present or of a different type.
-    auto typeExpr = stdx::make_unique<InternalSchemaTypeExpression>();
-    invariantOK(typeExpr->init(path, restrictionType));
+    auto typeExpr = stdx::make_unique<InternalSchemaTypeExpression>(path, restrictionType);
 
-    auto notExpr = stdx::make_unique<NotMatchExpression>();
-    invariantOK(notExpr->init(typeExpr.release()));
+    auto notExpr = stdx::make_unique<NotMatchExpression>(typeExpr.release());
 
     auto orExpr = stdx::make_unique<OrMatchExpression>();
     orExpr->add(notExpr.release());
@@ -228,11 +226,8 @@ StatusWith<std::unique_ptr<InternalSchemaTypeExpression>> parseType(
                                      << "' must name at least one type")};
     }
 
-    auto typeExpr = stdx::make_unique<InternalSchemaTypeExpression>();
-    auto initStatus = typeExpr->init(path, std::move(typeSet.getValue()));
-    if (!initStatus.isOK()) {
-        return initStatus;
-    }
+    auto typeExpr =
+        stdx::make_unique<InternalSchemaTypeExpression>(path, std::move(typeSet.getValue()));
 
     return {std::move(typeExpr)};
 }
@@ -254,13 +249,9 @@ StatusWithMatchExpression parseMaximum(StringData path,
 
     std::unique_ptr<ComparisonMatchExpression> expr;
     if (isExclusiveMaximum) {
-        expr = stdx::make_unique<LTMatchExpression>();
+        expr = stdx::make_unique<LTMatchExpression>(path, maximum);
     } else {
-        expr = stdx::make_unique<LTEMatchExpression>();
-    }
-    auto status = expr->init(path, maximum);
-    if (!status.isOK()) {
-        return status;
+        expr = stdx::make_unique<LTEMatchExpression>(path, maximum);
     }
 
     MatcherTypeSet restrictionType;
@@ -285,13 +276,9 @@ StatusWithMatchExpression parseMinimum(StringData path,
 
     std::unique_ptr<ComparisonMatchExpression> expr;
     if (isExclusiveMinimum) {
-        expr = stdx::make_unique<GTMatchExpression>();
+        expr = stdx::make_unique<GTMatchExpression>(path, minimum);
     } else {
-        expr = stdx::make_unique<GTEMatchExpression>();
-    }
-    auto status = expr->init(path, minimum);
-    if (!status.isOK()) {
-        return status;
+        expr = stdx::make_unique<GTEMatchExpression>(path, minimum);
     }
 
     MatcherTypeSet restrictionType;
@@ -316,11 +303,7 @@ StatusWithMatchExpression parseLength(StringData path,
         return {stdx::make_unique<AlwaysTrueMatchExpression>()};
     }
 
-    auto expr = stdx::make_unique<T>();
-    auto status = expr->init(path, parsedLength.getValue());
-    if (!status.isOK()) {
-        return status;
-    }
+    auto expr = stdx::make_unique<T>(path, parsedLength.getValue());
     return makeRestriction(restrictionType, path, std::move(expr), typeExpr);
 }
 
@@ -337,14 +320,11 @@ StatusWithMatchExpression parsePattern(StringData path,
         return {stdx::make_unique<AlwaysTrueMatchExpression>()};
     }
 
-    auto expr = stdx::make_unique<RegexMatchExpression>();
-
     // JSON Schema does not allow regex flags to be specified.
     constexpr auto emptyFlags = "";
-    auto status = expr->init(path, pattern.valueStringData(), emptyFlags);
-    if (!status.isOK()) {
-        return status;
-    }
+    auto expr =
+        stdx::make_unique<RegexMatchExpression>(path, pattern.valueStringData(), emptyFlags);
+
     return makeRestriction(BSONType::String, path, std::move(expr), typeExpr);
 }
 
@@ -366,11 +346,8 @@ StatusWithMatchExpression parseMultipleOf(StringData path,
         return {stdx::make_unique<AlwaysTrueMatchExpression>()};
     }
 
-    auto expr = stdx::make_unique<InternalSchemaFmodMatchExpression>();
-    auto status = expr->init(path, multipleOf.numberDecimal(), Decimal128(0));
-    if (!status.isOK()) {
-        return status;
-    }
+    auto expr = stdx::make_unique<InternalSchemaFmodMatchExpression>(
+        path, multipleOf.numberDecimal(), Decimal128(0));
 
     MatcherTypeSet restrictionType;
     restrictionType.allNumbers = true;
@@ -445,16 +422,12 @@ StatusWithMatchExpression parseEnum(StringData path, BSONElement enumElement) {
             // Top-level non-object enum values can be safely ignored, since MongoDB only stores
             // objects, not scalars or arrays.
             if (arrayElem.type() == BSONType::Object) {
-                auto rootDocEq = stdx::make_unique<InternalSchemaRootDocEqMatchExpression>();
-                rootDocEq->init(arrayElem.embeddedObject());
+                auto rootDocEq = stdx::make_unique<InternalSchemaRootDocEqMatchExpression>(
+                    arrayElem.embeddedObject());
                 orExpr->add(rootDocEq.release());
             }
         } else {
-            auto eqExpr = stdx::make_unique<InternalSchemaEqMatchExpression>();
-            auto initStatus = eqExpr->init(path, arrayElem);
-            if (!initStatus.isOK()) {
-                return initStatus;
-            }
+            auto eqExpr = stdx::make_unique<InternalSchemaEqMatchExpression>(path, arrayElem);
 
             orExpr->add(eqExpr.release());
         }
@@ -520,17 +493,13 @@ StatusWithMatchExpression translateRequired(
     auto andExpr = stdx::make_unique<AndMatchExpression>();
 
     for (auto&& propertyName : requiredProperties) {
-        auto existsExpr = stdx::make_unique<ExistsMatchExpression>();
-        invariantOK(existsExpr->init(propertyName));
+        auto existsExpr = stdx::make_unique<ExistsMatchExpression>(propertyName);
 
         if (path.empty()) {
             andExpr->add(existsExpr.release());
         } else {
-            auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>();
-            auto objectMatchStatus = objectMatch->init(std::move(existsExpr), path);
-            if (!objectMatchStatus.isOK()) {
-                return objectMatchStatus;
-            }
+            auto objectMatch =
+                stdx::make_unique<InternalSchemaObjectMatchExpression>(path, std::move(existsExpr));
 
             andExpr->add(objectMatch.release());
         }
@@ -580,11 +549,10 @@ StatusWithMatchExpression parseProperties(
         } else {
             // This property either must not exist or must match the nested schema. Therefore, we
             // generate the match expression (OR (NOT (EXISTS)) <nestedSchemaMatch>).
-            auto existsExpr = stdx::make_unique<ExistsMatchExpression>();
-            invariantOK(existsExpr->init(property.fieldNameStringData()));
+            auto existsExpr =
+                stdx::make_unique<ExistsMatchExpression>(property.fieldNameStringData());
 
-            auto notExpr = stdx::make_unique<NotMatchExpression>();
-            invariantOK(notExpr->init(existsExpr.release()));
+            auto notExpr = stdx::make_unique<NotMatchExpression>(existsExpr.release());
 
             auto orExpr = stdx::make_unique<OrMatchExpression>();
             orExpr->add(notExpr.release());
@@ -600,11 +568,8 @@ StatusWithMatchExpression parseProperties(
         return {std::move(andExpr)};
     }
 
-    auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>();
-    auto objectMatchStatus = objectMatch->init(std::move(andExpr), path);
-    if (!objectMatchStatus.isOK()) {
-        return objectMatchStatus;
-    }
+    auto objectMatch =
+        stdx::make_unique<InternalSchemaObjectMatchExpression>(path, std::move(andExpr));
 
     return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
 }
@@ -717,15 +682,11 @@ StatusWithMatchExpression parseAllowedProperties(StringData path,
     auto otherwiseWithPlaceholder = stdx::make_unique<ExpressionWithPlaceholder>(
         kNamePlaceholder.toString(), std::move(otherwiseExpr.getValue()));
 
-    auto allowedPropertiesExpr =
-        stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>();
-    auto status = allowedPropertiesExpr->init(std::move(propertyNames),
-                                              kNamePlaceholder,
-                                              std::move(patternProperties.getValue()),
-                                              std::move(otherwiseWithPlaceholder));
-    if (!status.isOK()) {
-        return status;
-    }
+    auto allowedPropertiesExpr = stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>(
+        std::move(propertyNames),
+        kNamePlaceholder,
+        std::move(patternProperties.getValue()),
+        std::move(otherwiseWithPlaceholder));
 
     // If this is a top-level schema, then we have no path and there is no need for an explicit
     // object match node.
@@ -733,11 +694,8 @@ StatusWithMatchExpression parseAllowedProperties(StringData path,
         return {std::move(allowedPropertiesExpr)};
     }
 
-    auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>();
-    auto objectMatchStatus = objectMatch->init(std::move(allowedPropertiesExpr), path);
-    if (!objectMatchStatus.isOK()) {
-        return objectMatchStatus;
-    }
+    auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>(
+        path, std::move(allowedPropertiesExpr));
 
     return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
 }
@@ -755,39 +713,28 @@ StatusWithMatchExpression parseNumProperties(StringData path,
         return parsedNumProps.getStatus();
     }
 
-    auto expr = stdx::make_unique<T>();
-    auto status = expr->init(parsedNumProps.getValue());
-    if (!status.isOK()) {
-        return status;
-    }
+    auto expr = stdx::make_unique<T>(parsedNumProps.getValue());
 
     if (path.empty()) {
         // This is a top-level schema.
         return {std::move(expr)};
     }
 
-    auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>();
-    auto objectMatchStatus = objectMatch->init(std::move(expr), path);
-    if (!objectMatchStatus.isOK()) {
-        return objectMatchStatus;
-    }
+    auto objectMatch =
+        stdx::make_unique<InternalSchemaObjectMatchExpression>(path, std::move(expr));
 
     return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
 }
 
 StatusWithMatchExpression makeDependencyExistsClause(StringData path, StringData dependencyName) {
-    auto existsExpr = stdx::make_unique<ExistsMatchExpression>();
-    invariantOK(existsExpr->init(dependencyName));
+    auto existsExpr = stdx::make_unique<ExistsMatchExpression>(dependencyName);
 
     if (path.empty()) {
         return {std::move(existsExpr)};
     }
 
-    auto objectMatch = stdx::make_unique<InternalSchemaObjectMatchExpression>();
-    auto status = objectMatch->init(std::move(existsExpr), path);
-    if (!status.isOK()) {
-        return status;
-    }
+    auto objectMatch =
+        stdx::make_unique<InternalSchemaObjectMatchExpression>(path, std::move(existsExpr));
 
     return {std::move(objectMatch)};
 }
@@ -807,10 +754,12 @@ StatusWithMatchExpression translateSchemaDependency(StringData path,
         return ifClause.getStatus();
     }
 
-    auto condExpr = stdx::make_unique<InternalSchemaCondMatchExpression>();
-    condExpr->init({std::move(ifClause.getValue()),
-                    std::move(nestedSchemaMatch.getValue()),
-                    stdx::make_unique<AlwaysTrueMatchExpression>()});
+    std::array<std::unique_ptr<MatchExpression>, 3> expressions = {
+        std::move(ifClause.getValue()),
+        std::move(nestedSchemaMatch.getValue()),
+        stdx::make_unique<AlwaysTrueMatchExpression>()};
+
+    auto condExpr = stdx::make_unique<InternalSchemaCondMatchExpression>(std::move(expressions));
     return {std::move(condExpr)};
 }
 
@@ -861,10 +810,12 @@ StatusWithMatchExpression translatePropertyDependency(StringData path, BSONEleme
         return ifClause.getStatus();
     }
 
-    auto condExpr = stdx::make_unique<InternalSchemaCondMatchExpression>();
-    condExpr->init({std::move(ifClause.getValue()),
-                    std::move(propertyDependencyExpr),
-                    stdx::make_unique<AlwaysTrueMatchExpression>()});
+    std::array<std::unique_ptr<MatchExpression>, 3> expressions = {
+        {std::move(ifClause.getValue()),
+         std::move(propertyDependencyExpr),
+         stdx::make_unique<AlwaysTrueMatchExpression>()}};
+
+    auto condExpr = stdx::make_unique<InternalSchemaCondMatchExpression>(std::move(expressions));
     return {std::move(condExpr)};
 }
 
@@ -910,11 +861,7 @@ StatusWithMatchExpression parseUniqueItems(BSONElement uniqueItemsElt,
     } else if (path.empty()) {
         return {stdx::make_unique<AlwaysTrueMatchExpression>()};
     } else if (uniqueItemsElt.boolean()) {
-        auto uniqueItemsExpr = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>();
-        auto status = uniqueItemsExpr->init(path);
-        if (!status.isOK()) {
-            return status;
-        }
+        auto uniqueItemsExpr = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>(path);
         return makeRestriction(BSONType::Array, path, std::move(uniqueItemsExpr), typeExpr);
     }
 
@@ -954,9 +901,8 @@ StatusWith<boost::optional<long long>> parseItems(StringData path,
             }
             auto exprWithPlaceholder = stdx::make_unique<ExpressionWithPlaceholder>(
                 kNamePlaceholder.toString(), std::move(parsedSubschema.getValue()));
-            auto matchArrayIndex =
-                stdx::make_unique<InternalSchemaMatchArrayIndexMatchExpression>();
-            invariantOK(matchArrayIndex->init(path, index, std::move(exprWithPlaceholder)));
+            auto matchArrayIndex = stdx::make_unique<InternalSchemaMatchArrayIndexMatchExpression>(
+                path, index, std::move(exprWithPlaceholder));
             andExprForSubschemas->add(matchArrayIndex.release());
             ++index;
         }
@@ -984,11 +930,10 @@ StatusWith<boost::optional<long long>> parseItems(StringData path,
         if (path.empty()) {
             andExpr->add(stdx::make_unique<AlwaysTrueMatchExpression>().release());
         } else {
-            auto allElemMatch =
-                stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>();
             constexpr auto startIndexForItems = 0LL;
-            invariantOK(
-                allElemMatch->init(path, startIndexForItems, std::move(exprWithPlaceholder)));
+            auto allElemMatch =
+                stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
+                    path, startIndexForItems, std::move(exprWithPlaceholder));
             andExpr->add(makeRestriction(BSONType::Array, path, std::move(allElemMatch), typeExpr)
                              .release());
         }
@@ -1039,9 +984,8 @@ Status parseAdditionalItems(StringData path,
             andExpr->add(stdx::make_unique<AlwaysTrueMatchExpression>().release());
         } else {
             auto allElemMatch =
-                stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>();
-            invariantOK(
-                allElemMatch->init(path, *startIndexForAdditionalItems, std::move(otherwiseExpr)));
+                stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
+                    path, *startIndexForAdditionalItems, std::move(otherwiseExpr));
             andExpr->add(makeRestriction(BSONType::Array, path, std::move(allElemMatch), typeExpr)
                              .release());
         }
@@ -1129,11 +1073,7 @@ Status translateLogicalKeywords(StringMap<BSONElement>* keywordMap,
             return parsedExpr.getStatus();
         }
 
-        auto notMatchExpr = stdx::make_unique<NotMatchExpression>();
-        auto initStatus = notMatchExpr->init(parsedExpr.getValue().release());
-        if (!initStatus.isOK()) {
-            return initStatus;
-        }
+        auto notMatchExpr = stdx::make_unique<NotMatchExpression>(parsedExpr.getValue().release());
         andExpr->add(notMatchExpr.release());
     }
 
@@ -1556,11 +1496,14 @@ constexpr StringData JSONSchemaParser::kSchemaTypeString;
 
 StatusWithMatchExpression JSONSchemaParser::parse(BSONObj schema, bool ignoreUnknownKeywords) {
     LOG(5) << "Parsing JSON Schema: " << schema.jsonString();
-
-    auto translation = _parse(""_sd, schema, ignoreUnknownKeywords);
-    if (shouldLog(logger::LogSeverity::Debug(5)) && translation.isOK()) {
-        LOG(5) << "Translated schema match expression: " << translation.getValue()->toString();
+    try {
+        auto translation = _parse(""_sd, schema, ignoreUnknownKeywords);
+        if (shouldLog(logger::LogSeverity::Debug(5)) && translation.isOK()) {
+            LOG(5) << "Translated schema match expression: " << translation.getValue()->toString();
+        }
+        return translation;
+    } catch (const DBException& ex) {
+        return {ex.toStatus()};
     }
-    return translation;
 }
 }  // namespace mongo

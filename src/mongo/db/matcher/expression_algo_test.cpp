@@ -70,8 +70,8 @@ private:
 };
 
 TEST(ExpressionAlgoIsSubsetOf, NullAndOmittedField) {
-    // Verify that ComparisonMatchExpression::init() prohibits creating a match expression with
-    // an Undefined type.
+    // Verify that the ComparisonMatchExpression constructor prohibits creating a match expression
+    // with an Undefined type.
     BSONObj undefined = fromjson("{a: undefined}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQUALS(ErrorCodes::BadValue,

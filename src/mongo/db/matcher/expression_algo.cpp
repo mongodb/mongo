@@ -153,8 +153,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rh
         }
         for (BSONElement elem : ime->getEqualities()) {
             // Each element in the $in-array represents an equality predicate.
-            EqualityMatchExpression equality;
-            equality.init(lhs->path(), elem).transitional_ignore();
+            EqualityMatchExpression equality(lhs->path(), elem);
             equality.setCollator(ime->getCollator());
             if (!_isSubsetOf(&equality, rhs)) {
                 return false;
@@ -179,7 +178,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
 
     if (ComparisonMatchExpression::isComparisonMatchExpression(lhs)) {
         const ComparisonMatchExpression* cme = static_cast<const ComparisonMatchExpression*>(lhs);
-        // CompareMatchExpression::init() prohibits creating a match expression with EOO or
+        // The CompareMatchExpression constructor prohibits creating a match expression with EOO or
         // Undefined types, so only need to ensure that the value is not of type jstNULL.
         return cme->getData().type() != jstNULL;
     }

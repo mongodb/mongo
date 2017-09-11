@@ -32,6 +32,10 @@
 
 namespace mongo {
 
+InternalSchemaNumArrayItemsMatchExpression::InternalSchemaNumArrayItemsMatchExpression(
+    MatchType type, StringData path, long long numItems, StringData name)
+    : ArrayMatchingMatchExpression(type, path), _name(name), _numItems(numItems) {}
+
 void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debug,
                                                              int level) const {
     _debugAddSpace(debug, level);

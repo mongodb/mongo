@@ -47,6 +47,27 @@
 
 namespace mongo {
 
+ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
+                                                     StringData path,
+                                                     const BSONElement& rhs)
+    : LeafMatchExpression(type, path), _rhs(rhs) {
+    invariant(_rhs);
+
+    uassert(
+        ErrorCodes::BadValue, "cannot compare to undefined", _rhs.type() != BSONType::Undefined);
+
+    switch (matchType()) {
+        case LT:
+        case LTE:
+        case EQ:
+        case GT:
+        case GTE:
+            break;
+        default:
+            uasserted(ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression");
+    }
+}
+
 bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
     if (other->matchType() != matchType())
         return false;
@@ -60,29 +81,6 @@ bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
     const StringData::ComparatorInterface* stringComparator = nullptr;
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
     return path() == realOther->path() && eltCmp.evaluate(_rhs == realOther->_rhs);
-}
-
-Status ComparisonMatchExpression::init(StringData path, const BSONElement& rhs) {
-    _rhs = rhs;
-
-    invariant(_rhs);
-
-    if (_rhs.type() == BSONType::Undefined) {
-        return Status(ErrorCodes::BadValue, "cannot compare to undefined");
-    }
-
-    switch (matchType()) {
-        case LT:
-        case LTE:
-        case EQ:
-        case GT:
-        case GTE:
-            break;
-        default:
-            return Status(ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression");
-    }
-
-    return setPath(path);
 }
 
 bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
@@ -221,7 +219,36 @@ inline pcrecpp::RE_Options flags2options(const char* flags) {
     return options;
 }
 
-RegexMatchExpression::RegexMatchExpression() : LeafMatchExpression(REGEX) {}
+RegexMatchExpression::RegexMatchExpression(StringData path, const BSONElement& e)
+    : LeafMatchExpression(REGEX, path),
+      _regex(e.regex()),
+      _flags(e.regexFlags()),
+      _re(new pcrecpp::RE(_regex.c_str(), flags2options(_flags.c_str()))) {
+    uassert(ErrorCodes::BadValue, "regex not a regex", e.type() == RegEx);
+    _init();
+}
+
+RegexMatchExpression::RegexMatchExpression(StringData path, StringData regex, StringData options)
+    : LeafMatchExpression(REGEX, path),
+      _regex(regex.toString()),
+      _flags(options.toString()),
+      _re(new pcrecpp::RE(_regex.c_str(), flags2options(_flags.c_str()))) {
+    _init();
+}
+
+void RegexMatchExpression::_init() {
+    uassert(ErrorCodes::BadValue,
+            "Regular expression cannot contain an embedded null byte",
+            _regex.find('\0') == std::string::npos);
+
+    uassert(ErrorCodes::BadValue,
+            "Regular expression options string cannot contain an embedded null byte",
+            _flags.find('\0') == std::string::npos);
+
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Regular expression is invalid: " << _re->error(),
+            _re->error().empty());
+}
 
 RegexMatchExpression::~RegexMatchExpression() {}
 
@@ -232,37 +259,6 @@ bool RegexMatchExpression::equivalent(const MatchExpression* other) const {
     const RegexMatchExpression* realOther = static_cast<const RegexMatchExpression*>(other);
     return path() == realOther->path() && _regex == realOther->_regex &&
         _flags == realOther->_flags;
-}
-
-
-Status RegexMatchExpression::init(StringData path, const BSONElement& e) {
-    if (e.type() != RegEx)
-        return Status(ErrorCodes::BadValue, "regex not a regex");
-    return init(path, e.regex(), e.regexFlags());
-}
-
-
-Status RegexMatchExpression::init(StringData path, StringData regex, StringData options) {
-    if (regex.find('\0') != std::string::npos) {
-        return Status(ErrorCodes::BadValue,
-                      "Regular expression cannot contain an embedded null byte");
-    }
-
-    if (options.find('\0') != std::string::npos) {
-        return Status(ErrorCodes::BadValue,
-                      "Regular expression options string cannot contain an embedded null byte");
-    }
-
-    _regex = regex.toString();
-    _flags = options.toString();
-    _re.reset(new pcrecpp::RE(_regex.c_str(), flags2options(_flags.c_str())));
-
-    if (!_re->error().empty()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Regular expression is invalid: " << _re->error());
-    }
-
-    return setPath(path);
 }
 
 bool RegexMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
@@ -315,12 +311,9 @@ void RegexMatchExpression::shortDebugString(StringBuilder& debug) const {
 
 // ---------
 
-Status ModMatchExpression::init(StringData path, int divisor, int remainder) {
-    if (divisor == 0)
-        return Status(ErrorCodes::BadValue, "divisor cannot be 0");
-    _divisor = divisor;
-    _remainder = remainder;
-    return setPath(path);
+ModMatchExpression::ModMatchExpression(StringData path, int divisor, int remainder)
+    : LeafMatchExpression(MOD, path), _divisor(divisor), _remainder(remainder) {
+    uassert(ErrorCodes::BadValue, "divisor cannot be 0", divisor != 0);
 }
 
 bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
@@ -356,9 +349,7 @@ bool ModMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ------------------
 
-Status ExistsMatchExpression::init(StringData path) {
-    return setPath(path);
-}
+ExistsMatchExpression::ExistsMatchExpression(StringData path) : LeafMatchExpression(EXISTS, path) {}
 
 bool ExistsMatchExpression::matchesSingleElement(const BSONElement& e,
                                                  MatchDetails* details) const {
@@ -391,13 +382,13 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ----
 
-Status InMatchExpression::init(StringData path) {
-    return setPath(path);
-}
+InMatchExpression::InMatchExpression(StringData path)
+    : LeafMatchExpression(MATCH_IN, path),
+      _eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator),
+      _equalitySet(_eltCmp.makeBSONEltFlatSet(_originalEqualityVector)) {}
 
 std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
-    auto next = stdx::make_unique<InMatchExpression>();
-    next->init(path()).transitional_ignore();
+    auto next = stdx::make_unique<InMatchExpression>(path());
     next->setCollator(_collator);
     if (getTag()) {
         next->setTag(getTag()->clone());
@@ -552,18 +543,16 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
             auto& childRe = regexList.front();
             invariant(!childRe->getTag());
 
-            auto simplifiedExpression = stdx::make_unique<RegexMatchExpression>();
-            invariantOK(simplifiedExpression->init(
-                expression->path(), childRe->getString(), childRe->getFlags()));
+            auto simplifiedExpression = stdx::make_unique<RegexMatchExpression>(
+                expression->path(), childRe->getString(), childRe->getFlags());
             if (expression->getTag()) {
                 simplifiedExpression->setTag(expression->getTag()->clone());
             }
-
             return std::move(simplifiedExpression);
         } else if (equalitySet.size() == 1 && regexList.empty()) {
             // Simplify IN of exactly one equality to be an EqualityMatchExpression.
-            auto simplifiedExpression = stdx::make_unique<EqualityMatchExpression>();
-            invariantOK(simplifiedExpression->init(expression->path(), *(equalitySet.begin())));
+            auto simplifiedExpression = stdx::make_unique<EqualityMatchExpression>(
+                expression->path(), *(equalitySet.begin()));
             simplifiedExpression->setCollator(collator);
             if (expression->getTag()) {
                 simplifiedExpression->setTag(expression->getTag()->clone());
@@ -578,9 +567,10 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
 
 // -----------
 
-Status BitTestMatchExpression::init(StringData path, std::vector<uint32_t> bitPositions) {
-    _bitPositions = std::move(bitPositions);
-
+BitTestMatchExpression::BitTestMatchExpression(MatchType type,
+                                               StringData path,
+                                               std::vector<uint32_t> bitPositions)
+    : LeafMatchExpression(type, path), _bitPositions(std::move(bitPositions)) {
     // Process bit positions into bitmask.
     for (auto bitPosition : _bitPositions) {
         // Checking bits > 63 is just checking the sign bit, since we sign-extend numbers. For
@@ -589,26 +579,23 @@ Status BitTestMatchExpression::init(StringData path, std::vector<uint32_t> bitPo
         bitPosition = std::min(bitPosition, 63U);
         _bitMask |= 1ULL << bitPosition;
     }
-
-    return setPath(path);
 }
 
-Status BitTestMatchExpression::init(StringData path, uint64_t bitMask) {
-    _bitMask = bitMask;
-
+BitTestMatchExpression::BitTestMatchExpression(MatchType type, StringData path, uint64_t bitMask)
+    : LeafMatchExpression(type, path), _bitMask(bitMask) {
     // Process bitmask into bit positions.
     for (int bit = 0; bit < 64; bit++) {
         if (_bitMask & (1ULL << bit)) {
             _bitPositions.push_back(bit);
         }
     }
-
-    return setPath(path);
 }
 
-Status BitTestMatchExpression::init(StringData path,
-                                    const char* bitMaskBinary,
-                                    uint32_t bitMaskLen) {
+BitTestMatchExpression::BitTestMatchExpression(MatchType type,
+                                               StringData path,
+                                               const char* bitMaskBinary,
+                                               uint32_t bitMaskLen)
+    : LeafMatchExpression(type, path) {
     for (uint32_t byte = 0; byte < bitMaskLen; byte++) {
         char byteAt = bitMaskBinary[byte];
         if (!byteAt) {
@@ -631,8 +618,6 @@ Status BitTestMatchExpression::init(StringData path,
             }
         }
     }
-
-    return setPath(path);
 }
 
 bool BitTestMatchExpression::needFurtherBitTests(bool isBitSet) const {

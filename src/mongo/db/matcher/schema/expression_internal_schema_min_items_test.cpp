@@ -36,8 +36,7 @@ namespace mongo {
 namespace {
 
 TEST(InternalSchemaMinItemsMatchExpression, RejectsNonArrayElements) {
-    InternalSchemaMinItemsMatchExpression minItems;
-    ASSERT_OK(minItems.init("a", 1));
+    InternalSchemaMinItemsMatchExpression minItems("a", 1);
 
     ASSERT(!minItems.matchesBSON(BSON("a" << BSONObj())));
     ASSERT(!minItems.matchesBSON(BSON("a" << 1)));
@@ -46,46 +45,40 @@ TEST(InternalSchemaMinItemsMatchExpression, RejectsNonArrayElements) {
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, RejectsArraysWithTooFewElements) {
-    InternalSchemaMinItemsMatchExpression minItems;
-    ASSERT_OK(minItems.init("a", 2));
+    InternalSchemaMinItemsMatchExpression minItems("a", 2);
 
     ASSERT(!minItems.matchesBSON(BSON("a" << BSONArray())));
     ASSERT(!minItems.matchesBSON(BSON("a" << BSON_ARRAY(1))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, AcceptsArrayWithAtLeastMinElements) {
-    InternalSchemaMinItemsMatchExpression minItems;
-    ASSERT_OK(minItems.init("a", 2));
+    InternalSchemaMinItemsMatchExpression minItems("a", 2);
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2))));
     ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, MinItemsZeroAllowsEmptyArrays) {
-    InternalSchemaMinItemsMatchExpression minItems;
-    ASSERT_OK(minItems.init("a", 0));
+    InternalSchemaMinItemsMatchExpression minItems("a", 0);
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSONArray())));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NullArrayEntriesCountAsItems) {
-    InternalSchemaMinItemsMatchExpression minItems;
-    ASSERT_OK(minItems.init("a", 1));
+    InternalSchemaMinItemsMatchExpression minItems("a", 1);
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL))));
     ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL << 1))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMinItemsMatchExpression minItems;
-    ASSERT_OK(minItems.init("a", 2));
+    InternalSchemaMinItemsMatchExpression minItems("a", 2);
 
     ASSERT(!minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(1 << 2)))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMinItemsMatchExpression minItems;
-    ASSERT_OK(minItems.init("a.b", 2));
+    InternalSchemaMinItemsMatchExpression minItems("a.b", 2);
 
     ASSERT(minItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2)))));
     ASSERT(!minItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1)))));

@@ -447,10 +447,10 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
         if (node->getCategory() == MatchExpression::MatchCategory::kLeaf &&
             node->matchType() != MatchExpression::TYPE_OPERATOR) {
             auto leafNode = static_cast<LeafMatchExpression*>(node);
-            leafNode->setPath(newPath).transitional_ignore();
+            leafNode->setPath(newPath);
         } else if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
             auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
-            arrayNode->setPath(newPath).transitional_ignore();
+            arrayNode->setPath(newPath);
         }
     });
 

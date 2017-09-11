@@ -38,10 +38,10 @@ namespace mongo {
 
 constexpr StringData InternalSchemaEqMatchExpression::kName;
 
-Status InternalSchemaEqMatchExpression::init(StringData path, BSONElement rhs) {
-    invariant(rhs);
-    _rhsElem = rhs;
-    return setPath(path);
+InternalSchemaEqMatchExpression::InternalSchemaEqMatchExpression(StringData path, BSONElement rhs)
+    : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_EQ, path), _rhsElem(rhs) {
+    invariant(_rhsElem);
+    setTraverseLeafArray();
 }
 
 bool InternalSchemaEqMatchExpression::matchesSingleElement(const BSONElement& elem,
@@ -78,8 +78,7 @@ bool InternalSchemaEqMatchExpression::equivalent(const MatchExpression* other) c
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaEqMatchExpression::shallowClone() const {
-    auto clone = stdx::make_unique<InternalSchemaEqMatchExpression>();
-    invariantOK(clone->init(path(), _rhsElem));
+    auto clone = stdx::make_unique<InternalSchemaEqMatchExpression>(path(), _rhsElem);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

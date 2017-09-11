@@ -73,19 +73,16 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(
         StatusWithMatchExpression s = _parseRegexElement(name, e);
         if (!s.isOK())
             return s;
-        std::unique_ptr<NotMatchExpression> n = stdx::make_unique<NotMatchExpression>();
-        Status s2 = n->init(s.getValue().release());
-        if (!s2.isOK())
-            return StatusWithMatchExpression(s2);
+        std::unique_ptr<NotMatchExpression> n =
+            stdx::make_unique<NotMatchExpression>(s.getValue().release());
         return {std::move(n)};
     }
 
-    if (e.type() != Object)
-        return StatusWithMatchExpression(ErrorCodes::BadValue, "$not needs a regex or a document");
+    uassert(ErrorCodes::BadValue, "$not needs a regex or a document", e.type() == Object);
 
     BSONObj notObject = e.Obj();
-    if (notObject.isEmpty())
-        return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot be empty");
+
+    uassert(ErrorCodes::BadValue, "$not cannot be empty", !notObject.isEmpty());
 
     std::unique_ptr<AndMatchExpression> theAnd = stdx::make_unique<AndMatchExpression>();
     Status s = _parseSub(name, notObject, theAnd.get(), expCtx, allowedFeatures, currentLevel);
@@ -98,10 +95,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(
         if (theAnd->getChild(i)->matchType() == MatchExpression::REGEX)
             return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot have a regex");
 
-    std::unique_ptr<NotMatchExpression> theNot = stdx::make_unique<NotMatchExpression>();
-    s = theNot->init(theAnd.release());
-    if (!s.isOK())
-        return StatusWithMatchExpression(s);
+    std::unique_ptr<NotMatchExpression> theNot =
+        stdx::make_unique<NotMatchExpression>(theAnd.release());
 
     return {std::move(theNot)};
 }

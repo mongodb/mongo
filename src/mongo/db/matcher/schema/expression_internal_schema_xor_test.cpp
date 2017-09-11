@@ -99,10 +99,8 @@ TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {
 TEST(InternalSchemaXorOp, Equivalent) {
     BSONObj baseOperand1 = BSON("a" << 1);
     BSONObj baseOperand2 = BSON("b" << 2);
-    EqualityMatchExpression sub1;
-    ASSERT(sub1.init("a", baseOperand1["a"]).isOK());
-    EqualityMatchExpression sub2;
-    ASSERT(sub2.init("b", baseOperand2["b"]).isOK());
+    EqualityMatchExpression sub1("a", baseOperand1["a"]);
+    EqualityMatchExpression sub2("b", baseOperand2["b"]);
 
     InternalSchemaXorMatchExpression e1;
     e1.add(sub1.shallowClone().release());

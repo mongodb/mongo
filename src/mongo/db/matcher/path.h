@@ -47,7 +47,7 @@ public:
 
     // TODO: replace uses of members below with regular construction.
     ElementPath() {}
-    Status init(StringData path);
+    void init(StringData path);
 
     void setTraverseNonleafArrays(bool b) {
         _shouldTraverseNonleafArrays = b;

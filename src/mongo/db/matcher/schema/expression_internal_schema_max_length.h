@@ -36,9 +36,10 @@ namespace mongo {
 class InternalSchemaMaxLengthMatchExpression final : public InternalSchemaStrLengthMatchExpression {
 
 public:
-    InternalSchemaMaxLengthMatchExpression()
-        : InternalSchemaStrLengthMatchExpression(MatchType::INTERNAL_SCHEMA_MAX_LENGTH,
-                                                 "$_internalSchemaMaxLength"_sd) {}
+    InternalSchemaMaxLengthMatchExpression(StringData path, long long strLen)
+        : InternalSchemaStrLengthMatchExpression(
+              MatchType::INTERNAL_SCHEMA_MAX_LENGTH, path, strLen, "$_internalSchemaMaxLength"_sd) {
+    }
 
     Validator getComparator() const final {
         return [strLen = strLen()](int lenWithoutNullTerm) {
@@ -48,8 +49,7 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaMaxLengthMatchExpression> maxLen =
-            stdx::make_unique<InternalSchemaMaxLengthMatchExpression>();
-        invariantOK(maxLen->init(path(), strLen()));
+            stdx::make_unique<InternalSchemaMaxLengthMatchExpression>(path(), strLen());
         if (getTag()) {
             maxLen->setTag(getTag()->clone());
         }

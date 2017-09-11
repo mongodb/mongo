@@ -41,8 +41,9 @@ class InternalSchemaCondMatchExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaCond"_sd;
 
-    InternalSchemaCondMatchExpression()
-        : FixedArityMatchExpression(MatchType::INTERNAL_SCHEMA_COND) {}
+    explicit InternalSchemaCondMatchExpression(
+        std::array<std::unique_ptr<MatchExpression>, 3> expressions)
+        : FixedArityMatchExpression(MatchType::INTERNAL_SCHEMA_COND, std::move(expressions)) {}
 
     const MatchExpression* condition() const {
         return expressions()[0].get();

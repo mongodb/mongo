@@ -33,6 +33,14 @@
 namespace mongo {
 constexpr StringData InternalSchemaMatchArrayIndexMatchExpression::kName;
 
+InternalSchemaMatchArrayIndexMatchExpression::InternalSchemaMatchArrayIndexMatchExpression(
+    StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression)
+    : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX, path),
+      _index(index),
+      _expression(std::move(expression)) {
+    invariant(static_cast<bool>(_expression));
+}
+
 void InternalSchemaMatchArrayIndexMatchExpression::debugString(StringBuilder& debug,
                                                                int level) const {
     _debugAddSpace(debug, level);
@@ -59,14 +67,6 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
         _expression->equivalent(other->_expression.get());
 }
 
-Status InternalSchemaMatchArrayIndexMatchExpression::init(
-    StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression) {
-    invariant(static_cast<bool>(expression));
-    _index = index;
-    _expression = std::move(expression);
-    return setPath(path);
-}
-
 void InternalSchemaMatchArrayIndexMatchExpression::serialize(BSONObjBuilder* builder) const {
     BSONObjBuilder pathSubobj(builder->subobjStart(path()));
     {
@@ -85,8 +85,11 @@ void InternalSchemaMatchArrayIndexMatchExpression::serialize(BSONObjBuilder* bui
 
 std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::shallowClone()
     const {
-    auto clone = stdx::make_unique<InternalSchemaMatchArrayIndexMatchExpression>();
-    invariantOK(clone->init(path(), _index, _expression->shallowClone()));
+    auto clone = stdx::make_unique<InternalSchemaMatchArrayIndexMatchExpression>(
+        path(), _index, _expression->shallowClone());
+    if (getTag()) {
+        clone->setTag(getTag()->clone());
+    }
     return std::move(clone);
 }
 

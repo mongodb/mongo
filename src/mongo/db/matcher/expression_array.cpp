@@ -67,10 +67,9 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
 
 // -------
 
-Status ElemMatchObjectMatchExpression::init(StringData path, MatchExpression* sub) {
-    _sub.reset(sub);
-    return setPath(path);
-}
+ElemMatchObjectMatchExpression::ElemMatchObjectMatchExpression(StringData path,
+                                                               MatchExpression* sub)
+    : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path), _sub(sub) {}
 
 bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
                                                   MatchDetails* details) const {
@@ -119,22 +118,19 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOpti
 
 // -------
 
+ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(StringData path, MatchExpression* sub)
+    : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path) {
+    add(sub);
+}
+
+ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(StringData path)
+    : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path) {}
+
 ElemMatchValueMatchExpression::~ElemMatchValueMatchExpression() {
     for (unsigned i = 0; i < _subs.size(); i++)
         delete _subs[i];
     _subs.clear();
 }
-
-Status ElemMatchValueMatchExpression::init(StringData path, MatchExpression* sub) {
-    init(path).transitional_ignore();
-    add(sub);
-    return Status::OK();
-}
-
-Status ElemMatchValueMatchExpression::init(StringData path) {
-    return setPath(path);
-}
-
 
 void ElemMatchValueMatchExpression::add(MatchExpression* sub) {
     verify(sub);
@@ -208,10 +204,8 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptim
 
 // ---------
 
-Status SizeMatchExpression::init(StringData path, int size) {
-    _size = size;
-    return setPath(path);
-}
+SizeMatchExpression::SizeMatchExpression(StringData path, int size)
+    : ArrayMatchingMatchExpression(SIZE, path), _size(size) {}
 
 bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* details) const {
     if (_size < 0)

@@ -51,7 +51,7 @@ public:
     static const bool kCaseSensitiveDefault;
     static const bool kDiacriticSensitiveDefault;
 
-    TextMatchExpressionBase();
+    explicit TextMatchExpressionBase(StringData path);
     virtual ~TextMatchExpressionBase() {}
 
     /**

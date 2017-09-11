@@ -37,7 +37,8 @@ namespace mongo {
 const bool TextMatchExpressionBase::kCaseSensitiveDefault = false;
 const bool TextMatchExpressionBase::kDiacriticSensitiveDefault = false;
 
-TextMatchExpressionBase::TextMatchExpressionBase() : LeafMatchExpression(TEXT) {}
+TextMatchExpressionBase::TextMatchExpressionBase(StringData path)
+    : LeafMatchExpression(TEXT, path) {}
 
 void TextMatchExpressionBase::debugString(StringBuilder& debug, int level) const {
     const fts::FTSQuery& ftsQuery = getFTSQuery();

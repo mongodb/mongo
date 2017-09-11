@@ -41,7 +41,7 @@ using std::string;
 
 TEST(Path, Root1) {
     ElementPath p;
-    ASSERT(p.init("a").isOK());
+    p.init("a");
 
     BSONObj doc = BSON("x" << 4 << "a" << 5);
 
@@ -55,7 +55,7 @@ TEST(Path, Root1) {
 
 TEST(Path, RootArray1) {
     ElementPath p;
-    ASSERT(p.init("a").isOK());
+    p.init("a");
 
     BSONObj doc = BSON("x" << 4 << "a" << BSON_ARRAY(5 << 6));
 
@@ -78,7 +78,7 @@ TEST(Path, RootArray1) {
 
 TEST(Path, RootArray2) {
     ElementPath p;
-    ASSERT(p.init("a").isOK());
+    p.init("a");
     p.setTraverseLeafArray(false);
 
     BSONObj doc = BSON("x" << 4 << "a" << BSON_ARRAY(5 << 6));
@@ -94,7 +94,7 @@ TEST(Path, RootArray2) {
 
 TEST(Path, Nested1) {
     ElementPath p;
-    ASSERT(p.init("a.b").isOK());
+    p.init("a.b");
 
     BSONObj doc =
         BSON("a" << BSON_ARRAY(BSON("b" << 5) << 3 << BSONObj() << BSON("b" << BSON_ARRAY(9 << 11))
@@ -133,7 +133,7 @@ TEST(Path, Nested1) {
 
 TEST(Path, NestedPartialMatchScalar) {
     ElementPath p;
-    ASSERT(p.init("a.b").isOK());
+    p.init("a.b");
 
     BSONObj doc = BSON("a" << 4);
 
@@ -152,7 +152,7 @@ TEST(Path, NestedPartialMatchScalar) {
 // what we want ideally.
 TEST(Path, NestedPartialMatchArray) {
     ElementPath p;
-    ASSERT(p.init("a.b").isOK());
+    p.init("a.b");
 
     BSONObj doc = BSON("a" << BSON_ARRAY(4));
 
@@ -164,7 +164,7 @@ TEST(Path, NestedPartialMatchArray) {
 // Note that this describes existing behavior and not necessarily
 TEST(Path, NestedEmptyArray) {
     ElementPath p;
-    ASSERT(p.init("a.b").isOK());
+    p.init("a.b");
 
     BSONObj doc = BSON("a" << BSON("b" << BSONArray()));
 
@@ -180,7 +180,7 @@ TEST(Path, NestedEmptyArray) {
 
 TEST(Path, NestedNoLeaf1) {
     ElementPath p;
-    ASSERT(p.init("a.b").isOK());
+    p.init("a.b");
     p.setTraverseLeafArray(false);
 
     BSONObj doc =
@@ -213,7 +213,7 @@ TEST(Path, NestedNoLeaf1) {
 
 TEST(Path, ArrayIndex1) {
     ElementPath p;
-    ASSERT(p.init("a.1").isOK());
+    p.init("a.1");
 
     BSONObj doc = BSON("a" << BSON_ARRAY(5 << 7 << 3));
 
@@ -228,7 +228,7 @@ TEST(Path, ArrayIndex1) {
 
 TEST(Path, ArrayIndex2) {
     ElementPath p;
-    ASSERT(p.init("a.1").isOK());
+    p.init("a.1");
 
     BSONObj doc = BSON("a" << BSON_ARRAY(5 << BSON_ARRAY(2 << 4) << 3));
 
@@ -243,7 +243,7 @@ TEST(Path, ArrayIndex2) {
 
 TEST(Path, ArrayIndex3) {
     ElementPath p;
-    ASSERT(p.init("a.1").isOK());
+    p.init("a.1");
 
     BSONObj doc = BSON("a" << BSON_ARRAY(5 << BSON("1" << 4) << 3));
 
@@ -262,7 +262,7 @@ TEST(Path, ArrayIndex3) {
 
 TEST(Path, ArrayIndexNested1) {
     ElementPath p;
-    ASSERT(p.init("a.1.b").isOK());
+    p.init("a.1.b");
 
     BSONObj doc = BSON("a" << BSON_ARRAY(5 << BSON("b" << 4) << 3));
 
@@ -282,7 +282,7 @@ TEST(Path, ArrayIndexNested1) {
 
 TEST(Path, ArrayIndexNested2) {
     ElementPath p;
-    ASSERT(p.init("a.1.b").isOK());
+    p.init("a.1.b");
 
     BSONObj doc = BSON("a" << BSON_ARRAY(5 << BSON_ARRAY(BSON("b" << 4)) << 3));
 
@@ -300,7 +300,7 @@ TEST(Path, ArrayIndexNested2) {
 // array containing subdocuments with nested arrays.
 TEST(Path, NonMatchingLongArrayOfSubdocumentsWithNestedArrays) {
     ElementPath p;
-    ASSERT(p.init("a.b.x").isOK());
+    p.init("a.b.x");
 
     // Build the document {a: [{b: []}, {b: []}, {b: []}, ...]}.
     BSONObj subdoc = BSON("b" << BSONArray());
@@ -321,7 +321,7 @@ TEST(Path, NonMatchingLongArrayOfSubdocumentsWithNestedArrays) {
 // outermost array that is implicitly traversed.
 TEST(Path, NestedArrayImplicitTraversal) {
     ElementPath p;
-    ASSERT(p.init("a.b").isOK());
+    p.init("a.b");
     BSONObj doc = fromjson("{a: [{b: [2, 3]}, {b: [4, 5]}]}");
     BSONElementIterator cursor(&p, doc);
 
@@ -369,7 +369,7 @@ TEST(Path, NestedArrayImplicitTraversal) {
 // current offset of the array being implicitly traversed.
 TEST(Path, ArrayOffsetWithImplicitAndExplicitTraversal) {
     ElementPath p;
-    ASSERT(p.init("a.0.b").isOK());
+    p.init("a.0.b");
     BSONObj doc = fromjson("{a: [{b: [2, 3]}, {b: [4, 5]}]}");
     BSONElementIterator cursor(&p, doc);
 

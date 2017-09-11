@@ -42,7 +42,7 @@ public:
         BSONObj scope;  // Owned.
     };
 
-    WhereMatchExpressionBase(WhereParams params);
+    explicit WhereMatchExpressionBase(WhereParams params);
 
     size_t numChildren() const final {
         return 0;

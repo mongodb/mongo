@@ -41,7 +41,7 @@ namespace mongo {
 
 class ListOfMatchExpression : public MatchExpression {
 public:
-    ListOfMatchExpression(MatchType type) : MatchExpression(type) {}
+    explicit ListOfMatchExpression(MatchType type) : MatchExpression(type) {}
     virtual ~ListOfMatchExpression();
 
     /**
@@ -187,19 +187,11 @@ public:
 
 class NotMatchExpression final : public MatchExpression {
 public:
-    NotMatchExpression() : MatchExpression(NOT) {}
-    NotMatchExpression(MatchExpression* e) : MatchExpression(NOT), _exp(e) {}
-    /**
-     * @param exp - I own it, and will delete
-     */
-    virtual Status init(MatchExpression* exp) {
-        _exp.reset(exp);
-        return Status::OK();
-    }
+    explicit NotMatchExpression(MatchExpression* e) : MatchExpression(NOT), _exp(e) {}
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<NotMatchExpression> self = stdx::make_unique<NotMatchExpression>();
-        self->init(_exp->shallowClone().release()).transitional_ignore();
+        std::unique_ptr<NotMatchExpression> self =
+            stdx::make_unique<NotMatchExpression>(_exp->shallowClone().release());
         if (getTag()) {
             self->setTag(getTag()->clone());
         }

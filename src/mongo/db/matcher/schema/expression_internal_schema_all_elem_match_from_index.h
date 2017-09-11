@@ -42,17 +42,8 @@ class InternalSchemaAllElemMatchFromIndexMatchExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaAllElemMatchFromIndex"_sd;
 
-    InternalSchemaAllElemMatchFromIndexMatchExpression()
-        : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX) {
-    }
-
-    Status init(StringData path,
-                long long index,
-                std::unique_ptr<ExpressionWithPlaceholder> expression) {
-        _index = index;
-        _expression = std::move(expression);
-        return setPath(path);
-    }
+    InternalSchemaAllElemMatchFromIndexMatchExpression(
+        StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression);
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 

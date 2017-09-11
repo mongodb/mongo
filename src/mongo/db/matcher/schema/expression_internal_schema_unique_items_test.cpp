@@ -36,8 +36,7 @@
 namespace mongo {
 namespace {
 TEST(InternalSchemaUniqueItemsMatchExpression, RejectsNonArrays) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
     ASSERT_FALSE(uniqueItems.matchesBSON(BSON("foo" << 1)));
     ASSERT_FALSE(uniqueItems.matchesBSON(BSON("foo" << BSONObj())));
     ASSERT_FALSE(uniqueItems.matchesBSON(BSON("foo"
@@ -45,22 +44,19 @@ TEST(InternalSchemaUniqueItemsMatchExpression, RejectsNonArrays) {
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesEmptyArray) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
     ASSERT_TRUE(uniqueItems.matchesBSON(BSON("foo" << BSONArray())));
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesOneElementArray) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
     ASSERT_TRUE(uniqueItems.matchesBSON(BSON("foo" << BSON_ARRAY(1))));
     ASSERT_TRUE(uniqueItems.matchesBSON(BSON("foo" << BSON_ARRAY(BSONObj()))));
     ASSERT_TRUE(uniqueItems.matchesBSON(BSON("foo" << BSON_ARRAY(BSON_ARRAY(9 << "bar")))));
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesArrayOfUniqueItems) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: [1, 'bar', {}, [], null]}")));
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: [{x: 1}, {x: 2}, {x: 2, y: 3}]}")));
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: [[1], [1, 2], 1]}")));
@@ -68,8 +64,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, MatchesArrayOfUniqueItems) {
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesNestedArrayOfUniqueItems) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo.bar"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo.bar");
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: {bar: [1, 'bar', {}, [], null]}}")));
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: {bar: [{x: 1}, {x: 2}, {x: 2, y: 3}]}}")));
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: {bar: [[1], [1, 2], 1]}}")));
@@ -77,8 +72,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, MatchesNestedArrayOfUniqueItems) 
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, RejectsArrayWithDuplicates) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
     ASSERT_FALSE(uniqueItems.matchesBSON(fromjson("{foo: [1, 1, 1]}")));
     ASSERT_FALSE(uniqueItems.matchesBSON(fromjson("{foo: [['bar'], ['bar']]}")));
     ASSERT_FALSE(
@@ -86,8 +80,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, RejectsArrayWithDuplicates) {
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, RejectsNestedArrayWithDuplicates) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
     ASSERT_FALSE(uniqueItems.matchesBSON(fromjson("{foo: {bar: [1, 1, 1]}}")));
     ASSERT_FALSE(uniqueItems.matchesBSON(fromjson("{foo: {bar: [['baz'], ['baz']]}}")));
     ASSERT_FALSE(uniqueItems.matchesBSON(
@@ -95,8 +88,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, RejectsNestedArrayWithDuplicates)
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, FieldNameSignificantWhenComparingNestedObjects) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: [{x: 7}, {y: 7}]}")));
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: [{a: 'bar'}, {b: 'bar'}]}")));
     ASSERT_FALSE(uniqueItems.matchesBSON(fromjson("{foo: [{a: 'bar'}, {a: 'bar'}]}")));
@@ -104,8 +96,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, FieldNameSignificantWhenComparing
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, AlwaysUsesBinaryComparisonRegardlessOfCollator) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems;
-    ASSERT_OK(uniqueItems.init("foo"));
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     uniqueItems.setCollator(&collator);
 

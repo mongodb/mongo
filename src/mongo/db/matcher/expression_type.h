@@ -36,7 +36,8 @@ namespace mongo {
 template <class T>
 class TypeMatchExpressionBase : public LeafMatchExpression {
 public:
-    explicit TypeMatchExpressionBase(MatchType matchType) : LeafMatchExpression(matchType) {}
+    explicit TypeMatchExpressionBase(MatchType matchType, StringData path, MatcherTypeSet typeSet)
+        : LeafMatchExpression(matchType, path), _typeSet(std::move(typeSet)) {}
 
     virtual ~TypeMatchExpressionBase() = default;
 
@@ -45,14 +46,8 @@ public:
      */
     virtual StringData name() const = 0;
 
-    Status init(StringData path, MatcherTypeSet typeSet) {
-        _typeSet = std::move(typeSet);
-        return setPath(path);
-    }
-
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto expr = stdx::make_unique<T>();
-        invariantOK(expr->init(path(), _typeSet));
+        auto expr = stdx::make_unique<T>(path(), _typeSet);
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
@@ -117,7 +112,8 @@ class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpres
 public:
     static constexpr StringData kName = "$type"_sd;
 
-    TypeMatchExpression() : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR) {}
+    TypeMatchExpression(StringData path, MatcherTypeSet typeSet)
+        : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR, path, typeSet) {}
 
     StringData name() const final {
         return kName;
@@ -134,8 +130,10 @@ class InternalSchemaTypeExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaType"_sd;
 
-    InternalSchemaTypeExpression()
-        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE) {}
+    InternalSchemaTypeExpression(StringData path, MatcherTypeSet typeSet)
+        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE, path, typeSet) {
+        setTraverseLeafArray();
+    }
 
     StringData name() const final {
         return kName;

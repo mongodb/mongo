@@ -33,25 +33,23 @@
 namespace mongo {
 constexpr StringData InternalSchemaAllowedPropertiesMatchExpression::kName;
 
-Status InternalSchemaAllowedPropertiesMatchExpression::init(
+InternalSchemaAllowedPropertiesMatchExpression::InternalSchemaAllowedPropertiesMatchExpression(
     boost::container::flat_set<StringData> properties,
     StringData namePlaceholder,
     std::vector<PatternSchema> patternProperties,
-    std::unique_ptr<ExpressionWithPlaceholder> otherwise) {
-    _properties = std::move(properties);
-    _namePlaceholder = namePlaceholder;
-    _patternProperties = std::move(patternProperties);
-    _otherwise = std::move(otherwise);
+    std::unique_ptr<ExpressionWithPlaceholder> otherwise)
+    : MatchExpression(MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES),
+      _properties(std::move(properties)),
+      _namePlaceholder(namePlaceholder),
+      _patternProperties(std::move(patternProperties)),
+      _otherwise(std::move(otherwise)) {
 
     for (auto&& constraint : _patternProperties) {
         const auto& errorStr = constraint.first.regex->error();
-        if (!errorStr.empty()) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "Invalid regular expression: " << errorStr};
-        }
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Invalid regular expression: " << errorStr,
+                errorStr.empty());
     }
-
-    return Status::OK();
 }
 
 void InternalSchemaAllowedPropertiesMatchExpression::debugString(StringBuilder& debug,
@@ -165,11 +163,11 @@ std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression:
                                              constraint.second->shallowClone());
     }
 
-    auto clone = stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>();
-    invariantOK(clone->init(_properties,
-                            _namePlaceholder,
-                            std::move(clonedPatternProperties),
-                            _otherwise->shallowClone()));
+    auto clone = stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>(
+        _properties,
+        _namePlaceholder,
+        std::move(clonedPatternProperties),
+        _otherwise->shallowClone());
     return {std::move(clone)};
 }
 

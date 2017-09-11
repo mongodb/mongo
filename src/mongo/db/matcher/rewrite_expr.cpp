@@ -150,9 +150,8 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
     std::vector<BSONElement> elementList;
     inValues.elems(elementList);
 
-    auto matchInExpr = stdx::make_unique<InMatchExpression>();
+    auto matchInExpr = stdx::make_unique<InMatchExpression>(fieldPath);
     matchInExpr->setCollator(_collator);
-    uassertStatusOK(matchInExpr->init(fieldPath));
     uassertStatusOK(matchInExpr->setEqualities(elementList));
 
     return std::move(matchInExpr);
@@ -226,42 +225,46 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
 
     switch (comparisonOp) {
         case ExpressionCompare::EQ: {
-            compMatchExpr = stdx::make_unique<EqualityMatchExpression>();
+            compMatchExpr = stdx::make_unique<EqualityMatchExpression>(fieldAndValue.fieldName(),
+                                                                       fieldAndValue);
             break;
         }
         case ExpressionCompare::NE: {
-            compMatchExpr = stdx::make_unique<EqualityMatchExpression>();
-            notMatchExpr = stdx::make_unique<NotMatchExpression>();
+            compMatchExpr = stdx::make_unique<EqualityMatchExpression>(fieldAndValue.fieldName(),
+                                                                       fieldAndValue);
+            notMatchExpr = stdx::make_unique<NotMatchExpression>(compMatchExpr.release());
             break;
         }
         case ExpressionCompare::GT: {
-            compMatchExpr = stdx::make_unique<GTMatchExpression>();
+            compMatchExpr =
+                stdx::make_unique<GTMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         case ExpressionCompare::GTE: {
-            compMatchExpr = stdx::make_unique<GTEMatchExpression>();
+            compMatchExpr =
+                stdx::make_unique<GTEMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         case ExpressionCompare::LT: {
-            compMatchExpr = stdx::make_unique<LTMatchExpression>();
+            compMatchExpr =
+                stdx::make_unique<LTMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         case ExpressionCompare::LTE: {
-            compMatchExpr = stdx::make_unique<LTEMatchExpression>();
+            compMatchExpr =
+                stdx::make_unique<LTEMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         default:
             MONGO_UNREACHABLE;
     }
 
-    uassertStatusOK(compMatchExpr->init(fieldAndValue.fieldName(), fieldAndValue));
-    compMatchExpr->setCollator(_collator);
-
     if (notMatchExpr) {
-        uassertStatusOK(notMatchExpr->init(compMatchExpr.release()));
+        notMatchExpr->setCollator(_collator);
         return std::move(notMatchExpr);
     }
 
+    compMatchExpr->setCollator(_collator);
     return std::move(compMatchExpr);
 }
 
