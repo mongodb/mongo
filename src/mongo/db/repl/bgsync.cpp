@@ -292,6 +292,10 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
 
     // this oplog reader does not do a handshake because we don't want the server it's syncing
     // from to track how far it has synced
+    HostAndPort oldSource;
+    OpTime lastOpTimeFetched;
+    HostAndPort source;
+    SyncSourceResolverResponse syncSourceResp;
     {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         if (_lastOpTimeFetched.isNull()) {
@@ -305,13 +309,11 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         if (_state != ProducerState::Running) {
             return;
         }
+
+        oldSource = _syncSourceHost;
     }
 
     // find a target to sync from the last optime fetched
-    OpTime lastOpTimeFetched;
-    HostAndPort source;
-    HostAndPort oldSource = _syncSourceHost;
-    SyncSourceResolverResponse syncSourceResp;
     {
         const OpTime minValidSaved =
             _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx);
