@@ -106,7 +106,7 @@ constexpr StringData kNamePlaceholder = "i"_sd;
  * then this is passed in 'path'. In this example, the value of 'path' is "myProp". If there is no
  * path, e.g. for top-level schemas, then 'path' is empty.
  */
-StatusWithMatchExpression _parse(StringData path, BSONObj schema);
+StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnknownKeywords);
 
 /**
  * Constructs and returns a match expression to evaluate a JSON Schema restriction keyword.
@@ -369,7 +369,9 @@ StatusWithMatchExpression parseMultipleOf(StringData path,
 }
 
 template <class T>
-StatusWithMatchExpression parseLogicalKeyword(StringData path, BSONElement logicalElement) {
+StatusWithMatchExpression parseLogicalKeyword(StringData path,
+                                              BSONElement logicalElement,
+                                              bool ignoreUnknownKeywords) {
     if (logicalElement.type() != BSONType::Array) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '" << logicalElement.fieldNameStringData()
@@ -392,7 +394,7 @@ StatusWithMatchExpression parseLogicalKeyword(StringData path, BSONElement logic
                                   << elem.type()};
         }
 
-        auto nestedSchemaMatch = _parse(path, elem.embeddedObject());
+        auto nestedSchemaMatch = _parse(path, elem.embeddedObject(), ignoreUnknownKeywords);
         if (!nestedSchemaMatch.isOK()) {
             return nestedSchemaMatch.getStatus();
         }
@@ -484,7 +486,8 @@ StatusWithMatchExpression parseProperties(
     StringData path,
     BSONElement propertiesElt,
     InternalSchemaTypeExpression* typeExpr,
-    const boost::container::flat_set<StringData>& requiredProperties) {
+    const boost::container::flat_set<StringData>& requiredProperties,
+    bool ignoreUnknownKeywords) {
     if (propertiesElt.type() != BSONType::Object) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '" << kSchemaPropertiesKeyword
@@ -501,7 +504,8 @@ StatusWithMatchExpression parseProperties(
                                   << "' must be an object"};
         }
 
-        auto nestedSchemaMatch = _parse(property.fieldNameStringData(), property.embeddedObject());
+        auto nestedSchemaMatch = _parse(
+            property.fieldNameStringData(), property.embeddedObject(), ignoreUnknownKeywords);
         if (!nestedSchemaMatch.isOK()) {
             return nestedSchemaMatch.getStatus();
         }
@@ -542,7 +546,8 @@ StatusWithMatchExpression parseProperties(
     return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
 }
 
-StatusWith<std::vector<PatternSchema>> parsePatternProperties(BSONElement patternPropertiesElt) {
+StatusWith<std::vector<PatternSchema>> parsePatternProperties(BSONElement patternPropertiesElt,
+                                                              bool ignoreUnknownKeywords) {
     std::vector<PatternSchema> patternProperties;
     if (!patternPropertiesElt) {
         return {std::move(patternProperties)};
@@ -566,7 +571,8 @@ StatusWith<std::vector<PatternSchema>> parsePatternProperties(BSONElement patter
 
         // Parse the nested schema using a placeholder as the path, since we intend on using the
         // resulting match expression inside an ExpressionWithPlaceholder.
-        auto nestedSchemaMatch = _parse(kNamePlaceholder, patternSchema.embeddedObject());
+        auto nestedSchemaMatch =
+            _parse(kNamePlaceholder, patternSchema.embeddedObject(), ignoreUnknownKeywords);
         if (!nestedSchemaMatch.isOK()) {
             return nestedSchemaMatch.getStatus();
         }
@@ -580,7 +586,8 @@ StatusWith<std::vector<PatternSchema>> parsePatternProperties(BSONElement patter
     return {std::move(patternProperties)};
 }
 
-StatusWithMatchExpression parseAdditionalProperties(BSONElement additionalPropertiesElt) {
+StatusWithMatchExpression parseAdditionalProperties(BSONElement additionalPropertiesElt,
+                                                    bool ignoreUnknownKeywords) {
     if (!additionalPropertiesElt) {
         // The absence of the 'additionalProperties' keyword is identical in meaning to the presence
         // of 'additionalProperties' with a value of true.
@@ -605,7 +612,8 @@ StatusWithMatchExpression parseAdditionalProperties(BSONElement additionalProper
 
     // Parse the nested schema using a placeholder as the path, since we intend on using the
     // resulting match expression inside an ExpressionWithPlaceholder.
-    auto nestedSchemaMatch = _parse(kNamePlaceholder, additionalPropertiesElt.embeddedObject());
+    auto nestedSchemaMatch =
+        _parse(kNamePlaceholder, additionalPropertiesElt.embeddedObject(), ignoreUnknownKeywords);
     if (!nestedSchemaMatch.isOK()) {
         return nestedSchemaMatch.getStatus();
     }
@@ -621,7 +629,8 @@ StatusWithMatchExpression parseAllowedProperties(StringData path,
                                                  BSONElement propertiesElt,
                                                  BSONElement patternPropertiesElt,
                                                  BSONElement additionalPropertiesElt,
-                                                 InternalSchemaTypeExpression* typeExpr) {
+                                                 InternalSchemaTypeExpression* typeExpr,
+                                                 bool ignoreUnknownKeywords) {
     // Collect the set of properties named by the 'properties' keyword.
     boost::container::flat_set<StringData> propertyNames;
     if (propertiesElt) {
@@ -633,12 +642,12 @@ StatusWithMatchExpression parseAllowedProperties(StringData path,
                                                                propertyNamesVec.end());
     }
 
-    auto patternProperties = parsePatternProperties(patternPropertiesElt);
+    auto patternProperties = parsePatternProperties(patternPropertiesElt, ignoreUnknownKeywords);
     if (!patternProperties.isOK()) {
         return patternProperties.getStatus();
     }
 
-    auto otherwiseExpr = parseAdditionalProperties(additionalPropertiesElt);
+    auto otherwiseExpr = parseAdditionalProperties(additionalPropertiesElt, ignoreUnknownKeywords);
     if (!otherwiseExpr.isOK()) {
         return otherwiseExpr.getStatus();
     }
@@ -720,10 +729,12 @@ StatusWithMatchExpression makeDependencyExistsClause(StringData path, StringData
     return {std::move(objectMatch)};
 }
 
-StatusWithMatchExpression translateSchemaDependency(StringData path, BSONElement dependency) {
+StatusWithMatchExpression translateSchemaDependency(StringData path,
+                                                    BSONElement dependency,
+                                                    bool ignoreUnknownKeywords) {
     invariant(dependency.type() == BSONType::Object);
 
-    auto nestedSchemaMatch = _parse(path, dependency.embeddedObject());
+    auto nestedSchemaMatch = _parse(path, dependency.embeddedObject(), ignoreUnknownKeywords);
     if (!nestedSchemaMatch.isOK()) {
         return nestedSchemaMatch.getStatus();
     }
@@ -794,7 +805,9 @@ StatusWithMatchExpression translatePropertyDependency(StringData path, BSONEleme
     return {std::move(condExpr)};
 }
 
-StatusWithMatchExpression parseDependencies(StringData path, BSONElement dependencies) {
+StatusWithMatchExpression parseDependencies(StringData path,
+                                            BSONElement dependencies,
+                                            bool ignoreUnknownKeywords) {
     if (dependencies.type() != BSONType::Object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '" << kSchemaDependenciesKeyword
@@ -812,7 +825,7 @@ StatusWithMatchExpression parseDependencies(StringData path, BSONElement depende
         }
 
         auto dependencyExpr = (dependency.type() == BSONType::Object)
-            ? translateSchemaDependency(path, dependency)
+            ? translateSchemaDependency(path, dependency, ignoreUnknownKeywords)
             : translatePropertyDependency(path, dependency);
         if (!dependencyExpr.isOK()) {
             return dependencyExpr.getStatus();
@@ -837,9 +850,11 @@ StatusWithMatchExpression parseDependencies(StringData path, BSONElement depende
  */
 Status translateLogicalKeywords(StringMap<BSONElement>* keywordMap,
                                 StringData path,
-                                AndMatchExpression* andExpr) {
+                                AndMatchExpression* andExpr,
+                                bool ignoreUnknownKeywords) {
     if (auto allOfElt = keywordMap->get(kSchemaAllOfKeyword)) {
-        auto allOfExpr = parseLogicalKeyword<AndMatchExpression>(path, allOfElt);
+        auto allOfExpr =
+            parseLogicalKeyword<AndMatchExpression>(path, allOfElt, ignoreUnknownKeywords);
         if (!allOfExpr.isOK()) {
             return allOfExpr.getStatus();
         }
@@ -847,7 +862,8 @@ Status translateLogicalKeywords(StringMap<BSONElement>* keywordMap,
     }
 
     if (auto anyOfElt = keywordMap->get(kSchemaAnyOfKeyword)) {
-        auto anyOfExpr = parseLogicalKeyword<OrMatchExpression>(path, anyOfElt);
+        auto anyOfExpr =
+            parseLogicalKeyword<OrMatchExpression>(path, anyOfElt, ignoreUnknownKeywords);
         if (!anyOfExpr.isOK()) {
             return anyOfExpr.getStatus();
         }
@@ -855,7 +871,8 @@ Status translateLogicalKeywords(StringMap<BSONElement>* keywordMap,
     }
 
     if (auto oneOfElt = keywordMap->get(kSchemaOneOfKeyword)) {
-        auto oneOfExpr = parseLogicalKeyword<InternalSchemaXorMatchExpression>(path, oneOfElt);
+        auto oneOfExpr = parseLogicalKeyword<InternalSchemaXorMatchExpression>(
+            path, oneOfElt, ignoreUnknownKeywords);
         if (!oneOfExpr.isOK()) {
             return oneOfExpr.getStatus();
         }
@@ -870,7 +887,7 @@ Status translateLogicalKeywords(StringMap<BSONElement>* keywordMap,
                                   << notElt.type()};
         }
 
-        auto parsedExpr = _parse(path, notElt.embeddedObject());
+        auto parsedExpr = _parse(path, notElt.embeddedObject(), ignoreUnknownKeywords);
         if (!parsedExpr.isOK()) {
             return parsedExpr.getStatus();
         }
@@ -957,7 +974,8 @@ Status translateArrayKeywords(StringMap<BSONElement>* keywordMap,
 Status translateObjectKeywords(StringMap<BSONElement>* keywordMap,
                                StringData path,
                                InternalSchemaTypeExpression* typeExpr,
-                               AndMatchExpression* andExpr) {
+                               AndMatchExpression* andExpr,
+                               bool ignoreUnknownKeywords) {
     boost::container::flat_set<StringData> requiredProperties;
     if (auto requiredElt = keywordMap->get(kSchemaRequiredKeyword)) {
         auto requiredStatus = parseRequired(requiredElt);
@@ -968,7 +986,8 @@ Status translateObjectKeywords(StringMap<BSONElement>* keywordMap,
     }
 
     if (auto propertiesElt = keywordMap->get(kSchemaPropertiesKeyword)) {
-        auto propertiesExpr = parseProperties(path, propertiesElt, typeExpr, requiredProperties);
+        auto propertiesExpr = parseProperties(
+            path, propertiesElt, typeExpr, requiredProperties, ignoreUnknownKeywords);
         if (!propertiesExpr.isOK()) {
             return propertiesExpr.getStatus();
         }
@@ -981,8 +1000,12 @@ Status translateObjectKeywords(StringMap<BSONElement>* keywordMap,
         auto additionalPropertiesElt = keywordMap->get(kSchemaAdditionalPropertiesKeyword);
 
         if (patternPropertiesElt || additionalPropertiesElt) {
-            auto allowedPropertiesExpr = parseAllowedProperties(
-                path, propertiesElt, patternPropertiesElt, additionalPropertiesElt, typeExpr);
+            auto allowedPropertiesExpr = parseAllowedProperties(path,
+                                                                propertiesElt,
+                                                                patternPropertiesElt,
+                                                                additionalPropertiesElt,
+                                                                typeExpr,
+                                                                ignoreUnknownKeywords);
             if (!allowedPropertiesExpr.isOK()) {
                 return allowedPropertiesExpr.getStatus();
             }
@@ -1017,7 +1040,7 @@ Status translateObjectKeywords(StringMap<BSONElement>* keywordMap,
     }
 
     if (auto dependenciesElt = keywordMap->get(kSchemaDependenciesKeyword)) {
-        auto dependenciesExpr = parseDependencies(path, dependenciesElt);
+        auto dependenciesExpr = parseDependencies(path, dependenciesElt, ignoreUnknownKeywords);
         if (!dependenciesExpr.isOK()) {
             return dependenciesExpr.getStatus();
         }
@@ -1158,7 +1181,7 @@ Status validateMetadataKeywords(StringMap<BSONElement>* keywordMap) {
     return Status::OK();
 }
 
-StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
+StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnknownKeywords) {
     // Map from JSON Schema keyword to the corresponding element from 'schema', or to an empty
     // BSONElement if the JSON Schema keyword is not specified.
     StringMap<BSONElement> keywordMap{
@@ -1197,10 +1220,12 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "$jsonSchema keyword '" << elt.fieldNameStringData()
                                             << "' is not currently supported");
+            } else if (!ignoreUnknownKeywords) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "Unknown $jsonSchema keyword: "
+                                            << elt.fieldNameStringData());
             }
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Unknown $jsonSchema keyword: "
-                                        << elt.fieldNameStringData());
+            continue;
         }
 
         if (it->second) {
@@ -1258,12 +1283,14 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema) {
         return translationStatus;
     }
 
-    translationStatus = translateObjectKeywords(&keywordMap, path, typeExpr.get(), andExpr.get());
+    translationStatus = translateObjectKeywords(
+        &keywordMap, path, typeExpr.get(), andExpr.get(), ignoreUnknownKeywords);
     if (!translationStatus.isOK()) {
         return translationStatus;
     }
 
-    translationStatus = translateLogicalKeywords(&keywordMap, path, andExpr.get());
+    translationStatus =
+        translateLogicalKeywords(&keywordMap, path, andExpr.get(), ignoreUnknownKeywords);
     if (!translationStatus.isOK()) {
         return translationStatus;
     }
@@ -1288,8 +1315,8 @@ constexpr StringData JSONSchemaParser::kSchemaTypeNull;
 constexpr StringData JSONSchemaParser::kSchemaTypeObject;
 constexpr StringData JSONSchemaParser::kSchemaTypeString;
 
-StatusWithMatchExpression JSONSchemaParser::parse(BSONObj schema) {
-    return _parse(StringData{}, schema);
+StatusWithMatchExpression JSONSchemaParser::parse(BSONObj schema, bool ignoreUnknownKeywords) {
+    return _parse(StringData{}, schema, ignoreUnknownKeywords);
 }
 
 }  // namespace mongo

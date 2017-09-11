@@ -64,6 +64,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
@@ -608,7 +609,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                     return {Status(ErrorCodes::TypeMismatch, "$jsonSchema must be an object")};
                 }
 
-                auto schemaMatch = JSONSchemaParser::parse(e.Obj());
+                auto schemaMatch = JSONSchemaParser::parse(
+                    e.Obj(), internalQueryIgnoreUnknownJSONSchemaKeywords.load());
                 if (!schemaMatch.isOK()) {
                     return schemaMatch.getStatus();
                 }

@@ -95,6 +95,9 @@ extern AtomicInt32 internalQueryMaxScansToExplode;
 // Allow the planner to generate covered whole index scans, rather than falling back to a COLLSCAN.
 extern AtomicBool internalQueryPlannerGenerateCoveredWholeIndexScans;
 
+// Ignore unknown JSON Schema keywords.
+extern AtomicBool internalQueryIgnoreUnknownJSONSchemaKeywords;
+
 //
 // Query execution.
 //

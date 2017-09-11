@@ -32,6 +32,7 @@
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -1909,6 +1910,55 @@ TEST(JSONSchemaParserTest, UniqueItemsTranslatesCorrectlyWithTypeArray) {
 		}]
 	    }]
 	})"));
+}
+
+TEST(JSONSchemaParserTest, CorrectlyIgnoresUnknownKeywordsParameterIsSet) {
+    const auto ignoreUnknownKeywords = true;
+
+    auto schema = fromjson("{ignored_keyword: 1}");
+    ASSERT_OK(JSONSchemaParser::parse(schema, ignoreUnknownKeywords).getStatus());
+
+    schema = fromjson("{properties: {a: {ignored_keyword: 1}}}");
+    ASSERT_OK(JSONSchemaParser::parse(schema, ignoreUnknownKeywords).getStatus());
+
+    schema = fromjson("{properties: {a: {oneOf: [{ignored_keyword: {}}]}}}");
+    ASSERT_OK(JSONSchemaParser::parse(schema, ignoreUnknownKeywords).getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseUnsupportedKeywordsWhenIgnoreUnknownParameterIsSet) {
+    const auto ignoreUnknownKeywords = true;
+
+    auto result = JSONSchemaParser::parse(fromjson("{default: {}}"), ignoreUnknownKeywords);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword 'default' is not currently supported");
+
+    result = JSONSchemaParser::parse(fromjson("{definitions: {numberField: {type: 'number'}}}"),
+                                     ignoreUnknownKeywords);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword 'definitions' is not currently supported");
+
+    result = JSONSchemaParser::parse(fromjson("{format: 'email'}"), ignoreUnknownKeywords);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword 'format' is not currently supported");
+
+    result = JSONSchemaParser::parse(fromjson("{id: 'someschema.json'}"), ignoreUnknownKeywords);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword 'id' is not currently supported");
+
+    result = JSONSchemaParser::parse(BSON("$ref"
+                                          << "#/definitions/positiveInt"),
+                                     ignoreUnknownKeywords);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword '$ref' is not currently supported");
+
+    result = JSONSchemaParser::parse(fromjson("{$schema: 'hyper-schema'}"), ignoreUnknownKeywords);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword '$schema' is not currently supported");
+
+    result = JSONSchemaParser::parse(
+        fromjson("{$schema: 'http://json-schema.org/draft-04/schema#'}"), ignoreUnknownKeywords);
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "$jsonSchema keyword '$schema' is not currently supported");
 }
 }  // namespace
 }  // namespace mongo

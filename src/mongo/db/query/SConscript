@@ -28,7 +28,6 @@ env.Library(
         "planner_access.cpp",
         "planner_analysis.cpp",
         "planner_ixselect.cpp",
-        "query_knobs.cpp",
         "query_planner.cpp",
         "query_planner_common.cpp",
         "query_solution.cpp",
@@ -45,6 +44,7 @@ env.Library(
         "collation/collator_factory_interface",
         "command_request_response",
         "index_bounds",
+        "query_knobs",
     ],
 )
 
@@ -248,6 +248,16 @@ env.Library(
         "$BUILD_DIR/mongo/db/repl/read_concern_args",
         "$BUILD_DIR/mongo/db/catalog/uuid_catalog"
     ],
+)
+
+env.Library(
+    target="query_knobs",
+    source=[
+        "query_knobs.cpp"
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_parameters'
+    ]
 )
 
 env.Library(

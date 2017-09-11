@@ -50,7 +50,7 @@ public:
      * Converts a JSON schema, represented as BSON, into a semantically equivalent match expression
      * tree. Returns a non-OK status if the schema is invalid or cannot be parsed.
      */
-    static StatusWithMatchExpression parse(BSONObj schema);
+    static StatusWithMatchExpression parse(BSONObj schema, bool ignoreUnknownKeywords = false);
 };
 
 }  // namespace mongo
