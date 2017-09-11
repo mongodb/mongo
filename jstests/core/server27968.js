@@ -140,6 +140,17 @@
             .toArray();
     assert.eq(result, [{name: "Polygon2"}]);
 
+    // Test for an empty query cap (radius 0) inside of a polygon that covers the centerSphere
+    // (should not return a match)
+    result =
+        coll.find({
+                boundary:
+                    {$geoWithin: {$centerSphere: [[174.79144274337722, -41.307682001033385], 0]}}
+            },
+                  {"name": 1, "_id": 0})
+            .toArray();
+    assert.eq(result, []);
+
     // Test for a Polygon intersecting with geowithin sphere (should not return a match)
     result =
         coll.find({
@@ -309,5 +320,30 @@
             .toArray();
     assert.eq(result, []);
 
+    coll.drop();
+
+    // Test for a large query cap containing both of line vertices but not the line itself.
+    // (should not return a match)
+    customLongLine = {
+        "name": "HorizontalLongLine",
+        "route": {
+            "type": "LineString",
+            "coordinates": [[96.328125, 5.61598581915534], [153.984375, -6.315298538330033]]
+        }
+    };
+    assert.writeOK(coll.insert(customLongLine));
+    result = coll.find({
+                     route: {
+                         $geoWithin: {
+                             $centerSphere:
+                                 [[-59.80246852929814, -2.3633072488322853], 2.768403272464979]
+                         }
+                     }
+                 },
+                       {"name": 1, "_id": 0})
+                 .toArray();
+    assert.eq(result, []);
+
+    // End of Test.
     coll.drop();
 })();
