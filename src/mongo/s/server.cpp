@@ -293,8 +293,9 @@ static Status initializeSharding(OperationContext* opCtx) {
 
 static void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
-    // connect to version supporting Write Concern only
-    spec.outgoing.minWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    // Since the upgrade order calls for upgrading mongos last, it only needs to talk the latest
+    // wire version. This ensures that users will get errors if they upgrade in the wrong order.
+    spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
     spec.isInternalClient = true;
