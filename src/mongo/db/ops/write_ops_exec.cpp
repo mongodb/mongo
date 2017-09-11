@@ -473,8 +473,6 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
     const size_t maxBatchSize = internalInsertMaxBatchSize.load();
     batch.reserve(std::min(wholeOp.getDocuments().size(), maxBatchSize));
 
-    auto session = OperationContextSession::get(opCtx);
-
     for (auto&& doc : wholeOp.getDocuments()) {
         const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
         auto fixedDoc = fixDocumentForInsert(opCtx->getServiceContext(), doc);
@@ -483,9 +481,11 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
             // correct order. In an ordered insert, if one of the docs ahead of us fails, we should
             // behave as-if we never got to this document.
         } else {
-            auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
-            if (session) {
-                if (auto entry = session->checkStatementExecuted(opCtx, stmtId)) {
+            const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
+            if (opCtx->getTxnNumber()) {
+                auto session = OperationContextSession::get(opCtx);
+                if (auto entry =
+                        session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
                     out.results.emplace_back(parseOplogEntryForInsert(*entry));
                     continue;
                 }
@@ -624,12 +624,12 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     WriteResult out;
     out.results.reserve(wholeOp.getUpdates().size());
 
-    auto session = OperationContextSession::get(opCtx);
-
     for (auto&& singleOp : wholeOp.getUpdates()) {
-        auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
-        if (session) {
-            if (auto entry = session->checkStatementExecuted(opCtx, stmtId)) {
+        const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
+        if (opCtx->getTxnNumber()) {
+            auto session = OperationContextSession::get(opCtx);
+            if (auto entry =
+                    session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
                 out.results.emplace_back(parseOplogEntryForUpdate(*entry));
                 continue;
             }
@@ -748,12 +748,12 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     WriteResult out;
     out.results.reserve(wholeOp.getDeletes().size());
 
-    auto session = OperationContextSession::get(opCtx);
-
     for (auto&& singleOp : wholeOp.getDeletes()) {
-        auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
-        if (session) {
-            if (auto entry = session->checkStatementExecuted(opCtx, stmtId)) {
+        const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
+        if (opCtx->getTxnNumber()) {
+            auto session = OperationContextSession::get(opCtx);
+            if (auto entry =
+                    session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
                 out.results.emplace_back(parseOplogEntryForDelete(*entry));
                 continue;
             }

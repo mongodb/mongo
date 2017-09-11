@@ -33,25 +33,22 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/session_txn_record.h"
-#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 
 class OperationContext;
+class UpdateRequest;
 
 /**
- * Represents the current state of this transaction.
+ * A write through cache for the state of a particular session. All modifications to the underlying
+ * session transactions collection must be performed through an object of this class.
  *
- * Note: this class is not thread safe. This class assumes that it is the only entity that modifies
- * the session transaction document matching it's own sessionId.
- *
- * All of the modifications to underlying collection will not be replicated because there is no
- * straightforward way to make sure that the secondaries will get the oplog entry for BOTH the
- * actual write and the update to the sessions table in the same batch when it fetches the oplog
- * from the sync source. This can cause the secondaries to be in an inconsistent state that is
- * externally observable and can be really bad if enough secondaries are in this state that they
- * become primaries and start accepting writes.
+ * The cache state can be 'up-to-date' (it is in sync with the persistent contents) or 'needs
+ * refresh' (in which case refreshFromStorageIfNeeded needs to be called in order to make it
+ * up-to-date).
  */
 class Session {
     MONGO_DISALLOW_COPYING(Session);
@@ -64,68 +61,110 @@ public:
     }
 
     /**
-     * Update the txnNum and lastWriteOpTimeTs of the session record. Will create a new entry if the
-     * record with corresponding sessionId does not exist.
+     * Blocking method, which loads the transaction state from storage if it has been marked as
+     * needing refresh.
      *
-     * Outside callers should use saveTxnProgress instead of this when running as primary and
-     * serving a user request.
+     * In order to avoid the possibility of deadlock, this method must not be called while holding a
+     * lock.
      */
-    static void updateSessionRecord(OperationContext* opCtx,
-                                    const LogicalSessionId& sessionId,
-                                    const TxnNumber& txnNum,
-                                    const Timestamp& ts);
+    void refreshFromStorageIfNeeded(OperationContext* opCtx);
 
     /**
-     * Load transaction state from storage if it hasn't or if the session has been reset. Will retry
-     * until the session generation does not change during I/O.
+     * Starts a new transaction on the session, must be called after refreshFromStorageIfNeeded has
+     * been called. If an attempt is made to start a transaction with number less than the latest
+     * transaction this session has seen, an exception will be thrown.
+     *
+     * Throws if the session has been invalidated or if an attempt is made to start a transaction
+     * older than the active.
+     *
+     * In order to avoid the possibility of deadlock, this method must not be called while holding a
+     * lock.
      */
-    void begin(OperationContext* opCtx, const TxnNumber& txnNumber);
+    void beginTxn(OperationContext* opCtx, TxnNumber txnNumber);
 
     /**
-     * Returns the history of writes that has happened on this transaction.
+     * Called after a write under the specified transaction completes while the node is a primary
+     * and specifies the statement ids which were written. Must be called while the caller is still
+     * in the write's WUOW. Updates the on-disk state of the session to match the specified
+     * transaction/timestamp and keeps the cached state in sync.
+     *
+     * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
-    TransactionHistoryIterator getWriteHistory(OperationContext* opCtx) const;
+    void onWriteOpCompletedOnPrimary(OperationContext* opCtx,
+                                     TxnNumber txnNumber,
+                                     std::vector<StmtId> stmtIdsWritten,
+                                     Timestamp newLastWriteTs);
 
     /**
-     * Stores the result of a single write operation within this transaction.
+     * Called after a replication batch has been applied on a secondary node. Keeps the session
+     * transaction entry in sync with the oplog chain which has been written.
+     *
+     * In order to avoid the possibility of deadlock, this method must not be called while holding a
+     * lock.
      */
-    void saveTxnProgress(OperationContext* opCtx, Timestamp opTime);
+    static void updateSessionRecordOnSecondary(OperationContext* opCtx,
+                                               const SessionTxnRecord& sessionTxnRecord);
 
     /**
-     * Note: can only be called after at least one successful execution of begin().
+     * Marks the session as requiring refresh. Used when the session state has been modified
+     * externally, such as through a direct write to the transactions table.
      */
-    TxnNumber getTxnNum() const;
+    void invalidate();
 
     /**
-     * Note: can only be called after at least one successful execution of begin().
+     * Returns the op time of the last committed write for this session and transaction. If no write
+     * has completed yet, returns an empty timestamp.
+     *
+     * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
-    Timestamp getLastWriteOpTimeTs() const;
+    Timestamp getLastWriteOpTimeTs(TxnNumber txnNumber) const;
 
     /**
-     * Resets the session's in-memory state, forcing it to reload from the transactions table the
-     * next time begin is called.
-     */
-    void reset();
-
-    /**
-     * Returns the oplog entry with the given statementId, if it exists.
+     * Returns the oplog entry with the given statementId for the specified transaction, if it
+     * exists. If an actual oplog entry is returned, this means the specified write statement has
+     * already executed and shouldn't be performed again.
+     *
+     * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
     boost::optional<repl::OplogEntry> checkStatementExecuted(OperationContext* opCtx,
-                                                             StmtId stmtId);
+                                                             TxnNumber txnNumber,
+                                                             StmtId stmtId) const;
 
 private:
+    void _beginTxn(WithLock, TxnNumber txnNumber);
+
+    void _checkValid(WithLock) const;
+
+    void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const;
+
+    UpdateRequest _makeUpdateRequest(WithLock,
+                                     TxnNumber newTxnNumber,
+                                     Timestamp newLastWriteTs) const;
+
+    void _registerUpdateCacheOnCommit(OperationContext* opCtx,
+                                      TxnNumber newTxnNumber,
+                                      std::vector<StmtId> stmtIdsWritten,
+                                      Timestamp newLastWriteTs);
+
     const LogicalSessionId _sessionId;
 
     // Protects the member variables below.
     mutable stdx::mutex _mutex;
 
-    boost::optional<SessionTxnRecord> _lastWrittenTxnRecord;
+    // Specifies whether the session information needs to be refreshed from storage
+    bool _isValid{false};
 
-    /**
-     * Incremented each time the session is externally modified. Used to determine if the session
-     * needs to be reloaded after I/O.
-     */
-    int _generation;
+    // Counter, incremented with each call to invalidate in order to discern invalidations, which
+    // happen during refresh
+    int _numInvalidations{0};
+
+    // Caches what is known to be the last written transaction record for the session
+    boost::optional<SessionTxnRecord> _lastWrittenSessionRecord;
+
+    // Tracks the last seen txn number for the session and is always >= to the transaction number in
+    // the last written txn record. When it is > than that in the last written txn record, this
+    // means a new transaction has begun on the session, but it hasn't yet performed any writes.
+    TxnNumber _activeTxnNumber{kUninitializedTxnNumber};
 };
 
 }  // namespace mongo

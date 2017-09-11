@@ -54,6 +54,7 @@
 
 namespace mongo {
 namespace {
+
 // Return whether we're a master using master-slave replication.
 bool isMasterSlave() {
     return repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
@@ -61,23 +62,39 @@ bool isMasterSlave() {
 }
 
 /**
- * Updates the session state with the operation timestamp if there is an active one in the
- * operation context.
+ * Updates the session state with the last write timestamp and transaction for that session.
+ *
+ * In the case of writes with transaction/statement id, this method will be recursively entered a
+ * second time for the actual write to the transactions table. Since this write does not generate an
+ * oplog entry, the recursion will stop at this point.
  */
-void updateSessionProgress(OperationContext* opCtx, const repl::OpTime& lastTxnWriteOpTime) {
-    if (opCtx->getTxnNumber()) {
-        auto lastWriteTs = lastTxnWriteOpTime.getTimestamp();
-        if (!lastWriteTs.isNull()) {
-            // Update session only if a new oplog entry was actually created.
-            OperationContextSession::get(opCtx)->saveTxnProgress(opCtx, lastWriteTs);
-        }
+void onWriteOpCompleted(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        std::vector<StmtId> stmtIdsWritten,
+                        const repl::OpTime& lastTxnWriteOpTime) {
+    const auto lastWriteTs = lastTxnWriteOpTime.getTimestamp();
+    if (lastWriteTs.isNull())
+        return;
+
+    if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
+        uassert(40528,
+                str::stream() << "Direct writes against "
+                              << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                              << "  cannot be performed using a transaction or on a session.",
+                !opCtx->getLogicalSessionId());
+        SessionCatalog::get(opCtx)->resetSessions();
+    } else if (opCtx->getTxnNumber()) {
+        OperationContextSession::get(opCtx)->onWriteOpCompletedOnPrimary(
+            opCtx, *opCtx->getTxnNumber(), std::move(stmtIdsWritten), lastWriteTs);
     }
 }
 
 /**
  * Write oplog entry(ies) for the update operation.
  */
-repl::OpTime replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+repl::OpTime replLogUpdate(OperationContext* opCtx,
+                           Session* session,
+                           const OplogUpdateEntryArgs& args) {
     BSONObj storeObj;
     if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
         invariant(args.preImageDoc);
@@ -86,16 +103,13 @@ repl::OpTime replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
         storeObj = args.updatedDoc;
     }
 
-    repl::OplogLink oplogLink;
     OperationSessionInfo sessionInfo;
+    repl::OplogLink oplogLink;
 
-    if (opCtx->getTxnNumber()) {
-        auto session = OperationContextSession::get(opCtx);
-
-        invariant(session);
-        oplogLink.prevTs = session->getLastWriteOpTimeTs();
-        sessionInfo.setSessionId(session->getSessionId());
-        sessionInfo.setTxnNumber(session->getTxnNum());
+    if (session) {
+        sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+        sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+        oplogLink.prevTs = session->getLastWriteOpTimeTs(*opCtx->getTxnNumber());
     }
 
     if (!storeObj.isEmpty() && opCtx->getTxnNumber()) {
@@ -135,20 +149,18 @@ repl::OpTime replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
 repl::OpTime replLogDelete(OperationContext* opCtx,
                            const NamespaceString& nss,
                            OptionalCollectionUUID uuid,
+                           Session* session,
                            StmtId stmtId,
                            CollectionShardingState::DeleteState deleteState,
                            bool fromMigrate,
                            const boost::optional<BSONObj>& deletedDoc) {
-    repl::OplogLink oplogLink;
     OperationSessionInfo sessionInfo;
+    repl::OplogLink oplogLink;
 
-    if (opCtx->getTxnNumber()) {
-        auto session = OperationContextSession::get(opCtx);
-
-        invariant(session);
-        oplogLink.prevTs = session->getLastWriteOpTimeTs();
-        sessionInfo.setSessionId(session->getSessionId());
-        sessionInfo.setTxnNumber(session->getTxnNum());
+    if (session) {
+        sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+        sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+        oplogLink.prevTs = session->getLastWriteOpTimeTs(*opCtx->getTxnNumber());
     }
 
     if (deletedDoc && opCtx->getTxnNumber()) {
@@ -222,12 +234,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator begin,
                                std::vector<InsertStatement>::const_iterator end,
                                bool fromMigrate) {
-    Session* session = nullptr;
-    if (opCtx->getTxnNumber()) {
-        session = OperationContextSession::get(opCtx);
-    }
-
-    auto opTime = repl::logInsertOps(opCtx, nss, uuid, session, begin, end, fromMigrate);
+    Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
+    const auto opTime = repl::logInsertOps(opCtx, nss, uuid, session, begin, end, fromMigrate);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
 
@@ -239,20 +247,22 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         }
     }
 
-    if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
+    if (nss.coll() == "system.js") {
+        Scope::storedFuncMod(opCtx);
+    } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onExternalChange(opCtx, nss);
+    } else if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
         for (auto it = begin; it != end; it++) {
             FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, it->doc);
         }
     }
 
-    if (strstr(nss.ns().c_str(), ".system.js")) {
-        Scope::storedFuncMod(opCtx);
-    }
-    if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
-        DurableViewCatalog::onExternalChange(opCtx, nss);
-    }
+    std::vector<StmtId> stmtIdsWritten;
+    std::transform(begin, end, std::back_inserter(stmtIdsWritten), [](const InsertStatement& stmt) {
+        return stmt.stmtId;
+    });
 
-    updateSessionProgress(opCtx, opTime);
+    onWriteOpCompleted(opCtx, nss, stmtIdsWritten, opTime);
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
@@ -261,7 +271,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         return;
     }
 
-    auto opTime = replLogUpdate(opCtx, args);
+    Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
+    const auto opTime = replLogUpdate(opCtx, session, args);
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "u", args.nss, args.update, &args.criteria);
@@ -271,19 +282,15 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         css->onUpdateOp(opCtx, args.criteria, args.update, args.updatedDoc);
     }
 
-    if (strstr(args.nss.ns().c_str(), ".system.js")) {
+    if (args.nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
-    }
-
-    if (args.nss.coll() == DurableViewCatalog::viewsCollectionName()) {
+    } else if (args.nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, args.nss);
-    }
-
-    if (args.nss.ns() == FeatureCompatibilityVersion::kCollection) {
+    } else if (args.nss.ns() == FeatureCompatibilityVersion::kCollection) {
         FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updatedDoc);
     }
 
-    updateSessionProgress(opCtx, opTime);
+    onWriteOpCompleted(opCtx, args.nss, std::vector<StmtId>{args.stmtId}, opTime);
 }
 
 auto OpObserverImpl::aboutToDelete(OperationContext* opCtx,
@@ -300,10 +307,14 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               CollectionShardingState::DeleteState deleteState,
                               bool fromMigrate,
                               const boost::optional<BSONObj>& deletedDoc) {
-    if (deleteState.documentKey.isEmpty())
+    if (deleteState.documentKey.isEmpty()) {
         return;
+    }
 
-    auto opTime = replLogDelete(opCtx, nss, uuid, stmtId, deleteState, fromMigrate, deletedDoc);
+    Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
+
+    const auto opTime =
+        replLogDelete(opCtx, nss, uuid, session, stmtId, deleteState, fromMigrate, deletedDoc);
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "d", nss, deleteState.documentKey, nullptr);
@@ -315,15 +326,13 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     if (nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
-    }
-    if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
+    } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, nss);
-    }
-    if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
+    } else if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
         FeatureCompatibilityVersion::onDelete(opCtx, deleteState.documentKey);
     }
 
-    updateSessionProgress(opCtx, opTime);
+    onWriteOpCompleted(opCtx, nss, std::vector<StmtId>{stmtId}, opTime);
 }
 
 void OpObserverImpl::onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) {

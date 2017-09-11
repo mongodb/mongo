@@ -573,8 +573,7 @@ void scheduleTxnTableUpdates(OperationContext* opCtx,
             const auto opCtx = opCtxHolder.get();
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-            Session::updateSessionRecord(
-                opCtx, record.getSessionId(), record.getTxnNum(), record.getLastWriteOpTimeTs());
+            Session::updateSessionRecordOnSecondary(opCtx, record);
         });
     }
 }

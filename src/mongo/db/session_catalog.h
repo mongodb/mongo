@@ -104,6 +104,10 @@ public:
      * Returns a reference to the specified cached session regardless of whether it is checked-out
      * or not. The returned session is not returned checked-out and is allowed to be checked-out
      * concurrently.
+     *
+     * The intended usage for this method is to allow migrations to run in parallel with writes for
+     * the same session without blocking it. Because of this, it may not be used from operations
+     * which run on a session.
      */
     ScopedSession getOrCreateSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 

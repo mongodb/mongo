@@ -465,13 +465,13 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
     WriteUnitOfWork wuow(opCtx);
     auto wallTime = Date_t::now();
 
-    OplogLink oplogLink;
     OperationSessionInfo sessionInfo;
+    OplogLink oplogLink;
 
     if (session) {
-        oplogLink.prevTs = session->getLastWriteOpTimeTs();
-        sessionInfo.setSessionId(session->getSessionId());
-        sessionInfo.setTxnNumber(session->getTxnNum());
+        sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+        sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+        oplogLink.prevTs = session->getLastWriteOpTimeTs(*opCtx->getTxnNumber());
     }
 
     auto timestamps = stdx::make_unique<Timestamp[]>(count);

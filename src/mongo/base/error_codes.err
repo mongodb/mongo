@@ -222,6 +222,7 @@ error_code("IndexModified", 221)
 error_code("CloseChangeStream", 222)
 error_code("IllegalOpMsgFlag", 223)
 error_code("JSONSchemaNotAllowed", 224)
+error_code("TransactionTooOld", 225)
 
 # Error codes 4000-8999 are reserved.
 

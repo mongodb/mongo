@@ -155,15 +155,25 @@ ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx)
 
 ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
                                                  const LogicalSessionId& lsid) {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->getLogicalSessionId());
+    invariant(!opCtx->getTxnNumber());
 
-    return ScopedSession(_getOrCreateSessionRuntimeInfo(opCtx, lsid, ul));
+    auto ss = [&] {
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
+        return ScopedSession(_getOrCreateSessionRuntimeInfo(opCtx, lsid, ul));
+    }();
+
+    // Perform the refresh outside of the mutex
+    ss->refreshFromStorageIfNeeded(opCtx);
+
+    return ss;
 }
 
 void SessionCatalog::resetSessions() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     for (const auto& it : _txnTable) {
-        it.second->txnState.reset();
+        it.second->txnState.invalidate();
     }
 }
 
@@ -212,8 +222,10 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opC
         return;
     }
 
+    checkedOutSession->scopedSession->refreshFromStorageIfNeeded(opCtx);
+
     if (opCtx->getTxnNumber()) {
-        checkedOutSession->scopedSession->begin(opCtx, opCtx->getTxnNumber().get());
+        checkedOutSession->scopedSession->beginTxn(opCtx, *opCtx->getTxnNumber());
     }
 }
 

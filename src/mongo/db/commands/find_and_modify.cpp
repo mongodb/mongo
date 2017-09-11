@@ -71,7 +71,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
 namespace {
 
 const UpdateStats* getUpdateStats(const PlanExecutor* exec) {
@@ -216,11 +215,11 @@ void recordStatsForTopCommand(OperationContext* opCtx) {
                 curOp->getReadWriteType());
 }
 
-}  // namespace
-
 /* Find and Modify an object returning either the old (default) or new value*/
 class CmdFindAndModify : public BasicCommand {
 public:
+    CmdFindAndModify() : BasicCommand("findAndModify", "findandmodify") {}
+
     void help(std::stringstream& help) const override {
         help << "{ findAndModify: \"collection\", query: {processed:false}, update: {$set: "
                 "{processed:true}}, new: true}\n"
@@ -230,13 +229,11 @@ public:
                 "Output is in the \"value\" field\n";
     }
 
-    CmdFindAndModify() : BasicCommand("findAndModify", "findandmodify") {}
-
     bool slaveOk() const override {
         return false;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -246,7 +243,7 @@ public:
         find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
     }
 
-    ReadWriteType getReadWriteType() const {
+    ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kWrite;
     }
 
@@ -362,14 +359,12 @@ public:
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);
 
+        const auto stmtId = 0;
         if (opCtx->getTxnNumber()) {
             auto session = OperationContextSession::get(opCtx);
-            invariant(session);
-            auto writeHistory = session->getWriteHistory(opCtx);
-
-            if (writeHistory.hasNext()) {
-                auto findAndModifyResult =
-                    parseOplogEntryForFindAndModify(opCtx, args, writeHistory.next(opCtx));
+            if (auto entry =
+                    session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
+                auto findAndModifyResult = parseOplogEntryForFindAndModify(opCtx, args, *entry);
                 findAndModifyResult.serialize(&result);
                 return true;
             }
@@ -381,14 +376,14 @@ public:
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it is
         // executing a findAndModify. This is done to ensure that we can always match, modify, and
         // return the document under concurrency, if a matching document exists.
-        bool success = writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
+        return writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
             if (args.isRemove()) {
                 DeleteRequest request(nsString);
                 const bool isExplain = false;
                 makeDeleteRequest(args, isExplain, &request);
 
                 if (opCtx->getTxnNumber()) {
-                    request.setStmtId(0);
+                    request.setStmtId(stmtId);
                 }
 
                 ParsedDelete parsedDelete(opCtx, &request);
@@ -473,7 +468,7 @@ public:
                 makeUpdateRequest(args, isExplain, &updateLifecycle, &request);
 
                 if (opCtx->getTxnNumber()) {
-                    request.setStmtId(0);
+                    request.setStmtId(stmtId);
                 }
 
                 ParsedUpdate parsedUpdate(opCtx, &request);
@@ -583,14 +578,9 @@ public:
             }
             return true;
         });
-
-        if (!success) {
-            return false;
-        }
-
-        return true;
     }
 
 } cmdFindAndModify;
 
+}  // namespace
 }  // namespace mongo

@@ -35,6 +35,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
@@ -61,6 +62,9 @@ void MockReplCoordServerFixture::setUp() {
     DBDirectClient client(opCtx());
     ASSERT_TRUE(
         client.createCollection(NamespaceString::kRsOplogNamespace.ns(), 1024 * 1024, true));
+
+    repl::setOplogCollectionName();
+    repl::acquireOplogCollectionForLogging(opCtx());
 }
 
 void MockReplCoordServerFixture::tearDown() {
