@@ -101,6 +101,8 @@ const boost::container::flat_set<StringData> topLevelOperators{"$_internalSchema
 namespace mongo {
 
 constexpr StringData MatchExpressionParser::kAggExpression;
+constexpr StringData AlwaysFalseMatchExpression::kName;
+constexpr StringData AlwaysTrueMatchExpression::kName;
 
 using std::string;
 using stdx::make_unique;

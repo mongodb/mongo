@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -153,14 +154,14 @@ TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesExpressionsWithTypeOther) 
 
 TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesAlwaysTrue) {
     constexpr CollatorInterface* collator = nullptr;
-    auto rawFilter = fromjson("{$alwaysTrue: 1}");
+    auto rawFilter = BSON(AlwaysTrueMatchExpression::kName << 1);
     auto result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
     ASSERT_FALSE(result->getPlaceholder());
 }
 
 TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesAlwaysFalse) {
     constexpr CollatorInterface* collator = nullptr;
-    auto rawFilter = fromjson("{$alwaysFalse: 1}");
+    auto rawFilter = BSON(AlwaysFalseMatchExpression::kName << 1);
     auto result = assertGet(ExpressionWithPlaceholder::parse(rawFilter, collator));
     ASSERT_FALSE(result->getPlaceholder());
 }
@@ -299,11 +300,11 @@ TEST(ExpressionWithPlaceholderTest, SameObjectMatchesAreEquivalent) {
 
 TEST(ExpressionWithPlaceholderTest, AlwaysTruesAreEquivalent) {
     constexpr auto collator = nullptr;
-    auto rawFilter1 = fromjson("{$alwaysTrue: 1}");
+    auto rawFilter1 = BSON(AlwaysTrueMatchExpression::kName << 1);
     auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::parse(rawFilter1, collator);
     ASSERT_OK(expressionWithPlaceholder1.getStatus());
 
-    auto rawFilter2 = fromjson("{$alwaysTrue: 1}");
+    auto rawFilter2 = BSON(AlwaysTrueMatchExpression::kName << 1);
     auto expressionWithPlaceholder2 = ExpressionWithPlaceholder::parse(rawFilter2, collator);
     ASSERT_OK(expressionWithPlaceholder2.getStatus());
     ASSERT(expressionWithPlaceholder1.getValue()->equivalent(

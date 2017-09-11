@@ -32,6 +32,7 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/matcher.h"
@@ -140,6 +141,19 @@ TEST(SerializeBasic, ExpressionOr) {
 
     obj = fromjson("{x: 'a'}");
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionOrWithNoChildrenSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    // We construct an OrMatchExpression directly rather than using the match expression
+    // parser, since the parser does not permit a $or with no children.
+    OrMatchExpression original;
+    Matcher reserialized(serialize(&original),
+                         kSimpleCollator,
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), BSON(AlwaysFalseMatchExpression::kName << 1));
 }
 
 TEST(SerializeBasic, ExpressionElemMatchObjectSerializesCorrectly) {
@@ -323,7 +337,7 @@ TEST(SerializeBasic, ExpressionAllWithEmptyArraySerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysFalse: 1}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), BSON(AlwaysFalseMatchExpression::kName << 1));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: [1, 2, 3]}");
@@ -1444,7 +1458,7 @@ TEST(SerializeBasic, ExpressionTextWithDefaultLanguageSerializesCorrectly) {
 
 TEST(SerializeBasic, ExpressionAlwaysTrueSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    Matcher original(fromjson("{$alwaysTrue: 1}"),
+    Matcher original(BSON(AlwaysTrueMatchExpression::kName << 1),
                      kSimpleCollator,
                      expCtx,
                      ExtensionsCallbackNoop(),
@@ -1454,13 +1468,13 @@ TEST(SerializeBasic, ExpressionAlwaysTrueSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysTrue: 1}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), BSON(AlwaysTrueMatchExpression::kName << 1));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeBasic, ExpressionAlwaysFalseSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    Matcher original(fromjson("{$alwaysFalse: 1}"),
+    Matcher original(BSON(AlwaysFalseMatchExpression::kName << 1),
                      kSimpleCollator,
                      expCtx,
                      ExtensionsCallbackNoop(),
@@ -1470,7 +1484,7 @@ TEST(SerializeBasic, ExpressionAlwaysFalseSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$alwaysFalse: 1}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), BSON(AlwaysFalseMatchExpression::kName << 1));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 

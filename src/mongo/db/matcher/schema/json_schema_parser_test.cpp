@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/bson/bson_helper.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/unittest/unittest.h"
 
@@ -139,7 +141,7 @@ TEST(JSONSchemaParserTest, TopLevelNonObjectTypeTranslatesCorrectly) {
     BSONObj schema = fromjson("{type: 'string'}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
-    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$alwaysFalse: 1}"));
+    ASSERT_SERIALIZES_TO(result.getValue().get(), BSON(AlwaysFalseMatchExpression::kName << 1));
 }
 
 TEST(JSONSchemaParserTest, TypeNumberTranslatesCorrectly) {
@@ -1361,13 +1363,13 @@ TEST(JSONSchemaParserTest, FailsToParseIfBsonTypeArrayContainsUnknownAlias) {
 TEST(JSONSchemaParserTest, CanTranslateTopLevelTypeArrayWithoutObject) {
     BSONObj schema = fromjson("{type: ['number', 'string']}}}");
     auto result = JSONSchemaParser::parse(schema);
-    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$alwaysFalse: 1}"));
+    ASSERT_SERIALIZES_TO(result.getValue().get(), BSON(AlwaysFalseMatchExpression::kName << 1));
 }
 
 TEST(JSONSchemaParserTest, CanTranslateTopLevelBsonTypeArrayWithoutObject) {
     BSONObj schema = fromjson("{bsonType: ['number', 'string']}}}");
     auto result = JSONSchemaParser::parse(schema);
-    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$alwaysFalse: 1}"));
+    ASSERT_SERIALIZES_TO(result.getValue().get(), BSON(AlwaysFalseMatchExpression::kName << 1));
 }
 
 TEST(JSONSchemaParserTest, CanTranslateTopLevelTypeArrayWithObject) {

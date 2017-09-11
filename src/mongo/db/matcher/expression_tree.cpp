@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 
 namespace mongo {
 
@@ -147,6 +148,10 @@ void OrMatchExpression::debugString(StringBuilder& debug, int level) const {
 }
 
 void OrMatchExpression::serialize(BSONObjBuilder* out) const {
+    if (!numChildren()) {
+        out->append(AlwaysFalseMatchExpression::kName, 1);
+        return;
+    }
     BSONArrayBuilder arrBob(out->subarrayStart("$or"));
     _listToBSON(&arrBob);
 }

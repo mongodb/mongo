@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -225,26 +226,25 @@ TEST(StatusWithTest, Fib1) {
 }
 
 TEST(MatchExpressionParserTest, AlwaysFalseFailsToParseNonOneArguments) {
-    auto queryIntArgument = BSON("$alwaysFalse" << 0);
+    auto queryIntArgument = BSON(AlwaysFalseMatchExpression::kName << 0);
     auto expr = MatchExpressionParser::parse(queryIntArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
-    auto queryStringArgument = BSON("$alwaysFalse"
-                                    << "");
+    auto queryStringArgument = BSON(AlwaysFalseMatchExpression::kName << "");
     expr = MatchExpressionParser::parse(queryStringArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
-    auto queryDoubleArgument = BSON("$alwaysFalse" << 1.1);
+    auto queryDoubleArgument = BSON(AlwaysFalseMatchExpression::kName << 1.1);
     expr = MatchExpressionParser::parse(queryDoubleArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
-    auto queryFalseArgument = BSON("$alwaysFalse" << true);
+    auto queryFalseArgument = BSON(AlwaysFalseMatchExpression::kName << true);
     expr = MatchExpressionParser::parse(queryFalseArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(MatchExpressionParserTest, AlwaysFalseParsesIntegerArgument) {
-    auto query = BSON("$alwaysFalse" << 1);
+    auto query = BSON(AlwaysFalseMatchExpression::kName << 1);
     auto expr = MatchExpressionParser::parse(query, nullptr);
     ASSERT_OK(expr.getStatus());
 
@@ -254,26 +254,25 @@ TEST(MatchExpressionParserTest, AlwaysFalseParsesIntegerArgument) {
 }
 
 TEST(MatchExpressionParserTest, AlwaysTrueFailsToParseNonOneArguments) {
-    auto queryIntArgument = BSON("$alwaysTrue" << 0);
+    auto queryIntArgument = BSON(AlwaysTrueMatchExpression::kName << 0);
     auto expr = MatchExpressionParser::parse(queryIntArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
-    auto queryStringArgument = BSON("$alwaysTrue"
-                                    << "");
+    auto queryStringArgument = BSON(AlwaysTrueMatchExpression::kName << "");
     expr = MatchExpressionParser::parse(queryStringArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
-    auto queryDoubleArgument = BSON("$alwaysTrue" << 1.1);
+    auto queryDoubleArgument = BSON(AlwaysTrueMatchExpression::kName << 1.1);
     expr = MatchExpressionParser::parse(queryDoubleArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 
-    auto queryFalseArgument = BSON("$alwaysTrue" << true);
+    auto queryFalseArgument = BSON(AlwaysTrueMatchExpression::kName << true);
     expr = MatchExpressionParser::parse(queryFalseArgument, nullptr);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(MatchExpressionParserTest, AlwaysTrueParsesIntegerArgument) {
-    auto query = BSON("$alwaysTrue" << 1);
+    auto query = BSON(AlwaysTrueMatchExpression::kName << 1);
     auto expr = MatchExpressionParser::parse(query, nullptr);
     ASSERT_OK(expr.getStatus());
 

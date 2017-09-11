@@ -87,10 +87,12 @@ private:
 
 class AlwaysFalseMatchExpression final : public AlwaysBooleanMatchExpression {
 public:
+    static constexpr StringData kName = "$alwaysFalse"_sd;
+
     AlwaysFalseMatchExpression() : AlwaysBooleanMatchExpression(MatchType::ALWAYS_FALSE, false) {}
 
     StringData name() const final {
-        return "$alwaysFalse"_sd;
+        return kName;
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
@@ -100,10 +102,12 @@ public:
 
 class AlwaysTrueMatchExpression final : public AlwaysBooleanMatchExpression {
 public:
+    static constexpr StringData kName = "$alwaysTrue"_sd;
+
     AlwaysTrueMatchExpression() : AlwaysBooleanMatchExpression(MatchType::ALWAYS_TRUE, true) {}
 
     StringData name() const final {
-        return "$alwaysTrue"_sd;
+        return kName;
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
