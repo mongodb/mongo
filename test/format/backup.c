@@ -121,7 +121,7 @@ backup(void *arg)
 		/* Sleep for short periods so we don't make the run wait. */
 		while (period > 0 && !g.workers_finished) {
 			--period;
-			sleep(1);
+			__wt_sleep(1, 0);
 		}
 
 		/*

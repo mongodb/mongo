@@ -76,7 +76,7 @@ wts_ops(int lastrun)
 	TINFO **tinfo_list, *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	wt_thread_t alter_tid, backup_tid, compact_tid, lrt_tid;
+	wt_thread_t alter_tid, backup_tid, compact_tid, lrt_tid, timestamp_tid;
 	int64_t fourths, thread_ops;
 	uint32_t i;
 	int running;
@@ -88,6 +88,7 @@ wts_ops(int lastrun)
 	memset(&backup_tid, 0, sizeof(backup_tid));
 	memset(&compact_tid, 0, sizeof(compact_tid));
 	memset(&lrt_tid, 0, sizeof(lrt_tid));
+	memset(&timestamp_tid, 0, sizeof(timestamp_tid));
 
 	modify_repl_init();
 
@@ -156,6 +157,9 @@ wts_ops(int lastrun)
 		    __wt_thread_create(NULL, &compact_tid, compact, NULL));
 	if (!SINGLETHREADED && g.c_long_running_txn)
 		testutil_check(__wt_thread_create(NULL, &lrt_tid, lrt, NULL));
+	if (g.c_txn_timestamps)
+		testutil_check(
+		    __wt_thread_create(NULL, &timestamp_tid, timestamp, NULL));
 
 	/* Spin on the threads, calculating the totals. */
 	for (;;) {
@@ -205,7 +209,7 @@ wts_ops(int lastrun)
 		track("ops", 0ULL, &total);
 		if (!running)
 			break;
-		(void)usleep(250000);		/* 1/4th of a second */
+		__wt_sleep(0, 250000);		/* 1/4th of a second */
 		if (fourths != -1)
 			--fourths;
 	}
@@ -223,6 +227,8 @@ wts_ops(int lastrun)
 		testutil_check(__wt_thread_join(NULL, compact_tid));
 	if (!SINGLETHREADED && g.c_long_running_txn)
 		testutil_check(__wt_thread_join(NULL, lrt_tid));
+	if (g.c_txn_timestamps)
+		testutil_check(__wt_thread_join(NULL, timestamp_tid));
 	g.workers_finished = 0;
 
 	if (g.logging != 0) {
@@ -447,11 +453,8 @@ snap_check(WT_CURSOR *cursor,
 static void
 commit_transaction(TINFO *tinfo, WT_SESSION *session)
 {
-	WT_CONNECTION *conn;
 	uint64_t ts;
-	char *commit_conf, config_buf[64];
-
-	conn = g.wts_conn;
+	char config_buf[64];
 
 	if (g.c_txn_timestamps) {
 		/*
@@ -462,45 +465,14 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 		 */
 		testutil_check(pthread_rwlock_rdlock(&g.commit_ts_lock));
 		ts = __wt_atomic_addv64(&g.timestamp, 1);
-
-		/* Periodically bump the oldest timestamp. */
-		if (ts > 100 && ts % 100 == 0) {
-			testutil_check(__wt_snprintf(
-			    config_buf, sizeof(config_buf),
-			    "oldest_timestamp=%" PRIx64, ts));
-			testutil_check(
-			    pthread_rwlock_unlock(&g.commit_ts_lock));
-			testutil_check(
-			    pthread_rwlock_wrlock(&g.commit_ts_lock));
-			if (g.oldest_ts >= ts) {
-				/*
-				 * This thread is too late to the party and is
-				 * trying to update the oldest_timestamp when
-				 * another thread has already updated it with a
-				 * more recent one. This would have been a no-op
-				 * but committing with this timestamp isn't
-				 * allowed anymore. Let's call commit without a
-				 * timestamp and then bail out.
-				 */
-				testutil_check(pthread_rwlock_unlock(
-				    &g.commit_ts_lock));
-				testutil_check(session->commit_transaction(
-				    session, NULL));
-				return;
-			}
-			g.oldest_ts = ts;
-			testutil_check(conn->set_timestamp(conn, config_buf));
-		}
-
 		testutil_check(__wt_snprintf(
 		    config_buf, sizeof(config_buf),
 		    "commit_timestamp=%" PRIx64, ts));
-		commit_conf = config_buf;
+		testutil_check(
+		    session->commit_transaction(session, config_buf));
+		testutil_check(pthread_rwlock_unlock(&g.commit_ts_lock));
 	} else
-		commit_conf = NULL;
-
-	testutil_check(session->commit_transaction(session, commit_conf));
-	testutil_check(pthread_rwlock_unlock(&g.commit_ts_lock));
+		testutil_check(session->commit_transaction(session, NULL));
 	++tinfo->commit;
 }
 
@@ -1626,7 +1598,7 @@ table_append(uint64_t keyno)
 
 		if (done)
 			break;
-		sleep(1);
+		__wt_sleep(1, 0);
 	}
 }
 
