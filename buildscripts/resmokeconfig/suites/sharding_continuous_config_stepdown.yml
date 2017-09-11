@@ -53,6 +53,7 @@ selector:
   - jstests/sharding/shard2.js
   - jstests/sharding/shard3.js
   - jstests/sharding/shard_collection_basic.js
+  - jstests/sharding/shard_existing_coll_chunk_count.js
   - jstests/sharding/sharding_balance1.js
   - jstests/sharding/sharding_balance2.js
   - jstests/sharding/sharding_balance3.js
