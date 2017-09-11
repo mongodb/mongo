@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/factory.h"
@@ -46,8 +47,10 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -112,9 +115,19 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
         auto validateStatus =
             rpc::validateWireVersion(WireSpec::instance().outgoing, protocolSet.getValue().version);
         if (!validateStatus.isOK()) {
-            warning() << "remote host has incompatible wire version: " << validateStatus;
 
-            return _completeOperation(op, validateStatus);
+            if (WireSpec::instance().isInternalClient) {
+                severe() << "remote host has incompatible wire version: " << validateStatus;
+                severe() << "Please consult the documentation for upgrading this server: "
+                         << feature_compatibility_version::kDochubLink;
+
+                // Exit if mongod should be upgraded.
+                quickExit(EXIT_NEED_UPGRADE);
+            } else {
+                warning() << "remote host has incompatible wire version: " << validateStatus;
+
+                return _completeOperation(op, validateStatus);
+            }
         }
 
         op->connection().setServerProtocols(protocolSet.getValue().protocolSet);
