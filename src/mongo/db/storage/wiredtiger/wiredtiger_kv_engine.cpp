@@ -1063,7 +1063,7 @@ bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
 void WiredTigerKVEngine::initializeOplogManager(OperationContext* opCtx,
                                                 const std::string& uri,
                                                 WiredTigerRecordStore* oplogRecordStore) {
-    stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
+    stdx::lock_guard<stdx::mutex> lock(_oplogManagerMutex);
     if (_oplogManagerCount == 0)
         _oplogManager.reset(new WiredTigerOplogManager(opCtx, uri, oplogRecordStore));
     _oplogManagerCount++;
@@ -1073,12 +1073,16 @@ void WiredTigerKVEngine::deleteOplogManager() {
     stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
     invariant(_oplogManagerCount > 0);
     _oplogManagerCount--;
-    if (_oplogManagerCount == 0)
+    if (_oplogManagerCount == 0) {
+        // Destructor may lock the mutex, so we must unlock here.
+        // Oplog managers only destruct at shutdown or test exit, so it is safe to unlock here.
+        lock.unlock();
         _oplogManager.reset();
+    }
 }
 
 void WiredTigerKVEngine::replicationBatchIsComplete() const {
-    stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
+    stdx::lock_guard<stdx::mutex> lock(_oplogManagerMutex);
     if (_oplogManager) {
         _oplogManager->triggerJournalFlush();
     }
