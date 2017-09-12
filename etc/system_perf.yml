@@ -15,21 +15,31 @@ post:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: work/reports.tgz
-        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}.${ext|tgz}
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}-${execution}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: test-log
+        display_name: test-log - Execution ${execution}
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: work/reports/graphs/timeseries-mongod.0.html
-        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-mongod.0-${task_name}-${build_id}.html
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-mongod.0-${task_name}-${build_id}-${execution}.html
         bucket: mciuploads
         permissions: public-read
         content_type: text/html
-        display_name: timeseries-p1.html
+        display_name: timeseries-p1.html - Execution ${execution}
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/workloads/workloads/jsdoc/jsdocs-redirect.html
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/workloads-${task_name}-${build_id}.html
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: workloads documentation
     - command: attach.results
       params:
         file_location: work/report.json
