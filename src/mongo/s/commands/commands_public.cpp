@@ -104,8 +104,8 @@ bool cursorCommandPassthrough(OperationContext* opCtx,
     BSONObj response = cursor->nextSafe().getOwned();
     conn.done();
     Status status = getStatusFromCommandResult(response);
-    if (ErrorCodes::SendStaleConfig == status || ErrorCodes::RecvStaleConfig == status) {
-        throw RecvStaleConfigException("command failed because of stale config", response);
+    if (ErrorCodes::StaleConfig == status) {
+        throw StaleConfigException("command failed because of stale config", response);
     }
     if (!status.isOK()) {
         return Command::appendCommandStatus(*out, status);

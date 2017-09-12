@@ -80,7 +80,7 @@ public:
      *
      * May throw any exception. Known exceptions are:
      *  - InvalidOptions if the operation context is missing shard version
-     *  - SendStaleConfigException if the expected collection version does not match what we find it
+     *  - StaleConfigException if the expected collection version does not match what we find it
      *      to be after acquiring the distributed lock.
      */
     MigrationSourceManager(OperationContext* opCtx,

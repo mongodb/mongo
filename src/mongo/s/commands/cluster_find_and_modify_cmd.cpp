@@ -234,10 +234,9 @@ private:
             conn->runCommand(nss.db().toString(), filterCommandRequestForPassthrough(cmdObj), res);
         conn.done();
 
-        // ErrorCodes::RecvStaleConfig is the code for RecvStaleConfigException.
-        if (!ok && res.getIntField("code") == ErrorCodes::RecvStaleConfig) {
+        if (!ok && res.getIntField("code") == ErrorCodes::StaleConfig) {
             // Command code traps this exception and re-runs
-            throw RecvStaleConfigException("FindAndModify", res);
+            throw StaleConfigException("FindAndModify", res);
         }
 
         // First append the properly constructed writeConcernError. It will then be skipped

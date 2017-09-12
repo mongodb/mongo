@@ -703,8 +703,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         Shard::RetryPolicy::kIdempotent));
 
     if (ErrorCodes::isStaleShardingError(cmdResponse.commandStatus.code())) {
-        throw RecvStaleConfigException("command failed because of stale config",
-                                       cmdResponse.response);
+        throw StaleConfigException("command failed because of stale config", cmdResponse.response);
     }
 
     BSONObj result;

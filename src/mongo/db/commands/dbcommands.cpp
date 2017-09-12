@@ -745,7 +745,7 @@ public:
                 try {
                     // RELOCKED
                     ctx.reset(new AutoGetCollectionForReadCommand(opCtx, nss));
-                } catch (const SendStaleConfigException& ex) {
+                } catch (const StaleConfigException& ex) {
                     LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
                     break;
                 }

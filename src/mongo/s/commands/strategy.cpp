@@ -229,8 +229,7 @@ void execCommandClient(OperationContext* opCtx,
         result.resetToEmpty();
         const int code = e.code();
 
-        // Codes for StaleConfigException
-        if (code == ErrorCodes::RecvStaleConfig || code == ErrorCodes::SendStaleConfig) {
+        if (code == ErrorCodes::StaleConfig) {
             throw;
         }
 

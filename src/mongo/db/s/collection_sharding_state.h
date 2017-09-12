@@ -181,10 +181,10 @@ public:
 
     /**
      * Checks whether the shard version in the context is compatible with the shard version of the
-     * collection locally and if not throws SendStaleConfigException populated with the expected and
+     * collection locally and if not throws StaleConfigException populated with the expected and
      * actual versions.
      *
-     * Because SendStaleConfigException has special semantics in terms of how a sharded command's
+     * Because StaleConfigException has special semantics in terms of how a sharded command's
      * response is constructed, this function should be the only means of checking for shard version
      * match.
      */

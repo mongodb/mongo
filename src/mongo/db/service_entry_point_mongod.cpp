@@ -32,6 +32,7 @@
 
 #include "mongo/db/service_entry_point_mongod.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
@@ -118,8 +119,8 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                   << " ntoreturn:" << queryMessage.ntoreturn;
     }
 
-    const SendStaleConfigException* scex = (exception->code() == ErrorCodes::SendStaleConfig)
-        ? static_cast<const SendStaleConfigException*>(exception)
+    const StaleConfigException* scex = (exception->code() == ErrorCodes::StaleConfig)
+        ? checked_cast<const StaleConfigException*>(exception)
         : NULL;
 
     BSONObjBuilder err;
@@ -171,10 +172,9 @@ void _generateErrorResponse(OperationContext* opCtx,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
 
-    // We need to include some extra information for SendStaleConfig.
-    if (exception.code() == ErrorCodes::SendStaleConfig) {
-        const SendStaleConfigException& scex =
-            static_cast<const SendStaleConfigException&>(exception);
+    // We need to include some extra information for StaleConfig.
+    if (exception.code() == ErrorCodes::StaleConfig) {
+        const StaleConfigException& scex = checked_cast<const StaleConfigException&>(exception);
         replyBuilder->setCommandReply(scex.toStatus(),
                                       BSON("ns" << scex.getns() << "vReceived"
                                                 << BSONArray(scex.getVersionReceived().toBSON())
@@ -198,10 +198,9 @@ void _generateErrorResponse(OperationContext* opCtx,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
 
-    // We need to include some extra information for SendStaleConfig.
-    if (exception.code() == ErrorCodes::SendStaleConfig) {
-        const SendStaleConfigException& scex =
-            static_cast<const SendStaleConfigException&>(exception);
+    // We need to include some extra information for StaleConfig.
+    if (exception.code() == ErrorCodes::StaleConfig) {
+        const StaleConfigException& scex = checked_cast<const StaleConfigException&>(exception);
         replyBuilder->setCommandReply(scex.toStatus(),
                                       BSON("ns" << scex.getns() << "vReceived"
                                                 << BSONArray(scex.getVersionReceived().toBSON())
@@ -702,7 +701,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
     } catch (const DBException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (e.code() == ErrorCodes::SendStaleConfig) {
+        if (e.code() == ErrorCodes::StaleConfig) {
             auto sce = dynamic_cast<const StaleConfigException*>(&e);
             invariant(sce);  // do not upcasts from DBException created by uassert variants.
 
@@ -859,7 +858,7 @@ DbResponse receivedQuery(OperationContext* opCtx,
         dbResponse.exhaustNS = runQuery(opCtx, q, nss, dbResponse.response);
     } catch (const AssertionException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (!opCtx->getClient()->isInDirectClient() && e.code() == ErrorCodes::SendStaleConfig) {
+        if (!opCtx->getClient()->isInDirectClient() && e.code() == ErrorCodes::StaleConfig) {
             auto& sce = static_cast<const StaleConfigException&>(e);
             ShardingState::get(opCtx)
                 ->onStaleShardVersion(opCtx, NamespaceString(sce.getns()), sce.getVersionReceived())

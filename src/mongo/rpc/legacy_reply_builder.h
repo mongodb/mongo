@@ -48,7 +48,7 @@ public:
     LegacyReplyBuilder(Message&&);
     ~LegacyReplyBuilder() final;
 
-    // Override of setCommandReply specifically used to handle SendStaleConfigException.
+    // Override of setCommandReply specifically used to handle StaleConfigException.
     LegacyReplyBuilder& setCommandReply(Status nonOKStatus, BSONObj extraErrorInfo) final;
     LegacyReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
 

@@ -228,7 +228,7 @@ error_code("TransactionTooOld", 225)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)
-error_code("RecvStaleConfig", 9996)
+error_code("OBSOLETE_RecvStaleConfig", 9996)
 error_code("NotMaster", 10107)
 error_code("CannotGrowDocumentInCappedNamespace", 10003)
 error_code("DuplicateKey", 11000)
@@ -242,7 +242,7 @@ error_code("BackgroundOperationInProgressForNamespace", 12587);
 error_code("NotMasterOrSecondary", 13436);
 error_code("NotMasterNoSlaveOk", 13435);
 error_code("ShardKeyTooBig", 13334);
-error_code("SendStaleConfig", 13388);
+error_code("StaleConfig", 13388);
 error_code("DatabaseDifferCase", 13297);
 error_code("OBSOLETE_PrepareConfigsFailed", 13104);
 
@@ -264,7 +264,7 @@ error_class("NotMasterError", [
     "PrimarySteppedDown",
     ])
 error_class("StaleShardingError",
-            ["RecvStaleConfig", "SendStaleConfig", "StaleShardVersion", "StaleEpoch"])
+            ["StaleConfig", "StaleShardVersion", "StaleEpoch"])
 error_class("WriteConcernError", ["WriteConcernFailed",
                                   "WriteConcernLegacyOK",
                                   "UnknownReplWriteConcern",

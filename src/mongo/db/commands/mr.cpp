@@ -1654,7 +1654,7 @@ public:
                 errmsg = "there were emits but no data!";
                 return false;
             }
-        } catch (SendStaleConfigException& e) {
+        } catch (StaleConfigException& e) {
             log() << "mr detected stale config, should retry" << redact(e);
             throw e;
         }

@@ -60,7 +60,7 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
+#include "mongo/s/stale_exception.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -179,10 +179,8 @@ rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
         uassertStatusOK(_metadataReader(opCtx, commandReply->getMetadata(), host));
     }
 
-    if (ErrorCodes::SendStaleConfig ==
-        getStatusFromCommandResult(commandReply->getCommandReply())) {
-        throw RecvStaleConfigException("stale config in runCommand",
-                                       commandReply->getCommandReply());
+    if (ErrorCodes::StaleConfig == getStatusFromCommandResult(commandReply->getCommandReply())) {
+        throw StaleConfigException("stale config in runCommand", commandReply->getCommandReply());
     }
 
     return rpc::UniqueReply(replyMsg, std::move(commandReply));
@@ -665,7 +663,7 @@ void DBClientBase::findN(vector<BSONObj>& out,
     if (c->hasResultFlag(ResultFlag_ShardConfigStale)) {
         BSONObj error;
         c->peekError(&error);
-        throw RecvStaleConfigException("findN stale config", error);
+        throw StaleConfigException("findN stale config", error);
     }
 
     for (int i = 0; i < nToReturn; i++) {

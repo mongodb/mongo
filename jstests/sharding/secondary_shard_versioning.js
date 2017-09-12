@@ -56,7 +56,7 @@
             "command.query": {x: 1},
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
-            "exceptionCode": ErrorCodes.SendStaleConfig
+            "exceptionCode": ErrorCodes.StaleConfig
         }
     });
 
@@ -70,7 +70,7 @@
             "command.query": {x: 1},
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
-            "exceptionCode": ErrorCodes.SendStaleConfig
+            "exceptionCode": ErrorCodes.StaleConfig
         }
     });
 

@@ -166,8 +166,8 @@ private:
 };
 
 /**
- * Throws a RecvStaleConfigException wrapping the stale error document in this cursor when the
- * ShardConfigStale flag is set or a command returns a ErrorCodes::SendStaleConfig error code.
+ * Throws a StaleConfigException wrapping the stale error document in this cursor when the
+ * ShardConfigStale flag is set or a command returns a ErrorCodes::StaleConfig error code.
  */
 void throwCursorStale(DBClientCursor* cursor);
 

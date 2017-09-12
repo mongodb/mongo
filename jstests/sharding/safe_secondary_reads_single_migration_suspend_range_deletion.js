@@ -486,7 +486,7 @@
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"$exists": false},
-                    "exceptionCode": ErrorCodes.SendStaleConfig
+                    "exceptionCode": ErrorCodes.StaleConfig
                 },
                                       commandProfile)
             });
@@ -500,7 +500,7 @@
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"$exists": false},
-                    "exceptionCode": ErrorCodes.SendStaleConfig
+                    "exceptionCode": ErrorCodes.StaleConfig
                 },
                                       commandProfile)
             });
