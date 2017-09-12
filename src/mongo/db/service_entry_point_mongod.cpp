@@ -682,14 +682,20 @@ void execCommandDatabase(OperationContext* opCtx,
             request.body,
             command->supportsNonLocalReadConcern(request.getDatabase().toString(), request.body)));
 
-        // We do not redo shard version handling if this command was issued via the direct client.
-        if ((serverGlobalParams.featureCompatibility.version.load() ==
-                 ServerGlobalParams::FeatureCompatibility::Version::k36 ||
-             iAmPrimary) &&
+        // Don't handle the shard version that may have been sent along with the command iff
+        //   fcv==3.4: This is a secondary.
+        //   fcv==3.6: The 'available' rc-level is specified, or this is a secondary and neither the
+        //             clusterTime nor rc-level was specified -- secondaries default to 'available'
+        //             when neither clusterTime nor rc-level is set.
+        //   or this command was issued via the direct client.
+        if ((iAmPrimary || (serverGlobalParams.featureCompatibility.version.load() ==
+                                ServerGlobalParams::FeatureCompatibility::Version::k36 &&
+                            (repl::ReadConcernArgs::get(opCtx).hasLevel() ||
+                             repl::ReadConcernArgs::get(opCtx).getArgsClusterTime()))) &&
             !opCtx->getClient()->isInDirectClient() &&
-            repl::ReadConcernArgs::get(opCtx).getLevel() !=
-                repl::ReadConcernLevel::kAvailableReadConcern) {
-            // Handle a shard version that may have been sent along with the command.
+            (serverGlobalParams.featureCompatibility.version.load() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::k34 ||
+             !repl::ReadConcernArgs::get(opCtx).isLevelAvailable())) {
             auto commandNS = NamespaceString(command->parseNs(dbname, request.body));
             auto& oss = OperationShardingState::get(opCtx);
             oss.initializeShardVersion(commandNS, shardVersionFieldIdx);

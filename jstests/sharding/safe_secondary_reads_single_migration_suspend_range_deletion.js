@@ -1,7 +1,10 @@
 /**
- * Tests that commands that can be sent to secondaries for sharded collections are "safe":
- * - the secondary participates in the shard versioning protocol
- * - the secondary filters returned documents using its routing table cache.
+ * Tests that commands that can be sent to secondaries for sharded collections can be "safe":
+ * - When non-'available' read concern is specified (local in this case), the secondary participates
+ *   in the shard versioning protocol and filters returned documents using its routing table cache.
+ * - When 'available' read concern is specified, the secondary does not check shard version nor
+ *   filters results.
+ * - When no read concern is specified, the secondary defaults to 'available' read concern.
  *
  * Since some commands are unversioned even against primaries or cannot be run on sharded
  * collections, this file declaratively defines the expected behavior for each command.
@@ -422,12 +425,20 @@
             JSON.parse(JSON.stringify(cmdReadPreferenceSecondary));
         Object.extend(cmdPrefSecondaryConcernAvailable, {readConcern: {level: 'available'}});
 
+        // Make a read preference secondary and read concern 'local' copy of the command.
+        let cmdPrefSecondaryConcernLocal = JSON.parse(JSON.stringify(cmdReadPreferenceSecondary));
+        Object.extend(cmdPrefSecondaryConcernLocal, {readConcern: {level: 'local'}});
+
         let availableReadConcernRes =
             staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernAvailable);
         test.checkAvailableReadConcernResults(availableReadConcernRes);
 
-        let res = staleMongos.getDB(db).runCommand(cmdReadPreferenceSecondary);
-        test.checkResults(res);
+        // A request sent to a secondary without read concern defaults to 'available' read concern.
+        let defaultReadConcernRes = staleMongos.getDB(db).runCommand(cmdReadPreferenceSecondary);
+        test.checkAvailableReadConcernResults(defaultReadConcernRes);
+
+        let localReadConcernRes = staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernLocal);
+        test.checkResults(localReadConcernRes);
 
         // Build the query to identify the command in the system profiler.
         let commandProfile = buildCommandProfile(test.command);
@@ -456,7 +467,7 @@
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"$exists": false},
+                    "command.readConcern": {"level": "local"},
                     "exceptionCode": {"$exists": false}
                 },
                                       commandProfile)
@@ -466,8 +477,9 @@
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
         } else if (test.behavior === "versioned") {
-            // Check that the donor shard secondary received the 'available' read concern request
-            // and returned success, despite the mongos' stale routing table.
+            // Check that the donor shard secondary received both the 'available' read concern
+            // request and read concern not specified request and returned success for both, despite
+            // the mongos' stale routing table.
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: donorShardSecondary.getDB(db),
                 filter: Object.extend({
@@ -478,42 +490,52 @@
                 },
                                       commandProfile)
             });
-
-            // Check that the donor shard secondary then returned stale shardVersion for the regular
-            // request (sans 'available' read concern).
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: donorShardSecondary.getDB(db),
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"$exists": false},
+                    "exceptionCode": {"$exists": false}
+                },
+                                      commandProfile)
+            });
+
+            // Check that the donor shard secondary then returned stale shardVersion for the request
+            // with local read concern.
+            profilerHasSingleMatchingEntryOrThrow({
+                profileDB: donorShardSecondary.getDB(db),
+                filter: Object.extend({
+                    "command.shardVersion": {"$exists": true},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "local"},
                     "exceptionCode": ErrorCodes.StaleConfig
                 },
                                       commandProfile)
             });
 
-            // Check that the recipient shard secondary received the regular request and also
-            // returned stale shardVersion once, even though the mongos is fresh, because the
-            // secondary was stale.
+            // Check that the recipient shard secondary received the request with local read concern
+            // and also returned stale shardVersion once, even though the mongos is fresh, because
+            // the secondary was stale.
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: recipientShardSecondary.getDB(db),
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"$exists": false},
+                    "command.readConcern": {"level": "local"},
                     "exceptionCode": ErrorCodes.StaleConfig
                 },
                                       commandProfile)
             });
 
-            // Check that the recipient shard secondary received the regular request again and
-            // finally returned success.
+            // Check that the recipient shard secondary received the request with local read concern
+            // again and finally returned success.
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: recipientShardSecondary.getDB(db),
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"$exists": false},
+                    "command.readConcern": {"level": "local"},
                     "exceptionCode": {"$exists": false}
                 },
                                       commandProfile)

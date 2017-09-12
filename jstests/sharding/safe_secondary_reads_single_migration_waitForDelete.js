@@ -1,7 +1,7 @@
 /**
- * Tests that commands that can be sent to secondaries for sharded collections are "safe":
- * - the secondary participates in the shard versioning protocol
- * - the secondary filters returned documents using its routing table cache.
+ * Tests that commands that can be sent to secondaries for sharded collections can be "safe":
+ * - When non-'available' read concern is specified (local in this case), the secondary participates
+ *   in the shard versioning protocol and filters returned documents using its routing table cache.
  *
  * Since some commands are unversioned even against primaries or cannot be run on sharded
  * collections, this file declaratively defines the expected behavior for each command.
@@ -377,8 +377,8 @@
             writeConcern: {w: 2},
         }));
 
-        let res = staleMongos.getDB(db).runCommand(
-            Object.extend(test.command, {$readPreference: {mode: 'secondary'}}));
+        let res = staleMongos.getDB(db).runCommand(Object.extend(
+            test.command, {$readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
 
         test.checkResults(res);
 
@@ -400,6 +400,7 @@
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "local"},
                     "exceptionCode": {"$exists": false}
                 },
                                       commandProfile)
@@ -415,6 +416,7 @@
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "local"},
                     "exceptionCode": ErrorCodes.StaleConfig
                 },
                                       commandProfile)
@@ -428,6 +430,7 @@
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "local"},
                     "exceptionCode": ErrorCodes.StaleConfig
                 },
                                       commandProfile)
@@ -440,6 +443,7 @@
                 filter: Object.extend({
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "local"},
                     "exceptionCode": {"$exists": false}
                 },
                                       commandProfile)

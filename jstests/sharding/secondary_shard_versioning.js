@@ -35,15 +35,20 @@
     assert.commandWorked(donorShardSecondary.getDB('test').setProfilingLevel(2));
     assert.commandWorked(recipientShardSecondary.getDB('test').setProfilingLevel(2));
 
-    // Use the mongos with the stale routing table to send read requests to the secondaries. Check
-    // that the donor shard returns a stale shardVersion error, which provokes mongos to refresh its
-    // routing table and re-target; that the recipient shard secondary refreshes its routing table
-    // on hearing the fresh version from mongos; and that the recipient shard secondary returns
-    // the results.
+    // Use the mongos with the stale routing table to send read requests to the secondaries. 'local'
+    // read concern level must be specified in the request because secondaries default to
+    // 'available', which doesn't participate in the version protocol. Check that the donor shard
+    // returns a stale shardVersion error, which provokes mongos to refresh its routing table and
+    // re-target; that the recipient shard secondary refreshes its routing table on hearing the
+    // fresh version from mongos; and that the recipient shard secondary returns the results.
 
     jsTest.log("do secondary read from stale mongos");
-    let res = staleMongos.getDB('test').runCommand(
-        {count: 'foo', query: {x: 1}, $readPreference: {mode: "secondary"}});
+    let res = staleMongos.getDB('test').runCommand({
+        count: 'foo',
+        query: {x: 1},
+        $readPreference: {mode: "secondary"},
+        readConcern: {"level": "local"}
+    });
     assert(res.ok);
     assert.eq(1, res.n, tojson(res));
 
@@ -56,6 +61,7 @@
             "command.query": {x: 1},
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
+            "command.readConcern": {"level": "local"},
             "exceptionCode": ErrorCodes.StaleConfig
         }
     });
@@ -70,6 +76,7 @@
             "command.query": {x: 1},
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
+            "command.readConcern": {"level": "local"},
             "exceptionCode": ErrorCodes.StaleConfig
         }
     });
@@ -83,6 +90,7 @@
             "command.query": {x: 1},
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
+            "command.readConcern": {"level": "local"},
             "exceptionCode": {"$exists": false}
         }
     });
