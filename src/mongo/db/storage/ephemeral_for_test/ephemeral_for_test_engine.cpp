@@ -55,6 +55,7 @@ Status EphemeralForTestEngine::createRecordStore(OperationContext* opCtx,
                                                  const CollectionOptions& options) {
     // Register the ident in the `_dataMap` (for `getAllIdents`). Remainder of work done in
     // `getRecordStore`.
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _dataMap[ident] = {};
     return Status::OK();
 }
@@ -79,6 +80,7 @@ Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx
                                                          const IndexDescriptor* desc) {
     // Register the ident in `_dataMap` (for `getAllIdents`). Remainder of work done in
     // `getSortedDataInterface`.
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _dataMap[ident] = {};
     return Status::OK();
 }
