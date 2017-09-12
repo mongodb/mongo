@@ -69,7 +69,7 @@ TEST_F(SessionCatalogTest, OperationContextSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession ocs(opCtx());
+        OperationContextSession ocs(opCtx(), true);
         auto session = OperationContextSession::get(opCtx());
 
         ASSERT(session);
@@ -91,7 +91,8 @@ TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
     const auto lsid = makeLogicalSessionIdForTest();
     opCtx()->setLogicalSessionId(lsid);
 
-    boost::optional<OperationContextSession> ocs(opCtx());
+    boost::optional<OperationContextSession> ocs;
+    ocs.emplace(opCtx(), true);
 
     stdx::async(stdx::launch::async, [&] {
         Client::initThreadIfNotAlready();
@@ -120,10 +121,10 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession outerScopedSession(opCtx());
+        OperationContextSession outerScopedSession(opCtx(), true);
 
         {
-            OperationContextSession innerScopedSession(opCtx());
+            OperationContextSession innerScopedSession(opCtx(), true);
 
             auto session = OperationContextSession::get(opCtx());
             ASSERT(session);
@@ -138,6 +139,20 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     }
 
     ASSERT(!OperationContextSession::get(opCtx()));
+}
+
+TEST_F(SessionCatalogTest, OnlyCheckOutSessionWithCheckOutSessionTrue) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+
+    {
+        OperationContextSession ocs(opCtx(), true);
+        ASSERT(OperationContextSession::get(opCtx()));
+    }
+
+    {
+        OperationContextSession ocs(opCtx(), false);
+        ASSERT(!OperationContextSession::get(opCtx()));
+    }
 }
 
 }  // namespace

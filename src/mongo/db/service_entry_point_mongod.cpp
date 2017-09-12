@@ -92,6 +92,21 @@ MONGO_FP_DECLARE(rsStopGetMore);
 namespace {
 using logger::LogComponent;
 
+// The command names for which to check out a session.
+//
+// Note: Eval should check out a session because it defaults to running under a global write lock,
+// so if it didn't, and the function it was given contains any of these whitelisted commands, they
+// would try to check out a session under a lock, which is not allowed.  Similarly,
+// refreshLogicalSessionCacheNow triggers a bulk update under a lock on the sessions collection.
+const StringMap<int> cmdWhitelist = {{"delete", 1},
+                                     {"eval", 1},
+                                     {"$eval", 1},
+                                     {"findandmodify", 1},
+                                     {"findAndModify", 1},
+                                     {"insert", 1},
+                                     {"refreshLogicalSessionCacheNow", 1},
+                                     {"update", 1}};
+
 inline void opread(const Message& m) {
     if (_diaglog.getLevel() & 2) {
         _diaglog.readop(m.singleData().view2ptr(), m.header().getLen());
@@ -581,7 +596,12 @@ void execCommandDatabase(OperationContext* opCtx,
             return;
         }
 
-        OperationContextSession sessionTxnState(opCtx);
+        // Session ids are forwarded in requests, so commands that require roundtrips between
+        // servers may result in a deadlock when a server tries to check out a session it is already
+        // using to service an earlier operation in the command's chain. To avoid this, only check
+        // out sessions for commands that require them (i.e. write commands).
+        OperationContextSession sessionTxnState(
+            opCtx, cmdWhitelist.find(command->getName()) != cmdWhitelist.cend());
 
         ImpersonationSessionGuard guard(opCtx);
         uassertStatusOK(Command::checkAuthorization(command, opCtx, request));

@@ -202,8 +202,18 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
     sri->availableCondVar.notify_one();
 }
 
-OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opCtx(opCtx) {
+OperationContextSession::OperationContextSession(OperationContext* opCtx, bool checkOutSession)
+    : _opCtx(opCtx) {
     if (!opCtx->getLogicalSessionId()) {
+        return;
+    }
+
+    if (!checkOutSession) {
+        // The session may have already been checked out by this operation, so bump the nesting
+        // level if necessary to avoid resetting the session when this command completes.
+        if (auto& checkedOutSession = operationSessionDecoration(opCtx)) {
+            checkedOutSession->checkOutNestingLevel++;
+        }
         return;
     }
 
