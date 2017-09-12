@@ -310,14 +310,13 @@ void insertDocuments(OperationContext* opCtx,
     // physically written in timestamp order, so we defer optime assignment until the oplog is about
     // to be written.
     auto batchSize = std::distance(begin, end);
-    std::unique_ptr<OplogSlot[]> slots(new OplogSlot[batchSize]);
     if (supportsDocLocking()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (!replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
             // Populate 'slots' with new optimes for each insert.
             // This also notifies the storage engine of each new timestamp.
-            repl::getNextOpTimes(opCtx, batchSize, slots.get());
-            OplogSlot* slot = slots.get();
+            auto oplogSlots = repl::getNextOpTimes(opCtx, batchSize);
+            auto slot = oplogSlots.begin();
             for (auto it = begin; it != end; it++) {
                 it->oplogSlot = *slot++;
             }

@@ -623,13 +623,27 @@ void createOplog(OperationContext* opCtx) {
     createOplog(opCtx, _oplogCollectionName, isReplSet);
 }
 
-void getNextOpTimes(OperationContext* opCtx, std::size_t count, OplogSlot* slotsOut) {
+OplogSlot getNextOpTime(OperationContext* opCtx) {
     // The local oplog collection pointer must already be established by this point.
     // We can't establish it here because that would require locking the local database, which would
     // be a lock order violation.
     invariant(_localOplogCollection);
-    _getNextOpTimes(opCtx, _localOplogCollection, count, slotsOut);
+    OplogSlot os;
+    _getNextOpTimes(opCtx, _localOplogCollection, 1, &os);
+    return os;
 }
+
+std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) {
+    // The local oplog collection pointer must already be established by this point.
+    // We can't establish it here because that would require locking the local database, which would
+    // be a lock order violation.
+    invariant(_localOplogCollection);
+    std::vector<OplogSlot> oplogSlots(count);
+    auto oplogSlot = oplogSlots.begin();
+    _getNextOpTimes(opCtx, _localOplogCollection, count, &(*oplogSlot));
+    return oplogSlots;
+}
+
 
 // -------------------------------------
 

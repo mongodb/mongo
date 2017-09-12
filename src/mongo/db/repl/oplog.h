@@ -215,10 +215,11 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
 
 /**
- * Allocates optimes for new entries in the oplog.  Returns an array of OplogSlots, which contain
- * the new optimes along with their terms and newly calculated hash fields.
+ * Allocates optimes for new entries in the oplog.  Returns an OplogSlot or a vector of OplogSlots,
+ * which contain the new optimes along with their terms and newly calculated hash fields.
  */
-void getNextOpTimes(OperationContext* opCtx, std::size_t count, OplogSlot* slotsOut);
+OplogSlot getNextOpTime(OperationContext* opCtx);
+std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count);
 
 }  // namespace repl
 }  // namespace mongo

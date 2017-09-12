@@ -423,7 +423,7 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (!replCoord->isOplogDisabledFor(opCtx, _ns)) {
         // Populate 'slot' with a new optime.
-        repl::getNextOpTimes(opCtx, 1, &slot);
+        slot = repl::getNextOpTime(opCtx);
     }
     inserts.emplace_back(kUninitializedStmtId, doc, slot);
 
