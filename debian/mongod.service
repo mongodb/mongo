@@ -17,6 +17,8 @@ LimitAS=infinity
 LimitNOFILE=64000
 # processes/threads
 LimitNPROC=64000
+# locked memory
+LimitMEMLOCK=infinity
 # total threads (user+kernel)
 TasksMax=infinity
 TasksAccounting=false

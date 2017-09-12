@@ -133,6 +133,7 @@ start_server() {
             ulimit -v unlimited
             ulimit -n 64000
             ulimit -m unlimited
+            ulimit -l unlimited
 
             # In dash, ulimit takes -p for maximum user processes
             # In bash, it's -u
