@@ -416,13 +416,16 @@ assert.commandFailedWithCode = function(res, code, msg) {
     if (assert._debug && msg)
         print("in assert for: " + msg);
 
+    if (!Array.isArray(code)) {
+        code = [code];
+    }
+
     assert(!res.ok,
-           "Command result indicates success, but expected failure with code " + code + ": " +
+           "Command result indicates success, but expected failure with code " + tojson(code) +
+               ": " + tojson(res) + " : " + msg);
+    assert(code.indexOf(res.code) >= 0,
+           "Expected failure code " + tojson(code) + " did not match actual in command result: " +
                tojson(res) + " : " + msg);
-    assert.eq(res.code,
-              code,
-              "Expected failure code did not match actual in command result: " + tojson(res) +
-                  " : " + msg);
     return res;
 };
 

@@ -779,8 +779,10 @@ var ReplSetTest = function(opts) {
             printjson(cmd);
 
             // replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error
-            // if a heartbeat times out during the quorum check. We retry three times to reduce
-            // the chance of failing this way.
+            // if a heartbeat times out during the quorum check.
+            // They may also fail with NewReplicaSetConfigurationIncompatible on similar timeout
+            // during the config validation stage while deducing isSelf().
+            // We retry three times to reduce the chance of failing this way.
             assert.retry(() => {
                 var res;
                 try {
@@ -799,7 +801,9 @@ var ReplSetTest = function(opts) {
                 }
 
                 assert.commandFailedWithCode(
-                    res, ErrorCodes.NodeNotFound, "replSetReconfig during initiate failed");
+                    res,
+                    [ErrorCodes.NodeNotFound, ErrorCodes.NewReplicaSetConfigurationIncompatible],
+                    "replSetReconfig during initiate failed");
                 return false;
             }, "replSetReconfig during initiate failed", 3, 5 * 1000);
         }
