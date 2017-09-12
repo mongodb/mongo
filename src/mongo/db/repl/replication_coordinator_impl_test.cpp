@@ -3605,7 +3605,15 @@ TEST_F(StableTimestampTest, CalculateStableTimestamp) {
         repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
     ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
 
-    // There is no valid stable timestamp.
+    // There is a valid stable timestamp, all candidates are smaller than the commit point.
+    commitPoint = Timestamp(0, 4);
+    stableTimestampCandidates = {{0, 1}, {0, 2}, {0, 3}};
+    expectedStableTimestamp = Timestamp(0, 3);
+    stableTimestamp =
+        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
+    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+
+    // There is no valid stable timestamp, all candidates are greater than the commit point.
     commitPoint = Timestamp(0, 0);
     stableTimestampCandidates = {{0, 1}, {0, 2}, {0, 3}};
     expectedStableTimestamp = boost::none;
@@ -3617,6 +3625,30 @@ TEST_F(StableTimestampTest, CalculateStableTimestamp) {
     commitPoint = Timestamp(0, 0);
     stableTimestampCandidates = {};
     expectedStableTimestamp = boost::none;
+    stableTimestamp =
+        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
+    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+
+    // There is a single timestamp candidate which is equal to the commit point.
+    commitPoint = Timestamp(0, 1);
+    stableTimestampCandidates = {{0, 1}};
+    expectedStableTimestamp = Timestamp(0, 1);
+    stableTimestamp =
+        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
+    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+
+    // There is a single timestamp candidate which is greater than the commit point.
+    commitPoint = Timestamp(0, 0);
+    stableTimestampCandidates = {{0, 1}};
+    expectedStableTimestamp = boost::none;
+    stableTimestamp =
+        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
+    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+
+    // There is a single timestamp candidate which is less than the commit point.
+    commitPoint = Timestamp(0, 2);
+    stableTimestampCandidates = {{0, 1}};
+    expectedStableTimestamp = Timestamp(0, 1);
     stableTimestamp =
         repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
     ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
@@ -3640,10 +3672,24 @@ TEST_F(StableTimestampTest, CleanupStableTimestampCandidates) {
     repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
     ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
 
+    // Cleanup should remove all timestamp candidates if they are all < the stable timestamp.
+    stableTimestamp = Timestamp(0, 5);
+    timestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
+    expectedTimestampCandidates = {};
+    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
+    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+
     // Cleanup should have no effect when stable timestamp is less than all candidates.
     stableTimestamp = Timestamp(0, 0);
     timestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
     expectedTimestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
+    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
+    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+
+    // Cleanup should have no effect for a single candidate that is equal to stable timestamp.
+    stableTimestamp = Timestamp(0, 1);
+    timestampCandidates = {{0, 1}};
+    expectedTimestampCandidates = {{0, 1}};
     repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
     ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
 

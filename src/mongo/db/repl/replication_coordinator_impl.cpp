@@ -2991,31 +2991,35 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
 boost::optional<Timestamp> ReplicationCoordinatorImpl::_calculateStableTimestamp(
     const std::set<Timestamp>& candidates, const Timestamp& commitPoint) {
 
-    // Find the greatest timestamp candidate that is less than or equal to the commit point. To do
-    // this, we search through the candidates in descending order, stopping at the first timestamp
-    // that is less than or equal to the commit point. Note that std::set maintains its elements in
-    // sorted order.
-    auto stableTimestampIter =
-        std::find_if(candidates.rbegin(), candidates.rend(), [commitPoint](Timestamp ts) {
-            return ts <= commitPoint;
-        });
-
-    // No stable timestamp found.
-    if (stableTimestampIter == candidates.rend()) {
+    // No timestamp candidates.
+    if (candidates.empty()) {
         return boost::none;
     }
-    return *stableTimestampIter;
+
+    // Find the greatest timestamp candidate that is less than or equal to the commit point.
+    // To do this we first find the upper bound of 'commitPoint', which points to the smallest
+    // element in 'candidates' that is greater than 'commitPoint'. We then step back one element,
+    // which should give us the largest element in 'candidates' that is less than or equal to the
+    // 'commitPoint'.
+    auto upperBoundIter = candidates.upper_bound(commitPoint);
+
+    // All timestamp candidates are greater than the commit point.
+    if (upperBoundIter == candidates.begin()) {
+        return boost::none;
+    }
+    // There is a valid stable timestamp.
+    else {
+        return *std::prev(upperBoundIter);
+    }
 }
 
 void ReplicationCoordinatorImpl::_cleanupStableTimestampCandidates(std::set<Timestamp>* candidates,
                                                                    Timestamp stableTimestamp) {
     // Discard timestamp candidates earlier than the current stable timestamp, since we don't need
-    // them anymore. To do this, we iterate through timestamps in ascending order, searching for the
-    // first timestamp T such that T >= stableTimestamp. We then discard all timestamps earlier than
-    // T.
-    auto deletePoint = std::find_if(candidates->begin(), candidates->end(), [&](Timestamp ts) {
-        return ts >= stableTimestamp;
-    });
+    // them anymore. To do this, we find the lower bound of the 'stableTimestamp' which is the first
+    // element that is greater than or equal to the 'stableTimestamp'. Then we discard everything up
+    // to but not including this lower bound i.e. 'deletePoint'.
+    auto deletePoint = candidates->lower_bound(stableTimestamp);
 
     // Delete the entire range of unneeded timestamps.
     candidates->erase(candidates->begin(), deletePoint);
