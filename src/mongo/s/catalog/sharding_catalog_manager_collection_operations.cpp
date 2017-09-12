@@ -225,7 +225,10 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-    auto dbEntry = uassertStatusOK(catalogClient->getDatabase(opCtx, nsToDatabase(ns))).value;
+    auto dbEntry =
+        uassertStatusOK(catalogClient->getDatabase(
+                            opCtx, nsToDatabase(ns), repl::ReadConcernLevel::kLocalReadConcern))
+            .value;
     auto dbPrimaryShardId = dbEntry.getPrimary();
     const auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
 

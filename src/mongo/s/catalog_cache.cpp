@@ -290,7 +290,8 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
     const auto dbNameCopy = dbName.toString();
 
     // Load the database entry
-    const auto opTimeWithDb = uassertStatusOK(catalogClient->getDatabase(opCtx, dbNameCopy));
+    const auto opTimeWithDb = uassertStatusOK(catalogClient->getDatabase(
+        opCtx, dbNameCopy, repl::ReadConcernLevel::kMajorityReadConcern));
     const auto& dbDesc = opTimeWithDb.value;
 
     // Load the sharded collections entries

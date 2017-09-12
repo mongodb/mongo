@@ -86,8 +86,10 @@ public:
                      const BSONObj& detail,
                      const WriteConcernOptions& writeConcern) override;
 
-    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
-                                                           const std::string& dbName) override;
+    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
+        OperationContext* opCtx,
+        const std::string& dbName,
+        repl::ReadConcernLevel readConcernLevel) override;
 
     StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* opCtx,
                                                                const std::string& collNs) override;
@@ -230,7 +232,10 @@ private:
      * given read preference.  Returns NamespaceNotFound if no database metadata is found.
      */
     StatusWith<repl::OpTimeWith<DatabaseType>> _fetchDatabaseMetadata(
-        OperationContext* opCtx, const std::string& dbName, const ReadPreferenceSetting& readPref);
+        OperationContext* opCtx,
+        const std::string& dbName,
+        const ReadPreferenceSetting& readPref,
+        repl::ReadConcernLevel readConcernLevel);
 
     /**
      * Best effort method, which logs diagnostic events on the config server. If the config server

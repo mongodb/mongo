@@ -125,8 +125,10 @@ public:
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - database does not exist
      */
-    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
-                                                                   const std::string& dbName) = 0;
+    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
+        OperationContext* opCtx,
+        const std::string& dbName,
+        repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
      * Retrieves the metadata for a given collection, if it exists.

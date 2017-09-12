@@ -146,7 +146,10 @@ TEST_F(ShardingCatalogClientTest, GetCollectionNotExisting) {
 }
 
 TEST_F(ShardingCatalogClientTest, GetDatabaseInvalidName) {
-    auto status = catalogClient()->getDatabase(operationContext(), "b.c").getStatus();
+    auto status =
+        catalogClient()
+            ->getDatabase(operationContext(), "b.c", repl::ReadConcernLevel::kMajorityReadConcern)
+            .getStatus();
     ASSERT_EQ(ErrorCodes::InvalidNamespace, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
@@ -162,7 +165,10 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
     auto future = launchAsync([this, &expectedDb] {
-        return assertGet(catalogClient()->getDatabase(operationContext(), expectedDb.getName()));
+        return assertGet(
+            catalogClient()->getDatabase(operationContext(),
+                                         expectedDb.getName(),
+                                         repl::ReadConcernLevel::kMajorityReadConcern));
     });
 
     onFindWithMetadataCommand([this, &expectedDb, newOpTime](const RemoteCommandRequest& request) {
@@ -204,7 +210,10 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetrySuccess) {
     expectedDb.setSharded(true);
 
     auto future = launchAsync([this, &expectedDb] {
-        return assertGet(catalogClient()->getDatabase(operationContext(), expectedDb.getName()));
+        return assertGet(
+            catalogClient()->getDatabase(operationContext(),
+                                         expectedDb.getName(),
+                                         repl::ReadConcernLevel::kMajorityReadConcern));
     });
 
     // Return empty result set as if the database wasn't found
@@ -229,7 +238,8 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
     configTargeter()->setFindHostReturnValue(testHost);
 
     auto future = launchAsync([this] {
-        auto dbResult = catalogClient()->getDatabase(operationContext(), "NonExistent");
+        auto dbResult = catalogClient()->getDatabase(
+            operationContext(), "NonExistent", repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NotMaster);
     });
 
@@ -248,7 +258,8 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseNotExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        auto dbResult = catalogClient()->getDatabase(operationContext(), "NonExistent");
+        auto dbResult = catalogClient()->getDatabase(
+            operationContext(), "NonExistent", repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NamespaceNotFound);
     });
 
@@ -1431,7 +1442,11 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeFindThenCmd) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future1 = launchAsync([this] {
-        ASSERT_OK(catalogClient()->getDatabase(operationContext(), "TestDB").getStatus());
+        ASSERT_OK(catalogClient()
+                      ->getDatabase(operationContext(),
+                                    "TestDB",
+                                    repl::ReadConcernLevel::kMajorityReadConcern)
+                      .getStatus());
     });
 
     OpTime highestOpTime;
@@ -1518,7 +1533,11 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeCmdThenFind) {
 
     // Return an older OpTime
     auto future2 = launchAsync([this] {
-        ASSERT_OK(catalogClient()->getDatabase(operationContext(), "TestDB").getStatus());
+        ASSERT_OK(catalogClient()
+                      ->getDatabase(operationContext(),
+                                    "TestDB",
+                                    repl::ReadConcernLevel::kMajorityReadConcern)
+                      .getStatus());
     });
 
     const OpTime oldOpTime(Timestamp(3, 10), 5);
@@ -1592,7 +1611,8 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry)
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        auto status = catalogClient()->getDatabase(operationContext(), "TestDB");
+        auto status = catalogClient()->getDatabase(
+            operationContext(), "TestDB", repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQ(ErrorCodes::HostUnreachable, status.getStatus().code());
     });
 
@@ -1608,8 +1628,13 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry)
 TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future = launchAsync(
-        [&] { ASSERT_OK(catalogClient()->getDatabase(operationContext(), "TestDB").getStatus()); });
+    auto future = launchAsync([&] {
+        ASSERT_OK(catalogClient()
+                      ->getDatabase(operationContext(),
+                                    "TestDB",
+                                    repl::ReadConcernLevel::kMajorityReadConcern)
+                      .getStatus());
+    });
 
     for (int i = 0; i < kMaxCommandRetry - 1; ++i) {
         onFindCommand([](const RemoteCommandRequest&) {

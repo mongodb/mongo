@@ -73,7 +73,7 @@ Status ShardingCatalogClientMock::updateDatabase(OperationContext* opCtx,
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientMock::getDatabase(
-    OperationContext* opCtx, const string& dbName) {
+    OperationContext* opCtx, const string& dbName, repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
