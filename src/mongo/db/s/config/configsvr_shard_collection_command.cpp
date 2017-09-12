@@ -244,30 +244,30 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
 /**
  * Throws an exception if the collection is already sharded with different options.
  *
- * Returns true if the collection is already sharded with the same options, and false if the
- * collection is not sharded.
+ * If the collection is already sharded with the same options, returns the existing collection's
+ * full spec, else returns boost::none.
  */
-bool checkIfAlreadyShardedWithSameOptions(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const ConfigsvrShardCollectionRequest& request) {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-
-    // Until all metadata commands are on the config server, the CatalogCache on the config
-    // server may be stale. Force a refresh for the collection before reading it.
-    catalogCache->invalidateShardedCollection(nss);
-    auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+boost::optional<CollectionType> checkIfAlreadyShardedWithSameOptions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ConfigsvrShardCollectionRequest& request) {
+    // TODO (SERVER-31027): Replace this direct read with using the routing table cache once UUIDs
+    // are stored in the routing table cache.
+    auto existingColls =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                            opCtx,
+                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                            repl::ReadConcernLevel::kLocalReadConcern,
+                            NamespaceString(CollectionType::ConfigNS),
+                            BSON("_id" << nss.ns() << "dropped" << false),
+                            BSONObj(),
+                            1))
+            .docs;
 
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
-    if (routingInfo.cm()) {
-        auto cm = routingInfo.cm();
-
-        CollectionType existingOptions;
-        existingOptions.setNs(NamespaceString(cm->getns()));
-        existingOptions.setKeyPattern(cm->getShardKeyPattern().getKeyPattern());
-        existingOptions.setDefaultCollation(
-            cm->getDefaultCollator() ? cm->getDefaultCollator()->getSpec().toBSON() : BSONObj());
-        existingOptions.setUnique(cm->isUnique());
+    if (!existingColls.empty()) {
+        auto existingOptions = uassertStatusOK(CollectionType::fromBSON(existingColls.front()));
 
         CollectionType requestedOptions;
         requestedOptions.setNs(nss);
@@ -281,12 +281,12 @@ bool checkIfAlreadyShardedWithSameOptions(OperationContext* opCtx,
                               << existingOptions.toString(),
                 requestedOptions.hasSameOptions(existingOptions));
 
-        // If the options do match, we can immediately return success.
-        return true;
+        // If the options do match, return the existing collection's full spec.
+        return existingOptions;
     }
 
     // Not currently sharded.
-    return false;
+    return boost::none;
 }
 
 /**
@@ -793,7 +793,11 @@ public:
         invariant(request.getCollation());
 
         // Step 2.
-        if (checkIfAlreadyShardedWithSameOptions(opCtx, nss, request)) {
+        if (auto existingColl = checkIfAlreadyShardedWithSameOptions(opCtx, nss, request)) {
+            result << "collectionsharded" << nss.ns();
+            if (existingColl->getUUID()) {
+                result << "collectionUUID" << *existingColl->getUUID();
+            }
             return true;
         }
 
