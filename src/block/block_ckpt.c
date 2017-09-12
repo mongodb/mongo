@@ -841,19 +841,21 @@ __wt_block_checkpoint_resolve(
 	 */
 	__wt_spin_lock(session, &block->live_lock);
 	switch (block->ckpt_state) {
-	case WT_CKPT_PANIC_ON_FAILURE:
-		if (!failed)
-			break;
-		ret = __wt_block_panic(session, EINVAL,
-		    "%s: the checkpoint failed, the system must restart",
-		    block->name);
-		break;
 	case WT_CKPT_INPROGRESS:
+		/* Something went wrong, but it's recoverable at our level. */
+		goto done;
 	case WT_CKPT_NONE:
 	case WT_CKPT_SALVAGE:
 		ret = __wt_block_panic(session, EINVAL,
 		    "%s: an unexpected checkpoint resolution: the checkpoint "
 		    "was never started or completed, or configured for salvage",
+		    block->name);
+		break;
+	case WT_CKPT_PANIC_ON_FAILURE:
+		if (!failed)
+			break;
+		ret = __wt_block_panic(session, EINVAL,
+		    "%s: the checkpoint failed, the system must restart",
 		    block->name);
 		break;
 	}
@@ -872,7 +874,7 @@ __wt_block_checkpoint_resolve(
 	__wt_block_extlist_free(session, &ci->ckpt_discard);
 
 	__wt_spin_lock(session, &block->live_lock);
-	block->ckpt_state = WT_CKPT_NONE;
+done:	block->ckpt_state = WT_CKPT_NONE;
 err:	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
