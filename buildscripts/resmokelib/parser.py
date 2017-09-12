@@ -299,9 +299,9 @@ def update_config_vars(values):
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpathPrefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest"))
     _config.DRY_RUN = config.pop("dryRun")
-    _config.EXCLUDE_WITH_ANY_TAGS = config.pop("excludeWithAnyTags")
+    _config.EXCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("excludeWithAnyTags"))
     _config.FAIL_FAST = not config.pop("continueOnFailure")
-    _config.INCLUDE_WITH_ANY_TAGS = config.pop("includeWithAnyTags")
+    _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("includeWithAnyTags"))
     _config.JOBS = config.pop("jobs")
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod"))
@@ -391,7 +391,6 @@ def get_suites(values, args):
                                                          _config.INCLUDE_WITH_ANY_TAGS))
         # Build configuration for list of files to run.
         suite_roots = _get_suite_roots(args)
-
 
     suite_files = values.suite_files.split(",")
 
@@ -487,3 +486,17 @@ def _expand_user(pathname):
     if pathname is None:
         return None
     return os.path.expanduser(pathname)
+
+
+def _tags_from_list(tags_list):
+    """
+    Returns the list of tags from a list of tag parameter values.
+
+    Each parameter value in the list may be a list of comma separated tags, with empty strings
+    ignored.
+    """
+    tags = []
+    if tags_list is not None:
+        for tag in tags_list:
+            tags.extend([t for t in tag.split(",") if t != ""])
+    return tags

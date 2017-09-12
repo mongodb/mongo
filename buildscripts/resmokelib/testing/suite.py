@@ -48,7 +48,6 @@ class Suite(object):
         Returns the tests to run based on the 'test_kind'-specific
         filtering policy.
         """
-
         test_info = self.get_selector_config()
 
         # The mongos_test doesn't have to filter anything, the test_info is just the arguments to
@@ -58,19 +57,11 @@ class Suite(object):
             if not isinstance(mongos_options, dict):
                 raise TypeError("Expected dictionary of arguments to mongos")
             return [mongos_options]
-        elif test_kind == "cpp_integration_test":
-            tests = _selector.filter_cpp_integration_tests(**test_info)
-        elif test_kind == "cpp_unit_test":
-            tests = _selector.filter_cpp_unit_tests(**test_info)
-        elif test_kind == "db_test":
-            tests = _selector.filter_dbtests(**test_info)
-        elif test_kind == "json_schema_test":
-            tests = _selector.filter_json_schema_tests(**test_info)
-        else:  # test_kind == "js_test":
-            tests = _selector.filter_jstests(**test_info)
 
+        tests = _selector.filter_tests(test_kind, test_info)
         if _config.ORDER_TESTS_BY_NAME:
             return sorted(tests, key=str.lower)
+
         return tests
 
     def get_name(self):
