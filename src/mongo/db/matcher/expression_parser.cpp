@@ -581,11 +581,19 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                     return s;
                 root->add(xorExpr.release());
             } else if (mongoutils::str::equals("_internalSchemaMinProperties", rest)) {
-                return _parseTopLevelInternalSchemaSingleIntegerArgument<
+                auto minPropsExpr = _parseTopLevelInternalSchemaSingleIntegerArgument<
                     InternalSchemaMinPropertiesMatchExpression>(e);
+                if (!minPropsExpr.isOK()) {
+                    return minPropsExpr.getStatus();
+                }
+                root->add(minPropsExpr.getValue().release());
             } else if (mongoutils::str::equals("_internalSchemaMaxProperties", rest)) {
-                return _parseTopLevelInternalSchemaSingleIntegerArgument<
+                auto maxPropsExpr = _parseTopLevelInternalSchemaSingleIntegerArgument<
                     InternalSchemaMaxPropertiesMatchExpression>(e);
+                if (!maxPropsExpr.isOK()) {
+                    return maxPropsExpr.getStatus();
+                }
+                root->add(maxPropsExpr.getValue().release());
             } else if (mongoutils::str::equals("jsonSchema", rest)) {
                 if ((allowedFeatures & AllowedFeatures::kJSONSchema) == 0u) {
                     return Status(
@@ -599,7 +607,12 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 if (e.type() != BSONType::Object) {
                     return {Status(ErrorCodes::TypeMismatch, "$jsonSchema must be an object")};
                 }
-                return JSONSchemaParser::parse(e.Obj());
+
+                auto schemaMatch = JSONSchemaParser::parse(e.Obj());
+                if (!schemaMatch.isOK()) {
+                    return schemaMatch.getStatus();
+                }
+                root->add(schemaMatch.getValue().release());
             } else if (mongoutils::str::equals("alwaysFalse", rest)) {
                 auto statusWithLong = MatchExpressionParser::parseIntegerElementToLong(e);
                 if (!statusWithLong.isOK()) {
@@ -611,7 +624,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                                    "$alwaysFalse must be an integer value of 1")};
                 }
 
-                return {stdx::make_unique<AlwaysFalseMatchExpression>()};
+                auto alwaysFalseExpr = stdx::make_unique<AlwaysFalseMatchExpression>();
+                root->add(alwaysFalseExpr.release());
             } else if (mongoutils::str::equals("alwaysTrue", rest)) {
                 auto statusWithLong = MatchExpressionParser::parseIntegerElementToLong(e);
                 if (!statusWithLong.isOK()) {
@@ -623,7 +637,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                                    "$alwaysTrue must be an integer value of 1")};
                 }
 
-                return {stdx::make_unique<AlwaysTrueMatchExpression>()};
+                auto alwaysTrueExpr = stdx::make_unique<AlwaysTrueMatchExpression>();
+                root->add(alwaysTrueExpr.release());
             } else {
                 return {Status(ErrorCodes::BadValue,
                                mongoutils::str::stream() << "unknown top level operator: "

@@ -324,4 +324,21 @@
     listCollectionsOutput = db.runCommand({listCollections: 1, filter: {name: coll.getName()}});
     assert.commandWorked(listCollectionsOutput);
     assert.eq(listCollectionsOutput.cursor.firstBatch[0].options.validator, {$jsonSchema: schema});
+
+    // Test that $jsonSchema and various internal match expressions work correctly with sibling
+    // predicates.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, a: 1, b: 1}));
+    assert.writeOK(coll.insert({_id: 2, a: 2, b: 2}));
+
+    assert.eq(1,
+              coll.find({$jsonSchema: {properties: {a: {type: "number"}}, required: ["a"]}, b: 1})
+                  .itcount());
+    assert.eq(1, coll.find({$or: [{$jsonSchema: {}, a: 1}, {b: 1}]}).itcount());
+    assert.eq(1, coll.find({$and: [{$jsonSchema: {}, a: 1}, {b: 1}]}).itcount());
+
+    assert.eq(1, coll.find({$_internalSchemaMinProperties: 3, b: 2}).itcount());
+    assert.eq(1, coll.find({$_internalSchemaMaxProperties: 3, b: 2}).itcount());
+    assert.eq(1, coll.find({$alwaysTrue: 1, b: 2}).itcount());
+    assert.eq(0, coll.find({$alwaysFalse: 1, b: 2}).itcount());
 }());
