@@ -47,12 +47,20 @@
 
     // Trying to create a new collection with a JSON Schema validator should fail while feature
     // compatibility version is 3.4.
-    assert.commandFailed(testDB.createCollection("coll2", {validator: {$jsonSchema: {}}}),
-                         ErrorCodes.InvalidOptions);
+    let res = testDB.createCollection("coll2", {validator: {$jsonSchema: {}}});
+    assert.commandFailedWithCode(res, ErrorCodes.JSONSchemaNotAllowed);
+    assert(
+        res.errmsg.match(/featureCompatibilityVersion/),
+        "Expected error message from createCollection referencing 'featureCompatibilityVersion' but instead got: " +
+            res.errmsg);
 
     // Trying to update a collection with a JSON Schema validator should also fail.
-    assert.commandFailed(testDB.runCommand({collMod: "coll", validator: {$jsonSchema: {}}}),
-                         ErrorCodes.InvalidOptions);
+    res = testDB.runCommand({collMod: "coll", validator: {$jsonSchema: {}}});
+    assert.commandFailedWithCode(res, ErrorCodes.JSONSchemaNotAllowed);
+    assert(
+        res.errmsg.match(/featureCompatibilityVersion/),
+        "Expected error message from collMod referencing 'featureCompatibilityVersion' but instead got: " +
+            res.errmsg);
 
     MongoRunner.stopMongod(conn);
 

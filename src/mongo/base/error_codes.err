@@ -221,6 +221,7 @@ error_code("FTDCPathAlreadySet", 220)
 error_code("IndexModified", 221)
 error_code("CloseChangeStream", 222)
 error_code("IllegalOpMsgFlag", 223)
+error_code("JSONSchemaNotAllowed", 224)
 
 # Error codes 4000-8999 are reserved.
 

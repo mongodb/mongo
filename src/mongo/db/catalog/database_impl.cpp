@@ -49,6 +49,7 @@
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -1015,8 +1016,19 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
 
         // We check the status of the parse to see if there are any banned features, but we don't
         // actually need the result for now.
-        if (!statusWithMatcher.isOK())
-            return statusWithMatcher.getStatus();
+        if (!statusWithMatcher.isOK()) {
+            if (statusWithMatcher.getStatus().code() == ErrorCodes::JSONSchemaNotAllowed) {
+                // The default error message for disallowed $jsonSchema is not descriptive enough,
+                // so we rewrite it here.
+                return {ErrorCodes::JSONSchemaNotAllowed,
+                        str::stream() << "The featureCompatibilityVersion must be 3.6 to create a "
+                                         "collection with a $jsonSchema validator. See "
+                                      << feature_compatibility_version::kDochubLink
+                                      << "."};
+            } else {
+                return statusWithMatcher.getStatus();
+            }
+        }
     }
 
     status =
