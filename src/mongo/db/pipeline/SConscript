@@ -270,7 +270,6 @@ docSourceEnv.Library(
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/index/key_generator',
         '$BUILD_DIR/mongo/db/logical_session_cache_impl',
-        '$BUILD_DIR/mongo/db/matcher/expression_algo',
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
@@ -439,7 +438,7 @@ env.Library(
     LIBDEPS=[
         'expression',
         'field_path',
-        '$BUILD_DIR/mongo/db/matcher/expression_algo',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
     ]
 )
 

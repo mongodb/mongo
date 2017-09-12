@@ -268,6 +268,10 @@ public:
                                            BSONElement bsonExpr,
                                            const VariablesParseState& vps);
 
+    const ExpressionVector& getOperandList() const {
+        return vpOperand;
+    }
+
 protected:
     explicit ExpressionNary(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : Expression(expCtx) {}
@@ -785,6 +789,10 @@ public:
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
+    CmpOp getOp() const {
+        return cmpOp;
+    }
+
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement bsonExpr,
@@ -1032,6 +1040,10 @@ public:
 
 class ExpressionFieldPath final : public Expression {
 public:
+    bool isRootFieldPath() const {
+        return _variable == Variables::kRootId;
+    }
+
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
