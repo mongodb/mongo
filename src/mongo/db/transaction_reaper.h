@@ -28,68 +28,35 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_cache.h"
+#include <memory>
 
 namespace mongo {
 
-class Client;
-class OperationContext;
 class ServiceContext;
+class SessionsCollection;
+class OperationContext;
 
 /**
- * A noop logical session cache for use in tests
+ * TransactionReaper is responsible for scanning the transaction table, checking if sessions are
+ * still alive and deleting the transaction records if their sessions have expired.
  */
-class LogicalSessionCacheNoop : public LogicalSessionCache {
+class TransactionReaper {
 public:
-    Status promote(LogicalSessionId lsid) override {
-        return Status::OK();
-    }
+    enum class Type {
+        kReplicaSet,
+        kSharded,
+    };
 
-    Status startSession(OperationContext* opCtx, LogicalSessionRecord record) override {
-        return Status::OK();
-    }
+    virtual ~TransactionReaper() = 0;
 
-    Status refreshSessions(OperationContext* opCtx,
-                           const RefreshSessionsCmdFromClient& cmd) override {
-        return Status::OK();
-    }
-    Status refreshSessions(OperationContext* opCtx,
-                           const RefreshSessionsCmdFromClusterMember& cmd) override {
-        return Status::OK();
-    }
+    virtual void reap(OperationContext* OperationContext) = 0;
 
-    void vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override {}
-
-    void clear() override {}
-
-    Status refreshNow(Client* client) override {
-        return Status::OK();
-    }
-
-    Status reapNow(Client* client) override {
-        return Status::OK();
-    }
-
-    Date_t now() override {
-        return Date_t::now();
-    }
-
-    size_t size() override {
-        return 0;
-    }
-
-    std::vector<LogicalSessionId> listIds() const override {
-        return {};
-    }
-
-    std::vector<LogicalSessionId> listIds(
-        const std::vector<SHA256Block>& userDigest) const override {
-        return {};
-    }
-
-    boost::optional<LogicalSessionRecord> peekCached(const LogicalSessionId& id) const override {
-        return boost::none;
-    }
+    /**
+     * The implementation of the sessions collections is different in replica sets versus sharded
+     * clusters, so we have a factory to pick the right impl.
+     */
+    static std::unique_ptr<TransactionReaper> make(Type type,
+                                                   std::shared_ptr<SessionsCollection> collection);
 };
 
 }  // namespace mongo

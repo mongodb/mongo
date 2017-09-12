@@ -53,6 +53,8 @@ public:
     static constexpr StringData kSessionsCollection = "system.sessions"_sd;
     static constexpr StringData kSessionsFullNS = "admin.system.sessions"_sd;
 
+    static const NamespaceString kSessionsNamespaceString;
+
     /**
      * Updates the last-use times on the given sessions to be greater than
      * or equal to the given time. Returns an error if a networking issue occurred.
@@ -71,6 +73,9 @@ public:
      */
     virtual Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) = 0;
 
+    virtual Status removeTransactionRecords(OperationContext* opCtx,
+                                            const LogicalSessionIdSet& sessions) = 0;
+
     /**
      * Checks a set of lsids and returns the set that no longer exists
      *
@@ -84,29 +89,39 @@ protected:
      * Makes a send function for the given client.
      */
     using SendBatchFn = stdx::function<Status(BSONObj batch)>;
-    SendBatchFn makeSendFnForCommand(DBClientBase* client);
-    SendBatchFn makeSendFnForBatchWrite(DBClientBase* client);
+    SendBatchFn makeSendFnForCommand(const NamespaceString& ns, DBClientBase* client);
+    SendBatchFn makeSendFnForBatchWrite(const NamespaceString& ns, DBClientBase* client);
     using FindBatchFn = stdx::function<StatusWith<BSONObj>(BSONObj batch)>;
-    FindBatchFn makeFindFnForCommand(DBClientBase* client);
+    FindBatchFn makeFindFnForCommand(const NamespaceString& ns, DBClientBase* client);
 
     /**
      * Formats and sends batches of refreshes for the given set of sessions.
      */
-    Status doRefresh(const LogicalSessionRecordSet& sessions, Date_t refreshTime, SendBatchFn send);
-    Status doRefreshExternal(const LogicalSessionRecordSet& sessions,
+    Status doRefresh(const NamespaceString& ns,
+                     const LogicalSessionRecordSet& sessions,
+                     Date_t refreshTime,
+                     SendBatchFn send);
+    Status doRefreshExternal(const NamespaceString& ns,
+                             const LogicalSessionRecordSet& sessions,
                              Date_t refreshTime,
                              SendBatchFn send);
 
     /**
      * Formats and sends batches of deletes for the given set of sessions.
      */
-    Status doRemove(const LogicalSessionIdSet& sessions, SendBatchFn send);
-    Status doRemoveExternal(const LogicalSessionIdSet& sessions, SendBatchFn send);
+    Status doRemove(const NamespaceString& ns,
+                    const LogicalSessionIdSet& sessions,
+                    SendBatchFn send);
+    Status doRemoveExternal(const NamespaceString& ns,
+                            const LogicalSessionIdSet& sessions,
+                            SendBatchFn send);
 
     /**
      * Formats and sends batches of fetches for the given set of sessions.
      */
-    StatusWith<LogicalSessionIdSet> doFetch(const LogicalSessionIdSet& sessions, FindBatchFn send);
+    StatusWith<LogicalSessionIdSet> doFetch(const NamespaceString& ns,
+                                            const LogicalSessionIdSet& sessions,
+                                            FindBatchFn send);
 };
 
 }  // namespace mongo

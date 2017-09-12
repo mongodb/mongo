@@ -100,7 +100,7 @@ public:
             std::make_shared<MockSessionsCollectionImpl>());
 
         auto localLogicalSessionCache = stdx::make_unique<LogicalSessionCacheImpl>(
-            std::move(localServiceLiason), std::move(localSessionsCollection));
+            std::move(localServiceLiason), std::move(localSessionsCollection), nullptr);
 
         LogicalSessionCache::set(&serviceContext, std::move(localLogicalSessionCache));
     }

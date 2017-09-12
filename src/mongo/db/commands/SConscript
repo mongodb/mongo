@@ -68,6 +68,7 @@ env.Library(
         "kill_sessions_command.cpp",
         "mr_common.cpp",
         "parameters.cpp",
+        "reap_logical_session_cache_now.cpp",
         "refresh_logical_session_cache_now.cpp",
         "refresh_sessions_command.cpp",
         "refresh_sessions_command_internal.cpp",

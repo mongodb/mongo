@@ -97,6 +97,11 @@ public:
     virtual Status refreshNow(Client* client) = 0;
 
     /**
+     * Reaps transaction records synchronously.
+     */
+    virtual Status reapNow(Client* client) = 0;
+
+    /**
      * Returns the current time.
      */
     virtual Date_t now() = 0;

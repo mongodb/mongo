@@ -69,8 +69,8 @@ public:
 
         auto mockService = stdx::make_unique<MockServiceLiason>(_service);
         auto mockSessions = stdx::make_unique<MockSessionsCollection>(_sessions);
-        _cache = stdx::make_unique<LogicalSessionCacheImpl>(std::move(mockService),
-                                                            std::move(mockSessions));
+        _cache = stdx::make_unique<LogicalSessionCacheImpl>(
+            std::move(mockService), std::move(mockSessions), nullptr);
     }
 
     void tearDown() override {

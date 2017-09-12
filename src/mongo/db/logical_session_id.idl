@@ -155,7 +155,7 @@ structs:
     description: "Parser for forming the fetch request for SessionsCollection::fetch"
     strict: true
     fields:
-      find: namespacestring
+      find: string
       filter: SessionsCollectionFetchRequestFilter
       projection: SessionsCollectionFetchRequestProjection
       batchSize: int

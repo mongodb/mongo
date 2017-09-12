@@ -256,6 +256,7 @@
         planCacheSetFilter: {skip: "does not return user data"},
         profile: {skip: "primary only"},
         reIndex: {skip: "does not return user data"},
+        reapLogicalSessionCacheNow: {skip: "does not return user data"},
         refreshLogicalSessionCacheNow: {skip: "does not return user data"},
         refreshSessions: {skip: "does not return user data"},
         refreshSessionsInternal: {skip: "does not return user data"},

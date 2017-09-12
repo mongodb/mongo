@@ -68,6 +68,12 @@ public:
 
     StatusWith<LogicalSessionIdSet> findRemovedSessions(
         OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+
+    Status removeTransactionRecords(OperationContext* opCtx,
+                                    const LogicalSessionIdSet& sessions) override;
+
+    static Status removeTransactionRecordsHelper(OperationContext* opCtx,
+                                                 const LogicalSessionIdSet& sessions);
 };
 
 }  // namespace mongo

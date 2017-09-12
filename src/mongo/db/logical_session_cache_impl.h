@@ -34,6 +34,7 @@
 #include "mongo/db/service_liason.h"
 #include "mongo/db/sessions_collection.h"
 #include "mongo/db/time_proof_service.h"
+#include "mongo/db/transaction_reaper.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/lru_cache.h"
@@ -96,7 +97,8 @@ public:
      * Construct a new session cache.
      */
     explicit LogicalSessionCacheImpl(std::unique_ptr<ServiceLiason> service,
-                                     std::unique_ptr<SessionsCollection> collection,
+                                     std::shared_ptr<SessionsCollection> collection,
+                                     std::shared_ptr<TransactionReaper> transactionReaper,
                                      Options options = Options{});
 
     LogicalSessionCacheImpl(const LogicalSessionCacheImpl&) = delete;
@@ -119,6 +121,8 @@ public:
 
     Status refreshNow(Client* client) override;
 
+    Status reapNow(Client* client) override;
+
     Date_t now() override;
 
     size_t size() override;
@@ -138,6 +142,9 @@ private:
     void _periodicRefresh(Client* client);
     Status _refresh(Client* client);
 
+    void _periodicReap(Client* client);
+    Status _reap(Client* client);
+
     /**
      * Returns true if a record has passed its given expiration.
      */
@@ -152,7 +159,10 @@ private:
     const Minutes _sessionTimeout;
 
     std::unique_ptr<ServiceLiason> _service;
-    std::unique_ptr<SessionsCollection> _sessionsColl;
+    std::shared_ptr<SessionsCollection> _sessionsColl;
+
+    mutable stdx::mutex _reaperMutex;
+    std::shared_ptr<TransactionReaper> _transactionReaper;
 
     mutable stdx::mutex _cacheMutex;
     LRUCache<LogicalSessionId, LogicalSessionRecord, LogicalSessionIdHash> _cache;

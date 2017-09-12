@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/db/sessions_collection_rs.h"
 #include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
@@ -71,7 +72,7 @@ Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         return Status(error, response.getErrMessage());
     };
 
-    return doRefresh(sessions, refreshTime, send);
+    return doRefresh(kSessionsNamespaceString, sessions, refreshTime, send);
 }
 
 Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
@@ -94,7 +95,7 @@ Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         return Status(error, response.getErrMessage());
     };
 
-    return doRemove(sessions, send);
+    return doRemove(kSessionsNamespaceString, sessions, send);
 }
 
 StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
@@ -140,7 +141,12 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
         return result.obj();
     };
 
-    return doFetch(sessions, send);
+    return doFetch(kSessionsNamespaceString, sessions, send);
+}
+
+Status SessionsCollectionSharded::removeTransactionRecords(OperationContext* opCtx,
+                                                           const LogicalSessionIdSet& sessions) {
+    return SessionsCollectionRS::removeTransactionRecordsHelper(opCtx, sessions);
 }
 
 }  // namespace mongo

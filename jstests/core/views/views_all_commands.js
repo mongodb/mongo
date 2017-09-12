@@ -482,6 +482,7 @@
         },
         stageDebug: {skip: isAnInternalCommand},
         startSession: {skip: isAnInternalCommand},
+        reapLogicalSessionCacheNow: {skip: isAnInternalCommand},
         refreshLogicalSessionCacheNow: {skip: isAnInternalCommand},
         refreshSessions: {skip: isUnrelated},
         refreshSessionsInternal: {skip: isAnInternalCommand},

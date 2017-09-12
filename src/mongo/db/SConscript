@@ -1050,6 +1050,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/s/query/cluster_query',
+        'sessions_collection_rs',
     ],
 )
 
@@ -1079,6 +1080,23 @@ env.Library(
         'sessions_collection',
         'server_parameters',
         'service_liason',
+    ],
+)
+
+env.Library(
+    target='transaction_reaper',
+    source=[
+        'transaction_reaper.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/s/client/shard_interface',
+        '$BUILD_DIR/mongo/s/coreshard',
+        'dbdirectclient',
+        'logical_session_id',
+        'sessions_collection',
+        'write_ops',
     ],
 )
 
@@ -1114,6 +1132,9 @@ envWithAsio.Library(
         'sessions_collection_rs',
         'sessions_collection_sharded',
         'sessions_collection_standalone',
+    ],
+    LIBDEPS_PRIVATE=[
+        'transaction_reaper',
     ],
 )
 
