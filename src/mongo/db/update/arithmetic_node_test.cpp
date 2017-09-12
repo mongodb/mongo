@@ -590,6 +590,23 @@ TEST_F(ArithmeticNodeTest, ApplyIncToStringFails) {
                                 "\"test_object\"} has the field 'a' of non-numeric type string");
 }
 
+TEST_F(ArithmeticNodeTest, OverflowingOperationFails) {
+    auto update = fromjson("{$mul: {a: 2}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
+    ASSERT_OK(node.init(update["$mul"]["a"], collator));
+
+    mutablebson::Document doc(fromjson("{_id: 'test_object', a: NumberLong(9223372036854775807)}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"])),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Failed to apply $mul operations to current value "
+                                "((NumberLong)9223372036854775807) for document {_id: "
+                                "\"test_object\"}");
+}
+
 TEST_F(ArithmeticNodeTest, ApplyNewPath) {
     auto update = fromjson("{$inc: {a: 2}}");
     const CollatorInterface* collator = nullptr;
