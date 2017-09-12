@@ -528,7 +528,7 @@ timestamp(void *arg)
 	while (!g.workers_finished) {
 		if (g.timestamp - last_timestamp < 100) {
 			__wt_seconds((WT_SESSION_IMPL *)session, &now);
-			if (difftime(now, last) < 15) {
+			if (g.timestamp == 0 || difftime(now, last) < 15) {
 				__wt_sleep(1, 0);
 				continue;
 			}
