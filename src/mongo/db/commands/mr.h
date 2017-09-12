@@ -250,6 +250,9 @@ public:
     // true when called from mongos to do phase-1 of M/R
     bool shardedFirstPass;
 
+    // if the output collection is sharded, we must be told what UUID to use for it
+    boost::optional<UUID> finalOutputCollUUID;
+
     static AtomicUInt32 JOB_NUMBER;
 };  // end MRsetup
 

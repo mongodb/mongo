@@ -435,6 +435,10 @@ public:
             LOG(1) << "MR with single shard output, NS=" << outputCollNss
                    << " primary=" << outputDbInfo.primaryId();
 
+            // Appending this field informs the shard that it can generate a UUID for the output
+            // collection itself.
+            finalCmd.append("finalOutputCollIsSharded", false);
+
             const auto outputShard =
                 uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
 
@@ -457,15 +461,36 @@ public:
             auto outputRoutingInfo =
                 uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, outputCollNss));
 
-            // Create the sharded collection if needed
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
+
+            // Appending this field informs the shard that if the shard is in fcv>=3.6, the shard
+            // should require a UUID to be sent as part of the mapreduce.shardedfinish request.
+            finalCmd.append("finalOutputCollIsSharded", true);
+
+            boost::optional<UUID> shardedOutputCollUUID;
             if (!outputRoutingInfo.cm()) {
-                outputRoutingInfo = createShardedOutputCollection(opCtx, outputCollNss, splitPts);
+                // Create the sharded collection if needed and parse the UUID from the response.
+                outputRoutingInfo = createShardedOutputCollection(
+                    opCtx, outputCollNss, splitPts, &shardedOutputCollUUID);
+            } else {
+                // Collection is already sharded; read the collection's UUID from the config server.
+                const auto coll =
+                    uassertStatusOK(catalogClient->getCollection(opCtx, outputCollNss.ns())).value;
+                shardedOutputCollUUID = coll.getUUID();
+            }
+
+            // This mongos might not have seen a UUID if setFCV was called on the cluster just after
+            // this mongos tried to obtain the sharded output collection's UUID, so appending the
+            // UUID is optional. If setFCV=3.6 has been called on the shard, the shard will error.
+            // Else, the shard will pull the UUID from the config server on receiving setFCV=3.6.
+            if (shardedOutputCollUUID) {
+                shardedOutputCollUUID->appendToBuilder(&finalCmd, "shardedOutputCollUUID");
             }
 
             auto chunkSizes = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>();
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
+                auto scopedDistLock = catalogClient->getDistLockManager()->lock(
                     opCtx, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
                 if (!scopedDistLock.isOK()) {
                     return appendCommandStatus(result, scopedDistLock.getStatus());
@@ -605,9 +630,11 @@ private:
     /**
      * Creates and shards the collection for the output results.
      */
-    static CachedCollectionRoutingInfo createShardedOutputCollection(OperationContext* opCtx,
-                                                                     const NamespaceString& nss,
-                                                                     const BSONObjSet& splitPts) {
+    static CachedCollectionRoutingInfo createShardedOutputCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObjSet& splitPts,
+        boost::optional<UUID>* outUUID) {
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
         // Enable sharding on the output db
@@ -658,6 +685,12 @@ private:
                 configShardCollRequest.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponse.commandStatus);
+
+        // Parse the UUID for the sharded collection from the shardCollection response, if one is
+        // present. It will only be present if the cluster is in fcv=3.6.
+        auto shardCollResponse = ConfigsvrShardCollectionResponse::parse(
+            IDLParserErrorContext("ConfigsvrShardCollectionResponse"), cmdResponse.response);
+        *outUUID = std::move(shardCollResponse.getCollectionUUID());
 
         // Make sure the cached metadata for the collection knows that we are now sharded
         return uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
