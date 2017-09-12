@@ -138,7 +138,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		btree = trk->dhandle->handle;
 		bm = btree->bm;
 		WT_WITH_DHANDLE(session, trk->dhandle,
-		    ret = bm->checkpoint_resolve(bm, session));
+		    ret = bm->checkpoint_resolve(bm, session, false));
 		break;
 	case WT_ST_DROP_COMMIT:
 		if ((ret =

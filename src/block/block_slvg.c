@@ -52,6 +52,10 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_RET(__wt_block_insert_ext(
 	    session, block, &block->live.alloc, allocsize, len - allocsize));
 
+	/* Salvage performs a checkpoint but doesn't start or resolve it. */
+	WT_ASSERT(session, block->ckpt_state == WT_CKPT_NONE);
+	block->ckpt_state = WT_CKPT_SALVAGE;
+
 	return (0);
 }
 
@@ -62,6 +66,10 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
+	/* Salvage performs a checkpoint but doesn't start or resolve it. */
+	WT_ASSERT(session, block->ckpt_state == WT_CKPT_SALVAGE);
+	block->ckpt_state = WT_CKPT_NONE;
+
 	/* Discard the checkpoint. */
 	return (__wt_block_checkpoint_unload(session, block, false));
 }

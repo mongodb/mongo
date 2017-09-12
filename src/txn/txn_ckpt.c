@@ -1427,7 +1427,7 @@ __checkpoint_tree(
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_LSN ckptlsn;
-	bool fake_ckpt;
+	bool fake_ckpt, resolve_bm;
 
 	WT_UNUSED(cfg);
 
@@ -1436,7 +1436,7 @@ __checkpoint_tree(
 	ckptbase = btree->ckpt;
 	conn = S2C(session);
 	dhandle = session->dhandle;
-	fake_ckpt = false;
+	fake_ckpt = resolve_bm = false;
 
 	/*
 	 * Set the checkpoint LSN to the maximum LSN so that if logging is
@@ -1500,6 +1500,10 @@ __checkpoint_tree(
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, false, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
+	/* Tell the block manager that a file checkpoint is starting. */
+	WT_ERR(bm->checkpoint_start(bm, session));
+	resolve_bm = true;
+
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
 		WT_ERR(__wt_cache_op(session, WT_SYNC_CHECKPOINT));
@@ -1544,17 +1548,18 @@ fake:	/*
 	    session, dhandle->name, ckptbase, &ckptlsn));
 
 	/*
-	 * If we wrote a checkpoint (rather than faking one), pages may be
-	 * available for re-use.  If tracking is enabled, defer making pages
-	 * available until transaction end.  The exception is if the handle is
-	 * being discarded, in which case the handle will be gone by the time
-	 * we try to apply or unroll the meta tracking event.
+	 * If we wrote a checkpoint (rather than faking one), we have to resolve
+	 * it. Normally, tracking is enabled and resolution deferred until
+	 * transaction end. The exception is if the handle is being discarded,
+	 * in which case the handle will be gone by the time we try to apply or
+	 * unroll the meta tracking event.
 	 */
 	if (!fake_ckpt) {
+		resolve_bm = false;
 		if (WT_META_TRACKING(session) && is_checkpoint)
 			WT_ERR(__wt_meta_track_checkpoint(session));
 		else
-			WT_ERR(bm->checkpoint_resolve(bm, session));
+			WT_ERR(bm->checkpoint_resolve(bm, session, false));
 	}
 
 	/* Tell logging that the checkpoint is complete. */
@@ -1562,7 +1567,11 @@ fake:	/*
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, false, WT_TXN_LOG_CKPT_STOP, NULL));
 
-err:	/*
+err:	/* Resolved the checkpoint for the block manager in the error path. */
+	if (resolve_bm)
+		WT_TRET(bm->checkpoint_resolve(bm, session, ret != 0));
+
+	/*
 	 * If the checkpoint didn't complete successfully, make sure the
 	 * tree is marked dirty.
 	 */

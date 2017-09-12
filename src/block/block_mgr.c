@@ -122,9 +122,9 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
  *	Resolve the checkpoint.
  */
 static int
-__bm_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool failed)
 {
-	return (__wt_block_checkpoint_resolve(session, bm->block));
+	return (__wt_block_checkpoint_resolve(session, bm->block, failed));
 }
 
 /*
@@ -132,7 +132,30 @@ __bm_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session)
  *	Resolve the checkpoint; readonly version.
  */
 static int
-__bm_checkpoint_resolve_readonly(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_checkpoint_resolve_readonly(
+    WT_BM *bm, WT_SESSION_IMPL *session, bool failed)
+{
+	WT_UNUSED(failed);
+
+	return (__bm_readonly(bm, session));
+}
+
+/*
+ * __bm_checkpoint_start --
+ *	Start the checkpoint.
+ */
+static int
+__bm_checkpoint_start(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+	return (__wt_block_checkpoint_start(session, bm->block));
+}
+
+/*
+ * __bm_checkpoint_start_readonly --
+ *	Start the checkpoint; readonly version.
+ */
+static int
+__bm_checkpoint_start_readonly(WT_BM *bm, WT_SESSION_IMPL *session)
 {
 	return (__bm_readonly(bm, session));
 }
@@ -539,6 +562,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
 	bm->checkpoint = __bm_checkpoint;
 	bm->checkpoint_load = __bm_checkpoint_load;
 	bm->checkpoint_resolve = __bm_checkpoint_resolve;
+	bm->checkpoint_start = __bm_checkpoint_start;
 	bm->checkpoint_unload = __bm_checkpoint_unload;
 	bm->close = __bm_close;
 	bm->compact_end = __bm_compact_end;
@@ -566,6 +590,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
 	if (readonly) {
 		bm->checkpoint = __bm_checkpoint_readonly;
 		bm->checkpoint_resolve = __bm_checkpoint_resolve_readonly;
+		bm->checkpoint_start = __bm_checkpoint_start_readonly;
 		bm->compact_end = __bm_compact_end_readonly;
 		bm->compact_page_skip = __bm_compact_page_skip_readonly;
 		bm->compact_skip = __bm_compact_skip_readonly;
