@@ -514,8 +514,6 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 			/* We have to find the start chunk: merge locked it. */
 			WT_ASSERT(session, start_chunk < lsm_tree->nchunks);
 		}
-
-		WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 	} else {
 		nchunks = lsm_tree->nchunks;
 		WT_ERR(__clsm_resize_chunks(session, clsm, nchunks));
@@ -618,6 +616,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		clsm->current = NULL;
 	}
 
+	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 	clsm->nchunks = nchunks;
 
 	/* Open the cursors for chunks that have changed. */
@@ -671,9 +670,10 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		    WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
 	}
 
-	/* Setup the count values for each chunk in the chunks*/
+	/* Setup the count values for each chunk in the chunks */
 	for (i = 0; i != clsm->nchunks; i++)
-		clsm->chunks[i]->count = lsm_tree->chunk[i]->count;
+		clsm->chunks[i]->count =
+		    lsm_tree->chunk[i + start_chunk]->count;
 
 	/* The last chunk is our new primary. */
 	if (chunk != NULL &&
