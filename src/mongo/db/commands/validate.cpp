@@ -75,8 +75,7 @@ public:
              "Slow.\n"
              "Add full:true option to do a more thorough check\n"
              "Add scandata:false to skip the scan of the collection data without skipping scans "
-             "of any indexes\n"
-             "Add background:false to block access to the collection during validation";
+             "of any indexes";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -137,7 +136,9 @@ public:
             return false;
         }
 
-        bool background = false;
+        // Omit background validation logic until it is fully implemented and vetted.
+        const bool background = false;
+        /*
         bool isInRecordIdOrder = collection->getRecordStore()->isInRecordIdOrder();
         if (isInRecordIdOrder && !full) {
             background = true;
@@ -161,9 +162,7 @@ public:
                                  "A full validate cannot run in the background, use full:false"});
             return false;
         }
-
-        // Set it to false forcefully until it is fully implemented.
-        background = false;
+        */
 
         result.append("ns", nss.ns());
 
