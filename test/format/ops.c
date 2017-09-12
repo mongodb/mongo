@@ -77,7 +77,7 @@ wts_ops(int lastrun)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	wt_thread_t alter_tid, backup_tid, compact_tid, lrt_tid, timestamp_tid;
-	int64_t fourths, thread_ops;
+	int64_t fourths, quit_fourths, thread_ops;
 	uint32_t i;
 	int running;
 
@@ -95,10 +95,13 @@ wts_ops(int lastrun)
 	/*
 	 * There are two mechanisms to specify the length of the run, a number
 	 * of operations and a timer, when either expire the run terminates.
+	 *
 	 * Each thread does an equal share of the total operations (and make
 	 * sure that it's not 0).
 	 *
-	 * Calculate how many fourth-of-a-second sleeps until any timer expires.
+	 * Calculate how many fourth-of-a-second sleeps until the timer expires.
+	 * If the timer expires and threads don't return in 15 minutes, assume
+	 * there is something hung, and force the quit.
 	 */
 	if (g.c_ops == 0)
 		thread_ops = -1;
@@ -108,9 +111,11 @@ wts_ops(int lastrun)
 		thread_ops = g.c_ops / g.c_threads;
 	}
 	if (g.c_timer == 0)
-		fourths = -1;
-	else
+		fourths = quit_fourths = -1;
+	else {
 		fourths = ((int64_t)g.c_timer * 4 * 60) / FORMAT_OPERATION_REPS;
+		quit_fourths = fourths + 15 * 4 * 60;
+	}
 
 	/* Initialize the table extension code. */
 	table_append_init();
@@ -212,6 +217,12 @@ wts_ops(int lastrun)
 		__wt_sleep(0, 250000);		/* 1/4th of a second */
 		if (fourths != -1)
 			--fourths;
+		if (quit_fourths != -1 && --quit_fourths == 0) {
+			fprintf(stderr, "%s\n",
+			    "format run exceeded 15 minutes past the maximum "
+			    "time, aborting the process.");
+			abort();
+		}
 	}
 	for (i = 0; i < g.c_threads; ++i)
 		free(tinfo_list[i]);

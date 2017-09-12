@@ -187,17 +187,28 @@ config_setup(void)
 		config_in_memory_reset();
 
 	/*
-	 * Run-length configured by a number of operations and a timer. If the
-	 * operation count and the timer are both set by a configuration, there
-	 * isn't anything to do. If only the operation count was configured,
-	 * set a default maximum-run of 20 minutes. If only the timer is set,
-	 * clear the operations count (which was set randomly).
+	 * Run-length is configured by a number of operations and a timer.
+	 *
+	 * If the operation count and the timer are both configured, do nothing.
+	 * If only the timer is configured, clear the operations count.
+	 * If only the operation count is configured, limit the run to 6 hours.
+	 * If neither is configured, leave the operations count alone and limit
+	 * the run to 30 minutes.
+	 *
+	 * In other words, if we rolled the dice on everything, do a short run.
+	 * If we chose a number of operations but the rest of the configuration
+	 * means operations take a long time to complete (for example, a small
+	 * cache and many worker threads), don't let it run forever.
 	 */
 	if (config_is_perm("timer")) {
 		if (!config_is_perm("ops"))
 			config_single("ops=0", 0);
-	} else
-		config_single("timer=20", 0);
+	} else {
+		if (!config_is_perm("ops"))
+			config_single("timer=30", 0);
+		else
+			config_single("timer=360", 0);
+	}
 
 	/*
 	 * Key/value minimum/maximum are related, correct unless specified by
