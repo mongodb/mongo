@@ -9,7 +9,11 @@
         sessionOptions = TestData.sessionOptions;
     }
 
-    db = db.getMongo().startSession(sessionOptions).getDatabase(db.getName());
+    const driverSession = db.getMongo().startSession(sessionOptions);
+    // Override the endSession function to be a no-op so fuzzer doesn't accidentally end the
+    // session.
+    driverSession.endSession = Function.prototype;
+    db = driverSession.getDatabase(db.getName());
 
     var originalStartParallelShell = startParallelShell;
     startParallelShell = function(jsCode, port, noConnect) {

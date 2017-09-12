@@ -2128,6 +2128,32 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger --numClientsPerFixture=10
 
+## jstestfuzz concurrent replica set with logical session mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_replication_session
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication_session --storageEngine=mmapv1 --numClientsPerFixture=10
+
+## jstestfuzz concurrent replica set with logical session WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_replication_session_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication_session --storageEngine=wiredTiger --numClientsPerFixture=10
+
 ## jstestfuzz concurrent sharded cluster mmapv1 ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded
@@ -2153,6 +2179,32 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger --numClientsPerFixture=10
+
+## jstestfuzz concurrent sharded cluster with logical session mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_sharded_session
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_sharded_session --storageEngine=mmapv1 --numClientsPerFixture=10
+
+## jstestfuzz concurrent sharded cluster with logical session WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_sharded_session_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_sharded_session --storageEngine=wiredTiger --numClientsPerFixture=10
 
 ## jstestfuzz replica set mmapv1 ##
 - <<: *jstestfuzz_template
@@ -2228,6 +2280,28 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication_resync --storageEngine=wiredTiger
 
+## jstestfuzz replica set with logical session mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_session
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication_session --storageEngine=mmapv1
+
+## jstestfuzz replica set with logical session WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_session_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication_session --storageEngine=wiredTiger
+
 ## jstestfuzz sharded cluster mmapv1 ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded
@@ -2249,6 +2323,28 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
+
+## jstestfuzz sharded cluster with logical session mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_sharded_session
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_sharded_session --storageEngine=mmapv1
+
+## jstestfuzz sharded cluster with logical session WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_sharded_session_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_sharded_session --storageEngine=wiredTiger
 
 ## integration test suites ##
 
@@ -6050,12 +6146,20 @@ buildvariants:
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_replication_session
+  - name: jstestfuzz_concurrent_replication_session_WT
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_concurrent_sharded_session_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_replication_session
+  - name: jstestfuzz_replication_session_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
+  - name: jstestfuzz_sharded_session
+  - name: jstestfuzz_sharded_session_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_jscore_passthrough
@@ -6224,12 +6328,20 @@ buildvariants:
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_replication_session
+  - name: jstestfuzz_concurrent_replication_session_WT
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_concurrent_sharded_session_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_replication_session
+  - name: jstestfuzz_replication_session_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
+  - name: jstestfuzz_sharded_session
+  - name: jstestfuzz_sharded_session_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_jscore_passthrough
@@ -6546,14 +6658,22 @@ buildvariants:
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_replication_session
+  - name: jstestfuzz_concurrent_replication_session_WT
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_concurrent_sharded_session_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_WT
   - name: jstestfuzz_replication_initsync
   - name: jstestfuzz_replication_initsync_WT
+  - name: jstestfuzz_replication_session
+  - name: jstestfuzz_replication_session_WT
+  - name: jstestfuzz_sharded
+  - name: jstestfuzz_sharded_WT
+  - name: jstestfuzz_sharded_session
+  - name: jstestfuzz_sharded_session_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_auth
@@ -8831,9 +8951,13 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_replication_session_WT
   - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_concurrent_sharded_session_WT
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_replication_session_WT
   - name: jstestfuzz_sharded_WT
+  - name: jstestfuzz_sharded_session_WT
   - name: master_slave_WT
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough
@@ -9386,12 +9510,20 @@ buildvariants:
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_replication_session
+  - name: jstestfuzz_concurrent_replication_session_WT
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_concurrent_sharded_session_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_replication_session
+  - name: jstestfuzz_replication_session_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
+  - name: jstestfuzz_sharded_session
+  - name: jstestfuzz_sharded_session_WT
 
 - name: ubuntu1604-debug-ubsan
   display_name: ~ UBSAN Enterprise Ubuntu 16.04 DEBUG
