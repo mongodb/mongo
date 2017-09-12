@@ -63,12 +63,13 @@ void PeriodicRunnerASIO::scheduleJob(PeriodicJob job) {
         stdx::unique_lock<stdx::mutex> lk(_stateMutex);
         _jobs.insert(_jobs.end(), asioJob);
         if (_state == State::kRunning) {
-            _scheduleJob(asioJob);
+            _scheduleJob(asioJob, true);
+            _spawnThreads(lk);
         }
     }
 }
 
-void PeriodicRunnerASIO::_scheduleJob(std::weak_ptr<PeriodicJobASIO> job) {
+void PeriodicRunnerASIO::_scheduleJob(std::weak_ptr<PeriodicJobASIO> job, bool firstTime) {
     auto lockedJob = job.lock();
     if (!lockedJob) {
         return;
@@ -78,27 +79,50 @@ void PeriodicRunnerASIO::_scheduleJob(std::weak_ptr<PeriodicJobASIO> job) {
     auto adjustedMS =
         std::max(Milliseconds(0), lockedJob->start + lockedJob->interval - _timerFactory->now());
     lockedJob->timer->expireAfter(adjustedMS);
-    lockedJob->timer->asyncWait([this, job](std::error_code ec) mutable {
-        if (ec) {
-            severe() << "Encountered an error in PeriodicRunnerASIO: " << ec.message();
-            return;
+    lockedJob->timer->asyncWait([this, job, firstTime](std::error_code ec) mutable {
+        if (!firstTime) {
+            if (ec) {
+                severe() << "Encountered an error in PeriodicRunnerASIO: " << ec.message();
+                return;
+            }
+
+            auto lockedJob = job.lock();
+            if (!lockedJob) {
+                return;
+            }
+
+            lockedJob->start = _timerFactory->now();
+
+            lockedJob->job(Client::getCurrent());
         }
 
-        stdx::unique_lock<stdx::mutex> lk(_stateMutex);
-        if (_state != State::kRunning) {
-            return;
-        }
-
-        auto lockedJob = job.lock();
-        if (!lockedJob) {
-            return;
-        }
-
-        lockedJob->start = _timerFactory->now();
-        lockedJob->job(_client);
-
-        _io_service.post([this, job]() mutable { _scheduleJob(job); });
+        _io_service.post([this, job]() mutable { _scheduleJob(job, false); });
     });
+}
+
+void PeriodicRunnerASIO::_spawnThreads(WithLock) {
+    while (_threads.size() < _jobs.size()) {
+        _threads.emplace_back([this] {
+            try {
+                auto client = getGlobalServiceContext()->makeClient("PeriodicRunnerASIO");
+                Client::setCurrent(std::move(client));
+
+                asio::io_service::work workItem(_io_service);
+                std::error_code ec;
+                _io_service.run(ec);
+
+                client = Client::releaseCurrent();
+
+                if (ec) {
+                    severe() << "Failure in PeriodicRunnerASIO: " << ec.message();
+                    fassertFailed(40438);
+                }
+            } catch (...) {
+                severe() << "Uncaught exception in PeriodicRunnerASIO: " << exceptionToStatus();
+                fassertFailed(40439);
+            }
+        });
+    }
 }
 
 Status PeriodicRunnerASIO::startup() {
@@ -108,33 +132,14 @@ Status PeriodicRunnerASIO::startup() {
     }
 
     _state = State::kRunning;
-    _thread = stdx::thread([this]() {
-        try {
-            auto client = getGlobalServiceContext()->makeClient("PeriodicRunnerASIO");
-            _client = client.get();
-            Client::setCurrent(std::move(client));
-
-            asio::io_service::work workItem(_io_service);
-            std::error_code ec;
-            _io_service.run(ec);
-
-            client = Client::releaseCurrent();
-
-            if (ec) {
-                severe() << "Failure in PeriodicRunnerASIO: " << ec.message();
-                fassertFailed(40438);
-            }
-        } catch (...) {
-            severe() << "Uncaught exception in PeriodicRunnerASIO: " << exceptionToStatus();
-            fassertFailed(40439);
-        }
-    });
 
     // schedule any jobs that we have
     for (auto& job : _jobs) {
         job->start = _timerFactory->now();
-        _scheduleJob(job);
+        _scheduleJob(job, true);
     }
+
+    _spawnThreads(lk);
 
     return Status::OK();
 }
@@ -149,7 +154,9 @@ void PeriodicRunnerASIO::shutdown() {
 
         lk.unlock();
 
-        _thread.join();
+        for (auto& thread : _threads) {
+            thread.join();
+        }
     }
 }
 

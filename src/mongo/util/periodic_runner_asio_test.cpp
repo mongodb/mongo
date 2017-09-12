@@ -221,5 +221,46 @@ TEST_F(PeriodicRunnerASIOTest, TwoJobsTest) {
     }
 }
 
+TEST_F(PeriodicRunnerASIOTest, TwoJobsDontDeadlock) {
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+    stdx::condition_variable doneCv;
+    bool a = false;
+    bool b = false;
+
+    PeriodicRunner::PeriodicJob jobA(
+        [&](Client*) {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            a = true;
+
+            cv.notify_one();
+            cv.wait(lk, [&] { return b; });
+            doneCv.notify_one();
+        },
+        Milliseconds(1));
+
+    PeriodicRunner::PeriodicJob jobB(
+        [&](Client*) {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            b = true;
+
+            cv.notify_one();
+            cv.wait(lk, [&] { return a; });
+            doneCv.notify_one();
+        },
+        Milliseconds(1));
+
+    runner()->scheduleJob(std::move(jobA));
+    runner()->scheduleJob(std::move(jobB));
+
+    timerFactory().fastForward(Milliseconds(1));
+
+    stdx::unique_lock<stdx::mutex> lk(mutex);
+    doneCv.wait(lk, [&] { return a && b; });
+
+    ASSERT(a);
+    ASSERT(b);
+}
+
 }  // namespace
 }  // namespace mongo
