@@ -145,7 +145,6 @@ public:
     virtual Role getRole() const;
     virtual MemberState getMemberState() const;
     virtual bool isSteppingDown() const override;
-    virtual bool isUnconditionallySteppingDown() const override;
     virtual HostAndPort getSyncSourceAddress() const;
     virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
     virtual int getMaintenanceCount() const;
@@ -217,7 +216,10 @@ public:
     virtual void processLoseElection();
     virtual Status checkShouldStandForElection(Date_t now) const;
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
-    virtual bool finishAttemptedStepDown(Date_t until, bool force) override;
+    virtual bool attemptStepDown(Date_t now,
+                                 Date_t waitUntil,
+                                 Date_t stepDownUntil,
+                                 bool force) override;
     virtual bool prepareForUnconditionalStepDown() override;
     virtual Status prepareForStepDownAttempt() override;
     virtual void abortAttemptedStepDownIfNeeded() override;
@@ -391,6 +393,15 @@ private:
      * _memberData vector.
      */
     void _updateHeartbeatDataForReconfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now);
+
+    /**
+     * Returns whether a stepdown attempt should be allowed to proceed.  See the comment for
+     * attemptStepDown() for more details on the rules of when stepdown attempts succeed or fail.
+     */
+    bool _canCompleteStepDownAttempt(Date_t now,
+                                     Date_t waitUntil,
+                                     Date_t stepDownUntil,
+                                     bool force);
 
     void _stepDownSelfAndReplaceWith(int newPrimary);
 

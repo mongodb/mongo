@@ -110,6 +110,11 @@ void RSDataSync::_run() {
                 continue;
             }
 
+            // Once we call into SyncTail::oplogApplication we never return, so this code only runs
+            // at startup.  It is not valid to transition from PRIMARY to RECOVERING ever, or from
+            // SECONDARY to RECOVERING without holding a global X lock, so we invariant to make
+            // sure this never happens.
+            invariant(!memberState.primary() && !memberState.secondary());
             SyncTail(_bgsync, multiSyncApply).oplogApplication(_replCoord);
         } catch (...) {
             auto status = exceptionToStatus();

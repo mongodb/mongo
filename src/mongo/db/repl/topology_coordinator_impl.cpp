@@ -2570,10 +2570,6 @@ bool TopologyCoordinatorImpl::isSteppingDown() const {
         _leaderMode == LeaderMode::kSteppingDown;
 }
 
-bool TopologyCoordinatorImpl::isUnconditionallySteppingDown() const {
-    return _leaderMode == LeaderMode::kSteppingDown;
-}
-
 void TopologyCoordinatorImpl::_setLeaderMode(TopologyCoordinator::LeaderMode newMode) {
     // Invariants for valid state transitions.
     switch (_leaderMode) {
@@ -2676,17 +2672,68 @@ void TopologyCoordinatorImpl::processLoseElection() {
     }
 }
 
-bool TopologyCoordinatorImpl::finishAttemptedStepDown(Date_t until, bool force) {
+bool TopologyCoordinatorImpl::attemptStepDown(Date_t now,
+                                              Date_t waitUntil,
+                                              Date_t stepDownUntil,
+                                              bool force) {
+    if (_role != Role::leader) {
+        uasserted(ErrorCodes::NotMaster,
+                  "Already stepped down from primary while processing step down request");
+    }
+    if (_leaderMode == LeaderMode::kSteppingDown) {
+        uasserted(ErrorCodes::PrimarySteppedDown,
+                  "While waiting for secondaries to catch up before stepping down, "
+                  "this node decided to step down for other reasons");
+    }
 
-    // force==true overrides all other checks.
-    if (force) {
-        _stepDownUntil = until;
-        _stepDownSelfAndReplaceWith(-1);
+
+    if (now >= stepDownUntil) {
+        uasserted(ErrorCodes::ExceededTimeLimit,
+                  "By the time we were ready to step down, we were already past the "
+                  "time we were supposed to step down until");
+    }
+
+    if (!_canCompleteStepDownAttempt(now, waitUntil, stepDownUntil, force)) {
+        // Stepdown attempt failed.
+
+        // Check waitUntil after at least one stepdown attempt, so that stepdown could succeed even
+        // if secondaryCatchUpPeriodSecs == 0.
+        if (now >= waitUntil) {
+            uasserted(ErrorCodes::ExceededTimeLimit,
+                      str::stream() << "No electable secondaries caught up as of "
+                                    << dateToISOStringLocal(now)
+                                    << "Please use the replSetStepDown command with the argument "
+                                    << "{force: true} to force node to step down.");
+        }
+        return false;
+    }
+
+    // Stepdown attempt success!
+    _stepDownUntil = stepDownUntil;
+    _stepDownSelfAndReplaceWith(-1);
+    return true;
+}
+
+bool TopologyCoordinatorImpl::_canCompleteStepDownAttempt(Date_t now,
+                                                          Date_t waitUntil,
+                                                          Date_t stepDownUntil,
+                                                          bool force) {
+    const bool forceNow = force && (now >= waitUntil);
+    OpTime lastApplied = getMyLastAppliedOpTime();
+
+    if (forceNow) {
         return true;
     }
 
-    // We already checked in ReplicationCoordinator that a majority of nodes are caught up.
-    // Here we must check that we also have at least one caught up node that is electable.
+    auto tagStatus = _rsConfig.findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName);
+    invariant(tagStatus.isOK());
+
+    // Check if a majority of nodes have reached the last applied optime.
+    if (!haveTaggedNodesReachedOpTime(lastApplied, tagStatus.getValue(), false)) {
+        return false;
+    }
+
+    // Now check that we also have at least one caught up node that is electable.
     const OpTime lastOpApplied = getMyLastAppliedOpTime();
     for (int memberIndex = 0; memberIndex < _rsConfig.getNumMembers(); memberIndex++) {
         // ignore your self
@@ -2696,11 +2743,10 @@ bool TopologyCoordinatorImpl::finishAttemptedStepDown(Date_t until, bool force) 
         UnelectableReasonMask reason = _getUnelectableReason(memberIndex);
         if (!reason && _memberData.at(memberIndex).getHeartbeatAppliedOpTime() >= lastOpApplied) {
             // Found a caught up and electable node, succeed with step down.
-            _stepDownUntil = until;
-            _stepDownSelfAndReplaceWith(-1);
             return true;
         }
     }
+
     return false;
 }
 
