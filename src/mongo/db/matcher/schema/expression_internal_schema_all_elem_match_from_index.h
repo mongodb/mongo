@@ -85,7 +85,7 @@ public:
 
     MatchExpression* getChild(size_t i) const final {
         invariant(i == 0);
-        return _query.get();
+        return _expression->getFilter();
     }
 
 private:
