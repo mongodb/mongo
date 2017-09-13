@@ -1,8 +1,8 @@
 (function() {
-    var coll = db.SERVER_27968;
+    let coll = db.geo_s2within_line_polygon_sphere;
     coll.drop();
 
-    // Basic tests
+    // Basic tests.
     assert.writeOK(coll.insert({name: "Point1", location: {type: "Point", coordinates: [1, 1]}}));
     assert.writeOK(coll.insert(
         {name: "LineString1", location: {type: "LineString", coordinates: [[1, 1], [2, 2]]}}));
@@ -11,13 +11,13 @@
         location: {type: "Polygon", coordinates: [[[1, 1], [2, 2], [2, 1], [1, 1]]]}
     }));
 
-    var result =
+    let result =
         coll.find({location: {$geoWithin: {$centerSphere: [[1, 1], 1]}}}, {"name": 1, "_id": 0})
             .toArray();
     assert.eq(result, [{name: 'Point1'}, {name: 'LineString1'}, {name: 'Polygon1'}]);
 
-    // Test for a LineString within a geowithin sphere
-    var route = {
+    // Test for a LineString within a geowithin sphere.
+    let route = {
         "name": "LineString2",
         "route": {
             "type": "LineString",
@@ -41,7 +41,7 @@
             .toArray();
     assert.eq(result, [{name: "LineString2"}]);
 
-    // Test for a LineString intersecting with geowithin sphere (should not return a match)
+    // Test for a LineString intersecting with geowithin sphere (should not return a match).
     result =
         coll.find({
                 route: {
@@ -56,7 +56,7 @@
     assert.eq(result, []);
 
     // Test for a LineString intersecting with the boundary of geowithin sphere (should not return a
-    // match)
+    // match).
     result = coll.find({
                      route: {
                          $geoWithin: {
@@ -69,7 +69,7 @@
                  .toArray();
     assert.eq(result, []);
 
-    // Test for a LineString forming a closed loop rectangle within a geowithin sphere
+    // Test for a LineString forming a closed loop rectangle within a geowithin sphere.
     route = {
         "name": "LineString3",
         "route": {
@@ -97,7 +97,7 @@
             .toArray();
     assert.eq(result, [{name: "LineString3"}]);
 
-    // Test for a LineString intersecting with geowithin sphere (should not return a match)
+    // Test for a LineString intersecting with geowithin sphere (should not return a match).
     result =
         coll.find({
                 route: {
@@ -111,8 +111,8 @@
             .toArray();
     assert.eq(result, []);
 
-    // Test for a Polygon within a geowithin sphere
-    var city = {
+    // Test for a Polygon within a geowithin sphere.
+    let city = {
         "name": "Polygon2",
         "city": "Wellington",
         "boundary": {
@@ -141,7 +141,7 @@
     assert.eq(result, [{name: "Polygon2"}]);
 
     // Test for an empty query cap (radius 0) inside of a polygon that covers the centerSphere
-    // (should not return a match)
+    // (should not return a match).
     result =
         coll.find({
                 boundary:
@@ -151,7 +151,7 @@
             .toArray();
     assert.eq(result, []);
 
-    // Test for a Polygon intersecting with geowithin sphere (should not return a match)
+    // Test for a Polygon intersecting with geowithin sphere (should not return a match).
     result =
         coll.find({
                 boundary: {
@@ -165,7 +165,7 @@
             .toArray();
     assert.eq(result, []);
 
-    // Test for a MultiPolygon (two seperate polygons) within a geowithin sphere
+    // Test for a MultiPolygon (two seperate polygons) within a geowithin sphere.
     city = {
         "name": "MultiPolygon1",
         "city": "Sydney",
@@ -205,7 +205,7 @@
     assert.eq(result, [{name: "MultiPolygon1"}]);
 
     // Test for a MultiPolygon with geowithin sphere only one of the polygons
-    //(should not return a match)
+    // (should not return a match).
     result =
         coll.find({
                 boundary: {
@@ -220,7 +220,7 @@
     assert.eq(result, []);
 
     // Test for a MultiPolygon with the boundary of geowithin sphere
-    // (should not return a match)
+    // (should not return a match).
     result =
         coll.find({
                 boundary: {
@@ -234,14 +234,7 @@
             .toArray();
     assert.eq(result, []);
 
-    {
-        boundary: {
-            $geoWithin:
-                {$centerSphere: [[151.2079123018654, -33.86617801222522], 0.0008612335666681253]}
-        }
-    }
-
-    // Test for a MultiPolygon (with a hole) within a geowithin sphere
+    // Test for a MultiPolygon (with a hole) within a geowithin sphere.
     customRegion = {
         "name": "MultiPolygon2",
         "city": "Sydney",
@@ -279,7 +272,7 @@
             .toArray();
     assert.eq(result, [{name: "MultiPolygon2"}]);
 
-    // Test for centerSphere as big as earth radius (should return all)
+    // Test for centerSphere as big as earth radius (should return all).
     result = coll.find({
                      boundary: {
                          $geoWithin:
@@ -291,7 +284,7 @@
     assert.eq(result, [{name: "Polygon2"}, {name: "MultiPolygon1"}, {name: "MultiPolygon2"}]);
 
     // Test for a MultiPolygon with holes intersecting with geowithin sphere (should not return a
-    // match)
+    // match).
     result =
         coll.find({
                 boundary: {
@@ -306,7 +299,7 @@
     assert.eq(result, []);
 
     // Test for a MultiPolygon with holes with geowithin sphere inside the hole (should not return a
-    // match)
+    // match).
     result =
         coll.find({
                 boundary: {
@@ -323,7 +316,7 @@
     coll.drop();
 
     // Test for a large query cap containing both of line vertices but not the line itself.
-    // (should not return a match)
+    // (should not return a match).
     customLongLine = {
         "name": "HorizontalLongLine",
         "route": {
@@ -345,5 +338,4 @@
     assert.eq(result, []);
 
     // End of Test.
-    coll.drop();
 })();
