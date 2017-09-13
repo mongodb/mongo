@@ -39,8 +39,8 @@
     // sharded src sharded dst
     var suffix = "InShardedOutSharded";
 
-    var out =
-        db.srcSharded.mapReduce(map, reduce, {out: {replace: "mrReplace" + suffix, sharded: true}});
+    var out = db.srcSharded.mapReduce(
+        map, reduce, {out: {replace: "mrReplace" + suffix, sharded: true}});
     verifyOutput(out);
 
     out = db.srcSharded.mapReduce(map, reduce, {out: {merge: "mrMerge" + suffix, sharded: true}});
