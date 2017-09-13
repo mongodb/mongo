@@ -2,7 +2,8 @@
 
 """Unit test for buildscripts/remote_operations.py.
 
-   Note - Tests require sshd to be enabled on localhost with paswordless login."""
+   Note - Tests require sshd to be enabled on localhost with paswordless login
+   and can fail otherwise."""
 
 import os
 import shutil
@@ -25,7 +26,8 @@ class RemoteOperationsTestCase(unittest.TestCase):
         self.rop_sh_shell_binary = rop.RemoteOperations(
             user_host="localhost", shell_binary="/bin/sh")
         self.rop_ssh_opts = rop.RemoteOperations(
-            user_host="localhost", ssh_options="-v -o ConnectTimeout=10 -o ConnectionAttempts=10")
+            user_host="localhost",
+            ssh_connection_options="-v -o ConnectTimeout=10 -o ConnectionAttempts=10")
 
     def tearDown(self):
         shutil.rmtree(self.temp_local_dir, ignore_errors=True)
@@ -60,17 +62,44 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
         self.assertNotEqual(0, ret)
         self.assertIsNotNone(buff)
 
-        # Valid host with invalid ssh_options
-        ssh_options = "-o invalid"
+        # Valid host with invalid ssh options
+        ssh_connection_options = "-o invalid"
+        remote_op = rop.RemoteOperations(
+            user_host="localhost", ssh_connection_options=ssh_connection_options)
+        ret, buff = remote_op.access_info()
+        self.assertFalse(remote_op.access_established())
+        self.assertNotEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ssh_options = "--invalid"
         remote_op = rop.RemoteOperations(user_host="localhost", ssh_options=ssh_options)
         ret, buff = remote_op.access_info()
         self.assertFalse(remote_op.access_established())
         self.assertNotEqual(0, ret)
         self.assertIsNotNone(buff)
 
-        # Valid host with valid ssh_options
+        # Valid host with valid ssh options
+        ssh_connection_options = "-v -o ConnectTimeout=10 -o ConnectionAttempts=10"
+        remote_op = rop.RemoteOperations(
+            user_host="localhost", ssh_connection_options=ssh_connection_options)
+        ret, buff = remote_op.access_info()
+        self.assertTrue(remote_op.access_established())
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
         ssh_options = "-v -o ConnectTimeout=10 -o ConnectionAttempts=10"
         remote_op = rop.RemoteOperations(user_host="localhost", ssh_options=ssh_options)
+        ret, buff = remote_op.access_info()
+        self.assertTrue(remote_op.access_established())
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+
+        ssh_connection_options = "-v -o ConnectTimeout=10 -o ConnectionAttempts=10"
+        ssh_options = "-t"
+        remote_op = rop.RemoteOperations(
+            user_host="localhost",
+            ssh_connection_options=ssh_connection_options,
+            ssh_options=ssh_options)
         ret, buff = remote_op.access_info()
         self.assertTrue(remote_op.access_established())
         self.assertEqual(0, ret)
@@ -262,6 +291,25 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
         self.assertTrue(os.path.isfile(r_temp_path))
         os.remove(r_temp_path)
 
+        # Valid scp options
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+        l_temp_file = os.path.basename(l_temp_path)
+        scp_options = "-l 5000"
+        remote_op = rop.RemoteOperations(user_host="localhost", scp_options=scp_options)
+        ret, buff = remote_op.copy_to(l_temp_path, self.temp_remote_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        r_temp_path = os.path.join(self.temp_remote_dir, l_temp_file)
+        self.assertTrue(os.path.isfile(r_temp_path))
+
+        # Invalid scp options
+        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
+        scp_options = "--invalid"
+        remote_op = rop.RemoteOperations(user_host="localhost", scp_options=scp_options)
+        ret, buff = remote_op.copy_to(l_temp_path, self.temp_remote_dir)
+        self.assertNotEqual(0, ret)
+        self.assertIsNotNone(buff)
+
 
 class RemoteOperationCopyFrom(RemoteOperationsTestCase):
     def runTest(self):
@@ -377,6 +425,25 @@ class RemoteOperationCopyFrom(RemoteOperationsTestCase):
 
         # Local directory does not exist.
         self.assertRaises(ValueError, lambda: self.rop_use_shell.copy_from(r_temp_path, "bad_dir"))
+
+        # Valid scp options
+        r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
+        r_temp_file = os.path.basename(r_temp_path)
+        scp_options = "-l 5000"
+        remote_op = rop.RemoteOperations(user_host="localhost", scp_options=scp_options)
+        ret, buff = remote_op.copy_from(r_temp_path, self.temp_local_dir)
+        self.assertEqual(0, ret)
+        self.assertIsNotNone(buff)
+        l_temp_path = os.path.join(self.temp_local_dir, r_temp_file)
+        self.assertTrue(os.path.isfile(l_temp_path))
+
+        # Invalid scp options
+        r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
+        scp_options = "--invalid"
+        remote_op = rop.RemoteOperations(user_host="localhost", scp_options=scp_options)
+        ret, buff = remote_op.copy_from(r_temp_path, self.temp_local_dir)
+        self.assertNotEqual(0, ret)
+        self.assertIsNotNone(buff)
 
 
 class RemoteOperation(RemoteOperationsTestCase):

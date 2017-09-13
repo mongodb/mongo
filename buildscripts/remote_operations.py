@@ -31,12 +31,13 @@ else:
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-_is_windows = sys.platform == "win32" or sys.platform == "cygwin"
+_IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 
 _OPERATIONS = ["shell", "copy_to", "copy_from"]
 
 
 def posix_path(path):
+    """ Returns posix path, used on Windows since scp requires posix style paths. """
     # If path is already quoted, we need to remove the quotes before calling
     path_quote = "\'" if path.startswith("\'") else ""
     path_quote = "\"" if path.startswith("\"") else path_quote
@@ -56,7 +57,9 @@ class RemoteOperations(object):
 
     def __init__(self,
                  user_host,
-                 ssh_options="",
+                 ssh_connection_options=None,
+                 ssh_options=None,
+                 scp_options=None,
                  retries=0,
                  retry_sleep=0,
                  debug=False,
@@ -64,7 +67,9 @@ class RemoteOperations(object):
                  use_shell=False):
 
         self.user_host = user_host
+        self.ssh_connection_options = ssh_connection_options if ssh_connection_options else ""
         self.ssh_options = ssh_options if ssh_options else ""
+        self.scp_options = scp_options if scp_options else ""
         self.retries = retries
         self.retry_sleep = retry_sleep
         self.debug = debug
@@ -84,12 +89,13 @@ class RemoteOperations(object):
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT,
                                    shell=self.use_shell)
-        buff_stdout, buff_stderr = process.communicate()
+        buff_stdout, _ = process.communicate()
         return process.poll(), buff_stdout
 
     def _remote_access(self):
         """ This will check if a remote session is possible. """
-        cmd = "ssh {} {} date".format(self.ssh_options, self.user_host)
+        cmd = "ssh {} {} {} date".format(
+            self.ssh_connection_options, self.ssh_options, self.user_host)
         attempt_num = 0
         buff = ""
         while True:
@@ -130,7 +136,7 @@ class RemoteOperations(object):
         # File names with a space must be quoted, since we permit the
         # the file names to be either a string or a list.
         if operation_type.startswith("copy") and isinstance(operation_param, str):
-            operation_param = shlex.split(operation_param, posix=not _is_windows)
+            operation_param = shlex.split(operation_param, posix=not _IS_WINDOWS)
 
         cmds = []
         if operation_type == "shell":
@@ -145,7 +151,8 @@ class RemoteOperations(object):
                 operation_param = "{}".format(operation_param.replace("'", r"\'"))
                 operation_param = "{}".format(operation_param.replace("\"", r"\""))
                 dollar = "$"
-            cmd = "ssh {} {} {} -c \"{}'{}'\"".format(
+            cmd = "ssh {} {} {} {} -c \"{}'{}'\"".format(
+                self.ssh_connection_options,
                 self.ssh_options,
                 self.user_host,
                 self.shell_binary,
@@ -154,12 +161,12 @@ class RemoteOperations(object):
             cmds.append(cmd)
 
         elif operation_type == "copy_to":
-            cmd = "scp -r {} ".format(self.ssh_options)
+            cmd = "scp -r {} {} ".format(self.ssh_connection_options, self.scp_options)
             # To support spaces in the filename or directory, we quote them one at a time.
-            for file in operation_param:
+            for copy_file in operation_param:
                 # Quote file on Posix.
-                quote = "\"" if not _is_windows else ""
-                cmd += "{quote}{file}{quote} ".format(quote=quote, file=posix_path(file))
+                quote = "\"" if not _IS_WINDOWS else ""
+                cmd += "{quote}{file}{quote} ".format(quote=quote, file=posix_path(copy_file))
             operation_dir = operation_dir if operation_dir else ""
             cmd += " {}:{}".format(self.user_host, posix_path(operation_dir))
             cmds.append(cmd)
@@ -173,15 +180,17 @@ class RemoteOperations(object):
             # We support multiple files being copied from the remote host
             # by invoking scp for each file specified.
             # Note - this is a method which scp does not support directly.
-            for file in operation_param:
-                file = posix_path(file)
-                cmd = "scp -r {} {}:".format(self.ssh_options, self.user_host)
+            for copy_file in operation_param:
+                copy_file = posix_path(copy_file)
+                cmd = "scp -r {} {} {}:".format(
+                    self.ssh_connection_options, self.scp_options, self.user_host)
                 # Quote (on Posix), and escape the file if there are spaces.
                 # Note - we do not support other non-ASCII characters in a file name.
-                quote = "\"" if not _is_windows else ""
-                if " " in file:
-                    file = re.escape("{quote}{file}{quote}".format(quote=quote, file=file))
-                cmd += "{} {}".format(file, posix_path(operation_dir))
+                quote = "\"" if not _IS_WINDOWS else ""
+                if " " in copy_file:
+                    copy_file = re.escape("{quote}{file}{quote}".format(
+                        quote=quote, file=copy_file))
+                cmd += "{} {}".format(copy_file, posix_path(operation_dir))
                 cmds.append(cmd)
 
         else:
@@ -221,6 +230,7 @@ class RemoteOperations(object):
 
 
 def main():
+    """ Main program. """
 
     parser = optparse.OptionParser(description=__doc__)
     control_options = optparse.OptionGroup(parser, "Control options")
@@ -240,16 +250,36 @@ def main():
                       help="Remote operation to perform, choose one of '{}',"
                            " defaults to '%default'.".format(", ".join(_OPERATIONS)))
 
-    control_options.add_option("--sshOptions",
-                               dest="ssh_options",
+    control_options.add_option("--sshConnectionOptions",
+                               dest="ssh_connection_options",
                                default=None,
                                action="append",
-                               help="SSH connection options."
+                               help="SSH connection options which are common to ssh and scp."
                                     " More than one option can be specified either"
                                     " in one quoted string or by specifying"
                                     " this option more than once. Example options:"
                                     " '-i $HOME/.ssh/access.pem -o ConnectTimeout=10"
                                     " -o ConnectionAttempts=10'")
+
+    control_options.add_option("--sshOptions",
+                               dest="ssh_options",
+                               default=None,
+                               action="append",
+                               help="SSH specific options."
+                                    " More than one option can be specified either"
+                                    " in one quoted string or by specifying"
+                                    " this option more than once. Example options:"
+                                    " '-t' or '-T'")
+
+    control_options.add_option("--scpOptions",
+                               dest="scp_options",
+                               default=None,
+                               action="append",
+                               help="SCP specific options."
+                                    " More than one option can be specified either"
+                                    " in one quoted string or by specifying"
+                                    " this option more than once. Example options:"
+                                    " '-l 5000'")
 
     control_options.add_option("--retries",
                                dest="retries",
@@ -320,7 +350,7 @@ def main():
     parser.add_option_group(shell_options)
     parser.add_option_group(copy_options)
 
-    (options, args) = parser.parse_args()
+    (options, _) = parser.parse_args()
 
     if not getattr(options, "user_host", None):
         parser.print_help()
@@ -344,10 +374,26 @@ def main():
         else:
             operation_dir = options.local_dir
 
-    ssh_options = None if not options.ssh_options else " ".join(options.ssh_options)
+    if not options.ssh_connection_options:
+        ssh_connection_options = None
+    else:
+        ssh_connection_options = " ".join(options.ssh_connection_options)
+
+    if not options.ssh_options:
+        ssh_options = None
+    else:
+        ssh_options = " ".join(options.ssh_options)
+
+    if not options.scp_options:
+        scp_options = None
+    else:
+        scp_options = " ".join(options.scp_options)
+
     remote_op = RemoteOperations(
         user_host=options.user_host,
+        ssh_connection_options=ssh_connection_options,
         ssh_options=ssh_options,
+        scp_options=scp_options,
         retries=options.retries,
         retry_sleep=options.retry_sleep,
         debug=options.debug)
