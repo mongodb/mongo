@@ -261,7 +261,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
         return;
     }
 
-    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth());
+    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true);
 
     int loops = 5;
 

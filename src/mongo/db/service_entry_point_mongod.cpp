@@ -552,7 +552,13 @@ void execCommandDatabase(OperationContext* opCtx,
         rpc::readRequestMetadata(opCtx, request.body);
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
-        initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth());
+        repl::ReplicationCoordinator* replCoord =
+            repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+        initializeOperationSessionInfo(opCtx,
+                                       request.body,
+                                       command->requiresAuth(),
+                                       replCoord->getReplicationMode() ==
+                                           repl::ReplicationCoordinator::modeReplSet);
 
         std::string dbname = request.getDatabase().toString();
         uassert(
@@ -606,8 +612,6 @@ void execCommandDatabase(OperationContext* opCtx,
         ImpersonationSessionGuard guard(opCtx);
         uassertStatusOK(Command::checkAuthorization(command, opCtx, request));
 
-        repl::ReplicationCoordinator* replCoord =
-            repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
         const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
 
         if (!opCtx->getClient()->isInDirectClient() &&

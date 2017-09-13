@@ -244,7 +244,7 @@ TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {
     addSimpleUser(UserName("simple", "test"));
-    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true);
+    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true, true);
 
     ASSERT(!_opCtx->getLogicalSessionId());
     ASSERT(!_opCtx->getTxnNumber());
@@ -258,6 +258,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransacti
     initializeOperationSessionInfo(_opCtx.get(),
                                    BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "OtherField"
                                                   << "TestField"),
+                                   true,
                                    true);
 
     ASSERT(_opCtx->getLogicalSessionId());
@@ -272,6 +273,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWith
         initializeOperationSessionInfo(_opCtx.get(),
                                        BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
                                                       << "TestField"),
+                                       true,
                                        true),
         AssertionException,
         ErrorCodes::IllegalOperation);
@@ -286,6 +288,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
         _opCtx.get(),
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
+        true,
         true);
 
     ASSERT(_opCtx->getLogicalSessionId());
@@ -293,6 +296,22 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
 
     ASSERT(_opCtx->getTxnNumber());
     ASSERT_EQ(100, *_opCtx->getTxnNumber());
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_CanAcceptTxnNumberFalse) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(
+        initializeOperationSessionInfo(
+            _opCtx.get(),
+            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
+                           << "TestField"),
+            true,
+            false),
+        AssertionException,
+        ErrorCodes::IllegalOperation);
 }
 
 }  // namespace

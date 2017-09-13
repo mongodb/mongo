@@ -41,9 +41,13 @@ namespace mongo {
  *
  * requiresAuth specifies if the command we're initializing operationSessionInfo for requires
  * authorization or not.  This can be determined by invoking ->requiresAuth() on the parsed command.
+ *
+ * canAcceptTxnNumber is true if the server is either a mongos or a member of a replica set. Throws
+ * if this value is false, and the command contains a transaction number.
  */
 void initializeOperationSessionInfo(OperationContext* opCtx,
                                     const BSONObj& requestBody,
-                                    bool requiresAuth);
+                                    bool requiresAuth,
+                                    bool canAcceptTxnNumber);
 
 }  // namespace mongo

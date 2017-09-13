@@ -392,6 +392,42 @@
     assert.eq(true, res.results[0], "Valid update failed");
     assert.eq(true, res.results[1], "Valid update failed");
 
+    // Ops with transaction numbers are valid.
+    var lsid = {id: UUID()};
+    res = db.runCommand({
+        applyOps: [
+            {
+              op: "i",
+              ns: t.getFullName(),
+              o: {_id: 7, x: 24},
+              lsid: lsid,
+              txnNumber: NumberLong(1),
+              stmdId: 0
+            },
+            {
+              op: "u",
+              ns: t.getFullName(),
+              o2: {_id: 8},
+              o: {$set: {x: 25}},
+              lsid: lsid,
+              txnNumber: NumberLong(1),
+              stmdId: 1
+            },
+            {
+              op: "d",
+              ns: t.getFullName(),
+              o: {_id: 7},
+              lsid: lsid,
+              txnNumber: NumberLong(2),
+              stmdId: 0
+            },
+        ]
+    });
+
+    assert.eq(true, res.results[0], "Valid insert with transaction number failed");
+    assert.eq(true, res.results[1], "Valid update with transaction number failed");
+    assert.eq(true, res.results[2], "Valid delete with transaction number failed");
+
     // Foreground index build.
     res = assert.commandWorked(db.adminCommand({
         applyOps: [{

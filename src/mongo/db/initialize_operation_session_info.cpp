@@ -38,7 +38,8 @@ namespace mongo {
 
 void initializeOperationSessionInfo(OperationContext* opCtx,
                                     const BSONObj& requestBody,
-                                    bool requiresAuth) {
+                                    bool requiresAuth,
+                                    bool canAcceptTxnNumber) {
     if (!requiresAuth) {
         return;
     }
@@ -60,6 +61,9 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction number requires a sessionId to be specified",
                 opCtx->getLogicalSessionId());
+        uassert(ErrorCodes::IllegalOperation,
+                "Transaction numbers are only allowed on a replica set member or mongos",
+                canAcceptTxnNumber);
         uassert(ErrorCodes::BadValue,
                 "Transaction number cannot be negative",
                 *osi.getTxnNumber() >= 0);
