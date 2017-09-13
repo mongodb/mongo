@@ -19,14 +19,14 @@ MANUAL_TESTS=tests/tester-parse-interval \
 AUTO_TESTS=tests/tester-parse-string tests/tester-parse-string-by-format \
 	tests/tester-create-ts tests/tester-render-ts tests/tester-render-ts-zoneinfo
 C_TESTS=tests/c/timelib_get_current_offset_test.cpp tests/c/timelib_decimal_hour.cpp \
-	tests/c/timelib_juliandate.cpp
+	tests/c/timelib_juliandate.cpp tests/c/issues.cpp tests/c/astro_rise_set_altitude.cpp
 TEST_BINARIES=${MANUAL_TESTS} ${AUTO_TESTS}
 
 EXAMPLE_BINARIES=docs/date-from-iso-parts docs/date-from-parts docs/date-from-string \
 	docs/date-to-parts
 
 all: parse_date.o tm2unixtime.o unixtime2tm.o dow.o astro.o interval.o \
-		${TEST_BINARIES} ${EXAMPLE_BINARIES}
+		${TEST_BINARIES} ${EXAMPLE_BINARIES} ctest
 
 parse_date.c: timezonemap.h parse_date.re
 	re2c -d -b parse_date.re > parse_date.c

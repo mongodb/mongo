@@ -125,18 +125,18 @@ typedef unsigned char uchar;
 #define YYDEBUG(s,c)
 #endif
 
-typedef struct timelib_elems {
+typedef struct _timelib_elems {
 	unsigned int   c; /* Number of elements */
 	char         **v; /* Values */
 } timelib_elems;
 
-typedef struct Scanner {
+typedef struct _Scanner {
 	int           fd;
 	uchar        *lim, *str, *ptr, *cur, *tok, *pos;
 	unsigned int  line, len;
-	struct timelib_error_container *errors;
+	timelib_error_container *errors;
 
-	struct timelib_time *time;
+	timelib_time        *time;
 	const timelib_tzdb  *tzdb;
 } Scanner;
 
@@ -771,7 +771,7 @@ static timelib_long timelib_parse_tz_cor(char **ptr)
 	return 0;
 }
 
-static timelib_long timelib_parse_zone(char **ptr, int *dst, timelib_time *t, int *tz_not_found, const timelib_tzdb *tzdb, timelib_tz_get_wrapper tz_wrapper)
+timelib_long timelib_parse_zone(char **ptr, int *dst, timelib_time *t, int *tz_not_found, const timelib_tzdb *tzdb, timelib_tz_get_wrapper tz_wrapper)
 {
 	timelib_tzinfo *res;
 	timelib_long            retval = 0;
@@ -947,8 +947,8 @@ isoweek          = year4 "-"? "W" weekofyear;
 exif             = year4 ":" monthlz ":" daylz " " hour24lz ":" minutelz ":" secondlz;
 firstdayof       = 'first day of';
 lastdayof        = 'last day of';
-backof           = 'back of ' hour24 space? meridian?;
-frontof          = 'front of ' hour24 space? meridian?;
+backof           = 'back of ' hour24 (space? meridian)?;
+frontof          = 'front of ' hour24 (space? meridian)?;
 
 /* Common Log Format: 10/Oct/2000:13:55:36 -0700 */
 clf              = day "/" monthabbr "/" year4 ":" hour24lz ":" minutelz ":" secondlz space tzcorrection;
@@ -1790,14 +1790,14 @@ weekdayof        = (reltextnumber|reltexttext) space (dayfull|dayabbr) space 'of
 
 /*!max:re2c */
 
-timelib_time* timelib_strtotime(char *s, size_t len, struct timelib_error_container **errors, const timelib_tzdb *tzdb, timelib_tz_get_wrapper tz_get_wrapper)
+timelib_time* timelib_strtotime(char *s, size_t len, timelib_error_container **errors, const timelib_tzdb *tzdb, timelib_tz_get_wrapper tz_get_wrapper)
 {
 	Scanner in;
 	int t;
 	char *e = s + len - 1;
 
 	memset(&in, 0, sizeof(in));
-	in.errors = timelib_malloc(sizeof(struct timelib_error_container));
+	in.errors = timelib_malloc(sizeof(timelib_error_container));
 	in.errors->warning_count = 0;
 	in.errors->warning_messages = NULL;
 	in.errors->error_count = 0;
@@ -1917,7 +1917,7 @@ timelib_time *timelib_parse_from_format(char *format, char *string, size_t len, 
 	int allow_extra = 0;
 
 	memset(&in, 0, sizeof(in));
-	in.errors = timelib_malloc(sizeof(struct timelib_error_container));
+	in.errors = timelib_malloc(sizeof(timelib_error_container));
 	in.errors->warning_count = 0;
 	in.errors->warning_messages = NULL;
 	in.errors->error_count = 0;

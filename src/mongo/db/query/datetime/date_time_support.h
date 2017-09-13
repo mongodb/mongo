@@ -36,10 +36,10 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
-struct timelib_error_container;
-struct timelib_time;
+struct _timelib_error_container;
+struct _timelib_time;
 struct _timelib_tzdb;
-struct timelib_tzinfo;
+struct _timelib_tzinfo;
 
 namespace mongo {
 
@@ -55,7 +55,7 @@ public:
      * A struct with member variables describing the different parts of the date.
      */
     struct DateParts {
-        DateParts(const timelib_time&, Date_t);
+        DateParts(const _timelib_time&, Date_t);
 
         int year;
         int month;
@@ -70,7 +70,7 @@ public:
      * A struct with member variables describing the different parts of the ISO8601 date.
      */
     struct Iso8601DateParts {
-        Iso8601DateParts(const timelib_time&, Date_t);
+        Iso8601DateParts(const _timelib_time&, Date_t);
 
         int year;
         int weekOfYear;
@@ -86,10 +86,10 @@ public:
      */
     struct TimelibTimeDeleter {
         TimelibTimeDeleter() = default;
-        void operator()(timelib_time* time);
+        void operator()(_timelib_time* time);
     };
 
-    explicit TimeZone(timelib_tzinfo* tzInfo);
+    explicit TimeZone(_timelib_tzinfo* tzInfo);
     explicit TimeZone(Seconds utcOffsetSeconds);
     TimeZone() = default;
 
@@ -181,7 +181,7 @@ public:
     /**
      * Adjusts 'timelibTime' according to this time zone definition.
      */
-    void adjustTimeZone(timelib_time* timelibTime) const;
+    void adjustTimeZone(_timelib_time* timelibTime) const;
 
     /**
      * Converts a date object to a string according to 'format'. 'format' can be any string literal,
@@ -282,7 +282,7 @@ public:
     static void validateFormat(StringData format);
 
 private:
-    std::unique_ptr<timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
+    std::unique_ptr<_timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
 
     /**
      * Only works with 1 <= spaces <= 4 and 0 <= number <= 9999. If spaces is less than the digit
@@ -312,11 +312,11 @@ private:
     }
 
     struct TimelibTZInfoDeleter {
-        void operator()(timelib_tzinfo* tzInfo);
+        void operator()(_timelib_tzinfo* tzInfo);
     };
 
     // null if this TimeZone represents the default UTC time zone, or a UTC-offset time zone
-    std::shared_ptr<timelib_tzinfo> _tzInfo;
+    std::shared_ptr<_timelib_tzinfo> _tzInfo;
 
     // represents the UTC offset in seconds if _tzInfo is null and it is not 0
     Seconds _utcOffset{0};
@@ -344,7 +344,7 @@ public:
      */
     struct TimelibErrorContainerDeleter {
         TimelibErrorContainerDeleter() = default;
-        void operator()(timelib_error_container* errorContainer);
+        void operator()(_timelib_error_container* errorContainer);
     };
 
     /**

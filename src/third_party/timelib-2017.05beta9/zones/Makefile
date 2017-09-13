@@ -1,8 +1,8 @@
 all: index
 
 download:
-	-@rm tzdata201*tar.gz
-	-@rm tzcode201*tar.gz
+	-@rm -f tzdata201*tar.gz
+	-@rm -f tzcode201*tar.gz
 	@echo "Downloading latest Olson TZDB release..."
 	$(eval VERSION := $(shell curl -s -o - https://www.iana.org/time-zones | grep \"version\" | sed 's/.*version">//' | sed 's/<\/span.*//'))
 	curl -s -o tzdata$(VERSION).tar.gz https://www.iana.org/time-zones/repository/releases/tzdata$(VERSION).tar.gz
@@ -10,7 +10,7 @@ download:
 
 clean: release-php-clean
 	-rm -rf code
-	-rm -f timezonedb.idx.php timezonedb.dta timezonedb.idx version-info.txt timezonedb-201*.tgz timezonedb.tgz timezonedb.zip
+	-rm -f timezonedb.idx.php timezonedb.dta timezonedb.idx version-info.txt timezonedb-201*.tgz timezonedb.tgz timezonedb.zip timezonedb-201*.zip
 
 tzdb: download
 	-@rm -rf code
@@ -38,6 +38,7 @@ timezonedb.idx: timezonedb.idx.php timezonedb.dta
 timezonedb.zip: code/zone.tab
 	@echo -n "Making archive..."
 	-@cd code/data; zip --quiet -r ../../timezonedb.zip .
+	cp timezonedb.zip timezonedb-$(VERSION).zip
 	@echo " done"
 
 version-info.txt:

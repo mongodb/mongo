@@ -55,7 +55,7 @@ void cleanup_cache()
 	/* Loop over all the entries in tz_cache and free */
 }
 
-struct timelib_tzinfo *cached_tzfile_wrapper(char *tz_id, const timelib_tzdb *db, int *error)
+timelib_tzinfo *cached_tzfile_wrapper(char *tz_id, const timelib_tzdb *db, int *error)
 {
 	/* return tz_cache[tzid]; (pseudo code) */
 	return timelib_parse_tzfile(tz_id, global.db, error);

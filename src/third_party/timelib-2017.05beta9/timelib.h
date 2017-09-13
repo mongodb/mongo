@@ -131,10 +131,10 @@ typedef signed long long timelib_sll;
 # define TIMELIB_LL_CONST(n) n ## ll
 #endif
 
-typedef struct ttinfo ttinfo;
-typedef struct tlinfo tlinfo;
+typedef struct _ttinfo ttinfo;
+typedef struct _tlinfo tlinfo;
 
-typedef struct tlocinfo
+typedef struct _tlocinfo
 {
 	char country_code[3];
 	double latitude;
@@ -142,7 +142,7 @@ typedef struct tlocinfo
 	char *comments;
 } tlocinfo;
 
-typedef struct timelib_tzinfo
+typedef struct _timelib_tzinfo
 {
 	char    *name;
 	struct {
@@ -173,7 +173,7 @@ typedef struct timelib_tzinfo
 	tlocinfo location;
 } timelib_tzinfo;
 
-typedef struct timelib_rel_time {
+typedef struct _timelib_rel_time {
 	timelib_sll y, m, d; /* Years, Months and Days */
 	timelib_sll h, i, s; /* Hours, mInutes and Seconds */
 	timelib_sll us;      /* Microseconds */
@@ -193,7 +193,7 @@ typedef struct timelib_rel_time {
 	unsigned int   have_weekday_relative, have_special_relative;
 } timelib_rel_time;
 
-typedef struct timelib_time_offset {
+typedef struct _timelib_time_offset {
 	int32_t      offset;
 	unsigned int leap_secs;
 	unsigned int is_dst;
@@ -201,7 +201,7 @@ typedef struct timelib_time_offset {
 	timelib_sll  transition_time;
 } timelib_time_offset;
 
-typedef struct timelib_time {
+typedef struct _timelib_time {
 	timelib_sll      y, m, d;     /* Year, Month, Day */
 	timelib_sll      h, i, s;     /* Hour, mInute, Second */
 	timelib_sll      us;          /* Microseconds */
@@ -223,7 +223,7 @@ typedef struct timelib_time {
 	                              *  2 TimeZone abbreviation */
 } timelib_time;
 
-typedef struct timelib_abbr_info {
+typedef struct _timelib_abbr_info {
 	timelib_sll  utc_offset;
 	char        *abbr;
 	int          dst;
@@ -265,21 +265,22 @@ typedef struct timelib_abbr_info {
 #define TIMELIB_ERR_TRAILING_DATA              0x21a
 #define TIMELIB_ERR_DATA_MISSING               0x21b
 
+#define TIMELIB_ZONETYPE_OFFSET 1
+#define TIMELIB_ZONETYPE_ABBR   2
+#define TIMELIB_ZONETYPE_ID     3
 
-
-
-typedef struct timelib_error_message {
+typedef struct _timelib_error_message {
 	int         error_code;
 	int         position;
 	char        character;
 	char       *message;
 } timelib_error_message;
 
-typedef struct timelib_error_container {
-	struct timelib_error_message *error_messages;
-	struct timelib_error_message *warning_messages;
-	int                           error_count;
-	int                           warning_count;
+typedef struct _timelib_error_container {
+	timelib_error_message *error_messages;
+	timelib_error_message *warning_messages;
+	int                    error_count;
+	int                    warning_count;
 } timelib_error_container;
 
 typedef struct _timelib_tz_lookup_table {
@@ -310,7 +311,8 @@ typedef struct _timelib_tzdb {
 #endif
 
 #define TIMELIB_VERSION 201705
-#define TIMELIB_ASCII_VERSION "2017.05beta2"
+#define TIMELIB_EXTENDED_VERSION 20170509
+#define TIMELIB_ASCII_VERSION "2017.05beta9"
 
 #define TIMELIB_NONE             0x00
 #define TIMELIB_OVERRIDE_TIME    0x01
@@ -467,6 +469,11 @@ char *timelib_timezone_id_from_abbr(const char *abbr, timelib_long gmtoffset, in
  */
 const timelib_tz_lookup_table *timelib_timezone_abbreviations_list(void);
 
+/**
+ * DEPRECATED, but still used by PHP.
+ */
+timelib_long timelib_parse_zone(char **ptr, int *dst, timelib_time *t, int *tz_not_found, const timelib_tzdb *tzdb, timelib_tz_get_wrapper tz_wrapper);
+
 /* From parse_iso_intervals.re */
 
 /**
@@ -482,7 +489,7 @@ const timelib_tz_lookup_table *timelib_timezone_abbreviations_list(void);
 void timelib_strtointerval(char *s, size_t len,
                            timelib_time **begin, timelib_time **end,
 						   timelib_rel_time **period, int *recurrences,
-						   struct timelib_error_container **errors);
+						   timelib_error_container **errors);
 
 
 /* From tm2unixtime.c */
@@ -799,12 +806,21 @@ void timelib_hms_to_decimal_hour(int hour, int min, int sec, double *h);
 /* from astro.c */
 
 /**
+ * Converts the Unix Epoch time stamp 'ts' to a Julian Day
+ *
+ * The value returned is the number of whole days since -4714-11-24T12:00:00 UTC
+ * (in the proleptic Gregorian calendar):
+ * https://en.wikipedia.org/wiki/Julian_day
+ */
+double timelib_ts_to_julianday(timelib_sll ts);
+
+/**
  * Converts the Unix Epoch time stamp 'ts' to the J2000 epoch
  *
  * The value returned is the number of whole days since 2000-01-01T12:00:00
  * UTC: https://en.wikipedia.org/wiki/Epoch_(astronomy)#Julian_years_and_J2000
  */
-double timelib_ts_to_juliandate(timelib_sll ts);
+double timelib_ts_to_j2000(timelib_sll ts);
 
 /**
  * Calculates when the Sun is above a certain latitude.

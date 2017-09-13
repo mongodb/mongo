@@ -25,6 +25,10 @@
 #ifndef __TIMELIB_PRIVATE_H__
 #define __TIMELIB_PRIVATE_H__
 
+#ifdef HAVE_SETLOCALE
+# include "locale.h"
+#endif
+
 #ifdef HAVE_TIMELIB_CONFIG_H
 # include "timelib_config.h"
 #endif
@@ -90,10 +94,6 @@
 #define TIMELIB_SPECIAL_FIRST_DAY_OF_MONTH        0x01
 #define TIMELIB_SPECIAL_LAST_DAY_OF_MONTH         0x02
 
-#define TIMELIB_ZONETYPE_OFFSET 1
-#define TIMELIB_ZONETYPE_ABBR   2
-#define TIMELIB_ZONETYPE_ID     3
-
 #define SECS_PER_ERA   TIMELIB_LL_CONST(12622780800)
 #define SECS_PER_DAY   86400
 #define DAYS_PER_YEAR    365
@@ -115,7 +115,7 @@
 		m = NULL;   \
 	}
 
-typedef struct ttinfo
+struct _ttinfo
 {
 	int32_t      offset;
 	int          isdst;
@@ -123,13 +123,13 @@ typedef struct ttinfo
 
 	unsigned int isstdcnt;
 	unsigned int isgmtcnt;
-} ttinfo;
+};
 
-typedef struct tlinfo
+struct _tlinfo
 {
 	int32_t  trans;
 	int32_t  offset;
-} tlinfo;
+};
 
 
 #ifndef LONG_MAX
