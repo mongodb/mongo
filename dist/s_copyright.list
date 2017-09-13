@@ -45,5 +45,4 @@ skip	test/packing/intpack-test2.c
 skip	test/packing/packing-test.c
 skip	tools/wtperf_stats/wt_nvd3_util.py
 skip	tools/wtperf_stats/wtperf_stats.py
-skip	tools/wtstats/stat_data.py
 skip	wiredtiger_config.h

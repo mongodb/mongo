@@ -22,6 +22,12 @@ The \c cache_overflow_value ("overflow values cached in memory") statistic
 has been removed, it no longer has any meaning.
 </dd>
 
+<dt>Performance visualization tool wtstats</dt>
+<dd>
+The performance visualization tool \c wtstats has been removed and is
+no longer supported.
+</dd>
+
 </dl><hr>
 @section version_292 Upgrading to Version 2.9.2
 <dl>

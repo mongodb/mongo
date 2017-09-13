@@ -5,9 +5,6 @@ WiredTiger optionally maintains a variety of statistics, when the
 see @ref statistics for general information about statistics, and
 @ref data_statistics for information about accessing the statistics.
 
-The resulting statistics can be displayed using the \c wtstats visualization
-tool.  For more information, see @ref wtstats.
-
 <b>
 Note that maintaining run-time statistics involves updating
 shared-memory data structures and may decrease application performance.

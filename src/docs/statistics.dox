@@ -101,10 +101,6 @@ Each log file contains the statistics for the hour specified in its name.
 The location of the log files may be changed with the \c statistics_log.path
 configuration string.
 
-The resulting statistics can be displayed and interactively examined
-using the \c wtstats visualization tool.  For more information, see
-@ref_single wtstats.
-
 The following example logs statistics every 30 seconds:
 
 @snippet ex_all.c Statistics logging
