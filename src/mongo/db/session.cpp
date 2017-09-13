@@ -42,6 +42,8 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -64,6 +66,15 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
         throw WriteConflictException();
     }
 }
+
+// Failpoint which allows different failure actions to happen after each write. Supports the
+// parameters below, which can be combined with each other (unless explicitly disallowed):
+//
+// closeConnection (bool, default = true): Closes the connection on which the write was executed.
+// failBeforeCommitExceptionCode (int, default = not specified): If set, the specified exception
+//      code will be thrown, which will cause the write to not commit; if not specified, the write
+//      will be allowed to commit.
+MONGO_FP_DECLARE(onPrimaryTransactionalWrite);
 
 }  // namespace
 
@@ -304,6 +315,25 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
                     _lastWrittenSessionRecord->setLastWriteOpTimeTs(newLastWriteTs);
             }
         });
+
+    MONGO_FAIL_POINT_BLOCK(onPrimaryTransactionalWrite, customArgs) {
+        const auto& data = customArgs.getData();
+
+        const auto closeConnectionElem = data["closeConnection"];
+        if (closeConnectionElem.eoo() || closeConnectionElem.Bool()) {
+            auto transportSession = opCtx->getClient()->session();
+            transportSession->getTransportLayer()->end(transportSession);
+        }
+
+        const auto failBeforeCommitExceptionElem = data["failBeforeCommitExceptionCode"];
+        if (!failBeforeCommitExceptionElem.eoo()) {
+            const auto failureCode =
+                ErrorCodes::fromInt(int(failBeforeCommitExceptionElem.Number()));
+            uasserted(failureCode,
+                      str::stream() << "Failing write for " << _sessionId << ":" << newTxnNumber
+                                    << " due to failpoint. The write must not be reflected.");
+        }
+    }
 }
 
 }  // namespace mongo
