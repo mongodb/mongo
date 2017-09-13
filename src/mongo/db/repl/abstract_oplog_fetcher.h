@@ -71,14 +71,6 @@ public:
     using OnShutdownCallbackFn = stdx::function<void(const Status& shutdownStatus)>;
 
     /**
-     * Constants used to specify how long the `find` command, `getMore` commands, and network
-     * operations should wait before timing out.
-     */
-    static const Seconds kOplogInitialFindMaxTime;
-    static const Seconds kOplogGetMoreMaxTime;
-    static const Seconds kOplogQueryNetworkTimeout;
-
-    /**
      * This function takes a BSONObj oplog entry and parses out the OpTime and hash.
      */
     static StatusWith<OpTimeWithHash> parseOpTimeWithHash(const BSONObj& oplogEntryObj);
@@ -118,6 +110,16 @@ public:
     OpTimeWithHash getLastOpTimeWithHashFetched_forTest() const;
 
 protected:
+    /**
+     * Returns how long the `find` command should wait before timing out.
+     */
+    virtual Milliseconds _getFindMaxTime() const;
+
+    /**
+     * Returns how long the `getMore` command should wait before timing out.
+     */
+    virtual Milliseconds _getGetMoreMaxTime() const;
+
     /**
      * Returns the sync source from which this oplog fetcher is fetching.
      */

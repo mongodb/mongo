@@ -350,8 +350,7 @@ BSONObj OplogFetcher::_makeFindCommandObject(const NamespaceString& nss,
     cmdBob.append("tailable", true);
     cmdBob.append("oplogReplay", true);
     cmdBob.append("awaitData", true);
-    cmdBob.append("maxTimeMS",
-                  durationCount<Milliseconds>(AbstractOplogFetcher::kOplogInitialFindMaxTime));
+    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(_getFindMaxTime()));
     cmdBob.append("batchSize", _batchSize);
 
     if (term != OpTime::kUninitializedTerm) {
@@ -379,6 +378,10 @@ BSONObj OplogFetcher::getMetadataObject_forTest() const {
 }
 
 Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
+    return _getGetMoreMaxTime();
+}
+
+Milliseconds OplogFetcher::_getGetMoreMaxTime() const {
     return _awaitDataTimeout;
 }
 
@@ -501,7 +504,7 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
     return makeGetMoreCommandObject(queryResponse.nss,
                                     queryResponse.cursorId,
                                     lastCommittedWithCurrentTerm,
-                                    _awaitDataTimeout,
+                                    _getGetMoreMaxTime(),
                                     _batchSize);
 }
 }  // namespace repl

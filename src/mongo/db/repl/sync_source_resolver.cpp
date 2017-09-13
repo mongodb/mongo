@@ -174,7 +174,8 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
                    candidate,
                    earliestOpTimeSeen),
         ReadPreferenceSetting::secondaryPreferredMetadata(),
-        kFetcherTimeout);
+        kFetcherTimeout /* find network timeout */,
+        kFetcherTimeout /* getMore network timeout */);
 }
 
 std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndPort candidate,
@@ -194,7 +195,8 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
                    candidate,
                    earliestOpTimeSeen),
         ReadPreferenceSetting::secondaryPreferredMetadata(),
-        kFetcherTimeout);
+        kFetcherTimeout /* find network timeout */,
+        kFetcherTimeout /* getMore network timeout */);
 }
 
 Status SyncSourceResolver::_scheduleFetcher(std::unique_ptr<Fetcher> fetcher) {

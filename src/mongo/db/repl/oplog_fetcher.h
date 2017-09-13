@@ -150,6 +150,8 @@ private:
 
     BSONObj _makeMetadataObject() const override;
 
+    Milliseconds _getGetMoreMaxTime() const override;
+
     /**
      * This function is run by the AbstractOplogFetcher on a successful batch of oplog entries.
      */
