@@ -116,6 +116,11 @@ namespace {
 // cached copy...so don't rename, drop, etc.!!!
 Collection* _localOplogCollection = nullptr;
 
+// Specifies whether we abort initial sync when attempting to apply a renameCollection operation.
+// If set to true, users risk corrupting their data. This should only be enabled by expert users
+// of the server who understand the risks this poses.
+MONGO_EXPORT_SERVER_PARAMETER(allowUnsafeRenamesDuringInitialSync, bool, false);
+
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
 
 // Synchronizes the section where a new Timestamp is generated and when it actually
@@ -1021,9 +1026,15 @@ Status applyCommand_inlock(OperationContext* txn,
     // Applying renameCollection during initial sync might lead to data corruption, so we restart
     // the initial sync.
     if (!inSteadyStateReplication && o.firstElementFieldName() == std::string("renameCollection")) {
-        return Status(ErrorCodes::OplogOperationUnsupported,
-                      str::stream() << "Applying renameCollection not supported in initial sync: "
-                                    << redact(op));
+        if (!allowUnsafeRenamesDuringInitialSync.load()) {
+            return Status(ErrorCodes::OplogOperationUnsupported,
+                          str::stream()
+                              << "Applying renameCollection not supported in initial sync: "
+                              << redact(op));
+        }
+        warning() << "allowUnsafeRenamesDuringInitialSync set to true. Applying renameCollection "
+                     "operation during initial sync even though it may lead to data corruption: "
+                  << redact(op);
     }
 
     // Applying commands in repl is done under Global W-lock, so it is safe to not
