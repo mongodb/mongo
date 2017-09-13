@@ -2637,6 +2637,10 @@ MemberState TopologyCoordinatorImpl::getMemberState() const {
     return _followerMode;
 }
 
+bool TopologyCoordinatorImpl::canAcceptWrites() const {
+    return _leaderMode == LeaderMode::kMaster;
+}
+
 void TopologyCoordinatorImpl::setElectionInfo(OID electionId, Timestamp electionOpTime) {
     invariant(_role == Role::leader);
     _electionTime = electionOpTime;
@@ -2672,20 +2676,15 @@ void TopologyCoordinatorImpl::processLoseElection() {
     }
 }
 
-bool TopologyCoordinatorImpl::attemptStepDown(Date_t now,
-                                              Date_t waitUntil,
-                                              Date_t stepDownUntil,
-                                              bool force) {
-    if (_role != Role::leader) {
-        uasserted(ErrorCodes::NotMaster,
-                  "Already stepped down from primary while processing step down request");
-    }
-    if (_leaderMode == LeaderMode::kSteppingDown) {
+bool TopologyCoordinatorImpl::attemptStepDown(
+    long long termAtStart, Date_t now, Date_t waitUntil, Date_t stepDownUntil, bool force) {
+
+    if (_role != Role::leader || _leaderMode == LeaderMode::kSteppingDown || _term != termAtStart) {
         uasserted(ErrorCodes::PrimarySteppedDown,
                   "While waiting for secondaries to catch up before stepping down, "
                   "this node decided to step down for other reasons");
     }
-
+    invariant(_leaderMode == LeaderMode::kAttemptingStepDown);
 
     if (now >= stepDownUntil) {
         uasserted(ErrorCodes::ExceededTimeLimit,
@@ -2693,7 +2692,7 @@ bool TopologyCoordinatorImpl::attemptStepDown(Date_t now,
                   "time we were supposed to step down until");
     }
 
-    if (!_canCompleteStepDownAttempt(now, waitUntil, stepDownUntil, force)) {
+    if (!_canCompleteStepDownAttempt(now, waitUntil, force)) {
         // Stepdown attempt failed.
 
         // Check waitUntil after at least one stepdown attempt, so that stepdown could succeed even
@@ -2705,6 +2704,8 @@ bool TopologyCoordinatorImpl::attemptStepDown(Date_t now,
                                     << "Please use the replSetStepDown command with the argument "
                                     << "{force: true} to force node to step down.");
         }
+
+        // Stepdown attempt failed, but in a way that can be retried
         return false;
     }
 
@@ -2716,14 +2717,21 @@ bool TopologyCoordinatorImpl::attemptStepDown(Date_t now,
 
 bool TopologyCoordinatorImpl::_canCompleteStepDownAttempt(Date_t now,
                                                           Date_t waitUntil,
-                                                          Date_t stepDownUntil,
                                                           bool force) {
     const bool forceNow = force && (now >= waitUntil);
-    OpTime lastApplied = getMyLastAppliedOpTime();
-
     if (forceNow) {
         return true;
     }
+
+    return isSafeToStepDown();
+}
+
+bool TopologyCoordinatorImpl::isSafeToStepDown() {
+    if (!_rsConfig.isInitialized() || _selfIndex < 0) {
+        return false;
+    }
+
+    OpTime lastApplied = getMyLastAppliedOpTime();
 
     auto tagStatus = _rsConfig.findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName);
     invariant(tagStatus.isOK());

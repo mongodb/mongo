@@ -224,7 +224,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     }
 
     // Wake the stepdown waiter when our updated OpTime allows it to finish stepping down.
-    _signalStepDownWaiter_inlock();
+    _signalStepDownWaiterIfReady_inlock();
 
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.
     if (_catchupState) {
@@ -247,7 +247,7 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
             // Update the cached member state if different than the current topology member state
             if (_memberState != _topCoord->getMemberState()) {
                 const PostMemberStateUpdateAction postUpdateAction =
-                    _updateMemberStateFromTopologyCoordinator_inlock();
+                    _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
                 lock.unlock();
                 _performPostMemberStateUpdateAction(postUpdateAction);
                 lock.lock();
@@ -375,11 +375,10 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalWrite globalExclusiveLock(opCtx.get());
-    // TODO Add invariant that we've got global shared or global exclusive lock, when supported
-    // by lock manager.
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+
     _topCoord->finishUnconditionalStepDown();
-    const auto action = _updateMemberStateFromTopologyCoordinator_inlock();
+    const auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx.get());
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
     _replExecutor->signalEvent(finishedEvent);
@@ -581,7 +580,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // If we do not have an index, we should pass -1 as our index to avoid falsely adding ourself to
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
-    const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndexValue);
+    const PostMemberStateUpdateAction action =
+        _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndexValue);
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);

@@ -595,7 +595,8 @@ private:
      * Returns an action to be performed after unlocking _mutex, via
      * _performPostMemberStateUpdateAction.
      */
-    PostMemberStateUpdateAction _setCurrentRSConfig_inlock(const ReplSetConfig& newConfig,
+    PostMemberStateUpdateAction _setCurrentRSConfig_inlock(OperationContext* opCtx,
+                                                           const ReplSetConfig& newConfig,
                                                            int myIndex);
 
     /**
@@ -633,16 +634,11 @@ private:
     Status _checkIfWriteConcernCanBeSatisfied_inlock(const WriteConcernOptions& writeConcern) const;
 
     /**
-     * Triggers all callbacks that are blocked waiting for new heartbeat data
-     * to decide whether or not to finish a step down.
+     * Wakes up threads in the process of handling a stepdown request based on whether the
+     * TopologyCoordinator now believes enough secondaries are caught up for the stepdown request to
+     * complete.
      */
-    void _signalStepDownWaiter_inlock();
-
-    /**
-     * Non-blocking helper method for the stepDown method, that represents executing
-     * one attempt to step down.
-     */
-    bool _tryToStepDown(WithLock, Date_t waitUntil, Date_t stepdownUntil, bool force);
+    void _signalStepDownWaiterIfReady_inlock();
 
     bool _canAcceptWritesFor_inlock(const NamespaceString& ns);
 
@@ -782,7 +778,9 @@ private:
     /**
      * Finishes the work of processReplSetInitiate() in the event of a successful quorum check.
      */
-    void _finishReplSetInitiate(const ReplSetConfig& newConfig, int myIndex);
+    void _finishReplSetInitiate(OperationContext* opCtx,
+                                const ReplSetConfig& newConfig,
+                                int myIndex);
 
     /**
      * Finishes the work of processReplSetReconfig, in the event of
@@ -806,8 +804,12 @@ private:
      * Returns an enum indicating what action to take after releasing _mutex, if any.
      * Call performPostMemberStateUpdateAction on the return value after releasing
      * _mutex.
+     *
+     * Note: opCtx may be null as currently not all paths thread an OperationContext all the way
+     * down, but it must be non-null for any calls that change _canAcceptNonLocalWrites.
      */
-    PostMemberStateUpdateAction _updateMemberStateFromTopologyCoordinator_inlock();
+    PostMemberStateUpdateAction _updateMemberStateFromTopologyCoordinator_inlock(
+        OperationContext* opCtx);
 
     /**
      * Performs a post member-state update action.  Do not call while holding _mutex.

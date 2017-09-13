@@ -144,6 +144,7 @@ public:
 
     virtual Role getRole() const;
     virtual MemberState getMemberState() const;
+    virtual bool canAcceptWrites() const override;
     virtual bool isSteppingDown() const override;
     virtual HostAndPort getSyncSourceAddress() const;
     virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
@@ -216,10 +217,12 @@ public:
     virtual void processLoseElection();
     virtual Status checkShouldStandForElection(Date_t now) const;
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
-    virtual bool attemptStepDown(Date_t now,
+    virtual bool attemptStepDown(long long termAtStart,
+                                 Date_t now,
                                  Date_t waitUntil,
                                  Date_t stepDownUntil,
                                  bool force) override;
+    virtual bool isSafeToStepDown() override;
     virtual bool prepareForUnconditionalStepDown() override;
     virtual Status prepareForStepDownAttempt() override;
     virtual void abortAttemptedStepDownIfNeeded() override;
@@ -398,10 +401,7 @@ private:
      * Returns whether a stepdown attempt should be allowed to proceed.  See the comment for
      * attemptStepDown() for more details on the rules of when stepdown attempts succeed or fail.
      */
-    bool _canCompleteStepDownAttempt(Date_t now,
-                                     Date_t waitUntil,
-                                     Date_t stepDownUntil,
-                                     bool force);
+    bool _canCompleteStepDownAttempt(Date_t now, Date_t waitUntil, bool force);
 
     void _stepDownSelfAndReplaceWith(int newPrimary);
 

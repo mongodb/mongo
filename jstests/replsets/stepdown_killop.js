@@ -2,14 +2,15 @@
 // 1. Start up a 3 node set (1 arbiter).
 // 2. Stop replication on the SECONDARY using a fail point.
 // 3. Do one write and then spin up a second shell which asks the PRIMARY to StepDown.
-// 4. Once StepDown has begun, spin up a third shell which will attempt to do writes, which should
-//    block waiting for stepDown to release its lock, which it never will do because no secondaries
-//    are caught up.
-// 5. Once a write is blocked, kill the stepDown operation
-// 6. Writes should become unblocked and the primary should stay primary
+// 4. Once StepDown has begun, attempt to do writes and confirm that they fail with NotMaster.
+// 5. Kill the stepDown operation.
+// 6. Writes should become allowed again and the primary should stay primary.
 
 (function() {
     "use strict";
+
+    load("jstests/libs/write_concern_util.js");
+
     var name = "interruptStepDown";
     var replSet = new ReplSetTest({name: name, nodes: 3});
     var nodes = replSet.nodeList();
@@ -27,11 +28,7 @@
 
     var secondary = replSet.getSecondary();
     jsTestLog('Disable replication on the SECONDARY ' + secondary.host);
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-                             {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
-                         'Failed to configure rsSyncApplyStop failpoint.');
-
-    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+    stopServerReplication(secondary);
 
     var primary = replSet.getPrimary();
     assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
@@ -60,35 +57,17 @@
         }
         printjson(res);
         return false;
-    }, "global shared lock not acquired");
+    }, "No pending stepdown command found");
 
-    jsTestLog("Ensuring writes block on the stepdown");
-    // Start repeatedly doing an update until one blocks waiting for the lock.
-    // If the test is successful this thread will be terminated when we remove the document
-    // being updated.
-    var updateCmd = function() {
-        while (true) {
-            var res =
-                db.getSiblingDB("interruptStepDown").foo.update({myDoc: true}, {$inc: {x: 1}});
-            assert.writeOK(res);
-            if (res.nModified == 0) {
-                quit(0);
-            } else {
-                printjson(res);
-            }
-        }
-    };
-    var writer = startParallelShell(updateCmd, primary.port);
-    assert.soon(function() {
-        var res = primary.getDB(name).currentOp();
-        for (var entry in res.inprog) {
-            if (res.inprog[entry]["waitingForLock"]) {
-                return true;
-            }
-        }
-        printjson(res);
-        return false;
-    }, "write never blocked on the global shared lock");
+    jsTestLog("Ensure that writes start failing with NotMaster errors");
+    assert.soonNoExcept(function() {
+        assert.writeErrorWithCode(primary.getDB(name).foo.insert({x: 2}), ErrorCodes.NotMaster);
+        return true;
+    });
+
+    jsTestLog("Ensure that even though writes are failing with NotMaster, we still report " +
+              "ourselves as PRIMARY");
+    assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand('replSetGetStatus').myState);
 
     // kill the stepDown and ensure that that unblocks writes to the db
     jsTestLog("Killing stepdown");
@@ -98,7 +77,5 @@
     assert.eq(0, exitCode);
 
     assert.writeOK(primary.getDB(name).foo.remove({}));
-    exitCode = writer();
-    assert.eq(0, exitCode);
-    secondary.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+    restartServerReplication(secondary);
 })();

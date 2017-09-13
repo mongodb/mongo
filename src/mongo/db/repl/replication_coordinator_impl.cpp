@@ -568,10 +568,11 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     }
 
+    auto opCtx = cc().makeOperationContext();
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
+        _setCurrentRSConfig_inlock(opCtx.get(), localConfig, myIndex.getValue());
     if (!lastOpTime.isNull()) {
         _setMyLastAppliedOpTime_inlock(lastOpTime, false);
         _setMyLastDurableOpTime_inlock(lastOpTime, false);
@@ -591,7 +592,6 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
 
     if (!isArbiter) {
         _externalState->startThreads(_settings);
-        auto opCtx = cc().makeOperationContext();
         _startDataReplication(opCtx.get());
     }
 }
@@ -777,7 +777,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
         _opTimeWaiterList.signalAndRemoveAll_inlock();
         _currentCommittedSnapshotCond.notify_all();
         _initialSyncer.swap(initialSyncerCopy);
-        _signalStepDownWaiter_inlock();
+        _stepDownWaiters.notify_all();
     }
 
 
@@ -872,7 +872,8 @@ Status ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) 
 
     _topCoord->setFollowerMode(newState.s);
 
-    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
+    const PostMemberStateUpdateAction action =
+        _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 
@@ -959,8 +960,11 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     // our election in onTransitionToPrimary(), above.
     _updateLastCommittedOpTime_inlock();
 
+    // Update _canAcceptNonLocalWrites
     invariant(!_canAcceptNonLocalWrites);
-    _canAcceptNonLocalWrites = true;
+    _updateMemberStateFromTopologyCoordinator_inlock(opCtx);
+    invariant(_canAcceptNonLocalWrites);
+
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
     _drainFinishedCond.notify_all();
     _externalState->startNoopWriter(_getMyLastAppliedOpTime_inlock());
@@ -1628,74 +1632,130 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     if (!getMemberState().primary()) {
         // Note this check is inherently racy - it's always possible for the node to
-        // stepdown from some other path before we acquire the global shared lock, but
-        // that's okay because we are resiliant to that happening in _stepDownContinue.
+        // stepdown from some other path before we acquire the global exclusive lock.  This check
+        // is just to try to save us from acquiring the global X lock unnecessarily.
         return {ErrorCodes::NotMaster, "not primary so can't step down"};
     }
 
-    Lock::GlobalLock globalReadLock(
-        opCtx, MODE_S, durationCount<Milliseconds>(stepdownTime), Lock::GlobalLock::EnqueueOnly());
+    auto globalLock = stdx::make_unique<Lock::GlobalLock>(
+        opCtx, MODE_X, durationCount<Milliseconds>(stepdownTime), Lock::GlobalLock::EnqueueOnly());
 
-    // We've requested the global shared lock which will stop new writes from coming in,
-    // but existing writes could take a long time to finish, so kill all user operations
+    // We've requested the global exclusive lock which will stop new operations from coming in,
+    // but existing operations could take a long time to finish, so kill all user operations
     // to help us get the global lock faster.
     _externalState->killAllUserOperations(opCtx);
 
-    globalReadLock.waitForLock(durationCount<Milliseconds>(stepdownTime));
-
-    if (!globalReadLock.isLocked()) {
+    globalLock->waitForLock(durationCount<Milliseconds>(stepdownTime));
+    if (!globalLock->isLocked()) {
         return {ErrorCodes::ExceededTimeLimit,
                 "Could not acquire the global shared lock within the amount of time "
                 "specified that we should step down for"};
     }
 
-    PostMemberStateUpdateAction action = kActionNone;
-    try {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-        Status status = _topCoord->prepareForStepDownAttempt();
-        if (!status.isOK()) {
-            // This will cause us to fail if we're already in the process of stepping down.
-            return status;
-        }
-        // If we return before this stepdown completes successfully, reset our state back as it was
-        // before we attempted the stepdown.
-        auto guard = MakeGuard([this] { _topCoord->abortAttemptedStepDownIfNeeded(); });
-
-        opCtx->checkForInterrupt();
-        if (!_tryToStepDown(lk, waitUntil, stepDownUntil, force)) {
-            // We send out a fresh round of heartbeats because stepping down successfully
-            // without {force: true} is dependent on timely heartbeat data.
-            _restartHeartbeats_inlock();
-            do {
-                opCtx->waitForConditionOrInterruptUntil(
-                    _stepDownWaiters, lk, std::min(stepDownUntil, waitUntil));
-            } while (!_tryToStepDown(lk, waitUntil, stepDownUntil, force));
-        }
-        action = _updateMemberStateFromTopologyCoordinator_inlock();
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+    auto status = opCtx->checkForInterruptNoAssert();
+    if (!status.isOK()) {
+        return status;
     }
 
-    _performPostMemberStateUpdateAction(action);
+    const long long termAtStart = _topCoord->getTerm();
 
+    status = _topCoord->prepareForStepDownAttempt();
+    if (!status.isOK()) {
+        // This will cause us to fail if we're already in the process of stepping down.
+        return status;
+    }
+
+    // Update _canAcceptNonLocalWrites from the TopologyCoordinator now that we're in the middle
+    // of a stepdown attempt.  This will prevent us from accepting writes so that if our stepdown
+    // attempt fails later we can release the global lock and go to sleep to allow secondaries to
+    // catch up without allowing new writes in.
+    auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx);
+    invariant(action == PostMemberStateUpdateAction::kActionNone);
+    invariant(!_canAcceptNonLocalWrites);
+
+    // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
+    auto updateMemberState = [&] {
+        invariant(lk.owns_lock());
+        invariant(opCtx->lockState()->isW());
+
+        auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx);
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
+    };
+    ScopeGuard onExitGuard = MakeGuard([&] {
+        _topCoord->abortAttemptedStepDownIfNeeded();
+        updateMemberState();
+    });
+
+    try {
+
+        bool firstTime = true;
+        while (!_topCoord->attemptStepDown(
+            termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
+
+            // The stepdown attempt failed.
+
+            if (firstTime) {
+                // We send out a fresh round of heartbeats because stepping down successfully
+                // without {force: true} is dependent on timely heartbeat data.
+                _restartHeartbeats_inlock();
+                firstTime = false;
+            }
+
+            // Now release the global lock to allow secondaries to read the oplog, then wait until
+            // enough secondaries are caught up for us to finish stepdown.
+            globalLock.reset();
+            invariant(!opCtx->lockState()->isLocked());
+
+            // Make sure we re-acquire the global lock before returning so that we're always holding
+            // the
+            // global lock when the onExitGuard set up earlier runs.
+            ON_BLOCK_EXIT([&] {
+                // Need to release _mutex before re-acquiring the global lock to preserve lock
+                // acquisition order rules.
+                lk.unlock();
+
+                // Need to re-acquire the global lock before re-attempting stepdown.
+                // We use no timeout here even though that means the lock acquisition could take
+                // longer
+                // than the stepdown window.  If that happens, the call to _tryToStepDown
+                // immediately
+                // after will error.  Since we'll need the global lock no matter what to clean up a
+                // failed stepdown attempt, we might as well spend whatever time we need to acquire
+                // it
+                // now.
+                globalLock.reset(new Lock::GlobalLock(opCtx, MODE_X, UINT_MAX));
+                invariant(globalLock->isLocked());
+                lk.lock();
+            });
+
+            // We ignore the case where waitForConditionOrInterruptUntil returns
+            // stdx::cv_status::timeout because in that case coming back around the loop and calling
+            // attemptStepDown again will cause attemptStepDown to return ExceededTimeLimit with
+            // the proper error message.
+            opCtx->waitForConditionOrInterruptUntil(
+                _stepDownWaiters, lk, std::min(stepDownUntil, waitUntil));
+        }
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+
+    // Stepdown success!
+    onExitGuard.Dismiss();
+    updateMemberState();
     // Schedule work to (potentially) step back up once the stepdown period has ended.
     _scheduleWorkAt(
         stepDownUntil,
         stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing, this, stdx::placeholders::_1));
-
     return Status::OK();
 }
 
-void ReplicationCoordinatorImpl::_signalStepDownWaiter_inlock() {
-    _stepDownWaiters.notify_all();
-}
-
-bool ReplicationCoordinatorImpl::_tryToStepDown(WithLock,
-                                                const Date_t waitUntil,
-                                                const Date_t stepDownUntil,
-                                                const bool force) {
-    return _topCoord->attemptStepDown(_replExecutor->now(), waitUntil, stepDownUntil, force);
+void ReplicationCoordinatorImpl::_signalStepDownWaiterIfReady_inlock() {
+    if (_topCoord->isSafeToStepDown()) {
+        _stepDownWaiters.notify_all();
+    }
 }
 
 void ReplicationCoordinatorImpl::_handleTimePassing(
@@ -2024,7 +2084,8 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
         return Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
     }
 
-    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
+    const PostMemberStateUpdateAction action =
+        _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
     return Status::OK();
@@ -2258,7 +2319,8 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     }
 
     const ReplSetConfig oldConfig = _rsConfig;
-    const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
+    const PostMemberStateUpdateAction action =
+        _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndex);
 
     // On a reconfig we drop all snapshots so we don't mistakenely read from the wrong one.
     // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
@@ -2348,7 +2410,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     auto initialDataTS = SnapshotName(lastAppliedOpTime.getTimestamp().asULL());
     _storage->setInitialDataTimestamp(getServiceContext(), initialDataTS);
 
-    _finishReplSetInitiate(newConfig, myIndex.getValue());
+    _finishReplSetInitiate(opCtx, newConfig, myIndex.getValue());
 
     // A configuration passed to replSetInitiate() with the current node as an arbiter
     // will fail validation with a "replSet initiate got ... while validating" reason.
@@ -2360,12 +2422,13 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     return Status::OK();
 }
 
-void ReplicationCoordinatorImpl::_finishReplSetInitiate(const ReplSetConfig& newConfig,
+void ReplicationCoordinatorImpl::_finishReplSetInitiate(OperationContext* opCtx,
+                                                        const ReplSetConfig& newConfig,
                                                         int myIndex) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigInitiating);
     invariant(!_rsConfig.isInitialized());
-    auto action = _setCurrentRSConfig_inlock(newConfig, myIndex);
+    auto action = _setCurrentRSConfig_inlock(opCtx, newConfig, myIndex);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 }
@@ -2378,7 +2441,22 @@ void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
 }
 
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
-ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
+ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
+    OperationContext* opCtx) {
+    {
+        // We have to do this check even if our current and target state are the same as we might
+        // have just failed a stepdown attempt and thus are staying in PRIMARY state but restoring
+        // our ability to accept writes.
+        bool canAcceptWrites = _topCoord->canAcceptWrites();
+        if (canAcceptWrites != _canAcceptNonLocalWrites) {
+            // We must be holding the global X lock to change _canAcceptNonLocalWrites.
+            invariant(opCtx);
+            invariant(opCtx->lockState()->isW());
+        }
+        _canAcceptNonLocalWrites = canAcceptWrites;
+    }
+
+
     const MemberState newState = _topCoord->getMemberState();
     if (newState == _memberState) {
         if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
@@ -2399,7 +2477,12 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         _replicationWaiterList.signalAndRemoveAll_inlock();
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
         _opTimeWaiterList.signalAndRemoveAll_inlock();
-        _canAcceptNonLocalWrites = false;
+        // If there are any pending stepdown command requests wake them up.
+        _stepDownWaiters.notify_all();
+
+        // _canAcceptNonLocalWrites should already be set above.
+        invariant(!_canAcceptNonLocalWrites);
+
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
         result = kActionCloseAllConnections;
     } else {
@@ -2516,7 +2599,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
             _topCoord->processWinElection(_electionId, ts);
             const PostMemberStateUpdateAction nextAction =
-                _updateMemberStateFromTopologyCoordinator_inlock();
+                _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
             invariant(nextAction != kActionWinElection);
             lk.unlock();
             _performPostMemberStateUpdateAction(nextAction);
@@ -2682,7 +2765,8 @@ Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& a
 }
 
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
-ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplSetConfig& newConfig,
+ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
+                                                       const ReplSetConfig& newConfig,
                                                        int myIndex) {
     invariant(_settings.usingReplSets());
     _cancelHeartbeats_inlock();
@@ -2705,7 +2789,8 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplSetConfig& newC
     _cancelPriorityTakeover_inlock();
     _cancelAndRescheduleElectionTimeout_inlock();
 
-    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
+    const PostMemberStateUpdateAction action =
+        _updateMemberStateFromTopologyCoordinator_inlock(opCtx);
     if (_selfIndex >= 0) {
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.

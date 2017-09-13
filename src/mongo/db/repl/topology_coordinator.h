@@ -119,6 +119,11 @@ public:
     virtual MemberState getMemberState() const = 0;
 
     /**
+     * Returns whether this node should be allowed to accept writes.
+     */
+    virtual bool canAcceptWrites() const = 0;
+
+    /**
      * Returns true if this node is in the process of stepping down.  Note that this can be
      * due to an unconditional stepdown that must succeed (for instance from learning about a new
      * term) or due to a stepdown attempt that could fail (for instance from a stepdown cmd that
@@ -575,17 +580,21 @@ public:
      *
      *
      * If C1 is true, or if both C2 and C3 are true, then the stepdown occurs and this method
-     * returns true. Otherwise this method returns false if the stepdown currently can't succeed
-     * but waiting for more time to pass could make it succeed, or throws an exception if this
-     * stepdown attempt should be aborted.
-     *
-     * NOTE: It is illegal to call this method if the node is not a primary.
+     * returns true. If the conditions for successful stepdown aren't met yet, but waiting for more
+     * time to pass could make it succeed, returns false.  If the whole stepdown attempt should be
+     * abandoned (for example because the time limit expired or because we've already stepped down),
+     * throws an exception.
      * TODO(spencer): Unify with the finishUnconditionalStepDown() method.
      */
-    virtual bool attemptStepDown(Date_t now,
-                                 Date_t waitUntil,
-                                 Date_t stepDownUntil,
-                                 bool force) = 0;
+    virtual bool attemptStepDown(
+        long long termAtStart, Date_t now, Date_t waitUntil, Date_t stepDownUntil, bool force) = 0;
+
+    /**
+     * Returns whether it is safe for a stepdown attempt to complete, ignoring the 'force' argument.
+     * This is essentially checking conditions C2 and C3 as described in the comment to
+     * attemptStepDown().
+     */
+    virtual bool isSafeToStepDown() = 0;
 
     /**
      * Readies the TopologyCoordinator for stepdown.  Returns false if we're already in the process
