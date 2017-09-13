@@ -340,7 +340,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
                     findCmdBuilder.done(),
                     fetcherCallback,
                     _appendMetadataForCommand(txn, readPrefWithMinOpTime),
-                    maxTimeMS);
+                    maxTimeMS /* find network timeout */,
+                    maxTimeMS /* getMore network timeout */);
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         return scheduleStatus;

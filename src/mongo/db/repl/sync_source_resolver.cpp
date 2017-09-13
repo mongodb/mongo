@@ -175,7 +175,8 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
                    candidate,
                    earliestOpTimeSeen),
         rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
-        kFetcherTimeout);
+        kFetcherTimeout /* find network timeout */,
+        kFetcherTimeout /* getMore network timeout */);
 }
 
 std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndPort candidate,
@@ -195,7 +196,8 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
                    candidate,
                    earliestOpTimeSeen),
         rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
-        kFetcherTimeout);
+        kFetcherTimeout /* find network timeout */,
+        kFetcherTimeout /* getMore network timeout */);
 }
 
 Status SyncSourceResolver::_scheduleFetcher(std::unique_ptr<Fetcher> fetcher) {

@@ -242,6 +242,7 @@ TEST_F(FetcherTest, InvalidConstruction) {
                 unreachableCallback,
                 rpc::makeEmptyMetadata(),
                 RemoteCommandRequest::kNoTimeout,
+                RemoteCommandRequest::kNoTimeout,
                 std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy>()),
         UserException,
         ErrorCodes::BadValue,
@@ -273,7 +274,6 @@ TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToCo
     ASSERT_EQUALS(source, fetcher->getSource());
     ASSERT_BSONOBJ_EQ(findCmdObj, fetcher->getCommandObject());
     ASSERT_BSONOBJ_EQ(metadataObj, fetcher->getMetadataObject());
-    ASSERT_EQUALS(timeout, fetcher->getTimeout());
 
     ASSERT_OK(fetcher->schedule());
 
@@ -284,6 +284,7 @@ TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToCo
         ASSERT_TRUE(net->hasReadyRequests());
         auto noi = net->getNextReadyRequest();
         request = noi->getRequest();
+        ASSERT_EQUALS(timeout, request.timeout);
     }
 
     ASSERT_EQUALS(source, request.target);
@@ -1047,6 +1048,7 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
                                          findCmdObj,
                                          makeCallback(),
                                          rpc::makeEmptyMetadata(),
+                                         executor::RemoteCommandRequest::kNoTimeout,
                                          executor::RemoteCommandRequest::kNoTimeout,
                                          std::move(policy));
 

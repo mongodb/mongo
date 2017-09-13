@@ -1189,7 +1189,8 @@ Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn 
                                    query,
                                    callback,
                                    rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
-                                   RemoteCommandRequest::kNoTimeout,
+                                   RemoteCommandRequest::kNoTimeout /* find network timeout */,
+                                   RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
                                    RemoteCommandRetryScheduler::makeRetryPolicy(
                                        numInitialSyncOplogFindAttempts,
                                        executor::RemoteCommandRequest::kNoTimeout,

@@ -235,6 +235,16 @@ private:
     void _finishCallback(Status status, OpTimeWithHash opTimeWithHash);
 
     /**
+     * Returns how long the `find` command should wait before timing out.
+     */
+    virtual Milliseconds _getFindMaxTime() const;
+
+    /**
+     * Returns how long the `getMore` command should wait before timing out.
+     */
+    virtual Milliseconds _getGetMoreMaxTime() const;
+
+    /**
      * Creates a new instance of the fetcher to tail the remote oplog starting at the given optime.
      */
     std::unique_ptr<Fetcher> _makeFetcher(long long currentTerm, OpTime lastFetchedOpTime);

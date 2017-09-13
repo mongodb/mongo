@@ -36,6 +36,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -56,8 +57,12 @@ MONGO_FP_DECLARE(stopReplProducer);
 
 namespace {
 
-Seconds kOplogInitialFindMaxTime{60};
-Seconds kOplogQueryNetworkTimeout{65};  // 5 seconds past the find command's 1 minute maxTimeMs
+// Number of seconds for the `maxTimeMS` on the initial `find` command.
+MONGO_EXPORT_SERVER_PARAMETER(oplogInitialFindMaxSeconds, int, 60);
+
+// Number of milliseconds to add to the `find` and `getMore` timeouts to calculate the network
+// timeout for the requests.
+const Milliseconds kNetworkTimeoutBufferMS{5000};
 
 Counter64 readersCreatedStats;
 ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
@@ -91,14 +96,15 @@ Milliseconds calculateAwaitDataTimeout(const ReplSetConfig& config) {
  */
 BSONObj makeFindCommandObject(const NamespaceString& nss,
                               long long currentTerm,
-                              OpTime lastOpTimeFetched) {
+                              OpTime lastOpTimeFetched,
+                              Milliseconds fetcherMaxTimeMS) {
     BSONObjBuilder cmdBob;
     cmdBob.append("find", nss.coll());
     cmdBob.append("filter", BSON("ts" << BSON("$gte" << lastOpTimeFetched.getTimestamp())));
     cmdBob.append("tailable", true);
     cmdBob.append("oplogReplay", true);
     cmdBob.append("awaitData", true);
-    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(kOplogInitialFindMaxTime));
+    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
     if (currentTerm != OpTime::kUninitializedTerm) {
         cmdBob.append("term", currentTerm);
     }
@@ -454,6 +460,14 @@ BSONObj OplogFetcher::getMetadataObject_forTest() const {
 }
 
 Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
+    return _getGetMoreMaxTime();
+}
+
+Milliseconds OplogFetcher::_getFindMaxTime() const {
+    return Milliseconds(oplogInitialFindMaxSeconds.load() * 1000);
+}
+
+Milliseconds OplogFetcher::_getGetMoreMaxTime() const {
     return _awaitDataTimeout;
 }
 
@@ -664,7 +678,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     getMoreBob->appendElements(makeGetMoreCommandObject(queryResponse.nss,
                                                         queryResponse.cursorId,
                                                         lastCommittedWithCurrentTerm,
-                                                        _awaitDataTimeout));
+                                                        _getGetMoreMaxTime()));
 }
 
 void OplogFetcher::_finishCallback(Status status) {
@@ -695,10 +709,11 @@ std::unique_ptr<Fetcher> OplogFetcher::_makeFetcher(long long currentTerm,
         _executor,
         _source,
         _nss.db().toString(),
-        makeFindCommandObject(_nss, currentTerm, lastFetchedOpTime),
+        makeFindCommandObject(_nss, currentTerm, lastFetchedOpTime, _getFindMaxTime()),
         stdx::bind(&OplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
         _metadataObject,
-        kOplogQueryNetworkTimeout);
+        _getFindMaxTime() + kNetworkTimeoutBufferMS,
+        _getGetMoreMaxTime() + kNetworkTimeoutBufferMS);
 }
 
 bool OplogFetcher::_isShuttingDown() const {
