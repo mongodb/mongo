@@ -439,13 +439,16 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
                                   << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
                                   << "must be an object");
             }
-            StatusWithMatchExpression query =
-                _parse(second.embeddedObject(), collator, expCtx, allowedFeatures, topLevel);
-            if (!query.isOK()) {
-                return query.getStatus();
+
+            auto exprWithPlaceholder =
+                ExpressionWithPlaceholder::parse(second.embeddedObject(), collator);
+            if (!exprWithPlaceholder.isOK()) {
+                return exprWithPlaceholder.getStatus();
             }
+
             auto expr = stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>();
-            auto status = expr->init(name, parsedIndex.getValue(), std::move(query.getValue()));
+            auto status =
+                expr->init(name, parsedIndex.getValue(), std::move(exprWithPlaceholder.getValue()));
             if (!status.isOK()) {
                 return status;
             }

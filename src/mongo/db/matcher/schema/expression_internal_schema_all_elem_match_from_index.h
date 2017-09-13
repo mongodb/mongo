@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 
 namespace mongo {
 /**
@@ -45,21 +46,23 @@ public:
         : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX) {
     }
 
-    Status init(StringData path, long long index, std::unique_ptr<MatchExpression> query) {
+    Status init(StringData path,
+                long long index,
+                std::unique_ptr<ExpressionWithPlaceholder> expression) {
         _index = index;
-        _query = std::move(query);
+        _expression = std::move(expression);
         return setPath(path);
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
-    bool matchesArray(const BSONObj& array, MatchDetails*) const final {
+    bool matchesArray(const BSONObj& array, MatchDetails* details) const final {
         auto iter = array.begin();
         for (int i = 0; iter.more() && i < _index; i++) {
             iter.next();
         }
         while (iter.more()) {
-            if (!_query->matchesBSONElement(iter.next())) {
+            if (!_expression->matchesBSONElement(iter.next(), details)) {
                 return false;
             }
         }
@@ -87,6 +90,6 @@ public:
 
 private:
     long long _index;
-    std::unique_ptr<MatchExpression> _query;
+    std::unique_ptr<ExpressionWithPlaceholder> _expression;
 };
 }  // namespace mongo
