@@ -29,24 +29,21 @@
 
 #include "mongo/db/ops/modifier_pull.h"
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
+
+namespace mongo {
 
 namespace {
 
-using mongo::BSONObj;
-using mongo::LogBuilder;
-using mongo::ModifierPull;
-using mongo::ModifierInterface;
-using mongo::Status;
-using mongo::StringData;
-using mongo::fromjson;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 
@@ -58,6 +55,11 @@ public:
     explicit Mod(BSONObj modObj) : _modObj(modObj), _mod() {
         ASSERT_OK(_mod.init(_modObj["$pull"].embeddedObject().firstElement(),
                             ModifierInterface::Options::normal()));
+    }
+
+    Mod(BSONObj modObj, const CollatorInterface* collator) : _modObj(modObj), _mod() {
+        ASSERT_OK(_mod.init(_modObj["$pull"].embeddedObject().firstElement(),
+                            ModifierInterface::Options::normal(collator)));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -80,6 +82,62 @@ private:
     BSONObj _modObj;
     ModifierPull _mod;
 };
+
+TEST(SimpleMod, InitWithTextFails) {
+    auto update = fromjson("{$pull: {a: {$text: {$search: 'str'}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithWhereFails) {
+    auto update = fromjson("{$pull: {a: {$where: 'this.a == this.b'}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithGeoNearElemFails) {
+    auto update =
+        fromjson("{$pull: {a: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithGeoNearObjectFails) {
+    auto update = fromjson(
+        "{$pull: {a: {b: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithExprElemFails) {
+    auto update = fromjson("{$pull: {a: {$expr: {$eq: ['$a', 5]}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(SimpleMod, InitWithExprObjectFails) {
+    auto update = fromjson("{$pull: {a: {$expr: {$eq: ['$a', {$literal: {b: 5}}]}}}}");
+    const CollatorInterface* collator = nullptr;
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
 
 TEST(SimpleMod, PrepareOKTargetNotFound) {
     Document doc(fromjson("{}"));
@@ -239,6 +297,122 @@ TEST(SimpleMod, ApplyAndLogPullMatchesAll) {
     ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
 }
 
+TEST(SimpleMod, PullRespectsTheCollation) {
+    Document doc(fromjson("{ a : ['zaa', 'zcc', 'zbb', 'zee'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    Mod mod(fromjson("{ $pull : { a : { $gt : 'abc' } } }"), &collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : ['zaa', 'zbb'] }"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : ['zaa', 'zbb'] } }"), logDoc);
+}
+
+TEST(SimpleMod, CollationHasNoAffectWhenPullingNonStrings) {
+    Document doc(fromjson("{ a : [0, -1, -2, -3, -4, -5] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    Mod mod(fromjson("{ $pull : { a : { $lt : 1 } } }"), &collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
+}
+
+TEST(SimpleMod, CollationHasNoAffectWhenPullingStringsUsingRegex) {
+    Document doc(fromjson("{ a : ['b', 'a', 'aab', 'cb', 'bba'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Mod mod(fromjson("{ $pull : { a : /a/ } }"), &collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : ['b', 'cb'] }"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : ['b', 'cb'] } }"), logDoc);
+}
+
+TEST(SimpleMod, PullingBasedOnStringLiteralRespectsCollation) {
+    Document doc(fromjson("{ a : ['a', 'b', 'c', 'd'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Mod mod(fromjson("{ $pull : { a : 'c' } }"), &collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
+}
+
+TEST(SimpleMod, PullingBasedOnNumberLiteralNotAffectedByCollation) {
+    Document doc(fromjson("{ a : ['a', 99, 'b', 2, 'c', 99, 'd'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Mod mod(fromjson("{ $pull : { a : 99 } }"), &collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : ['a', 'b', 2, 'c', 'd'] }"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson("{ $set : { a : ['a', 'b', 2, 'c', 'd'] } }"), logDoc);
+}
+
+TEST(SimpleMod, PullingBasedOnStringRespectsCollationProvidedBySetCollation) {
+    Document doc(fromjson("{ a : ['a', 'b', 'c', 'd'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Mod mod(fromjson("{ $pull : { a : 'c' } }"), nullptr);
+    mod.mod().setCollator(&collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+}
+
 TEST(ComplexMod, ApplyAndLogComplexDocAndMatching1) {
     const char* const strings[] = {
         // Document:
@@ -322,6 +496,40 @@ TEST(ComplexMod, ApplyAndLogComplexDocAndMatching3) {
 
     Document doc(fromjson(strings[0]));
     Mod mod(fromjson(strings[1]));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson(strings[2]), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(mod.log(&logBuilder));
+    ASSERT_EQUALS(fromjson(strings[3]), logDoc);
+}
+
+TEST(ComplexMod, FullPredicateInsidePullRespectsCollation) {
+    const char* const strings[] = {
+        // Document:
+        "{ a : { b : [ { x : 'foo', y : 1 }, { x : 'bar', y : 2 }, { x : 'baz', y : 3 } ] } }",
+
+        // Modifier:
+        "{ $pull : { 'a.b' : { x : 'blah' } } }",
+
+        // Document result:
+        "{ a : { b : [ ] } }",
+
+        // Log result:
+        "{ $set : { 'a.b' : [ ] } }"};
+
+    Document doc(fromjson(strings[0]));
+
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Mod mod(fromjson(strings[1]), &collator);
 
     ModifierInterface::ExecInfo execInfo;
     ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
@@ -553,3 +761,4 @@ TEST(MatchingRegressions, SERVER_3988) {
 }
 
 }  // namespace
+}  // namespace mongo

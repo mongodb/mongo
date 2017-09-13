@@ -7,11 +7,11 @@
  */
 
 #include "mongo/logger/console.h"
+#include "mongo/unittest/unittest.h"
 #include <iostream>
 #include <ostream>
 #include <sstream>
 #include <string>
-#include "mongo/unittest/unittest.h"
 
 namespace {
 

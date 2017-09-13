@@ -13,7 +13,10 @@ var testRole = "userDefinedRolesTestRole";
 
 load("jstests/auth/lib/commands_lib.js");
 
-function testProperAuthorization(conn, t, testcase) {
+/**
+ * Run the command specified in 't' with the privileges specified in 'privileges'.
+ */
+function testProperAuthorization(conn, t, testcase, privileges) {
     var out = "";
 
     var runOnDb = conn.getDB(testcase.runOnDb);
@@ -23,28 +26,22 @@ function testProperAuthorization(conn, t, testcase) {
     authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
-    assert.commandWorked(adminDb.runCommand({
-        updateRole: testRole,
-        privileges: testcase.privileges
-    }));
+    assert.commandWorked(adminDb.runCommand({updateRole: testRole, privileges: privileges}));
     adminDb.logout();
 
     assert(adminDb.auth(testUser, "password"));
 
+    authCommandsLib.authenticatedSetup(t, runOnDb);
     var res = runOnDb.runCommand(t.command);
 
     if (!testcase.expectFail && res.ok != 1 && res.code != commandNotSupportedCode) {
         // don't error if the test failed with code commandNotSupported since
         // some storage engines (e.g wiredTiger) don't support some commands (e.g. touch)
-        out = "command failed with " + tojson(res) +
-              " on db " + testcase.runOnDb +
-              " with privileges " + tojson(testcase.privileges);
-    }
-    else if (testcase.expectFail && res.code == authErrCode) {
-        out = "expected authorization success" +
-              " but received " + tojson(res) +
-              " on db " + testcase.runOnDb +
-              " with privileges " + tojson(testcase.privileges);
+        out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
+            " with privileges " + tojson(privileges);
+    } else if (testcase.expectFail && res.code == authErrCode) {
+        out = "expected authorization success" + " but received " + tojson(res) + " on db " +
+            testcase.runOnDb + " with privileges " + tojson(privileges);
     }
 
     firstDb.logout();
@@ -62,20 +59,17 @@ function testInsufficientPrivileges(conn, t, testcase, privileges) {
     authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
-    assert.commandWorked(adminDb.runCommand({
-        updateRole: testRole,
-        privileges: privileges
-    }));
+    assert.commandWorked(adminDb.runCommand({updateRole: testRole, privileges: privileges}));
     adminDb.logout();
 
     assert(adminDb.auth(testUser, "password"));
 
+    authCommandsLib.authenticatedSetup(t, runOnDb);
     var res = runOnDb.runCommand(t.command);
 
     if (res.ok == 1 || res.code != authErrCode) {
-        out = "expected authorization failure " +
-              " but received " + tojson(res) +
-              " with privileges " + tojson(privileges);
+        out = "expected authorization failure " + " but received " + tojson(res) +
+            " with privileges " + tojson(privileges);
     }
 
     firstDb.logout();
@@ -89,8 +83,6 @@ function runOneTest(conn, t) {
 
     for (var i = 0; i < t.testcases.length; i++) {
         var testcase = t.testcases[i];
-        var privileges = testcase.privileges;
-
         if (!("privileges" in testcase)) {
             continue;
         }
@@ -103,15 +95,22 @@ function runOneTest(conn, t) {
             continue;
         }
 
-        if ((privileges.length == 1 && privileges[0].actions.length > 1)
-            || privileges.length > 1) {
-            for (var j = 0; j < privileges.length; j++) {
-                var p = privileges[j];
+        if ((testcase.privileges.length == 1 && testcase.privileges[0].actions.length > 1) ||
+            testcase.privileges.length > 1) {
+            for (var j = 0; j < testcase.privileges.length; j++) {
+                var p = testcase.privileges[j];
                 var resource = p.resource;
                 var actions = p.actions;
 
+                // A particular privilege can explicitly specify that it should not be removed when
+                // testing for authorization failure. This accommodates special-case behavior for
+                // views in conjunction with the create and collMod commands.
+                if (p.removeWhenTestingAuthzFailure === false) {
+                    continue;
+                }
+
                 for (var k = 0; k < actions.length; k++) {
-                    var privDoc = { resource: resource, actions: [actions[k]] };
+                    var privDoc = {resource: resource, actions: [actions[k]]};
                     msg = testInsufficientPrivileges(conn, t, testcase, [privDoc]);
                     if (msg) {
                         failures.push(t.testname + ": " + msg);
@@ -120,29 +119,50 @@ function runOneTest(conn, t) {
             }
         }
 
-        msg = testProperAuthorization(conn, t, testcase);
+        // Test for proper authorization with the privileges specified in the test case.
+        msg = testProperAuthorization(conn, t, testcase, testcase.privileges);
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }
 
-        // test resource pattern where collection is ""
-        testcase.privileges.forEach(function(j) {
-            if (j.resource.collection && !j.resource.collection.startsWith('system.')) {
-                j.resource.collection = "";
+        var specialResource = function(resource) {
+            if (!resource)
+                return true;
+
+            // Tests which use {db: "local", collection: "oplog.rs"} will not work with
+            // {db: "", collection: "oplog.rs"}. oplog.rs is special, and does not match with
+            // forDatabaseName or anyNormalResource ResourcePatterns. The same is true of
+            // oplog.$main, but oplog.$main is also an illegal collection name on any database
+            // other than local. The other collections checked for here in the local database have
+            // the same property as oplog.rs.
+            return !resource.db || !resource.collection ||
+                resource.collection.startsWith("system.") || resource.db == "local";
+        };
+
+        // Test for proper authorization with the test case's privileges where non-system
+        // collections are modified to be the empty string.
+        msg = testProperAuthorization(conn, t, testcase, testcase.privileges.map(function(priv) {
+            // Make a copy of the privilege so as not to modify the original array.
+            var modifiedPrivilege = Object.extend({}, priv, true);
+            if (modifiedPrivilege.resource.collection && !specialResource(priv.resource)) {
+                modifiedPrivilege.resource.collection = "";
             }
-        });
-        msg = testProperAuthorization(conn, t, testcase);
+            return modifiedPrivilege;
+        }));
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }
 
-        // test resource pattern where database is ""
-        testcase.privileges.forEach(function(j) {
-            if (j.resource.db) {
-                j.resource.db = "";
+        // Test for proper authorization with the test case's privileges where the database is the
+        // empty string.
+        msg = testProperAuthorization(conn, t, testcase, testcase.privileges.map(function(priv) {
+            // Make a copy of the privilege so as not to modify the original array.
+            var modifiedPrivilege = Object.extend({}, priv, true);
+            if (!specialResource(priv.resource)) {
+                modifiedPrivilege.resource.db = "";
             }
-        });
-        msg = testProperAuthorization(conn, t, testcase);
+            return modifiedPrivilege;
+        }));
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }
@@ -154,37 +174,19 @@ function runOneTest(conn, t) {
 function createUsers(conn) {
     var adminDb = conn.getDB(adminDbName);
     var firstDb = conn.getDB(firstDbName);
-    adminDb.createUser({
-        user: "admin",
-        pwd: "password",
-        roles: ["__system"]
-    });
+    adminDb.createUser({user: "admin", pwd: "password", roles: ["__system"]});
 
     assert(adminDb.auth("admin", "password"));
 
-    assert.commandWorked(adminDb.runCommand({
-        createRole: testRole,
-        privileges: [ ],
-        roles: [ ]
-    }));
-    assert.commandWorked(adminDb.runCommand({
-        createUser: testUser,
-        pwd: "password",
-        roles: [ { role: testRole, db: adminDbName } ]
-    }));
+    assert.commandWorked(adminDb.runCommand({createRole: testRole, privileges: [], roles: []}));
+    assert.commandWorked(adminDb.runCommand(
+        {createUser: testUser, pwd: "password", roles: [{role: testRole, db: adminDbName}]}));
 
     adminDb.logout();
 }
 
-var opts = {
-    auth:"",
-    enableExperimentalIndexStatsCmd: "",
-    enableExperimentalStorageDetailsCmd: ""
-}
-var impls = {
-    createUsers: createUsers,
-    runOneTest: runOneTest
-}
+var opts = {auth: "", enableExperimentalStorageDetailsCmd: ""};
+var impls = {createUsers: createUsers, runOneTest: runOneTest};
 
 // run all tests standalone
 var conn = MongoRunner.runMongod(opts);
@@ -192,12 +194,7 @@ authCommandsLib.runTests(conn, impls);
 MongoRunner.stopMongod(conn);
 
 // run all tests sharded
-conn = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    keyFile: "jstests/libs/key1",
-    other: { shardOptions: opts }
-});
+conn = new ShardingTest(
+    {shards: 2, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
 authCommandsLib.runTests(conn, impls);
 conn.stop();
-

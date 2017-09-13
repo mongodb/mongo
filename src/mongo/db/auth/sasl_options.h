@@ -28,10 +28,12 @@
 
 #pragma once
 
+#include <atomic>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -47,7 +49,8 @@ struct SASLGlobalParams {
     std::string hostName;
     std::string serviceName;
     std::string authdPath;
-    int scramIterationCount;
+    AtomicInt32 scramIterationCount;
+    AtomicInt32 authFailedDelay;
 
     SASLGlobalParams();
 };

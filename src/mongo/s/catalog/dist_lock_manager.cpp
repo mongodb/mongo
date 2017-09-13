@@ -36,28 +36,32 @@
 
 namespace mongo {
 
-const stdx::chrono::milliseconds DistLockManager::kDefaultSingleLockAttemptTimeout(0);
-const stdx::chrono::milliseconds DistLockManager::kDefaultLockRetryInterval(1000);
+const Seconds DistLockManager::kDefaultLockTimeout(20);
+const Milliseconds DistLockManager::kSingleLockAttemptTimeout(0);
 
-DistLockManager::ScopedDistLock::ScopedDistLock() : _lockManager(nullptr) {}
-
-DistLockManager::ScopedDistLock::ScopedDistLock(DistLockHandle lockHandle,
+DistLockManager::ScopedDistLock::ScopedDistLock(OperationContext* opCtx,
+                                                DistLockHandle lockHandle,
                                                 DistLockManager* lockManager)
-    : _lockID(std::move(lockHandle)), _lockManager(lockManager) {}
+    : _opCtx(opCtx), _lockID(std::move(lockHandle)), _lockManager(lockManager) {}
 
 DistLockManager::ScopedDistLock::~ScopedDistLock() {
     if (_lockManager) {
-        _lockManager->unlock(_lockID);
+        _lockManager->unlock(_opCtx, _lockID);
     }
 }
 
-DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other) {
+DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
+    : _opCtx(nullptr), _lockManager(nullptr) {
     *this = std::move(other);
 }
 
 DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
     ScopedDistLock&& other) {
     if (this != &other) {
+        invariant(_lockManager == nullptr);
+        invariant(_opCtx == nullptr);
+
+        _opCtx = other._opCtx;
         _lockID = std::move(other._lockID);
         _lockManager = other._lockManager;
         other._lockManager = nullptr;
@@ -66,11 +70,24 @@ DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
     return *this;
 }
 
+StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationContext* opCtx,
+                                                                  StringData name,
+                                                                  StringData whyMessage,
+                                                                  Milliseconds waitFor) {
+    auto distLockHandleStatus = lockWithSessionID(opCtx, name, whyMessage, OID::gen(), waitFor);
+    if (!distLockHandleStatus.isOK()) {
+        return distLockHandleStatus.getStatus();
+    }
+
+    return DistLockManager::ScopedDistLock(opCtx, std::move(distLockHandleStatus.getValue()), this);
+}
+
 Status DistLockManager::ScopedDistLock::checkStatus() {
     if (!_lockManager) {
         return Status(ErrorCodes::IllegalOperation, "no lock manager, lock was not acquired");
     }
 
-    return _lockManager->checkStatus(_lockID);
+    return _lockManager->checkStatus(_opCtx, _lockID);
 }
-}
+
+}  // namespace mongo

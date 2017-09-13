@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 
+#include "mongo/base/static_assert.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 
@@ -45,7 +46,7 @@ AlignedBuilder::AlignedBuilder(unsigned initSize) {
     uassert(13584, "out of memory AlignedBuilder", _p._allocationAddress);
 }
 
-BOOST_STATIC_ASSERT(sizeof(void*) == sizeof(size_t));
+MONGO_STATIC_ASSERT(sizeof(void*) == sizeof(size_t));
 
 /** reset for a re-use. shrinks if > 128MB */
 void AlignedBuilder::reset() {
@@ -100,18 +101,20 @@ void NOINLINE_DECL AlignedBuilder::growReallocate(unsigned oldLen) {
     const unsigned oldSize = _p._size;
 
     // Warn for unexpectedly large buffer
-    wassert(_len <= kWarnSize);
+    if (_len > kWarnSize) {
+        warning() << "large amount of uncommitted data (" << _len << " bytes)";
+    }
 
     // Check validity of requested size
     invariant(_len > oldSize);
     if (_len > kMaxSize) {
-        log() << "error writing journal: too much uncommitted data (" << _len << " bytes)";
-        log() << "shutting down immediately to avoid corruption";
+        error() << "error writing journal: too much uncommitted data (" << _len << " bytes)";
+        error() << "shutting down immediately to avoid corruption";
         fassert(28614, _len <= kMaxSize);
     }
 
     // Use smaller maximum for debug builds, as we should never be close the the maximum
-    dassert(_len <= 256 * MB);
+    dassert(_len <= 1000 * MB);
 
     // Compute newSize by doubling the existing maximum size until the maximum is reached
     invariant(oldSize > 0);

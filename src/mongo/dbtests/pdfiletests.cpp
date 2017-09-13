@@ -32,10 +32,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -44,13 +44,13 @@ namespace PdfileTests {
 namespace Insert {
 class Base {
 public:
-    Base() : _scopedXact(&_txn, MODE_X), _lk(_txn.lockState()), _context(&_txn, ns()) {}
+    Base() : _lk(&_opCtx), _context(&_opCtx, ns()) {}
 
     virtual ~Base() {
         if (!collection())
             return;
-        WriteUnitOfWork wunit(&_txn);
-        _context.db()->dropCollection(&_txn, ns());
+        WriteUnitOfWork wunit(&_opCtx);
+        _context.db()->dropCollection(&_opCtx, ns()).transitional_ignore();
         wunit.commit();
     }
 
@@ -59,11 +59,11 @@ protected:
         return "unittests.pdfiletests.Insert";
     }
     Collection* collection() {
-        return _context.db()->getCollection(ns());
+        return _context.db()->getCollection(&_opCtx, ns());
     }
 
-    OperationContextImpl _txn;
-    ScopedTransaction _scopedXact;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     Lock::GlobalWrite _lk;
     OldClientContext _context;
 };
@@ -71,19 +71,19 @@ protected:
 class InsertNoId : public Base {
 public:
     void run() {
-        WriteUnitOfWork wunit(&_txn);
+        WriteUnitOfWork wunit(&_opCtx);
         BSONObj x = BSON("x" << 1);
         ASSERT(x["_id"].type() == 0);
-        Collection* collection = _context.db()->getOrCreateCollection(&_txn, ns());
-        StatusWith<RecordId> dl = collection->insertDocument(&_txn, x, true);
-        ASSERT(!dl.isOK());
+        Collection* collection =
+            _context.db()->getOrCreateCollection(&_opCtx, NamespaceString(ns()));
+        OpDebug* const nullOpDebug = nullptr;
+        ASSERT(!collection->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
 
-        StatusWith<BSONObj> fixed = fixDocumentForInsert(x);
+        StatusWith<BSONObj> fixed = fixDocumentForInsert(_opCtx.getServiceContext(), x);
         ASSERT(fixed.isOK());
         x = fixed.getValue();
         ASSERT(x["_id"].type() == jstOID);
-        dl = collection->insertDocument(&_txn, x, true);
-        ASSERT(dl.isOK());
+        ASSERT(collection->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
         wunit.commit();
     }
 };
@@ -96,7 +96,7 @@ public:
         b.append("_id", 1);
         BSONObj o = b.done();
 
-        BSONObj fixed = fixDocumentForInsert(o).getValue();
+        BSONObj fixed = fixDocumentForInsert(_opCtx.getServiceContext(), o).getValue();
         ASSERT_EQUALS(2, fixed.nFields());
         ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
         ASSERT(fixed.firstElement().number() == 1);
@@ -121,7 +121,7 @@ public:
             o = b.obj();
         }
 
-        BSONObj fixed = fixDocumentForInsert(o).getValue();
+        BSONObj fixed = fixDocumentForInsert(_opCtx.getServiceContext(), o).getValue();
         ASSERT_EQUALS(3, fixed.nFields());
         ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
         ASSERT(fixed.firstElement().number() == 1);
@@ -143,10 +143,13 @@ public:
 class ValidId : public Base {
 public:
     void run() {
-        ASSERT(fixDocumentForInsert(BSON("_id" << 5)).isOK());
-        ASSERT(fixDocumentForInsert(BSON("_id" << BSON("x" << 5))).isOK());
-        ASSERT(!fixDocumentForInsert(BSON("_id" << BSON("$x" << 5))).isOK());
-        ASSERT(!fixDocumentForInsert(BSON("_id" << BSON("$oid" << 5))).isOK());
+        ASSERT(fixDocumentForInsert(_opCtx.getServiceContext(), BSON("_id" << 5)).isOK());
+        ASSERT(
+            fixDocumentForInsert(_opCtx.getServiceContext(), BSON("_id" << BSON("x" << 5))).isOK());
+        ASSERT(!fixDocumentForInsert(_opCtx.getServiceContext(), BSON("_id" << BSON("$x" << 5)))
+                    .isOK());
+        ASSERT(!fixDocumentForInsert(_opCtx.getServiceContext(), BSON("_id" << BSON("$oid" << 5)))
+                    .isOK());
     }
 };
 }  // namespace Insert

@@ -5,13 +5,15 @@
 # This means that the integer value assigned to each ActionType and used internally in ActionSet
 # also may change between versions.
 ["addShard",
+"advanceLogicalTime",
 "anyAction", # Special ActionType that represents *all* actions
 "appendOplogNote",
 "applicationMessage",
 "auditLogRotate",  # Not used for permissions checks, but to id the event in logs.
 "authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
 "authenticate",  # Not used for permission checks, but to id authentication events in logs.
-"bypassDocumentValidation", # For bypassDocumentValidation command option.
+"authSchemaUpgrade",
+"bypassDocumentValidation",
 "changeCustomData",
 "changePassword",
 "changeOwnPassword",
@@ -30,7 +32,6 @@
 "createIndex",  # Not used for permissions checks, but to id the event in logs.
 "createRole",
 "createUser",
-"cursorInfo",
 "dbHash",
 "dbStats",
 "diagLogging",
@@ -63,11 +64,13 @@
 "insert",
 "internal", # Special action type that represents internal actions
 "invalidateUserCache",
+"killAnySession",
 "killCursors",
 "killop",
 "listCollections",
 "listDatabases",
 "listIndexes",
+"listSessions",
 "listShards",
 "logRotate",
 "moveChunk",
@@ -86,6 +89,7 @@
 "replSetGetStatus",
 "replSetHeartbeat",
 "replSetReconfig",  # Not used for permissions checks, but to id the event in logs.
+"replSetResizeOplog",
 "replSetStateChange",
 "resync",
 "revokeRole",

@@ -28,6 +28,8 @@
 
 #include "mongo/db/ops/modifier_rename.h"
 
+#include <cstdint>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"
@@ -35,23 +37,14 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
-namespace {
+namespace mongo {
 
-using mongo::BSONObj;
-using mongo::fromjson;
-using mongo::LogBuilder;
-using mongo::ModifierInterface;
-using mongo::NumberInt;
-using mongo::ModifierRename;
-using mongo::Status;
-using mongo::StringData;
-using mongo::mutablebson::ConstElement;
-using mongo::mutablebson::Document;
-using mongo::mutablebson::Element;
+using mutablebson::ConstElement;
+using mutablebson::Document;
+using mutablebson::Element;
 
 /** Helper to build and manipulate the mod. */
 class Mod {
@@ -107,6 +100,33 @@ TEST(InvalidInit, FromDbTests) {
         mod.init(fromjson("{'b':'a.'}").firstElement(), ModifierInterface::Options::normal()));
 }
 
+TEST(InvalidInit, ToFieldCannotContainEmbeddedNullByte) {
+    ModifierRename mod;
+    {
+        const auto embeddedNull = "a\0b"_sd;
+        ASSERT_NOT_OK(mod.init(BSON("a" << embeddedNull).firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
+
+    {
+        const auto singleNullByte = "\0"_sd;
+        ASSERT_NOT_OK(mod.init(BSON("a" << singleNullByte).firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
+
+    {
+        const auto leadingNullByte = "\0bbbb"_sd;
+        ASSERT_NOT_OK(mod.init(BSON("a" << leadingNullByte).firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
+
+    {
+        const auto trailingNullByte = "bbbb\0"_sd;
+        ASSERT_NOT_OK(mod.init(BSON("a" << trailingNullByte).firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
+}
+
 TEST(MissingFrom, InitPrepLog) {
     Document doc(fromjson("{a: 2}"));
     Mod setMod(fromjson("{$rename: {'b':'a'}}"));
@@ -151,6 +171,12 @@ TEST(MoveOnSamePath, MoveDown) {
     ModifierRename mod;
     ASSERT_NOT_OK(
         mod.init(fromjson("{'b':'b.a'}").firstElement(), ModifierInterface::Options::normal()));
+}
+
+TEST(MoveOnSamePath, MoveToSelf) {
+    ModifierRename mod;
+    ASSERT_NOT_OK(
+        mod.init(fromjson("{'b.a':'b.a'}").firstElement(), ModifierInterface::Options::normal()));
 }
 
 TEST(MissingTo, SimpleNumberAtRoot) {
@@ -215,6 +241,48 @@ TEST(SimpleReplace, FromDottedElement) {
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'b': {d: 6}}, $unset: {'a.c': true}}");
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(logDoc, logObj);
+}
+
+TEST(SimpleReplace, RenameToExistingFieldDoesNotReorderFields) {
+    Document doc(fromjson("{a: 1, b: 2, c: 3}"));
+    Mod setMod(fromjson("{$rename: {a: 'b'}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(doc, fromjson("{b: 1, c: 3}"));
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    BSONObj logObj = fromjson("{$set: {b: 1}, $unset: {a: true}}");
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(logDoc, logObj);
+}
+
+TEST(SimpleReplace, RenameToExistingNestedFieldDoesNotReorderFields) {
+    Document doc(fromjson("{a: {b: {c: 1, d: 2}}, b: 3, c: {d: 4}}"));
+    Mod setMod(fromjson("{$rename: {'c.d': 'a.b.c'}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "c.d");
+    ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "a.b.c");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(doc, fromjson("{a: {b: {c: 4, d: 2}}, b: 3, c: {}}"));
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    BSONObj logObj = fromjson("{$set: {'a.b.c': 4}, $unset: {'c.d': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
     ASSERT_EQUALS(logDoc, logObj);
 }
@@ -392,4 +460,4 @@ TEST(LegacyData, CanRenameFromInvalidFieldName) {
     ASSERT_EQUALS(logDoc, logObj);
 }
 
-}  // namespace
+}  // namespace mongo

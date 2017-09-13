@@ -33,8 +33,13 @@
 
 #ifndef _WIN32
 #include <cstdio>
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
+
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
 #endif
 
 #include <sstream>
@@ -58,8 +63,11 @@ namespace unittest {
 DeathTestImpl::DeathTestImpl(std::unique_ptr<Test> test) : _test(std::move(test)) {}
 
 void DeathTestImpl::_doTest() {
-#ifdef _WIN32
+#if defined(_WIN32)
     log() << "Skipping death test on Windows";
+    return;
+#elif defined(__APPLE__) && TARGET_OS_TV
+    log() << "Skipping death test on tvOS";
     return;
 #else
     int pipes[2];
@@ -105,6 +113,13 @@ void DeathTestImpl::_doTest() {
     checkSyscall(close(pipes[0]));
     checkSyscall(dup2(pipes[1], 1));
     checkSyscall(dup2(1, 2));
+
+    // We disable the creation of core dump files in the child process since the child process is
+    // expected to exit uncleanly. This avoids unnecessarily creating core dump files when the child
+    // process calls std::abort() or std::terminate().
+    const struct rlimit kNoCoreDump { 0U, 0U };
+    checkSyscall(setrlimit(RLIMIT_CORE, &kNoCoreDump));
+
     try {
         _test->run();
     } catch (const TestAssertionFailureException& tafe) {

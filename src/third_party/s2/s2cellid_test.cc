@@ -237,8 +237,8 @@ TEST(S2CellId, Continuity) {
     double u, v;
     S2::XYZtoFaceUV(id.ToPointRaw(), &u, &v);
     static double const kCellSize = 1.0 / (1 << kMaxWalkLevel);
-    EXPECT_NEAR(drem(S2::UVtoST(u), 0.5 * kCellSize), 0.0, 1e-15);
-    EXPECT_NEAR(drem(S2::UVtoST(v), 0.5 * kCellSize), 0.0, 1e-15);
+    EXPECT_NEAR(remainder(S2::UVtoST(u), 0.5 * kCellSize), 0.0, 1e-15);
+    EXPECT_NEAR(remainder(S2::UVtoST(v), 0.5 * kCellSize), 0.0, 1e-15);
   }
 }
 

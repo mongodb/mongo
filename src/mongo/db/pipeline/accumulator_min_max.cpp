@@ -29,17 +29,31 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
+
+#include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
+REGISTER_ACCUMULATOR(max, AccumulatorMax::create);
+REGISTER_ACCUMULATOR(min, AccumulatorMin::create);
+REGISTER_EXPRESSION(max, ExpressionFromAccumulator<AccumulatorMax>::parse);
+REGISTER_EXPRESSION(min, ExpressionFromAccumulator<AccumulatorMin>::parse);
+
+const char* AccumulatorMinMax::getOpName() const {
+    if (_sense == 1)
+        return "$min";
+    return "$max";
+}
+
 void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
     // nullish values should have no impact on result
     if (!input.nullish()) {
         /* compare with the current value; swap if appropriate */
-        int cmp = Value::compare(_val, input) * _sense;
+        int cmp = getExpressionContext()->getValueComparator().compare(_val, input) * _sense;
         if (cmp > 0 || _val.missing()) {  // missing is lower than all other values
             _val = input;
             _memUsageBytes = sizeof(*this) + input.getApproximateSize() - sizeof(Value);
@@ -47,11 +61,16 @@ void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
     }
 }
 
-Value AccumulatorMinMax::getValue(bool toBeMerged) const {
+Value AccumulatorMinMax::getValue(bool toBeMerged) {
+    if (_val.missing()) {
+        return Value(BSONNULL);
+    }
     return _val;
 }
 
-AccumulatorMinMax::AccumulatorMinMax(Sense sense) : _sense(sense) {
+AccumulatorMinMax::AccumulatorMinMax(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     Sense sense)
+    : Accumulator(expCtx), _sense(sense) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -60,17 +79,13 @@ void AccumulatorMinMax::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<Accumulator> AccumulatorMinMax::createMin() {
-    return new AccumulatorMinMax(Sense::MIN);
+intrusive_ptr<Accumulator> AccumulatorMin::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new AccumulatorMin(expCtx);
 }
 
-intrusive_ptr<Accumulator> AccumulatorMinMax::createMax() {
-    return new AccumulatorMinMax(Sense::MAX);
-}
-
-const char* AccumulatorMinMax::getOpName() const {
-    if (_sense == 1)
-        return "$min";
-    return "$max";
+intrusive_ptr<Accumulator> AccumulatorMax::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new AccumulatorMax(expCtx);
 }
 }

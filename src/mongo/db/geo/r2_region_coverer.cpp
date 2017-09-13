@@ -28,16 +28,30 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
+#include <algorithm>
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/geo/shapes.h"
 #include "mongo/db/geo/r2_region_coverer.h"
+#include "mongo/db/geo/shapes.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
+using std::less;
+
 // Definition
 int const R2RegionCoverer::kDefaultMaxCells = 8;
+
+// We define our own own comparison function on QueueEntries in order to
+// make the results deterministic.  Using the default less<QueueEntry>,
+// entries of equal priority would be sorted according to the memory address
+// of the candidate.
+struct R2RegionCoverer::CompareQueueEntries : public less<QueueEntry> {
+    bool operator()(QueueEntry const& x, QueueEntry const& y) {
+        return x.first < y.first;
+    }
+};
 
 // Doesn't take ownership of "hashConverter". The caller should guarantee its life cycle
 // is longer than this coverer.
@@ -54,15 +68,13 @@ R2RegionCoverer::R2RegionCoverer(GeoHashConverter* hashConverter)
 R2RegionCoverer::~R2RegionCoverer() {}
 
 void R2RegionCoverer::setMinLevel(unsigned int minLevel) {
-    dassert(minLevel >= 0);
     dassert(minLevel <= GeoHash::kMaxBits);
-    _minLevel = max(0u, min(GeoHash::kMaxBits, minLevel));
+    _minLevel = min(GeoHash::kMaxBits, minLevel);
 }
 
 void R2RegionCoverer::setMaxLevel(unsigned int maxLevel) {
-    dassert(maxLevel >= 0);
     dassert(maxLevel <= GeoHash::kMaxBits);
-    _maxLevel = max(0u, min(GeoHash::kMaxBits, maxLevel));
+    _maxLevel = min(GeoHash::kMaxBits, maxLevel);
 }
 
 void R2RegionCoverer::setMaxCells(int maxCells) {
@@ -94,7 +106,8 @@ void R2RegionCoverer::getCovering(const R2Region& region, vector<GeoHash>* cover
     while (!_candidateQueue->empty()) {
         Candidate* candidate = _candidateQueue->top().second;  // Owned
         _candidateQueue->pop();
-        LOG(3) << "Pop: " << candidate->cell;
+        // REDACT?? I think this may have User info, but I'm not sure how to redact
+        LOG(3) << "Pop: " << redact(candidate->cell.toString());
 
         // Try to expand this cell into its children
         if (candidate->cell.getBits() < _minLevel || candidate->numChildren == 1 ||
@@ -170,7 +183,8 @@ void R2RegionCoverer::addCandidate(Candidate* candidate) {
         int priority = -(((((int)candidate->cell.getBits() << 4) + candidate->numChildren) << 4) +
                          numTerminals);
         _candidateQueue->push(make_pair(priority, candidate));  // queue owns candidate
-        LOG(3) << "Push: " << candidate->cell << " (" << priority << ") ";
+        // REDACT??
+        LOG(3) << "Push: " << redact(candidate->cell.toString()) << " (" << priority << ") ";
     }
 }
 
@@ -216,11 +230,21 @@ void R2CellUnion::init(const vector<GeoHash>& cellIds) {
     normalize();
 }
 
+void R2CellUnion::add(const std::vector<GeoHash>& cellIds) {
+    _cellIds.insert(_cellIds.end(), cellIds.begin(), cellIds.end());
+    normalize();
+}
+
+void R2CellUnion::detach(std::vector<GeoHash>* cellIds) {
+    _cellIds.swap(*cellIds);
+    _cellIds.clear();
+}
+
 bool R2CellUnion::contains(const GeoHash cellId) const {
     // Since all cells are ordered, if an ancestor of id exists, it must be the previous one.
     vector<GeoHash>::const_iterator it;
-    it = upper_bound(_cellIds.begin(), _cellIds.end(), cellId);  // it > cellId
-    return it != _cellIds.begin() && (--it)->contains(cellId);   // --it <= cellId
+    it = std::upper_bound(_cellIds.begin(), _cellIds.end(), cellId);  // it > cellId
+    return it != _cellIds.begin() && (--it)->contains(cellId);        // --it <= cellId
 }
 
 bool R2CellUnion::normalize() {
@@ -276,6 +300,45 @@ string R2CellUnion::toString() const {
     }
     ss << "]";
     return ss.str();
+}
+
+bool R2CellUnion::intersects(const GeoHash cellId) const {
+    // After normalization, the cells will be ordered.
+    // cellId intersects with the union if and only if it either contains or is contained by
+    // a member of the union.
+    std::vector<GeoHash>::const_iterator i =
+        std::lower_bound(_cellIds.begin(), _cellIds.end(), cellId);
+    if (i != _cellIds.end() && cellId.contains(*i)) {
+        return true;
+    }
+    return i != _cellIds.begin() && (--i)->contains(cellId);
+}
+
+namespace {
+void getDifferenceInternal(GeoHash cellId,
+                           R2CellUnion const& cellUnion,
+                           std::vector<GeoHash>* cellIds) {
+    // Add the difference between cell and cellUnion to cellIds.
+    // If they intersect but the difference is non-empty, divides and conquers.
+    if (!cellUnion.intersects(cellId)) {
+        cellIds->push_back(cellId);
+    } else if (!cellUnion.contains(cellId)) {
+        GeoHash children[4];
+        if (cellId.subdivide(children)) {
+            for (int i = 0; i < 4; i++) {
+                getDifferenceInternal(children[i], cellUnion, cellIds);
+            }
+        }
+    }
+}
+}
+
+void R2CellUnion::getDifference(const R2CellUnion& cellUnion) {
+    std::vector<GeoHash> diffCellIds;
+    for (size_t i = 0; i < _cellIds.size(); ++i) {
+        getDifferenceInternal(_cellIds[i], cellUnion, &diffCellIds);
+    }
+    _cellIds.swap(diffCellIds);
 }
 
 } /* namespace mongo */

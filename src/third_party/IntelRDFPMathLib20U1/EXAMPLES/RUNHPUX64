@@ -1,0 +1,8 @@
+echo "BEGIN BUILDING AND RUNNING EXAMPLES IN HPUX (64-BIT DATA MODE)..."
+rm -f a.out hpuxout64
+./hpuxbuild64 > hpuxout64
+# grep PASS hpuxout64
+cat hpuxout64
+grep FAIL hpuxout64
+echo "END BUILDING AND RUNNING EXAMPLES IN HPUX (64-BIT DATA MODE)..."
+echo "THE TESTS PASSED IF THE WORD 'FAIL' WAS NOT PRINTED ABOVE"

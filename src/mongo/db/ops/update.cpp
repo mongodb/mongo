@@ -38,85 +38,94 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-UpdateResult update(OperationContext* txn,
-                    Database* db,
-                    const UpdateRequest& request,
-                    OpDebug* opDebug) {
+UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& request) {
     invariant(db);
 
     // Explain should never use this helper.
     invariant(!request.isExplain());
 
     const NamespaceString& nsString = request.getNamespaceString();
-    Collection* collection = db->getCollection(nsString.ns());
+    Collection* collection = db->getCollection(opCtx, nsString);
 
     // The update stage does not create its own collection.  As such, if the update is
     // an upsert, create the collection that the update stage inserts into beforehand.
     if (!collection && request.isUpsert()) {
         // We have to have an exclusive lock on the db to be allowed to create the collection.
         // Callers should either get an X or create the collection.
-        const Locker* locker = txn->lockState();
+        const Locker* locker = opCtx->lockState();
         invariant(locker->isW() ||
                   locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()), MODE_X));
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+        writeConflictRetry(opCtx, "createCollection", nsString.ns(), [&] {
+            Lock::DBLock lk(opCtx, nsString.db(), MODE_X);
 
-            const bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
+            const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nsString);
 
             if (userInitiatedWritesAndNotPrimary) {
-                uassertStatusOK(Status(ErrorCodes::NotMaster,
+                uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
                                        str::stream() << "Not primary while creating collection "
-                                                     << nsString.ns() << " during upsert"));
+                                                     << nsString.ns()
+                                                     << " during upsert"));
             }
-            WriteUnitOfWork wuow(txn);
-            collection = db->createCollection(txn, nsString.ns(), CollectionOptions());
+            WriteUnitOfWork wuow(opCtx);
+            collection = db->createCollection(opCtx, nsString.ns(), CollectionOptions());
             invariant(collection);
             wuow.commit();
-        }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", nsString.ns());
+        });
     }
 
     // Parse the update, get an executor for it, run the executor, get stats out.
-    ParsedUpdate parsedUpdate(txn, &request);
+    ParsedUpdate parsedUpdate(opCtx, &request);
     uassertStatusOK(parsedUpdate.parseRequest());
 
-    PlanExecutor* rawExec;
-    uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug, &rawExec));
-    std::unique_ptr<PlanExecutor> exec(rawExec);
+    OpDebug* const nullOpDebug = nullptr;
+    auto exec = uassertStatusOK(getExecutorUpdate(opCtx, nullOpDebug, collection, &parsedUpdate));
 
     uassertStatusOK(exec->executePlan());
-    return UpdateStage::makeUpdateResult(exec.get(), opDebug);
+
+    const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
+
+    return UpdateStage::makeUpdateResult(updateStats);
 }
 
 BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {
     UpdateDriver::Options opts;
     UpdateDriver driver(opts);
-    Status status = driver.parse(operators);
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    Status status = driver.parse(operators, arrayFilters);
     if (!status.isOK()) {
         uasserted(16838, status.reason());
     }
 
     mutablebson::Document doc(from, mutablebson::Document::kInPlaceDisabled);
-    status = driver.update(StringData(), &doc);
+
+    // The original document can be empty because it is only needed for validation of immutable
+    // paths.
+    const BSONObj emptyOriginal;
+    const bool validateForStorage = false;
+    const FieldRefSet emptyImmutablePaths;
+    status =
+        driver.update(StringData(), emptyOriginal, &doc, validateForStorage, emptyImmutablePaths);
     if (!status.isOK()) {
         uasserted(16839, status.reason());
     }

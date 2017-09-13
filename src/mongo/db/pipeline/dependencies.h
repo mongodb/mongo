@@ -41,7 +41,13 @@ class ParsedDeps;
  * This struct allows components in an agg pipeline to report what they need from their input.
  */
 struct DepsTracker {
-    DepsTracker() : needWholeDocument(false), needTextScore(false) {}
+    /**
+     * Represents what metadata is available on documents that are input to the pipeline.
+     */
+    enum MetadataAvailable { kNoMetadata = 0, kTextScore = 1 };
+
+    DepsTracker(MetadataAvailable metadataAvailable = kNoMetadata)
+        : _metadataAvailable(metadataAvailable) {}
 
     /**
      * Returns a projection object covering the dependencies tracked by this class.
@@ -50,9 +56,54 @@ struct DepsTracker {
 
     boost::optional<ParsedDeps> toParsedDeps() const;
 
-    std::set<std::string> fields;  // names of needed fields in dotted notation
-    bool needWholeDocument;        // if true, ignore fields and assume the whole document is needed
-    bool needTextScore;
+    bool hasNoRequirements() const {
+        return fields.empty() && !needWholeDocument && !_needTextScore;
+    }
+
+    MetadataAvailable getMetadataAvailable() const {
+        return _metadataAvailable;
+    }
+
+    bool isTextScoreAvailable() const {
+        return _metadataAvailable & MetadataAvailable::kTextScore;
+    }
+
+    bool getNeedTextScore() const {
+        return _needTextScore;
+    }
+
+    void setNeedTextScore(bool needTextScore) {
+        if (needTextScore && !isTextScoreAvailable()) {
+            uasserted(
+                40218,
+                "pipeline requires text score metadata, but there is no text score available");
+        }
+        _needTextScore = needTextScore;
+    }
+
+    bool getNeedSortKey() const {
+        return _needSortKey;
+    }
+
+    void setNeedSortKey(bool needSortKey) {
+        // We don't expect to ever unset '_needSortKey'.
+        invariant(!_needSortKey || needSortKey);
+        _needSortKey = needSortKey;
+    }
+
+    std::set<std::string> fields;    // The names of needed fields in dotted notation.
+    bool needWholeDocument = false;  // If true, ignore 'fields' and assume the whole document is
+                                     // needed.
+private:
+    /**
+     * Appends the meta projections for the sort key and/or text score to 'bb' if necessary. Returns
+     * true if either type of metadata was needed, and false otherwise.
+     */
+    bool _appendMetaProjections(BSONObjBuilder* bb) const;
+
+    MetadataAvailable _metadataAvailable;
+    bool _needTextScore = false;  // if true, add a {$meta: "textScore"} to the projection.
+    bool _needSortKey = false;    // if true, add a {$meta: "sortKey"} to the projection.
 };
 
 /**
@@ -65,8 +116,9 @@ public:
 
 private:
     friend struct DepsTracker;  // so it can call constructor
-    explicit ParsedDeps(const Document& fields) : _fields(fields) {}
+    explicit ParsedDeps(Document&& fields) : _fields(std::move(fields)), _nFields(_fields.size()) {}
 
     Document _fields;
+    int _nFields;  // Cache the number of top-level fields needed.
 };
 }

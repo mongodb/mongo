@@ -31,15 +31,16 @@
 #include <list>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-class OperationContext;
 class Status;
 class OldThreadPool;
+class OperationContext;
 
 namespace repl {
 
@@ -57,8 +58,17 @@ public:
         kCancel = 3,
     };
 
-    using CreateOperationContextFn = stdx::function<OperationContext*()>;
     using Task = stdx::function<NextAction(OperationContext*, const Status&)>;
+    using SynchronousTask = stdx::function<Status(OperationContext* opCtx)>;
+
+    /**
+     * Returns the Status from the supplied function after running it..
+     *
+     * Note: TaskRunner::NextAction controls when the operation context and thread will be released.
+     */
+    Status runSynchronousTask(
+        SynchronousTask func,
+        TaskRunner::NextAction nextAction = TaskRunner::NextAction::kKeepOperationContext);
 
     /**
      * Creates a Task returning kCancel. This is useful in shutting down the task runner after
@@ -69,7 +79,7 @@ public:
      */
     static Task makeCancelTask();
 
-    TaskRunner(OldThreadPool* threadPool, const CreateOperationContextFn& createOperationContext);
+    explicit TaskRunner(OldThreadPool* threadPool);
 
     virtual ~TaskRunner();
 
@@ -89,7 +99,7 @@ public:
      *
      * This transitions the task runner to an active state.
      *
-     * The task runner creates an operation context using '_createOperationContext'
+     * The task runner creates an operation context using the current client
      * prior to running a scheduled task. Depending on the NextAction returned from the
      * task, operation contexts may be shared between consecutive tasks invoked by the task
      * runner.
@@ -127,6 +137,11 @@ public:
      */
     void cancel();
 
+    /**
+     * Waits for the task runner to become inactive.
+     */
+    void join();
+
 private:
     /**
      * Runs tasks in a loop.
@@ -142,7 +157,6 @@ private:
     Task _waitForNextTask();
 
     OldThreadPool* _threadPool;
-    CreateOperationContextFn _createOperationContext;
 
     // Protects member data of this TaskRunner.
     mutable stdx::mutex _mutex;

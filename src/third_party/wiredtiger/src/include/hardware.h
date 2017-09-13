@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -33,29 +33,41 @@
 	uint8_t __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig | (uint8_t)(mask)));				\
-} while (0)
-
-#define	F_CAS_ATOMIC(p, mask, ret) do {					\
-	uint8_t __orig;							\
-	ret = 0;							\
-	do {								\
-		__orig = (p)->flags_atomic;				\
-		if ((__orig & (uint8_t)(mask)) != 0) {			\
-			ret = EBUSY;					\
-			break;						\
-		}							\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig | (uint8_t)(mask)));				\
+	} while (!__wt_atomic_cas8(					\
+	    &(p)->flags_atomic, __orig, __orig | (uint8_t)(mask)));	\
 } while (0)
 
 #define	F_CLR_ATOMIC(p, mask)	do {					\
 	uint8_t __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig & ~(uint8_t)(mask)));			\
+	} while (!__wt_atomic_cas8(					\
+	    &(p)->flags_atomic, __orig, __orig & ~(uint8_t)(mask)));	\
 } while (0)
 
-#define	WT_CACHE_LINE_ALIGNMENT	64	/* Cache line alignment */
+/*
+ * Cache line alignment.
+ */
+#if defined(__PPC64__) || defined(PPC64)
+#define	WT_CACHE_LINE_ALIGNMENT	128
+#elif defined(__s390x__)
+#define	WT_CACHE_LINE_ALIGNMENT	256
+#else
+#define	WT_CACHE_LINE_ALIGNMENT	64
+#endif
+
+/*
+ * Pad a structure so an array of structures get separate cache lines.
+ *
+ * Note that we avoid compiler structure alignment because that requires
+ * allocating aligned blocks of memory, and alignment pollutes any other type
+ * that contains an aligned field.  It is possible that a hot field positioned
+ * before this one will be on the same cache line, but not if it is also
+ * padded.
+ *
+ * This alignment has a small impact on portability as well, as we are using an
+ * anonymous union here which is supported under C11, earlier versions of
+ * the GNU standard, and MSVC versions as early as 2003.
+ */
+#define	WT_CACHE_LINE_PAD_BEGIN union { struct {
+#define	WT_CACHE_LINE_PAD_END   }; char __padding[WT_CACHE_LINE_ALIGNMENT]; };

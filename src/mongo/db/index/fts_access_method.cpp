@@ -27,14 +27,18 @@
 */
 
 #include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
 
 FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
     : IndexAccessMethod(btreeState, btree), _ftsSpec(btreeState->descriptor()->infoObj()) {}
 
-void FTSAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
+void FTSAccessMethod::doGetKeys(const BSONObj& obj,
+                                BSONObjSet* keys,
+                                MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getFTSKeys(obj, _ftsSpec, keys);
 }
 

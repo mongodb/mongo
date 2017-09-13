@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 
@@ -54,10 +56,47 @@ ReplicationCoordinator* ReplicationCoordinator::get(ServiceContext& service) {
     return getReplicationCoordinator(service).get();
 }
 
+ReplicationCoordinator* ReplicationCoordinator::get(OperationContext* ctx) {
+    return get(ctx->getClient()->getServiceContext());
+}
+
+
 void ReplicationCoordinator::set(ServiceContext* service,
                                  std::unique_ptr<ReplicationCoordinator> replCoord) {
     auto& coordinator = getReplicationCoordinator(service);
     coordinator = std::move(replCoord);
+}
+
+bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
+    if (getReplicationMode() == ReplicationCoordinator::modeNone) {
+        return true;
+    }
+
+    if (!opCtx->writesAreReplicated()) {
+        return true;
+    }
+
+    if (nss.db() == "local") {
+        return true;
+    }
+
+    if (nss.isSystemDotProfile()) {
+        return true;
+    }
+
+    if (nss.isDropPendingNamespace()) {
+        return true;
+    }
+
+    // <db>.system.namespaces is a MMAP-only collection and is not replicated.
+    if (nss.coll() == "system.namespaces"_sd) {
+        return true;
+    }
+
+    fassert(28626, opCtx->recoveryUnit());
+
+    return false;
 }
 
 }  // namespace repl

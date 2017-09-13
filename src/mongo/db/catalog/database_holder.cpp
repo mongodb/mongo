@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2012-2014 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -32,173 +32,36 @@
 
 #include "mongo/db/catalog/database_holder.h"
 
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/auth_index_d.h"
-#include "mongo/db/background.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/util/log.h"
-
 namespace mongo {
 
-using std::set;
-using std::string;
-using std::stringstream;
+DatabaseHolder::Impl::~Impl() = default;
 
 namespace {
-
-StringData _todb(StringData ns) {
-    size_t i = ns.find('.');
-    if (i == std::string::npos) {
-        uassert(13074, "db name can't be empty", ns.size());
-        return ns;
-    }
-
-    uassert(13075, "db name can't be empty", i > 0);
-
-    const StringData d = ns.substr(0, i);
-    uassert(13280, "invalid db name: " + ns.toString(), NamespaceString::validDBName(d));
-
-    return d;
-}
-
-
-DatabaseHolder _dbHolder;
-
+stdx::function<DatabaseHolder::factory_function_type> factory;
 }  // namespace
 
-
-DatabaseHolder& dbHolder() {
-    return _dbHolder;
+void DatabaseHolder::registerFactory(decltype(factory) newFactory) {
+    factory = std::move(newFactory);
 }
 
-
-Database* DatabaseHolder::get(OperationContext* txn, StringData ns) const {
-    const StringData db = _todb(ns);
-    invariant(txn->lockState()->isDbLockedForMode(db, MODE_IS));
-
-    stdx::lock_guard<SimpleMutex> lk(_m);
-    DBs::const_iterator it = _dbs.find(db);
-    if (it != _dbs.end()) {
-        return it->second;
-    }
-
-    return NULL;
+auto DatabaseHolder::makeImpl() -> std::unique_ptr<Impl> {
+    return factory();
 }
 
-Database* DatabaseHolder::openDb(OperationContext* txn, StringData ns, bool* justCreated) {
-    const StringData dbname = _todb(ns);
-    invariant(txn->lockState()->isDbLockedForMode(dbname, MODE_X));
+void DatabaseHolder::TUHook::hook() noexcept {}
 
-    Database* db = get(txn, ns);
-    if (db) {
-        if (justCreated) {
-            *justCreated = false;
-        }
+namespace {
+stdx::function<decltype(dbHolder)> dbHolderImpl;
+}  // namespace
+}  // namespace mongo
 
-        return db;
-    }
-
-    // Check casing
-    const string duplicate = Database::duplicateUncasedName(dbname.toString());
-    if (!duplicate.empty()) {
-        stringstream ss;
-        ss << "db already exists with different case already have: [" << duplicate
-           << "] trying to create [" << dbname.toString() << "]";
-        uasserted(ErrorCodes::DatabaseDifferCase, ss.str());
-    }
-
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-    invariant(storageEngine);
-
-    DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(txn, dbname);
-    invariant(entry);
-    const bool exists = entry->exists();
-    if (!exists) {
-        audit::logCreateDatabase(&cc(), dbname);
-    }
-
-    if (justCreated) {
-        *justCreated = !exists;
-    }
-
-    // Do this outside of the scoped lock, because database creation does transactional
-    // operations which may block. Only one thread can be inside this method for the same DB
-    // name, because of the requirement for X-lock on the database when we enter. So there is
-    // no way we can insert two different databases for the same name.
-    db = new Database(txn, dbname, entry);
-
-    stdx::lock_guard<SimpleMutex> lk(_m);
-    _dbs[dbname] = db;
-
-    return db;
+// The `mongo::` prefix is necessary to placate MSVC -- it is unable to properly identify anonymous
+// nested namespace members in `decltype` expressions when defining functions using scope-resolution
+// syntax.
+void mongo::registerDbHolderImpl(decltype(mongo::dbHolderImpl) impl) {
+    dbHolderImpl = std::move(impl);
 }
 
-void DatabaseHolder::close(OperationContext* txn, StringData ns) {
-    // TODO: This should be fine if only a DB X-lock
-    invariant(txn->lockState()->isW());
-
-    const StringData dbName = _todb(ns);
-
-    stdx::lock_guard<SimpleMutex> lk(_m);
-
-    DBs::const_iterator it = _dbs.find(dbName);
-    if (it == _dbs.end()) {
-        return;
-    }
-
-    it->second->close(txn);
-    delete it->second;
-    _dbs.erase(it);
-
-    getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(txn, dbName.toString());
-}
-
-bool DatabaseHolder::closeAll(OperationContext* txn, BSONObjBuilder& result, bool force) {
-    invariant(txn->lockState()->isW());
-
-    stdx::lock_guard<SimpleMutex> lk(_m);
-
-    set<string> dbs;
-    for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
-        dbs.insert(i->first);
-    }
-
-    BSONArrayBuilder bb(result.subarrayStart("dbs"));
-    int nNotClosed = 0;
-    for (set<string>::iterator i = dbs.begin(); i != dbs.end(); ++i) {
-        string name = *i;
-
-        LOG(2) << "DatabaseHolder::closeAll name:" << name;
-
-        if (!force && BackgroundOperation::inProgForDb(name)) {
-            log() << "WARNING: can't close database " << name
-                  << " because a bg job is in progress - try killOp command";
-            nNotClosed++;
-            continue;
-        }
-
-        Database* db = _dbs[name];
-        db->close(txn);
-        delete db;
-
-        _dbs.erase(name);
-
-        getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(txn, name);
-
-        bb.append(name);
-    }
-
-    bb.done();
-    if (nNotClosed) {
-        result.append("nNotClosed", nNotClosed);
-    }
-
-    return true;
-}
+auto mongo::dbHolder() -> DatabaseHolder& {
+    return dbHolderImpl();
 }

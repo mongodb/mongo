@@ -38,24 +38,25 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/multi_iterator.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response.h"
 
 namespace mongo {
 
 using std::string;
 
-class RepairCursorCmd : public Command {
+class RepairCursorCmd : public BasicCommand {
 public:
-    RepairCursorCmd() : Command("repairCursor") {}
+    RepairCursorCmd() : BasicCommand("repairCursor") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual bool slaveOk() const {
         return true;
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         ActionSet actions;
@@ -66,15 +67,13 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         NamespaceString ns(parseNs(dbname, cmdObj));
 
-        AutoGetCollectionForRead ctx(txn, ns.ns());
+        AutoGetCollectionForReadCommand ctx(opCtx, ns);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {
@@ -82,7 +81,7 @@ public:
                 result, Status(ErrorCodes::NamespaceNotFound, "ns does not exist: " + ns.ns()));
         }
 
-        auto cursor = collection->getRecordStore()->getCursorForRepair(txn);
+        auto cursor = collection->getRecordStore()->getCursorForRepair(opCtx);
         if (!cursor) {
             return appendCommandStatus(
                 result, Status(ErrorCodes::CommandNotSupported, "repair iterator not supported"));
@@ -90,27 +89,27 @@ public:
 
         std::unique_ptr<WorkingSet> ws(new WorkingSet());
         std::unique_ptr<MultiIteratorStage> stage(
-            new MultiIteratorStage(txn, ws.get(), collection));
+            new MultiIteratorStage(opCtx, ws.get(), collection));
         stage->addIterator(std::move(cursor));
 
-        PlanExecutor* rawExec;
-        Status execStatus = PlanExecutor::make(
-            txn, ws.release(), stage.release(), collection, PlanExecutor::YIELD_AUTO, &rawExec);
-        invariant(execStatus.isOK());
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            opCtx, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
+        invariant(statusWithPlanExecutor.isOK());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
-        // 'exec' will be used in getMore(). It was automatically registered on construction
-        // due to the auto yield policy, so it could yield during plan selection. We deregister
-        // it now so that it can be registed with ClientCursor.
-        exec->deregisterExec();
         exec->saveState();
+        exec->detachFromOperationContext();
 
-        // ClientCursors' constructor inserts them into a global map that manages their
-        // lifetimes. That is why the next line isn't leaky.
-        ClientCursor* cc =
-            new ClientCursor(collection->getCursorManager(), exec.release(), ns.ns());
+        auto pinnedCursor = collection->getCursorManager()->registerCursor(
+            opCtx,
+            {std::move(exec),
+             ns,
+             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+             cmdObj});
 
-        appendCursorResponseObject(cc->cursorid(), ns.ns(), BSONArray(), &result);
+        appendCursorResponseObject(
+            pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &result);
 
         return true;
     }

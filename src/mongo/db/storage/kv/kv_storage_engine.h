@@ -1,5 +1,3 @@
-// kv_storage_engine.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -33,33 +31,50 @@
 #include <map>
 #include <string>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/db/storage/kv/kv_database_catalog_entry_base.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
 class KVCatalog;
 class KVEngine;
-class KVDatabaseCatalogEntry;
 
 struct KVStorageEngineOptions {
-    KVStorageEngineOptions()
-        : directoryPerDB(false), directoryForIndexes(false), forRepair(false) {}
-
-    bool directoryPerDB;
-    bool directoryForIndexes;
-    bool forRepair;
+    bool directoryPerDB = false;
+    bool directoryForIndexes = false;
+    bool forRepair = false;
 };
 
-class KVStorageEngine : public StorageEngine {
+/*
+ * The actual definition for this function is in
+ * `src/mongo/db/storage/kv/kv_database_catalog_entry.cpp` This unusual forward declaration is to
+ * facilitate better linker error messages.  Tests need to pass a mock construction factory, whereas
+ * main implementations should pass the `default...` factory which is linked in with the main
+ * `KVDatabaseCatalogEntry` code.
+ */
+std::unique_ptr<KVDatabaseCatalogEntryBase> defaultDatabaseCatalogEntryFactory(
+    const StringData name, KVStorageEngine* const engine);
+
+using KVDatabaseCatalogEntryFactory = decltype(defaultDatabaseCatalogEntryFactory);
+
+class KVStorageEngine final : public StorageEngine {
 public:
     /**
-     * @param engine - owneership passes to me
+     * @param engine - ownership passes to me
      */
     KVStorageEngine(KVEngine* engine,
-                    const KVStorageEngineOptions& options = KVStorageEngineOptions());
+                    const KVStorageEngineOptions& options = KVStorageEngineOptions(),
+                    stdx::function<KVDatabaseCatalogEntryFactory> databaseCatalogEntryFactory =
+                        defaultDatabaseCatalogEntryFactory);
+
     virtual ~KVStorageEngine();
 
     virtual void finishInit();
@@ -68,23 +83,46 @@ public:
 
     virtual void listDatabases(std::vector<std::string>* out) const;
 
-    virtual DatabaseCatalogEntry* getDatabaseCatalogEntry(OperationContext* opCtx, StringData db);
+    KVDatabaseCatalogEntryBase* getDatabaseCatalogEntry(OperationContext* opCtx,
+                                                        StringData db) override;
 
     virtual bool supportsDocLocking() const {
         return _supportsDocLocking;
     }
 
-    virtual Status closeDatabase(OperationContext* txn, StringData db);
+    virtual bool supportsDBLocking() const {
+        return _supportsDBLocking;
+    }
 
-    virtual Status dropDatabase(OperationContext* txn, StringData db);
+    virtual Status closeDatabase(OperationContext* opCtx, StringData db);
 
-    virtual int flushAllFiles(bool sync);
+    virtual Status dropDatabase(OperationContext* opCtx, StringData db);
+
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync);
+
+    virtual Status beginBackup(OperationContext* opCtx);
+
+    virtual void endBackup(OperationContext* opCtx);
 
     virtual bool isDurable() const;
 
-    virtual Status repairRecordStore(OperationContext* txn, const std::string& ns);
+    virtual bool isEphemeral() const;
+
+    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns);
 
     virtual void cleanShutdown();
+
+    virtual void setStableTimestamp(SnapshotName stableTimestamp) override;
+
+    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
+
+    virtual bool supportsRecoverToStableTimestamp() const override;
+
+    virtual void replicationBatchIsComplete() const override;
+
+    SnapshotManager* getSnapshotManager() const final;
+
+    void setJournalListener(JournalListener* jl) final;
 
     // ------ kv ------
 
@@ -102,8 +140,16 @@ public:
         return _catalog.get();
     }
 
+    /**
+     * Drop abandoned idents. Returns a parallel list of index name, index spec pairs to rebuild.
+     */
+    StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> reconcileCatalogAndIdents(
+        OperationContext* opCtx) override;
+
 private:
     class RemoveDBChange;
+
+    stdx::function<KVDatabaseCatalogEntryFactory> _databaseCatalogEntryFactory;
 
     KVStorageEngineOptions _options;
 
@@ -111,12 +157,16 @@ private:
     std::unique_ptr<KVEngine> _engine;
 
     const bool _supportsDocLocking;
+    const bool _supportsDBLocking;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
     std::unique_ptr<KVCatalog> _catalog;
 
-    typedef std::map<std::string, KVDatabaseCatalogEntry*> DBMap;
+    typedef std::map<std::string, KVDatabaseCatalogEntryBase*> DBMap;
     DBMap _dbs;
     mutable stdx::mutex _dbsLock;
+
+    // Flag variable that states if the storage engine is in backup mode.
+    bool _inBackupMode = false;
 };
-}
+}  // namespace mongo

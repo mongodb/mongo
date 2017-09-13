@@ -28,6 +28,7 @@
 #include "mongo/db/auth/user_name.h"
 
 #include <algorithm>
+#include <iostream>
 #include <string>
 
 #include "mongo/base/string_data.h"

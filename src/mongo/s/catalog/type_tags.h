@@ -98,7 +98,7 @@ public:
     const BSONObj& getMaxKey() const {
         return _maxKey.get();
     }
-    void setMaxKey(const BSONObj& max);
+    void setMaxKey(const BSONObj& maxKey);
 
 private:
     // Required namespace to which this tag belongs

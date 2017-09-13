@@ -26,12 +26,14 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/assert_util.h"
 
-using mongo::MsgAssertionException;
+using mongo::AssertionException;
 
 /**
  * Test getLastError client handling
@@ -48,8 +50,9 @@ static const char* const _ns = "unittests.gle";
 class GetLastErrorCommandFailure {
 public:
     void run() {
-        OperationContextImpl txn;
-        DBDirectClient client(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient client(&opCtx);
 
         client.insert(_ns,
                       BSON("test"
@@ -67,8 +70,9 @@ public:
 class GetLastErrorClean {
 public:
     void run() {
-        OperationContextImpl txn;
-        DBDirectClient client(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient client(&opCtx);
 
         client.insert(_ns,
                       BSON("test"
@@ -86,8 +90,9 @@ public:
 class GetLastErrorFromDup {
 public:
     void run() {
-        OperationContextImpl txn;
-        DBDirectClient client(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient client(&opCtx);
 
         client.insert(_ns, BSON("_id" << 1));
 
@@ -98,8 +103,12 @@ public:
         // insert dup
         client.insert(_ns, BSON("_id" << 1));
         // Make sure there was an error
-        gleString = client.getLastError();
-        ASSERT_NOT_EQUALS(gleString, "");
+
+        BSONObj info = client.getLastErrorDetailed();
+        ASSERT_NOT_EQUALS(info["err"].String(), "");
+        ASSERT_EQUALS(info["ok"].Double(), 1.0);
+        ASSERT_EQUALS(info["code"].Int(), 11000);
+        ASSERT_EQUALS(info["codeName"].String(), "DuplicateKey");
     }
 };
 
@@ -115,4 +124,4 @@ public:
 };
 
 SuiteInstance<All> myall;
-}
+}  // namespace

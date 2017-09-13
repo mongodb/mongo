@@ -30,10 +30,11 @@
 
 #pragma once
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/config.h"
 
 namespace mongo {
 
@@ -71,10 +72,6 @@ private:
  */
 bool isValidUTF8(const char* s);
 bool isValidUTF8(const std::string& s);
-
-// expect that n contains a base ten number and nothing else after it
-// NOTE win version hasn't been tested directly
-long long parseLL(const char* n);
 
 #if defined(_WIN32)
 

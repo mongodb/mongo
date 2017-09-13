@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -43,9 +44,27 @@ class StatusWith;
 
 
 /**
- * This class represents the layout and contents of documents contained in the
+ * This class represents the layout and contents of documents contained in the config server's
  * config.collections collection. All manipulation of documents coming from that collection
  * should be done with this class.
+ *
+ * Expected config server config.collections collection format:
+ *   {
+ *      "_id" : "foo.bar",
+ *      "lastmodEpoch" : ObjectId("58b6fd76132358839e409e47"),
+ *      "lastmod" : ISODate("1970-02-19T17:02:47.296Z"),
+ *      "dropped" : false,
+ *      "key" : {
+ *          "_id" : 1
+ *      },
+ *      "defaultCollation" : {
+ *          "locale" : "fr_CA"
+ *      },
+ *      "unique" : false,
+ *      "uuid" : UUID,
+ *      "noBalance" : false
+ *   }
+ *
  */
 class CollectionType {
 public:
@@ -56,13 +75,16 @@ public:
     static const BSONField<OID> epoch;
     static const BSONField<Date_t> updatedAt;
     static const BSONField<BSONObj> keyPattern;
+    static const BSONField<BSONObj> defaultCollation;
     static const BSONField<bool> unique;
-    static const BSONField<bool> noBalance;
-    static const BSONField<bool> dropped;
-
+    static const BSONField<UUID> uuid;
 
     /**
      * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
+     *
+     * Dropped collections accumulate in the collections list, through 3.6, so that
+     * mongos <= 3.4.x, when it retrieves the list from the config server, can delete its
+     * cache entries for dropped collections.  See SERVER-27475, SERVER-27474
      */
     static StatusWith<CollectionType> fromBSON(const BSONObj& source);
 
@@ -109,6 +131,13 @@ public:
     }
     void setKeyPattern(const KeyPattern& keyPattern);
 
+    const BSONObj& getDefaultCollation() const {
+        return _defaultCollation;
+    }
+    void setDefaultCollation(const BSONObj& collation) {
+        _defaultCollation = collation.getOwned();
+    }
+
     bool getUnique() const {
         return _unique.get_value_or(false);
     }
@@ -116,9 +145,19 @@ public:
         _unique = unique;
     }
 
+    boost::optional<UUID> getUUID() const {
+        return _uuid;
+    }
+
+    void setUUID(UUID uuid) {
+        _uuid = uuid;
+    }
+
     bool getAllowBalance() const {
         return _allowBalance.get_value_or(true);
     }
+
+    bool hasSameOptions(CollectionType& other);
 
 private:
     // Required full namespace (with the database prefix).
@@ -136,8 +175,14 @@ private:
     // Sharding key. Required, if collection is not dropped.
     boost::optional<KeyPattern> _keyPattern;
 
+    // Optional collection default collation. If empty, implies simple collation.
+    BSONObj _defaultCollation;
+
     // Optional uniqueness of the sharding key. If missing, implies false.
     boost::optional<bool> _unique;
+
+    // Optional in 3.6 binaries, because UUID does not exist in featureCompatibilityVersion=3.4.
+    boost::optional<UUID> _uuid;
 
     // Optional whether balancing is allowed for this collection. If missing, implies true.
     boost::optional<bool> _allowBalance;

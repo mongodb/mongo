@@ -28,40 +28,42 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/record_store_test_harness.h"
 
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
-using std::string;
-using std::stringstream;
 
 namespace mongo {
+namespace {
 
+using std::string;
+using std::stringstream;
 using std::unique_ptr;
 
 // Insert a record and verify its contents by calling dataFor()
 // on the returned RecordId.
 TEST(RecordStoreTestHarness, DataFor) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     string data = "record-";
     RecordId loc;
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -69,12 +71,12 @@ TEST(RecordStoreTestHarness, DataFor) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
@@ -86,18 +88,18 @@ TEST(RecordStoreTestHarness, DataFor) {
 // Insert multiple records and verify their contents by calling dataFor()
 // on each of the returned RecordIds.
 TEST(RecordStoreTestHarness, DataForMultiple) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record----" << i;
@@ -105,7 +107,7 @@ TEST(RecordStoreTestHarness, DataForMultiple) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             uow.commit();
@@ -113,12 +115,12 @@ TEST(RecordStoreTestHarness, DataForMultiple) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record----" << i;
@@ -131,4 +133,5 @@ TEST(RecordStoreTestHarness, DataForMultiple) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

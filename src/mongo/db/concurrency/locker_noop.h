@@ -41,19 +41,31 @@ class LockerNoop : public Locker {
 public:
     LockerNoop() {}
 
+    virtual bool isNoop() const {
+        return true;
+    }
+
+    virtual ClientState getClientState() const {
+        invariant(false);
+    }
+
     virtual LockerId getId() const {
         invariant(false);
     }
 
-    virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs) {
+    stdx::thread::id getThreadId() const override {
         invariant(false);
     }
 
-    virtual LockResult lockGlobalBegin(LockMode mode) {
+    virtual LockResult lockGlobal(LockMode mode) {
         invariant(false);
     }
 
-    virtual LockResult lockGlobalComplete(unsigned timeoutMs) {
+    virtual LockResult lockGlobalBegin(LockMode mode, Milliseconds timeout) {
+        invariant(false);
+    }
+
+    virtual LockResult lockGlobalComplete(Milliseconds timeout) {
         invariant(false);
     }
 
@@ -61,7 +73,7 @@ public:
         invariant(false);
     }
 
-    virtual bool unlockAll() {
+    virtual bool unlockGlobal() {
         invariant(false);
     }
 
@@ -79,9 +91,9 @@ public:
 
     virtual LockResult lock(ResourceId resId,
                             LockMode mode,
-                            unsigned timeoutMs,
+                            Milliseconds timeout,
                             bool checkDeadlock) {
-        invariant(false);
+        return LockResult::LOCK_OK;
     }
 
     virtual void downgrade(ResourceId resId, LockMode newMode) {
@@ -89,7 +101,7 @@ public:
     }
 
     virtual bool unlock(ResourceId resId) {
-        invariant(false);
+        return true;
     }
 
     virtual LockMode getLockMode(ResourceId resId) const {
@@ -137,7 +149,7 @@ public:
     }
 
     virtual bool isLocked() const {
-        invariant(false);
+        return false;
     }
 
     virtual bool isWriteLocked() const {
@@ -148,24 +160,8 @@ public:
         invariant(false);
     }
 
-    virtual void assertEmptyAndReset() {
-        invariant(false);
-    }
-
     virtual bool hasLockPending() const {
         invariant(false);
-    }
-
-    virtual void setIsBatchWriter(bool newValue) {
-        invariant(false);
-    }
-
-    virtual bool isBatchWriter() const {
-        invariant(false);
-    }
-
-    virtual bool hasStrongLocks() const {
-        return false;
     }
 };
 

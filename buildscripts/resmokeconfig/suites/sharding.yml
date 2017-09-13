@@ -1,10 +1,12 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/sharding/*.js
+  roots:
+  - jstests/sharding/*.js
+  exclude_files:
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        nodb: ''
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands

@@ -35,13 +35,12 @@
 #include <boost/filesystem.hpp>
 #include <fcntl.h>
 #include <ostream>
+#include <sstream>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sstream>
 
-#include "mongo/db/storage/paths.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -51,7 +50,50 @@ namespace mongo {
 namespace {
 
 const std::string kLockFileBasename = "mongod.lock";
+void flushMyDirectory(const boost::filesystem::path& file) {
+#ifdef __linux__  // this isn't needed elsewhere
+    static bool _warnedAboutFilesystem = false;
+    // if called without a fully qualified path it asserts; that makes mongoperf fail.
+    // so make a warning. need a better solution longer term.
+    // massert(40389, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
+    if (!file.has_branch_path()) {
+        log() << "warning flushMyDirectory couldn't find parent dir for file: " << file.string();
+        return;
+    }
 
+
+    boost::filesystem::path dir = file.branch_path();  // parent_path in new boosts
+
+    LOG(1) << "flushing directory " << dir.string();
+
+    int fd = ::open(dir.string().c_str(), O_RDONLY);  // DO NOT THROW OR ASSERT BEFORE CLOSING
+    massert(40387,
+            str::stream() << "Couldn't open directory '" << dir.string() << "' for flushing: "
+                          << errnoWithDescription(),
+            fd >= 0);
+    if (fsync(fd) != 0) {
+        int e = errno;
+        if (e == EINVAL) {  // indicates filesystem does not support synchronization
+            if (!_warnedAboutFilesystem) {
+                log() << "\tWARNING: This file system is not supported. For further information"
+                      << " see:" << startupWarningsLog;
+                log() << "\t\t\thttp://dochub.mongodb.org/core/unsupported-filesystems"
+                      << startupWarningsLog;
+                log() << "\t\tPlease notify MongoDB, Inc. if an unlisted filesystem generated "
+                      << "this warning." << startupWarningsLog;
+                _warnedAboutFilesystem = true;
+            }
+        } else {
+            close(fd);
+            massert(40388,
+                    str::stream() << "Couldn't fsync directory '" << dir.string() << "': "
+                                  << errnoWithDescription(e),
+                    false);
+        }
+    }
+    close(fd);
+#endif
+}
 }  // namespace
 
 class StorageEngineLockFile::LockFileHandle {
@@ -93,16 +135,30 @@ Status StorageEngineLockFile::open() {
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "Unable to check existence of data directory " << _dbpath
-                                    << ": " << ex.what());
+                                    << ": "
+                                    << ex.what());
     }
 
-    int lockFile = ::open(_filespec.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+    // Use file permissions 644
+    int lockFile =
+        ::open(_filespec.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (lockFile < 0) {
         int errorcode = errno;
+        if (errorcode == EACCES) {
+            return Status(ErrorCodes::IllegalOperation,
+                          str::stream()
+                              << "Attempted to create a lock file on a read-only directory: "
+                              << _dbpath);
+        }
         return Status(ErrorCodes::DBPathInUse,
-                      str::stream() << "Unable to create/open lock file: " << _filespec << ' '
+                      str::stream() << "Unable to create/open the lock file: " << _filespec << " ("
                                     << errnoWithDescription(errorcode)
-                                    << " Is a mongod instance already running?");
+                                    << ")."
+                                    << " Ensure the user executing mongod is the owner of the lock "
+                                       "file and has the appropriate permissions. Also make sure "
+                                       "that another mongod instance is not already running on the "
+                                    << _dbpath
+                                    << " directory");
     }
 #if !defined(__sun)
     int ret = ::flock(lockFile, LOCK_EX | LOCK_NB);
@@ -116,9 +172,12 @@ Status StorageEngineLockFile::open() {
         int errorcode = errno;
         ::close(lockFile);
         return Status(ErrorCodes::DBPathInUse,
-                      str::stream() << "Unable to lock file: " << _filespec << ' '
+                      str::stream() << "Unable to lock the lock file: " << _filespec << " ("
                                     << errnoWithDescription(errorcode)
-                                    << ". Is a mongod instance already running?");
+                                    << ")."
+                                    << " Another mongod instance is already running on the "
+                                    << _dbpath
+                                    << " directory");
     }
     _lockFileHandle->_fd = lockFile;
     return Status::OK();
@@ -143,7 +202,9 @@ Status StorageEngineLockFile::writePid() {
         int errorcode = errno;
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id to file (ftruncate failed): "
-                                    << _filespec << ' ' << errnoWithDescription(errorcode));
+                                    << _filespec
+                                    << ' '
+                                    << errnoWithDescription(errorcode));
     }
 
     ProcessId pid = ProcessId::getCurrent();
@@ -155,20 +216,26 @@ Status StorageEngineLockFile::writePid() {
         int errorcode = errno;
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id " << pid.toString()
-                                    << " to file: " << _filespec << ' '
+                                    << " to file: "
+                                    << _filespec
+                                    << ' '
                                     << errnoWithDescription(errorcode));
 
     } else if (bytesWritten == 0) {
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id " << pid.toString()
-                                    << " to file: " << _filespec << " no data written.");
+                                    << " to file: "
+                                    << _filespec
+                                    << " no data written.");
     }
 
     if (::fsync(_lockFileHandle->_fd)) {
         int errorcode = errno;
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id " << pid.toString()
-                                    << " to file (fsync failed): " << _filespec << ' '
+                                    << " to file (fsync failed): "
+                                    << _filespec
+                                    << ' '
                                     << errnoWithDescription(errorcode));
     }
 
@@ -184,7 +251,7 @@ void StorageEngineLockFile::clearPidAndUnlock() {
     log() << "shutdown: removing fs lock...";
     // This ought to be an unlink(), but Eliot says the last
     // time that was attempted, there was a race condition
-    // with acquirePathLock().
+    // with StorageEngineLockFile::open().
     if (::ftruncate(_lockFileHandle->_fd, 0)) {
         int errorcode = errno;
         log() << "couldn't remove fs lock " << errnoWithDescription(errorcode);

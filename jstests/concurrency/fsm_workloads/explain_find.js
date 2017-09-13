@@ -6,9 +6,9 @@
  * Runs explain() and find() on a collection.
  *
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/explain.js'); // for $config
-load('jstests/libs/analyze_plan.js'); // for planHasStage and isIxscan
+load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_workloads/explain.js');     // for $config
+load('jstests/libs/analyze_plan.js');                     // for planHasStage and isIxscan
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -32,13 +32,13 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways(planHasStage(res.queryPlanner.winningPlan, 'SKIP'));
         },
         explainSort: function explainSort(db, collName) {
-            var res = db[collName].find().sort({ i: -1 }).explain();
+            var res = db[collName].find().sort({i: -1}).explain();
             assertAlways.commandWorked(res);
             assertAlways(planHasStage(res.queryPlanner.winningPlan, 'SORT'));
         },
         explainHint: function explainHint(db, collName) {
             assertWhenOwnColl(function() {
-                var res = db[collName].find().hint({ j: 1 }).explain();
+                var res = db[collName].find().hint({j: 1}).explain();
                 assertWhenOwnColl.commandWorked(res);
                 assertWhenOwnColl(isIxscan(res.queryPlanner.winningPlan));
             });
@@ -52,11 +52,11 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.commandWorked(res);
             assertWhenOwnColl(isIxscan(res.queryPlanner.winningPlan));
         }
-    }, $super.states);
+    },
+                                   $super.states);
 
-    $config.transitions = Object.extend({
-        explain: $config.data.assignEqualProbsToTransitions($config.states)
-    }, $super.transitions);
+    $config.transitions = Object.extend(
+        {explain: $config.data.assignEqualProbsToTransitions($config.states)}, $super.transitions);
 
     // doubling number of iterations so there is a higher chance we will
     // transition to each of the 8 new states at least once

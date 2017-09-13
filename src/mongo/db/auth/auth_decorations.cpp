@@ -31,13 +31,10 @@
 #include <memory>
 #include <utility>
 
-#include "mongo/base/init.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
@@ -45,28 +42,14 @@
 namespace mongo {
 namespace {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateAuthorizationManager,
-                                     ("SetupInternalSecurityUser",
-                                      "OIDGeneration",
-                                      "SetGlobalEnvironment",
-                                      "CreateAuthorizationExternalStateFactory",
-                                      "EndStartupOptionStorage"))
-(InitializerContext* context) {
-    auto authzManager =
-        stdx::make_unique<AuthorizationManager>(AuthzManagerExternalState::create());
-    authzManager->setAuthEnabled(serverGlobalParams.isAuthEnabled);
-    AuthorizationManager::set(getGlobalServiceContext(), std::move(authzManager));
-    return Status::OK();
-}
-
 const auto getAuthenticationSession =
-    ClientBasic::declareDecoration<std::unique_ptr<AuthenticationSession>>();
+    Client::declareDecoration<std::unique_ptr<AuthenticationSession>>();
 
 const auto getAuthorizationManager =
     ServiceContext::declareDecoration<std::unique_ptr<AuthorizationManager>>();
 
 const auto getAuthorizationSession =
-    ClientBasic::declareDecoration<std::unique_ptr<AuthorizationSession>>();
+    Client::declareDecoration<std::unique_ptr<AuthorizationSession>>();
 
 class AuthzClientObserver final : public ServiceContext::ClientObserver {
 public:
@@ -84,13 +67,11 @@ public:
 
 }  // namespace
 
-void AuthenticationSession::set(ClientBasic* client,
-                                std::unique_ptr<AuthenticationSession> newSession) {
+void AuthenticationSession::set(Client* client, std::unique_ptr<AuthenticationSession> newSession) {
     getAuthenticationSession(client) = std::move(newSession);
 }
 
-void AuthenticationSession::swap(ClientBasic* client,
-                                 std::unique_ptr<AuthenticationSession>& other) {
+void AuthenticationSession::swap(Client* client, std::unique_ptr<AuthenticationSession>& other) {
     using std::swap;
     swap(getAuthenticationSession(client), other);
 }
@@ -112,21 +93,21 @@ void AuthorizationManager::set(ServiceContext* service,
     service->registerClientObserver(stdx::make_unique<AuthzClientObserver>());
 }
 
-AuthorizationSession* AuthorizationSession::get(ClientBasic* client) {
+AuthorizationSession* AuthorizationSession::get(Client* client) {
     return get(*client);
 }
 
-AuthorizationSession* AuthorizationSession::get(ClientBasic& client) {
+AuthorizationSession* AuthorizationSession::get(Client& client) {
     AuthorizationSession* retval = getAuthorizationSession(client).get();
     massert(16481, "No AuthorizationManager has been set up for this connection", retval);
     return retval;
 }
 
-bool AuthorizationSession::exists(ClientBasic* client) {
+bool AuthorizationSession::exists(Client* client) {
     return getAuthorizationSession(client).get();
 }
 
-void AuthorizationSession::set(ClientBasic* client,
+void AuthorizationSession::set(Client* client,
                                std::unique_ptr<AuthorizationSession> authorizationSession) {
     auto& authzSession = getAuthorizationSession(client);
     invariant(authorizationSession);

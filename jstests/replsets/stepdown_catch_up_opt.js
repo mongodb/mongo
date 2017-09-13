@@ -29,38 +29,29 @@
     assert.commandFailedWithCode(
         primary.getDB('admin').runCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 'STR'}),
         stringNotIntCode,
-        'Expected string argument to secondaryCatchupPeriodSecs to fail.'
-    );
+        'Expected string argument to secondaryCatchupPeriodSecs to fail.');
 
     // Expect a failure with a longer secondaryCatchupPeriodSecs than the stepdown period.
     assert.commandFailedWithCode(
         primary.getDB('admin').runCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 20}),
         stepDownPeriodTooShortCode,
         ('Expected replSetStepDown to fail given a stepdown time shorter than' +
-         ' secondaryCatchUpPeriodSecs')
-    );
+         ' secondaryCatchUpPeriodSecs'));
 
     jsTestLog('Stop secondary syncing.');
-    assert.commandWorked(
-        secondary.getDB('admin').runCommand(
-            {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}
-        ),
-        'Failed to configure rsSyncApplyStop failpoint.'
-    );
+    assert.commandWorked(secondary.getDB('admin').runCommand(
+                             {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
+                         'Failed to configure rsSyncApplyStop failpoint.');
 
     function disableFailPoint() {
-        assert.commandWorked(
-            secondary.getDB('admin').runCommand(
-                {configureFailPoint: 'rsSyncApplyStop', mode: 'off'}
-            ),
-            'Failed to disable rsSyncApplyStop failpoint.'
-        );
+        assert.commandWorked(secondary.getDB('admin').runCommand(
+                                 {configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
+                             'Failed to disable rsSyncApplyStop failpoint.');
     }
 
     // If any of these assertions fail, we need to disable the fail point in order for the mongod to
     // shut down.
     try {
-
         jsTestLog('Write to primary to make secondary out of sync.');
         assert.writeOK(primary.getDB('test').foo.insert({i: 1}), 'Failed to insert document.');
         sleep(1000);
@@ -71,16 +62,15 @@
         assert.commandFailedWithCode(
             primary.getDB('admin').runCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 1}),
             noCaughtUpSecondariesCode,
-            'Expected replSetStepDown to fail, since no secondaries should be caught up.'
-        );
+            'Expected replSetStepDown to fail, since no secondaries should be caught up.');
         var endTime = new Date();
 
-        // Ensure it took at least 1 second to time out.
-        assert.lte(1,
+        // Ensure it took at least 1 second to time out. Adjust the timeout a little bit
+        // for the precision issue of clock on Windows 2K8.
+        assert.lte(0.95,
                    (endTime - startTime) / 1000,
-                   'Expected replSetStepDown command to fail within 1 second.');
-    }
-    catch (err) {
+                   'Expected replSetStepDown command to fail after 1 second.');
+    } catch (err) {
         disableFailPoint();
         throw err;
     }

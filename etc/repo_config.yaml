@@ -1,0 +1,303 @@
+services:
+  notary_url: "http://notary-service.build.10gen.cc:5000"
+
+templates:
+  deb:
+    org: |
+      Origin: mongodb
+      Label: mongodb
+      Suite: {{ .CodeName }}
+      Codename: {{ .CodeName }}/mongodb-org
+      Architectures: {{ .Architectures }}
+      Components: {{ .Component }}
+      Description: MongoDB packages
+    enterprise: |
+      Origin: mongodb
+      Label: mongodb
+      Suite: {{ .CodeName }}
+      Codename: {{ .CodeName }}/mongodb-enterprise
+      Architectures: {{ .Architectures }}
+      Components: {{ .Component }}
+      Description: MongoDB packages
+  index_page: |
+    <!DOCTYPE html>
+    <html>
+     <head>
+       <title>{{ .Title }}</title>
+     </head>
+
+     <body>
+       <table>
+        <tr><td>
+          <h1>{{ .Title }}</h1>
+        </td></tr>
+
+        <tr><td>
+          <hr>
+        </td></tr>
+
+        <tr><td>
+          <a href='..'>Parent Directory</a>
+        </td></tr>
+
+        {{ range $fn := .Files }}
+        <tr><td>
+          <a href='{{ $fn }}'>{{ $fn }}</a>
+        </td></tr>
+        {{ end }}
+
+        <tr><td>
+          <hr>
+        </td></tr>
+
+        <tr><td>
+          <address>{{ .RepoName }}</address>
+        </td></tr>
+      </table>
+     </body>
+    </html>
+
+
+repos:
+
+####################
+#
+# Community Repos:
+#
+####################
+
+  - name: rhel62
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - yum/redhat/6/mongodb-org
+      - yum/redhat/6Server/mongodb-org
+
+  - name: rhel70
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - yum/redhat/7/mongodb-org
+      - yum/redhat/7Server/mongodb-org
+
+  - name: amazon
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - yum/amazon/2013.03/mongodb-org
+
+  - name: suse11
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - zypper/suse/11/mongodb-org
+
+  - name: suse12
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - zypper/suse/12/mongodb-org
+
+  - name: debian81
+    type: deb
+    code_name: "jessie"
+    bucket: repo.mongodb.org
+    edition: org
+    component: main
+    architectures:
+      - amd64
+      - i386
+    repos:
+      - apt/debian/dists/jessie/mongodb-org
+
+  - name: debian71
+    type: deb
+    code_name: "wheezy"
+    bucket: repo.mongodb.org
+    edition: org
+    component: main
+    architectures:
+      - amd64
+      - i386
+    repos:
+      - apt/debian/dists/wheezy/mongodb-org
+
+  - name: ubuntu1204
+    type: deb
+    code_name: "precise"
+    edition: org
+    bucket: repo.mongodb.org
+    component: multiverse
+    architectures:
+      - amd64
+      - i386
+    repos:
+      - apt/ubuntu/dists/precise/mongodb-org
+
+  - name: ubuntu1404
+    type: deb
+    code_name: "trusty"
+    edition: org
+    bucket: repo.mongodb.org
+    component: multiverse
+    architectures:
+      - amd64
+      - i386
+    repos:
+      - apt/ubuntu/dists/trusty/mongodb-org
+
+  - name: ubuntu1604
+    type: deb
+    code_name: "xenial"
+    edition: org
+    bucket: repo.mongodb.org
+    component: multiverse
+    architectures:
+      - amd64
+      - arm64
+      - i386
+    repos:
+      - apt/ubuntu/dists/xenial/mongodb-org
+
+####################
+#
+# Enterprise Repos:
+#
+####################
+
+  - name: rhel62
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/redhat/6/mongodb-enterprise
+      - yum/redhat/6Server/mongodb-enterprise
+
+  - name: rhel67
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/redhat/6/mongodb-enterprise
+      - yum/redhat/6Server/mongodb-enterprise
+        
+  - name: rhel70
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/redhat/7/mongodb-enterprise
+      - yum/redhat/7Server/mongodb-enterprise
+
+  - name: rhel71
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/redhat/7/mongodb-enterprise
+      - yum/redhat/7Server/mongodb-enterprise
+
+  - name: rhel72
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/redhat/7/mongodb-enterprise
+      - yum/redhat/7Server/mongodb-enterprise
+
+  - name: amazon
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/amazon/2013.03/mongodb-enterprise
+
+  - name: suse11
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - zypper/suse/11/mongodb-enterprise
+
+  - name: suse12
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - zypper/suse/12/mongodb-enterprise
+
+  - name: debian81
+    type: deb
+    edition: enterprise
+    code_name: "jessie"
+    bucket: repo.mongodb.com
+    component: main
+    architectures:
+      - amd64
+      - ppc64el
+      - s390x
+      - i386
+    repos:
+      - apt/debian/dists/jessie/mongodb-enterprise
+
+  - name: debian71
+    type: deb
+    code_name: "wheezy"
+    edition: enterprise
+    bucket: repo.mongodb.com
+    component: main
+    architectures:
+      - amd64
+      - ppc64el
+      - s390x
+      - i386
+    repos:
+      - apt/debian/dists/wheezy/mongodb-enterprise
+
+  - name: ubuntu1204
+    type: deb
+    code_name: "precise"
+    edition: enterprise
+    bucket: repo.mongodb.com
+    component: multiverse
+    architectures:
+      - amd64
+      - ppc64el
+      - s390x
+      - i386
+    repos:
+      - apt/ubuntu/dists/precise/mongodb-enterprise
+
+  - name: ubuntu1404
+    type: deb
+    code_name: "trusty"
+    edition: enterprise
+    bucket: repo.mongodb.com
+    component: multiverse
+    architectures:
+      - amd64
+      - ppc64el
+      - s390x
+      - i386
+    repos:
+      - apt/ubuntu/dists/trusty/mongodb-enterprise
+
+  - name: ubuntu1604
+    type: deb
+    code_name: "xenial"
+    edition: enterprise
+    bucket: repo.mongodb.com
+    component: multiverse
+    architectures:
+      - amd64
+      - ppc64el
+      - s390x
+      - arm64
+      - i386
+    repos:
+      - apt/ubuntu/dists/xenial/mongodb-enterprise

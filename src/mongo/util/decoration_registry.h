@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/decoration_container.h"
 
@@ -59,10 +60,8 @@ public:
      */
     template <typename T>
     DecorationContainer::DecorationDescriptorWithType<T> declareDecoration() {
-#if !defined(_MSC_VER) || (_MSC_VER > 1800)  // Try again with MSVC 2015
-        static_assert(std::is_nothrow_destructible<T>::value,
-                      "Decorations must be nothrow destructible");
-#endif
+        MONGO_STATIC_ASSERT_MSG(std::is_nothrow_destructible<T>::value,
+                                "Decorations must be nothrow destructible");
         return DecorationContainer::DecorationDescriptorWithType<T>(std::move(declareDecoration(
             sizeof(T), std::alignment_of<T>::value, &constructAt<T>, &destructAt<T>)));
     }

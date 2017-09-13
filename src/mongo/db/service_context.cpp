@@ -34,14 +34,20 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/system_clock_source.h"
+#include "mongo/util/system_tick_source.h"
 
 namespace mongo {
-
 namespace {
 
-ServiceContext* globalServiceContext = NULL;
+ServiceContext* globalServiceContext = nullptr;
+stdx::mutex globalServiceContextMutex;
+stdx::condition_variable globalServiceContextCV;
 
 }  // namespace
 
@@ -54,10 +60,23 @@ ServiceContext* getGlobalServiceContext() {
     return globalServiceContext;
 }
 
+ServiceContext* waitAndGetGlobalServiceContext() {
+    stdx::unique_lock<stdx::mutex> lk(globalServiceContextMutex);
+    globalServiceContextCV.wait(lk, [] { return globalServiceContext; });
+    fassert(40549, globalServiceContext);
+    return globalServiceContext;
+}
+
 void setGlobalServiceContext(std::unique_ptr<ServiceContext>&& serviceContext) {
     fassert(17509, serviceContext.get());
 
     delete globalServiceContext;
+
+    stdx::lock_guard<stdx::mutex> lk(globalServiceContextMutex);
+
+    if (!globalServiceContext) {
+        globalServiceContextCV.notify_all();
+    }
 
     globalServiceContext = serviceContext.release();
 }
@@ -112,14 +131,19 @@ Status validateStorageOptions(
     return Status::OK();
 }
 
+ServiceContext::ServiceContext()
+    : _tickSource(stdx::make_unique<SystemTickSource>()),
+      _fastClockSource(stdx::make_unique<SystemClockSource>()),
+      _preciseClockSource(stdx::make_unique<SystemClockSource>()) {}
+
 ServiceContext::~ServiceContext() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_clients.empty());
 }
 
 ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
-                                                        AbstractMessagingPort* p) {
-    std::unique_ptr<Client> client(new Client(std::move(desc), this, p));
+                                                        transport::SessionHandle session) {
+    std::unique_ptr<Client> client(new Client(std::move(desc), this, std::move(session)));
     auto observer = _clientObservers.cbegin();
     try {
         for (; observer != _clientObservers.cend(); ++observer) {
@@ -143,12 +167,62 @@ ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
     return UniqueClient(client.release());
 }
 
+void ServiceContext::setPeriodicRunner(std::unique_ptr<PeriodicRunner> runner) {
+    invariant(!_runner);
+    _runner = std::move(runner);
+}
+
+PeriodicRunner* ServiceContext::getPeriodicRunner() const {
+    return _runner.get();
+}
+
+transport::TransportLayer* ServiceContext::getTransportLayer() const {
+    return _transportLayer.get();
+}
+
+ServiceEntryPoint* ServiceContext::getServiceEntryPoint() const {
+    return _serviceEntryPoint.get();
+}
+
+transport::ServiceExecutor* ServiceContext::getServiceExecutor() const {
+    return _serviceExecutor.get();
+}
+
+
 TickSource* ServiceContext::getTickSource() const {
     return _tickSource.get();
 }
 
+ClockSource* ServiceContext::getFastClockSource() const {
+    return _fastClockSource.get();
+}
+
+ClockSource* ServiceContext::getPreciseClockSource() const {
+    return _preciseClockSource.get();
+}
+
 void ServiceContext::setTickSource(std::unique_ptr<TickSource> newSource) {
     _tickSource = std::move(newSource);
+}
+
+void ServiceContext::setFastClockSource(std::unique_ptr<ClockSource> newSource) {
+    _fastClockSource = std::move(newSource);
+}
+
+void ServiceContext::setPreciseClockSource(std::unique_ptr<ClockSource> newSource) {
+    _preciseClockSource = std::move(newSource);
+}
+
+void ServiceContext::setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep) {
+    _serviceEntryPoint = std::move(sep);
+}
+
+void ServiceContext::setTransportLayer(std::unique_ptr<transport::TransportLayer> tl) {
+    _transportLayer = std::move(tl);
+}
+
+void ServiceContext::setServiceExecutor(std::unique_ptr<transport::ServiceExecutor> exec) {
+    _serviceExecutor = std::move(exec);
 }
 
 void ServiceContext::ClientDeleter::operator()(Client* client) const {
@@ -168,7 +242,7 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
 }
 
 ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Client* client) {
-    auto opCtx = _newOpCtx(client);
+    auto opCtx = _newOpCtx(client, _nextOpId.fetchAndAdd(1));
     auto observer = _clientObservers.begin();
     try {
         for (; observer != _clientObservers.cend(); ++observer) {
@@ -185,26 +259,20 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         }
         throw;
     }
-    // // TODO(schwerin): When callers no longer construct their own OperationContexts directly,
-    // // but only through the ServiceContext, uncomment the following.  Until then, it must
-    // // be done in the operation context destructors, which introduces a potential race.
-    // {
-    //     stdx::lock_guard<Client> lk(*client);
-    //     client->setOperationContext(opCtx.get());
-    // }
+    {
+        stdx::lock_guard<Client> lk(*client);
+        client->setOperationContext(opCtx.get());
+    }
     return UniqueOperationContext(opCtx.release());
 };
 
 void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx) const {
     auto client = opCtx->getClient();
     auto service = client->getServiceContext();
-    // // TODO(schwerin): When callers no longer construct their own OperationContexts directly,
-    // // but only through the ServiceContext, uncomment the following.  Until then, it must
-    // // be done in the operation context destructors, which introduces a potential race.
-    // {
-    //     stdx::lock_guard<Client> lk(*client);
-    //     client->resetOperationContext();
-    // }
+    {
+        stdx::lock_guard<Client> lk(*client);
+        client->resetOperationContext();
+    }
     try {
         for (const auto& observer : service->_clientObservers) {
             observer->onDestroyOperationContext(opCtx);
@@ -252,4 +320,81 @@ BSONArray storageEngineList() {
 void appendStorageEngineList(BSONObjBuilder* result) {
     result->append("storageEngines", storageEngineList());
 }
+
+void ServiceContext::setKillAllOperations() {
+    stdx::lock_guard<stdx::mutex> clientLock(_mutex);
+
+    // Ensure that all newly created operation contexts will immediately be in the interrupted state
+    _globalKill.store(true);
+
+    // Interrupt all active operations
+    for (auto&& client : _clients) {
+        stdx::lock_guard<Client> lk(*client);
+        auto opCtxToKill = client->getOperationContext();
+        if (opCtxToKill) {
+            killOperation(opCtxToKill, ErrorCodes::InterruptedAtShutdown);
+        }
+    }
+
+    // Notify any listeners who need to reach to the server shutting down
+    for (const auto listener : _killOpListeners) {
+        try {
+            listener->interruptAll();
+        } catch (...) {
+            std::terminate();
+        }
+    }
+}
+
+void ServiceContext::killOperation(OperationContext* opCtx, ErrorCodes::Error killCode) {
+    opCtx->markKilled(killCode);
+
+    for (const auto listener : _killOpListeners) {
+        try {
+            listener->interrupt(opCtx->getOpID());
+        } catch (...) {
+            std::terminate();
+        }
+    }
+}
+
+void ServiceContext::killAllUserOperations(const OperationContext* opCtx,
+                                           ErrorCodes::Error killCode) {
+    for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
+        if (!client->isFromUserConnection()) {
+            // Don't kill system operations.
+            continue;
+        }
+
+        stdx::lock_guard<Client> lk(*client);
+        OperationContext* toKill = client->getOperationContext();
+
+        // Don't kill ourself.
+        if (toKill && toKill->getOpID() != opCtx->getOpID()) {
+            killOperation(toKill, killCode);
+        }
+    }
+}
+
+void ServiceContext::unsetKillAllOperations() {
+    _globalKill.store(false);
+}
+
+void ServiceContext::registerKillOpListener(KillOpListenerInterface* listener) {
+    stdx::lock_guard<stdx::mutex> clientLock(_mutex);
+    _killOpListeners.push_back(listener);
+}
+
+void ServiceContext::waitForStartupComplete() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _startupCompleteCondVar.wait(lk, [this] { return _startupComplete; });
+}
+
+void ServiceContext::notifyStartupComplete() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _startupComplete = true;
+    lk.unlock();
+    _startupCompleteCondVar.notify_all();
+}
+
 }  // namespace mongo

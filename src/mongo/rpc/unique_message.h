@@ -33,37 +33,24 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/request_interface.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
-class Message;
 namespace rpc {
 
 /**
- * A wrapper around an owned message that includes access to an associated
- * ReplyInterface or RequestInterface.
+ * A wrapper around an owned message that includes access to an associated ReplyInterface.
  */
 template <typename MessageViewType>
 class UniqueMessage {
     MONGO_DISALLOW_COPYING(UniqueMessage);
 
 public:
-    UniqueMessage(std::unique_ptr<Message> message, std::unique_ptr<MessageViewType> view)
+    UniqueMessage(Message message, std::unique_ptr<MessageViewType> view)
         : _message{std::move(message)}, _view{std::move(view)} {}
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-    UniqueMessage(UniqueMessage&& other)
-        : _message{std::move(other._message)}, _view{std::move(other._view)} {}
-
-    UniqueMessage& operator=(UniqueMessage&& other) {
-        _message = std::move(other._message);
-        _view = std::move(other._view);
-        return *this;
-    }
-#else
     UniqueMessage(UniqueMessage&&) = default;
     UniqueMessage& operator=(UniqueMessage&&) = default;
-#endif
 
     const MessageViewType* operator->() const {
         return _view.get();
@@ -77,18 +64,17 @@ public:
      * Releases ownership of the underlying message. The result of calling any other methods
      * on the object afterward is undefined.
      */
-    std::unique_ptr<Message> releaseMessage() {
+    Message releaseMessage() {
         _view.reset();
         return std::move(_message);
     }
 
 private:
-    std::unique_ptr<Message> _message;
+    Message _message;
     std::unique_ptr<MessageViewType> _view;
 };
 
 using UniqueReply = UniqueMessage<ReplyInterface>;
-using UniqueRequest = UniqueMessage<RequestInterface>;
 
 }  // namespace rpc
 }  // namespace mongo

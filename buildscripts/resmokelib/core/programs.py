@@ -12,8 +12,8 @@ import os.path
 import stat
 
 from . import process as _process
-from .. import utils
 from .. import config
+from .. import utils
 
 
 def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
@@ -25,39 +25,84 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOD_EXECUTABLE)
     args = [executable]
 
-    # Apply the --setParameter command line argument.
-    set_parameter = kwargs.pop("set_parameters", {})
-    _apply_set_parameters(args, set_parameter)
+    # Apply the --setParameter command line argument. Command line options to resmoke.py override
+    # the YAML configuration.
+    suite_set_parameters = kwargs.pop("set_parameters", {})
+
+    if config.MONGOD_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+
+    # Turn on replication heartbeat logging.
+    if "replSet" in kwargs and "logComponentVerbosity" not in suite_set_parameters:
+        suite_set_parameters["logComponentVerbosity"] = {
+            "replication": {"heartbeats": 2, "rollback": 2}
+        }
+
+    # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
+    # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
+    # complete first. It defaults to 900, or 15 minutes, which is prohibitively long for tests.
+    # Setting it in the .yml file overrides this.
+    if "shardsvr" in kwargs and "orphanCleanupDelaySecs" not in suite_set_parameters:
+        suite_set_parameters["orphanCleanupDelaySecs"] = 0
+
+    # The LogicalSessionCache does automatic background refreshes in the server. This is
+    # race-y for tests, since tests trigger their own immediate refreshes instead. Turn off
+    # background refreshing for tests. Set in the .yml file to override this.
+    if "disableLogicalSessionCacheRefresh" not in suite_set_parameters:
+        suite_set_parameters["disableLogicalSessionCacheRefresh"] = True
+
+    _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {
         "nojournal": config.NO_JOURNAL,
         "nopreallocj": config.NO_PREALLOC_JOURNAL,
+        "serviceExecutor": config.SERVICE_EXECUTOR,
         "storageEngine": config.STORAGE_ENGINE,
         "wiredTigerCollectionConfigString": config.WT_COLL_CONFIG,
         "wiredTigerEngineConfigString": config.WT_ENGINE_CONFIG,
         "wiredTigerIndexConfigString": config.WT_INDEX_CONFIG,
     }
 
+    if config.STORAGE_ENGINE == "rocksdb":
+        shortcut_opts["rocksdbCacheSizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
+    elif config.STORAGE_ENGINE == "wiredTiger" or config.STORAGE_ENGINE is None:
+        shortcut_opts["wiredTigerCacheSizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
+
     # These options are just flags, so they should not take a value.
     opts_without_vals = ("nojournal", "nopreallocj")
 
     # Have the --nojournal command line argument to resmoke.py unset the journal option.
-    if shortcut_opts["nojournal"] is not None and "journal" in kwargs:
+    if shortcut_opts["nojournal"] and "journal" in kwargs:
         del kwargs["journal"]
 
+    # Ensure that config servers run with journaling enabled.
+    if "configsvr" in kwargs:
+        shortcut_opts["nojournal"] = False
+        kwargs["journal"] = ""
+
+    # Command line options override the YAML configuration.
     for opt_name in shortcut_opts:
-        if shortcut_opts[opt_name] is not None:
-            # Command line options override the YAML configuration.
-            if opt_name in opts_without_vals:
+        opt_value = shortcut_opts[opt_name]
+        if opt_name in opts_without_vals:
+            # Options that are specified as --flag on the command line are represented by a boolean
+            # value where True indicates that the flag should be included in 'kwargs'.
+            if opt_value:
                 kwargs[opt_name] = ""
-            else:
-                kwargs[opt_name] = shortcut_opts[opt_name]
+        else:
+            # Options that are specified as --key=value on the command line are represented by a
+            # value where None indicates that the key-value pair shouldn't be included in 'kwargs'.
+            if opt_value is not None:
+                kwargs[opt_name] = opt_value
+
+    # Override the storage engine specified on the command line with "wiredTiger" if running a
+    # config server replica set.
+    if "replSet" in kwargs and "configsvr" in kwargs:
+        kwargs["storageEngine"] = "wiredTiger"
 
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
 
-    if "keyFile" in kwargs:
-        _set_keyfile_permissions(kwargs["keyFile"])
+    _set_keyfile_permissions(kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
     return _process.Process(logger, args, **process_kwargs)
@@ -72,36 +117,44 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOS_EXECUTABLE)
     args = [executable]
 
-    # Apply the --setParameter command line argument.
-    set_parameter = kwargs.pop("set_parameters", {})
-    _apply_set_parameters(args, set_parameter)
+    # Apply the --setParameter command line argument. Command line options to resmoke.py override
+    # the YAML configuration.
+    suite_set_parameters = kwargs.pop("set_parameters", {})
+
+    if config.MONGOS_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+
+    _apply_set_parameters(args, suite_set_parameters)
 
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
 
-    if "keyFile" in kwargs:
-        _set_keyfile_permissions(kwargs["keyFile"])
+    _set_keyfile_permissions(kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
     return _process.Process(logger, args, **process_kwargs)
 
 
-def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=None, **kwargs):
+def mongo_shell_program(logger, executable=None, connection_string=None, filename=None,
+                        process_kwargs=None, **kwargs):
     """
-    Returns a Process instance that starts a mongo shell with arguments
-    constructed from 'kwargs'.
+    Returns a Process instance that starts a mongo shell with the given connection string and
+    arguments constructed from 'kwargs'.
     """
+    connection_string = utils.default_if_none(config.SHELL_CONN_STRING, connection_string)
 
     executable = utils.default_if_none(executable, config.DEFAULT_MONGO_EXECUTABLE)
     args = [executable]
 
     eval_sb = []  # String builder.
-    global_vars = kwargs.pop("global_vars", {})
+    global_vars = kwargs.pop("global_vars", {}).copy()
 
     shortcut_opts = {
         "noJournal": (config.NO_JOURNAL, False),
         "noJournalPrealloc": (config.NO_PREALLOC_JOURNAL, False),
+        "serviceExecutor": (config.SERVICE_EXECUTOR, ""),
         "storageEngine": (config.STORAGE_ENGINE, ""),
+        "storageEngineCacheSizeGB": (config.STORAGE_ENGINE_CACHE_SIZE, ""),
         "testName": (os.path.splitext(os.path.basename(filename))[0], ""),
         "wiredTigerCollectionConfigString": (config.WT_COLL_CONFIG, ""),
         "wiredTigerEngineConfigString": (config.WT_ENGINE_CONFIG, ""),
@@ -116,29 +169,68 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
         elif opt_name not in test_data:
             # Only use 'opt_default' if the property wasn't set in the YAML configuration.
             test_data[opt_name] = opt_default
+
     global_vars["TestData"] = test_data
+
+    # Pass setParameters for mongos and mongod through TestData. The setParameter parsing in
+    # servers.js is very primitive (just splits on commas), so this may break for non-scalar
+    # setParameter values.
+    if config.MONGOD_SET_PARAMETERS is not None:
+        if "setParameters" in test_data:
+            raise ValueError("setParameters passed via TestData can only be set from either the"
+                             " command line or the suite YAML, not both")
+        mongod_set_parameters = utils.load_yaml(config.MONGOD_SET_PARAMETERS)
+        test_data["setParameters"] = _format_test_data_set_parameters(mongod_set_parameters)
+
+    if config.MONGOS_SET_PARAMETERS is not None:
+        if "setParametersMongos" in test_data:
+            raise ValueError("setParametersMongos passed via TestData can only be set from either"
+                             " the command line or the suite YAML, not both")
+        mongos_set_parameters = utils.load_yaml(config.MONGOS_SET_PARAMETERS)
+        test_data["setParametersMongos"] = _format_test_data_set_parameters(mongos_set_parameters)
+
+    if "eval_prepend" in kwargs:
+        eval_sb.append(str(kwargs.pop("eval_prepend")))
 
     for var_name in global_vars:
         _format_shell_vars(eval_sb, var_name, global_vars[var_name])
 
     if "eval" in kwargs:
-        eval_sb.append(kwargs.pop("eval"))
+        eval_sb.append(str(kwargs.pop("eval")))
+
+    # Load this file to allow a callback to validate collections before shutting down mongod.
+    eval_sb.append("load('jstests/libs/override_methods/validate_collections_on_shutdown.js');")
 
     eval_str = "; ".join(eval_sb)
     args.append("--eval")
     args.append(eval_str)
 
+    if config.SHELL_READ_MODE is not None:
+        kwargs["readMode"] = config.SHELL_READ_MODE
+
     if config.SHELL_WRITE_MODE is not None:
         kwargs["writeMode"] = config.SHELL_WRITE_MODE
+
+    if connection_string is not None:
+        # The --host and --port options are ignored by the mongo shell when an explicit connection
+        # string is specified. We remove these options to avoid any ambiguity with what server the
+        # logged mongo shell invocation will connect to.
+        if "port" in kwargs:
+            kwargs.pop("port")
+
+        if "host" in kwargs:
+            kwargs.pop("host")
 
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
 
+    if connection_string is not None:
+        args.append(connection_string)
+
     # Have the mongos shell run the specified file.
     args.append(filename)
 
-    if "keyFile" in global_vars["TestData"]:
-        _set_keyfile_permissions(global_vars["TestData"]["keyFile"])
+    _set_keyfile_permissions(test_data)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
     return _process.Process(logger, args, **process_kwargs)
@@ -180,14 +272,44 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
     if config.STORAGE_ENGINE is not None:
         kwargs["storageEngine"] = config.STORAGE_ENGINE
 
-    for arg_name in kwargs:
-        arg_value = str(kwargs[arg_name])
-        args.append("--%s" % (arg_name))
-        if arg_value:
-            args.append(arg_value)
+    return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
+
+
+def generic_program(logger, args, process_kwargs=None, **kwargs):
+    """
+    Returns a Process instance that starts an arbitrary executable with
+    arguments constructed from 'kwargs'. The args parameter is an array
+    of strings containing the command to execute.
+    """
+
+    if not utils.is_string_list(args):
+        raise ValueError("The args parameter must be a list of command arguments")
+
+    _apply_kwargs(args, kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
     return _process.Process(logger, args, **process_kwargs)
+
+
+def _format_test_data_set_parameters(set_parameters):
+    """
+    Converts key-value pairs from 'set_parameters' into the comma
+    delimited list format expected by the parser in servers.js.
+
+    WARNING: the parsing logic in servers.js is very primitive.
+    Non-scalar options such as logComponentVerbosity will not work
+    correctly.
+    """
+    params = []
+    for param_name in set_parameters:
+        param_value = set_parameters[param_name]
+        if isinstance(param_value, bool):
+            # Boolean valued setParameters are specified as lowercase strings.
+            param_value = "true" if param_value else "false"
+        elif isinstance(param_value, dict):
+            raise TypeError("Non-scalar setParameter values are not currently supported.")
+        params.append("%s=%s" % (param_name, param_value))
+    return ",".join(params)
 
 
 def _apply_set_parameters(args, set_parameter):
@@ -220,12 +342,18 @@ def _apply_kwargs(args, kwargs):
             args.append(arg_value)
 
 
-def _set_keyfile_permissions(keyfile_path):
+def _set_keyfile_permissions(opts):
     """
-    Change the permissions on 'keyfile_path' to 600, i.e. only the user
-    can read and write the file.
+    Change the permissions of keyfiles in 'opts' to 600, i.e. only the
+    user can read and write the file.
 
     This necessary to avoid having the mongod/mongos fail to start up
-    because "permissions on 'keyfile_path' are too open".
+    because "permissions on the keyfiles are too open".
+
+    We can't permanently set the keyfile permissions because git is not
+    aware of them.
     """
-    os.chmod(keyfile_path, stat.S_IRUSR | stat.S_IWUSR)
+    if "keyFile" in opts:
+        os.chmod(opts["keyFile"], stat.S_IRUSR | stat.S_IWUSR)
+    if "encryptionKeyFile" in opts:
+        os.chmod(opts["encryptionKeyFile"], stat.S_IRUSR | stat.S_IWUSR)

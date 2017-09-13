@@ -26,25 +26,26 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/util/fail_point_service.h"
+#include "mongo/platform/basic.h"
 
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 
-MONGO_FP_DECLARE(dummy);  // used by jstests/libs/fail_point.js
+MONGO_FP_DECLARE(dummy);  // used by tests in jstests/fail_point
 
 unique_ptr<FailPointRegistry> _fpRegistry(nullptr);
 
-MONGO_INITIALIZER(FailPointRegistry)(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(FailPointRegistry, MONGO_NO_PREREQUISITES)
+(InitializerContext* context) {
     _fpRegistry.reset(new FailPointRegistry());
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered,
-                          MONGO_NO_PREREQUISITES,
-                          MONGO_NO_DEPENDENTS)(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
+(InitializerContext* context) {
     _fpRegistry->freeze();
     return Status::OK();
 }
@@ -52,4 +53,15 @@ MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered,
 FailPointRegistry* getGlobalFailPointRegistry() {
     return _fpRegistry.get();
 }
+
+FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName) {
+    _failPoint = getGlobalFailPointRegistry()->getFailPoint(failPointName);
+    invariant(_failPoint != nullptr);
+    _failPoint->setMode(FailPoint::alwaysOn);
 }
+
+FailPointEnableBlock::~FailPointEnableBlock() {
+    _failPoint->setMode(FailPoint::off);
+}
+
+}  // namespace mongo

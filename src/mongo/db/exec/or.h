@@ -43,32 +43,25 @@ namespace mongo {
  *
  * If we're deduping, we may fail to dedup any invalidated RecordId properly.
  */
-class OrStage : public PlanStage {
+class OrStage final : public PlanStage {
 public:
-    OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter);
-    virtual ~OrStage();
+    OrStage(OperationContext* opCtx, WorkingSet* ws, bool dedup, const MatchExpression* filter);
 
     void addChild(PlanStage* child);
 
-    virtual bool isEOF();
+    bool isEOF() final;
 
-    virtual StageState work(WorkingSetID* out);
+    StageState doWork(WorkingSetID* out) final;
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_OR;
     }
 
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
@@ -78,9 +71,6 @@ private:
 
     // The filter is not owned by us.
     const MatchExpression* _filter;
-
-    // Owned by us.
-    std::vector<PlanStage*> _children;
 
     // Which of _children are we calling work(...) on now?
     size_t _currentChild;
@@ -92,7 +82,6 @@ private:
     unordered_set<RecordId, RecordId::Hasher> _seen;
 
     // Stats
-    CommonStats _commonStats;
     OrStats _specificStats;
 };
 

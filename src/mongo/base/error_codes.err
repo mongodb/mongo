@@ -59,7 +59,7 @@ error_code("EmptyFieldName", 56)
 error_code("DottedFieldName", 57)
 error_code("RoleModificationFailed", 58)
 error_code("CommandNotFound", 59)
-error_code("DatabaseNotFound", 60)
+error_code("OBSOLETE_DatabaseNotFound", 60)
 error_code("ShardKeyNotFound", 61)
 error_code("OplogOperationUnsupported", 62)
 error_code("StaleShardVersion", 63)
@@ -80,14 +80,14 @@ error_code("OperationIncomplete", 77)
 error_code("CommandResultSchemaViolation", 78)
 error_code("UnknownReplWriteConcern", 79)
 error_code("RoleDataInconsistent", 80)
-error_code("NoWhereParseContext", 81)
+error_code("NoMatchParseContext", 81)
 error_code("NoProgressMade", 82)
 error_code("RemoteResultsUnavailable", 83)
 error_code("DuplicateKeyValue", 84)
 error_code("IndexOptionsConflict", 85 )
 error_code("IndexKeySpecsConflict", 86 )
 error_code("CannotSplit", 87)
-error_code("SplitFailed", 88)
+error_code("SplitFailed_OBSOLETE", 88)
 error_code("NetworkTimeout", 89)
 error_code("CallbackCanceled", 90)
 error_code("ShutdownInProgress", 91)
@@ -98,7 +98,6 @@ error_code("NotSecondary", 95)
 error_code("OperationFailed", 96)
 error_code("NoProjectionFound", 97)
 error_code("DBPathInUse", 98)
-error_code("WriteConcernNotDefined", 99)
 error_code("CannotSatisfyWriteConcern", 100)
 error_code("OutdatedClient", 101)
 error_code("IncompatibleAuditMetadata", 102)
@@ -131,26 +130,145 @@ error_code("LockNotFound", 128)
 error_code("LockStateChangeFailed", 129)
 error_code("SymbolNotFound", 130)
 error_code("RLPInitializationFailed", 131)
-error_code("ConfigServersInconsistent", 132)
+error_code("OBSOLETE_ConfigServersInconsistent", 132)
 error_code("FailedToSatisfyReadPreference", 133)
+error_code("ReadConcernMajorityNotAvailableYet", 134)
+error_code("StaleTerm", 135)
+error_code("CappedPositionLost", 136)
+error_code("IncompatibleShardingConfigVersion", 137)
+error_code("RemoteOplogStale", 138)
+error_code("JSInterpreterFailure", 139)
+error_code("InvalidSSLConfiguration", 140)
+error_code("SSLHandshakeFailed", 141)
+error_code("JSUncatchableError", 142)
+error_code("CursorInUse", 143)
+error_code("IncompatibleCatalogManager", 144)
+error_code("PooledConnectionsDropped", 145)
+error_code("ExceededMemoryLimit", 146)
+error_code("ZLibError", 147)
+error_code("ReadConcernMajorityNotEnabled", 148)
+error_code("NoConfigMaster", 149)
+error_code("StaleEpoch", 150)
+error_code("OperationCannotBeBatched", 151)
+error_code("OplogOutOfOrder", 152)
+error_code("ChunkTooBig", 153)
+error_code("InconsistentShardIdentity", 154)
+error_code("CannotApplyOplogWhilePrimary", 155)
+error_code("NeedsDocumentMove", 156)
+error_code("CanRepairToDowngrade", 157)
+error_code("MustUpgrade", 158)
+error_code("DurationOverflow", 159)
+error_code("MaxStalenessOutOfRange", 160)
+error_code("IncompatibleCollationVersion", 161)
+error_code("CollectionIsEmpty", 162)
+error_code("ZoneStillInUse", 163)
+error_code("InitialSyncActive", 164)
+error_code("ViewDepthLimitExceeded", 165)
+error_code("CommandNotSupportedOnView", 166)
+error_code("OptionNotSupportedOnView", 167)
+error_code("InvalidPipelineOperator", 168)
+error_code("CommandOnShardedViewNotSupportedOnMongod", 169)
+error_code("TooManyMatchingDocuments", 170)
+error_code("CannotIndexParallelArrays", 171)
+error_code("TransportSessionClosed", 172)
+error_code("TransportSessionNotFound", 173)
+error_code("TransportSessionUnknown", 174)
+error_code("QueryPlanKilled", 175)
+error_code("FileOpenFailed", 176)
+error_code("ZoneNotFound", 177)
+error_code("RangeOverlapConflict", 178)
+error_code("WindowsPdhError", 179)
+error_code("BadPerfCounterPath", 180)
+error_code("AmbiguousIndexKeyPattern", 181)
+error_code("InvalidViewDefinition", 182);
+error_code("ClientMetadataMissingField", 183)
+error_code("ClientMetadataAppNameTooLarge", 184)
+error_code("ClientMetadataDocumentTooLarge", 185)
+error_code("ClientMetadataCannotBeMutated", 186)
+error_code("LinearizableReadConcernError", 187)
+error_code("IncompatibleServerVersion", 188)
+error_code("PrimarySteppedDown", 189)
+error_code("MasterSlaveConnectionFailure", 190)
+error_code("OBSOLETE_BalancerLostDistributedLock", 191)
+error_code("FailPointEnabled", 192)
+error_code("NoShardingEnabled", 193)
+error_code("BalancerInterrupted", 194)
+error_code("ViewPipelineMaxSizeExceeded", 195)
+error_code("InvalidIndexSpecificationOption", 197)
+error_code("OBSOLETE_ReceivedOpReplyMessage", 198)
+error_code("ReplicaSetMonitorRemoved", 199)
+error_code("ChunkRangeCleanupPending", 200)
+error_code("CannotBuildIndexKeys", 201)
+error_code("NetworkInterfaceExceededTimeLimit", 202)
+error_code("ShardingStateNotInitialized", 203)
+error_code("TimeProofMismatch", 204)
+error_code("ClusterTimeFailsRateLimiter", 205)
+error_code("NoSuchSession", 206)
+error_code("InvalidUUID", 207)
+error_code("TooManyLocks", 208)
+error_code("StaleClusterTime", 209)
+error_code("CannotVerifyAndSignLogicalTime", 210)
+error_code("KeyNotFound", 211)
+error_code("IncompatibleRollbackAlgorithm", 212)
+error_code("DuplicateSession", 213)
+error_code("AuthenticationRestrictionUnmet", 214)
+error_code("DatabaseDropPending", 215)
+error_code("ElectionInProgress", 216)
+error_code("IncompleteTransactionHistory", 217);
+error_code("UpdateOperationFailed", 218)
+error_code("FTDCPathNotSet", 219)
+error_code("FTDCPathAlreadySet", 220)
+error_code("IndexModified", 221)
+error_code("CloseChangeStream", 222)
+error_code("IllegalOpMsgFlag", 223)
+error_code("JSONSchemaNotAllowed", 224)
+
+# Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)
-error_code("NotMaster", 10107) #this comes from assert_util.h
+error_code("SocketException", 9001)
+error_code("RecvStaleConfig", 9996)
+error_code("NotMaster", 10107)
+error_code("CannotGrowDocumentInCappedNamespace", 10003)
 error_code("DuplicateKey", 11000)
 error_code("InterruptedAtShutdown", 11600)
 error_code("Interrupted", 11601)
+error_code("InterruptedDueToReplStateChange", 11602)
 error_code("OutOfDiskSpace", 14031 )
 error_code("KeyTooLong", 17280);
 error_code("BackgroundOperationInProgressForDatabase", 12586);
 error_code("BackgroundOperationInProgressForNamespace", 12587);
-error_code("NotMasterOrSecondaryCode", 13436);
-error_code("NotMasterNoSlaveOkCode", 13435);
+error_code("NotMasterOrSecondary", 13436);
+error_code("NotMasterNoSlaveOk", 13435);
 error_code("ShardKeyTooBig", 13334);
 error_code("SendStaleConfig", 13388);
 error_code("DatabaseDifferCase", 13297);
-error_code("PrepareConfigsFailedCode", 13104);
+error_code("OBSOLETE_PrepareConfigsFailed", 13104);
 
-error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout"])
-error_class("Interruption", ["Interrupted", "InterruptedAtShutdown", "ExceededTimeLimit"])
-error_class("IndexCreationError", ["CannotCreateIndex", "IndexOptionsConflict", 
-                                   "IndexKeySpecsConflict", "IndexAlreadyExists"])
+# Group related errors into classes, can be checked against ErrorCodes::isXXXClassName methods.
+error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout", "SocketException"])
+error_class("Interruption", ["Interrupted",
+                             "InterruptedAtShutdown",
+                             "InterruptedDueToReplStateChange",
+                             "ExceededTimeLimit"])
+
+# isNotMasterError() includes all codes that indicate that the node that received the request was
+# not master at some point during command processing, regardless of whether some write may have
+# happened. If you care about whether a write could have happened, check for individual codes.
+error_class("NotMasterError", [
+    "NotMaster",
+    "NotMasterNoSlaveOk",
+    "NotMasterOrSecondary",
+    "InterruptedDueToReplStateChange",
+    "PrimarySteppedDown",
+    ])
+error_class("StaleShardingError",
+            ["RecvStaleConfig", "SendStaleConfig", "StaleShardVersion", "StaleEpoch"])
+error_class("WriteConcernError", ["WriteConcernFailed",
+                                  "WriteConcernLegacyOK",
+                                  "UnknownReplWriteConcern",
+                                  "CannotSatisfyWriteConcern"])
+error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
+
+#TODO SERVER-28679 add checksum failure.
+error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag"])

@@ -25,25 +25,94 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
+#include <numeric>
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/storage_interface_mock.h"
 
-#include "mongo/db/repl/operation_context_repl_mock.h"
+#include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
 
-StorageInterfaceMock::StorageInterfaceMock() {}
-
-StorageInterfaceMock::~StorageInterfaceMock() {}
-
-OperationContext* StorageInterfaceMock::createOperationContext() {
-    return new OperationContextReplMock();
+StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (!_rbidInitialized) {
+        return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
+    }
+    return _rbid;
 }
+
+Status StorageInterfaceMock::initializeRollbackID(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (_rbidInitialized) {
+        return Status(ErrorCodes::NamespaceExists, "Rollback ID already initialized");
+    }
+    _rbidInitialized = true;
+
+    // Start the mock RBID at a very high number to differentiate it from uninitialized RBIDs.
+    _rbid = 100;
+    return Status::OK();
+}
+
+Status StorageInterfaceMock::incrementRollbackID(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (!_rbidInitialized) {
+        return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
+    }
+    _rbid++;
+    return Status::OK();
+}
+
+void StorageInterfaceMock::setStableTimestamp(ServiceContext* serviceCtx,
+                                              SnapshotName snapshotName) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _stableTimestamp = snapshotName;
+}
+
+void StorageInterfaceMock::setInitialDataTimestamp(ServiceContext* serviceCtx,
+                                                   SnapshotName snapshotName) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _initialDataTimestamp = snapshotName;
+}
+
+SnapshotName StorageInterfaceMock::getStableTimestamp() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _stableTimestamp;
+}
+
+SnapshotName StorageInterfaceMock::getInitialDataTimestamp() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _initialDataTimestamp;
+}
+
+Status CollectionBulkLoaderMock::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
+    LOG(1) << "CollectionBulkLoaderMock::init called";
+    stats->initCalled = true;
+    return Status::OK();
+};
+
+Status CollectionBulkLoaderMock::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
+                                                 const std::vector<BSONObj>::const_iterator end) {
+    LOG(1) << "CollectionBulkLoaderMock::insertDocuments called";
+    const auto status = insertDocsFn(begin, end);
+
+    // Only count if it succeeds.
+    if (status.isOK()) {
+        stats->insertCount += std::distance(begin, end);
+    }
+    return status;
+};
+
+Status CollectionBulkLoaderMock::commit() {
+    LOG(1) << "CollectionBulkLoaderMock::commit called";
+    stats->commitCalled = true;
+    return commitFn();
+};
 
 }  // namespace repl
 }  // namespace mongo

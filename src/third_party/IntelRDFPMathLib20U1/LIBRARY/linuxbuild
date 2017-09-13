@@ -1,0 +1,98 @@
+rm -f *.o *.a  
+make   CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a icc000libbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a icc001libbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a icc010libbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a icc011libbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a icc100libbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a icc101libbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a icc110libbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a icc111libbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a gcc000libbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a gcc001libbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a gcc010libbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a gcc011libbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a gcc100libbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a gcc101libbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a gcc110libbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+mv libbid.a gcc111libbid.a
+
+make  clean 
+make   CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a icc000blibbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a icc001blibbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a icc010blibbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a icc011blibbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a icc100blibbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a icc101blibbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a icc110blibbid.a
+make  clean 
+make   CC=icc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a icc111blibbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a gcc000blibbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a gcc001blibbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a gcc010blibbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a gcc011blibbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a gcc100blibbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a gcc101blibbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a gcc110blibbid.a
+make  clean 
+make   CC=gcc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+mv libbid.a gcc111blibbid.a
+make  clean 

@@ -39,8 +39,8 @@ namespace mongo {
 //
 // This class also parses the ad-hoc geo formats that MongoDB introduced.
 //
-// parse* methods may do some more validation than the is* methods; they return false if they
-// encounter invalid geometry and true if the geometry is parsed successfully.
+// parse methods where validation is time consuming optimize to skip
+// validation if the BSONObj was previously validated.
 class GeoParser {
 public:
     // Geospatial specifier after $geoWithin / $geoIntersects predicates.
@@ -80,13 +80,17 @@ public:
     static Status parseLegacyCenter(const BSONObj& obj, CapWithCRS* out);
     static Status parseLegacyPolygon(const BSONObj& obj, PolygonWithCRS* out);
     static Status parseCenterSphere(const BSONObj& obj, CapWithCRS* out);
-    static Status parseGeoJSONPolygon(const BSONObj& obj, PolygonWithCRS* out);
+    static Status parseGeoJSONPolygon(const BSONObj& obj, bool skipValidation, PolygonWithCRS* out);
     static Status parseGeoJSONPoint(const BSONObj& obj, PointWithCRS* out);
-    static Status parseGeoJSONLine(const BSONObj& obj, LineWithCRS* out);
+    static Status parseGeoJSONLine(const BSONObj& obj, bool skipValidation, LineWithCRS* out);
     static Status parseMultiPoint(const BSONObj& obj, MultiPointWithCRS* out);
-    static Status parseMultiLine(const BSONObj& obj, MultiLineWithCRS* out);
-    static Status parseMultiPolygon(const BSONObj& obj, MultiPolygonWithCRS* out);
-    static Status parseGeometryCollection(const BSONObj& obj, GeometryCollection* out);
+    static Status parseMultiLine(const BSONObj& obj, bool skipValidation, MultiLineWithCRS* out);
+    static Status parseMultiPolygon(const BSONObj& obj,
+                                    bool skipValidation,
+                                    MultiPolygonWithCRS* out);
+    static Status parseGeometryCollection(const BSONObj& obj,
+                                          bool skipValidation,
+                                          GeometryCollection* out);
 
     // For geo near
     static Status parseQueryPoint(const BSONElement& elem, PointWithCRS* out);

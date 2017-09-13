@@ -28,12 +28,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
+#include <iostream>
 #include <vector>
 
-#include "mongo/util/processinfo.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/processinfo.h"
 
 using mongo::ProcessInfo;
+using boost::optional;
 
 namespace mongo_test {
 TEST(ProcessInfo, SysInfoIsInitialized) {
@@ -49,24 +52,21 @@ TEST(ProcessInfo, NonZeroPageSize) {
     }
 }
 
-const size_t PAGES = 10;
-
-TEST(ProcessInfo, BlockInMemoryDoesNotThrowIfSupported) {
-    if (ProcessInfo::blockCheckSupported()) {
-        static char ptr[4096 * PAGES] = "This needs data to not be in .bss";
-        ProcessInfo::blockInMemory(ptr + ProcessInfo::getPageSize() * 2);
-    }
+TEST(ProcessInfo, GetNumAvailableCores) {
+#if defined(__APPLE__) || defined(__linux__) || (defined(__sun) && defined(__SVR4)) || \
+    defined(_WIN32)
+    ProcessInfo processInfo;
+    ProcessInfo::initializeSystemInfo();
+    optional<unsigned long> numAvailCores = processInfo.getNumAvailableCores();
+    ASSERT_TRUE(numAvailCores.is_initialized());
+    ASSERT_GREATER_THAN(*numAvailCores, 0u);
+    ASSERT_LESS_THAN_OR_EQUALS(*numAvailCores, processInfo.getNumCores());
+#endif
 }
 
-TEST(ProcessInfo, PagesInMemoryIsSensible) {
-    if (ProcessInfo::blockCheckSupported()) {
-        static char ptr[4096 * PAGES] = "This needs data to not be in .bss";
-        ptr[(ProcessInfo::getPageSize() * 0) + 1] = 'a';
-        ptr[(ProcessInfo::getPageSize() * 8) + 1] = 'a';
-        std::vector<char> result;
-        ASSERT_TRUE(ProcessInfo::pagesInMemory(const_cast<char*>(ptr), PAGES, &result));
-        ASSERT_TRUE(result[0]);
-        ASSERT_TRUE(result[8]);
-    }
+TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
+    ProcessInfo processInfo;
+    ProcessInfo::initializeSystemInfo();
+    ASSERT_GREATER_THAN(processInfo.getNumCores(), 0u);
 }
 }

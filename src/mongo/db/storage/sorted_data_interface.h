@@ -42,6 +42,7 @@ namespace mongo {
 class BSONObjBuilder;
 class BucketDeletionNotification;
 class SortedDataBuilderInterface;
+struct ValidateResults;
 
 /**
  * This interface is a work in progress.  Notes below:
@@ -74,18 +75,19 @@ public:
      * Implementations can assume that 'this' index outlives its bulk
      * builder.
      *
-     * @param txn the transaction under which keys are added to 'this' index
+     * @param opCtx the transaction under which keys are added to 'this' index
      * @param dupsAllowed true if duplicate keys are allowed, and false
      *        otherwise
      *
      * @return caller takes ownership
      */
-    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) = 0;
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
+                                                       bool dupsAllowed) = 0;
 
     /**
      * Insert an entry into the index with the specified key and RecordId.
      *
-     * @param txn the transaction under which the insert takes place
+     * @param opCtx the transaction under which the insert takes place
      * @param dupsAllowed true if duplicate keys are allowed, and false
      *        otherwise
      *
@@ -94,7 +96,7 @@ public:
      *         ErrorCodes::DuplicateKey if 'key' already exists in 'this' index
      *         at a RecordId other than 'loc' and duplicates were not allowed
      */
-    virtual Status insert(OperationContext* txn,
+    virtual Status insert(OperationContext* opCtx,
                           const BSONObj& key,
                           const RecordId& loc,
                           bool dupsAllowed) = 0;
@@ -102,11 +104,11 @@ public:
     /**
      * Remove the entry from the index with the specified key and RecordId.
      *
-     * @param txn the transaction under which the remove takes place
+     * @param opCtx the transaction under which the remove takes place
      * @param dupsAllowed true if duplicate keys are allowed, and false
      *        otherwise
      */
-    virtual void unindex(OperationContext* txn,
+    virtual void unindex(OperationContext* opCtx,
                          const BSONObj& key,
                          const RecordId& loc,
                          bool dupsAllowed) = 0;
@@ -115,28 +117,34 @@ public:
      * Return ErrorCodes::DuplicateKey if 'key' already exists in 'this'
      * index at a RecordId other than 'loc', and Status::OK() otherwise.
      *
-     * @param txn the transaction under which this operation takes place
+     * @param opCtx the transaction under which this operation takes place
      *
      * TODO: Hide this by exposing an update method?
      */
-    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) = 0;
+    virtual Status dupKeyCheck(OperationContext* opCtx,
+                               const BSONObj& key,
+                               const RecordId& loc) = 0;
+
+    /**
+     * Attempt to reduce the storage space used by this index via compaction. Only called if the
+     * indexed record store supports compaction-in-place.
+     */
+    virtual Status compact(OperationContext* opCtx) {
+        return Status::OK();
+    }
 
     //
     // Information about the tree
     //
 
     /**
-     * 'output' is used to store results of validate when 'full' is true.
-     * If 'full' is false, 'output' may be NULL.
-     *
      * TODO: expose full set of args for testing?
      */
-    virtual void fullValidate(OperationContext* txn,
-                              bool full,
+    virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
-                              BSONObjBuilder* output) const = 0;
+                              ValidateResults* fullResults) const = 0;
 
-    virtual bool appendCustomStats(OperationContext* txn,
+    virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
                                    double scale) const = 0;
 
@@ -144,16 +152,16 @@ public:
     /**
      * Return the number of bytes consumed by 'this' index.
      *
-     * @param txn the transaction under which this operation takes place
+     * @param opCtx the transaction under which this operation takes place
      *
      * @see IndexAccessMethod::getSpaceUsedBytes
      */
-    virtual long long getSpaceUsedBytes(OperationContext* txn) const = 0;
+    virtual long long getSpaceUsedBytes(OperationContext* opCtx) const = 0;
 
     /**
      * Return true if 'this' index is empty, and false otherwise.
      */
-    virtual bool isEmpty(OperationContext* txn) = 0;
+    virtual bool isEmpty(OperationContext* opCtx) = 0;
 
     /**
      * Attempt to bring the entirety of 'this' index into memory.
@@ -163,7 +171,7 @@ public:
      *
      * @return Status::OK()
      */
-    virtual Status touch(OperationContext* txn) const {
+    virtual Status touch(OperationContext* opCtx) const {
         return Status(ErrorCodes::CommandNotSupported,
                       "this storage engine does not support touch");
     }
@@ -174,9 +182,9 @@ public:
      * The default implementation should be overridden with a more
      * efficient one if at all possible.
      */
-    virtual long long numEntries(OperationContext* txn) const {
+    virtual long long numEntries(OperationContext* opCtx) const {
         long long x = -1;
-        fullValidate(txn, false, &x, NULL);
+        fullValidate(opCtx, &x, NULL);
         return x;
     }
 
@@ -300,10 +308,10 @@ public:
          * Prepares for state changes in underlying data in a way that allows the cursor's
          * current position to be restored.
          *
-         * It is safe to call savePositioned multiple times in a row.
+         * It is safe to call save multiple times in a row.
          * No other method (excluding destructor) may be called until successfully restored.
          */
-        virtual void savePositioned() = 0;
+        virtual void save() = 0;
 
         /**
          * Prepares for state changes in underlying data without necessarily saving the current
@@ -316,7 +324,7 @@ public:
          * No other method (excluding destructor) may be called until successfully restored.
          */
         virtual void saveUnpositioned() {
-            savePositioned();
+            save();
         }
 
         /**
@@ -325,9 +333,26 @@ public:
          * If the former position no longer exists, a following call to next() will return the
          * next closest position in the direction of the scan, if any.
          *
-         * This handles restoring after either savePositioned() or saveUnpositioned().
+         * This handles restoring after either save() or saveUnpositioned().
          */
-        virtual void restore(OperationContext* txn) = 0;
+        virtual void restore() = 0;
+
+        /**
+         * Detaches from the OperationContext and releases any storage-engine state.
+         *
+         * It is only legal to call this when in a "saved" state. While in the "detached" state, it
+         * is only legal to call reattachToOperationContext or the destructor. It is not legal to
+         * call detachFromOperationContext() while already in the detached state.
+         */
+        virtual void detachFromOperationContext() = 0;
+
+        /**
+         * Reattaches to the OperationContext and reacquires any storage-engine state.
+         *
+         * It is only legal to call this in the "detached" state. On return, the cursor is left in a
+         * "saved" state, so callers must still call restoreState to use this object.
+         */
+        virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
     };
 
     /**
@@ -335,14 +360,32 @@ public:
      *
      * Implementations can assume that 'this' index outlives all cursors it produces.
      */
-    virtual std::unique_ptr<Cursor> newCursor(OperationContext* txn,
+    virtual std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
                                               bool isForward = true) const = 0;
+
+    /**
+     * Constructs a cursor over an index that returns entries in a randomized order, and allows
+     * storage engines to provide a more efficient way to randomly sample a collection than
+     * MongoDB's default sampling methods, which are used when this method returns {}. Note if it is
+     * possible to implement RecordStore::getRandomCursor(), that method is preferred, as it will
+     * return the entire document, whereas this method will only return the index key and the
+     * RecordId, requiring an extra lookup.
+     *
+     * This method may be implemented using a pseudo-random walk over B-trees or a similar approach.
+     * Different cursors should return entries in a different order. Random cursors may return the
+     * same entry more than once and, as a result, may return more entries than exist in the index.
+     * Implementations should avoid obvious biases toward older, newer, larger smaller or other
+     * specific classes of entries.
+     */
+    virtual std::unique_ptr<Cursor> newRandomCursor(OperationContext* opCtx) const {
+        return {};
+    }
 
     //
     // Index creation
     //
 
-    virtual Status initAsEmpty(OperationContext* txn) = 0;
+    virtual Status initAsEmpty(OperationContext* opCtx) = 0;
 };
 
 /**

@@ -44,8 +44,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/instance.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -57,38 +55,36 @@ using std::string;
 using std::vector;
 
 namespace {
-void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
+void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
     bool firstTime = true;
     for (std::list<std::string>::const_iterator it = nsToCheck.begin(); it != nsToCheck.end();
          ++it) {
-        string ns = *it;
+        NamespaceString nss(*it);
 
-        LOG(3) << "IndexRebuilder::checkNS: " << ns;
+        LOG(3) << "IndexRebuilder::checkNS: " << nss.ns();
 
-        // This write lock is held throughout the index building process
-        // for this namespace.
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
-        OldClientContext ctx(txn, ns);
+        // This write lock is held throughout the index building process for this namespace.
+        Lock::DBLock lk(opCtx, nss.db(), MODE_X);
+        OldClientContext ctx(opCtx, nss.ns());
 
-        Collection* collection = ctx.db()->getCollection(ns);
+        Collection* collection = ctx.db()->getCollection(opCtx, nss);
         if (collection == NULL)
             continue;
 
         IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-        if (collection->ns().isOplog() && indexCatalog->numIndexesTotal(txn) > 0) {
-            warning() << ns << " had illegal indexes, removing";
-            indexCatalog->dropAllIndexes(txn, true);
+        if (collection->ns().isOplog() && indexCatalog->numIndexesTotal(opCtx) > 0) {
+            warning() << nss.ns() << " had illegal indexes, removing";
+            indexCatalog->dropAllIndexes(opCtx, true);
             continue;
         }
 
 
-        MultiIndexBlock indexer(txn, collection);
+        MultiIndexBlock indexer(opCtx, collection);
 
         {
-            WriteUnitOfWork wunit(txn);
-            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
+            WriteUnitOfWork wunit(opCtx);
+            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(opCtx);
 
             // The indexes have now been removed from system.indexes, so the only record is
             // in-memory. If there is a journal commit between now and when insert() rewrites
@@ -102,7 +98,8 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
                 continue;
             }
 
-            log() << "found " << indexesToBuild.size() << " interrupted index build(s) on " << ns;
+            log() << "found " << indexesToBuild.size() << " interrupted index build(s) on "
+                  << nss.ns();
 
             if (firstTime) {
                 log() << "note: restart the server with --noIndexBuildRetry "
@@ -124,11 +121,11 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
         try {
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
-            WriteUnitOfWork wunit(txn);
+            WriteUnitOfWork wunit(opCtx);
             indexer.commit();
             wunit.commit();
         } catch (const DBException& e) {
-            error() << "Index rebuilding did not complete: " << e.toString();
+            error() << "Index rebuilding did not complete: " << redact(e);
             log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
             // If anything went wrong, leave the indexes partially built so that we pick them up
             // again on restart.
@@ -144,8 +141,8 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
 }
 }  // namespace
 
-void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
-    AuthorizationSession::get(txn->getClient())->grantInternalAuthorization();
+void restartInProgressIndexesFromLastShutdown(OperationContext* opCtx) {
+    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
 
     std::vector<std::string> dbNames;
 
@@ -157,17 +154,16 @@ void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
         for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
              dbName < dbNames.end();
              ++dbName) {
-            ScopedTransaction scopedXact(txn, MODE_IS);
-            AutoGetDb autoDb(txn, *dbName, MODE_S);
+            AutoGetDb autoDb(opCtx, *dbName, MODE_S);
 
             Database* db = autoDb.getDb();
             db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
         }
-        checkNS(txn, collNames);
+        checkNS(opCtx, collNames);
     } catch (const DBException& e) {
-        error() << "Index verification did not complete: " << e.toString();
+        error() << "Index verification did not complete: " << redact(e);
         fassertFailedNoTrace(18643);
     }
-    LOG(1) << "checking complete" << endl;
+    LOG(1) << "checking complete";
 }
 }

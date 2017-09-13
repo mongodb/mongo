@@ -10,9 +10,7 @@ var nodes = replTest.nodeList();
 var conns = replTest.startSet();
 var admin = conns[0].getDB("admin");
 
-replTest.initiate({
-    _id: 'prohibit_w0',
-    members: [{_id: 0, host: nodes[0]}]});
+replTest.initiate({_id: 'prohibit_w0', members: [{_id: 0, host: nodes[0]}]});
 
 function testReconfig(gleDefaults) {
     var conf = admin.runCommand({replSetGetConfig: 1}).config;
@@ -28,13 +26,11 @@ function testReconfig(gleDefaults) {
 /*
  * Try to reconfig with w: 0 in getLastErrorDefaults.
  */
-testReconfig({
-    getLastErrorDefaults: {w: 0}});
+testReconfig({getLastErrorDefaults: {w: 0}});
 
 /*
  * Try to reconfig with w: 0 and other options in getLastErrorDefaults.
  */
-testReconfig({
-    getLastErrorDefaults: {w: 0, j: false, wtimeout: 100, fsync: true}});
+testReconfig({getLastErrorDefaults: {w: 0, j: false, wtimeout: 100, fsync: true}});
 
 replTest.stopSet();

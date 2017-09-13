@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -107,6 +109,16 @@ TEST(HostAndPort, RoundTripAbility) {
     ASSERT_EQUALS(HostAndPort("abc.def:3421"), HostAndPort(HostAndPort("abc.def:3421").toString()));
     ASSERT_EQUALS(HostAndPort("[124d:]:34"), HostAndPort(HostAndPort("[124d:]:34").toString()));
     ASSERT_EQUALS(HostAndPort("[124d:]"), HostAndPort(HostAndPort("[124d:]").toString()));
+}
+
+TEST(HostAndPort, CanIdentifyDefaultRoutes) {
+    ASSERT_TRUE(HostAndPort("0.0.0.0").isDefaultRoute());
+    ASSERT_FALSE(HostAndPort("127.0.0.1").isDefaultRoute());
+    ASSERT_TRUE(HostAndPort("[::]").isDefaultRoute());
+    ASSERT_FALSE(HostAndPort("[::1]").isDefaultRoute());
+    ASSERT_TRUE(HostAndPort("[0:0:0:0:0:0:0:0]").isDefaultRoute());
+    ASSERT_TRUE(HostAndPort("[0:0:0::0:0:0]").isDefaultRoute());
+    ASSERT_TRUE(HostAndPort("[0:0:0::00:0:0]").isDefaultRoute());
 }
 
 }  // namespace

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -19,9 +19,6 @@ __config_parser_close(WT_CONFIG_PARSER *wt_config_parser)
 
 	config_parser = (WT_CONFIG_PARSER_IMPL *)wt_config_parser;
 
-	if (config_parser == NULL)
-		return (EINVAL);
-
 	__wt_free(config_parser->session, config_parser);
 	return (0);
 }
@@ -38,9 +35,6 @@ __config_parser_get(WT_CONFIG_PARSER *wt_config_parser,
 
 	config_parser = (WT_CONFIG_PARSER_IMPL *)wt_config_parser;
 
-	if (config_parser == NULL)
-		return (EINVAL);
-
 	return (__wt_config_subgets(config_parser->session,
 	    &config_parser->config_item, key, cval));
 }
@@ -56,9 +50,6 @@ __config_parser_next(WT_CONFIG_PARSER *wt_config_parser,
 	WT_CONFIG_PARSER_IMPL *config_parser;
 
 	config_parser = (WT_CONFIG_PARSER_IMPL *)wt_config_parser;
-
-	if (config_parser == NULL)
-		return (EINVAL);
 
 	return (__wt_config_next(&config_parser->config, key, cval));
 }
@@ -79,7 +70,6 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 	WT_CONFIG_ITEM config_item =
 	    { config, len, 0, WT_CONFIG_ITEM_STRING };
 	WT_CONFIG_PARSER_IMPL *config_parser;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	*config_parserp = NULL;
@@ -94,14 +84,10 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 	 * structure for iterations through the configuration string.
 	 */
 	memcpy(&config_parser->config_item, &config_item, sizeof(config_item));
-	WT_ERR(__wt_config_initn(session, &config_parser->config, config, len));
+	__wt_config_initn(session, &config_parser->config, config, len);
 
-	if (ret == 0)
-		*config_parserp = (WT_CONFIG_PARSER *)config_parser;
-	else
-err:		__wt_free(session, config_parser);
-
-	return (ret);
+	*config_parserp = (WT_CONFIG_PARSER *)config_parser;
+	return (0);
 }
 
 /*
@@ -118,7 +104,7 @@ wiredtiger_config_validate(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	/* 
+	/*
 	 * It's a logic error to specify both a session and an event handler.
 	 */
 	if (session != NULL && handler != NULL)
@@ -175,7 +161,7 @@ wiredtiger_config_validate(WT_SESSION *wt_session,
  * __conn_foc_add --
  *	Add a new entry into the connection's free-on-close list.
  */
-static int
+static void
 __conn_foc_add(WT_SESSION_IMPL *session, const void *p)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -183,13 +169,14 @@ __conn_foc_add(WT_SESSION_IMPL *session, const void *p)
 	conn = S2C(session);
 
 	/*
-	 * Our caller is expected to be holding any locks we need.
+	 * Callers of this function are expected to be holding the connection's
+	 * api_lock.
+	 *
+	 * All callers of this function currently ignore errors.
 	 */
-	WT_RET(__wt_realloc_def(
-	    session, &conn->foc_size, conn->foc_cnt + 1, &conn->foc));
-
-	conn->foc[conn->foc_cnt++] = (void *)p;
-	return (0);
+	if (__wt_realloc_def(
+	    session, &conn->foc_size, conn->foc_cnt + 1, &conn->foc) == 0)
+		conn->foc[conn->foc_cnt++] = (void *)p;
 }
 
 /*
@@ -228,14 +215,14 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	WT_CONFIG_ENTRY *entry;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	size_t cnt;
+	size_t cnt, len;
 	char *newcheck_name, *p;
 
 	/*
 	 * !!!
 	 * We ignore the specified uri, that is, all new configuration options
-	 * will be valid for all data sources.   That shouldn't be too bad
-	 * as the worst that can happen is an application might specify some
+	 * will be valid for all data sources. That shouldn't be too bad as
+	 * the worst that can happen is an application might specify some
 	 * configuration option and not get an error -- the option should be
 	 * ignored by the underlying implementation since it's unexpected, so
 	 * there shouldn't be any real problems.  Eventually I expect we will
@@ -289,12 +276,10 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__wt_calloc_one(session, &entry));
 	entry->method = (*epp)->method;
-	WT_ERR(__wt_calloc_def(session,
-	    strlen((*epp)->base) + strlen(",") + strlen(config) + 1, &p));
-	(void)strcpy(p, (*epp)->base);
-	(void)strcat(p, ",");
-	(void)strcat(p, config);
+	len = strlen((*epp)->base) + strlen(",") + strlen(config) + 1;
+	WT_ERR(__wt_calloc_def(session, len, &p));
 	entry->base = p;
+	WT_ERR(__wt_snprintf(p, len, "%s,%s", (*epp)->base, config));
 
 	/*
 	 * There may be a default value in the config argument passed in (for
@@ -342,12 +327,12 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	 * order to avoid freeing chunks of memory twice.  Again, this isn't a
 	 * commonly used API and it shouldn't ever happen, just leak it.
 	 */
-	(void)__conn_foc_add(session, entry->base);
-	(void)__conn_foc_add(session, entry);
-	(void)__conn_foc_add(session, checks);
-	(void)__conn_foc_add(session, newcheck->type);
-	(void)__conn_foc_add(session, newcheck->checks);
-	(void)__conn_foc_add(session, newcheck_name);
+	__conn_foc_add(session, entry->base);
+	__conn_foc_add(session, entry);
+	__conn_foc_add(session, checks);
+	__conn_foc_add(session, newcheck->type);
+	__conn_foc_add(session, newcheck->checks);
+	__conn_foc_add(session, newcheck_name);
 
 	/*
 	 * Instead of using locks to protect configuration information, assume

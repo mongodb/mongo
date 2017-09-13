@@ -30,9 +30,10 @@
 
 #include <string>
 
+#include "mongo/db/client.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -46,7 +47,7 @@ class NetworkInterfaceMock;
 
 namespace repl {
 
-class ReplicaSetConfig;
+class ReplSetConfig;
 class ReplicationCoordinatorExternalStateMock;
 class ReplicationCoordinatorImpl;
 class StorageInterfaceMock;
@@ -58,22 +59,38 @@ class TopologyCoordinatorImpl;
 class ReplCoordTest : public mongo::unittest::Test {
 public:
     /**
-     * Makes a ResponseStatus with the given "doc" response and optional elapsed time "millis".
+     * Makes a command response with the given "doc" response and optional elapsed time "millis".
      */
-    static ResponseStatus makeResponseStatus(const BSONObj& doc,
-                                             Milliseconds millis = Milliseconds(0));
+    static executor::RemoteCommandResponse makeResponseStatus(
+        const BSONObj& doc, Milliseconds millis = Milliseconds(0));
 
     /**
-     * Constructs a ReplicaSetConfig from the given BSON, or raises a test failure exception.
+     * Makes a command response with the given "doc" response, metadata and optional elapsed time
+     * "millis".
      */
-    static ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBSON);
+    static executor::RemoteCommandResponse makeResponseStatus(
+        const BSONObj& doc, const BSONObj& metadata, Milliseconds millis = Milliseconds(0));
 
-    ReplCoordTest();
-    virtual ~ReplCoordTest();
+    /**
+     * Constructs a ReplSetConfig from the given BSON, or raises a test failure exception.
+     */
+    static ReplSetConfig assertMakeRSConfig(const BSONObj& configBSON);
+    static ReplSetConfig assertMakeRSConfigV0(const BSONObj& configBson);
+
+    /**
+     * Adds { protocolVersion: 0 or 1 } to the config.
+     */
+    static BSONObj addProtocolVersion(const BSONObj& configDoc, int protocolVersion);
 
 protected:
     virtual void setUp();
     virtual void tearDown();
+
+    /**
+     * Asserts that calling start(configDoc, selfHost) successfully initiates the
+     * ReplicationCoordinator under test.
+     */
+    virtual void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
 
     /**
      * Gets the network mock.
@@ -83,10 +100,22 @@ protected:
     }
 
     /**
+     * Gets the replication executor under test.
+     */
+    executor::TaskExecutor* getReplExec();
+
+    /**
      * Gets the replication coordinator under test.
      */
     ReplicationCoordinatorImpl* getReplCoord() {
         return _repl.get();
+    }
+
+    /**
+     * Gets the storage interface.
+     */
+    StorageInterfaceMock* getStorageInterface() {
+        return _storageInterface;
     }
 
     /**
@@ -101,6 +130,27 @@ protected:
      */
     ReplicationCoordinatorExternalStateMock* getExternalState() {
         return _externalState;
+    }
+
+    /**
+     * Makes a new OperationContext on the default Client for this test.
+     */
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        return _client->makeOperationContext();
+    }
+
+    /**
+     * Returns the ServiceContext for this test.
+     */
+    ServiceContext* getServiceContext() {
+        return getGlobalServiceContext();
+    }
+
+    /**
+     * Returns the default Client for this test.
+     */
+    Client* getClient() {
+        return _client.get();
     }
 
     /**
@@ -158,8 +208,21 @@ protected:
     void start(const HostAndPort& selfHost);
 
     /**
+     * Brings the TopologyCoordinator from follower to candidate by simulating a period of time in
+     * which the election timer expires and starts a dry run election.
+     * Returns after dry run is completed but before actual election starts.
+     * If 'onDryRunRequest' is provided, this function is invoked with the
+     * replSetRequestVotes network request before simulateSuccessfulDryRun() simulates
+     * a successful dry run vote response.
+     * Applicable to protocol version 1 only.
+     */
+    void simulateSuccessfulDryRun(
+        stdx::function<void(const executor::RemoteCommandRequest& request)> onDryRunRequest);
+    void simulateSuccessfulDryRun();
+
+    /**
      * Brings the repl coord from SECONDARY to PRIMARY by simulating the messages required to
-     * elect it.
+     * elect it, after progressing the mocked-out notion of time past the election timeout.
      *
      * Behavior is unspecified if node does not have a clean config, is not in SECONDARY, etc.
      */
@@ -167,39 +230,56 @@ protected:
     void simulateSuccessfulV1Election();
 
     /**
-     * Brings the repl coord from PRIMARY to SECONDARY by simulating a period of time in which
-     * all heartbeats respond with an error condition, such as time out.
+     * Same as simulateSuccessfulV1Election, but rather than getting the election timeout and
+     * progressing time past that point, takes in what time to expect an election to occur at.
+     * Useful for simulating elections triggered via priority takeover.
      */
-    void simulateStepDownOnIsolation();
-
-    /**
-     * Asserts that calling start(configDoc, selfHost) successfully initiates the
-     * ReplicationCoordinator under test.
-     */
-    void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
+    void simulateSuccessfulV1ElectionAt(Date_t electionTime);
 
     /**
      * Shuts down the objects under test.
      */
-    void shutdown();
+    void shutdown(OperationContext* opCtx);
 
     /**
-     * Returns the number of collected log lines containing "needle".
+     * Receive the heartbeat request from replication coordinator and reply with a response.
      */
-    int64_t countLogLinesContaining(const std::string& needle);
+    void replyToReceivedHeartbeat();
+    void replyToReceivedHeartbeatV1();
+
+    void simulateEnoughHeartbeatsForAllNodesUp();
+
+    /**
+     * Disables read concern majority support.
+     */
+    void disableReadConcernMajoritySupport();
+
+    /**
+     * Disables snapshot support.
+     */
+    void disableSnapshots();
+
+    /**
+     * Timeout all heartbeat requests for primary catch-up.
+     */
+    void simulateCatchUpAbort();
 
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl
-    TopologyCoordinatorImpl* _topo;
+    TopologyCoordinatorImpl* _topo = nullptr;
+    // Owned by executor
+    executor::NetworkInterfaceMock* _net = nullptr;
     // Owned by ReplicationCoordinatorImpl
-    executor::NetworkInterfaceMock* _net;
+    ReplicationCoordinatorExternalStateMock* _externalState = nullptr;
     // Owned by ReplicationCoordinatorImpl
-    StorageInterfaceMock* _storage;
-    // Owned by ReplicationCoordinatorImpl
-    ReplicationCoordinatorExternalStateMock* _externalState;
+    executor::TaskExecutor* _replExec = nullptr;
+    // Owned by the ServiceContext
+    StorageInterfaceMock* _storageInterface = nullptr;
+
     ReplSettings _settings;
-    bool _callShutdown;
+    bool _callShutdown = false;
+    ServiceContext::UniqueClient _client = getGlobalServiceContext()->makeClient("testClient");
 };
 
 }  // namespace repl

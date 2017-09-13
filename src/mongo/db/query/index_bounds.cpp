@@ -29,7 +29,10 @@
 #include "mongo/db/query/index_bounds.h"
 
 #include <algorithm>
+#include <tuple>
 #include <utility>
+
+#include "mongo/bson/simple_bsonobj_comparator.h"
 
 namespace mongo {
 
@@ -93,6 +96,34 @@ Interval IndexBounds::getInterval(size_t i, size_t j) const {
     }
 }
 
+bool IndexBounds::operator==(const IndexBounds& other) const {
+    if (this->isSimpleRange != other.isSimpleRange) {
+        return false;
+    }
+
+    if (this->isSimpleRange) {
+        return SimpleBSONObjComparator::kInstance.evaluate(this->startKey == other.startKey) &&
+            SimpleBSONObjComparator::kInstance.evaluate(this->endKey == other.endKey) &&
+            (this->boundInclusion == other.boundInclusion);
+    }
+
+    if (this->fields.size() != other.fields.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < this->fields.size(); ++i) {
+        if (this->fields[i] != other.fields[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool IndexBounds::operator!=(const IndexBounds& other) const {
+    return !(*this == other);
+}
+
 string OrderedIntervalList::toString() const {
     mongoutils::str::stream ss;
     ss << "['" << name << "']: ";
@@ -103,6 +134,56 @@ string OrderedIntervalList::toString() const {
         }
     }
     return ss;
+}
+
+bool IndexBounds::isStartIncludedInBound(BoundInclusion boundInclusion) {
+    return boundInclusion == BoundInclusion::kIncludeBothStartAndEndKeys ||
+        boundInclusion == BoundInclusion::kIncludeStartKeyOnly;
+}
+
+bool IndexBounds::isEndIncludedInBound(BoundInclusion boundInclusion) {
+    return boundInclusion == BoundInclusion::kIncludeBothStartAndEndKeys ||
+        boundInclusion == BoundInclusion::kIncludeEndKeyOnly;
+}
+
+BoundInclusion IndexBounds::makeBoundInclusionFromBoundBools(bool startKeyInclusive,
+                                                             bool endKeyInclusive) {
+    if (startKeyInclusive) {
+        if (endKeyInclusive) {
+            return BoundInclusion::kIncludeBothStartAndEndKeys;
+        } else {
+            return BoundInclusion::kIncludeStartKeyOnly;
+        }
+    } else {
+        if (endKeyInclusive) {
+            return BoundInclusion::kIncludeEndKeyOnly;
+        } else {
+            return BoundInclusion::kExcludeBothStartAndEndKeys;
+        }
+    }
+}
+
+
+bool OrderedIntervalList::operator==(const OrderedIntervalList& other) const {
+    if (this->name != other.name) {
+        return false;
+    }
+
+    if (this->intervals.size() != other.intervals.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < this->intervals.size(); ++i) {
+        if (this->intervals[i] != other.intervals[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool OrderedIntervalList::operator!=(const OrderedIntervalList& other) const {
+    return !(*this == other);
 }
 
 // static
@@ -163,12 +244,17 @@ void OrderedIntervalList::complement() {
 string IndexBounds::toString() const {
     mongoutils::str::stream ss;
     if (isSimpleRange) {
-        ss << "[" << startKey.toString() << ", ";
+        if (IndexBounds::isStartIncludedInBound(boundInclusion)) {
+            ss << "[";
+        } else {
+            ss << "(";
+        }
+        ss << startKey.toString() << ", ";
         if (endKey.isEmpty()) {
             ss << "]";
         } else {
             ss << endKey.toString();
-            if (endKeyInclusive) {
+            if (IndexBounds::isEndIncludedInBound(boundInclusion)) {
                 ss << "]";
             } else {
                 ss << ")";

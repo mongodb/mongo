@@ -26,9 +26,13 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/batched_command_response.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -45,10 +49,10 @@ const BSONField<long long> BatchedCommandResponse::n("n", 0);
 const BSONField<long long> BatchedCommandResponse::nModified("nModified", 0);
 const BSONField<std::vector<BatchedUpsertDetail*>> BatchedCommandResponse::upsertDetails(
     "upserted");
-const BSONField<Timestamp> BatchedCommandResponse::lastOp("lastOp");
 const BSONField<OID> BatchedCommandResponse::electionId("electionId");
 const BSONField<std::vector<WriteErrorDetail*>> BatchedCommandResponse::writeErrors("writeErrors");
-const BSONField<WCErrorDetail*> BatchedCommandResponse::writeConcernError("writeConcernError");
+const BSONField<WriteConcernErrorDetail*> BatchedCommandResponse::writeConcernError(
+    "writeConcernError");
 
 BatchedCommandResponse::BatchedCommandResponse() {
     clear();
@@ -102,18 +106,47 @@ BSONObj BatchedCommandResponse::toBSON() const {
         upsertedBuilder.done();
     }
 
-    if (_isLastOpSet)
-        builder.append(lastOp(), _lastOp);
+    if (_isLastOpSet) {
+        if (_lastOp.getTerm() != repl::OpTime::kUninitializedTerm) {
+            _lastOp.append(&builder, "opTime");
+        } else {
+            builder.append("opTime", _lastOp.getTimestamp());
+        }
+    }
     if (_isElectionIdSet)
         builder.appendOID(electionId(), const_cast<OID*>(&_electionId));
 
     if (_writeErrorDetails.get()) {
+        auto errorMessage =
+            [ errorCount = size_t(0), errorSize = size_t(0) ](StringData rawMessage) mutable {
+            // Start truncating error messages once both of these limits are exceeded.
+            constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
+            constexpr size_t kErrorCountTruncationMin = 2;
+            if (errorSize >= kErrorSizeTruncationMin && errorCount >= kErrorCountTruncationMin) {
+                return ""_sd;
+            }
+
+            errorCount++;
+            errorSize += rawMessage.size();
+            return rawMessage;
+        };
+
         BSONArrayBuilder errDetailsBuilder(builder.subarrayStart(writeErrors()));
-        for (std::vector<WriteErrorDetail*>::const_iterator it = _writeErrorDetails->begin();
-             it != _writeErrorDetails->end();
-             ++it) {
-            BSONObj errDetailsDocument = (*it)->toBSON();
-            errDetailsBuilder.append(errDetailsDocument);
+        for (auto&& writeError : *_writeErrorDetails) {
+            BSONObjBuilder errDetailsDocument(errDetailsBuilder.subobjStart());
+
+            if (writeError->isIndexSet())
+                builder.append(WriteErrorDetail::index(), writeError->getIndex());
+
+            if (writeError->isErrCodeSet())
+                builder.append(WriteErrorDetail::errCode(), writeError->getErrCode());
+
+            if (writeError->isErrInfoSet())
+                builder.append(WriteErrorDetail::errInfo(), writeError->getErrInfo());
+
+            if (writeError->isErrMessageSet())
+                builder.append(WriteErrorDetail::errMessage(),
+                               errorMessage(writeError->getErrMessage()));
         }
         errDetailsBuilder.done();
     }
@@ -186,10 +219,22 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
         return false;
     _upsertDetails.reset(tempUpsertDetails);
 
-    fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
+    const BSONElement opTimeElement = source["opTime"];
+    _isLastOpSet = true;
+    if (opTimeElement.eoo()) {
+        _isLastOpSet = false;
+    } else if (opTimeElement.type() == bsonTimestamp) {
+        _lastOp = repl::OpTime(opTimeElement.timestamp(), repl::OpTime::kUninitializedTerm);
+    } else if (opTimeElement.type() == Date) {
+        _lastOp = repl::OpTime(Timestamp(opTimeElement.date()), repl::OpTime::kUninitializedTerm);
+    } else if (opTimeElement.type() == Object) {
+        Status status = bsonExtractOpTimeField(source, "opTime", &_lastOp);
+        if (!status.isOK()) {
+            return false;
+        }
+    } else {
         return false;
-    _isLastOpSet = fieldState == FieldParser::FIELD_SET;
+    }
 
     fieldState = FieldParser::extract(source, electionId, &_electionId, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
@@ -202,7 +247,7 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
         return false;
     _writeErrorDetails.reset(tempErrDetails);
 
-    WCErrorDetail* wcError = NULL;
+    WriteConcernErrorDetail* wcError = NULL;
     fieldState = FieldParser::extract(source, writeConcernError, &wcError, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
@@ -239,7 +284,7 @@ void BatchedCommandResponse::clear() {
         _upsertDetails.reset();
     }
 
-    _lastOp = Timestamp();
+    _lastOp = repl::OpTime();
     _isLastOpSet = false;
 
     _electionId = OID();
@@ -307,7 +352,7 @@ void BatchedCommandResponse::cloneTo(BatchedCommandResponse* other) const {
     }
 
     if (_wcErrDetails.get()) {
-        other->_wcErrDetails.reset(new WCErrorDetail());
+        other->_wcErrDetails.reset(new WriteConcernErrorDetail());
         _wcErrDetails->cloneTo(other->_wcErrDetails.get());
     }
 }
@@ -319,14 +364,6 @@ std::string BatchedCommandResponse::toString() const {
 void BatchedCommandResponse::setOk(int ok) {
     _ok = ok;
     _isOkSet = true;
-}
-
-void BatchedCommandResponse::unsetOk() {
-    _isOkSet = false;
-}
-
-bool BatchedCommandResponse::isOkSet() const {
-    return _isOkSet;
 }
 
 int BatchedCommandResponse::getOk() const {
@@ -358,10 +395,6 @@ int BatchedCommandResponse::getErrCode() const {
 void BatchedCommandResponse::setErrMessage(StringData errMessage) {
     _errMessage = errMessage.toString();
     _isErrMessageSet = true;
-}
-
-void BatchedCommandResponse::unsetErrMessage() {
-    _isErrMessageSet = false;
 }
 
 bool BatchedCommandResponse::isErrMessageSet() const {
@@ -465,7 +498,7 @@ const BatchedUpsertDetail* BatchedCommandResponse::getUpsertDetailsAt(size_t pos
     return _upsertDetails->at(pos);
 }
 
-void BatchedCommandResponse::setLastOp(Timestamp lastOp) {
+void BatchedCommandResponse::setLastOp(repl::OpTime lastOp) {
     _lastOp = lastOp;
     _isLastOpSet = true;
 }
@@ -478,7 +511,7 @@ bool BatchedCommandResponse::isLastOpSet() const {
     return _isLastOpSet;
 }
 
-Timestamp BatchedCommandResponse::getLastOp() const {
+repl::OpTime BatchedCommandResponse::getLastOp() const {
     dassert(_isLastOpSet);
     return _lastOp;
 }
@@ -550,7 +583,7 @@ const WriteErrorDetail* BatchedCommandResponse::getErrDetailsAt(size_t pos) cons
     return _writeErrorDetails->at(pos);
 }
 
-void BatchedCommandResponse::setWriteConcernError(WCErrorDetail* error) {
+void BatchedCommandResponse::setWriteConcernError(WriteConcernErrorDetail* error) {
     _wcErrDetails.reset(error);
 }
 
@@ -562,8 +595,28 @@ bool BatchedCommandResponse::isWriteConcernErrorSet() const {
     return _wcErrDetails.get();
 }
 
-const WCErrorDetail* BatchedCommandResponse::getWriteConcernError() const {
+const WriteConcernErrorDetail* BatchedCommandResponse::getWriteConcernError() const {
     return _wcErrDetails.get();
+}
+
+Status BatchedCommandResponse::toStatus() const {
+    if (!getOk()) {
+        return Status(ErrorCodes::fromInt(getErrCode()), getErrMessage());
+    }
+
+    if (isErrDetailsSet()) {
+        const WriteErrorDetail* errDetail = getErrDetails().front();
+
+        return Status(ErrorCodes::fromInt(errDetail->getErrCode()), errDetail->getErrMessage());
+    }
+
+    if (isWriteConcernErrorSet()) {
+        const WriteConcernErrorDetail* errDetail = getWriteConcernError();
+
+        return Status(ErrorCodes::fromInt(errDetail->getErrCode()), errDetail->getErrMessage());
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

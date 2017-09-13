@@ -28,9 +28,11 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -39,6 +41,8 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
+
+extern AtomicBool failIndexKeyTooLong;
 
 class BSONObjBuilder;
 class MatchExpression;
@@ -68,23 +72,23 @@ public:
 
     /**
      * Internally generate the keys {k1, ..., kn} for 'obj'.  For each key k, insert (k ->
-     * 'loc') into the index.  'obj' is the object at the location 'loc'.  If not NULL,
+     * 'loc') into the index.  'obj' is the object at the location 'loc'.
      * 'numInserted' will be set to the number of keys added to the index for the document.  If
      * there is more than one key for 'obj', either all keys will be inserted or none will.
      *
      * The behavior of the insertion can be specified through 'options'.
      */
-    Status insert(OperationContext* txn,
+    Status insert(OperationContext* opCtx,
                   const BSONObj& obj,
                   const RecordId& loc,
                   const InsertDeleteOptions& options,
                   int64_t* numInserted);
 
     /**
-     * Analogous to above, but remove the records instead of inserting them.  If not NULL,
-     * numDeleted will be set to the number of keys removed from the index for the document.
+     * Analogous to above, but remove the records instead of inserting them.
+     * 'numDeleted' will be set to the number of keys removed from the index for the document.
      */
-    Status remove(OperationContext* txn,
+    Status remove(OperationContext* opCtx,
                   const BSONObj& obj,
                   const RecordId& loc,
                   const InsertDeleteOptions& options,
@@ -100,7 +104,7 @@ public:
      *
      * There is no obligation to perform the update after performing validation.
      */
-    Status validateUpdate(OperationContext* txn,
+    Status validateUpdate(OperationContext* opCtx,
                           const BSONObj& from,
                           const BSONObj& to,
                           const RecordId& loc,
@@ -115,14 +119,24 @@ public:
      * 'from' will remain.  Assumes that the index has not changed since validateUpdate was
      * called.  If the index was changed, we may return an error, as our ticket may have been
      * invalidated.
+     *
+     * 'numInserted' will be set to the number of keys inserted into the index for the document.
+     * 'numDeleted' will be set to the number of keys removed from the index for the document.
      */
-    Status update(OperationContext* txn, const UpdateTicket& ticket, int64_t* numUpdated);
+    Status update(OperationContext* opCtx,
+                  const UpdateTicket& ticket,
+                  int64_t* numInserted,
+                  int64_t* numDeleted);
 
     /**
      * Returns an unpositioned cursor over 'this' index.
      */
-    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool isForward = true) const;
+    /**
+     * Returns a pseudo-random cursor over 'this' index.
+     */
+    std::unique_ptr<SortedDataInterface::Cursor> newRandomCursor(OperationContext* opCtx) const;
 
     // ------ index level operations ------
 
@@ -132,7 +146,7 @@ public:
      * only called once for the lifetime of the index
      * if called multiple times, is an error
      */
-    Status initializeAsEmpty(OperationContext* txn);
+    Status initializeAsEmpty(OperationContext* opCtx);
 
     /**
      * Try to page-in the pages that contain the keys generated from 'obj'.
@@ -140,26 +154,18 @@ public:
      * appropriate pages are not swapped out.
      * See prefetch.cpp.
      */
-    Status touch(OperationContext* txn, const BSONObj& obj);
+    Status touch(OperationContext* opCtx, const BSONObj& obj);
 
     /**
      * this pages in the entire index
      */
-    Status touch(OperationContext* txn) const;
+    Status touch(OperationContext* opCtx) const;
 
     /**
      * Walk the entire index, checking the internal structure for consistency.
      * Set numKeys to the number of keys in the index.
-     *
-     * 'output' is used to store results of validate when 'full' is true.
-     * If 'full' is false, 'output' may be NULL.
-     *
-     * Return OK if the index is valid.
-     *
-     * Currently wasserts that the index is invalid.  This could/should be changed in
-     * the future to return a Status.
      */
-    Status validate(OperationContext* txn, bool full, int64_t* numKeys, BSONObjBuilder* output);
+    void validate(OperationContext* opCtx, int64_t* numKeys, ValidateResults* fullResults);
 
     /**
      * Add custom statistics about this index to BSON object builder, for display.
@@ -168,15 +174,21 @@ public:
      *
      * Returns true if stats were appended.
      */
-    bool appendCustomStats(OperationContext* txn, BSONObjBuilder* result, double scale) const;
+    bool appendCustomStats(OperationContext* opCtx, BSONObjBuilder* result, double scale) const;
 
     /**
      * @return The number of bytes consumed by this index.
      *         Exactly what is counted is not defined based on padding, re-use, etc...
      */
-    long long getSpaceUsedBytes(OperationContext* txn) const;
+    long long getSpaceUsedBytes(OperationContext* opCtx) const;
 
-    RecordId findSingle(OperationContext* txn, const BSONObj& key) const;
+    RecordId findSingle(OperationContext* opCtx, const BSONObj& key) const;
+
+    /**
+     * Attempt compaction to regain disk space if the indexed record store supports
+     * compaction-in-place.
+     */
+    Status compact(OperationContext* opCtx);
 
     //
     // Bulk operations support
@@ -187,7 +199,7 @@ public:
         /**
          * Insert into the BulkBuilder as-if inserting into an IndexAccessMethod.
          */
-        Status insert(OperationContext* txn,
+        Status insert(OperationContext* opCtx,
                       const BSONObj& obj,
                       const RecordId& loc,
                       const InsertDeleteOptions& options,
@@ -198,12 +210,21 @@ public:
 
         using Sorter = mongo::Sorter<BSONObj, RecordId>;
 
-        BulkBuilder(const IndexAccessMethod* index, const IndexDescriptor* descriptor);
+        BulkBuilder(const IndexAccessMethod* index,
+                    const IndexDescriptor* descriptor,
+                    size_t maxMemoryUsageBytes);
 
         std::unique_ptr<Sorter> _sorter;
         const IndexAccessMethod* _real;
         int64_t _keysInserted = 0;
-        bool _isMultiKey = false;
+
+        // Set to true if at least one document causes IndexAccessMethod::getKeys() to return a
+        // BSONObjSet with size strictly greater than one.
+        bool _everGeneratedMultipleKeys = false;
+
+        // Holds the path components that cause this index to be multikey. The '_indexMultikeyPaths'
+        // vector remains empty if this index doesn't support path-level multikey tracking.
+        MultikeyPaths _indexMultikeyPaths;
     };
 
     /**
@@ -212,8 +233,11 @@ public:
      * This can return NULL, meaning bulk mode is not available.
      *
      * It is only legal to initiate bulk when the index is new and empty.
+     *
+     * maxMemoryUsageBytes: amount of memory consumed before the external sorter starts spilling to
+     *                      disk
      */
-    std::unique_ptr<BulkBuilder> initiateBulk();
+    std::unique_ptr<BulkBuilder> initiateBulk(size_t maxMemoryUsageBytes);
 
     /**
      * Call this when you are ready to finish your bulk work.
@@ -224,26 +248,69 @@ public:
      * @param dups - if NULL, error out on dups if not allowed
      *               if not NULL, put the bad RecordIds there
      */
-    Status commitBulk(OperationContext* txn,
+    Status commitBulk(OperationContext* opCtx,
                       std::unique_ptr<BulkBuilder> bulk,
                       bool mayInterrupt,
                       bool dupsAllowed,
                       std::set<RecordId>* dups);
 
     /**
-     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     * Specifies whether getKeys should relax the index constraints or not.
      */
-    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const = 0;
+    enum class GetKeysMode { kRelaxConstraints, kEnforceConstraints };
+
+    /**
+     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     * Based on 'mode', it will honor or ignore index constraints, e.g. duplicated key, key too
+     * long, and geo index parsing errors. The ignoring of constraints is for replication due to
+     * idempotency reasons. In those cases, the generated 'keys' will be empty.
+     *
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
+     * index type supports tracking path-level multikey information, then this function resizes
+     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
+     * element with the prefixes of the indexed field that would cause this index to be multikey as
+     * a result of inserting 'keys'.
+     */
+    void getKeys(const BSONObj& obj,
+                 GetKeysMode mode,
+                 BSONObjSet* keys,
+                 MultikeyPaths* multikeyPaths) const;
+
+    /**
+     * Splits the sets 'left' and 'right' into two vectors, the first containing the elements that
+     * only appeared in 'left', and the second containing only elements that appeared in 'right'.
+     *
+     * Note this considers objects which are not identical as distinct objects. For example,
+     * setDifference({BSON("a" << 0.0)}, {BSON("a" << 0LL)}) would result in the pair
+     * ( {BSON("a" << 0.0)}, {BSON("a" << 0LL)} ).
+     */
+    static std::pair<std::vector<BSONObj>, std::vector<BSONObj>> setDifference(
+        const BSONObjSet& left, const BSONObjSet& right);
 
 protected:
-    // Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
-    bool ignoreKeyTooLong(OperationContext* txn);
+    /**
+     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     *
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
+     * index type supports tracking path-level multikey information, then this function resizes
+     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
+     * element with the prefixes of the indexed field that would cause this index to be multikey as
+     * a result of inserting 'keys'.
+     */
+    virtual void doGetKeys(const BSONObj& obj,
+                           BSONObjSet* keys,
+                           MultikeyPaths* multikeyPaths) const = 0;
+
+    /**
+     * Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
+     */
+    bool ignoreKeyTooLong(OperationContext* opCtx);
 
     IndexCatalogEntry* _btreeState;  // owned by IndexCatalogEntry
     const IndexDescriptor* _descriptor;
 
 private:
-    void removeOneKey(OperationContext* txn,
+    void removeOneKey(OperationContext* opCtx,
                       const BSONObj& key,
                       const RecordId& loc,
                       bool dupsAllowed);
@@ -256,7 +323,10 @@ private:
  * validateUpdate fills out the UpdateStatus and update actually applies it.
  */
 class UpdateTicket {
-    // No public interface
+public:
+    UpdateTicket()
+        : oldKeys(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), newKeys(oldKeys) {}
+
 private:
     friend class IndexAccessMethod;
 
@@ -265,25 +335,31 @@ private:
     BSONObjSet oldKeys;
     BSONObjSet newKeys;
 
-    // These point into the sets oldKeys and newKeys.
-    std::vector<BSONObj*> removed;
-    std::vector<BSONObj*> added;
+    std::vector<BSONObj> removed;
+    std::vector<BSONObj> added;
 
     RecordId loc;
     bool dupsAllowed;
+
+    // Holds the path components that would cause this index to be multikey as a result of inserting
+    // 'newKeys'. The 'newMultikeyPaths' vector remains empty if this index doesn't support
+    // path-level multikey tracking.
+    MultikeyPaths newMultikeyPaths;
 };
 
 /**
  * Flags we can set for inserts and deletes (and updates, which are kind of both).
  */
 struct InsertDeleteOptions {
-    InsertDeleteOptions() : logIfError(false), dupsAllowed(false) {}
-
     // If there's an error, log() it.
-    bool logIfError;
+    bool logIfError = false;
 
     // Are duplicate keys allowed in the index?
-    bool dupsAllowed;
+    bool dupsAllowed = false;
+
+    // Should we relax the index constraints?
+    IndexAccessMethod::GetKeysMode getKeysMode =
+        IndexAccessMethod::GetKeysMode::kEnforceConstraints;
 };
 
 }  // namespace mongo

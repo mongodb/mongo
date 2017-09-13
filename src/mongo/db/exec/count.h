@@ -34,6 +34,30 @@
 
 namespace mongo {
 
+struct CountStageParams {
+    CountStageParams(const CountRequest& request, bool useRecordStoreCount)
+        : nss(request.getNs()),
+          limit(request.getLimit()),
+          skip(request.getSkip()),
+          useRecordStoreCount(useRecordStoreCount) {}
+
+    // Namespace to operate on (e.g. "foo.bar").
+    NamespaceString nss;
+
+    // An integer limiting the number of documents to count. 0 means no limit.
+    long long limit;
+
+    // An integer indicating to not include the first n documents in the count. 0 means no skip.
+    long long skip;
+
+    // True if this count stage should just ask the record store for a count instead of computing
+    // one itself.
+    //
+    // Note: This strategy can lead to inaccurate counts on certain storage engines (including
+    // WiredTiger).
+    bool useRecordStoreCount;
+};
+
 /**
  * Stage used by the count command. This stage sits at the root of a plan tree
  * and counts the number of results returned by its child stage.
@@ -45,51 +69,40 @@ namespace mongo {
  * Only returns NEED_TIME until hitting EOF. The count result can be obtained by examining
  * the specific stats.
  */
-class CountStage : public PlanStage {
+class CountStage final : public PlanStage {
 public:
-    CountStage(OperationContext* txn,
+    CountStage(OperationContext* opCtx,
                Collection* collection,
-               const CountRequest& request,
+               CountStageParams params,
                WorkingSet* ws,
                PlanStage* child);
 
-    virtual ~CountStage();
+    bool isEOF() final;
+    StageState doWork(WorkingSetID* out) final;
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
-
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_COUNT;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
 private:
     /**
-     * Computes the count in the case of an empty query, applying the skip and
-     * limit if necessary. The result is stored in '_specificStats'.
+     * Asks the record store for the count, applying the skip and limit if necessary. The result is
+     * stored in '_specificStats'.
+     *
+     * This is only valid if the query and hint are both empty.
      */
-    void trivialCount();
-
-    // Transactional context for read locks. Not owned by us.
-    OperationContext* _txn;
+    void recordStoreCount();
 
     // The collection over which we are counting.
     Collection* _collection;
 
-    CountRequest _request;
+    CountStageParams _params;
 
     // The number of documents that we still need to skip.
     long long _leftToSkip;
@@ -98,9 +111,6 @@ private:
     // by us.
     WorkingSet* _ws;
 
-    std::unique_ptr<PlanStage> _child;
-
-    CommonStats _commonStats;
     CountStats _specificStats;
 };
 

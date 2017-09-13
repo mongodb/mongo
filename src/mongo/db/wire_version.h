@@ -26,6 +26,11 @@
 *    it in the license file.
 */
 
+#pragma once
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/bson/bsonobjbuilder.h"
+
 namespace mongo {
 
 /**
@@ -54,15 +59,76 @@ enum WireVersion {
     BATCH_COMMANDS = 2,
 
     // support SCRAM-SHA1, listIndexes, listCollections, new explain
-    RELEASE_2_7_7 = 3
+    RELEASE_2_7_7 = 3,
+
+    // Support find and getMore commands, as well as OP_COMMAND in mongod (but not mongos).
+    FIND_COMMAND = 4,
+
+    // Supports all write commands take a write concern.
+    COMMANDS_ACCEPT_WRITE_CONCERN = 5,
+
+    // Supports the new OP_MSG wireprotocol (3.6+).
+    SUPPORTS_OP_MSG = 6,
+
+    // Set this to the highest value in this enum - it will be the default maxWireVersion for
+    // the WireSpec values.
+    LATEST_WIRE_VERSION = SUPPORTS_OP_MSG,
 };
 
-// Latest version that the server accepts. This should always be at the latest entry in
-// WireVersion.
-static const int maxWireVersion = RELEASE_2_7_7;
+/**
+ * Struct to pass around information about wire version.
+ */
+struct WireVersionInfo {
+    int minWireVersion;
+    int maxWireVersion;
+};
 
-// Minimum version that the server accepts. We should bump this whenever we don't want
-// to allow communication with too old agents.
-static const int minWireVersion = RELEASE_2_4_AND_BEFORE;
+struct WireSpec {
+    MONGO_DISALLOW_COPYING(WireSpec);
+
+    static WireSpec& instance();
+
+    /**
+     * Appends the min and max versions in 'wireVersionInfo' to 'builder' in the format expected for
+     * reporting information about the internal client.
+     *
+     * Intended for use as part of performing the isMaster handshake with a remote node. When an
+     * internal clients make a connection to another node in the cluster, it includes internal
+     * client information as a parameter to the isMaster command. This parameter has the following
+     * format:
+     *
+     *    internalClient: {
+     *        minWireVersion: <int>,
+     *        maxWireVersion: <int>
+     *    }
+     *
+     * This information can be used to ensure correctness during upgrade in mixed version clusters.
+     */
+    static void appendInternalClientWireVersion(WireVersionInfo wireVersionInfo,
+                                                BSONObjBuilder* builder);
+
+    // incoming.minWireVersion - Minimum version that the server accepts on incoming requests. We
+    // should bump this whenever we don't want to allow incoming connections from clients that are
+    // too old.
+
+    // incoming.maxWireVersion - Latest version that the server accepts on incoming requests. This
+    // should always be at the latest entry in WireVersion.
+    WireVersionInfo incoming = {RELEASE_2_4_AND_BEFORE, LATEST_WIRE_VERSION};
+
+    // outgoing.minWireVersion - Minimum version allowed on remote nodes when the server sends
+    // requests. We should bump this whenever we don't want to connect to clients that are too old.
+
+    // outgoing.maxWireVersion - Latest version allowed on remote nodes when the server sends
+    // requests.
+    WireVersionInfo outgoing = {RELEASE_2_4_AND_BEFORE, LATEST_WIRE_VERSION};
+
+    // Set to true if the client is internal to the cluster---this is a mongod or mongos connecting
+    // to another mongod.
+    bool isInternalClient = false;
+
+private:
+    WireSpec() = default;
+};
+
 
 }  // namespace mongo

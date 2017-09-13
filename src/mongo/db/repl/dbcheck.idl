@@ -1,0 +1,122 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# IDL basic types
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/repl/dbcheck_idl.h"
+
+imports:
+  - "mongo/idl/basic_types.idl"
+
+types:
+  _id_key:
+    bson_serialization_type: any
+    description: "An _id value."
+    cpp_type: "mongo::BSONKey"
+    serializer: "mongo::BSONKey::serializeToBSON"
+    deserializer: "mongo::BSONKey::parseFromBSON"
+
+enums:
+  OplogEntries:
+    description: "The type of dbCheck oplog entry."
+    type: string
+    values:
+      Batch: "batch"
+      Collection: "collection"
+
+structs:
+  DbCheckSingleInvocation:
+    description: "Command object for dbCheck invocation"
+    fields:
+      dbCheck:
+        type: string
+        cpp_name: coll
+      minKey:
+        type: _id_key
+        default: "BSONKey::min()"
+      maxKey:
+        type: _id_key
+        default: "BSONKey::max()"
+      maxCount:
+        type: safeInt64
+        default: "std::numeric_limits<int64_t>::max()"
+      maxSize:
+        type: safeInt64
+        default: "std::numeric_limits<int64_t>::max()"
+      maxCountPerSecond:
+        type: safeInt64
+        default: "std::numeric_limits<int64_t>::max()"
+
+  DbCheckAllInvocation:
+    description: "Command object for database-wide form of dbCheck invocation"
+    fields:
+      dbCheck:
+        type: safeInt64
+        cpp_name: tag
+      maxCountPerSecond:
+        type: safeInt64
+        default: "std::numeric_limits<int64_t>::max()"
+
+  DbCheckOplogBatch:
+    description: "Oplog entry for a dbCheck batch"
+    fields:
+      dbCheck:
+        type: namespacestring
+        cpp_name: nss
+      type:
+        type: OplogEntries
+        cpp_name: type
+      md5:
+        type: string
+        cpp_name: md5
+      minKey:
+        type: _id_key
+        cpp_name: minKey
+      maxKey:
+        type: _id_key
+        cpp_name: maxKey
+      maxRate:
+        type: safeInt64
+        optional: true
+
+  DbCheckOplogCollection:
+    description: "Oplog entry for dbCheck collection metadata"
+    fields:
+      dbCheck:
+        type: namespacestring
+        cpp_name: nss
+      type:
+        type: OplogEntries
+        cpp_name: type
+      uuid:
+        type: uuid
+        cpp_name: uuid
+      prev:
+        optional: true
+        type: uuid
+        cpp_name: prev
+      next:
+        optional: true
+        type: uuid
+        cpp_name: next
+      indexes:
+        type: array<object>
+        cpp_name: indexes
+      options:
+        type: object
+        cpp_name: options

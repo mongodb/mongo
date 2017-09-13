@@ -6,8 +6,8 @@
  * Intersperse queries which use the AND_HASH stage with updates and deletes of documents they may
  * match.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/yield_rooted_or.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');       // for extendWorkload
+load('jstests/concurrency/fsm_workloads/yield_rooted_or.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -20,24 +20,47 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways.lte(nMatches, this.nDocs);
         // Construct the query plan: two ixscans under an andHashed.
         // Scan c <= nMatches
-        var ixscan1 = { ixscan: { args: { name: 'stages_and_hashed', keyPattern: { c: 1 },
-                                          startKey: { '': nMatches }, endKey: {},
-                                          endKeyInclusive: true, direction: -1 } } };
+        var ixscan1 = {
+            ixscan: {
+                args: {
+                    name: 'stages_and_hashed',
+                    keyPattern: {c: 1},
+                    startKey: {'': nMatches},
+                    endKey: {},
+                    startKeyInclusive: true,
+                    endKeyInclusive: true,
+                    direction: -1
+                }
+            }
+        };
 
         // Scan d >= this.nDocs - nMatches
-        var ixscan2 = { ixscan: { args: { name: 'stages_and_hashed', keyPattern: { d: 1 },
-                                          startKey: { '': this.nDocs - nMatches }, endKey: {},
-                                          endKeyInclusive: true, direction: 1 } } };
+        var ixscan2 = {
+            ixscan: {
+                args: {
+                    name: 'stages_and_hashed',
+                    keyPattern: {d: 1},
+                    startKey: {'': this.nDocs - nMatches},
+                    endKey: {},
+                    startKeyInclusive: true,
+                    endKeyInclusive: true,
+                    direction: 1
+                }
+            }
+        };
 
-        var andix1ix2 = { andHash: { args: { nodes: [ixscan1, ixscan2] } } };
+        var andix1ix2 = {andHash: {args: {nodes: [ixscan1, ixscan2]}}};
 
         // On non-MMAP storage engines, index intersection plans will always re-filter
         // the docs to make sure we don't get any spurious matches.
-        var fetch = { fetch: { filter: { c: { $lte: nMatches },
-                                         d: { $gte: (this.nDocs - nMatches) } },
-                               args: { node: andix1ix2 } } };
+        var fetch = {
+            fetch: {
+                filter: {c: {$lte: nMatches}, d: {$gte: (this.nDocs - nMatches)}},
+                args: {node: andix1ix2}
+            }
+        };
 
-        var res = db.runCommand({ stageDebug: { plan: fetch, collection: collName } });
+        var res = db.runCommand({stageDebug: {plan: fetch, collection: collName}});
         assertAlways.commandWorked(res);
         for (var i = 0; i < res.results.length; i++) {
             var result = res.results[i];

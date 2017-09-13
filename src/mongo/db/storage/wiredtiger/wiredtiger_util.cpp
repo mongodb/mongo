@@ -37,6 +37,7 @@
 
 #include <limits>
 
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -45,6 +46,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -69,6 +71,8 @@ Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == EINVAL) {
         return Status(ErrorCodes::BadValue, s);
     }
+
+    uassert(ErrorCodes::ExceededMemoryLimit, s, retCode != WT_CACHE_FULL);
 
     // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
     return Status(ErrorCodes::UnknownError, s);
@@ -99,7 +103,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, StringData uri) {
     invariant(opCtx);
-    WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataCursorId, false, opCtx);
+    WiredTigerCursor curwrap("metadata:create", WiredTigerSession::kMetadataTableId, false, opCtx);
     WT_CURSOR* cursor = curwrap.get();
     invariant(cursor);
     std::string strUri = uri.toString();
@@ -145,13 +149,15 @@ Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
     WT_CONFIG_ITEM keyItem;
     WT_CONFIG_ITEM valueItem;
     int ret;
-    unordered_set<StringData, StringData::Hasher> keysSeen;
+    auto keysSeen = SimpleStringDataComparator::kInstance.makeStringDataUnorderedSet();
     while ((ret = parser.next(&keyItem, &valueItem)) == 0) {
         const StringData key(keyItem.str, keyItem.len);
         if (keysSeen.count(key)) {
             return Status(ErrorCodes::DuplicateKey,
                           str::stream() << "app_metadata must not contain duplicate keys. "
-                                        << "Found multiple instances of key '" << key << "'.");
+                                        << "Found multiple instances of key '"
+                                        << key
+                                        << "'.");
         }
         keysSeen.insert(key);
 
@@ -184,10 +190,10 @@ StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(OperationContext* opC
     return StatusWith<BSONObj>(bob.obj());
 }
 
-Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* opCtx,
-                                                             StringData uri,
-                                                             int64_t minimumVersion,
-                                                             int64_t maximumVersion) {
+StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* opCtx,
+                                                                          StringData uri,
+                                                                          int64_t minimumVersion,
+                                                                          int64_t maximumVersion) {
     StatusWith<std::string> result = getMetadata(opCtx, uri);
     if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
         return result.getStatus();
@@ -199,6 +205,13 @@ Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* o
     if (topParser.get("app_metadata", &metadata) != 0)
         return Status(ErrorCodes::UnsupportedFormat,
                       str::stream() << "application metadata for " << uri << " is missing ");
+
+    if (metadata.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream()
+                          << "application metadata must be enclosed in parentheses. Actual value: "
+                          << StringData(metadata.str, metadata.len));
+    }
 
     WiredTigerConfigParser parser(metadata);
 
@@ -220,13 +233,46 @@ Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* o
     if (version < minimumVersion || version > maximumVersion) {
         return Status(ErrorCodes::UnsupportedFormat,
                       str::stream() << "Application metadata for " << uri
-                                    << " has unsupported format version " << version);
+                                    << " has unsupported format version: "
+                                    << version
+                                    << ".");
     }
 
     LOG(2) << "WiredTigerUtil::checkApplicationMetadataFormatVersion "
            << " uri: " << uri << " ok range " << minimumVersion << " -> " << maximumVersion
            << " current: " << version;
 
+    return version;
+}
+
+// static
+Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) {
+    invariant(configElem.fieldNameStringData() == "configString");
+
+    if (configElem.type() != String) {
+        return {ErrorCodes::TypeMismatch, "'configString' must be a string."};
+    }
+
+    std::vector<std::string> errors;
+    ErrorAccumulator eventHandler(&errors);
+
+    StringData config = configElem.valueStringData();
+    // Do NOT allow embedded null characters
+    if (config.size() != strlen(config.rawData())) {
+        return {ErrorCodes::FailedToParse, "malformed 'configString' value."};
+    }
+
+    Status status = wtRCToStatus(
+        wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.rawData()));
+    if (!status.isOK()) {
+        StringBuilder errorMsg;
+        errorMsg << status.reason();
+        for (std::string error : errors) {
+            errorMsg << ". " << error;
+        }
+        errorMsg << ".";
+        return {status.code(), errorMsg.str()};
+    }
     return Status::OK();
 }
 
@@ -242,7 +288,8 @@ StatusWith<uint64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
     if (ret != 0) {
         return StatusWith<uint64_t>(ErrorCodes::CursorNotFound,
                                     str::stream() << "unable to open cursor at URI " << uri
-                                                  << ". reason: " << wiredtiger_strerror(ret));
+                                                  << ". reason: "
+                                                  << wiredtiger_strerror(ret));
     }
     invariant(cursor);
     ON_BLOCK_EXIT(cursor->close, cursor);
@@ -250,19 +297,21 @@ StatusWith<uint64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
     cursor->set_key(cursor, statisticsKey);
     ret = cursor->search(cursor);
     if (ret != 0) {
-        return StatusWith<uint64_t>(ErrorCodes::NoSuchKey,
-                                    str::stream() << "unable to find key " << statisticsKey
-                                                  << " at URI " << uri
-                                                  << ". reason: " << wiredtiger_strerror(ret));
+        return StatusWith<uint64_t>(
+            ErrorCodes::NoSuchKey,
+            str::stream() << "unable to find key " << statisticsKey << " at URI " << uri
+                          << ". reason: "
+                          << wiredtiger_strerror(ret));
     }
 
     uint64_t value;
     ret = cursor->get_value(cursor, NULL, NULL, &value);
     if (ret != 0) {
-        return StatusWith<uint64_t>(ErrorCodes::BadValue,
-                                    str::stream() << "unable to get value for key " << statisticsKey
-                                                  << " at URI " << uri
-                                                  << ". reason: " << wiredtiger_strerror(ret));
+        return StatusWith<uint64_t>(
+            ErrorCodes::BadValue,
+            str::stream() << "unable to get value for key " << statisticsKey << " at URI " << uri
+                          << ". reason: "
+                          << wiredtiger_strerror(ret));
     }
 
     return StatusWith<uint64_t>(value);
@@ -282,13 +331,33 @@ int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
     return result.getValue();
 }
 
+size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
+    double cacheSizeMB;
+    const double kMaxSizeCacheMB = 10 * 1000 * 1000;
+    if (requestedCacheSizeGB == 0) {
+        // Choose a reasonable amount of cache when not explicitly specified by user.
+        // Set a minimum of 256MB, otherwise use 50% of available memory over 1GB.
+        ProcessInfo pi;
+        double memSizeMB = pi.getMemSizeMB();
+        cacheSizeMB = std::max((memSizeMB - 1024) * 0.5, 256.0);
+    } else {
+        cacheSizeMB = 1024 * requestedCacheSizeGB;
+    }
+    if (cacheSizeMB > kMaxSizeCacheMB) {
+        log() << "Requested cache size: " << cacheSizeMB << "MB exceeds max; setting to "
+              << kMaxSizeCacheMB << "MB";
+        cacheSizeMB = kMaxSizeCacheMB;
+    }
+    return static_cast<size_t>(cacheSizeMB);
+}
+
 namespace {
 int mdb_handle_error(WT_EVENT_HANDLER* handler,
                      WT_SESSION* session,
                      int errorCode,
                      const char* message) {
     try {
-        error() << "WiredTiger (" << errorCode << ") " << message;
+        error() << "WiredTiger error (" << errorCode << ") " << redact(message);
         fassert(28558, errorCode != WT_PANIC);
     } catch (...) {
         std::terminate();
@@ -298,7 +367,7 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
 
 int mdb_handle_message(WT_EVENT_HANDLER* handler, WT_SESSION* session, const char* message) {
     try {
-        log() << "WiredTiger " << message;
+        log() << "WiredTiger message " << redact(message);
     } catch (...) {
         std::terminate();
     }
@@ -310,7 +379,7 @@ int mdb_handle_progress(WT_EVENT_HANDLER* handler,
                         const char* operation,
                         uint64_t progress) {
     try {
-        log() << "WiredTiger progress " << operation << " " << progress;
+        log() << "WiredTiger progress " << redact(operation) << " " << progress;
     } catch (...) {
         std::terminate();
     }
@@ -327,51 +396,101 @@ WT_EVENT_HANDLER WiredTigerUtil::defaultEventHandlers() {
     return handlers;
 }
 
-int WiredTigerUtil::verifyTable(OperationContext* txn,
+WiredTigerUtil::ErrorAccumulator::ErrorAccumulator(std::vector<std::string>* errors)
+    : WT_EVENT_HANDLER(defaultEventHandlers()),
+      _errors(errors),
+      _defaultErrorHandler(handle_error) {
+    if (errors) {
+        handle_error = onError;
+    }
+}
+
+// static
+int WiredTigerUtil::ErrorAccumulator::onError(WT_EVENT_HANDLER* handler,
+                                              WT_SESSION* session,
+                                              int error,
+                                              const char* message) {
+    try {
+        ErrorAccumulator* self = static_cast<ErrorAccumulator*>(handler);
+        self->_errors->push_back(message);
+        return self->_defaultErrorHandler(handler, session, error, message);
+    } catch (...) {
+        std::terminate();
+    }
+}
+
+int WiredTigerUtil::verifyTable(OperationContext* opCtx,
                                 const std::string& uri,
                                 std::vector<std::string>* errors) {
-    class MyEventHandlers : public WT_EVENT_HANDLER {
-    public:
-        MyEventHandlers(std::vector<std::string>* errors)
-            : WT_EVENT_HANDLER(defaultEventHandlers()),
-              _errors(errors),
-              _defaultErrorHandler(handle_error) {
-            handle_error = onError;
-        }
-
-    private:
-        static int onError(WT_EVENT_HANDLER* handler,
-                           WT_SESSION* session,
-                           int error,
-                           const char* message) {
-            try {
-                MyEventHandlers* self = static_cast<MyEventHandlers*>(handler);
-                self->_errors->push_back(message);
-                return self->_defaultErrorHandler(handler, session, error, message);
-            } catch (...) {
-                std::terminate();
-            }
-        }
-
-        typedef int (*ErrorHandler)(WT_EVENT_HANDLER*, WT_SESSION*, int, const char*);
-
-        std::vector<std::string>* const _errors;
-        const ErrorHandler _defaultErrorHandler;
-    } eventHandler(errors);
+    ErrorAccumulator eventHandler(errors);
 
     // Try to close as much as possible to avoid EBUSY errors.
-    WiredTigerRecoveryUnit::get(txn)->getSession(txn)->closeAllCursors();
-    WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
-    sessionCache->closeAll();
+    WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->closeAllCursors(uri);
+    WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+    sessionCache->closeAllCursors(uri);
 
     // Open a new session with custom error handlers.
-    WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(txn)->getSessionCache()->conn();
+    WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
     WT_SESSION* session;
-    invariantWTOK(conn->open_session(conn, errors ? &eventHandler : NULL, NULL, &session));
+    invariantWTOK(conn->open_session(conn, &eventHandler, NULL, &session));
     ON_BLOCK_EXIT(session->close, session, "");
 
     // Do the verify. Weird parens prevent treating "verify" as a macro.
     return (session->verify)(session, uri.c_str(), NULL);
+}
+
+bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
+    if (!replEnabled) {
+        // All tables on standalones are logged.
+        return true;
+    }
+
+    // Of the replica set configurations:
+    if (ns.db() != "local") {
+        // All replicated collections are not logged.
+        return false;
+    }
+
+    if (ns.coll() == "replset.checkpointTimestamp" || ns.coll() == "replset.minvalid") {
+        // Of local collections, these two are derived from the state of the data and therefore
+        // are not logged.
+        return false;
+    }
+
+    // The remainder of local gets logged. In particular, the oplog and user created collections.
+    return true;
+}
+
+Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::string& uri, bool on) {
+    WiredTigerRecoveryUnit* recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
+    return setTableLogging(recoveryUnit->getSession(opCtx)->getSession(), uri, on);
+}
+
+Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
+    const bool keepOldBehavior = true;
+    if (keepOldBehavior) {
+        return Status::OK();
+    }
+
+    LOG(3) << "Changing logging values. Uri: " << uri << " Enabled? " << on;
+    int ret;
+    if (on) {
+        ret = session->alter(session, uri.c_str(), "log=(enabled=true)");
+    } else {
+        ret = session->alter(session, uri.c_str(), "log=(enabled=false)");
+    }
+
+    if (ret) {
+        return Status(ErrorCodes::WriteConflict,
+                      str::stream() << "Failed to update log setting. Uri: " << uri << " Enable? "
+                                    << on
+                                    << " Ret: "
+                                    << ret
+                                    << " Msg: "
+                                    << session->strerror(session, ret));
+    }
+
+    return Status::OK();
 }
 
 Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
@@ -385,8 +504,8 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
     int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &c);
     if (ret != 0) {
         return Status(ErrorCodes::CursorNotFound,
-                      str::stream() << "unable to open cursor at URI " << uri
-                                    << ". reason: " << wiredtiger_strerror(ret));
+                      str::stream() << "unable to open cursor at URI " << uri << ". reason: "
+                                    << wiredtiger_strerror(ret));
     }
     bob->append("uri", uri);
     invariant(c);

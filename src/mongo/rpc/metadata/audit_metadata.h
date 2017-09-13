@@ -32,9 +32,9 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 class BSONObj;
@@ -57,17 +57,13 @@ public:
 
     static StatusWith<AuditMetadata> readFromMetadata(const BSONObj& metadataObj);
 
+    /**
+     * Parses AuditMetadata from a pre-extracted BSONElement. When reading a metadata object, this
+     * form is more efficient as it permits parsing the metadata in one pass.
+     */
+    static StatusWith<AuditMetadata> readFromMetadata(const BSONElement& metadataElem);
+
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;
-
-    static Status downconvert(const BSONObj& command,
-                              const BSONObj& metadata,
-                              BSONObjBuilder* legacyCommandBob,
-                              int* legacyQueryFlags);
-
-    static Status upconvert(const BSONObj& legacyCommand,
-                            const int legacyQueryFlags,
-                            BSONObjBuilder* commandBob,
-                            BSONObjBuilder* metadataBob);
 
     using UsersAndRoles = std::tuple<std::vector<UserName>, std::vector<RoleName>>;
 
@@ -75,19 +71,13 @@ public:
 
     AuditMetadata(boost::optional<UsersAndRoles> impersonatedUsersAndRoles);
 
+    static StringData fieldName() {
+        return "$audit";
+    }
+
 private:
     boost::optional<UsersAndRoles> _impersonatedUsersAndRoles;
 };
-
-/**
- * The legacy field name used to hold impersonated users.
- */
-extern const char kLegacyImpersonatedUsersFieldName[];
-
-/**
- * The legacy field name used to hold impersonated roles.
- */
-extern const char kLegacyImpersonatedRolesFieldName[];
 
 }  // namespace rpc
 }  // namespace mongo

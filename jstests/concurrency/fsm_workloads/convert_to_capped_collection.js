@@ -12,13 +12,8 @@
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');
 
 var $config = (function() {
-    var iter = 20;
-    var data = {
-        prefix: 'convert_to_capped_collection',
-
-        // initial size should not be a power of 256
-        size: Math.pow(2, iter + 5) + 1
-    };
+    // TODO: This workload may fail if an iteration multiplier is specified.
+    var data = {prefix: 'convert_to_capped_collection'};
 
     var states = (function() {
 
@@ -35,7 +30,7 @@ var $config = (function() {
 
             var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (var i = 0; i < (this.tid + 1) * 200; i++) {
-                bulk.insert({ i: i, rand: Random.rand() });
+                bulk.insert({i: i, rand: Random.rand()});
             }
 
             var res = bulk.execute();
@@ -45,7 +40,7 @@ var $config = (function() {
             assertWhenOwnDB(!db[this.threadCollName].isCapped());
             assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
             assertWhenOwnDB(db[this.threadCollName].isCapped());
-            assertWhenOwnDB(isMultiple256(db[this.threadCollName].storageSize()));
+            assertWhenOwnDB(isMultiple256(db[this.threadCollName].stats().maxSize));
         }
 
         function convertToCapped(db, collName) {
@@ -55,26 +50,25 @@ var $config = (function() {
 
             assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
             assertWhenOwnDB(db[this.threadCollName].isCapped());
-            assertWhenOwnDB(isMultiple256(db[this.threadCollName].storageSize()));
+            assertWhenOwnDB(isMultiple256(db[this.threadCollName].stats().maxSize));
 
             // only the _id index should remain after running convertToCapped
             var indexKeys = db[this.threadCollName].getIndexKeys();
             assertWhenOwnDB.eq(1, indexKeys.length);
             assertWhenOwnDB(function() {
-                assertWhenOwnDB.docEq({ _id: 1 }, indexKeys[0]);
+                assertWhenOwnDB.docEq({_id: 1}, indexKeys[0]);
             });
         }
 
-        return {
-            init: init,
-            convertToCapped: convertToCapped
-        };
+        return {init: init, convertToCapped: convertToCapped};
     })();
 
-    var transitions = {
-        init: { convertToCapped: 1 },
-        convertToCapped: { convertToCapped: 1 }
-    };
+    var transitions = {init: {convertToCapped: 1}, convertToCapped: {convertToCapped: 1}};
+
+    function setup(db, collName, cluster) {
+        // Initial size should not be a power of 256.
+        this.size = Math.pow(2, this.iterations + 5) + 1;
+    }
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '_\\d+$');
@@ -83,10 +77,11 @@ var $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: iter,
+        iterations: 20,
         data: data,
         states: states,
         transitions: transitions,
+        setup: setup,
         teardown: teardown
     };
 

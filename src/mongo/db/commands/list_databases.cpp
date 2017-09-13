@@ -33,10 +33,18 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
+namespace {
+static const StringData kFilterField{"filter"};
+static const StringData kNameField{"name"};
+static const StringData kNameOnlyField{"nameOnly"};
+}  // namespace
 
 using std::set;
 using std::string;
@@ -46,7 +54,7 @@ using std::vector;
 // XXX: remove and put into storage api
 intmax_t dbSize(const string& database);
 
-class CmdListDatabases : public Command {
+class CmdListDatabases : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return false;
@@ -57,11 +65,12 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual void help(stringstream& help) const {
-        help << "list databases on this server";
+        help << "{ listDatabases:1, [filter: <filterObject>] [, nameOnly: true ] }\n"
+                "list databases on this server";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -71,21 +80,45 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    CmdListDatabases() : Command("listDatabases", true) {}
+    CmdListDatabases() : BasicCommand("listDatabases") {}
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
-             int,
-             string& errmsg,
+             const BSONObj& jsobj,
              BSONObjBuilder& result) {
+        // Parse the filter.
+        std::unique_ptr<MatchExpression> filter;
+        if (auto filterElt = jsobj[kFilterField]) {
+            if (filterElt.type() != BSONType::Object) {
+                return appendCommandStatus(result,
+                                           {ErrorCodes::TypeMismatch,
+                                            str::stream() << "Field '" << kFilterField
+                                                          << "' must be of type Object in: "
+                                                          << jsobj});
+            }
+            // The collator is null because database metadata objects are compared using simple
+            // binary comparison.
+            const CollatorInterface* collator = nullptr;
+            auto statusWithMatcher = MatchExpressionParser::parse(filterElt.Obj(), collator);
+            if (!statusWithMatcher.isOK()) {
+                return appendCommandStatus(result, statusWithMatcher.getStatus());
+            }
+            filter = std::move(statusWithMatcher.getValue());
+        }
+        bool nameOnly = jsobj[kNameOnlyField].trueValue();
+
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-        storageEngine->listDatabases(&dbNames);
+        {
+            Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
+            storageEngine->listDatabases(&dbNames);
+        }
 
         vector<BSONObj> dbInfos;
 
-        set<string> seen;
+        bool filterNameOnly = filter &&
+            filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
+            filter->path() == kNameField;
         intmax_t totalSize = 0;
         for (vector<string>::iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
             const string& dbname = *i;
@@ -93,31 +126,38 @@ public:
             BSONObjBuilder b;
             b.append("name", dbname);
 
-            {
-                ScopedTransaction transaction(txn, MODE_IS);
-                Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
+            int64_t size = 0;
+            if (!nameOnly) {
+                // Filtering on name only should not require taking locks on filtered-out names.
+                if (filterNameOnly && !filter->matchesBSON(b.asTempObj()))
+                    continue;
 
-                Database* db = dbHolder().get(txn, dbname);
+                Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
+
+                Database* db = dbHolder().get(opCtx, dbname);
                 if (!db)
                     continue;
 
                 const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
                 invariant(entry);
 
-                int64_t size = entry->sizeOnDisk(txn);
+                size = entry->sizeOnDisk(opCtx);
                 b.append("sizeOnDisk", static_cast<double>(size));
-                totalSize += size;
 
-                b.appendBool("empty", size == 0);
+                b.appendBool("empty", entry->isEmpty());
             }
+            BSONObj curDbObj = b.obj();
 
-            dbInfos.push_back(b.obj());
-
-            seen.insert(i->c_str());
+            if (!filter || filter->matchesBSON(curDbObj)) {
+                totalSize += size;
+                dbInfos.push_back(curDbObj);
+            }
         }
 
         result.append("databases", dbInfos);
-        result.append("totalSize", double(totalSize));
+        if (!nameOnly) {
+            result.append("totalSize", double(totalSize));
+        }
         return true;
     }
 } cmdListDatabases;

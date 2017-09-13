@@ -28,22 +28,40 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
+#include "mongo/platform/basic.h"
+
 #include <string>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/parsed_distinct.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/util/timer.h"
+#include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/views/resolved_view.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -51,18 +69,34 @@ using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
-class DistinctCommand : public Command {
+namespace dps = ::mongo::dotted_path_support;
+
+class DistinctCommand : public BasicCommand {
 public:
-    DistinctCommand() : Command("distinct") {}
+    DistinctCommand() : BasicCommand("distinct") {}
 
     virtual bool slaveOk() const {
         return false;
     }
+
     virtual bool slaveOverrideOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
+    }
+
+    bool supportsNonLocalReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
+        return true;
+    }
+
+    ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kRead;
+    }
+
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
@@ -77,74 +111,120 @@ public:
         help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
     }
 
-    bool run(OperationContext* txn,
-             const string& dbname,
-             BSONObj& cmdObj,
-             int,
-             string& errmsg,
-             BSONObjBuilder& result) {
-        Timer t;
+    virtual Status explain(OperationContext* opCtx,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainOptions::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
-        // ensure that the key is a string
-        uassert(18510,
-                mongoutils::str::stream() << "The first argument to the distinct command "
-                                          << "must be a string but was a "
-                                          << typeName(cmdObj["key"].type()),
-                cmdObj["key"].type() == mongo::String);
-
-        // ensure that the where clause is a document
-        if (cmdObj["query"].isNull() == false && cmdObj["query"].eoo() == false) {
-            uassert(18511,
-                    mongoutils::str::stream() << "The query for the distinct command must be a "
-                                              << "document but was a "
-                                              << typeName(cmdObj["query"].type()),
-                    cmdObj["query"].type() == mongo::Object);
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        auto parsedDistinct = ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true);
+        if (!parsedDistinct.isOK()) {
+            return parsedDistinct.getStatus();
         }
 
-        string key = cmdObj["key"].valuestrsafe();
-        BSONObj keyPattern = BSON(key << 1);
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
+        Collection* collection = ctx.getCollection();
 
-        BSONObj query = getQuery(cmdObj);
+        if (ctx.getView()) {
+            ctx.releaseLocksForView();
+
+            auto viewAggregation = parsedDistinct.getValue().asAggregationCommand();
+            if (!viewAggregation.isOK()) {
+                return viewAggregation.getStatus();
+            }
+
+            auto viewAggRequest =
+                AggregationRequest::parseFromBSON(nss, viewAggregation.getValue(), verbosity);
+            if (!viewAggRequest.isOK()) {
+                return viewAggRequest.getStatus();
+            }
+
+            return runAggregate(
+                opCtx, nss, viewAggRequest.getValue(), viewAggregation.getValue(), *out);
+        }
+
+        auto executor = getExecutorDistinct(
+            opCtx, collection, nss.ns(), &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
+        if (!executor.isOK()) {
+            return executor.getStatus();
+        }
+
+        Explain::explainStages(executor.getValue().get(), collection, verbosity, out);
+        return Status::OK();
+    }
+
+    bool run(OperationContext* opCtx,
+             const string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) {
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        auto parsedDistinct = ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false);
+        if (!parsedDistinct.isOK()) {
+            return appendCommandStatus(result, parsedDistinct.getStatus());
+        }
+
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
+        Collection* collection = ctx.getCollection();
+
+        if (ctx.getView()) {
+            ctx.releaseLocksForView();
+
+            auto viewAggregation = parsedDistinct.getValue().asAggregationCommand();
+            if (!viewAggregation.isOK()) {
+                return appendCommandStatus(result, viewAggregation.getStatus());
+            }
+
+            BSONObj aggResult = Command::runCommandDirectly(
+                opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
+
+            if (ResolvedView::isResolvedViewErrorResponse(aggResult)) {
+                result.appendElements(aggResult);
+                return false;
+            }
+
+            ViewResponseFormatter formatter(aggResult);
+            Status formatStatus = formatter.appendAsDistinctResponse(&result);
+            if (!formatStatus.isOK()) {
+                return appendCommandStatus(result, formatStatus);
+            }
+            return true;
+        }
+
+        auto executor = getExecutorDistinct(
+            opCtx, collection, nss.ns(), &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
+        if (!executor.isOK()) {
+            return appendCommandStatus(result, executor.getStatus());
+        }
+
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setPlanSummary_inlock(
+                Explain::getPlanSummary(executor.getValue().get()));
+        }
+
+        string key = cmdObj[ParsedDistinct::kKeyField].valuestrsafe();
 
         int bufSize = BSONObjMaxUserSize - 4096;
         BufBuilder bb(bufSize);
         char* start = bb.buf();
 
         BSONArrayBuilder arr(bb);
-        BSONElementSet values;
-
-        const string ns = parseNs(dbname, cmdObj);
-        AutoGetCollectionForRead ctx(txn, ns);
-
-        Collection* collection = ctx.getCollection();
-        if (!collection) {
-            result.appendArray("values", BSONObj());
-            result.append("stats", BSON("n" << 0 << "nscanned" << 0 << "nscannedObjects" << 0));
-            return true;
-        }
-
-        PlanExecutor* rawExec;
-        Status status =
-            getExecutorDistinct(txn, collection, query, key, PlanExecutor::YIELD_AUTO, &rawExec);
-        if (!status.isOK()) {
-            uasserted(17216,
-                      mongoutils::str::stream() << "Can't get executor for query " << query << ": "
-                                                << status.toString());
-            return 0;
-        }
-
-        unique_ptr<PlanExecutor> exec(rawExec);
+        BSONElementSet values(executor.getValue()->getCanonicalQuery()->getCollator());
 
         BSONObj obj;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = executor.getValue()->getNext(&obj, NULL))) {
             // Distinct expands arrays.
             //
             // If our query is covered, each value of the key should be in the index key and
             // available to us without this.  If a collection scan is providing the data, we may
             // have to expand an array.
             BSONElementSet elts;
-            obj.getFieldsDotted(key, elts);
+            dps::extractAllElementsAlongPath(obj, key, elts);
 
             for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
                 BSONElement elt = *it;
@@ -163,23 +243,39 @@ public:
             }
         }
 
+        // Return an error if execution fails for any reason.
+        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+            log() << "Plan executor error during distinct command: "
+                  << redact(PlanExecutor::statestr(state))
+                  << ", stats: " << redact(Explain::getWinningPlanStats(executor.getValue().get()));
+
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::OperationFailed,
+                                              str::stream()
+                                                  << "Executor error during distinct command: "
+                                                  << WorkingSetCommon::toStatusString(obj)));
+        }
+
+
+        auto curOp = CurOp::get(opCtx);
+
         // Get summary information about the plan.
         PlanSummaryStats stats;
-        Explain::getSummaryStats(exec.get(), &stats);
+        Explain::getSummaryStats(*executor.getValue(), &stats);
+        if (collection) {
+            collection->infoCache()->notifyOfQuery(opCtx, stats.indexesUsed);
+        }
+        curOp->debug().setPlanSummaryMetrics(stats);
+
+        if (curOp->shouldDBProfile()) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(executor.getValue().get(), &execStatsBob);
+            curOp->debug().execStats = execStatsBob.obj();
+        }
 
         verify(start == bb.buf());
 
         result.appendArray("values", arr.done());
-
-        {
-            BSONObjBuilder b;
-            b.appendNumber("n", stats.nReturned);
-            b.appendNumber("nscanned", stats.totalKeysExamined);
-            b.appendNumber("nscannedObjects", stats.totalDocsExamined);
-            b.appendNumber("timems", t.millis());
-            b.append("planSummary", Explain::getPlanSummary(exec.get()));
-            result.append("stats", b.obj());
-        }
 
         return true;
     }

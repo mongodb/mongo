@@ -1,0 +1,5 @@
+--enable-threadsafe
+--enable-optimize
+--enable-debug
+--enable-dtrace
+--enable-debug-symbols

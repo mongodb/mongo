@@ -67,8 +67,7 @@ void BasicEstimators<Sample>::appendBasicToBSONObjBuilder(BSONObjBuilder& b) con
 }
 
 template <std::size_t NumQuantiles>
-DistributionEstimators<NumQuantiles>::DistributionEstimators()
-    : _count(0) {
+DistributionEstimators<NumQuantiles>::DistributionEstimators() : _count(0) {
     for (std::size_t i = 0; i < NumMarkers; i++) {
         _actual_positions[i] = i + 1;
     }

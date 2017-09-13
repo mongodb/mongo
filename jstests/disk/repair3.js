@@ -1,52 +1,77 @@
 // test --repairpath on another partition
 
+// `--repairpath` is mmap only.
+// @tags: [requires_mmapv1]
+
 var baseName = "jstests_disk_repair3";
-var repairbase = MongoRunner.dataDir + "/repairpartitiontest"
-var repairpath = repairbase + "/dir"
+var repairbase = MongoRunner.dataDir + "/repairpartitiontest";
+var repairpath = repairbase + "/dir";
 
 doIt = false;
-files = listFiles( MongoRunner.dataDir );
-for ( i in files ) {
-    if ( files[ i ].name == repairbase ) {
+files = listFiles(MongoRunner.dataDir);
+for (i in files) {
+    if (files[i].name == repairbase) {
         doIt = true;
     }
 }
 
-if ( !doIt ) {
-    print( "path " + repairpath + " missing, skipping repair3 test" );
+if (!doIt) {
+    print("path " + repairpath + " missing, skipping repair3 test");
     doIt = false;
 }
 
-if ( doIt ) {
+if (doIt) {
+    var dbpath = MongoRunner.dataPath + baseName + "/";
 
-    port = allocatePorts( 1 )[ 0 ];
-    dbpath = MongoRunner.dataPath + baseName + "/";
+    resetDbpath(dbpath);
+    resetDbpath(repairpath);
 
-    resetDbpath( dbpath );
-    resetDbpath( repairpath );
-
-    m = startMongoProgram( "mongod", "--nssize", "8", "--noprealloc", "--smallfiles", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-    db = m.getDB( baseName );
-    db[ baseName ].save( {} );
-    assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles:false} ) );
+    var m = MongoRunner.runMongod({
+        nssize: 8,
+        noprealloc: "",
+        smallfiles: "",
+        dbpath: dbpath,
+        repairpath: repairpath,
+    });
+    db = m.getDB(baseName);
+    db[baseName].save({});
+    assert.commandWorked(db.runCommand({repairDatabase: 1, backupOriginalFiles: false}));
     function check() {
-        files = listFiles( dbpath );
-        for( f in files ) {
-            assert( ! new RegExp( "^" + dbpath + "backup_" ).test( files[ f ].name ), "backup dir in dbpath" );
+        files = listFiles(dbpath);
+        for (f in files) {
+            assert(!new RegExp("^" + dbpath + "backup_").test(files[f].name),
+                   "backup dir in dbpath");
         }
-    
-        assert.eq.automsg( "1", "db[ baseName ].count()" );
+
+        assert.eq.automsg("1", "db[ baseName ].count()");
     }
 
     check();
-    MongoRunner.stopMongod( port );
+    MongoRunner.stopMongod(m);
 
-    resetDbpath( repairpath );
-    rc = runMongoProgram( "mongod", "--nssize", "8", "--noprealloc", "--smallfiles", "--repair", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-    assert.eq.automsg( "0", "rc" );
-    m = startMongoProgram( "mongod", "--nssize", "8", "--noprealloc", "--smallfiles", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-    db = m.getDB( baseName );
+    resetDbpath(repairpath);
+    var rc = runMongoProgram("mongod",
+                             "--nssize",
+                             "8",
+                             "--noprealloc",
+                             "--smallfiles",
+                             "--repair",
+                             "--port",
+                             m.port,
+                             "--dbpath",
+                             dbpath,
+                             "--repairpath",
+                             repairpath);
+    assert.eq.automsg("0", "rc");
+    m = MongoRunner.runMongod({
+        nssize: 8,
+        noprealloc: "",
+        smallfiles: "",
+        port: m.port,
+        dbpath: dbpath,
+        repairpath: repairpath,
+    });
+    db = m.getDB(baseName);
     check();
-    MongoRunner.stopMongod( port );
-
+    MongoRunner.stopMongod(m);
 }

@@ -1,0 +1,44 @@
+/*! @m_page{{c,java},cursor_join,Join cursors}
+
+Join cursors provide a way to iterate over a subset of a table, where the subset is specified by relationships with reference cursors.
+
+A join cursor is created with WT_SESSION::open_cursor using a \c
+"join:table:<name>" URI prefix.  Then reference cursors are positioned to
+keys on indices and joined to the join cursor using WT_SESSION::join calls.
+The result is a join cursor that can be iterated to satisfy the join
+equation.
+
+Here is an example using join cursors:
+
+@snippet ex_schema.c Join cursors
+
+Joins support various comparison operators: \c "eq", \c "gt", \c "ge", \c "lt", \c "le".  Ranges with lower and upper bounds can also be specified, by joining two cursors on the same index, for example, one with \c "compare=ge" and another \c "compare=lt".  In addition to joining indices, the main table can be joined so that a range of primary keys can be specified.
+
+By default, a join cursor returns a conjunction, that is, all keys that
+satisfy all the joined comparisons. By specifying a configuration with \c
+"operation=or", a join cursor will return a disjunction, or all keys that
+satisfy at least one of the joined comparisons.  More complex joins can be
+composed by specifying another join cursor as the reference cursor in a join
+call.
+
+Here is an example using these concepts to show a conjunction of a disjunction:
+
+@snippet ex_schema.c Complex join cursors
+
+All the joins should be done on the join cursor before WT_CURSOR::next is called.  Calling WT_CURSOR::next on a join cursor for the first time populates any bloom filters and performs other initialization.  The join cursor's key is the primary key (the key for the main table), and its value is the entire set of values of the main table.  A join cursor can be created with a projection by appending \c "(col1,col2,...)" to the URI if a different set of values is needed.
+
+Keys returned from the join cursor are ordered according to the
+first reference cursor joined. For example, if an index cursor was joined
+first, that index determines the order of results. If the join cursor
+uses disjunctions, then the ordering of all joins determines the order.
+The first join in a conjunctive join, or all joins in a disjunctive join,
+are distinctive in that they are iterated internally as the cursor join
+returns values in order.  Any bloom filters specified on the
+joins that are used for iteration are not useful, and are silently ignored.
+
+When disjunctions are used where the sets of keys overlap on these 'iteration
+joins', a join cursor will return duplicates. A join cursor never returns
+duplicates unless \c "operation=or" is used in a join configuration, or unless
+the first joined cursor is itself a join cursor that would return duplicates.
+
+*/

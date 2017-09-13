@@ -9,7 +9,7 @@ load('jstests/aggregation/extras/utils.js');
     var coll = db.agg_array_elem_at_expr;
     coll.drop();
 
-    assert.writeOK(coll.insert({a: [1,2,3,4,5]}));
+    assert.writeOK(coll.insert({a: [1, 2, 3, 4, 5]}));
 
     // Normal indexing.
     var pipeline = [{$project: {_id: 0, x: {$arrayElemAt: ['$a', 2]}}}];
@@ -18,6 +18,10 @@ load('jstests/aggregation/extras/utils.js');
     // Indexing with a float.
     pipeline = [{$project: {_id: 0, x: {$arrayElemAt: ['$a', 1.0]}}}];
     assert.eq(coll.aggregate(pipeline).toArray(), [{x: 2}]);
+
+    // Indexing with a decimal
+    pipeline = [{$project: {_id: 0, x: {$arrayElemAt: ['$a', NumberDecimal('2.0')]}}}];
+    assert.eq(coll.aggregate(pipeline).toArray(), [{x: 3}]);
 
     // Negative indexing.
     pipeline = [{$project: {_id: 0, x: {$arrayElemAt: ['$a', -1]}}}];
@@ -60,6 +64,7 @@ load('jstests/aggregation/extras/utils.js');
 
     // Second argument is not integral.
     assertErrorCode(coll, [{$project: {x: {$arrayElemAt: [[1, 2], 1.5]}}}], 28691);
+    assertErrorCode(coll, [{$project: {x: {$arrayElemAt: [[1, 2], NumberDecimal('1.5')]}}}], 28691);
     assertErrorCode(coll, [{$project: {x: {$arrayElemAt: [[1, 2], Math.pow(2, 32)]}}}], 28691);
     assertErrorCode(coll, [{$project: {x: {$arrayElemAt: [[1, 2], -Math.pow(2, 31) - 1]}}}], 28691);
 }());

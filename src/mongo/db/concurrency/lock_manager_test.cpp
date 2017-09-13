@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/unittest/unittest.h"
 
@@ -414,7 +415,42 @@ TEST(LockManager, ConflictCancelMultipleWaiting) {
     lockMgr.unlock(&request[0]);
 }
 
-TEST(LockManager, ConflictCancelWaitingConversion) {
+TEST(LockManager, CancelWaitingConversionWeakModes) {
+    LockManager lockMgr;
+    const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+    MMAPV1LockerImpl locker1;
+    MMAPV1LockerImpl locker2;
+
+    LockRequestCombo request1(&locker1);
+    LockRequestCombo request2(&locker2);
+
+    // First request granted right away
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_IS));
+    ASSERT(request1.numNotifies == 0);
+
+    // Second request is granted right away
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &request2, MODE_IX));
+    ASSERT(request2.numNotifies == 0);
+
+    // Convert first request to conflicting
+    ASSERT(LOCK_WAITING == lockMgr.convert(resId, &request1, MODE_S));
+    ASSERT(request1.mode == MODE_IS);
+    ASSERT(request1.convertMode == MODE_S);
+    ASSERT(request1.numNotifies == 0);
+
+    // Cancel the conflicting conversion
+    lockMgr.unlock(&request1);
+    ASSERT(request1.mode == MODE_IS);
+    ASSERT(request1.convertMode == MODE_NONE);
+    ASSERT(request1.numNotifies == 0);
+
+    // Free the remaining locks so the LockManager destructor does not complain
+    lockMgr.unlock(&request1);
+    lockMgr.unlock(&request2);
+}
+
+TEST(LockManager, CancelWaitingConversionStrongModes) {
     LockManager lockMgr;
     const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
@@ -708,6 +744,66 @@ TEST(LockManager, CompatibleFirstImmediateGrant) {
     ASSERT(lockMgr.unlock(&requestX));
 }
 
+TEST(LockManager, CompatibleFirstGrantAlreadyQueued) {
+    LockManager lockMgr;
+    const ResourceId resId(RESOURCE_GLOBAL, 0);
+
+    // This tests the following behaviors (alternatives indicated with '|'):
+    //   Lock held in X, queue: S X|IX IS, where S is compatibleFirst.
+    //   Once X unlocks|downgrades both the S and IS requests should proceed.
+
+
+    enum UnblockMethod { kDowngrading, kUnlocking };
+    LockMode conflictingModes[2] = {MODE_IX, MODE_X};
+    UnblockMethod unblockMethods[2] = {kDowngrading, kUnlocking};
+
+    for (LockMode writerMode : conflictingModes) {
+        for (UnblockMethod unblockMethod : unblockMethods) {
+            MMAPV1LockerImpl locker1;
+            LockRequestCombo request1(&locker1);
+
+            MMAPV1LockerImpl locker2;
+            LockRequestCombo request2(&locker2);
+            request2.compatibleFirst = true;
+
+            MMAPV1LockerImpl locker3;
+            LockRequestCombo request3(&locker3);
+
+            MMAPV1LockerImpl locker4;
+            LockRequestCombo request4(&locker4);
+
+            // Hold the lock in X and establish the S IX|X IS queue.
+            ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request3, writerMode));
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request4, MODE_IS));
+
+            // Now unlock the initial X, so all readers should be able to proceed, while the writer
+            // remains queued.
+            if (unblockMethod == kUnlocking) {
+                ASSERT(lockMgr.unlock(&request1));
+            } else {
+                invariant(unblockMethod == kDowngrading);
+                lockMgr.downgrade(&request1, MODE_S);
+            }
+            ASSERT(request2.lastResult == LOCK_OK);
+            ASSERT(request3.lastResult == LOCK_INVALID);
+            ASSERT(request4.lastResult == LOCK_OK);
+
+            // Now unlock the readers, and the writer succeeds as well.
+            ASSERT(lockMgr.unlock(&request2));
+            ASSERT(lockMgr.unlock(&request4));
+            if (unblockMethod == kDowngrading) {
+                ASSERT(lockMgr.unlock(&request1));
+            }
+            ASSERT(request3.lastResult == LOCK_OK);
+
+            // Unlock the writer
+            ASSERT(lockMgr.unlock(&request3));
+        }
+    }
+}
+
 TEST(LockManager, CompatibleFirstDelayedGrant) {
     LockManager lockMgr;
     const ResourceId resId(RESOURCE_GLOBAL, 0);
@@ -814,6 +910,45 @@ TEST(LockManager, CompatibleFirstCancelWaiting) {
     // Unlock remaining locks to keep the leak detection logic happy
     ASSERT(lockMgr.unlock(&requestSInitial));
     ASSERT(lockMgr.unlock(&requestX));
+}
+
+TEST(LockManager, Fairness) {
+    LockManager lockMgr;
+    const ResourceId resId(RESOURCE_GLOBAL, 0);
+
+    // Start with some 'regular' intent locks
+    MMAPV1LockerImpl lockerIS;
+    LockRequestCombo requestIS(&lockerIS);
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &requestIS, MODE_IS));
+
+    MMAPV1LockerImpl lockerIX;
+    LockRequestCombo requestIX(&lockerIX);
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &requestIX, MODE_IX));
+
+    // Now a conflicting lock comes
+    MMAPV1LockerImpl lockerX;
+    LockRequestCombo requestX(&lockerX);
+    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestX, MODE_X));
+
+    // Now, whoever comes next should be blocked
+    MMAPV1LockerImpl lockerIX1;
+    LockRequestCombo requestIX1(&lockerIX1);
+    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestIX1, MODE_IX));
+
+    // Freeing the first two locks should grant the X lock
+    ASSERT(lockMgr.unlock(&requestIS));
+    ASSERT(lockMgr.unlock(&requestIX));
+    ASSERT_EQ(LOCK_OK, requestX.lastResult);
+    ASSERT_EQ(1, requestX.numNotifies);
+    ASSERT_EQ(LOCK_INVALID, requestIX1.lastResult);
+    ASSERT_EQ(0, requestIX1.numNotifies);
+
+    ASSERT(lockMgr.unlock(&requestX));
+    ASSERT_EQ(LOCK_OK, requestIX1.lastResult);
+    ASSERT_EQ(1, requestIX1.numNotifies);
+
+    // Unlock all locks so we don't assert for leaked locks
+    ASSERT(lockMgr.unlock(&requestIX1));
 }
 
 }  // namespace mongo

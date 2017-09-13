@@ -32,13 +32,15 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
+#include "mongo/db/update/update_driver.h"
 
 namespace mongo {
 
 class OperationContext;
+class OpDebug;
+struct PlanSummaryStats;
 
 struct UpdateStageParams {
     UpdateStageParams(const UpdateRequest* r, UpdateDriver* d, OpDebug* o)
@@ -71,47 +73,48 @@ private:
  *
  * Callers of work() must be holding a write lock.
  */
-class UpdateStage : public PlanStage {
+class UpdateStage final : public PlanStage {
     MONGO_DISALLOW_COPYING(UpdateStage);
 
 public:
-    UpdateStage(OperationContext* txn,
+    UpdateStage(OperationContext* opCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
                 Collection* collection,
                 PlanStage* child);
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState doWork(WorkingSetID* out) final;
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doRestoreState() final;
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_UPDATE;
     }
 
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
     /**
-     * Converts the execution stats (stored by the update stage as an UpdateStats) for the
-     * update plan represented by 'exec' into the UpdateResult format used to report the results
-     * of writes.
+     * Gets a pointer to the UpdateStats inside 'exec'.
      *
-     * Also responsible for filling out 'opDebug' with execution info.
-     *
-     * Should only be called once this stage is EOF.
+     * The 'exec' must have an UPDATE stage as its root stage, and the plan must be EOF before
+     * calling this method.
      */
-    static UpdateResult makeUpdateResult(PlanExecutor* exec, OpDebug* opDebug);
+    static const UpdateStats* getUpdateStats(const PlanExecutor* exec);
+
+    /**
+     * Populate 'opDebug' with stats from 'updateStats' describing the execution of this update.
+     */
+    static void recordUpdateStatsInOpDebug(const UpdateStats* updateStats, OpDebug* opDebug);
+
+    /**
+     * Converts 'updateStats' into an UpdateResult.
+     */
+    static UpdateResult makeUpdateResult(const UpdateStats* updateStats);
 
     /**
      * Computes the document to insert if the upsert flag is set to true and no matching
@@ -129,24 +132,24 @@ public:
      *
      * Fills out whether or not this is a fastmodinsert in 'stats'.
      *
-     * Returns the document to insert in *out.
+     * Returns the document to insert.
      */
-    static Status applyUpdateOpsForInsert(const CanonicalQuery* cq,
-                                          const BSONObj& query,
-                                          UpdateDriver* driver,
-                                          UpdateLifecycle* lifecycle,
-                                          mutablebson::Document* doc,
-                                          bool isInternalRequest,
-                                          UpdateStats* stats,
-                                          BSONObj* out);
+    static BSONObj applyUpdateOpsForInsert(OperationContext* opCtx,
+                                           const CanonicalQuery* cq,
+                                           const BSONObj& query,
+                                           UpdateDriver* driver,
+                                           mutablebson::Document* doc,
+                                           bool isInternalRequest,
+                                           const NamespaceString& ns,
+                                           UpdateStats* stats);
 
 private:
     /**
-     * Computes the result of applying mods to the document 'oldObj' at RecordId 'loc' in
+     * Computes the result of applying mods to the document 'oldObj' at RecordId 'recordId' in
      * memory, then commits these changes to the database. Returns a possibly unowned copy
      * of the newly-updated version of the document.
      */
-    BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& loc);
+    BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& recordId);
 
     /**
      * Computes the document to insert and inserts it into the collection. Used if the
@@ -167,12 +170,10 @@ private:
     bool needInsert();
 
     /**
-     * Helper for restoring the state of this update.
+     * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to
+     * work(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
      */
-    Status restoreUpdateState(OperationContext* opCtx);
-
-    // Transactional context.  Not owned by us.
-    OperationContext* _txn;
+    StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
 
     UpdateStageParams _params;
 
@@ -182,9 +183,6 @@ private:
     // Not owned by us. May be NULL.
     Collection* _collection;
 
-    // Owned by us.
-    std::unique_ptr<PlanStage> _child;
-
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;
 
@@ -192,7 +190,6 @@ private:
     WorkingSetID _idReturning;
 
     // Stats
-    CommonStats _commonStats;
     UpdateStats _specificStats;
 
     // If the update was in-place, we may see it again.  This only matters if we're doing
@@ -207,8 +204,8 @@ private:
     // document and we wouldn't want to update that.
     //
     // So, no matter what, we keep track of where the doc wound up.
-    typedef unordered_set<RecordId, RecordId::Hasher> DiskLocSet;
-    const std::unique_ptr<DiskLocSet> _updatedLocs;
+    typedef unordered_set<RecordId, RecordId::Hasher> RecordIdSet;
+    const std::unique_ptr<RecordIdSet> _updatedRecordIds;
 
     // These get reused for each update.
     mutablebson::Document& _doc;

@@ -39,11 +39,14 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+namespace executor {
+class NetworkConnectionHook;
+}
 
 /**
  * Represents a pool of connections to a MongoDB server. The pool is synchronized internally
  * and its methods can be called from multiple threads, however once a connection is obtained
- * it should only be used from one thread in accordance with the rules of DBClientInterface.
+ * it should only be used from one thread in accordance with the rules of DBClientBase.
  */
 class ConnectionPool {
     MONGO_DISALLOW_COPYING(ConnectionPool);
@@ -53,7 +56,6 @@ public:
      * Information about a connection in the pool.
      */
     struct ConnectionInfo {
-        ConnectionInfo() : conn(NULL) {}
         ConnectionInfo(DBClientConnection* theConn, Date_t date)
             : conn(theConn), creationDate(date) {}
 
@@ -61,13 +63,12 @@ public:
         DBClientConnection* const conn;
 
         // The date at which the connection was created.
-        Date_t creationDate;
+        const Date_t creationDate;
     };
 
     typedef stdx::list<ConnectionInfo> ConnectionList;
     typedef unordered_map<HostAndPort, ConnectionList> HostConnectionMap;
     typedef std::map<HostAndPort, Date_t> HostLastUsedMap;
-
 
     /**
      * RAII class for connections from the pool.  To use the connection pool, instantiate one of
@@ -97,6 +98,12 @@ public:
          */
         ~ConnectionPtr();
 
+        // We need to provide user defined move operations as we need to set the pool
+        // pointer to nullptr on the moved-from object.
+        ConnectionPtr(ConnectionPtr&&);
+
+        ConnectionPtr& operator=(ConnectionPtr&&);
+
         /**
          * Obtains the underlying connection which can be used for making calls to the server.
          */
@@ -111,9 +118,8 @@ public:
 
     private:
         ConnectionPool* _pool;
-        const ConnectionList::iterator _connInfo;
+        ConnectionList::iterator _connInfo;
     };
-
 
     /**
      * Instantiates a new connection pool with the specified tags to be applied to the
@@ -122,6 +128,7 @@ public:
      * @param messagingPortTags tags to be applied to the messaging ports for each of the
      *      connections. If no tags are required, use 0.
      */
+    ConnectionPool(int messagingPortTags, std::unique_ptr<executor::NetworkConnectionHook> hook);
     ConnectionPool(int messagingPortTags);
     ~ConnectionPool();
 
@@ -170,11 +177,6 @@ private:
     void _cleanUpStaleHosts_inlock(Date_t now);
 
     /**
-     * Implementation of cleanUpOlderThan which assumes that _mutex is already held.
-     */
-    void _cleanUpOlderThan_inlock(Date_t now);
-
-    /**
      * Reaps connections in "hostConns" that are too old or have been in the pool too long as of
      * "now".  Expects _mutex to be held.
      */
@@ -203,6 +205,9 @@ private:
 
     // Time representing when the connections were last cleaned.
     Date_t _lastCleanUpTime;
+
+    // The connection hook for this pool. May be nullptr if there is no hook.
+    const std::unique_ptr<executor::NetworkConnectionHook> _hook;
 };
 
 }  // namespace mongo

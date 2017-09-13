@@ -28,48 +28,51 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/record_store_test_harness.h"
 
 
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
-using std::string;
-using std::stringstream;
 
 namespace mongo {
+namespace {
 
+using std::string;
+using std::stringstream;
 using std::unique_ptr;
 
 // Verify that an empty collection takes up no space.
 TEST(RecordStoreTestHarness, DataSizeEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(rs->dataSize(opCtx.get()) == 0);
     }
 }
 
 // Verify that a nonempty collection takes up some space.
 TEST(RecordStoreTestHarness, DataSizeNonEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record " << i;
@@ -77,21 +80,22 @@ TEST(RecordStoreTestHarness, DataSizeNonEmpty) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             uow.commit();
         }
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(rs->dataSize(opCtx.get()) > 0);
     }
 }
 
+}  // namespace
 }  // namespace mongo

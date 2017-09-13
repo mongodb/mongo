@@ -7,7 +7,7 @@
  * command against it. Inserts documents into the "to" namespace and specifies
  * dropTarget=true.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = (function() {
 
@@ -19,10 +19,7 @@ var $config = (function() {
 
     var states = (function() {
 
-        var options = {
-            capped: true,
-            size: 4096
-        };
+        var options = {capped: true, size: 4096};
 
         function uniqueCollectionName(prefix, tid, num) {
             return prefix + tid + '_' + num;
@@ -59,8 +56,8 @@ var $config = (function() {
 
             // Verify that 'fromCollCount' documents exist in the "to" collection
             // after the rename occurs
-            var res = db[this.fromCollName].renameCollection(this.toCollName,
-                                                             true /* dropTarget */);
+            var res =
+                db[this.fromCollName].renameCollection(this.toCollName, true /* dropTarget */);
             assertWhenOwnDB.commandWorked(res);
             assertWhenOwnDB(db[this.toCollName].isCapped());
             assertWhenOwnDB.eq(fromCollCount, db[this.toCollName].find().itcount());
@@ -72,17 +69,11 @@ var $config = (function() {
             this.toCollName = temp;
         }
 
-        return {
-            init: init,
-            rename: rename
-        };
+        return {init: init, rename: rename};
 
     })();
 
-    var transitions = {
-        init: { rename: 1 },
-        rename: { rename: 1 }
-    };
+    var transitions = {init: {rename: 1}, rename: {rename: 1}};
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');

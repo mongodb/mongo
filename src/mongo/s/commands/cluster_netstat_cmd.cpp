@@ -29,15 +29,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
 
-class NetStatCmd : public Command {
+class NetStatCmd : public BasicCommand {
 public:
-    NetStatCmd() : Command("netstat", false, "netstat") {}
+    NetStatCmd() : BasicCommand("netstat") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -47,7 +48,8 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -63,13 +65,12 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        result.append("configserver", grid.catalogManager()->connectionString().toString());
+        result.append("configserver",
+                      grid.shardRegistry()->getConfigServerConnectionString().toString());
         result.append("isdbgrid", 1);
         return true;
     }

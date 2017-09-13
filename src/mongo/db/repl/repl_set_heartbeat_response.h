@@ -32,7 +32,7 @@
 
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -117,7 +117,7 @@ public:
     bool hasConfig() const {
         return _configSet;
     }
-    const ReplicaSetConfig& getConfig() const;
+    const ReplSetConfig& getConfig() const;
     bool hasPrimaryId() const {
         return _primaryIdSet;
     }
@@ -125,10 +125,14 @@ public:
     long long getTerm() const {
         return _term;
     }
-    bool hasOpTime() const {
-        return _opTimeSet;
+    bool hasAppliedOpTime() const {
+        return _appliedOpTimeSet;
     }
-    OpTime getOpTime() const;
+    OpTime getAppliedOpTime() const;
+    bool hasDurableOpTime() const {
+        return _durableOpTimeSet;
+    }
+    OpTime getDurableOpTime() const;
 
     /**
      * Sets _mismatch to true.
@@ -223,7 +227,7 @@ public:
     /**
      * Initializes _config with "config".
      */
-    void setConfig(const ReplicaSetConfig& config) {
+    void setConfig(const ReplSetConfig& config) {
         _configSet = true;
         _config = config;
     }
@@ -232,9 +236,13 @@ public:
         _primaryIdSet = true;
         _primaryId = primaryId;
     }
-    void setOpTime(OpTime time) {
-        _opTimeSet = true;
-        _opTime = time;
+    void setAppliedOpTime(OpTime time) {
+        _appliedOpTimeSet = true;
+        _appliedOpTime = time;
+    }
+    void setDurableOpTime(OpTime time) {
+        _durableOpTimeSet = true;
+        _durableOpTime = time;
     }
     void setTerm(long long term) {
         _term = term;
@@ -247,8 +255,11 @@ private:
     bool _timeSet = false;
     Seconds _time = Seconds(0);  // Seconds since UNIX epoch.
 
-    bool _opTimeSet = false;
-    OpTime _opTime;
+    bool _appliedOpTimeSet = false;
+    OpTime _appliedOpTime;
+
+    bool _durableOpTimeSet = false;
+    OpTime _durableOpTime;
 
     bool _electableSet = false;
     bool _electable = false;
@@ -269,7 +280,7 @@ private:
     HostAndPort _syncingTo;
 
     bool _configSet = false;
-    ReplicaSetConfig _config;
+    ReplSetConfig _config;
 
     bool _primaryIdSet = false;
     long long _primaryId = -1;

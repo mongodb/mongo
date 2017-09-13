@@ -10,23 +10,23 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * Each thread inserts docs into a unique collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/count.js'); // for $config
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/count.js');              // for $config
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'count_fsm';
-    $config.data.shardKey = { tid: 1, i: 1 };
+    $config.data.shardKey = {tid: 1, i: 1};
 
     $config.data.getCount = function getCount(db, predicate) {
-        var query = Object.extend({ tid: this.tid }, predicate);
-        return db[this.threadCollName].find(query).hint({ tid: 1, i: 1 }).count();
+        var query = Object.extend({tid: this.tid}, predicate);
+        return db[this.threadCollName].find(query).hint({tid: 1, i: 1}).count();
     };
 
     $config.states.init = function init(db, collName) {
         this.threadCollName = this.prefix + '_' + this.tid;
         $super.states.init.apply(this, arguments);
-        assertAlways.commandWorked(db[this.threadCollName].ensureIndex({ tid: 1, i: 1 }));
+        assertAlways.commandWorked(db[this.threadCollName].ensureIndex({tid: 1, i: 1}));
     };
 
     $config.teardown = function teardown(db, collName) {

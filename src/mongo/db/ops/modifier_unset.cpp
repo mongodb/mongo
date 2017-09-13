@@ -30,9 +30,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/ops/field_checker.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/update/field_checker.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -83,7 +83,8 @@ Status ModifierUnset::init(const BSONElement& modExpr, const Options& opts, bool
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
 

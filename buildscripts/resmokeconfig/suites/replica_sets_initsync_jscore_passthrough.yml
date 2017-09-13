@@ -1,0 +1,99 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # These tests are not expected to pass with replica-sets:
+  - jstests/core/dbadmin.js
+  - jstests/core/opcounters_write_cmd.js
+  - jstests/core/read_after_optime.js
+  - jstests/core/capped_update.js
+  # These tests use map-reduce which can lead to consistency mismatches (SERVER-27147).
+  - jstests/core/bypass_doc_validation.js
+  - jstests/core/collation.js
+  - jstests/core/commands_that_do_not_write_do_not_accept_wc.js
+  - jstests/core/constructors.js
+  - jstests/core/eval_mr.js
+  - jstests/core/function_string_representations.js
+  - jstests/core/geo_big_polygon3.js
+  - jstests/core/geo_mapreduce.js
+  - jstests/core/geo_mapreduce2.js
+  - jstests/core/index_stats.js
+  - jstests/core/mr1.js
+  - jstests/core/mr2.js
+  - jstests/core/mr3.js
+  - jstests/core/mr4.js
+  - jstests/core/mr5.js
+  - jstests/core/mr_bigobject.js
+  - jstests/core/mr_bigobject_replace.js
+  - jstests/core/mr_comments.js
+  - jstests/core/mr_errorhandling.js
+  - jstests/core/mr_index.js
+  - jstests/core/mr_index2.js
+  - jstests/core/mr_index3.js
+  - jstests/core/mr_killop.js
+  - jstests/core/mr_merge.js
+  - jstests/core/mr_merge2.js
+  - jstests/core/mr_mutable_properties.js
+  - jstests/core/mr_optim.js
+  - jstests/core/mr_outreduce.js
+  - jstests/core/mr_outreduce2.js
+  - jstests/core/mr_replaceIntoDB.js
+  - jstests/core/mr_sort.js
+  - jstests/core/mr_stored.js
+  - jstests/core/mr_undef.js
+  - jstests/core/opcounters_active.js
+  - jstests/core/or4.js
+  # This test is blacklisted due to both map-reduce and getLatestProfilerEntry().
+  - jstests/core/profile_mapreduce.js
+  # Tests that query the system.profile collection cannot run in this suite since an initial sync
+  # may insert unexpected operations into the profile collection.
+  - jstests/core/profile_list_collections.js
+  - jstests/core/profile_list_indexes.js
+  - jstests/core/profile_parallel_collection_scan.js
+  - jstests/core/profile_repair_cursor.js
+  - jstests/core/recursion.js
+  - jstests/core/system_profile.js
+  - jstests/core/temp_cleanup.js
+  # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
+  # against their test collections.
+  - jstests/core/operation_latency_histogram.js
+  - jstests/core/geo_s2cursorlimitskip.js
+  # Having duplicate namespaces is not supported and will cause initial sync to fail.
+  - jstests/core/views/duplicate_ns.js
+  # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
+  - jstests/core/profile_agg.js
+  - jstests/core/profile_count.js
+  - jstests/core/profile_delete.js
+  - jstests/core/profile_distinct.js
+  - jstests/core/profile_find.js
+  - jstests/core/profile_findandmodify.js
+  - jstests/core/profile_geonear.js
+  - jstests/core/profile_getmore.js
+  - jstests/core/profile_group.js
+  - jstests/core/profile_insert.js
+  - jstests/core/profile_sampling.js
+  - jstests/core/profile_update.js
+  # The downstream syncing node affects the top output.
+  - jstests/core/top.js
+
+run_hook_interval: &run_hook_interval 20
+executor:
+  config:
+    shell_options:
+      eval: "testingReplication = true;"
+      readMode: commands
+  hooks:
+  - class: BackgroundInitialSync
+    n: *run_hook_interval
+  - class: CleanEveryN
+    n: *run_hook_interval
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 511
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2
+    start_initial_sync_node: True

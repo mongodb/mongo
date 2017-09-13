@@ -1,35 +1,52 @@
 # List of sub-directories, used by makemake to create Makefile.am
 #
 # The format is:
-#   <dir> [<condition>]
+#   <dir> [<condition> ...]
 #
 # If the directory exists, it is added to AUTO_SUBDIRS.
-# If a condition is included, the subdir is made conditional via AM_CONDITIONAL
+# If condition(s) are included, the subdir is made conditional via
+# AM_CONDITIONAL.  All conditions must be true to include the directory.
 ext/collators/reverse
-ext/compressors/bzip2 BZIP2
+ext/collators/revint
 ext/compressors/lz4 LZ4
 ext/compressors/nop
 ext/compressors/snappy SNAPPY
 ext/compressors/zlib ZLIB
+ext/compressors/zstd ZSTD
 ext/datasources/helium HAVE_HELIUM
 ext/encryptors/nop
 ext/encryptors/rotn
 ext/extractors/csv
 ext/test/kvs_bdb HAVE_BERKELEY_DB
+ext/test/fail_fs
 .
 api/leveldb LEVELDB
-bench/wtperf
-examples/c
 lang/java JAVA
-examples/java JAVA
 lang/python PYTHON
 
-# Make the tests
+# Test/Benchmark/Examples support library.
+test/utility
+
+# Example programs.
+examples/c
+examples/java JAVA
+
+# Test programs.
 test/bloom
 test/checkpoint
+test/csuite
+test/cursor_order
 test/fops
 test/format
 test/huge
+test/manydbs
 test/packing
+test/readonly
+test/recovery
 test/salvage
+test/syscall
 test/thread
+
+# Benchmark programs.
+bench/workgen PYTHON HAVE_CXX
+bench/wtperf

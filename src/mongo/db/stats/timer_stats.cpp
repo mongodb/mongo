@@ -48,9 +48,8 @@ int TimerHolder::recordMillis() {
 }
 
 void TimerStats::recordMillis(int millis) {
-    scoped_spinlock lk(_lock);
-    _num++;
-    _totalMillis += millis;
+    _num.fetchAndAdd(1);
+    _totalMillis.fetchAndAdd(millis);
 }
 
 int TimerStats::record(const Timer& timer) {
@@ -62,9 +61,8 @@ int TimerStats::record(const Timer& timer) {
 BSONObj TimerStats::getReport() const {
     long long n, t;
     {
-        scoped_spinlock lk(_lock);
-        n = _num;
-        t = _totalMillis;
+        n = _num.loadRelaxed();
+        t = _totalMillis.loadRelaxed();
     }
     BSONObjBuilder b(64);
     b.appendNumber("num", n);

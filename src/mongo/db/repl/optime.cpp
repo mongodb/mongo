@@ -26,38 +26,64 @@
  *    it in the license file.
  */
 
+#include <limits>
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <utility>
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
 namespace repl {
 
-OpTime::OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
+const char OpTime::kTimestampFieldName[] = "ts";
+const char OpTime::kTermFieldName[] = "t";
 
-Timestamp OpTime::getTimestamp() const {
-    return _timestamp;
+// static
+OpTime OpTime::max() {
+    return OpTime(Timestamp::max(), std::numeric_limits<decltype(OpTime::_term)>::max());
 }
 
-long long OpTime::getSecs() const {
-    return _timestamp.getSecs();
+void OpTime::append(BSONObjBuilder* builder, const std::string& subObjName) const {
+    BSONObjBuilder opTimeBuilder(builder->subobjStart(subObjName));
+    opTimeBuilder.append(kTimestampFieldName, _timestamp);
+
+    opTimeBuilder.append(kTermFieldName, _term);
+    opTimeBuilder.doneFast();
 }
 
-long long OpTime::getTerm() const {
-    return _term;
+StatusWith<OpTime> OpTime::parseFromOplogEntry(const BSONObj& obj) {
+    Timestamp ts;
+    Status status = bsonExtractTimestampField(obj, kTimestampFieldName, &ts);
+    if (!status.isOK())
+        return status;
+
+    // Default to -1 if the term is absent.
+    long long term;
+    status = bsonExtractIntegerFieldWithDefault(obj, kTermFieldName, kUninitializedTerm, &term);
+    if (!status.isOK())
+        return status;
+
+    return OpTime(ts, term);
 }
 
-bool OpTime::isNull() const {
-    return _timestamp.isNull();
+BSONObj OpTime::toBSON() const {
+    BSONObjBuilder bldr;
+    bldr.append(kTimestampFieldName, _timestamp);
+    bldr.append(kTermFieldName, _term);
+    return bldr.obj();
+}
+
+// static
+OpTime OpTime::parse(const BSONObj& obj) {
+    return uassertStatusOK(parseFromOplogEntry(obj));
 }
 
 std::string OpTime::toString() const {
-    std::stringstream ss;
-    ss << "(term: " << _term << ", timestamp: " << _timestamp.toStringPretty() << ")";
-    return ss.str();
+    return toBSON().toString();
 }
 
 std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {
@@ -65,4 +91,9 @@ std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {
 }
 
 }  // namespace repl
+
+BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const repl::OpTime& value) {
+    return builder << value.toBSON();
+}
+
 }  // namespace mongo

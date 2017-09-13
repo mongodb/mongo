@@ -28,45 +28,49 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/exec/shard_filter.h"
 
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/s/metadata_manager.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
+using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
 
-ShardFilterStage::ShardFilterStage(const CollectionMetadataPtr& metadata,
+ShardFilterStage::ShardFilterStage(OperationContext* opCtx,
+                                   ScopedCollectionMetadata metadata,
                                    WorkingSet* ws,
                                    PlanStage* child)
-    : _ws(ws), _child(child), _commonStats(kStageType), _metadata(metadata) {}
+    : PlanStage(kStageType, opCtx), _ws(ws), _metadata(std::move(metadata)) {
+    _children.emplace_back(child);
+}
 
 ShardFilterStage::~ShardFilterStage() {}
 
 bool ShardFilterStage::isEOF() {
-    return _child->isEOF();
+    return child()->isEOF();
 }
 
-PlanStage::StageState ShardFilterStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
     // If we've returned as many results as we're limited to, isEOF will be true.
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
 
-    StageState status = _child->work(out);
+    StageState status = child()->work(out);
 
     if (PlanStage::ADVANCED == status) {
         // If we're sharded make sure that we don't return data that is not owned by us,
@@ -87,7 +91,7 @@ PlanStage::StageState ShardFilterStage::work(WorkingSetID* out) {
                                   "query planning has failed");
 
                     // Fail loudly and cleanly in production, fatally in debug
-                    error() << status.toString();
+                    error() << redact(status);
                     dassert(false);
 
                     _ws->free(*out);
@@ -97,8 +101,7 @@ PlanStage::StageState ShardFilterStage::work(WorkingSetID* out) {
 
                 // Skip this document with a warning - no shard key should not be possible
                 // unless manually inserting data into a shard
-                warning() << "no shard key found in document " << member->obj.value().toString()
-                          << " "
+                warning() << "no shard key found in document " << redact(member->obj.value()) << " "
                           << "for shard key pattern " << _metadata->getKeyPattern() << ", "
                           << "document may have been inserted manually into shard";
             }
@@ -112,50 +115,19 @@ PlanStage::StageState ShardFilterStage::work(WorkingSetID* out) {
 
         // If we're here either we have shard state and our doc passed, or we have no shard
         // state.  Either way, we advance.
-        ++_commonStats.advanced;
         return status;
-    } else if (PlanStage::NEED_TIME == status) {
-        ++_commonStats.needTime;
-    } else if (PlanStage::NEED_YIELD == status) {
-        ++_commonStats.needYield;
     }
 
     return status;
 }
 
-void ShardFilterStage::saveState() {
-    ++_commonStats.yields;
-    _child->saveState();
-}
-
-void ShardFilterStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-    _child->restoreState(opCtx);
-}
-
-void ShardFilterStage::invalidate(OperationContext* txn,
-                                  const RecordId& dl,
-                                  InvalidationType type) {
-    ++_commonStats.invalidates;
-    _child->invalidate(txn, dl, type);
-}
-
-vector<PlanStage*> ShardFilterStage::getChildren() const {
-    vector<PlanStage*> children;
-    children.push_back(_child.get());
-    return children;
-}
-
-PlanStageStats* ShardFilterStage::getStats() {
+unique_ptr<PlanStageStats> ShardFilterStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SHARDING_FILTER));
-    ret->children.push_back(_child->getStats());
-    ret->specific.reset(new ShardingFilterStats(_specificStats));
-    return ret.release();
-}
-
-const CommonStats* ShardFilterStage::getCommonStats() const {
-    return &_commonStats;
+    unique_ptr<PlanStageStats> ret =
+        make_unique<PlanStageStats>(_commonStats, STAGE_SHARDING_FILTER);
+    ret->children.emplace_back(child()->getStats());
+    ret->specific = make_unique<ShardingFilterStats>(_specificStats);
+    return ret;
 }
 
 const SpecificStats* ShardFilterStage::getSpecificStats() const {

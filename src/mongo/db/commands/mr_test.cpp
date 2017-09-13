@@ -57,7 +57,11 @@ void _compareOutputOptionField(const std::string& dbname,
     if (actual == expected)
         return;
     FAIL(str::stream() << "parseOutputOptions(\"" << dbname << ", " << cmdObjStr << "): "
-                       << fieldName << ": Expected: " << expected << ". Actual: " << actual);
+                       << fieldName
+                       << ": Expected: "
+                       << expected
+                       << ". Actual: "
+                       << actual);
 }
 
 /**
@@ -92,8 +96,11 @@ void _testConfigParseOutputOptions(const std::string& dbname,
     _compareOutputOptionField(dbname, cmdObjStr, "outDb", outputOptions.outDB, expectedOutDb);
     _compareOutputOptionField(
         dbname, cmdObjStr, "collectionName", outputOptions.collectionName, expectedCollectionName);
-    _compareOutputOptionField(
-        dbname, cmdObjStr, "finalNamespace", outputOptions.finalNamespace, expectedFinalNamespace);
+    _compareOutputOptionField(dbname,
+                              cmdObjStr,
+                              "finalNamespace",
+                              outputOptions.finalNamespace.ns(),
+                              expectedFinalNamespace);
     _compareOutputOptionField(
         dbname, cmdObjStr, "outNonAtomic", outputOptions.outNonAtomic, expectedOutNonAtomic);
     _compareOutputOptionField(dbname,
@@ -108,23 +115,24 @@ void _testConfigParseOutputOptions(const std::string& dbname,
  */
 TEST(ConfigOutputOptionsTest, parseOutputOptions) {
     // Missing 'out' field.
-    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{}")), UserException);
+    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{}")), AssertionException);
     // 'out' must be either string or object.
-    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{out: 99}")), UserException);
+    ASSERT_THROWS(mr::Config::parseOutputOptions("mydb", fromjson("{out: 99}")),
+                  AssertionException);
     // 'out.nonAtomic' is not supported with normal, replace or inline.
     ASSERT_THROWS(mr::Config::parseOutputOptions(
                       "mydb", fromjson("{out: {normal: 'mycoll', nonAtomic: true}}")),
-                  UserException);
+                  AssertionException);
     ASSERT_THROWS(mr::Config::parseOutputOptions(
                       "mydb", fromjson("{out: {replace: 'mycoll', nonAtomic: true}}")),
-                  UserException);
+                  AssertionException);
     ASSERT_THROWS(mr::Config::parseOutputOptions(
                       "mydb", fromjson("{out: {inline: 'mycoll', nonAtomic: true}}")),
-                  UserException);
+                  AssertionException);
     // Unknown output specifer.
     ASSERT_THROWS(
         mr::Config::parseOutputOptions("mydb", fromjson("{out: {no_such_out_type: 'mycoll'}}")),
-        UserException);
+        AssertionException);
 
 
     // 'out' is string.
@@ -206,6 +214,45 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   "",
                                   false,
                                   mr::Config::INMEMORY);
+}
+
+TEST(ConfigTest, ParseCollation) {
+    std::string dbname = "myDB";
+    BSONObj collation = BSON("locale"
+                             << "en_US");
+    BSONObjBuilder bob;
+    bob.append("mapReduce", "myCollection");
+    bob.appendCode("map", "function() { emit(0, 1); }");
+    bob.appendCode("reduce", "function(k, v) { return {count: 0}; }");
+    bob.append("out", "outCollection");
+    bob.append("collation", collation);
+    BSONObj cmdObj = bob.obj();
+    mr::Config config(dbname, cmdObj);
+    ASSERT_BSONOBJ_EQ(config.collation, collation);
+}
+
+TEST(ConfigTest, ParseNoCollation) {
+    std::string dbname = "myDB";
+    BSONObjBuilder bob;
+    bob.append("mapReduce", "myCollection");
+    bob.appendCode("map", "function() { emit(0, 1); }");
+    bob.appendCode("reduce", "function(k, v) { return {count: 0}; }");
+    bob.append("out", "outCollection");
+    BSONObj cmdObj = bob.obj();
+    mr::Config config(dbname, cmdObj);
+    ASSERT_BSONOBJ_EQ(config.collation, BSONObj());
+}
+
+TEST(ConfigTest, CollationNotAnObjectFailsToParse) {
+    std::string dbname = "myDB";
+    BSONObjBuilder bob;
+    bob.append("mapReduce", "myCollection");
+    bob.appendCode("map", "function() { emit(0, 1); }");
+    bob.appendCode("reduce", "function(k, v) { return {count: 0}; }");
+    bob.append("out", "outCollection");
+    bob.append("collation", "en_US");
+    BSONObj cmdObj = bob.obj();
+    ASSERT_THROWS(mr::Config(dbname, cmdObj), AssertionException);
 }
 
 }  // namespace

@@ -57,10 +57,14 @@ public:
 
     virtual Status prepare(mutablebson::Element root, StringData matchedField, ExecInfo* execInfo);
 
-
     virtual Status apply() const;
 
     virtual Status log(LogBuilder* logBuilder) const;
+
+    virtual void setCollator(const CollatorInterface* collator) {
+        invariant(!_collator);
+        _collator = collator;
+    }
 
 private:
     // Access to each component of fieldName that's the target of this mod.
@@ -76,6 +80,9 @@ private:
 
     // User specified elements to remove
     std::vector<BSONElement> _elementsToFind;
+
+    // The collator this modifier uses when comparing strings.
+    const CollatorInterface* _collator = nullptr;
 };
 
 }  // namespace mongo

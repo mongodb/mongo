@@ -37,11 +37,42 @@
 namespace mongo {
 
 class BSONObj;
+class CollatorInterface;
+class CompositeIndexabilityDiscriminator;
 class MatchExpression;
 struct IndexEntry;
 
 using IndexabilityDiscriminator = stdx::function<bool(const MatchExpression* me)>;
 using IndexabilityDiscriminators = std::vector<IndexabilityDiscriminator>;
+using IndexToDiscriminatorMap = StringMap<CompositeIndexabilityDiscriminator>;
+
+/**
+ * CompositeIndexabilityDiscriminator holds all indexability discriminators for a particular path,
+ * for a particular index. For example, a path may have both a collation discriminator and a sparse
+ * index discriminator for a particular index.
+ */
+class CompositeIndexabilityDiscriminator {
+public:
+    /**
+     * Considers all discriminators for the path-index pair, and returns a single bit indicating
+     * whether the index can be used for that path.
+     */
+    bool isMatchCompatibleWithIndex(const MatchExpression* me) const {
+        for (auto&& discriminator : _discriminators) {
+            if (!discriminator(me)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void addDiscriminator(IndexabilityDiscriminator discriminator) {
+        _discriminators.push_back(std::move(discriminator));
+    }
+
+private:
+    IndexabilityDiscriminators _discriminators;
+};
 
 /**
  * PlanCacheIndexabilityState holds a set of "indexability discriminators" for certain paths.
@@ -55,13 +86,13 @@ public:
     PlanCacheIndexabilityState() = default;
 
     /**
-     * Gets the set of discriminators associated with 'path'.  Returns an empty set if no
-     * discriminators are registered for 'path'.
+     * Returns a map from index name to discriminator for each index associated with 'path'.
+     * Returns an empty set if no discriminators are registered for 'path'.
      *
      * The object returned by reference is valid until the next call to updateDiscriminators()
      * or until destruction of 'this', whichever is first.
      */
-    const IndexabilityDiscriminators& getDiscriminators(StringData path) const;
+    const IndexToDiscriminatorMap& getDiscriminators(StringData path) const;
 
     /**
      * Clears discriminators for all paths, and regenerate them from 'indexEntries'.
@@ -79,11 +110,11 @@ private:
      * element of the key pattern.  The former predicate is compatibile with this index, but the
      * latter is not compatible.
      */
-    void processSparseIndex(const BSONObj& keyPattern);
+    void processSparseIndex(const std::string& indexName, const BSONObj& keyPattern);
 
     /**
      * Adds partial index discriminators for the partial index with the given filter expression
-     * to '_pathDiscriminatorsMap'.
+     * to the discriminators for that index in '_pathDiscriminatorsMap'.
      *
      * A partial index discriminator distinguishes expressions that match a given partial index
      * predicate from expressions that don't match the partial index predicate.  For example,
@@ -91,9 +122,23 @@ private:
      * predicate {a: {$gt: -5}}, if there is a partial index defined with document filter {a:
      * {$gt: 0}}.  The former is compatible with this index, but the latter is not compatible.
      */
-    void processPartialIndex(const MatchExpression* filterExpr);
+    void processPartialIndex(const std::string& indexName, const MatchExpression* filterExpr);
 
-    using PathDiscriminatorsMap = StringMap<IndexabilityDiscriminators>;
+    /**
+     * Adds collation discriminators for the index with the given key pattern and collator to
+     * '_pathDiscriminatorsMap'.
+     *
+     * The discriminator for a given path returns true if the index collator matches the query
+     * collator, or if the query does not contain string comparison at that path.
+     */
+    void processIndexCollation(const std::string& indexName,
+                               const BSONObj& keyPattern,
+                               const CollatorInterface* collator);
+
+    /**
+     * PathDiscriminatorsMap is a map from field path to index name to IndexabilityDiscriminator.
+     */
+    using PathDiscriminatorsMap = StringMap<IndexToDiscriminatorMap>;
     PathDiscriminatorsMap _pathDiscriminatorsMap;
 };
 

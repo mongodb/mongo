@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -56,38 +56,51 @@ struct __wt_config_parser_impl {
 #define	WT_CONFIG_ENTRY_WT_CONNECTION_add_extractor	 4
 #define	WT_CONFIG_ENTRY_WT_CONNECTION_async_new_op	 5
 #define	WT_CONFIG_ENTRY_WT_CONNECTION_close		 6
-#define	WT_CONFIG_ENTRY_WT_CONNECTION_load_extension	 7
-#define	WT_CONFIG_ENTRY_WT_CONNECTION_open_session	 8
-#define	WT_CONFIG_ENTRY_WT_CONNECTION_reconfigure	 9
-#define	WT_CONFIG_ENTRY_WT_CURSOR_close			10
-#define	WT_CONFIG_ENTRY_WT_CURSOR_reconfigure		11
-#define	WT_CONFIG_ENTRY_WT_SESSION_begin_transaction	12
-#define	WT_CONFIG_ENTRY_WT_SESSION_checkpoint		13
-#define	WT_CONFIG_ENTRY_WT_SESSION_close		14
-#define	WT_CONFIG_ENTRY_WT_SESSION_commit_transaction	15
-#define	WT_CONFIG_ENTRY_WT_SESSION_compact		16
-#define	WT_CONFIG_ENTRY_WT_SESSION_create		17
-#define	WT_CONFIG_ENTRY_WT_SESSION_drop			18
-#define	WT_CONFIG_ENTRY_WT_SESSION_log_printf		19
-#define	WT_CONFIG_ENTRY_WT_SESSION_open_cursor		20
-#define	WT_CONFIG_ENTRY_WT_SESSION_reconfigure		21
-#define	WT_CONFIG_ENTRY_WT_SESSION_rename		22
-#define	WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction	23
-#define	WT_CONFIG_ENTRY_WT_SESSION_salvage		24
-#define	WT_CONFIG_ENTRY_WT_SESSION_snapshot		25
-#define	WT_CONFIG_ENTRY_WT_SESSION_strerror		26
-#define	WT_CONFIG_ENTRY_WT_SESSION_transaction_sync	27
-#define	WT_CONFIG_ENTRY_WT_SESSION_truncate		28
-#define	WT_CONFIG_ENTRY_WT_SESSION_upgrade		29
-#define	WT_CONFIG_ENTRY_WT_SESSION_verify		30
-#define	WT_CONFIG_ENTRY_colgroup_meta			31
-#define	WT_CONFIG_ENTRY_file_meta			32
-#define	WT_CONFIG_ENTRY_index_meta			33
-#define	WT_CONFIG_ENTRY_table_meta			34
-#define	WT_CONFIG_ENTRY_wiredtiger_open			35
-#define	WT_CONFIG_ENTRY_wiredtiger_open_all		36
-#define	WT_CONFIG_ENTRY_wiredtiger_open_basecfg		37
-#define	WT_CONFIG_ENTRY_wiredtiger_open_usercfg		38
+#define	WT_CONFIG_ENTRY_WT_CONNECTION_debug_info	 7
+#define	WT_CONFIG_ENTRY_WT_CONNECTION_load_extension	 8
+#define	WT_CONFIG_ENTRY_WT_CONNECTION_open_session	 9
+#define	WT_CONFIG_ENTRY_WT_CONNECTION_query_timestamp	10
+#define	WT_CONFIG_ENTRY_WT_CONNECTION_reconfigure	11
+#define	WT_CONFIG_ENTRY_WT_CONNECTION_rollback_to_stable	12
+#define	WT_CONFIG_ENTRY_WT_CONNECTION_set_file_system	13
+#define	WT_CONFIG_ENTRY_WT_CONNECTION_set_timestamp	14
+#define	WT_CONFIG_ENTRY_WT_CURSOR_close			15
+#define	WT_CONFIG_ENTRY_WT_CURSOR_reconfigure		16
+#define	WT_CONFIG_ENTRY_WT_SESSION_alter		17
+#define	WT_CONFIG_ENTRY_WT_SESSION_begin_transaction	18
+#define	WT_CONFIG_ENTRY_WT_SESSION_checkpoint		19
+#define	WT_CONFIG_ENTRY_WT_SESSION_close		20
+#define	WT_CONFIG_ENTRY_WT_SESSION_commit_transaction	21
+#define	WT_CONFIG_ENTRY_WT_SESSION_compact		22
+#define	WT_CONFIG_ENTRY_WT_SESSION_create		23
+#define	WT_CONFIG_ENTRY_WT_SESSION_drop			24
+#define	WT_CONFIG_ENTRY_WT_SESSION_join			25
+#define	WT_CONFIG_ENTRY_WT_SESSION_log_flush		26
+#define	WT_CONFIG_ENTRY_WT_SESSION_log_printf		27
+#define	WT_CONFIG_ENTRY_WT_SESSION_open_cursor		28
+#define	WT_CONFIG_ENTRY_WT_SESSION_rebalance		29
+#define	WT_CONFIG_ENTRY_WT_SESSION_reconfigure		30
+#define	WT_CONFIG_ENTRY_WT_SESSION_rename		31
+#define	WT_CONFIG_ENTRY_WT_SESSION_reset		32
+#define	WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction	33
+#define	WT_CONFIG_ENTRY_WT_SESSION_salvage		34
+#define	WT_CONFIG_ENTRY_WT_SESSION_snapshot		35
+#define	WT_CONFIG_ENTRY_WT_SESSION_strerror		36
+#define	WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction	37
+#define	WT_CONFIG_ENTRY_WT_SESSION_transaction_sync	38
+#define	WT_CONFIG_ENTRY_WT_SESSION_truncate		39
+#define	WT_CONFIG_ENTRY_WT_SESSION_upgrade		40
+#define	WT_CONFIG_ENTRY_WT_SESSION_verify		41
+#define	WT_CONFIG_ENTRY_colgroup_meta			42
+#define	WT_CONFIG_ENTRY_file_config			43
+#define	WT_CONFIG_ENTRY_file_meta			44
+#define	WT_CONFIG_ENTRY_index_meta			45
+#define	WT_CONFIG_ENTRY_lsm_meta			46
+#define	WT_CONFIG_ENTRY_table_meta			47
+#define	WT_CONFIG_ENTRY_wiredtiger_open			48
+#define	WT_CONFIG_ENTRY_wiredtiger_open_all		49
+#define	WT_CONFIG_ENTRY_wiredtiger_open_basecfg		50
+#define	WT_CONFIG_ENTRY_wiredtiger_open_usercfg		51
 /*
  * configuration section: END
  * DO NOT EDIT: automatically built by dist/flags.py.

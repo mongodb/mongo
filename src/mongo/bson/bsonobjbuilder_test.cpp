@@ -26,24 +26,16 @@
  *    it in the license file.
  */
 
-/**
- * tests for BSONObjBuilder
- */
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-
-#include <sstream>
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
 using std::string;
-using std::stringstream;
-using mongo::BSONElement;
-using mongo::BSONObj;
-using mongo::BSONObjBuilder;
-using mongo::BSONType;
 
 const long long maxEncodableInt = (1 << 30) - 1;
 const long long minEncodableInt = -maxEncodableInt;
@@ -63,13 +55,21 @@ const long long minLongLong = (std::numeric_limits<long long>::min)();
 template <typename T>
 void assertBSONTypeEquals(BSONType actual, BSONType expected, T value, int i) {
     if (expected != actual) {
-        stringstream ss;
+        std::stringstream ss;
         ss << "incorrect type in bson object for " << (i + 1) << "-th test value " << value
            << ". actual: " << mongo::typeName(actual)
            << "; expected: " << mongo::typeName(expected);
         const string msg = ss.str();
         FAIL(msg);
     }
+}
+
+TEST(BSONObjBuilderTest, AppendInt64T) {
+    auto obj = BSON("a" << int64_t{5} << "b" << int64_t{1ll << 40});
+    ASSERT_EQ(obj["a"].type(), NumberLong);
+    ASSERT_EQ(obj["b"].type(), NumberLong);
+    ASSERT_EQ(obj["a"].Long(), 5);
+    ASSERT_EQ(obj["b"].Long(), 1ll << 40);
 }
 
 /**
@@ -249,7 +249,7 @@ TEST(BSONObjBuilderTest, AppendNumberLongLongMinCompareObject) {
 
     BSONObj o2 = BSON("a" << std::numeric_limits<long long>::min());
 
-    ASSERT_EQUALS(o1, o2);
+    ASSERT_BSONOBJ_EQ(o1, o2);
 }
 
 TEST(BSONObjBuilderTest, AppendMaxTimestampConversion) {
@@ -264,4 +264,187 @@ TEST(BSONObjBuilderTest, AppendMaxTimestampConversion) {
     ASSERT_FALSE(timestamp.isNull());
 }
 
-}  // unnamed namespace
+TEST(BSONObjBuilderTest, ResumeBuilding) {
+    BufBuilder b;
+    {
+        BSONObjBuilder firstBuilder(b);
+        firstBuilder.append("a", "b");
+    }
+    {
+        BSONObjBuilder secondBuilder(BSONObjBuilder::ResumeBuildingTag(), b);
+        secondBuilder.append("c", "d");
+    }
+    auto obj = BSONObj(b.buf());
+    ASSERT_BSONOBJ_EQ(obj,
+                      BSON("a"
+                           << "b"
+                           << "c"
+                           << "d"));
+}
+
+TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
+    BufBuilder b;
+    // build a trivial object.
+    {
+        BSONObjBuilder firstBuilder(b);
+        firstBuilder.append("ll",
+                            BSON("f" << BSON("cc"
+                                             << "dd")));
+    }
+    // add a complex field
+    {
+        BSONObjBuilder secondBuilder(BSONObjBuilder::ResumeBuildingTag(), b);
+        secondBuilder.append("a", BSON("c" << 3));
+    }
+    auto obj = BSONObj(b.buf());
+    ASSERT_BSONOBJ_EQ(obj,
+                      BSON("ll" << BSON("f" << BSON("cc"
+                                                    << "dd"))
+                                << "a"
+                                << BSON("c" << 3)));
+}
+
+TEST(BSONObjBuilderTest, ResetToEmptyResultsInEmptyObj) {
+    BSONObjBuilder bob;
+    bob.append("a", 3);
+    bob.resetToEmpty();
+    ASSERT_BSONOBJ_EQ(BSONObj(), bob.obj());
+}
+
+TEST(BSONObjBuilderTest, ResetToEmptyForNestedBuilderOnlyResetsInnerObj) {
+    BSONObjBuilder bob;
+    bob.append("a", 3);
+    BSONObjBuilder innerObj(bob.subobjStart("nestedObj"));
+    innerObj.append("b", 4);
+    innerObj.resetToEmpty();
+    innerObj.done();
+    ASSERT_BSONOBJ_EQ(BSON("a" << 3 << "nestedObj" << BSONObj()), bob.obj());
+}
+
+TEST(BSONObjBuilderTest, MovingAnOwningBSONObjBuilderWorks) {
+    BSONObjBuilder initial;
+    initial.append("a", 1);
+
+    BSONObjBuilder bob(std::move(initial));
+    ASSERT(bob.owned());
+    bob.append("b", 2);
+    bob << "c" << 3;
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << 1 << "b" << 2 << "c" << 3));
+}
+
+TEST(BSONObjBuilderTest, MovingANonOwningBSONObjBuilderWorks) {
+    BSONObjBuilder outer;
+    {
+        BSONObjBuilder initial(outer.subobjStart("nested"));
+        initial.append("a", 1);
+
+        BSONObjBuilder bob(std::move(initial));
+        ASSERT(!bob.owned());
+        ASSERT_EQ(&bob.bb(), &outer.bb());
+
+        bob.append("b", 2);
+        bob << "c" << 3;
+    }
+
+    ASSERT_BSONOBJ_EQ(outer.obj(), BSON("nested" << BSON("a" << 1 << "b" << 2 << "c" << 3)));
+}
+
+TEST(BSONArrayBuilderTest, MovingABSONArrayBuilderWorks) {
+    BSONObjBuilder bob;
+    bob.append("a", 1);
+
+    BSONArrayBuilder initial(bob.subarrayStart("array"));
+    initial.append(1);
+    initial << "2";
+
+    BSONArrayBuilder moved(std::move(initial));
+    moved.append(3);
+    moved << "4";
+
+    moved.done();
+
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << 1 << "array" << BSON_ARRAY(1 << "2" << 3 << "4")));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedUnsharedOwnedBsonWorks) {
+    auto origObj = BSON("a" << 1);
+    auto origObjPtr = origObj.objdata();
+
+    BSONObjBuilder bob(std::move(origObj));  // moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSONObj());
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_EQ(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedSharedOwnedBsonWorks) {
+    const auto origObj = BSON("a" << 1);
+    auto origObjPtr = origObj.objdata();
+
+    BSONObjBuilder bob(origObj);  // not moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedUnownedBsonWorks) {
+    const auto origObjHolder = BSON("a" << 1);
+    auto origObjPtr = origObjHolder.objdata();
+    const auto origObj = BSONObj(origObjPtr);
+    invariant(!origObj.isOwned());
+
+    BSONObjBuilder bob(origObj);  // not moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithNonrootedUnsharedOwnedBsonWorks) {
+    auto origObjHolder = BSON("" << BSON("a" << 1));
+    auto origObj = origObjHolder.firstElement().Obj();
+    auto origObjPtr = origObj.objdata();
+    origObj.shareOwnershipWith(origObjHolder.releaseSharedBuffer());
+
+    BSONObjBuilder bob(std::move(origObj));  // moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSONObj());
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_EQ(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithNonrootedSharedOwnedBsonWorks) {
+    auto origObjHolder = BSON("" << BSON("a" << 1));
+    auto origObj = origObjHolder.firstElement().Obj();
+    auto origObjPtr = origObj.objdata();
+    origObj.shareOwnershipWith(origObjHolder.releaseSharedBuffer());
+
+    BSONObjBuilder bob(origObj);  // not moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithNonrootedUnownedBsonWorks) {
+    auto origObjHolder = BSON("" << BSON("a" << 1));
+    auto origObj = origObjHolder.firstElement().Obj();
+    auto origObjPtr = origObj.objdata();
+    invariant(!origObj.isOwned());
+
+    BSONObjBuilder bob(origObj);  // not moving.
+    bob.append("b", 1);
+    const auto obj = bob.obj();
+    ASSERT_BSONOBJ_EQ(origObj, BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
+    ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
+}
+
+}  // namespace
+}  // namespace mongo

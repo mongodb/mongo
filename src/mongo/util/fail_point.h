@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
@@ -68,7 +69,7 @@ class FailPoint {
 
 public:
     typedef AtomicUInt32::WordType ValType;
-    enum Mode { off, alwaysOn, random, nTimes, numModes };
+    enum Mode { off, alwaysOn, random, nTimes };
     enum RetCode { fastOff = 0, slowOff, slowOn };
 
     /**
@@ -76,6 +77,11 @@ public:
      * an instance of SecureRandom is used to seed the PRNG.
      */
     static void setThreadPRNGSeed(int32_t seed);
+
+    /**
+     * Parses the FailPoint::Mode, FailPoint::ValType, and data BSONObj from the BSON.
+     */
+    static StatusWith<std::tuple<Mode, ValType, BSONObj>> parseBSON(const BSONObj& obj);
 
     FailPoint();
 
@@ -192,8 +198,14 @@ class ScopedFailPoint {
     MONGO_DISALLOW_COPYING(ScopedFailPoint);
 
 public:
-    ScopedFailPoint(FailPoint* failPoint);
-    ~ScopedFailPoint();
+    ScopedFailPoint(FailPoint* failPoint)
+        : _failPoint(failPoint), _once(false), _shouldClose(false) {}
+
+    ~ScopedFailPoint() {
+        if (_shouldClose) {
+            _failPoint->shouldFailCloseBlock();
+        }
+    }
 
     /**
      * @return true if fail point is on. This will be true at most once.
@@ -214,7 +226,11 @@ public:
      * @return the data stored in the fail point. #isActive must be true
      *     before you can call this.
      */
-    const BSONObj& getData() const;
+    const BSONObj& getData() const {
+        // Assert when attempting to get data without incrementing ref counter.
+        fassert(16445, _shouldClose);
+        return _failPoint->getData();
+    }
 
 private:
     FailPoint* _failPoint;
@@ -223,6 +239,13 @@ private:
 };
 
 #define MONGO_FAIL_POINT(symbol) MONGO_unlikely(symbol.shouldFail())
+
+#define MONGO_FAIL_POINT_PAUSE_WHILE_SET(symbol) \
+    do {                                         \
+        while (MONGO_FAIL_POINT(symbol)) {       \
+            sleepmillis(100);                    \
+        }                                        \
+    } while (false)
 
 /**
  * Macro for creating a fail point with block context. Also use this when

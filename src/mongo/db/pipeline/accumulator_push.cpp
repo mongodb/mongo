@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
+
+#include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
 
@@ -36,6 +38,12 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 using std::vector;
+
+REGISTER_ACCUMULATOR(push, AccumulatorPush::create);
+
+const char* AccumulatorPush::getOpName() const {
+    return "$push";
+}
 
 void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {
@@ -59,11 +67,12 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
     }
 }
 
-Value AccumulatorPush::getValue(bool toBeMerged) const {
+Value AccumulatorPush::getValue(bool toBeMerged) {
     return Value(vpValue);
 }
 
-AccumulatorPush::AccumulatorPush() {
+AccumulatorPush::AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : Accumulator(expCtx) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -72,11 +81,8 @@ void AccumulatorPush::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<Accumulator> AccumulatorPush::create() {
-    return new AccumulatorPush();
-}
-
-const char* AccumulatorPush::getOpName() const {
-    return "$push";
+intrusive_ptr<Accumulator> AccumulatorPush::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new AccumulatorPush(expCtx);
 }
 }

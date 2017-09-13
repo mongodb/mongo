@@ -29,10 +29,12 @@
 #pragma once
 
 #include <deque>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 
@@ -42,7 +44,7 @@ class Database;
 class OperationContext;
 
 namespace repl {
-class BackgroundSyncInterface;
+class BackgroundSync;
 class ReplicationCoordinator;
 class OpTime;
 
@@ -51,149 +53,243 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc = stdx::function<void(const std::vector<BSONObj>& ops, SyncTail* st)>;
-
-    /**
-     * Type of function that takes a non-command op and applies it locally.
-     * Used for applying from an oplog.
-     * Last boolean argument 'convertUpdateToUpsert' converts some updates to upserts for
-     * idempotency reasons.
-     * Returns failure status if the op was an update that could not be applied.
-     */
-    using ApplyOperationInLockFn =
-        stdx::function<Status(OperationContext*, Database*, const BSONObj&, bool)>;
-
-    /**
-     * Type of function that takes a command op and applies it locally.
-     * Used for applying from an oplog.
-     * Returns failure status if the op that could not be applied.
-     */
-    using ApplyCommandInLockFn = stdx::function<Status(OperationContext*, const BSONObj&)>;
+    using MultiSyncApplyFunc = stdx::function<void(MultiApplier::OperationPtrs* ops, SyncTail* st)>;
 
     /**
      * Type of function to increment "repl.apply.ops" server status metric.
      */
     using IncrementOpsAppliedStatsFn = stdx::function<void()>;
 
-    SyncTail(BackgroundSyncInterface* q, MultiSyncApplyFunc func);
+    /**
+     * Type of function that takes a non-command op and applies it locally.
+     * Used for applying from an oplog.
+     * 'db' is the database where the op will be applied.
+     * 'opObj' is a BSONObj describing the op to be applied.
+     * 'inSteadyStateReplication' indicates to convert some updates to upserts for idempotency
+     * reasons.
+     * 'opCounter' is used to update server status metrics.
+     * Returns failure status if the op was an update that could not be applied.
+     */
+    using ApplyOperationInLockFn = stdx::function<Status(OperationContext* opCtx,
+                                                         Database* db,
+                                                         const BSONObj& opObj,
+                                                         bool inSteadyStateReplication,
+                                                         IncrementOpsAppliedStatsFn opCounter)>;
+
+    /**
+     * Type of function that takes a command op and applies it locally.
+     * Used for applying from an oplog.
+     * inSteadyStateReplication indicates whether we are in steady state replication, rather than
+     * initial sync.
+     * Returns failure status if the op that could not be applied.
+     */
+    using ApplyCommandInLockFn =
+        stdx::function<Status(OperationContext*, const BSONObj&, bool inSteadyStateReplication)>;
+
+    SyncTail(BackgroundSync* q, MultiSyncApplyFunc func);
+    SyncTail(BackgroundSync* q, MultiSyncApplyFunc func, std::unique_ptr<OldThreadPool> writerPool);
     virtual ~SyncTail();
+
+    /**
+     * Creates thread pool for writer tasks.
+     */
+    static std::unique_ptr<OldThreadPool> makeWriterPool();
 
     /**
      * Applies the operation that is in param o.
      * Functions for applying operations/commands and increment server status counters may
      * be overridden for testing.
      */
-    static Status syncApply(OperationContext* txn,
+    static Status syncApply(OperationContext* opCtx,
                             const BSONObj& o,
-                            bool convertUpdateToUpsert,
+                            bool inSteadyStateReplication,
                             ApplyOperationInLockFn applyOperationInLock,
                             ApplyCommandInLockFn applyCommandInLock,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
 
-    static Status syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert);
+    static Status syncApply(OperationContext* opCtx,
+                            const BSONObj& o,
+                            bool inSteadyStateReplication);
 
-    /**
-     * Runs _applyOplogUntil(stopOpTime)
-     */
-    virtual void oplogApplication(OperationContext* txn, const OpTime& stopOpTime);
-
-    void oplogApplication();
-    bool peek(BSONObj* obj);
+    void oplogApplication(ReplicationCoordinator* replCoord);
+    bool peek(OperationContext* opCtx, BSONObj* obj);
 
     class OpQueue {
     public:
-        OpQueue() : _size(0) {}
-        size_t getSize() const {
-            return _size;
-        }
-        const std::deque<BSONObj>& getDeque() const {
-            return _deque;
-        }
-        void push_back(BSONObj& op) {
-            _deque.push_back(op);
-            _size += op.objsize();
-        }
-        bool empty() const {
-            return _deque.empty();
+        OpQueue() : _bytes(0) {
+            _batch.reserve(replBatchLimitOperations.load());
         }
 
-        BSONObj back() const {
-            invariant(!_deque.empty());
-            return _deque.back();
+        size_t getBytes() const {
+            return _bytes;
+        }
+        size_t getCount() const {
+            return _batch.size();
+        }
+        bool empty() const {
+            return _batch.empty();
+        }
+        const OplogEntry& front() const {
+            invariant(!_batch.empty());
+            return _batch.front();
+        }
+        const OplogEntry& back() const {
+            invariant(!_batch.empty());
+            return _batch.back();
+        }
+        const std::vector<OplogEntry>& getBatch() const {
+            return _batch;
+        }
+
+        void emplace_back(BSONObj obj) {
+            invariant(!_mustShutdown);
+            _bytes += obj.objsize();
+            _batch.emplace_back(std::move(obj));
+        }
+        void pop_back() {
+            _bytes -= back().raw.objsize();
+            _batch.pop_back();
+        }
+
+        /**
+         * A batch with this set indicates that the upstream stages of the pipeline are shutdown and
+         * no more batches will be coming.
+         *
+         * This can only happen with empty batches.
+         *
+         * TODO replace the empty object used to signal draining with this.
+         */
+        bool mustShutdown() const {
+            return _mustShutdown;
+        }
+        void setMustShutdownFlag() {
+            invariant(empty());
+            _mustShutdown = true;
+        }
+
+        /**
+         * Leaves this object in an unspecified state. Only assignment and destruction are valid.
+         */
+        std::vector<OplogEntry> releaseBatch() {
+            return std::move(_batch);
         }
 
     private:
-        std::deque<BSONObj> _deque;
-        size_t _size;
+        std::vector<OplogEntry> _batch;
+        size_t _bytes;
+        bool _mustShutdown = false;
     };
 
-    // returns true if we should continue waiting for BSONObjs, false if we should
-    // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
-    bool tryPopAndWaitForMore(OperationContext* txn,
-                              OpQueue* ops,
-                              ReplicationCoordinator* replCoord);
+    struct BatchLimits {
+        size_t bytes = replBatchLimitBytes;
+        size_t ops = replBatchLimitOperations.load();
+
+        // If provided, the batch will not include any operations with timestamps after this point.
+        // This is intended for implementing slaveDelay, so it should be some number of seconds
+        // before now.
+        boost::optional<Date_t> slaveDelayLatestTimestamp = {};
+    };
+
+    /**
+     * Attempts to pop an OplogEntry off the BGSync queue and add it to ops.
+     *
+     * Returns true if the (possibly empty) batch in ops should be ended and a new one started.
+     * If ops is empty on entry and nothing can be added yet, will wait up to a second before
+     * returning true.
+     */
+    bool tryPopAndWaitForMore(OperationContext* opCtx, OpQueue* ops, const BatchLimits& limits);
 
     /**
      * Fetch a single document referenced in the operation from the sync source.
      */
-    virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o);
+    virtual BSONObj getMissingDoc(OperationContext* opCtx, const BSONObj& o);
 
     /**
-     * If applyOperation_inlock should be called again after an update fails.
+     * If an update fails, fetches the missing document and inserts it into the local collection.
+     *
+     * Returns true if the document was fetched and inserted successfully.
      */
-    virtual bool shouldRetry(OperationContext* txn, const BSONObj& o);
+    virtual bool fetchAndInsertMissingDocument(OperationContext* opCtx, const BSONObj& o);
+
     void setHostname(const std::string& hostname);
 
-protected:
-    // Cap the batches using the limit on journal commits.
-    // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
-    static const unsigned int replBatchLimitBytes = dur::UncommittedBytesLimit;
-    static const int replBatchLimitSeconds = 1;
-    static const unsigned int replBatchLimitOperations = 5000;
-
-    // SyncTail base class always supports awaiting commit if any op has j:true flag
-    // that indicates awaiting commit before updating last OpTime.
-    virtual bool supportsWaitingUntilDurable() {
-        return true;
-    }
-
-    // Prefetch and write a deque of operations, using the supplied function.
-    // Initial Sync and Sync Tail each use a different function.
-    // Returns the last OpTime applied.
-    static OpTime multiApply(OperationContext* txn,
-                             const OpQueue& ops,
-                             OldThreadPool* prefetcherPool,
-                             OldThreadPool* writerPool,
-                             MultiSyncApplyFunc func,
-                             SyncTail* sync,
-                             bool supportsAwaitingCommit);
-
     /**
-     * Applies oplog entries until reaching "endOpTime".
-     *
-     * NOTE:Will not transition or check states
+     * Returns writer thread pool.
+     * Used by ReplicationCoordinatorExternalStateImpl only.
      */
-    void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
+    OldThreadPool* getWriterPool();
+
+    static AtomicInt32 replBatchLimitOperations;
+
+protected:
+    static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
+    static const int replBatchLimitSeconds = 1;
+
+    // Apply a batch of operations, using multiple threads.
+    // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
+    OpTime multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
 private:
+    class OpQueueBatcher;
+
     std::string _hostname;
 
-    BackgroundSyncInterface* _networkQueue;
+    BackgroundSync* _networkQueue;
 
     // Function to use during applyOps
     MultiSyncApplyFunc _applyFunc;
 
-    void handleSlaveDelay(const BSONObj& op);
-
     // persistent pool of worker threads for writing ops to the databases
-    OldThreadPool _writerPool;
-    // persistent pool of worker threads for prefetching
-    OldThreadPool _prefetcherPool;
+    std::unique_ptr<OldThreadPool> _writerPool;
 };
 
+/**
+ * Applies the operations described in the oplog entries contained in "ops" using the
+ * "applyOperation" function.
+ *
+ * Returns ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary, and the OpTime
+ * of the final operation applied otherwise.
+ *
+ * Shared between here and MultiApplier.
+ */
+StatusWith<OpTime> multiApply(OperationContext* opCtx,
+                              OldThreadPool* workerPool,
+                              MultiApplier::Operations ops,
+                              MultiApplier::ApplyOperationFn applyOperation);
+
 // These free functions are used by the thread pool workers to write ops to the db.
-void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
-void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
+// They consume the passed in OperationPtrs and callers should not make any assumptions about the
+// state of the container after calling. However, these functions cannot modify the pointed-to
+// operations because the OperationPtrs container contains const pointers.
+void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
+
+// Used by 3.2 initial sync.
+void multiInitialSyncApply_abortOnFailure(MultiApplier::OperationPtrs* ops, SyncTail* st);
+
+// Used by 3.4 initial sync.
+Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                             SyncTail* st,
+                             AtomicUInt32* fetchCount);
+
+/**
+ * Testing-only version of multiSyncApply that returns an error instead of aborting.
+ * Accepts an external operation context and a function with the same argument list as
+ * SyncTail::syncApply.
+ */
+using SyncApplyFn = stdx::function<Status(
+    OperationContext* opCtx, const BSONObj& o, bool inSteadyStateReplication)>;
+Status multiSyncApply_noAbort(OperationContext* opCtx,
+                              MultiApplier::OperationPtrs* ops,
+                              SyncApplyFn syncApply);
+
+/**
+ * Testing-only version of multiInitialSyncApply that accepts an external operation context and
+ * returns an error instead of aborting.
+ */
+Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
+                                     MultiApplier::OperationPtrs* ops,
+                                     SyncTail* st,
+                                     AtomicUInt32* fetchCount);
 
 }  // namespace repl
 }  // namespace mongo

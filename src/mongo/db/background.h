@@ -33,9 +33,9 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <map>
 #include <set>
-#include <iosfwd>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
@@ -63,6 +63,16 @@ public:
     static void awaitNoBgOpInProgForDb(StringData db);
     static void awaitNoBgOpInProgForNs(StringData ns);
     static void dump(std::ostream&);
+
+    static bool inProgForNs(const NamespaceString& ns) {
+        return inProgForNs(ns.ns());
+    }
+    static void assertNoBgOpInProgForNs(const NamespaceString& ns) {
+        assertNoBgOpInProgForNs(ns.ns());
+    }
+    static void awaitNoBgOpInProgForNs(const NamespaceString& ns) {
+        awaitNoBgOpInProgForNs(ns.ns());
+    }
 
     /* check for in progress before instantiating */
     BackgroundOperation(StringData ns);

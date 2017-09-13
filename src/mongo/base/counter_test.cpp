@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/static_assert.hpp>
 #include <climits>
 #include <iostream>
 

@@ -32,24 +32,34 @@
 
 #include <map>
 
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record_access_tracker.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
+class ClockSource;
+class JournalListener;
 class MMAPV1DatabaseCatalogEntry;
 
 class MMAPV1Engine : public StorageEngine {
 public:
-    MMAPV1Engine(const StorageEngineLockFile& lockFile);
+    MMAPV1Engine(const StorageEngineLockFile* lockFile, ClockSource* cs);
+
+    MMAPV1Engine(const StorageEngineLockFile* lockFile,
+                 ClockSource* cs,
+                 std::unique_ptr<ExtentManager::Factory> extentManagerFactory);
     virtual ~MMAPV1Engine();
 
     void finishInit();
 
     RecoveryUnit* newRecoveryUnit();
     void listDatabases(std::vector<std::string>* out) const;
-    int flushAllFiles(bool sync);
+
+    int flushAllFiles(OperationContext* opCtx, bool sync);
+    Status beginBackup(OperationContext* opCtx);
+    void endBackup(OperationContext* opCtx);
 
     DatabaseCatalogEntry* getDatabaseCatalogEntry(OperationContext* opCtx, StringData db);
 
@@ -62,19 +72,21 @@ public:
 
     virtual bool isDurable() const;
 
-    virtual Status closeDatabase(OperationContext* txn, StringData db);
+    virtual bool isEphemeral() const;
 
-    virtual Status dropDatabase(OperationContext* txn, StringData db);
+    virtual Status closeDatabase(OperationContext* opCtx, StringData db);
+
+    virtual Status dropDatabase(OperationContext* opCtx, StringData db);
 
     virtual void cleanShutdown();
 
     // Callers should use  repairDatabase instead.
-    virtual Status repairRecordStore(OperationContext* txn, const std::string& ns) {
+    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns) {
         return Status(ErrorCodes::InternalError, "MMAPv1 doesn't support repairRecordStore");
     }
 
     // MMAPv1 specific (non-virtual)
-    Status repairDatabase(OperationContext* txn,
+    Status repairDatabase(OperationContext* opCtx,
                           const std::string& dbName,
                           bool preserveClonedFilesOnFailure,
                           bool backupOriginalFiles);
@@ -90,6 +102,8 @@ public:
      */
     RecordAccessTracker& getRecordAccessTracker();
 
+    void setJournalListener(JournalListener* jl) final;
+
 private:
     static void _listDatabases(const std::string& directory, std::vector<std::string>* out);
 
@@ -101,6 +115,11 @@ private:
     // addresses. It is used when higher layers (e.g. the query system) need to ask
     // the storage engine whether data is likely in physical memory.
     RecordAccessTracker _recordAccessTracker;
+
+    std::unique_ptr<ExtentManager::Factory> _extentManagerFactory;
+
+    ClockSource* _clock;
+    int64_t _startMs;
 };
 
 void _deleteDataFiles(const std::string& database);

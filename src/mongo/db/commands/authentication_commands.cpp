@@ -32,7 +32,6 @@
 
 #include "mongo/db/commands/authentication_commands.h"
 
-#include <boost/algorithm/string.hpp>
 #include <string>
 #include <vector>
 
@@ -49,13 +48,16 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/mongo_authentication_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_key.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
@@ -95,9 +97,9 @@ void CmdAuthenticate::disableAuthMechanism(std::string authMechanism) {
    where <key> is md5(<nonce_str><username><pwd_digest_str>) as a string
 */
 
-class CmdGetNonce : public Command {
+class CmdGetNonce : public BasicCommand {
 public:
-    CmdGetNonce() : Command("getnonce"), _random(SecureRandom::create()) {}
+    CmdGetNonce() : BasicCommand("getnonce"), _random(SecureRandom::create()) {}
 
     virtual bool slaveOk() const {
         return true;
@@ -105,23 +107,21 @@ public:
     void help(stringstream& h) const {
         h << "internal";
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string&,
-             BSONObj& cmdObj,
-             int,
-             string& errmsg,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         nonce64 n = getNextNonce();
         stringstream ss;
         ss << hex << n;
         result.append("nonce", ss.str());
-        AuthenticationSession::set(ClientBasic::getCurrent(),
+        AuthenticationSession::set(Client::getCurrent(),
                                    stdx::make_unique<MongoAuthenticationSession>(n));
         return true;
     }
@@ -144,24 +144,32 @@ void CmdAuthenticate::redactForLogging(mutablebson::Document* cmdObj) {
         for (mmb::Element element = mmb::findFirstChildNamed(cmdObj->root(), redactedFields[i]);
              element.ok();
              element = mmb::findElementNamed(element.rightSibling(), redactedFields[i])) {
-            element.setValueString("xxx");
+            element.setValueString("xxx").transitional_ignore();
         }
     }
 }
 
-bool CmdAuthenticate::run(OperationContext* txn,
+bool CmdAuthenticate::run(OperationContext* opCtx,
                           const string& dbname,
-                          BSONObj& cmdObj,
-                          int,
-                          string& errmsg,
+                          const BSONObj& cmdObj,
                           BSONObjBuilder& result) {
-    if (!serverGlobalParams.quiet) {
+    if (!serverGlobalParams.quiet.load()) {
         mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
         redactForLogging(&cmdToLog);
         log() << " authenticate db: " << dbname << " " << cmdToLog;
     }
+    std::string mechanism = cmdObj.getStringField("mechanism");
+    if (mechanism.empty()) {
+        mechanism = "MONGODB-CR";
+    }
+    UserName user;
+    auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
+    if (mechanism == "MONGODB-X509" && !cmdObj.hasField("user")) {
+        user = UserName(sslPeerInfo.subjectName, dbname);
+    } else {
+        user = UserName(cmdObj.getStringField("user"), dbname);
+    }
 
-    UserName user(cmdObj.getStringField("user"), dbname);
     if (Command::testCommandsEnabled && user.getDB() == "admin" &&
         user.getUser() == internalSecurity.user->getName().getUser()) {
         // Allows authenticating as the internal user against the admin database.  This is to
@@ -170,16 +178,14 @@ bool CmdAuthenticate::run(OperationContext* txn,
         user = internalSecurity.user->getName();
     }
 
-    std::string mechanism = cmdObj.getStringField("mechanism");
-    if (mechanism.empty()) {
-        mechanism = "MONGODB-CR";
-    }
-    Status status = _authenticate(txn, mechanism, user, cmdObj);
-    audit::logAuthentication(ClientBasic::getCurrent(), mechanism, user, status.code());
+    Status status = _authenticate(opCtx, mechanism, user, cmdObj);
+    audit::logAuthentication(Client::getCurrent(), mechanism, user, status.code());
     if (!status.isOK()) {
-        if (!serverGlobalParams.quiet) {
-            log() << "Failed to authenticate " << user << " with mechanism " << mechanism << ": "
-                  << status;
+        if (!serverGlobalParams.quiet.load()) {
+            auto const client = opCtx->getClient();
+            log() << "Failed to authenticate " << user
+                  << (client->hasRemote() ? (" from client " + client->getRemote().toString()) : "")
+                  << " with mechanism " << mechanism << ": " << status;
         }
         if (status.code() == ErrorCodes::AuthenticationFailed) {
             // Statuses with code AuthenticationFailed may contain messages we do not wish to
@@ -188,6 +194,7 @@ bool CmdAuthenticate::run(OperationContext* txn,
         } else {
             appendCommandStatus(result, status);
         }
+        sleepmillis(saslGlobalParams.authFailedDelay.load());
         return false;
     }
     result.append("dbname", user.getDB());
@@ -195,22 +202,22 @@ bool CmdAuthenticate::run(OperationContext* txn,
     return true;
 }
 
-Status CmdAuthenticate::_authenticate(OperationContext* txn,
+Status CmdAuthenticate::_authenticate(OperationContext* opCtx,
                                       const std::string& mechanism,
                                       const UserName& user,
                                       const BSONObj& cmdObj) {
     if (mechanism == "MONGODB-CR") {
-        return _authenticateCR(txn, user, cmdObj);
+        return _authenticateCR(opCtx, user, cmdObj);
     }
 #ifdef MONGO_CONFIG_SSL
     if (mechanism == "MONGODB-X509") {
-        return _authenticateX509(txn, user, cmdObj);
+        return _authenticateX509(opCtx, user, cmdObj);
     }
 #endif
     return Status(ErrorCodes::BadValue, "Unsupported mechanism: " + mechanism);
 }
 
-Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
+Status CmdAuthenticate::_authenticateCR(OperationContext* opCtx,
                                         const UserName& user,
                                         const BSONObj& cmdObj) {
     if (user == internalSecurity.user->getName() &&
@@ -239,7 +246,7 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
     stringstream digestBuilder;
 
     {
-        ClientBasic* client = ClientBasic::getCurrent();
+        Client* client = Client::getCurrent();
         std::unique_ptr<AuthenticationSession> session;
         AuthenticationSession::swap(client, session);
         if (!session || session->getType() != AuthenticationSession::SESSION_TYPE_MONGO) {
@@ -256,7 +263,7 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
     }
 
     User* userObj;
-    Status status = getGlobalAuthorizationManager()->acquireUser(txn, user, &userObj);
+    Status status = getGlobalAuthorizationManager()->acquireUser(opCtx, user, &userObj);
     if (!status.isOK()) {
         // Failure to find the privilege document indicates no-such-user, a fact that we do not
         // wish to reveal to the client.  So, we return AuthenticationFailed rather than passing
@@ -288,9 +295,8 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
         return Status(ErrorCodes::AuthenticationFailed, "key mismatch");
     }
 
-    AuthorizationSession* authorizationSession =
-        AuthorizationSession::get(ClientBasic::getCurrent());
-    status = authorizationSession->addAndAuthorizeUser(txn, user);
+    AuthorizationSession* authorizationSession = AuthorizationSession::get(Client::getCurrent());
+    status = authorizationSession->addAndAuthorizeUser(opCtx, user);
     if (!status.isOK()) {
         return status;
     }
@@ -299,42 +305,7 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
 }
 
 #ifdef MONGO_CONFIG_SSL
-void canonicalizeClusterDN(std::vector<std::string>* dn) {
-    // remove all RDNs we don't care about
-    for (size_t i = 0; i < dn->size(); i++) {
-        std::string& comp = dn->at(i);
-        boost::algorithm::trim(comp);
-        if (!mongoutils::str::startsWith(comp.c_str(), "DC=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "O=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "OU=")) {
-            dn->erase(dn->begin() + i);
-            i--;
-        }
-    }
-    std::stable_sort(dn->begin(), dn->end());
-}
-
-bool CmdAuthenticate::_clusterIdMatch(const std::string& subjectName,
-                                      const std::string& srvSubjectName) {
-    std::vector<string> clientRDN = StringSplitter::split(subjectName, ",");
-    std::vector<string> serverRDN = StringSplitter::split(srvSubjectName, ",");
-
-    canonicalizeClusterDN(&clientRDN);
-    canonicalizeClusterDN(&serverRDN);
-
-    if (clientRDN.size() == 0 || clientRDN.size() != serverRDN.size()) {
-        return false;
-    }
-
-    for (size_t i = 0; i < serverRDN.size(); i++) {
-        if (clientRDN[i] != serverRDN[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
+Status CmdAuthenticate::_authenticateX509(OperationContext* opCtx,
                                           const UserName& user,
                                           const BSONObj& cmdObj) {
     if (!getSSLManager()) {
@@ -346,21 +317,19 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
                       "X.509 authentication must always use the $external database.");
     }
 
-    ClientBasic* client = ClientBasic::getCurrent();
+    Client* client = Client::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
-    std::string subjectName = client->port()->getX509SubjectName();
+    auto clientName = SSLPeerInfo::forSession(client->session()).subjectName;
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "Unable to verify x.509 certificate, as no CA has been provided.");
-    } else if (user.getUser() != subjectName) {
+    } else if (user.getUser() != clientName) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "There is no x.509 client certificate matching the user.");
     } else {
-        std::string srvSubjectName = getSSLManager()->getSSLConfiguration().serverSubjectName;
-
         // Handle internal cluster member auth, only applies to server-server connections
-        if (_clusterIdMatch(subjectName, srvSubjectName)) {
+        if (getSSLManager()->getSSLConfiguration().isClusterMember(clientName)) {
             int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
             if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
                 clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {
@@ -377,7 +346,7 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
             if (_isX509AuthDisabled) {
                 return Status(ErrorCodes::BadValue, _x509AuthenticationDisabledMessage);
             }
-            Status status = authorizationSession->addAndAuthorizeUser(txn, user);
+            Status status = authorizationSession->addAndAuthorizeUser(opCtx, user);
             if (!status.isOK()) {
                 return status;
             }
@@ -388,7 +357,7 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
 #endif
 CmdAuthenticate cmdAuthenticate;
 
-class CmdLogout : public Command {
+class CmdLogout : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return true;
@@ -399,17 +368,15 @@ public:
     void help(stringstream& h) const {
         h << "de-authenticate";
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    CmdLogout() : Command("logout") {}
-    bool run(OperationContext* txn,
+    CmdLogout() : BasicCommand("logout") {}
+    bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
-             int options,
-             string& errmsg,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        AuthorizationSession* authSession = AuthorizationSession::get(ClientBasic::getCurrent());
+        AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
         authSession->logoutDatabase(dbname);
         if (Command::testCommandsEnabled && dbname == "admin") {
             // Allows logging out as the internal user against the admin database, however

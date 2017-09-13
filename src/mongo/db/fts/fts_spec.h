@@ -31,15 +31,17 @@
 #pragma once
 
 #include <map>
-#include <vector>
 #include <string>
+#include <vector>
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -58,7 +60,7 @@ struct ScoreHelperStruct {
     double count;
     double exp;
 };
-typedef unordered_map<std::string, ScoreHelperStruct> ScoreHelperMap;
+typedef StringMap<ScoreHelperStruct> ScoreHelperMap;
 
 class FTSSpec {
     struct Tools {
@@ -112,7 +114,7 @@ public:
     const Weights& weights() const {
         return _weights;
     }
-    static BSONObj fixSpec(const BSONObj& spec);
+    static StatusWith<BSONObj> fixSpec(const BSONObj& spec);
 
     /**
      * Returns text index version.
@@ -163,7 +165,7 @@ private:
 
     const FTSLanguage& _getLanguageToUseV1(const BSONObj& userDoc) const;
 
-    static BSONObj _fixSpecV1(const BSONObj& spec);
+    static StatusWith<BSONObj> _fixSpecV1(const BSONObj& spec);
 
     //
     // Instance variables.

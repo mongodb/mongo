@@ -28,6 +28,8 @@
 
 #ifdef _WIN32
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #define SECURITY_WIN32 1  // Required for SSPI support.
 
 #include "mongo/platform/basic.h"
@@ -37,8 +39,10 @@
 #include <sspi.h>
 
 #include "mongo/base/init.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/base/status.h"
+#include "mongo/client/sasl_sspi_options.h"
+#include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 
@@ -175,7 +179,7 @@ int sspiClientMechNew(void* glob_context,
     pcctx->userPlusRealm = userPlusRealm;
     TimeStamp ignored;
     SECURITY_STATUS status = AcquireCredentialsHandleW(NULL,  // principal
-                                                       L"kerberos",
+                                                       const_cast<LPWSTR>(L"kerberos"),
                                                        SECPKG_CRED_OUTBOUND,
                                                        NULL,           // LOGON id
                                                        &authIdentity,  // auth data
@@ -190,13 +194,37 @@ int sspiClientMechNew(void* glob_context,
 
     pcctx->haveCred = true;
 
-    // Compose target name token.
+    // Compose target name token. First, verify that a hostname has been provided.
     if (cparams->serverFQDN == NULL || strlen(cparams->serverFQDN) == 0) {
         cparams->utils->seterror(cparams->utils->conn, 0, "SSPI: no serverFQDN");
         return SASL_FAIL;
     }
-    pcctx->nameToken =
-        toWideString((std::string(cparams->service) + "/" + cparams->serverFQDN).c_str());
+
+    // Then obtain all potential FQDNs for the hostname.
+    std::string canonName = cparams->serverFQDN;
+    auto fqdns = getHostFQDNs(cparams->serverFQDN, saslSSPIGlobalParams.canonicalization);
+    if (!fqdns.empty()) {
+        // PTR records should point to the canonical name. If there's more than one, warn and
+        // arbitrarily use the last entry.
+        if (fqdns.size() > 1) {
+            std::stringstream ss;
+            ss << "Found multiple PTR records while performing reverse DNS: [ ";
+            for (const std::string& fqdn : fqdns) {
+                ss << fqdn << " ";
+            }
+            ss << "]";
+            warning() << ss.str();
+        }
+        canonName = std::move(fqdns.back());
+        fqdns.pop_back();
+    } else if (saslSSPIGlobalParams.canonicalization != HostnameCanonicalizationMode::kNone) {
+        warning() << "Was unable to acquire an FQDN";
+    }
+
+    pcctx->nameToken = toWideString(cparams->service) + L'/' + toWideString(canonName.c_str());
+    if (!saslSSPIGlobalParams.realmOverride.empty()) {
+        pcctx->nameToken += L'@' + toWideString(saslSSPIGlobalParams.realmOverride.c_str());
+    }
 
     *conn_context = pcctx.release();
 
@@ -459,7 +487,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
     if (SASL_OK != ret) {
         return Status(ErrorCodes::UnknownError,
                       mongoutils::str::stream() << "could not add SASL Client SSPI plugin "
-                                                << sspiPluginName << ": "
+                                                << sspiPluginName
+                                                << ": "
                                                 << sasl_errstring(ret, NULL, NULL));
     }
 
@@ -472,7 +501,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslCramClientPlugin,
     if (SASL_OK != ret) {
         return Status(ErrorCodes::UnknownError,
                       mongoutils::str::stream() << "Could not add SASL Client CRAM-MD5 plugin "
-                                                << sspiPluginName << ": "
+                                                << sspiPluginName
+                                                << ": "
                                                 << sasl_errstring(ret, NULL, NULL));
     }
 
@@ -486,7 +516,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin,
     if (SASL_OK != ret) {
         return Status(ErrorCodes::UnknownError,
                       mongoutils::str::stream() << "Could not add SASL Client PLAIN plugin "
-                                                << sspiPluginName << ": "
+                                                << sspiPluginName
+                                                << ": "
                                                 << sasl_errstring(ret, NULL, NULL));
     }
 

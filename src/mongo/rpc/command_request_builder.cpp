@@ -30,77 +30,74 @@
 
 #include "mongo/rpc/command_request_builder.h"
 
-#include <utility>
-
-#include "mongo/stdx/memory.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/commands.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace rpc {
 
-CommandRequestBuilder::CommandRequestBuilder() : _message{stdx::make_unique<Message>()} {}
+namespace {
+// OP_COMMAND put some generic arguments in the metadata and some in the body.
+bool fieldGoesInMetadata(StringData commandName, StringData field) {
+    if (!Command::isGenericArgument(field))
+        return false;  // All non-generic arguments go to the body.
 
-CommandRequestBuilder::~CommandRequestBuilder() {}
+    // For some reason this goes in the body only for a single command...
+    if (field == "$replData")
+        return commandName != "replSetUpdatePosition";
 
-CommandRequestBuilder::CommandRequestBuilder(std::unique_ptr<Message> message)
-    : _message{std::move(message)} {}
-
-CommandRequestBuilder& CommandRequestBuilder::setDatabase(StringData database) {
-    invariant(_state == State::kDatabase);
-    _builder.appendStr(database);
-    _state = State::kCommandName;
-    return *this;
+    // These generic arguments went in the body.
+    return !(field == "maxTimeMS" || field == "readConcern" || field == "writeConcern" ||
+             field == "shardVersion");
 }
+}  // namespace
 
-CommandRequestBuilder& CommandRequestBuilder::setCommandName(StringData commandName) {
-    invariant(_state == State::kCommandName);
-    _builder.appendStr(commandName);
-    _state = State::kMetadata;
-    return *this;
-}
+Message opCommandRequestFromOpMsgRequest(const OpMsgRequest& request) {
+    const auto commandName = request.getCommandName();
 
-CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
-    invariant(_state == State::kMetadata);
-    metadata.appendSelfToBufBuilder(_builder);
-    _state = State::kCommandArgs;
-    return *this;
-}
+    BufBuilder builder;
+    builder.skip(mongo::MsgData::MsgDataHeaderSize);  // Leave room for message header.
+    builder.appendStr(request.getDatabase());
+    builder.appendStr(commandName);
 
-CommandRequestBuilder& CommandRequestBuilder::setCommandArgs(BSONObj commandArgs) {
-    invariant(_state == State::kCommandArgs);
-    commandArgs.appendSelfToBufBuilder(_builder);
-    _state = State::kInputDocs;
-    return *this;
-}
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. In addition to field-level differences, some generic arguments are pulled
+    // out to a metadata object, separate from the body. We do all down-conversion here so that the
+    // rest of the code only has to deal with the current format.
+    BSONObjBuilder metadataBuilder;  // Will be appended to the message after we finish the body.
+    {
+        BSONObjBuilder bodyBuilder(builder);
+        for (auto elem : request.body) {
+            const auto fieldName = elem.fieldNameStringData();
+            if (fieldName == "$configServerState") {
+                metadataBuilder.appendAs(elem, "configsvr");
+            } else if (fieldName == "$readPreference") {
+                BSONObjBuilder ssmBuilder(metadataBuilder.subobjStart("$ssm"));
+                ssmBuilder.append(elem);
+                ssmBuilder.append("$secondaryOk",
+                                  uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(elem))
+                                      .canRunOnSecondary());
+            } else if (fieldName == "$db") {
+                // skip
+            } else if (fieldGoesInMetadata(commandName, fieldName)) {
+                metadataBuilder.append(elem);
+            } else {
+                bodyBuilder.append(elem);
+            }
+        }
+        for (auto&& seq : request.sequences) {
+            invariant(seq.name.find('.') == std::string::npos);  // Only support top-level for now.
+            dassert(!bodyBuilder.asTempObj().hasField(seq.name));
+            bodyBuilder.append(seq.name, seq.objs);
+        }
+    }
+    metadataBuilder.obj().appendSelfToBufBuilder(builder);
 
-CommandRequestBuilder& CommandRequestBuilder::addInputDocs(DocumentRange inputDocs) {
-    invariant(_state == State::kInputDocs);
-    auto rangeData = inputDocs.data();
-    _builder.appendBuf(rangeData.data(), rangeData.length());
-    return *this;
-}
-
-CommandRequestBuilder& CommandRequestBuilder::addInputDoc(BSONObj inputDoc) {
-    invariant(_state == State::kInputDocs);
-    inputDoc.appendSelfToBufBuilder(_builder);
-    return *this;
-}
-
-RequestBuilderInterface::State CommandRequestBuilder::getState() const {
-    return _state;
-}
-
-Protocol CommandRequestBuilder::getProtocol() const {
-    return rpc::Protocol::kOpCommandV1;
-}
-
-std::unique_ptr<Message> CommandRequestBuilder::done() {
-    invariant(_state == State::kInputDocs);
-    // TODO: we can elide a large copy here by transferring the internal buffer of
-    // the BufBuilder to the Message.
-    _message->setData(dbCommand, _builder.buf(), _builder.len());
-    _state = State::kDone;
-    return std::move(_message);
+    MsgData::View msg = builder.buf();
+    msg.setLen(builder.len());
+    msg.setOperation(dbCommand);
+    return Message(builder.release());
 }
 
 }  // namespace rpc

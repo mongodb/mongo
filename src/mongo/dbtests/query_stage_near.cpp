@@ -31,94 +31,38 @@
  */
 
 
+#include "mongo/platform/basic.h"
+
+#include <memory>
+#include <vector>
+
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/near.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using namespace mongo;
 using std::shared_ptr;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
-/**
- * Stage which takes in an array of BSONObjs and returns them.
- * If the BSONObj is in the form of a Status, returns the Status as a FAILURE.
- */
-class MockStage : public PlanStage {
-public:
-    MockStage(const vector<BSONObj>& data, WorkingSet* workingSet)
-        : _data(data), _pos(0), _workingSet(workingSet), _stats("MOCK_STAGE") {}
-
-    virtual ~MockStage() {}
-
-    virtual StageState work(WorkingSetID* out) {
-        ++_stats.works;
-
-        if (isEOF())
-            return PlanStage::IS_EOF;
-
-        BSONObj next = _data[_pos++];
-
-        if (WorkingSetCommon::isValidStatusMemberObject(next)) {
-            Status status = WorkingSetCommon::getMemberObjectStatus(next);
-            *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
-            return PlanStage::FAILURE;
-        }
-
-        *out = _workingSet->allocate();
-        WorkingSetMember* member = _workingSet->get(*out);
-        member->state = WorkingSetMember::OWNED_OBJ;
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), next);
-
-        return PlanStage::ADVANCED;
-    }
-
-    virtual bool isEOF() {
-        return _pos == static_cast<int>(_data.size());
-    }
-
-    virtual void saveState() {}
-
-    virtual void restoreState(OperationContext* opCtx) {}
-
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {}
-    virtual vector<PlanStage*> getChildren() const {
-        return vector<PlanStage*>();
-    }
-
-    virtual StageType stageType() const {
-        return STAGE_UNKNOWN;
-    }
-
-    virtual PlanStageStats* getStats() {
-        return new PlanStageStats(_stats, STAGE_UNKNOWN);
-    }
-
-    virtual const CommonStats* getCommonStats() const {
-        return &_stats;
-    }
-
-    virtual const SpecificStats* getSpecificStats() const {
-        return NULL;
-    }
-
-private:
-    vector<BSONObj> _data;
-    int _pos;
-
-    // Not owned here
-    WorkingSet* const _workingSet;
-
-    CommonStats _stats;
+class QueryStageNearTest : public unittest::Test {
+protected:
+    const ServiceContext::UniqueOperationContext _uniqOpCtx = cc().makeOperationContext();
+    OperationContext* const _opCtx = _uniqOpCtx.get();
 };
 
 /**
  * Stage which implements a basic distance search, and interprets the "distance" field of
  * fetched documents as the distance.
  */
-class MockNearStage : public NearStage {
+class MockNearStage final : public NearStage {
 public:
     struct MockInterval {
         MockInterval(const vector<BSONObj>& data, double min, double max)
@@ -129,58 +73,54 @@ public:
         double max;
     };
 
-    MockNearStage(WorkingSet* workingSet)
-        : NearStage(NULL,
-                    workingSet,
-                    NULL,
-                    new PlanStageStats(CommonStats("MOCK_DISTANCE_SEARCH_STAGE"), STAGE_UNKNOWN)),
+    MockNearStage(OperationContext* opCtx, WorkingSet* workingSet)
+        : NearStage(opCtx, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, NULL),
           _pos(0) {}
 
-    virtual ~MockNearStage() {}
-
     void addInterval(vector<BSONObj> data, double min, double max) {
-        _intervals.mutableVector().push_back(new MockInterval(data, min, max));
+        _intervals.push_back(stdx::make_unique<MockInterval>(data, min, max));
     }
 
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
+    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                                       WorkingSet* workingSet,
                                                       Collection* collection) {
         if (_pos == static_cast<int>(_intervals.size()))
             return StatusWith<CoveredInterval*>(NULL);
 
-        const MockInterval& interval = *_intervals.vector()[_pos++];
+        const MockInterval& interval = *_intervals[_pos++];
 
-        bool lastInterval = _pos == static_cast<int>(_intervals.vector().size());
-        return StatusWith<CoveredInterval*>(
-            new CoveredInterval(new MockStage(interval.data, workingSet),
-                                true,
-                                interval.min,
-                                interval.max,
-                                lastInterval));
+        bool lastInterval = _pos == static_cast<int>(_intervals.size());
+
+        auto queuedStage = make_unique<QueuedDataStage>(opCtx, workingSet);
+
+        for (unsigned int i = 0; i < interval.data.size(); i++) {
+            // Add all documents from the lastInterval into the QueuedDataStage.
+            const WorkingSetID id = workingSet->allocate();
+            WorkingSetMember* member = workingSet->get(id);
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), interval.data[i]);
+            workingSet->transitionToOwnedObj(id);
+            queuedStage->pushBack(id);
+        }
+
+        _children.push_back(std::move(queuedStage));
+        return StatusWith<CoveredInterval*>(new CoveredInterval(
+            _children.back().get(), true, interval.min, interval.max, lastInterval));
     }
 
-    virtual StatusWith<double> computeDistance(WorkingSetMember* member) {
+    StatusWith<double> computeDistance(WorkingSetMember* member) final {
         ASSERT(member->hasObj());
         return StatusWith<double>(member->obj.value()["distance"].numberDouble());
     }
 
-    virtual StageState initialize(OperationContext* txn,
+    virtual StageState initialize(OperationContext* opCtx,
                                   WorkingSet* workingSet,
                                   Collection* collection,
                                   WorkingSetID* out) {
         return IS_EOF;
     }
 
-    virtual void finishSaveState() {}
-
-    virtual void finishRestoreState(OperationContext* txn) {}
-
-    virtual void finishInvalidate(OperationContext* txn,
-                                  const RecordId& dl,
-                                  InvalidationType type) {}
-
 private:
-    OwnedPointerVector<MockInterval> _intervals;
+    std::vector<std::unique_ptr<MockInterval>> _intervals;
     int _pos;
 };
 
@@ -210,23 +150,25 @@ static void assertAscendingAndValid(const vector<BSONObj>& results) {
     }
 }
 
-TEST(query_stage_near, Basic) {
+TEST_F(QueryStageNearTest, Basic) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(&workingSet);
+    MockNearStage nearStage(_opCtx, &workingSet);
 
     // First set of results
     mockData.clear();
     mockData.push_back(BSON("distance" << 0.5));
-    mockData.push_back(BSON("distance" << 2.0 << "$included" << false));  // Not included
+    // Not included in this interval, but will be buffered and included in the last interval
+    mockData.push_back(BSON("distance" << 2.0));
     mockData.push_back(BSON("distance" << 0.0));
+    mockData.push_back(BSON("distance" << 3.5));  // Not included
     nearStage.addInterval(mockData, 0.0, 1.0);
 
     // Second set of results
     mockData.clear();
     mockData.push_back(BSON("distance" << 1.5));
-    mockData.push_back(BSON("distance" << 2.0 << "$included" << false));  // Not included
+    mockData.push_back(BSON("distance" << 0.5));  // Not included
     mockData.push_back(BSON("distance" << 1.0));
     nearStage.addInterval(mockData, 1.0, 2.0);
 
@@ -235,24 +177,25 @@ TEST(query_stage_near, Basic) {
     mockData.push_back(BSON("distance" << 2.5));
     mockData.push_back(BSON("distance" << 3.0));  // Included
     mockData.push_back(BSON("distance" << 2.0));
+    mockData.push_back(BSON("distance" << 3.5));  // Not included
     nearStage.addInterval(mockData, 2.0, 3.0);
 
     vector<BSONObj> results = advanceStage(&nearStage, &workingSet);
-    ASSERT_EQUALS(results.size(), 7u);
+    ASSERT_EQUALS(results.size(), 8u);
     assertAscendingAndValid(results);
 }
 
-TEST(query_stage_near, EmptyResults) {
+TEST_F(QueryStageNearTest, EmptyResults) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(&workingSet);
+    MockNearStage nearStage(_opCtx, &workingSet);
 
     // Empty set of results
     mockData.clear();
     nearStage.addInterval(mockData, 0.0, 1.0);
 
-    // Non-empty sest of results
+    // Non-empty set of results
     mockData.clear();
     mockData.push_back(BSON("distance" << 1.5));
     mockData.push_back(BSON("distance" << 2.0));

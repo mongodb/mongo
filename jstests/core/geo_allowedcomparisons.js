@@ -2,22 +2,30 @@
 t = db.geo_allowedcomparisons;
 
 // Any GeoJSON object can intersect with any geojson object.
-geojsonPoint = { "type" : "Point", "coordinates": [ 0, 0 ] };
-oldPoint = [0,0];
+geojsonPoint = {
+    "type": "Point",
+    "coordinates": [0, 0]
+};
+oldPoint = [0, 0];
 
 // GeoJSON polygons can contain any geojson object and OLD points.
-geojsonPoly = { "type" : "Polygon",
-                "coordinates" : [ [ [-5,-5], [-5,5], [5,5], [5,-5], [-5,-5]]]};
+geojsonPoly = {
+    "type": "Polygon",
+    "coordinates": [[[-5, -5], [-5, 5], [5, 5], [5, -5], [-5, -5]]]
+};
 
 // This can be contained by GJ polygons, intersected by anything GJ and old points.
-geojsonLine = { "type" : "LineString", "coordinates": [ [ 0, 0], [1, 1]]}
+geojsonLine = {
+    "type": "LineString",
+    "coordinates": [[0, 0], [1, 1]]
+};
 
 // $centerSphere can contain old or new points.
 oldCenterSphere = [[0, 0], Math.PI / 180];
 // $box can contain old points.
-oldBox = [[-5,-5], [5,5]];
+oldBox = [[-5, -5], [5, 5]];
 // $polygon can contain old points.
-oldPolygon = [[-5,-5], [-5,5], [5,5], [5,-5], [-5,-5]]
+oldPolygon = [[-5, -5], [-5, 5], [5, 5], [5, -5], [-5, -5]];
 // $center can contain old points.
 oldCenter = [[0, 0], 1];
 
@@ -37,53 +45,61 @@ assert.writeError(t.insert({geo: oldCenter}));
 // do that.  Ditto for the box.
 
 // Verify that even if we can't index them, we can use them in a matcher.
-t.insert({gj: geojsonLine})
-t.insert({gj: geojsonPoly})
-geojsonPoint2 = { "type" : "Point", "coordinates": [ 0, 0.001 ] };
-t.insert({gjp: geojsonPoint2})
+t.insert({gj: geojsonLine});
+t.insert({gj: geojsonPoly});
+geojsonPoint2 = {
+    "type": "Point",
+    "coordinates": [0, 0.001]
+};
+t.insert({gjp: geojsonPoint2});
 
 // We convert between old and new style points.
 assert.eq(1, t.find({gjp: {$geoWithin: {$box: oldBox}}}).itcount());
 assert.eq(1, t.find({gjp: {$geoWithin: {$polygon: oldPolygon}}}).itcount());
 assert.eq(1, t.find({gjp: {$geoWithin: {$center: oldCenter}}}).itcount());
-assert.eq(1, t.find({gjp: {$geoWithin: {$centerSphere: oldCenterSphere}}}).itcount())
+assert.eq(1, t.find({gjp: {$geoWithin: {$centerSphere: oldCenterSphere}}}).itcount());
 
 function runTests() {
     // Each find the box, the polygon, and the old point.
-    assert.eq(1, t.find({geo: {$geoWithin: {$box: oldBox}}}).itcount())
-    assert.eq(1, t.find({geo: {$geoWithin: {$polygon: oldPolygon}}}).itcount())
+    assert.eq(1, t.find({geo: {$geoWithin: {$box: oldBox}}}).itcount());
+    assert.eq(1, t.find({geo: {$geoWithin: {$polygon: oldPolygon}}}).itcount());
     // Each find the old point.
-    assert.eq(1, t.find({geo: {$geoWithin: {$center: oldCenter}}}).itcount())
-    assert.eq(1, t.find({geo: {$geoWithin: {$centerSphere: oldCenterSphere}}}).itcount())
+    assert.eq(1, t.find({geo: {$geoWithin: {$center: oldCenter}}}).itcount());
+    assert.eq(1, t.find({geo: {$geoWithin: {$centerSphere: oldCenterSphere}}}).itcount());
     // Using geojson with 2d-style geoWithin syntax should choke.
-    assert.throws(function() { return t.find({geo: {$geoWithin: {$polygon: geojsonPoly}}})
-                                       .itcount();})
+    assert.throws(function() {
+        return t.find({geo: {$geoWithin: {$polygon: geojsonPoly}}}).itcount();
+    });
     // Using old polygon w/new syntax should choke too.
-    assert.throws(function() { return t.find({geo: {$geoWithin: {$geometry: oldPolygon}}})
-                                       .itcount();})
-    assert.throws(function() { return t.find({geo: {$geoWithin: {$geometry: oldBox}}})
-                                       .itcount();})
-    assert.throws(function() { return t.find({geo: {$geoWithin: {$geometry: oldCenter}}})
-                                       .itcount();})
-    assert.throws(function() { return t.find({geo: {$geoWithin: {$geometry: oldCenterSphere}}})
-                                       .itcount();})
+    assert.throws(function() {
+        return t.find({geo: {$geoWithin: {$geometry: oldPolygon}}}).itcount();
+    });
+    assert.throws(function() {
+        return t.find({geo: {$geoWithin: {$geometry: oldBox}}}).itcount();
+    });
+    assert.throws(function() {
+        return t.find({geo: {$geoWithin: {$geometry: oldCenter}}}).itcount();
+    });
+    assert.throws(function() {
+        return t.find({geo: {$geoWithin: {$geometry: oldCenterSphere}}}).itcount();
+    });
     // Even if we only have a 2d index, the 2d suitability function should
     // allow the matcher to deal with this.  If we have a 2dsphere index we use it.
-    assert.eq(1, t.find({geo: {$geoWithin: {$geometry: geojsonPoly}}}).itcount())
-    assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: geojsonPoly}}}).itcount())
-    assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: oldPoint}}}).itcount())
-    assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: geojsonPoint}}}).itcount())
+    assert.eq(1, t.find({geo: {$geoWithin: {$geometry: geojsonPoly}}}).itcount());
+    assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: geojsonPoly}}}).itcount());
+    assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: oldPoint}}}).itcount());
+    assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: geojsonPoint}}}).itcount());
 }
 
 // We have a 2d index right now.  Let's see what it does.
 runTests();
 
 // No index now.
-t.dropIndex({geo: "2d"})
+t.dropIndex({geo: "2d"});
 runTests();
 
 // 2dsphere index now.
-assert.commandWorked( t.ensureIndex({geo: "2dsphere"}) );
+assert.commandWorked(t.ensureIndex({geo: "2dsphere"}));
 // 2dsphere does not support arrays of points.
 assert.writeError(t.insert({geo: [geojsonPoint2, geojsonPoint]}));
 runTests();

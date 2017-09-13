@@ -87,14 +87,21 @@ bool ParsedResource::isValid(std::string* errMsg) const {
         *errMsg = stream() << cluster.name() << " must be true when specified";
         return false;
     }
-    if (isDbSet() && (!NamespaceString::validDBName(getDb()) && !getDb().empty())) {
+    if (isDbSet() &&
+        (!NamespaceString::validDBName(getDb(), NamespaceString::DollarInDbNameBehavior::Allow) &&
+         !getDb().empty())) {
         *errMsg = stream() << getDb() << " is not a valid database name";
         return false;
     }
     if (isCollectionSet() &&
         (!NamespaceString::validCollectionName(getCollection()) && !getCollection().empty())) {
-        *errMsg = stream() << getCollection() << " is not a valid collection name";
-        return false;
+        // local.oplog.$main is a real collection that the server will create. But, collection
+        // names with a '$' character are illegal. We must make an exception for this collection
+        // here so we can grant users access to it.
+        if (!(getDb() == "local" && getCollection() == "oplog.$main")) {
+            *errMsg = stream() << getCollection() << " is not a valid collection name";
+            return false;
+        }
     }
     return true;
 }
@@ -387,20 +394,21 @@ const ParsedResource& ParsedPrivilege::getResource() const {
     return _resource;
 }
 
-bool ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPrivilege,
-                                                 Privilege* result,
-                                                 std::string* errmsg) {
-    if (!parsedPrivilege.isValid(errmsg)) {
-        return false;
+Status ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPrivilege,
+                                                   Privilege* result,
+                                                   std::vector<std::string>* unrecognizedActions) {
+    std::string errmsg;
+    if (!parsedPrivilege.isValid(&errmsg)) {
+        return Status(ErrorCodes::FailedToParse, errmsg);
     }
 
     // Build actions
     ActionSet actions;
     const vector<std::string>& parsedActions = parsedPrivilege.getActions();
-    Status status = ActionSet::parseActionSetFromStringVector(parsedActions, &actions);
+    Status status =
+        ActionSet::parseActionSetFromStringVector(parsedActions, &actions, unrecognizedActions);
     if (!status.isOK()) {
-        *errmsg = status.reason();
-        return false;
+        return status;
     }
 
     // Build resource
@@ -428,7 +436,7 @@ bool ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPr
     }
 
     *result = Privilege(resource, actions);
-    return true;
+    return Status::OK();
 }
 
 bool ParsedPrivilege::privilegeToParsedPrivilege(const Privilege& privilege,

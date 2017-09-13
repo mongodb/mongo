@@ -42,6 +42,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stringutils.h"
 #include "mongo/util/version.h"
 
 #if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
@@ -204,7 +205,11 @@ void printStackTrace(std::ostream& os) {
         const uintptr_t fileOffset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_fbase);
         if (i)
             os << ',';
-        os << "{\"b\":\"" << uintptr_t(dlinfo.dli_fbase) << "\",\"o\":\"" << fileOffset << "\"}";
+        os << "{\"b\":\"" << uintptr_t(dlinfo.dli_fbase) << "\",\"o\":\"" << fileOffset;
+        if (dlinfo.dli_sname) {
+            os << "\",\"s\":\"" << dlinfo.dli_sname;
+        }
+        os << "\"}";
     }
     os << ']';
 
@@ -251,9 +256,12 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap);
  */
 MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
     BSONObjBuilder soMap;
-    soMap << "mongodbVersion" << versionString;
-    soMap << "gitVersion" << gitVersion();
-    soMap << "compiledModules" << compiledModules();
+
+    auto&& vii = VersionInfoInterface::instance(VersionInfoInterface::NotEnabledAction::kFallback);
+    soMap << "mongodbVersion" << vii.version();
+    soMap << "gitVersion" << vii.gitVersion();
+    soMap << "compiledModules" << vii.modules();
+
     struct utsname unameData;
     if (!uname(&unameData)) {
         BSONObjBuilder unameBuilder(soMap.subobjStart("uname"));
@@ -315,8 +323,7 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
         if (noteHeader.n_type != NT_GNU_BUILD_ID)
             continue;
         const char* const noteNameBegin = notesCurr + sizeof(noteHeader);
-        if (StringData(noteNameBegin, noteHeader.n_namesz - 1) !=
-            StringData(ELF_NOTE_GNU, StringData::LiteralTag())) {
+        if (StringData(noteNameBegin, noteHeader.n_namesz - 1) != ELF_NOTE_GNU) {
             continue;
         }
         const char* const noteDescBegin =
@@ -451,6 +458,15 @@ uint32_t lcType(const char* lcCurr) {
     return cmd->cmd;
 }
 
+template <typename SegmentCommandType>
+bool maybeAppendLoadAddr(BSONObjBuilder* soInfo, const SegmentCommandType* segmentCommand) {
+    if (StringData(SEG_TEXT) != segmentCommand->segname) {
+        return false;
+    }
+    *soInfo << "vmaddr" << integerToHex(segmentCommand->vmaddr);
+    return true;
+}
+
 void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
     const uint32_t numImages = _dyld_image_count();
     BSONArrayBuilder soList(soMap->subarrayStart("somap"));
@@ -475,16 +491,34 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
         const char* const loadCommandsBegin = reinterpret_cast<const char*>(header) + headerSize;
         const char* const loadCommandsEnd = loadCommandsBegin + header->sizeofcmds;
 
-        // Search the "load command" data in the Mach object for the entry
-        // encoding the UUID of the object.
+        // Search the "load command" data in the Mach object for the entry encoding the UUID of the
+        // object, and for the __TEXT segment. Adding the "vmaddr" field of the __TEXT segment load
+        // command of an executable or dylib to an offset in that library provides an address
+        // suitable to passing to atos or llvm-symbolizer for symbolization.
+        //
+        // See, for example, http://lldb.llvm.org/symbolication.html.
+        bool foundTextSegment = false;
         for (const char* lcCurr = loadCommandsBegin; lcCurr < loadCommandsEnd;
              lcCurr = lcNext(lcCurr)) {
-            if (LC_UUID != lcType(lcCurr))
-                continue;
-
-            const uuid_command* uuidCmd = reinterpret_cast<const uuid_command*>(lcCurr);
-            soInfo << "buildId" << toHex(uuidCmd->uuid, 16);
-            break;
+            switch (lcType(lcCurr)) {
+                case LC_UUID: {
+                    const auto uuidCmd = reinterpret_cast<const uuid_command*>(lcCurr);
+                    soInfo << "buildId" << toHex(uuidCmd->uuid, 16);
+                    break;
+                }
+                case LC_SEGMENT_64:
+                    if (!foundTextSegment) {
+                        foundTextSegment = maybeAppendLoadAddr(
+                            &soInfo, reinterpret_cast<const segment_command_64*>(lcCurr));
+                    }
+                    break;
+                case LC_SEGMENT:
+                    if (!foundTextSegment) {
+                        foundTextSegment = maybeAppendLoadAddr(
+                            &soInfo, reinterpret_cast<const segment_command*>(lcCurr));
+                    }
+                    break;
+            }
         }
     }
 }

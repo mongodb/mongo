@@ -43,19 +43,15 @@ int ConnPoolOptions::maxShardedConnsPerHost(200);
 
 namespace {
 
-ExportedServerParameter<int>  //
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
     maxConnsPerHostParameter(ServerParameterSet::getGlobal(),
                              "connPoolMaxConnsPerHost",
-                             &ConnPoolOptions::maxConnsPerHost,
-                             true,
-                             false /* can't change at runtime */);
+                             &ConnPoolOptions::maxConnsPerHost);
 
-ExportedServerParameter<int>  //
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
     maxShardedConnsPerHostParameter(ServerParameterSet::getGlobal(),
                                     "connPoolMaxShardedConnsPerHost",
-                                    &ConnPoolOptions::maxShardedConnsPerHost,
-                                    true,
-                                    false /* can't change at runtime */);
+                                    &ConnPoolOptions::maxShardedConnsPerHost);
 
 MONGO_INITIALIZER(InitializeConnectionPools)(InitializerContext* context) {
     // Initialize the sharded and unsharded outgoing connection pools

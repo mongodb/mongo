@@ -28,16 +28,16 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/net/listen.h"  // for Listener::getElapsedTimeMillis()
 
 namespace mongo {
 
@@ -106,12 +106,6 @@ private:
 struct PlanStageStats {
     PlanStageStats(const CommonStats& c, StageType t) : stageType(t), common(c) {}
 
-    ~PlanStageStats() {
-        for (size_t i = 0; i < children.size(); ++i) {
-            delete children[i];
-        }
-    }
-
     /**
      * Make a deep copy.
      */
@@ -122,7 +116,7 @@ struct PlanStageStats {
         }
         for (size_t i = 0; i < children.size(); ++i) {
             invariant(children[i]);
-            stats->children.push_back(children[i]->clone());
+            stats->children.emplace_back(children[i]->clone());
         }
         return stats;
     }
@@ -137,7 +131,7 @@ struct PlanStageStats {
     std::unique_ptr<SpecificStats> specific;
 
     // The stats of the node's children.
-    std::vector<PlanStageStats*> children;
+    std::vector<std::unique_ptr<PlanStageStats>> children;
 
 private:
     MONGO_DISALLOW_COPYING(PlanStageStats);
@@ -146,9 +140,7 @@ private:
 struct AndHashStats : public SpecificStats {
     AndHashStats() : flaggedButPassed(0), flaggedInProgress(0), memUsage(0), memLimit(0) {}
 
-    virtual ~AndHashStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         AndHashStats* specific = new AndHashStats(*this);
         return specific;
     }
@@ -178,9 +170,7 @@ struct AndHashStats : public SpecificStats {
 struct AndSortedStats : public SpecificStats {
     AndSortedStats() : flagged(0) {}
 
-    virtual ~AndSortedStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         AndSortedStats* specific = new AndSortedStats(*this);
         return specific;
     }
@@ -193,17 +183,19 @@ struct AndSortedStats : public SpecificStats {
 };
 
 struct CachedPlanStats : public SpecificStats {
-    CachedPlanStats() {}
+    CachedPlanStats() : replanned(false) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         return new CachedPlanStats(*this);
     }
+
+    bool replanned;
 };
 
 struct CollectionScanStats : public SpecificStats {
     CollectionScanStats() : docsTested(0), direction(1) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         CollectionScanStats* specific = new CollectionScanStats(*this);
         return specific;
     }
@@ -217,9 +209,9 @@ struct CollectionScanStats : public SpecificStats {
 };
 
 struct CountStats : public SpecificStats {
-    CountStats() : nCounted(0), nSkipped(0), trivialCount(false) {}
+    CountStats() : nCounted(0), nSkipped(0), recordStoreCount(false) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         CountStats* specific = new CountStats(*this);
         return specific;
     }
@@ -230,9 +222,8 @@ struct CountStats : public SpecificStats {
     // The number of results we skipped over.
     long long nSkipped;
 
-    // A "trivial count" is one that we can answer by calling numRecords() on the
-    // collection, without actually going through any query logic.
-    bool trivialCount;
+    // True if we computed the count via Collection::numRecords().
+    bool recordStoreCount;
 };
 
 struct CountScanStats : public SpecificStats {
@@ -244,12 +235,13 @@ struct CountScanStats : public SpecificStats {
           isUnique(false),
           keysExamined(0) {}
 
-    virtual ~CountScanStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         CountScanStats* specific = new CountScanStats(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
+        specific->collation = collation.getOwned();
+        specific->startKey = startKey.getOwned();
+        specific->endKey = endKey.getOwned();
         return specific;
     }
 
@@ -257,9 +249,25 @@ struct CountScanStats : public SpecificStats {
 
     BSONObj keyPattern;
 
+    BSONObj collation;
+
+    // The starting/ending key(s) of the index scan.
+    // startKey and endKey contain the fields of keyPattern, with values
+    // that match the corresponding index bounds.
+    BSONObj startKey;
+    BSONObj endKey;
+    // Whether or not those keys are inclusive or exclusive bounds.
+    bool startKeyInclusive;
+    bool endKeyInclusive;
+
     int indexVersion;
 
+    // Set to true if the index used for the count scan is multikey.
     bool isMultiKey;
+
+    // Represents which prefixes of the indexed field(s) cause the index to be multikey.
+    MultikeyPaths multiKeyPaths;
+
     bool isPartial;
     bool isSparse;
     bool isUnique;
@@ -270,7 +278,7 @@ struct CountScanStats : public SpecificStats {
 struct DeleteStats : public SpecificStats {
     DeleteStats() : docsDeleted(0), nInvalidateSkips(0) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         return new DeleteStats(*this);
     }
 
@@ -282,30 +290,59 @@ struct DeleteStats : public SpecificStats {
 };
 
 struct DistinctScanStats : public SpecificStats {
-    DistinctScanStats() : keysExamined(0), indexVersion(0) {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         DistinctScanStats* specific = new DistinctScanStats(*this);
+        // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
+        specific->collation = collation.getOwned();
+        specific->indexBounds = indexBounds.getOwned();
         return specific;
     }
 
     // How many keys did we look at while distinct-ing?
-    size_t keysExamined;
-
-    std::string indexName;
+    size_t keysExamined = 0;
 
     BSONObj keyPattern;
 
-    int indexVersion;
+    BSONObj collation;
+
+    // Properties of the index used for the distinct scan.
+    std::string indexName;
+    int indexVersion = 0;
+
+    // Set to true if the index used for the distinct scan is multikey.
+    bool isMultiKey = false;
+
+    // Represents which prefixes of the indexed field(s) cause the index to be multikey.
+    MultikeyPaths multiKeyPaths;
+
+    bool isPartial = false;
+    bool isSparse = false;
+    bool isUnique = false;
+
+    // >1 if we're traversing the index forwards and <1 if we're traversing it backwards.
+    int direction = 1;
+
+    // A BSON representation of the distinct scan's index bounds.
+    BSONObj indexBounds;
+};
+
+struct EnsureSortedStats : public SpecificStats {
+    EnsureSortedStats() : nDropped(0) {}
+
+    SpecificStats* clone() const final {
+        EnsureSortedStats* specific = new EnsureSortedStats(*this);
+        return specific;
+    }
+
+    // The number of out-of-order results that were dropped.
+    long long nDropped;
 };
 
 struct FetchStats : public SpecificStats {
     FetchStats() : alreadyHasObj(0), forcedFetches(0), docsExamined(0) {}
 
-    virtual ~FetchStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         FetchStats* specific = new FetchStats(*this);
         return specific;
     }
@@ -323,9 +360,7 @@ struct FetchStats : public SpecificStats {
 struct GroupStats : public SpecificStats {
     GroupStats() : nGroups(0) {}
 
-    virtual ~GroupStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         GroupStats* specific = new GroupStats(*this);
         return specific;
     }
@@ -337,12 +372,12 @@ struct GroupStats : public SpecificStats {
 struct IDHackStats : public SpecificStats {
     IDHackStats() : keysExamined(0), docsExamined(0) {}
 
-    virtual ~IDHackStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         IDHackStats* specific = new IDHackStats(*this);
         return specific;
     }
+
+    std::string indexName;
 
     // Number of entries retrieved from the index while executing the idhack.
     size_t keysExamined;
@@ -362,14 +397,14 @@ struct IndexScanStats : public SpecificStats {
           dupsTested(0),
           dupsDropped(0),
           seenInvalidated(0),
-          keysExamined(0) {}
+          keysExamined(0),
+          seeks(0) {}
 
-    virtual ~IndexScanStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         IndexScanStats* specific = new IndexScanStats(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
+        specific->collation = collation.getOwned();
         specific->indexBounds = indexBounds.getOwned();
         return specific;
     }
@@ -381,6 +416,8 @@ struct IndexScanStats : public SpecificStats {
     std::string indexName;
 
     BSONObj keyPattern;
+
+    BSONObj collation;
 
     int indexVersion;
 
@@ -395,6 +432,10 @@ struct IndexScanStats : public SpecificStats {
     // index properties
     // Whether this index is over a field that contain array values.
     bool isMultiKey;
+
+    // Represents which prefixes of the indexed field(s) cause the index to be multikey.
+    MultikeyPaths multiKeyPaths;
+
     bool isPartial;
     bool isSparse;
     bool isUnique;
@@ -407,12 +448,15 @@ struct IndexScanStats : public SpecificStats {
 
     // Number of entries retrieved from the index during the scan.
     size_t keysExamined;
+
+    // Number of times the index cursor is re-positioned during the execution of the scan.
+    size_t seeks;
 };
 
 struct LimitStats : public SpecificStats {
     LimitStats() : limit(0) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         LimitStats* specific = new LimitStats(*this);
         return specific;
     }
@@ -423,7 +467,7 @@ struct LimitStats : public SpecificStats {
 struct MockStats : public SpecificStats {
     MockStats() {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         return new MockStats(*this);
     }
 };
@@ -431,17 +475,15 @@ struct MockStats : public SpecificStats {
 struct MultiPlanStats : public SpecificStats {
     MultiPlanStats() {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         return new MultiPlanStats(*this);
     }
 };
 
 struct OrStats : public SpecificStats {
-    OrStats() : dupsTested(0), dupsDropped(0), locsForgotten(0) {}
+    OrStats() : dupsTested(0), dupsDropped(0), recordIdsForgotten(0) {}
 
-    virtual ~OrStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         OrStats* specific = new OrStats(*this);
         return specific;
     }
@@ -450,13 +492,13 @@ struct OrStats : public SpecificStats {
     size_t dupsDropped;
 
     // How many calls to invalidate(...) actually removed a RecordId from our deduping map?
-    size_t locsForgotten;
+    size_t recordIdsForgotten;
 };
 
 struct ProjectionStats : public SpecificStats {
     ProjectionStats() {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         ProjectionStats* specific = new ProjectionStats(*this);
         return specific;
     }
@@ -468,9 +510,7 @@ struct ProjectionStats : public SpecificStats {
 struct SortStats : public SpecificStats {
     SortStats() : forcedFetches(0), memUsage(0), memLimit(0) {}
 
-    virtual ~SortStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         SortStats* specific = new SortStats(*this);
         return specific;
     }
@@ -494,9 +534,7 @@ struct SortStats : public SpecificStats {
 struct MergeSortStats : public SpecificStats {
     MergeSortStats() : dupsTested(0), dupsDropped(0), forcedFetches(0) {}
 
-    virtual ~MergeSortStats() {}
-
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         MergeSortStats* specific = new MergeSortStats(*this);
         return specific;
     }
@@ -514,7 +552,7 @@ struct MergeSortStats : public SpecificStats {
 struct ShardingFilterStats : public SpecificStats {
     ShardingFilterStats() : chunkSkips(0) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         ShardingFilterStats* specific = new ShardingFilterStats(*this);
         return specific;
     }
@@ -525,7 +563,7 @@ struct ShardingFilterStats : public SpecificStats {
 struct SkipStats : public SpecificStats {
     SkipStats() : skip(0) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         SkipStats* specific = new SkipStats(*this);
         return specific;
     }
@@ -534,50 +572,30 @@ struct SkipStats : public SpecificStats {
 };
 
 struct IntervalStats {
-    IntervalStats()
-        : numResultsFound(0),
-          numResultsBuffered(0),
-          minDistanceAllowed(-1),
-          maxDistanceAllowed(-1),
-          inclusiveMaxDistanceAllowed(false),
-          minDistanceFound(-1),
-          maxDistanceFound(-1),
-          minDistanceBuffered(-1),
-          maxDistanceBuffered(-1) {}
+    // Number of results found in the covering of this interval.
+    long long numResultsBuffered = 0;
+    // Number of documents in this interval returned to the parent stage.
+    long long numResultsReturned = 0;
 
-    long long numResultsFound;
-    long long numResultsBuffered;
-
-    double minDistanceAllowed;
-    double maxDistanceAllowed;
-    bool inclusiveMaxDistanceAllowed;
-
-    double minDistanceFound;
-    double maxDistanceFound;
-    double minDistanceBuffered;
-    double maxDistanceBuffered;
+    // Min distance of this interval - always inclusive.
+    double minDistanceAllowed = -1;
+    // Max distance of this interval - inclusive iff inclusiveMaxDistanceAllowed.
+    double maxDistanceAllowed = -1;
+    // True only in the last interval.
+    bool inclusiveMaxDistanceAllowed = false;
 };
 
-class NearStats : public SpecificStats {
-public:
-    NearStats() {}
+struct NearStats : public SpecificStats {
+    NearStats() : indexVersion(0) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         return new NearStats(*this);
-    }
-
-    long long totalResultsFound() {
-        long long totalResultsFound = 0;
-        for (std::vector<IntervalStats>::iterator it = intervalStats.begin();
-             it != intervalStats.end();
-             ++it) {
-            totalResultsFound += it->numResultsFound;
-        }
-        return totalResultsFound;
     }
 
     std::vector<IntervalStats> intervalStats;
     std::string indexName;
+    // btree index version, not geo index version
+    int indexVersion;
     BSONObj keyPattern;
 };
 
@@ -586,12 +604,11 @@ struct UpdateStats : public SpecificStats {
         : nMatched(0),
           nModified(0),
           isDocReplacement(false),
-          fastmod(false),
           fastmodinsert(false),
           inserted(false),
           nInvalidateSkips(0) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         return new UpdateStats(*this);
     }
 
@@ -603,11 +620,6 @@ struct UpdateStats : public SpecificStats {
 
     // True iff this is a doc-replacement style update, as opposed to a $mod update.
     bool isDocReplacement;
-
-    // A 'fastmod' update is an in-place update that does not have to modify
-    // any indices. It's "fast" because the only work needed is changing the bits
-    // inside the document.
-    bool fastmod;
 
     // A 'fastmodinsert' is an insert resulting from an {upsert: true} update
     // which is a doc-replacement style update. It's "fast" because we don't need
@@ -627,24 +639,44 @@ struct UpdateStats : public SpecificStats {
 };
 
 struct TextStats : public SpecificStats {
-    TextStats() : keysExamined(0), fetches(0), parsedTextQuery() {}
+    TextStats() : parsedTextQuery(), textIndexVersion(0) {}
 
-    virtual SpecificStats* clone() const {
+    SpecificStats* clone() const final {
         TextStats* specific = new TextStats(*this);
         return specific;
     }
 
     std::string indexName;
 
-    size_t keysExamined;
-
-    size_t fetches;
-
     // Human-readable form of the FTSQuery associated with the text stage.
     BSONObj parsedTextQuery;
 
+    int textIndexVersion;
+
     // Index keys that precede the "text" index key.
     BSONObj indexPrefix;
+};
+
+struct TextMatchStats : public SpecificStats {
+    TextMatchStats() : docsRejected(0) {}
+
+    SpecificStats* clone() const final {
+        TextMatchStats* specific = new TextMatchStats(*this);
+        return specific;
+    }
+
+    size_t docsRejected;
+};
+
+struct TextOrStats : public SpecificStats {
+    TextOrStats() : fetches(0) {}
+
+    SpecificStats* clone() const final {
+        TextOrStats* specific = new TextOrStats(*this);
+        return specific;
+    }
+
+    size_t fetches;
 };
 
 }  // namespace mongo

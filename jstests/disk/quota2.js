@@ -1,34 +1,36 @@
 // Test for quotaFiles off by one file limit issue - SERVER-3420.
 
-if ( 0 ) { // SERVER-3420
+// `--quotaFiles` is mmap only.
+// @tags: [requires_mmapv1]
 
-baseName = "jstests_disk_quota2";
+if (0) {  // SERVER-3420
 
-var m = MongoRunner.runMongod({quotaFiles: 2, smallfiles: ""});
-db = m.getDB( baseName );
+    baseName = "jstests_disk_quota2";
 
-big = new Array( 10000 ).toString();
+    var m = MongoRunner.runMongod({quotaFiles: 2, smallfiles: ""});
+    db = m.getDB(baseName);
 
-// Insert documents until quota is exhausted.
-var coll = db[ baseName ];
-var res = coll.insert({ b: big });
-while( !res.hasWriteError() ) {
-    res = coll.insert({ b: big });
-}
+    big = new Array(10000).toString();
 
-// Trigger allocation of an additional file for a 'special' namespace.
-for( n = 0; !db.getLastError(); ++n ) {
-	db.createCollection( '' + n );
-}
-
-// Check that new docs are saved in the .0 file.
-for( i = 0; i < n; ++i ) {
-    c = db[ ''+i ];
-    res = c.insert({ b: big });
-    if( !res.hasWriteError() ) {
-        var recordId = c.find().showRecord()[0].$recordId;
-        assert.eq(0, recordId >> 32);
+    // Insert documents until quota is exhausted.
+    var coll = db[baseName];
+    var res = coll.insert({b: big});
+    while (!res.hasWriteError()) {
+        res = coll.insert({b: big});
     }
-}
 
+    // Trigger allocation of an additional file for a 'special' namespace.
+    for (n = 0; !db.getLastError(); ++n) {
+        db.createCollection('' + n);
+    }
+
+    // Check that new docs are saved in the .0 file.
+    for (i = 0; i < n; ++i) {
+        c = db['' + i];
+        res = c.insert({b: big});
+        if (!res.hasWriteError()) {
+            var recordId = c.find().showRecord()[0].$recordId;
+            assert.eq(0, recordId >> 32);
+        }
+    }
 }

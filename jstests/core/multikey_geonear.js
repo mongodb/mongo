@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Test that we correct return results for compound 2d and 2dsphere indices in
 // both the multikey and non-multikey cases.
 
@@ -49,15 +53,15 @@ t.insert({_id: 0, a: [{b: 0}, {c: {type: "Point", coordinates: [0, 0]}}]});
 t.insert({_id: 1, a: [{b: 1}, {c: {type: "Point", coordinates: [1, 1]}}]});
 t.insert({_id: 2, a: [{b: 2}, {c: {type: "Point", coordinates: [2, 2]}}]});
 
-cursor = t.find({"a.b": {$gte: 0}, "a.c": {$near:
-                    {$geometry: {type: "Point", coordinates: [2, 2]}}}});
+cursor =
+    t.find({"a.b": {$gte: 0}, "a.c": {$near: {$geometry: {type: "Point", coordinates: [2, 2]}}}});
 checkResults(cursor);
 
 // Double check that we're not intersecting bounds. Doing so should cause us to
 // miss the result here.
 t.insert({_id: 3, a: [{b: 10}, {b: -1}, {c: {type: "Point", coordinates: [0, 0]}}]});
-cursor = t.find({"a.b": {$lt: 0, $gt: 9}, "a.c": {$near:
-                    {$geometry: {type: "Point", coordinates: [0, 0]}}}});
+cursor = t.find(
+    {"a.b": {$lt: 0, $gt: 9}, "a.c": {$near: {$geometry: {type: "Point", coordinates: [0, 0]}}}});
 assert.eq(3, cursor.next()["_id"]);
 assert(!cursor.hasNext());
 

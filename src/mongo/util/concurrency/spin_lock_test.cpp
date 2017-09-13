@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -106,9 +108,6 @@ TEST(Concurrency, ConcurrentIncs) {
     mongo::unittest::log() << "spinlock ConcurrentIncs time: " << ms << std::endl;
 
     ASSERT_EQUALS(counter, threads * incs);
-#if defined(__linux__)
-    ASSERT(SpinLock::isfast());
-#endif
 }
 
 }  // namespace

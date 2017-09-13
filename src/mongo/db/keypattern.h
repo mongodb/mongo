@@ -29,7 +29,9 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -80,9 +82,13 @@ public:
      * Returns a string representation of this KeyPattern
      */
     std::string toString() const {
-        return toBSON().toString();
+        return str::stream() << *this;
     }
 
+    /**
+     * Writes to 'sb' a string representation of this KeyPattern.
+     */
+    friend StringBuilder& operator<<(StringBuilder& sb, const KeyPattern& keyPattern);
 
     /* Takes a BSONObj whose field names are a prefix of the fields in this keyPattern, and
      * outputs a new bound with MinKey values appended to match the fields in this keyPattern

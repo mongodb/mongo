@@ -2,34 +2,33 @@
     "use strict";
     function profileCursor(query) {
         query = query || {};
-        Object.extend(query, {user:username + "@" + db.getName()});
+        Object.extend(query, {user: username + "@" + db.getName()});
         return db.system.profile.find(query);
-    };
+    }
 
     function getProfileAString() {
         var s = "\n";
-        profileCursor().forEach(function(z){
+        profileCursor().forEach(function(z) {
             s += tojson(z) + " ,\n";
         });
         return s;
-    };
+    }
 
     function resetProfile(level, slowms) {
         db.setProfilingLevel(0);
         db.system.profile.drop();
-        db.setProfilingLevel(level,slowms);
-    };
+        db.setProfilingLevel(level, slowms);
+    }
 
     // special db so that it can be run in parallel tests
     var stddb = db;
     db = db.getSisterDB("profile1");
     var username = "jstests_profile1_user";
 
-    db.dropUser(username)
+    db.dropUser(username);
     db.dropDatabase();
 
     try {
-
         db.createUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
         db.auth(username, "password");
 
@@ -46,7 +45,7 @@
         assert.eq(2, db.runCommand({profile: -1}).was, "B");
         assert.eq(1, db.system.profile.stats().capped, "C");
 
-        db.foo.findOne()
+        db.foo.findOne();
 
         var profileItems = profileCursor().toArray();
 
@@ -54,16 +53,16 @@
         var msg = "";
         profileItems.forEach(function(d) {
             msg += "profile doc: " + d.ns + " " + d.op + " " +
-                tojson(d.query ? d.query : d.command);
+                tojson(d.query ? d.query : d.command) + '\n';
         });
         msg += tojson(db.system.profile.stats());
 
         // If these nunmbers don't match, it is possible the collection has rolled over
         // (set to 32MB above in the hope this doesn't happen)
-        assert.eq(3, profileItems.length, "E2 -- " + msg);
+        assert.eq(2, profileItems.length, "E2 -- " + msg);
 
         // Make sure we can't drop if profiling is still on
-        assert.throws(function(z){
+        assert.throws(function(z) {
             db.getCollection("system.profile").drop();
         });
 
@@ -92,10 +91,9 @@
         var u = {$inc: {x: 1}};
         db.profile1.update(q, u);
         var r = profileCursor({ns: db.profile1.getFullName()}).sort({$natural: -1})[0];
-        assert.eq(q, r.query, "Y1: " + tojson(r));
-        assert.eq(u, r.updateobj, "Y2");
-        assert.eq("update", r.op, "Y3");
-        assert.eq("profile1.profile1", r.ns, "Y4");
+        assert.eq({q: q, u: u, multi: false, upsert: false}, r.command, tojson(r));
+        assert.eq("update", r.op, tojson(r));
+        assert.eq("profile1.profile1", r.ns, tojson(r));
     } finally {
         // disable profiling for subsequent tests
         assert.commandWorked(db.runCommand({profile: 0}));

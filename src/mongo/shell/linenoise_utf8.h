@@ -34,7 +34,7 @@
 namespace linenoise_utf8 {
 
 typedef unsigned char UChar8;  // UTF-8 octet
-typedef unsigned int UChar32;  // Unicode code point
+typedef char32_t UChar32;      // Unicode code point
 
 // Error bits (or-ed together) returned from utf8toUChar32string
 //

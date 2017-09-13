@@ -27,20 +27,21 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/shell/shell_utils.h"
 
-#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/index/external_key_generator.h"
-#include "mongo/shell/bench.h"
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/shell/bench.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
@@ -57,7 +58,7 @@ extern const JSFile servers;
 extern const JSFile shardingtest;
 extern const JSFile servers_misc;
 extern const JSFile replsettest;
-extern const JSFile replsetbridge;
+extern const JSFile bridge;
 }
 
 namespace shell_utils {
@@ -94,15 +95,6 @@ const char* getUserDir() {
 
 // real methods
 
-BSONObj Quit(const BSONObj& args, void* data) {
-    // If no arguments are given first element will be EOO, which
-    // converts to the integer value 0.
-    goingAwaySoon();
-    int exit_code = int(args.firstElement().number());
-    quickExit(exit_code);
-    return undefinedReturn;
-}
-
 BSONObj JSGetMemInfo(const BSONObj& args, void* data) {
     ProcessInfo pi;
     uassert(10258, "processinfo not supported", pi.supported());
@@ -118,27 +110,32 @@ BSONObj JSGetMemInfo(const BSONObj& args, void* data) {
 }
 
 #if !defined(_WIN32)
-ThreadLocalValue<unsigned int> _randomSeed;
+thread_local unsigned int _randomSeed = 0;
 #endif
 
 BSONObj JSSrand(const BSONObj& a, void* data) {
-    uassert(12518,
-            "srand requires a single numeric argument",
-            a.nFields() == 1 && a.firstElement().isNumber());
+    unsigned int seed;
+    // grab the least significant bits of either the supplied argument or
+    // a random number from SecureRandom.
+    if (a.nFields() == 1 && a.firstElement().isNumber())
+        seed = static_cast<unsigned int>(a.firstElement().numberLong());
+    else {
+        std::unique_ptr<SecureRandom> rand(SecureRandom::create());
+        seed = static_cast<unsigned int>(rand->nextInt64());
+    }
 #if !defined(_WIN32)
-    _randomSeed.set(
-        static_cast<unsigned int>(a.firstElement().numberLong()));  // grab least significant digits
+    _randomSeed = seed;
 #else
-    srand(static_cast<unsigned int>(a.firstElement().numberLong()));
+    srand(seed);
 #endif
-    return undefinedReturn;
+    return BSON("" << static_cast<double>(seed));
 }
 
 BSONObj JSRand(const BSONObj& a, void* data) {
     uassert(12519, "rand accepts no arguments", a.nFields() == 0);
     unsigned r;
 #if !defined(_WIN32)
-    r = rand_r(&_randomSeed.getRef());
+    r = rand_r(&_randomSeed);
 #else
     r = rand();
 #endif
@@ -154,47 +151,38 @@ BSONObj isWindows(const BSONObj& a, void* data) {
 #endif
 }
 
-BSONObj isAddressSanitizerActive(const BSONObj& a, void* data) {
-    bool isSanitized = false;
-// See the following for information on how we detect address sanitizer in clang and gcc.
-//
-// - http://clang.llvm.org/docs/AddressSanitizer.html#has-feature-address-sanitizer
-// - https://gcc.gnu.org/ml/gcc-patches/2012-11/msg01827.html
-//
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-    isSanitized = true;
-#endif
-#elif defined(__SANITIZE_ADDRESS__)
-    isSanitized = true;
-#endif
-    return BSON("" << isSanitized);
-}
-
 BSONObj getBuildInfo(const BSONObj& a, void* data) {
     uassert(16822, "getBuildInfo accepts no arguments", a.nFields() == 0);
     BSONObjBuilder b;
-    appendBuildInfo(b);
+    VersionInfoInterface::instance().appendBuildInfo(&b);
     return BSON("" << b.done());
 }
 
-BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
-    uassert(17428, "keyTooLarge takes exactly 2 arguments", a.nFields() == 2);
-    BSONObjIterator i(a);
-    BSONObj index = i.next().Obj();
-    BSONObj doc = i.next().Obj();
+BSONObj computeSHA256Block(const BSONObj& a, void* data) {
+    std::vector<ConstDataRange> blocks;
 
-    return BSON("" << isAnyIndexKeyTooLarge(index, doc));
-}
+    auto ele = a[0];
 
-BSONObj validateIndexKey(const BSONObj& a, void* data) {
-    BSONObj key = a[0].Obj();
-    Status indexValid = validateKeyPattern(key);
-    if (!indexValid.isOK()) {
-        return BSON("" << BSON("ok" << false << "type" << indexValid.codeString() << "errmsg"
-                                    << indexValid.reason()));
+    BSONObjBuilder bob;
+    switch (ele.type()) {
+        case BinData: {
+            int len;
+            const char* ptr = ele.binData(len);
+            SHA256Block::computeHash({ConstDataRange(ptr, len)}).appendAsBinData(bob, ""_sd);
+
+            break;
+        }
+        case String: {
+            auto str = ele.valueStringData();
+            SHA256Block::computeHash({ConstDataRange(str.rawData(), str.size())})
+                .appendAsBinData(bob, ""_sd);
+            break;
+        }
+        default:
+            uasserted(ErrorCodes::BadValue, "Can only computeSHA256Block of strings and bindata");
     }
-    return BSON("" << BSON("ok" << true));
+
+    return bob.obj();
 }
 
 BSONObj replMonitorStats(const BSONObj& a, void* data) {
@@ -227,21 +215,18 @@ BSONObj readMode(const BSONObj&, void*) {
 
 BSONObj interpreterVersion(const BSONObj& a, void* data) {
     uassert(16453, "interpreterVersion accepts no arguments", a.nFields() == 0);
-    return BSON("" << globalScriptEngine->getInterpreterVersionString());
+    return BSON("" << getGlobalScriptEngine()->getInterpreterVersionString());
 }
 
 void installShellUtils(Scope& scope) {
-    scope.injectNative("quit", Quit);
     scope.injectNative("getMemInfo", JSGetMemInfo);
     scope.injectNative("_replMonitorStats", replMonitorStats);
     scope.injectNative("_srand", JSSrand);
     scope.injectNative("_rand", JSRand);
     scope.injectNative("_isWindows", isWindows);
-    scope.injectNative("_isAddressSanitizerActive", isAddressSanitizerActive);
     scope.injectNative("interpreterVersion", interpreterVersion);
     scope.injectNative("getBuildInfo", getBuildInfo);
-    scope.injectNative("isKeyTooLarge", isKeyTooLarge);
-    scope.injectNative("validateIndexKey", validateIndexKey);
+    scope.injectNative("computeSHA256Block", computeSHA256Block);
 
 #ifndef MONGO_SAFE_SHELL
     // can't launch programs
@@ -261,7 +246,7 @@ void initScope(Scope& scope) {
     scope.execSetup(JSFiles::shardingtest);
     scope.execSetup(JSFiles::servers_misc);
     scope.execSetup(JSFiles::replsettest);
-    scope.execSetup(JSFiles::replsetbridge);
+    scope.execSetup(JSFiles::bridge);
 
     scope.injectNative("benchRun", BenchRunner::benchRunSync);
     scope.injectNative("benchRunSync", BenchRunner::benchRunSync);
@@ -296,10 +281,10 @@ bool Prompter::confirm() {
 
 ConnectionRegistry::ConnectionRegistry() = default;
 
-void ConnectionRegistry::registerConnection(DBClientWithCommands& client) {
+void ConnectionRegistry::registerConnection(DBClientBase& client) {
     BSONObj info;
     if (client.runCommand("admin", BSON("whatsmyuri" << 1), info)) {
-        string connstr = dynamic_cast<DBClientBase&>(client).getServerAddress();
+        string connstr = client.getServerAddress();
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _connectionUris[connstr].insert(info["you"].str());
     }
@@ -319,7 +304,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
         const ConnectionString cs(status.getValue());
 
         string errmsg;
-        std::unique_ptr<DBClientWithCommands> conn(cs.connect(errmsg));
+        std::unique_ptr<DBClientBase> conn(cs.connect("MongoDB Shell", errmsg));
         if (!conn) {
             continue;
         }
@@ -328,13 +313,43 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
 
         BSONObj currentOpRes;
         conn->runPseudoCommand("admin", "currentOp", "$cmd.sys.inprog", {}, currentOpRes);
+        if (!currentOpRes["inprog"].isABSONObj()) {
+            // We don't have permissions (or the call didn't succeed) - go to the next connection.
+            continue;
+        }
         auto inprog = currentOpRes["inprog"].embeddedObject();
-        BSONForEach(op, inprog) {
-            if (uris.count(op["client"].String())) {
+        for (const auto op : inprog) {
+            // For sharded clusters, `client_s` is used instead and `client` is not present.
+            string client;
+            if (auto elem = op["client"]) {
+                // mongod currentOp client
+                if (elem.type() != String) {
+                    warning() << "Ignoring operation " << op["opid"].toString(false)
+                              << "; expected 'client' field in currentOp response to have type "
+                                 "string, but found "
+                              << typeName(elem.type());
+                    continue;
+                }
+                client = elem.str();
+            } else if (auto elem = op["client_s"]) {
+                // mongos currentOp client
+                if (elem.type() != String) {
+                    warning() << "Ignoring operation " << op["opid"].toString(false)
+                              << "; expected 'client_s' field in currentOp response to have type "
+                                 "string, but found "
+                              << typeName(elem.type());
+                    continue;
+                }
+                client = elem.str();
+            } else {
+                // Internal operation, like TTL index.
+                continue;
+            }
+            if (uris.count(client)) {
                 if (!withPrompt || prompter.confirm()) {
                     BSONObjBuilder cmdBob;
                     BSONObj info;
-                    cmdBob.append("op", op["opid"]);
+                    cmdBob.appendAs(op["opid"], "op");
                     auto cmdArgs = cmdBob.done();
                     conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", cmdArgs, info);
                 } else {
@@ -348,11 +363,16 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
 ConnectionRegistry connectionRegistry;
 
 bool _nokillop = false;
-void onConnect(DBClientWithCommands& c) {
+void onConnect(DBClientBase& c) {
     if (_nokillop) {
         return;
     }
-    c.setClientRPCProtocols(shellGlobalParams.rpcProtocols);
+
+    // Only override the default rpcProtocols if they were set on the command line.
+    if (shellGlobalParams.rpcProtocols) {
+        c.setClientRPCProtocols(*shellGlobalParams.rpcProtocols);
+    }
+
     connectionRegistry.registerConnection(c);
 }
 

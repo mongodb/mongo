@@ -20,7 +20,7 @@
     // .group()
     explainMissingDb.dropDatabase();
     explainColl = explainMissingDb.collection.explain("executionStats");
-    explain = explainColl.group({key: "a", initial: {}, reduce: function() { } });
+    explain = explainColl.group({key: "a", initial: {}, reduce: function() {}});
     assert.commandWorked(explain);
     assert("executionStats" in explain);
 

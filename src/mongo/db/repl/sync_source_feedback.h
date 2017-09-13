@@ -29,66 +29,62 @@
 
 #pragma once
 
-#include "mongo/client/constants.h"
-#include "mongo/client/dbclientcursor.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+struct HostAndPort;
 class OperationContext;
 
+namespace executor {
+class TaskExecutor;
+}  // namespace executor
+
 namespace repl {
+class BackgroundSync;
+class Reporter;
 
 class SyncSourceFeedback {
+    MONGO_DISALLOW_COPYING(SyncSourceFeedback);
+
 public:
-    SyncSourceFeedback();
-    ~SyncSourceFeedback();
+    SyncSourceFeedback() = default;
 
     /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
     /// replication progress.
     void forwardSlaveProgress();
 
-    /// Loops continuously until shutdown() is called, passing updates when they are present.
-    void run();
+    /**
+     * Loops continuously until shutdown() is called, passing updates when they are present. If no
+     * update occurs within the _keepAliveInterval, progress is forwarded to let the upstream node
+     * know that this node, along with the alive nodes chaining through it, are still alive.
+     *
+     * Task executor is used to run replSetUpdatePosition command on sync source.
+     */
+    void run(executor::TaskExecutor* executor, BackgroundSync* bgsync);
 
     /// Signals the run() method to terminate.
     void shutdown();
 
 private:
-    void _resetConnection();
-
-    /**
-     * Authenticates _connection using the server's cluster-membership credentials.
-     *
-     * Returns true on successful authentication.
-     */
-    bool replAuthenticate();
-
     /* Inform the sync target of our current position in the oplog, as well as the positions
      * of all secondaries chained through us.
      */
-    Status updateUpstream(OperationContext* txn);
+    Status _updateUpstream(Reporter* reporter);
 
-    bool hasConnection() {
-        return _connection.get();
-    }
-
-    /// Connect to sync target.
-    bool _connect(OperationContext* txn, const HostAndPort& host);
-
-    // the member we are currently syncing from
-    HostAndPort _syncTarget;
-    // our connection to our sync target
-    std::unique_ptr<DBClientConnection> _connection;
-    // protects cond, _shutdownSignaled, and _positionChanged.
+    // protects cond, _shutdownSignaled, _keepAliveInterval, and _positionChanged.
     stdx::mutex _mtx;
     // used to alert our thread of changes which need to be passed up the chain
     stdx::condition_variable _cond;
     // used to indicate a position change which has not yet been pushed along
-    bool _positionChanged;
+    bool _positionChanged = false;
     // Once this is set to true the _run method will terminate
-    bool _shutdownSignaled;
+    bool _shutdownSignaled = false;
+    // Reports replication progress to sync source.
+    Reporter* _reporter = nullptr;
 };
+
 }  // namespace repl
 }  // namespace mongo

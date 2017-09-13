@@ -1,0 +1,21 @@
+# Simulate the MongoDB oplog apply threads on a secondary.
+conn_config="cache_size=10GB,session_max=1000,eviction=(threads_min=4,threads_max=8),log=(enabled=false),transaction_sync=(enabled=false),checkpoint_sync=true,checkpoint=(wait=60)"
+table_config="allocation_size=4k,memory_page_max=5MB,prefix_compression=false,split_pct=75,leaf_page_max=32k,internal_page_max=16k,type=file"
+# Spread the workload out over several tables.
+table_count=4
+# We like compression.
+compression=snappy
+icount=1000
+populate_threads=1
+reopen_connection=true
+log_like_table=true
+report_interval=5
+run_time=360
+# Configure multiple threads doing a limited number of operations each. Enclose
+# a few operations in an explicit transaction to simulate MongoDB apply on a
+# secondary.
+threads=((count=16,throttle=1000,inserts=1,ops_per_txn=3))
+# Configure a moderately large value size
+value_sz=1800
+sample_interval=5
+sample_rate=1

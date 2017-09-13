@@ -29,18 +29,21 @@
 
 #include "mongo/db/ops/modifier_bit.h"
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using mongo::BSONObj;
+using mongo::Decimal128;
 using mongo::LogBuilder;
 using mongo::ModifierBit;
 using mongo::ModifierInterface;
@@ -87,6 +90,11 @@ TEST(Init, FailToInitWithInvalidValue) {
     BSONObj modObj;
     ModifierBit mod;
 
+    // Double is an invalid $bit argument
+    modObj = fromjson("{ $bit : { a : 0 } }");
+    ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
+
     // String is an invalid $bit argument
     modObj = fromjson("{ $bit : { a : '' } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
@@ -94,6 +102,11 @@ TEST(Init, FailToInitWithInvalidValue) {
 
     // Array is an invalid $bit argument
     modObj = fromjson("{ $bit : { a : [] } }");
+    ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
+
+    // An empty document is an invalid $bit argument.
+    modObj = fromjson("{$bit: {a: {}}}");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
                            ModifierInterface::Options::normal()));
 
@@ -113,6 +126,11 @@ TEST(Init, FailToInitWithInvalidValue) {
 
     // The argument to the sub-operator must be integral
     modObj = fromjson("{ $bit : { a : { or : 1.0 } } }");
+    ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
+
+    // The argument to the sub-operator must be integral
+    modObj = fromjson("{ $bit : { a : { or : NumberDecimal(\"1.0\") } } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
                            ModifierInterface::Options::normal()));
 }
@@ -166,7 +184,7 @@ TEST(SimpleMod, PrepareOKTargetFound) {
     ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
 }
 
-TEST(SimpleMod, PrepareSimpleNonNumericObject) {
+TEST(SimpleMod, PrepareWithObjectShouldFail) {
     Document doc(fromjson("{ a : {} }"));
     Mod mod(fromjson("{ $bit : { a : { or : 1 } } }"));
 
@@ -174,7 +192,7 @@ TEST(SimpleMod, PrepareSimpleNonNumericObject) {
     ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
 }
 
-TEST(SimpleMod, PrepareSimpleNonNumericArray) {
+TEST(SimpleMod, PrepareWithArrayShouldFail) {
     Document doc(fromjson("{ a : [] }"));
     Mod mod(fromjson("{ $bit : { a : { and : 1 } } }"));
 
@@ -182,8 +200,16 @@ TEST(SimpleMod, PrepareSimpleNonNumericArray) {
     ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
 }
 
-TEST(SimpleMod, PrepareSimpleNonNumericString) {
+TEST(SimpleMod, PrepareWithStringShouldFail) {
     Document doc(fromjson("{ a : '' }"));
+    Mod mod(fromjson("{ $bit : { a : { or : 1 } } }"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
+}
+
+TEST(SimpleMod, PrepareWithDoubleShouldFail) {
+    Document doc(fromjson("{ a : 1.1 }"));
     Mod mod(fromjson("{ $bit : { a : { or : 1 } } }"));
 
     ModifierInterface::ExecInfo execInfo;

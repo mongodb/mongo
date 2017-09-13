@@ -25,8 +25,8 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 

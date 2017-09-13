@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -61,24 +61,24 @@
  *	If deleting a range, try to delete the page without instantiating it.
  */
 int
-__wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
 	WT_DECL_RET;
 	WT_PAGE *parent;
 
-	*skipp = 0;
+	*skipp = false;
 
 	/* If we have a clean page in memory, attempt to evict it. */
 	if (ref->state == WT_REF_MEM &&
-	    WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
+	    __wt_atomic_casv32(&ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if (__wt_page_is_modified(ref->page)) {
 			WT_PUBLISH(ref->state, WT_REF_MEM);
 			return (0);
 		}
 
-		(void)WT_ATOMIC_ADD4(S2BT(session)->evict_busy, 1);
-		ret = __wt_evict_page(session, ref);
-		(void)WT_ATOMIC_SUB4(S2BT(session)->evict_busy, 1);
+		(void)__wt_atomic_addv32(&S2BT(session)->evict_busy, 1);
+		ret = __wt_evict(session, ref, false);
+		(void)__wt_atomic_subv32(&S2BT(session)->evict_busy, 1);
 		WT_RET_BUSY_OK(ret);
 	}
 
@@ -93,31 +93,24 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * unclear optimizing for overlapping range deletes is worth the effort.
 	 */
 	if (ref->state != WT_REF_DISK ||
-	    !WT_ATOMIC_CAS4(ref->state, WT_REF_DISK, WT_REF_LOCKED))
+	    !__wt_atomic_casv32(&ref->state, WT_REF_DISK, WT_REF_LOCKED))
 		return (0);
 
 	/*
 	 * We cannot fast-delete pages that have overflow key/value items as
 	 * the overflow blocks have to be discarded.  The way we figure that
-	 * out is to check the on-page cell type for the page, cells for leaf
-	 * pages that have no overflow items are special.
-	 *
-	 * In some cases, the reference address may not reference an on-page
-	 * cell (for example, some combination of page splits), in which case
-	 * we can't check the original cell value and we fail.
+	 * out is to check the page's cell type, cells for leaf pages without
+	 * overflow items are special.
 	 *
 	 * To look at an on-page cell, we need to look at the parent page, and
 	 * that's dangerous, our parent page could change without warning if
 	 * the parent page were to split, deepening the tree.  It's safe: the
 	 * page's reference will always point to some valid page, and if we find
 	 * any problems we simply fail the fast-delete optimization.
-	 *
-	 * !!!
-	 * I doubt it's worth the effort, but we could copy the cell's type into
-	 * the reference structure, and then we wouldn't need an on-page cell.
 	 */
 	parent = ref->home;
-	if (__wt_off_page(parent, ref->addr) ||
+	if (__wt_off_page(parent, ref->addr) ?
+	    ((WT_ADDR *)ref->addr)->type != WT_ADDR_LEAF_NO :
 	    __wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LEAF_NO)
 		goto err;
 
@@ -126,7 +119,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * future reconciliation of the child leaf page that will dirty it as
 	 * we write the tree.
 	 */
-	WT_ERR(__wt_page_parent_modify_set(session, ref, 0));
+	WT_ERR(__wt_page_parent_modify_set(session, ref, false));
 
 	/*
 	 * Record the change in the transaction structure and set the change's
@@ -137,7 +130,9 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 
 	WT_ERR(__wt_txn_modify_ref(session, ref));
 
-	*skipp = 1;
+	*skipp = true;
+	WT_STAT_CONN_INCR(session, rec_page_delete_fast);
+	WT_STAT_DATA_INCR(session, rec_page_delete_fast);
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (0);
 
@@ -158,6 +153,7 @@ void
 __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_UPDATE **upd;
+	uint64_t sleep_count, yield_count;
 
 	/*
 	 * If the page is still "deleted", it's as we left it, reset the state
@@ -165,7 +161,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * instantiated or being instantiated.  Loop because it's possible for
 	 * the page to return to the deleted state if instantiation fails.
 	 */
-	for (;; __wt_yield())
+	for (sleep_count = yield_count = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_READING:
@@ -176,8 +172,8 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			 * If the page is still "deleted", it's as we left it,
 			 * reset the state.
 			 */
-			if (WT_ATOMIC_CAS4(
-			    ref->state, WT_REF_DELETED, WT_REF_DISK))
+			if (__wt_atomic_casv32(
+			    &ref->state, WT_REF_DELETED, WT_REF_DISK))
 				return;
 			break;
 		case WT_REF_LOCKED:
@@ -210,16 +206,26 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			__wt_free(session, ref->page_del);
 			return;
 		}
+		/*
+		 * We wait for the change in page state, yield before retrying,
+		 * and if we've yielded enough times, start sleeping so we don't
+		 * burn CPU to no purpose.
+		 */
+		__wt_ref_state_yield_sleep(&yield_count, &sleep_count);
+		WT_STAT_CONN_INCRV(session, page_del_rollback_blocked,
+		    sleep_count);
+	}
 }
 
 /*
  * __wt_delete_page_skip --
- *	If iterating a cursor, skip deleted pages that are visible to us.
+ *	If iterating a cursor, skip deleted pages that are either visible to
+ * us or globally visible.
  */
-int
-__wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
+bool
+__wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 {
-	int skip;
+	bool skip;
 
 	/*
 	 * Deleted pages come from two sources: either it's a fast-delete as
@@ -240,13 +246,29 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * the structure, just to be safe.
 	 */
 	if (ref->page_del == NULL)
-		return (1);
+		return (true);
 
-	if (!WT_ATOMIC_CAS4(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
-		return (0);
+	if (!__wt_atomic_casv32(&ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+		return (false);
 
-	skip = (ref->page_del == NULL ||
-	    __wt_txn_visible(session, ref->page_del->txnid));
+	skip = ref->page_del == NULL || (visible_all ?
+	    __wt_txn_visible_all(session, ref->page_del->txnid,
+		WT_TIMESTAMP_NULL(&ref->page_del->timestamp)):
+	    __wt_txn_visible(session, ref->page_del->txnid,
+		WT_TIMESTAMP_NULL(&ref->page_del->timestamp)));
+
+	/*
+	 * The page_del structure can be freed as soon as the delete is stable:
+	 * it is only read when the ref state is WT_REF_DELETED.  It is worth
+	 * checking every time we come through because once this is freed, we
+	 * no longer need synchronization to check the ref.
+	 */
+	if (skip && ref->page_del != NULL && (visible_all ||
+	    __wt_txn_visible_all(session, ref->page_del->txnid,
+		WT_TIMESTAMP_NULL(&ref->page_del->timestamp)))) {
+		__wt_free(session, ref->page_del->update_list);
+		__wt_free(session, ref->page_del);
+	}
 
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (skip);
@@ -279,10 +301,9 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * read-only or if the application never modifies the tree, we're not
 	 * able to do so.)
 	 */
-	if (btree->modified) {
-		WT_RET(__wt_page_modify_init(session, page));
+	WT_RET(__wt_page_modify_init(session, page));
+	if (btree->modified)
 		__wt_page_modify_set(session, page);
-	}
 
 	/*
 	 * An operation is accessing a "deleted" page, and we're building an
@@ -310,23 +331,22 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * hard case is if a page splits: the update structures might be moved
 	 * to different pages, and we still have to find them all for an abort.
 	 */
-
 	if (page_del != NULL)
 		WT_RET(__wt_calloc_def(
-		    session, page->pg_row_entries + 1, &page_del->update_list));
+		    session, page->entries + 1, &page_del->update_list));
 
 	/* Allocate the per-page update array. */
-	WT_ERR(__wt_calloc_def(session, page->pg_row_entries, &upd_array));
-	page->pg_row_upd = upd_array;
+	WT_ERR(__wt_calloc_def(session, page->entries, &upd_array));
+	page->modify->mod_row_update = upd_array;
 
 	/*
 	 * Fill in the per-reference update array with references to update
 	 * structures, fill in the per-page update array with references to
 	 * deleted items.
 	 */
-	for (i = 0, size = 0; i < page->pg_row_entries; ++i) {
+	for (i = 0, size = 0; i < page->entries; ++i) {
 		WT_ERR(__wt_calloc_one(session, &upd));
-		WT_UPDATE_DELETED_SET(upd);
+		upd->type = WT_UPDATE_DELETED;
 
 		if (page_del == NULL)
 			upd->txnid = WT_TXN_NONE;	/* Globally visible */

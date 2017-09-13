@@ -26,15 +26,17 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_client_info.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -42,11 +44,28 @@ namespace repl {
 const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
     Client::declareDecoration<ReplClientInfo>();
 
-long long ReplClientInfo::getTerm() {
-    if (_cachedTerm == kUninitializedTerm) {
-        _cachedTerm = getGlobalReplicationCoordinator()->getTerm();
+void ReplClientInfo::setLastOp(const OpTime& ot) {
+    invariant(ot >= _lastOp);
+    _lastOp = ot;
+}
+
+void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+    if (replCoord->isReplEnabled() && opCtx->writesAreReplicated()) {
+        auto systemOpTime = replCoord->getMyLastAppliedOpTime();
+
+        // If the system optime has gone backwards, that must mean that there was a rollback.
+        // This is safe, but the last op for a Client should never go backwards, so just leave
+        // the last op for this Client as it was.
+        if (systemOpTime >= _lastOp) {
+            _lastOp = systemOpTime;
+        } else {
+            log() << "Not setting the last OpTime for this Client from " << _lastOp
+                  << " to the current system time of " << systemOpTime
+                  << " as that would be moving the OpTime backwards.  This should only happen if "
+                     "there was a rollback recently";
+        }
     }
-    return _cachedTerm;
 }
 
 }  // namespace repl

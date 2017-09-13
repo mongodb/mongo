@@ -3,12 +3,7 @@
 t = db.jstests_regexb;
 t.drop();
 
-t.save( {a:'a',b:'b',c:'c',d:'d',e:'e'} );
+t.save({a: 'a', b: 'b', c: 'c', d: 'd', e: 'e'});
 
-assert.eq( 1, t.count( {a:/a/,b:/b/,c:/c/,d:/d/,e:/e/} ) );
-assert.eq( 0, t.count( {a:/a/,b:/b/,c:/c/,d:/d/,e:/barf/} ) );
-
-
-
-
-
+assert.eq(1, t.count({a: /a/, b: /b/, c: /c/, d: /d/, e: /e/}));
+assert.eq(0, t.count({a: /a/, b: /b/, c: /c/, d: /d/, e: /barf/}));

@@ -1,0 +1,138 @@
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 000 ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 BID_LIB=../LIBRARY/gcc000libbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 001 ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0 BID_LIB=../LIBRARY/gcc001libbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 010 ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 BID_LIB=../LIBRARY/gcc010libbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 011 ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0 BID_LIB=../LIBRARY/gcc011libbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 100 ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 BID_LIB=../LIBRARY/gcc100libbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 101 ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0 BID_LIB=../LIBRARY/gcc101libbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 110 ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 BID_LIB=../LIBRARY/gcc110libbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 111 ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc111libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0 BID_LIB=../LIBRARY/gcc111libbid.a
+./readtest < readtest.in
+
+
+
+
+
+
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 000b ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1 BID_LIB=../LIBRARY/gcc000blibbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 001b ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1 BID_LIB=../LIBRARY/gcc001blibbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 010b ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1 BID_LIB=../LIBRARY/gcc010blibbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 011b ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1 BID_LIB=../LIBRARY/gcc011blibbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 100b ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1 BID_LIB=../LIBRARY/gcc100blibbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 101b ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1 BID_LIB=../LIBRARY/gcc101blibbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 110b ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1 BID_LIB=../LIBRARY/gcc110blibbid.a
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 111b ***************************"
+echo ""
+echo ""
+rm readtest readtest.o
+gmake OS_TYPE=LINUX CC=gcc BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1 BID_LIB=../LIBRARY/gcc111blibbid.a
+./readtest < readtest.in
+rm ../LIBRARY/libbid.a
+
+

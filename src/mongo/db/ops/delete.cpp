@@ -35,44 +35,32 @@
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/repl_client_info.h"
 
 namespace mongo {
 
-/* ns:      namespace, e.g. <database>.<collection>
-   pattern: the "where" clause / criteria
-   justOne: stop after 1 match
-   god:     allow access to system namespaces, and don't yield
-*/
-long long deleteObjects(OperationContext* txn,
-                        Database* db,
-                        StringData ns,
+long long deleteObjects(OperationContext* opCtx,
+                        Collection* collection,
+                        const NamespaceString& ns,
                         BSONObj pattern,
-                        PlanExecutor::YieldPolicy policy,
                         bool justOne,
                         bool god,
                         bool fromMigrate) {
-    NamespaceString nsString(ns);
-    DeleteRequest request(nsString);
+    DeleteRequest request(ns);
     request.setQuery(pattern);
     request.setMulti(!justOne);
     request.setGod(god);
     request.setFromMigrate(fromMigrate);
-    request.setYieldPolicy(policy);
 
-    Collection* collection = NULL;
-    if (db) {
-        collection = db->getCollection(nsString.ns());
-    }
-
-    ParsedDelete parsedDelete(txn, &request);
+    ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    PlanExecutor* rawExec;
-    uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
-    std::unique_ptr<PlanExecutor> exec(rawExec);
+    auto exec = uassertStatusOK(
+        getExecutorDelete(opCtx, &CurOp::get(opCtx)->debug(), collection, &parsedDelete));
 
     uassertStatusOK(exec->executePlan());
-    return DeleteStage::getNumDeleted(exec.get());
+
+    return DeleteStage::getNumDeleted(*exec);
 }
 
 }  // namespace mongo

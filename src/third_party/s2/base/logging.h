@@ -54,6 +54,7 @@
 
 #include "base/port.h"
 #define INFO LogMessageInfo().stream()
+#define WARN LogMessageWarning(__FILE__, __LINE__).stream()
 #define FATAL LogMessageFatal(__FILE__, __LINE__).stream()
 #define DFATAL LogMessageFatal(__FILE__, __LINE__).stream()
 
@@ -89,7 +90,7 @@ private:
 class LogMessageWarning : public LogMessageBase {
 public:
     LogMessageWarning(const char* file, int line);
-    virtual ~LogMessageWarning();
+    virtual ~LogMessageWarning() { };
 
 private:
     DISALLOW_COPY_AND_ASSIGN(LogMessageWarning);

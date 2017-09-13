@@ -105,34 +105,28 @@ TEST(Path, Nested1) {
     ASSERT(cursor.more());
     BSONElementIterator::Context e = cursor.next();
     ASSERT_EQUALS(5, e.element().numberInt());
-    ASSERT(!e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT(e.element().eoo());
     ASSERT_EQUALS((string) "2", e.arrayOffset().fieldName());
-    ASSERT(!e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(9, e.element().numberInt());
-    ASSERT(!e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(11, e.element().numberInt());
-    ASSERT(!e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
     ASSERT_EQUALS(2, e.element().Obj().nFields());
-    ASSERT(e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(7, e.element().numberInt());
-    ASSERT(!e.outerArray());
 
     ASSERT(!cursor.more());
 }
@@ -149,7 +143,6 @@ TEST(Path, NestedPartialMatchScalar) {
     BSONElementIterator::Context e = cursor.next();
     ASSERT(e.element().eoo());
     ASSERT(e.arrayOffset().eoo());
-    ASSERT(!e.outerArray());
 
     ASSERT(!cursor.more());
 }
@@ -181,7 +174,6 @@ TEST(Path, NestedEmptyArray) {
     BSONElementIterator::Context e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
     ASSERT_EQUALS(0, e.element().Obj().nFields());
-    ASSERT(e.outerArray());
 
     ASSERT(!cursor.more());
 }
@@ -200,24 +192,20 @@ TEST(Path, NestedNoLeaf1) {
     ASSERT(cursor.more());
     BSONElementIterator::Context e = cursor.next();
     ASSERT_EQUALS(5, e.element().numberInt());
-    ASSERT(!e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT(e.element().eoo());
     ASSERT_EQUALS((string) "2", e.arrayOffset().fieldName());
-    ASSERT(!e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
     ASSERT_EQUALS(2, e.element().Obj().nFields());
-    ASSERT(e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(7, e.element().numberInt());
-    ASSERT(!e.outerArray());
 
     ASSERT(!cursor.more());
 }
@@ -264,12 +252,10 @@ TEST(Path, ArrayIndex3) {
     ASSERT(cursor.more());
     BSONElementIterator::Context e = cursor.next();
     ASSERT_EQUALS(4, e.element().numberInt());
-    ASSERT(!e.outerArray());
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(BSON("1" << 4), e.element().Obj());
-    ASSERT(e.outerArray());
+    ASSERT_BSONOBJ_EQ(BSON("1" << 4), e.element().Obj());
 
     ASSERT(!cursor.more());
 }
@@ -354,7 +340,7 @@ TEST(Path, NestedArrayImplicitTraversal) {
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
-    ASSERT_EQUALS(BSON("0" << 2 << "1" << 3), e.element().Obj());
+    ASSERT_BSONOBJ_EQ(BSON("0" << 2 << "1" << 3), e.element().Obj());
     ASSERT_EQUALS("0", e.arrayOffset().fieldNameStringData());
 
     ASSERT(cursor.more());
@@ -372,7 +358,7 @@ TEST(Path, NestedArrayImplicitTraversal) {
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
-    ASSERT_EQUALS(BSON("0" << 4 << "1" << 5), e.element().Obj());
+    ASSERT_BSONOBJ_EQ(BSON("0" << 4 << "1" << 5), e.element().Obj());
     ASSERT_EQUALS("1", e.arrayOffset().fieldNameStringData());
 
     ASSERT(!cursor.more());
@@ -407,7 +393,7 @@ TEST(Path, ArrayOffsetWithImplicitAndExplicitTraversal) {
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
-    ASSERT_EQUALS(BSON("0" << 2 << "1" << 3), e.element().Obj());
+    ASSERT_BSONOBJ_EQ(BSON("0" << 2 << "1" << 3), e.element().Obj());
     ASSERT(e.arrayOffset().eoo());
 
     ASSERT(cursor.more());

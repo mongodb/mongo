@@ -14,8 +14,8 @@
  * Specifies nonAtomic=true and writes the results of each thread to
  * the same collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/map_reduce_inline.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -35,13 +35,7 @@ var $config = extendWorkload($config, function($config, $super) {
                      "output collection '" + fullName + "' should exist");
 
         // Have all threads combine their results into the same collection
-        var options = {
-            finalize: this.finalizer,
-            out: {
-                reduce: this.outCollName,
-                nonAtomic: true
-            }
-        };
+        var options = {finalize: this.finalizer, out: {reduce: this.outCollName, nonAtomic: true}};
 
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);
         assertAlways.commandWorked(res);

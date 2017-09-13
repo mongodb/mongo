@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -56,9 +55,8 @@ public:
     }
 
 private:
-    mutable SpinLock _lock;
-    long long _num;
-    long long _totalMillis;
+    AtomicInt64 _num;
+    AtomicInt64 _totalMillis;
 };
 
 /**

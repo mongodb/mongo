@@ -49,10 +49,10 @@ UpdateResult::UpdateResult(bool existing_,
       numDocsModified(numDocsModified_),
       numMatched(numMatched_) {
     BSONElement id = upsertedObject_["_id"];
-    if (!existing && numMatched == 1 && !id.eoo()) {
+    if (!existing && numMatched == 0 && !id.eoo()) {
         upserted = id.wrap(kUpsertedFieldName);
     }
-    LOG(4) << "UpdateResult -- " << toString();
+    LOG(4) << "UpdateResult -- " << redact(toString());
 }
 
 }  // namespace mongo

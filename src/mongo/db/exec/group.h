@@ -28,8 +28,9 @@
 
 #pragma once
 
-
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
@@ -41,7 +42,7 @@ class Collection;
  */
 struct GroupRequest {
     // Namespace to operate on (e.g. "foo.bar").
-    std::string ns;
+    NamespaceString ns;
 
     // A predicate describing the set of documents to group.
     BSONObj query;
@@ -53,6 +54,10 @@ struct GroupRequest {
     // A Javascript function that maps a document to a key object.  Alternative to "keyPattern".
     // Empty is "keyPattern" is being used instead.
     std::string keyFunctionCode;
+
+    // The collation used for string comparisons. If empty, simple binary comparison with memcmp()
+    // is used.
+    BSONObj collation;
 
     // A Javascript function that takes a (input document, group result) pair and
     // updates the group result document.
@@ -78,33 +83,25 @@ struct GroupRequest {
  *
  * Only created through the getExecutorGroup path.
  */
-class GroupStage : public PlanStage {
+class GroupStage final : public PlanStage {
     MONGO_DISALLOW_COPYING(GroupStage);
 
 public:
-    GroupStage(OperationContext* txn,
+    GroupStage(OperationContext* opCtx,
                const GroupRequest& request,
                WorkingSet* workingSet,
                PlanStage* child);
-    virtual ~GroupStage() {}
 
-    virtual StageState work(WorkingSetID* out);
-    virtual bool isEOF();
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    StageState doWork(WorkingSetID* out) final;
+    bool isEOF() final;
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_GROUP;
     }
 
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
@@ -125,28 +122,22 @@ private:
     };
 
     // Initializes _scope, _reduceFunction and _keyFunction using the global scripting engine.
-    void initGroupScripting();
+    Status initGroupScripting();
 
     // Updates _groupMap and _scope to account for the group key associated with this object.
     // Returns an error status if an error occurred, else Status::OK().
     Status processObject(const BSONObj& obj);
 
-    // Finalize the results for this group operation.  Returns an owned BSONObj with the results
-    // array.
-    BSONObj finalizeResults();
-
-    // Transactional context for read locks.  Not owned by us.
-    OperationContext* _txn;
+    // Finalize the results for this group operation. On success, returns with a BSONObj with
+    // the results array. On failure, returns a non-OK status. Does not throw.
+    StatusWith<BSONObj> finalizeResults();
 
     GroupRequest _request;
 
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _ws;
 
-    CommonStats _commonStats;
     GroupStats _specificStats;
-
-    std::unique_ptr<PlanStage> _child;
 
     // Current state for this stage.
     GroupState _groupState;
@@ -165,7 +156,7 @@ private:
 
     // Map from group key => group index.  The group index is used to index into "$arr", a
     // variable owned by _scope which contains the group data for this key.
-    std::map<BSONObj, int, BSONObjCmp> _groupMap;
+    BSONObjIndexedMap<int> _groupMap;
 };
 
 }  // namespace mongo

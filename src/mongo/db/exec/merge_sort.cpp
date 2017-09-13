@@ -31,36 +31,35 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::list;
 using std::string;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* MergeSortStage::kStageType = "SORT_MERGE";
 
-MergeSortStage::MergeSortStage(const MergeSortStageParams& params,
+MergeSortStage::MergeSortStage(OperationContext* opCtx,
+                               const MergeSortStageParams& params,
                                WorkingSet* ws,
                                const Collection* collection)
-    : _collection(collection),
+    : PlanStage(kStageType, opCtx),
+      _collection(collection),
       _ws(ws),
       _pattern(params.pattern),
+      _collator(params.collator),
       _dedup(params.dedup),
-      _merging(StageWithValueComparison(ws, params.pattern)),
-      _commonStats(kStageType) {}
-
-MergeSortStage::~MergeSortStage() {
-    for (size_t i = 0; i < _children.size(); ++i) {
-        delete _children[i];
-    }
-}
+      _merging(StageWithValueComparison(ws, params.pattern, params.collator)) {}
 
 void MergeSortStage::addChild(PlanStage* child) {
-    _children.push_back(child);
+    _children.emplace_back(child);
 
     // We have to call work(...) on every child before we can pick a min.
     _noResultToMerge.push(child);
@@ -72,12 +71,7 @@ bool MergeSortStage::isEOF() {
     return _merging.empty() && _noResultToMerge.empty();
 }
 
-PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -90,26 +84,25 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
         StageState code = child->work(&id);
 
         if (PlanStage::ADVANCED == code) {
+            WorkingSetMember* member = _ws->get(id);
+
             // If we're deduping...
             if (_dedup) {
-                WorkingSetMember* member = _ws->get(id);
-
-                if (!member->hasLoc()) {
+                if (!member->hasRecordId()) {
                     // Can't dedup data unless there's a RecordId.  We go ahead and use its
                     // result.
                     _noResultToMerge.pop();
                 } else {
                     ++_specificStats.dupsTested;
-                    // ...and there's a diskloc and and we've seen the RecordId before
-                    if (_seen.end() != _seen.find(member->loc)) {
+                    // ...and there's a RecordId and and we've seen the RecordId before
+                    if (_seen.end() != _seen.find(member->recordId)) {
                         // ...drop it.
                         _ws->free(id);
-                        ++_commonStats.needTime;
                         ++_specificStats.dupsDropped;
                         return PlanStage::NEED_TIME;
                     } else {
                         // Otherwise, note that we've seen it.
-                        _seen.insert(member->loc);
+                        _seen.insert(member->recordId);
                         // We're going to use the result from the child, so we remove it from
                         // the queue of children without a result.
                         _noResultToMerge.pop();
@@ -125,18 +118,18 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
             StageWithValue value;
             value.id = id;
             value.stage = child;
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+            member->makeObjOwnedIfNeeded();
             _mergingData.push_front(value);
 
             // Insert the result (indirectly) into our priority queue.
             _merging.push(_mergingData.begin());
 
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         } else if (PlanStage::IS_EOF == code) {
             // There are no more results possible from this child.  Don't bother with it
             // anymore.
             _noResultToMerge.pop();
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         } else if (PlanStage::FAILURE == code || PlanStage::DEAD == code) {
             *out = id;
@@ -151,11 +144,8 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
             }
             return code;
         } else {
-            if (PlanStage::NEED_TIME == code) {
-                ++_commonStats.needTime;
-            } else if (PlanStage::NEED_YIELD == code) {
+            if (PlanStage::NEED_YIELD == code) {
                 *out = id;
-                ++_commonStats.needYield;
             }
 
             return code;
@@ -179,52 +169,29 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
 
     // Return the min.
     *out = idToTest;
-    ++_commonStats.advanced;
-
-    // But don't return it if it's flagged.
-    if (_ws->isFlagged(*out)) {
-        return PlanStage::NEED_TIME;
-    }
 
     return PlanStage::ADVANCED;
 }
 
-void MergeSortStage::saveState() {
-    ++_commonStats.yields;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->saveState();
-    }
-}
 
-void MergeSortStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->restoreState(opCtx);
-    }
-}
-
-void MergeSortStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->invalidate(txn, dl, type);
-    }
-
-    // Go through our data and see if we're holding on to the invalidated loc.
+void MergeSortStage::doInvalidate(OperationContext* opCtx,
+                                  const RecordId& dl,
+                                  InvalidationType type) {
+    // Go through our data and see if we're holding on to the invalidated RecordId.
     for (list<StageWithValue>::iterator valueIt = _mergingData.begin();
          valueIt != _mergingData.end();
          valueIt++) {
         WorkingSetMember* member = _ws->get(valueIt->id);
-        if (member->hasLoc() && (dl == member->loc)) {
-            // Force a fetch and flag.  We could possibly merge this result back in later.
-            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
-            _ws->flagForReview(valueIt->id);
+        if (member->hasRecordId() && (dl == member->recordId)) {
+            // Fetch the about-to-be mutated result.
+            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
             ++_specificStats.forcedFetches;
         }
     }
 
-    // If we see DL again it is not the same record as it once was so we still want to
-    // return it.
-    if (_dedup) {
+    // If we see the deleted RecordId again it is not the same record as it once was so we still
+    // want to return it.
+    if (_dedup && INVALIDATION_DELETION == type) {
         _seen.erase(dl);
     }
 }
@@ -248,7 +215,7 @@ bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,
         verify(rhsMember->getFieldDotted(fn, &rhsElt));
 
         // false means don't compare field name.
-        int x = lhsElt.woCompare(rhsElt, false);
+        int x = lhsElt.woCompare(rhsElt, false, _collator);
         if (-1 == patternElt.number()) {
             x = -x;
         }
@@ -263,25 +230,17 @@ bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,
     return false;
 }
 
-vector<PlanStage*> MergeSortStage::getChildren() const {
-    return _children;
-}
-
-PlanStageStats* MergeSortStage::getStats() {
+unique_ptr<PlanStageStats> MergeSortStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     _specificStats.sortPattern = _pattern;
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT_MERGE));
-    ret->specific.reset(new MergeSortStats(_specificStats));
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SORT_MERGE);
+    ret->specific = make_unique<MergeSortStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats());
+        ret->children.emplace_back(_children[i]->getStats());
     }
-    return ret.release();
-}
-
-const CommonStats* MergeSortStage::getCommonStats() const {
-    return &_commonStats;
+    return ret;
 }
 
 const SpecificStats* MergeSortStage::getSpecificStats() const {

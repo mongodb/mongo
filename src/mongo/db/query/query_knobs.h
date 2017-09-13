@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
+
 namespace mongo {
 
 //
@@ -36,72 +39,85 @@ namespace mongo {
 
 // Max number of times we call work() on plans before comparing them,
 // for small collections.
-extern int internalQueryPlanEvaluationWorks;
+extern AtomicInt32 internalQueryPlanEvaluationWorks;
 
 // For large collections, the number times we work() candidate plans is
 // taken as this fraction of the collection size.
-extern double internalQueryPlanEvaluationCollFraction;
+extern AtomicDouble internalQueryPlanEvaluationCollFraction;
 
 // Stop working plans once a plan returns this many results.
-extern int internalQueryPlanEvaluationMaxResults;
+extern AtomicInt32 internalQueryPlanEvaluationMaxResults;
 
 // Do we give a big ranking bonus to intersection plans?
-extern bool internalQueryForceIntersectionPlans;
+extern AtomicBool internalQueryForceIntersectionPlans;
 
 // Do we have ixisect on at all?
-extern bool internalQueryPlannerEnableIndexIntersection;
+extern AtomicBool internalQueryPlannerEnableIndexIntersection;
 
 // Do we use hash-based intersection for rooted $and queries?
-extern bool internalQueryPlannerEnableHashIntersection;
+extern AtomicBool internalQueryPlannerEnableHashIntersection;
 
 //
 // plan cache
 //
 
 // How many entries in the cache?
-extern int internalQueryCacheSize;
+extern AtomicInt32 internalQueryCacheSize;
 
 // How many feedback entries do we collect before possibly evicting from the cache based on bad
 // performance?
-extern int internalQueryCacheFeedbacksStored;
+extern AtomicInt32 internalQueryCacheFeedbacksStored;
 
 // How many times more works must we perform in order to justify plan cache eviction
 // and replanning?
-extern double internalQueryCacheEvictionRatio;
-
-// How many write ops should we allow in a collection before tossing all cache entries?
-extern int internalQueryCacheWriteOpsBetweenFlush;
+extern AtomicDouble internalQueryCacheEvictionRatio;
 
 //
 // Planning and enumeration.
 //
 
 // How many indexed solutions will QueryPlanner::plan output?
-extern int internalQueryPlannerMaxIndexedSolutions;
+extern AtomicInt32 internalQueryPlannerMaxIndexedSolutions;
 
 // How many solutions will the enumerator consider at each OR?
-extern int internalQueryEnumerationMaxOrSolutions;
+extern AtomicInt32 internalQueryEnumerationMaxOrSolutions;
 
 // How many intersections will the enumerator consider at each AND?
-extern int internalQueryEnumerationMaxIntersectPerAnd;
+extern AtomicInt32 internalQueryEnumerationMaxIntersectPerAnd;
 
 // Do we want to plan each child of the OR independently?
-extern bool internalQueryPlanOrChildrenIndependently;
+extern AtomicBool internalQueryPlanOrChildrenIndependently;
 
 // How many index scans are we willing to produce in order to obtain a sort order
 // during explodeForSort?
-extern int internalQueryMaxScansToExplode;
+extern AtomicInt32 internalQueryMaxScansToExplode;
+
+// Allow the planner to generate covered whole index scans, rather than falling back to a COLLSCAN.
+extern AtomicBool internalQueryPlannerGenerateCoveredWholeIndexScans;
+
+// Ignore unknown JSON Schema keywords.
+extern AtomicBool internalQueryIgnoreUnknownJSONSchemaKeywords;
 
 //
 // Query execution.
 //
 
-extern int internalQueryExecMaxBlockingSortBytes;
+extern AtomicInt32 internalQueryExecMaxBlockingSortBytes;
 
 // Yield after this many "should yield?" checks.
-extern int internalQueryExecYieldIterations;
+extern AtomicInt32 internalQueryExecYieldIterations;
 
 // Yield if it's been at least this many milliseconds since we last yielded.
-extern int internalQueryExecYieldPeriodMS;
+extern AtomicInt32 internalQueryExecYieldPeriodMS;
+
+// Limit the size that we write without yielding to 16MB / 64 (max expected number of indexes)
+const int64_t insertVectorMaxBytes = 256 * 1024;
+
+// The number of bytes to buffer at once during a $facet stage.
+extern AtomicInt32 internalQueryFacetBufferSizeBytes;
+
+extern AtomicInt32 internalInsertMaxBatchSize;
+
+extern AtomicInt32 internalDocumentSourceCursorBatchSizeBytes;
 
 }  // namespace mongo

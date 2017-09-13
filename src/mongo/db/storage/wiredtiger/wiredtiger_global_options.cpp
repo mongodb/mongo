@@ -46,58 +46,68 @@ Status WiredTigerGlobalOptions::add(moe::OptionSection* options) {
     // WiredTiger storage engine options
     wiredTigerOptions.addOptionChaining("storage.wiredTiger.engineConfig.cacheSizeGB",
                                         "wiredTigerCacheSizeGB",
-                                        moe::Int,
+                                        moe::Double,
                                         "maximum amount of memory to allocate for cache; "
-                                        "defaults to 1/2 of physical RAM").validRange(1, 10000);
-    wiredTigerOptions.addOptionChaining(
-                          "storage.wiredTiger.engineConfig.statisticsLogDelaySecs",
-                          "wiredTigerStatisticsLogDelaySecs",
-                          moe::Int,
-                          "seconds to wait between each write to a statistics file in the dbpath; "
-                          "0 means do not log statistics")
+                                        "defaults to 1/2 of physical RAM");
+    wiredTigerOptions
+        .addOptionChaining("storage.wiredTiger.engineConfig.statisticsLogDelaySecs",
+                           "wiredTigerStatisticsLogDelaySecs",
+                           moe::Int,
+                           "seconds to wait between each write to a statistics file in the dbpath; "
+                           "0 means do not log statistics")
+        // FTDC supercedes WiredTiger's statistics logging.
+        .hidden()
         .validRange(0, 100000)
         .setDefault(moe::Value(0));
-    wiredTigerOptions.addOptionChaining("storage.wiredTiger.engineConfig.journalCompressor",
-                                        "wiredTigerJournalCompressor",
-                                        moe::String,
-                                        "use a compressor for log records [none|snappy|zlib]")
+    wiredTigerOptions
+        .addOptionChaining("storage.wiredTiger.engineConfig.journalCompressor",
+                           "wiredTigerJournalCompressor",
+                           moe::String,
+                           "use a compressor for log records [none|snappy|zlib]")
         .format("(:?none)|(:?snappy)|(:?zlib)", "(none/snappy/zlib)")
         .setDefault(moe::Value(std::string("snappy")));
     wiredTigerOptions.addOptionChaining("storage.wiredTiger.engineConfig.directoryForIndexes",
                                         "wiredTigerDirectoryForIndexes",
                                         moe::Switch,
                                         "Put indexes and data in different directories");
-    wiredTigerOptions.addOptionChaining("storage.wiredTiger.engineConfig.configString",
-                                        "wiredTigerEngineConfigString",
-                                        moe::String,
-                                        "WiredTiger storage engine custom "
-                                        "configuration settings").hidden();
+    wiredTigerOptions
+        .addOptionChaining("storage.wiredTiger.engineConfig.configString",
+                           "wiredTigerEngineConfigString",
+                           moe::String,
+                           "WiredTiger storage engine custom "
+                           "configuration settings")
+        .hidden();
 
     // WiredTiger collection options
-    wiredTigerOptions.addOptionChaining("storage.wiredTiger.collectionConfig.blockCompressor",
-                                        "wiredTigerCollectionBlockCompressor",
-                                        moe::String,
-                                        "block compression algorithm for collection data "
-                                        "[none|snappy|zlib]")
+    wiredTigerOptions
+        .addOptionChaining("storage.wiredTiger.collectionConfig.blockCompressor",
+                           "wiredTigerCollectionBlockCompressor",
+                           moe::String,
+                           "block compression algorithm for collection data "
+                           "[none|snappy|zlib]")
         .format("(:?none)|(:?snappy)|(:?zlib)", "(none/snappy/zlib)")
         .setDefault(moe::Value(std::string("snappy")));
-    wiredTigerOptions.addOptionChaining("storage.wiredTiger.collectionConfig.configString",
-                                        "wiredTigerCollectionConfigString",
-                                        moe::String,
-                                        "WiredTiger custom collection configuration settings")
+    wiredTigerOptions
+        .addOptionChaining("storage.wiredTiger.collectionConfig.configString",
+                           "wiredTigerCollectionConfigString",
+                           moe::String,
+                           "WiredTiger custom collection configuration settings")
         .hidden();
 
 
     // WiredTiger index options
-    wiredTigerOptions.addOptionChaining("storage.wiredTiger.indexConfig.prefixCompression",
-                                        "wiredTigerIndexPrefixCompression",
-                                        moe::Bool,
-                                        "use prefix compression on row-store leaf pages")
+    wiredTigerOptions
+        .addOptionChaining("storage.wiredTiger.indexConfig.prefixCompression",
+                           "wiredTigerIndexPrefixCompression",
+                           moe::Bool,
+                           "use prefix compression on row-store leaf pages")
         .setDefault(moe::Value(true));
-    wiredTigerOptions.addOptionChaining("storage.wiredTiger.indexConfig.configString",
-                                        "wiredTigerIndexConfigString",
-                                        moe::String,
-                                        "WiredTiger custom index configuration settings").hidden();
+    wiredTigerOptions
+        .addOptionChaining("storage.wiredTiger.indexConfig.configString",
+                           "wiredTigerIndexConfigString",
+                           moe::String,
+                           "WiredTiger custom index configuration settings")
+        .hidden();
 
     return options->addSection(wiredTigerOptions);
 }
@@ -107,7 +117,7 @@ Status WiredTigerGlobalOptions::store(const moe::Environment& params,
     // WiredTiger storage engine options
     if (params.count("storage.wiredTiger.engineConfig.cacheSizeGB")) {
         wiredTigerGlobalOptions.cacheSizeGB =
-            params["storage.wiredTiger.engineConfig.cacheSizeGB"].as<int>();
+            params["storage.wiredTiger.engineConfig.cacheSizeGB"].as<double>();
     }
     if (params.count("storage.syncPeriodSecs")) {
         wiredTigerGlobalOptions.checkpointDelaySecs =

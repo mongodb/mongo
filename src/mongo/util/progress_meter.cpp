@@ -49,13 +49,13 @@ void ProgressMeter::reset(unsigned long long total, int secondsBetween, int chec
     _hits = 0;
     _lastTime = (int)time(0);
 
-    _active = 1;
+    _active = true;
 }
 
 
 bool ProgressMeter::hit(int n) {
     if (!_active) {
-        warning() << "hit an inactive ProgressMeter" << endl;
+        warning() << "hit an inactive ProgressMeter";
         return false;
     }
 

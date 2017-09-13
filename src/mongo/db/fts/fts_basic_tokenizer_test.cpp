@@ -34,12 +34,13 @@ namespace mongo {
 namespace fts {
 
 std::vector<std::string> tokenizeString(const char* str, const char* language) {
+    // To retrieve the FTSBasicTokenizer, use TEXT_INDEX_VERSION_2
     StatusWithFTSLanguage swl = FTSLanguage::make(language, TEXT_INDEX_VERSION_2);
     ASSERT_OK(swl);
 
     std::unique_ptr<FTSTokenizer> tokenizer(swl.getValue()->createTokenizer());
 
-    tokenizer->reset(str, FTSTokenizer::None);
+    tokenizer->reset(str, FTSTokenizer::kNone);
 
     std::vector<std::string> terms;
 

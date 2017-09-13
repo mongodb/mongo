@@ -5,29 +5,31 @@
  *
  * Runs explain() and update() on a collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/explain.js'); // for $config
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongos
+load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
+load('jstests/concurrency/fsm_workloads/explain.js');              // for $config
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
 var $config = extendWorkload($config, function($config, $super) {
 
     $config.states = Object.extend({
         explainBasicUpdate: function explainBasicUpdate(db, collName) {
-            var res = db[collName].explain('executionStats').update({i: this.nInserted},
-                                                                    {$set: {j: 49}});
+            var res =
+                db[collName].explain('executionStats').update({i: this.nInserted}, {$set: {j: 49}});
             assertAlways.commandWorked(res);
             assertWhenOwnColl(function() {
                 assertWhenOwnColl.eq(1, explain.executionStats.totalDocsExamined);
 
                 // document should not have been updated.
-                var doc = db[collName].findOne({ i: this.nInserted });
+                var doc = db[collName].findOne({i: this.nInserted});
                 assertWhenOwnColl.eq(2 * this.nInserted, doc.j);
             }.bind(this));
         },
         explainUpdateUpsert: function explainUpdateUpsert(db, collName) {
-            var res = db[collName].explain('executionStats').update({i: 2 * this.nInserted + 1},
-                                                                    {$set: {j: 81}},
-                                                                    /* upsert */ true);
+            var res = db[collName]
+                          .explain('executionStats')
+                          .update({i: 2 * this.nInserted + 1},
+                                  {$set: {j: 81}},
+                                  /* upsert */ true);
             assertAlways.commandWorked(res);
             var stage = res.executionStats.executionStages;
 
@@ -42,9 +44,12 @@ var $config = extendWorkload($config, function($config, $super) {
             assertWhenOwnColl.eq(this.nInserted, db[collName].find().itcount());
         },
         explainUpdateMulti: function explainUpdateMulti(db, collName) {
-            var res = db[collName].explain('executionStats').update({i: {$lte: 2}}, {$set: {b: 3}},
-                                                                     /* upsert */ false,
-                                                                     /* multi */ true);
+            var res = db[collName]
+                          .explain('executionStats')
+                          .update({i: {$lte: 2}},
+                                  {$set: {b: 3}},
+                                  /* upsert */ false,
+                                  /* multi */ true);
             assertAlways.commandWorked(res);
             var stage = res.executionStats.executionStages;
 
@@ -57,11 +62,11 @@ var $config = extendWorkload($config, function($config, $super) {
             assertWhenOwnColl.eq(3, stage.nMatched);
             assertWhenOwnColl.eq(3, stage.nWouldModify);
         }
-    }, $super.states);
+    },
+                                   $super.states);
 
-    $config.transitions = Object.extend({
-        explain: $config.data.assignEqualProbsToTransitions($config.states)
-    }, $super.transitions);
+    $config.transitions = Object.extend(
+        {explain: $config.data.assignEqualProbsToTransitions($config.states)}, $super.transitions);
 
     return $config;
 });

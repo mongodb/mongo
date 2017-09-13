@@ -1,6 +1,10 @@
+// Cannot implicitly shard accessed collections because of collection existing when none
+// expected.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
 // Basic functional tests for the listIndexes command.
 
-(function () {
+(function() {
     "use strict";
 
     var coll = db.list_indexes1;
@@ -27,17 +31,20 @@
     //
 
     var getListIndexesCursor = function(coll, options, subsequentBatchSize) {
-        return new DBCommandCursor(coll.getDB().getMongo(),
-                                   coll.runCommand("listIndexes", options),
-                                   subsequentBatchSize);
+        return new DBCommandCursor(
+            coll.getDB().getMongo(), coll.runCommand("listIndexes", options), subsequentBatchSize);
     };
 
     var cursorGetIndexSpecs = function(cursor) {
-        return cursor.toArray().sort(function(a, b) { return a.name > b.name; });
+        return cursor.toArray().sort(function(a, b) {
+            return a.name > b.name;
+        });
     };
 
     var cursorGetIndexNames = function(cursor) {
-        return cursorGetIndexSpecs(cursor).map(function(spec) { return spec.name; });
+        return cursorGetIndexSpecs(cursor).map(function(spec) {
+            return spec.name;
+        });
     };
 
     coll.drop();
@@ -161,8 +168,9 @@
 
     res = coll.runCommand("listIndexes", {cursor: {batchSize: 0}});
     cursor = new DBCommandCursor(coll.getDB().getMongo(), res, 2);
-    cursor = null;
-    gc(); // Shell will send a killCursors message when cleaning up underlying cursor.
+    cursor.close();
     cursor = new DBCommandCursor(coll.getDB().getMongo(), res, 2);
-    assert.throws(function() { cursor.hasNext(); });
+    assert.throws(function() {
+        cursor.hasNext();
+    });
 }());

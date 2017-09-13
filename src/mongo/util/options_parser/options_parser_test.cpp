@@ -205,8 +205,8 @@ TEST(Registration, ComposableWithImplicit) {
     try {
         std::vector<std::string> implicitVal;
         implicitVal.push_back("implicit");
-        testOpts.addOptionChaining(
-                     "setParameter", "setParameter", moe::StringVector, "Multiple Values")
+        testOpts
+            .addOptionChaining("setParameter", "setParameter", moe::StringVector, "Multiple Values")
             .setImplicit(moe::Value(implicitVal))
             .composing();
         FAIL("Was able to register composable option with implicit value");
@@ -216,8 +216,8 @@ TEST(Registration, ComposableWithImplicit) {
     try {
         std::vector<std::string> implicitVal;
         implicitVal.push_back("implicit");
-        testOpts.addOptionChaining(
-                     "setParameter", "setParameter", moe::StringVector, "Multiple Values")
+        testOpts
+            .addOptionChaining("setParameter", "setParameter", moe::StringVector, "Multiple Values")
             .composing()
             .setImplicit(moe::Value(implicitVal));
         FAIL("Was able to set implicit value on composable option");
@@ -230,8 +230,8 @@ TEST(Registration, ComposableWithDefault) {
     try {
         std::vector<std::string> defaultVal;
         defaultVal.push_back("default");
-        testOpts.addOptionChaining(
-                     "setParameter", "setParameter", moe::StringVector, "Multiple Values")
+        testOpts
+            .addOptionChaining("setParameter", "setParameter", moe::StringVector, "Multiple Values")
             .setDefault(moe::Value(defaultVal))
             .composing();
         FAIL("Was able to register composable option with default value");
@@ -241,8 +241,8 @@ TEST(Registration, ComposableWithDefault) {
     try {
         std::vector<std::string> defaultVal;
         defaultVal.push_back("default");
-        testOpts.addOptionChaining(
-                     "setParameter", "setParameter", moe::StringVector, "Multiple Values")
+        testOpts
+            .addOptionChaining("setParameter", "setParameter", moe::StringVector, "Multiple Values")
             .composing()
             .setDefault(moe::Value(defaultVal));
         FAIL("Was able to set default value on composable option");
@@ -302,7 +302,7 @@ TEST(Parsing, SubSection) {
     moe::OptionSection subSection("Section Name");
 
     subSection.addOptionChaining("port", "port", moe::Int, "Port");
-    testOpts.addSection(subSection);
+    testOpts.addSection(subSection).transitional_ignore();
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -684,7 +684,7 @@ TEST(Parsing, DefaultValuesNotInBSON) {
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
 
     mongo::BSONObj expected = BSON("val1" << 6);
-    ASSERT_EQUALS(expected, environment.toBSON());
+    ASSERT_BSONOBJ_EQ(expected, environment.toBSON());
 }
 
 TEST(Parsing, ImplicitValue) {
@@ -746,6 +746,29 @@ TEST(Parsing, ImplicitValueOverride) {
     argv.push_back("binaryname");
     argv.push_back("--port");
     argv.push_back("5");
+    std::map<std::string, std::string> env_map;
+
+    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    moe::Value value;
+    ASSERT_OK(environment.get(moe::Key("port"), &value));
+    int port;
+    ASSERT_OK(value.get(&port));
+    ASSERT_EQUALS(port, 5);
+}
+
+TEST(Parsing, ImplicitValueOverrideWithEqualsSign) {
+    moe::OptionsParser parser;
+    moe::Environment environment;
+
+    moe::OptionSection testOpts;
+    testOpts.addOptionChaining("help", "help", moe::Switch, "Display help");
+    testOpts.addOptionChaining("port", "port", moe::Int, "Port")
+        .setDefault(moe::Value(6))
+        .setImplicit(moe::Value(7));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--port=5");
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
@@ -844,8 +867,9 @@ TEST(Style, Verbosity) {
 
     /* support for -vv -vvvv etc. */
     for (std::string s = "vv"; s.length() <= 12; s.append("v")) {
-        testOpts.addOptionChaining(
-                     s.c_str(), s.c_str(), moe::Switch, "higher verbosity levels (hidden)")
+        testOpts
+            .addOptionChaining(
+                s.c_str(), s.c_str(), moe::Switch, "higher verbosity levels (hidden)")
             .hidden();
     }
 
@@ -1810,6 +1834,82 @@ TEST(Parsing, BadConfigFileOption) {
     ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
 }
 
+TEST(Parsing, MapForScalarMismatch) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection testOpts;
+
+    testOpts.addOptionChaining("config", "config", moe::Int, "Config file to parse");
+    testOpts.addOptionChaining("str", "str", moe::String, "");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.json");
+    std::map<std::string, std::string> env_map;
+
+    parser.setConfig("config.json", R"cfg({ str: { elem: "val" } })cfg");
+
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+TEST(Parsing, ScalarForMapMismatch) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection testOpts;
+
+    testOpts.addOptionChaining("config", "config", moe::Int, "Config file to parse");
+    testOpts.addOptionChaining("strmap", "strmap", moe::StringMap, "");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.json");
+    std::map<std::string, std::string> env_map;
+
+    parser.setConfig("config.json", R"cfg({ str: "val" })cfg");
+
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+TEST(Parsing, ListForScalarMismatch) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection testOpts;
+
+    testOpts.addOptionChaining("config", "config", moe::Int, "Config file to parse");
+    testOpts.addOptionChaining("str", "str", moe::String, "");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.json");
+    std::map<std::string, std::string> env_map;
+
+    parser.setConfig("config.json", R"cfg({ str: ["val"] })cfg");
+
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+TEST(Parsing, ScalarForListMismatch) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection testOpts;
+
+    testOpts.addOptionChaining("config", "config", moe::Int, "Config file to parse");
+    testOpts.addOptionChaining("strlist", "strlist", moe::StringVector, "");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.json");
+    std::map<std::string, std::string> env_map;
+
+    parser.setConfig("config.json", R"cfg({ str: "val" })cfg");
+
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
 TEST(ConfigFromFilesystem, JSONGood) {
     moe::OptionsParser parser;
     moe::Environment environment;
@@ -1869,6 +1969,64 @@ TEST(ConfigFromFilesystem, Empty) {
 
     moe::Value value;
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+TEST(ConfigFromFilesystem, NullByte) {
+
+    moe::OptionsParser parser;
+    moe::Environment environment;
+
+    moe::OptionSection testOpts;
+    testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+    testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back(TEST_CONFIG_PATH("nullByte.conf"));
+    std::map<std::string, std::string> env_map;
+
+    moe::Value value;
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+TEST(ConfigFromFilesystem, NullSubDir) {
+
+    moe::OptionsParser parser;
+    moe::Environment environment;
+
+    moe::OptionSection testOpts;
+    testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+    testOpts.addOptionChaining("storage.dbPath", "dbPath", moe::String, "path");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back(TEST_CONFIG_PATH("dirNullByte.conf"));
+    std::map<std::string, std::string> env_map;
+
+    moe::Value value;
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
+
+TEST(ConfigFromFilesystem, NullTerminated) {
+
+    moe::OptionsParser parser;
+    moe::Environment environment;
+
+    moe::OptionSection testOpts;
+    testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+    testOpts.addOptionChaining("storage.dbPath", "dbPath", moe::String, "path");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back(TEST_CONFIG_PATH("endStringNull.conf"));
+    std::map<std::string, std::string> env_map;
+
+    moe::Value value;
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
 }
 
 TEST(JSONConfigFile, ComposingStringVector) {
@@ -3759,8 +3917,7 @@ TEST(YAMLConfigFile, DeprecatedDottedNameMultipleDeprecated) {
         std::map<std::string, std::string> env_map;
 
         std::stringstream ss;
-        ss << deprecatedDottedNames[0] << ": 6" << std::endl
-           << deprecatedDottedNames[1] << ": 7";
+        ss << deprecatedDottedNames[0] << ": 6" << std::endl << deprecatedDottedNames[1] << ": 7";
         parser.setConfig("config.yaml", ss.str());
 
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
@@ -3997,7 +4154,7 @@ TEST(OptionCount, Basic) {
     moe::OptionSection subSection("Section Name");
     subSection.addOptionChaining("port", "port", moe::Int, "Port")
         .setSources(moe::SourceYAMLConfig);
-    testOpts.addSection(subSection);
+    testOpts.addSection(subSection).transitional_ignore();
 
     int numOptions;
     ASSERT_OK(testOpts.countOptions(&numOptions, true /*visibleOnly*/, moe::SourceCommandLine));

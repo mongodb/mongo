@@ -31,14 +31,14 @@
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/storage/in_memory/in_memory_record_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-class EmptyRecordCursor final : public RecordCursor {
+class EmptyRecordCursor final : public SeekableRecordCursor {
 public:
     boost::optional<Record> next() final {
         return {};
@@ -46,10 +46,12 @@ public:
     boost::optional<Record> seekExact(const RecordId& id) final {
         return {};
     }
-    void savePositioned() final {}
-    bool restore(OperationContext* txn) final {
+    void save() final {}
+    bool restore() final {
         return true;
     }
+    void detachFromOperationContext() final {}
+    void reattachToOperationContext(OperationContext* opCtx) final {}
 };
 
 class DevNullRecordStore : public RecordStore {
@@ -64,13 +66,13 @@ public:
         return "devnull";
     }
 
-    virtual void setCappedDeleteCallback(CappedDocumentDeleteCallback*) {}
+    virtual void setCappedCallback(CappedCallback*) {}
 
-    virtual long long dataSize(OperationContext* txn) const {
+    virtual long long dataSize(OperationContext* opCtx) const {
         return 0;
     }
 
-    virtual long long numRecords(OperationContext* txn) const {
+    virtual long long numRecords(OperationContext* opCtx) const {
         return 0;
     }
 
@@ -78,89 +80,96 @@ public:
         return _options.capped;
     }
 
-    virtual int64_t storageSize(OperationContext* txn,
+    virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = NULL,
                                 int infoLevel = 0) const {
         return 0;
     }
 
-    virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const {
+    virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const {
         return RecordData(_dummy.objdata(), _dummy.objsize());
     }
 
-    virtual bool findRecord(OperationContext* txn, const RecordId& loc, RecordData* rd) const {
+    virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const {
         return false;
     }
 
-    virtual void deleteRecord(OperationContext* txn, const RecordId& dl) {}
+    virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) {}
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
-                                              const char* data,
-                                              int len,
-                                              bool enforceQuota) {
+    virtual StatusWith<RecordId> insertRecord(
+        OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota) {
         _numInserts++;
         return StatusWith<RecordId>(RecordId(6, 4));
     }
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
-                                              const DocWriter* doc,
-                                              bool enforceQuota) {
-        _numInserts++;
-        return StatusWith<RecordId>(RecordId(6, 4));
+    virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
+                                              const DocWriter* const* docs,
+                                              const Timestamp*,
+                                              size_t nDocs,
+                                              RecordId* idsOut) {
+        _numInserts += nDocs;
+        if (idsOut) {
+            for (size_t i = 0; i < nDocs; i++) {
+                idsOut[i] = RecordId(6, 4);
+            }
+        }
+        return Status::OK();
     }
 
-    virtual StatusWith<RecordId> updateRecord(OperationContext* txn,
-                                              const RecordId& oldLocation,
-                                              const char* data,
-                                              int len,
-                                              bool enforceQuota,
-                                              UpdateNotifier* notifier) {
-        return StatusWith<RecordId>(oldLocation);
+    virtual Status updateRecord(OperationContext* opCtx,
+                                const RecordId& oldLocation,
+                                const char* data,
+                                int len,
+                                bool enforceQuota,
+                                UpdateNotifier* notifier) {
+        return Status::OK();
     }
 
     virtual bool updateWithDamagesSupported() const {
         return false;
     }
 
-    virtual Status updateWithDamages(OperationContext* txn,
-                                     const RecordId& loc,
-                                     const RecordData& oldRec,
-                                     const char* damageSource,
-                                     const mutablebson::DamageVector& damages) {
+    virtual StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
+                                                     const RecordId& loc,
+                                                     const RecordData& oldRec,
+                                                     const char* damageSource,
+                                                     const mutablebson::DamageVector& damages) {
         invariant(false);
     }
 
 
-    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final {
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
+                                                    bool forward) const final {
         return stdx::make_unique<EmptyRecordCursor>();
     }
 
-    virtual Status truncate(OperationContext* txn) {
+    virtual Status truncate(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {}
+    virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {}
 
-    virtual Status validate(OperationContext* txn,
-                            bool full,
-                            bool scanData,
+    virtual Status validate(OperationContext* opCtx,
+                            ValidateCmdLevel level,
                             ValidateAdaptor* adaptor,
                             ValidateResults* results,
                             BSONObjBuilder* output) {
         return Status::OK();
     }
 
-    virtual void appendCustomStats(OperationContext* txn,
+    virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,
                                    double scale) const {
         result->appendNumber("numInserts", _numInserts);
     }
 
-    virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const {
+    virtual Status touch(OperationContext* opCtx, BSONObjBuilder* output) const {
         return Status::OK();
     }
 
-    virtual void updateStatsAfterRepair(OperationContext* txn,
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override {}
+
+    virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize) {}
 
@@ -185,64 +194,63 @@ class DevNullSortedDataInterface : public SortedDataInterface {
 public:
     virtual ~DevNullSortedDataInterface() {}
 
-    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) {
         return new DevNullSortedDataBuilderInterface();
     }
 
-    virtual Status insert(OperationContext* txn,
+    virtual Status insert(OperationContext* opCtx,
                           const BSONObj& key,
                           const RecordId& loc,
                           bool dupsAllowed) {
         return Status::OK();
     }
 
-    virtual void unindex(OperationContext* txn,
+    virtual void unindex(OperationContext* opCtx,
                          const BSONObj& key,
                          const RecordId& loc,
                          bool dupsAllowed) {}
 
-    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
+    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key, const RecordId& loc) {
         return Status::OK();
     }
 
-    virtual void fullValidate(OperationContext* txn,
-                              bool full,
+    virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
-                              BSONObjBuilder* output) const {}
+                              ValidateResults* fullResults) const {}
 
-    virtual bool appendCustomStats(OperationContext* txn,
+    virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
                                    double scale) const {
         return false;
     }
 
-    virtual long long getSpaceUsedBytes(OperationContext* txn) const {
+    virtual long long getSpaceUsedBytes(OperationContext* opCtx) const {
         return 0;
     }
 
-    virtual bool isEmpty(OperationContext* txn) {
+    virtual bool isEmpty(OperationContext* opCtx) {
         return true;
     }
 
-    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                                    bool isForward) const {
         return {};
     }
 
-    virtual Status initAsEmpty(OperationContext* txn) {
+    virtual Status initAsEmpty(OperationContext* opCtx) {
         return Status::OK();
     }
 };
 
 
-RecordStore* DevNullKVEngine::getRecordStore(OperationContext* opCtx,
-                                             StringData ns,
-                                             StringData ident,
-                                             const CollectionOptions& options) {
+std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* opCtx,
+                                                             StringData ns,
+                                                             StringData ident,
+                                                             const CollectionOptions& options) {
     if (ident == "_mdb_catalog") {
-        return new InMemoryRecordStore(ns, &_catalogInfo);
+        return stdx::make_unique<EphemeralForTestRecordStore>(ns, &_catalogInfo);
     }
-    return new DevNullRecordStore(ns, options);
+    return stdx::make_unique<DevNullRecordStore>(ns, options);
 }
 
 SortedDataInterface* DevNullKVEngine::getSortedDataInterface(OperationContext* opCtx,

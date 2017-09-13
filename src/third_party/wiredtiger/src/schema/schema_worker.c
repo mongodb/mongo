@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -17,7 +17,7 @@ int
 __wt_schema_worker(WT_SESSION_IMPL *session,
    const char *uri,
    int (*file_func)(WT_SESSION_IMPL *, const char *[]),
-   int (*name_func)(WT_SESSION_IMPL *, const char *, int *),
+   int (*name_func)(WT_SESSION_IMPL *, const char *, bool *),
    const char *cfg[], uint32_t open_flags)
 {
 	WT_COLGROUP *colgroup;
@@ -26,14 +26,12 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	WT_INDEX *idx;
 	WT_SESSION *wt_session;
 	WT_TABLE *table;
-	const char *tablename;
 	u_int i;
-	int skip;
+	bool skip;
 
 	table = NULL;
-	tablename = uri;
 
-	skip = 0;
+	skip = false;
 	if (name_func != NULL)
 		WT_ERR(name_func(session, uri, &skip));
 
@@ -49,48 +47,41 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			 * any open file handles, including checkpoints.
 			 */
 			if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE)) {
-				WT_WITH_HANDLE_LIST_LOCK(session,
+				WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
 				    ret = __wt_conn_dhandle_close_all(
-				    session, uri, 0));
+				    session, uri, false));
 				WT_ERR(ret);
 			}
 
-			if ((ret = __wt_session_get_btree_ckpt(
-			    session, uri, cfg, open_flags)) == 0) {
-				WT_SAVE_DHANDLE(session,
-				    ret = file_func(session, cfg));
-				WT_TRET(__wt_session_release_btree(session));
-			} else if (ret == EBUSY) {
-				WT_ASSERT(session, !FLD_ISSET(
-				    open_flags, WT_DHANDLE_EXCLUSIVE));
-				WT_WITH_HANDLE_LIST_LOCK(session,
-				    ret = __wt_conn_btree_apply_single_ckpt(
-				    session, uri, file_func, cfg));
-			}
+			WT_ERR(__wt_session_get_btree_ckpt(
+			    session, uri, cfg, open_flags));
+			WT_SAVE_DHANDLE(session,
+			    ret = file_func(session, cfg));
+			WT_TRET(__wt_session_release_dhandle(session));
 			WT_ERR(ret);
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
 		WT_ERR(__wt_schema_get_colgroup(
-		    session, uri, 0, NULL, &colgroup));
+		    session, uri, false, NULL, &colgroup));
 		WT_ERR(__wt_schema_worker(session,
 		    colgroup->source, file_func, name_func, cfg, open_flags));
-	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
+	} else if (WT_PREFIX_MATCH(uri, "index:")) {
 		idx = NULL;
-		WT_ERR(__wt_schema_get_index(session, uri, 0, NULL, &idx));
+		WT_ERR(__wt_schema_get_index(session, uri, false, false, &idx));
 		WT_ERR(__wt_schema_worker(session, idx->source,
 		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
+		WT_ERR(__wt_lsm_tree_worker(session,
+		    uri, file_func, name_func, cfg, open_flags));
+	} else if (WT_PREFIX_MATCH(uri, "table:")) {
 		/*
-		 * LSM compaction is handled elsewhere, but if we get here
-		 * trying to compact files, don't descend into an LSM tree.
+		 * Note: we would like to use open_flags here (e.g., to lock
+		 * the table exclusive during schema-changing operations), but
+		 * that is currently problematic because we get the table again
+		 * in order to discover column groups and indexes.
 		 */
-		if (file_func != __wt_compact)
-			WT_ERR(__wt_lsm_tree_worker(session,
-			    uri, file_func, name_func, cfg, open_flags));
-	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
-		WT_ERR(__wt_schema_get_table(session,
-		    tablename, strlen(tablename), 0, &table));
-		WT_ASSERT(session, session->dhandle == NULL);
+		WT_ERR(__wt_schema_get_table_uri(
+		    session, uri, false, 0, &table));
 
 		/*
 		 * We could make a recursive call for each colgroup or index
@@ -100,7 +91,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		 */
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
-			skip = 0;
+			skip = false;
 			if (name_func != NULL)
 				WT_ERR(name_func(
 				    session, colgroup->name, &skip));
@@ -113,7 +104,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_open_indices(session, table));
 		for (i = 0; i < table->nindices; i++) {
 			idx = table->indices[i];
-			skip = 0;
+			skip = false;
 			if (name_func != NULL)
 				WT_ERR(name_func(session, idx->name, &skip));
 			if (!skip)
@@ -122,18 +113,15 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		}
 	} else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL) {
 		wt_session = (WT_SESSION *)session;
-		if (file_func == __wt_compact && dsrc->compact != NULL)
-			WT_ERR(dsrc->compact(
-			    dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
-		else if (file_func == __wt_salvage && dsrc->salvage != NULL)
+		if (file_func == __wt_salvage && dsrc->salvage != NULL)
 			WT_ERR(dsrc->salvage(
-			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
+			    dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else if (file_func == __wt_verify && dsrc->verify != NULL)
 			WT_ERR(dsrc->verify(
-			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
+			    dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else if (file_func == __wt_checkpoint)
 			;
-		else if (file_func == __wt_checkpoint_list)
+		else if (file_func == __wt_checkpoint_get_handles)
 			;
 		else if (file_func == __wt_checkpoint_sync)
 			;
@@ -143,6 +131,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_bad_object_type(session, uri));
 
 err:	if (table != NULL)
-		__wt_schema_release_table(session, table);
+		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }

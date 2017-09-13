@@ -28,6 +28,9 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
+
 #include "mongo/dbtests/framework_options.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -37,7 +40,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -45,6 +48,13 @@
 #include "mongo/util/password.h"
 
 namespace mongo {
+
+namespace {
+
+// This specifies default dbpath for our testing framework
+const std::string default_test_dbpath = "/tmp/unittest";
+
+}  // namespace
 
 using std::cout;
 using std::endl;
@@ -56,13 +66,14 @@ FrameworkGlobalParams frameworkGlobalParams;
 Status addTestFrameworkOptions(moe::OptionSection* options) {
     options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information");
 
-    options->addOptionChaining(
-                 "dbpath",
-                 "dbpath",
-                 moe::String,
-                 "db data path for this test run. NOTE: the contents of this directory will "
-                 "be overwritten if it already exists")
-        .setDefault(moe::Value(dbtests::default_test_dbpath));
+    options
+        ->addOptionChaining(
+            "dbpath",
+            "dbpath",
+            moe::String,
+            "db data path for this test run. NOTE: the contents of this directory will "
+            "be overwritten if it already exists")
+        .setDefault(moe::Value(default_test_dbpath));
 
     options->addOptionChaining("debug", "debug", moe::Switch, "run tests with verbose output");
 
@@ -90,16 +101,18 @@ Status addTestFrameworkOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "perfHist", "perfHist", moe::Unsigned, "number of back runs of perf stats to display");
 
-    options->addOptionChaining(
-                 "storage.engine", "storageEngine", moe::String, "what storage engine to use")
+    options
+        ->addOptionChaining(
+            "storage.engine", "storageEngine", moe::String, "what storage engine to use")
         .setDefault(moe::Value(std::string("wiredTiger")));
 
     options->addOptionChaining("suites", "suites", moe::StringVector, "test suites to run")
         .hidden()
         .positional(1, -1);
 
-    options->addOptionChaining(
-                 "nopreallocj", "nopreallocj", moe::Switch, "disable journal prealloc").hidden();
+    options
+        ->addOptionChaining("nopreallocj", "nopreallocj", moe::Switch, "disable journal prealloc")
+        .hidden();
 
 
     return Status::OK();
@@ -107,8 +120,8 @@ Status addTestFrameworkOptions(moe::OptionSection* options) {
 
 std::string getTestFrameworkHelp(StringData name, const moe::OptionSection& options) {
     StringBuilder sb;
-    sb << "usage: " << name << " [options] [suite]...\n" << options.helpString()
-       << "suite: run the specified test suite(s) only\n";
+    sb << "usage: " << name << " [options] [suite]...\n"
+       << options.helpString() << "suite: run the specified test suite(s) only\n";
     return sb.str();
 }
 

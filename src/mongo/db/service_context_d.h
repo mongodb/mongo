@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <vector>
 
 #include "mongo/db/service_context.h"
@@ -48,6 +49,8 @@ public:
 
     StorageEngine* getGlobalStorageEngine() override;
 
+    void createLockFile();
+
     void initializeGlobalStorageEngine() override;
 
     void shutdownGlobalStorageEngineCleanly() override;
@@ -59,52 +62,17 @@ public:
 
     StorageFactoriesIterator* makeStorageFactoriesIterator() override;
 
-    void setKillAllOperations() override;
-
-    void unsetKillAllOperations() override;
-
-    bool getKillAllOperations() override;
-
-    bool killOperation(unsigned int opId) override;
-
-    void killAllUserOperations(const OperationContext* txn) override;
-
-    void registerKillOpListener(KillOpListenerInterface* listener) override;
-
     void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
 
     OpObserver* getOpObserver() override;
 
 private:
-    std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
-
-    /**
-     * Kills the active operation on "client" if that operation is associated with operation id
-     * "opId".
-     *
-     * Returns true if an operation was killed.
-     *
-     * Must only be called by a thread owning both this service context's mutex and the
-     * client's.
-     */
-    bool _killOperationsAssociatedWithClientAndOpId_inlock(Client* client, unsigned int opId);
-
-    /**
-     * Kills the given operation.
-     *
-     * Caller must own the service context's _mutex.
-     */
-    void _killOperation_inlock(OperationContext* opCtx);
-
-    bool _globalKill;
-
-    // protected by parent class's _mutex
-    std::vector<KillOpListenerInterface*> _killOpListeners;
+    std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 
     std::unique_ptr<StorageEngineLockFile> _lockFile;
 
     // logically owned here, but never deleted by anyone.
-    StorageEngine* _storageEngine;
+    StorageEngine* _storageEngine = nullptr;
 
     // logically owned here.
     std::unique_ptr<OpObserver> _opObserver;

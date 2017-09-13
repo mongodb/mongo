@@ -14,12 +14,8 @@ for (var i = 0; i < 62; i++) {
 }
 
 // attempt to add 2 more indexes to push over the limit (64).
-var newSpecs = [
-    {key: {i62: 1 }, name: 'i62'},
-    {key: {i63: 1 }, name: 'i63'}
-];
+var newSpecs = [{key: {i62: 1}, name: 'i62'}, {key: {i63: 1}, name: 'i63'}];
 
 var res = coll.runCommand('createIndexes', {indexes: newSpecs});
 assert.commandFailed(res, tojson(res));
-assert.eq(res.code, 67); // CannotCreateIndex
-
+assert.eq(res.code, 67);  // CannotCreateIndex

@@ -8,7 +8,6 @@ from __future__ import absolute_import
 # constructing a new Logger instance should use the loggers.new_logger() function instead.
 from logging import Logger
 
-from . import config
 from . import buildlogger
 from . import flush
 from . import loggers

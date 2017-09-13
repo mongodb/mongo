@@ -30,9 +30,8 @@
 
 #include <memory>
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/net/message.h"
@@ -54,15 +53,13 @@ public:
      * Constructs an OP_COMMANDREPLY in an existing buffer. Ownership of the buffer
      * will be transfered to the CommandReplyBuilder.
      */
-    CommandReplyBuilder(std::unique_ptr<Message> message);
+    CommandReplyBuilder(Message&& message);
 
-    CommandReplyBuilder& setMetadata(BSONObj metadata) final;
-    CommandReplyBuilder& setRawCommandReply(BSONObj commandReply) final;
 
-    CommandReplyBuilder& addOutputDocs(DocumentRange outputDocs) final;
-    CommandReplyBuilder& addOutputDoc(BSONObj outputDoc) final;
+    CommandReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
+    BSONObjBuilder getInPlaceReplyBuilder(std::size_t) final;
 
-    State getState() const final;
+    CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
 
     Protocol getProtocol() const final;
 
@@ -73,16 +70,15 @@ public:
      * The behavior of calling any methods on the object is subsequently
      * undefined.
      */
-    std::unique_ptr<Message> done() final;
-
-    std::size_t availableSpaceForOutputDocs() const final;
+    Message done() final;
 
 private:
+    enum class State { kMetadata, kCommandReply, kOutputDocs, kDone };
+
     // Default values are all empty.
     BufBuilder _builder{};
-    std::unique_ptr<Message> _message;
-
-    State _state{State::kMetadata};
+    Message _message;
+    State _state{State::kCommandReply};
 };
 
 }  // namespace rpc

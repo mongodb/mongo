@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -7,6 +7,7 @@
  */
 
 #include "wt_internal.h"
+
 /*
  * __async_get_key --
  *	WT_ASYNC_OP->get_key implementation for op handles.
@@ -31,18 +32,16 @@ static void
 __async_set_key(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_CURSOR *c;
-	WT_DECL_RET;
 	va_list ap;
 
 	c = &asyncop->c;
 	va_start(ap, asyncop);
 	__wt_cursor_set_keyv(c, c->flags, ap);
 	if (!WT_DATA_IN_ITEM(&c->key) && !WT_CURSOR_RECNO(c))
-		WT_ERR(__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &c->key,
-		    c->key.data, c->key.size));
+		c->saved_err = __wt_buf_set(
+		    O2S((WT_ASYNC_OP_IMPL *)asyncop),
+		    &c->key, c->key.data, c->key.size);
 	va_end(ap);
-	if (0)
-err:		c->saved_err = ret;
 }
 
 /*
@@ -69,7 +68,6 @@ static void
 __async_set_value(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_CURSOR *c;
-	WT_DECL_RET;
 	va_list ap;
 
 	c = &asyncop->c;
@@ -77,11 +75,10 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 	__wt_cursor_set_valuev(c, ap);
 	/* Copy the data, if it is pointing at data elsewhere. */
 	if (!WT_DATA_IN_ITEM(&c->value))
-		WT_ERR(__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop),
-		    &c->value, c->value.data, c->value.size));
+		c->saved_err = __wt_buf_set(
+		    O2S((WT_ASYNC_OP_IMPL *)asyncop),
+		    &c->value, c->value.data, c->value.size);
 	va_end(ap);
-	if (0)
-err:		c->saved_err = ret;
 }
 
 /*
@@ -108,7 +105,7 @@ __async_search(WT_ASYNC_OP *asyncop)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, search);
-	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_search);
+	WT_STAT_CONN_INCR(O2S(op), async_op_search);
 	WT_ERR(__async_op_wrap(op, WT_AOP_SEARCH));
 err:	API_END_RET(session, ret);
 }
@@ -126,7 +123,7 @@ __async_insert(WT_ASYNC_OP *asyncop)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, insert);
-	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_insert);
+	WT_STAT_CONN_INCR(O2S(op), async_op_insert);
 	WT_ERR(__async_op_wrap(op, WT_AOP_INSERT));
 err:	API_END_RET(session, ret);
 }
@@ -144,7 +141,7 @@ __async_update(WT_ASYNC_OP *asyncop)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, update);
-	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_update);
+	WT_STAT_CONN_INCR(O2S(op), async_op_update);
 	WT_ERR(__async_op_wrap(op, WT_AOP_UPDATE));
 err:	API_END_RET(session, ret);
 }
@@ -162,7 +159,7 @@ __async_remove(WT_ASYNC_OP *asyncop)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, remove);
-	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_remove);
+	WT_STAT_CONN_INCR(O2S(op), async_op_remove);
 	WT_ERR(__async_op_wrap(op, WT_AOP_REMOVE));
 err:	API_END_RET(session, ret);
 }
@@ -180,7 +177,7 @@ __async_compact(WT_ASYNC_OP *asyncop)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, compact);
-	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_compact);
+	WT_STAT_CONN_INCR(O2S(op), async_op_compact);
 	WT_ERR(__async_op_wrap(op, WT_AOP_COMPACT));
 err:	API_END_RET(session, ret);
 }
@@ -209,7 +206,7 @@ __async_get_type(WT_ASYNC_OP *asyncop)
  * __async_op_init --
  *	Initialize all the op handle fields.
  */
-static int
+static void
 __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 {
 	WT_ASYNC_OP *asyncop;
@@ -237,7 +234,7 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	asyncop->c.set_key = __wt_cursor_set_key;
 	asyncop->c.get_value = __wt_cursor_get_value;
 	asyncop->c.set_value = __wt_cursor_set_value;
-	asyncop->c.recno = 0;
+	asyncop->c.recno = WT_RECNO_OOB;
 	memset(asyncop->c.raw_recno_buf, 0, sizeof(asyncop->c.raw_recno_buf));
 	memset(&asyncop->c.key, 0, sizeof(asyncop->c.key));
 	memset(&asyncop->c.value, 0, sizeof(asyncop->c.value));
@@ -247,7 +244,6 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 
 	op->internal_id = id;
 	op->state = WT_ASYNCOP_FREE;
-	return (0);
 }
 
 /*
@@ -259,7 +255,6 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	uint64_t cur_head, cur_tail, my_alloc, my_slot;
 #ifdef	HAVE_DIAGNOSTIC
 	WT_ASYNC_OP_IMPL *my_op;
@@ -280,7 +275,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 	 * Enqueue op at the tail of the work queue.
 	 * We get our slot in the ring buffer to use.
 	 */
-	my_alloc = WT_ATOMIC_ADD8(async->alloc_head, 1);
+	my_alloc = __wt_atomic_add64(&async->alloc_head, 1);
 	my_slot = my_alloc % async->async_qsize;
 
 	/*
@@ -300,7 +295,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 #endif
 	WT_PUBLISH(async->async_queue[my_slot], op);
 	op->state = WT_ASYNCOP_ENQUEUED;
-	if (WT_ATOMIC_ADD4(async->cur_queue, 1) > async->max_queue)
+	if (__wt_atomic_add32(&async->cur_queue, 1) > async->max_queue)
 		WT_PUBLISH(async->max_queue, async->cur_queue);
 	/*
 	 * Multiple threads may be adding ops to the queue.  We need to wait
@@ -312,7 +307,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 		WT_ORDERED_READ(cur_head, async->head);
 	}
 	WT_PUBLISH(async->head, my_alloc);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -334,7 +329,7 @@ __wt_async_op_init(WT_SESSION_IMPL *session)
 	/*
 	 * Initialize the flush op structure.
 	 */
-	WT_RET(__async_op_init(conn, &async->flush_op, OPS_INVALID_INDEX));
+	__async_op_init(conn, &async->flush_op, OPS_INVALID_INDEX);
 
 	/*
 	 * Allocate and initialize the work queue.  This is sized so that
@@ -350,17 +345,11 @@ __wt_async_op_init(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_calloc_def(session, conn->async_size, &async->async_ops));
 	for (i = 0; i < conn->async_size; i++) {
 		op = &async->async_ops[i];
-		WT_ERR(__async_op_init(conn, op, i));
+		__async_op_init(conn, op, i);
 	}
 	return (0);
-err:
-	if (async->async_ops != NULL) {
-		__wt_free(session, async->async_ops);
-		async->async_ops = NULL;
-	}
-	if (async->async_queue != NULL) {
-		__wt_free(session, async->async_queue);
-		async->async_queue = NULL;
-	}
+
+err:	__wt_free(session, async->async_ops);
+	__wt_free(session, async->async_queue);
 	return (ret);
 }

@@ -1,0 +1,24 @@
+functions:
+  "fetch source" :
+    - command: git.get_project
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          echo "Scripts to generate time zone zip file goes here"
+          ls
+tasks:
+- name: compile
+  depends_on: []
+  commands:
+    - func: "fetch source"
+
+buildvariants:
+- name: linux-64
+  display_name: Linux
+  run_on:
+  - rhel62-small
+  tasks:
+  - name: compile

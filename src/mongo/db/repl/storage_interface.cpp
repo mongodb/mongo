@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,17 +26,40 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
 
-StorageInterface::StorageInterface() {}
-StorageInterface::~StorageInterface() {}
+
+namespace {
+const auto getStorageInterface =
+    ServiceContext::declareDecoration<std::unique_ptr<StorageInterface>>();
+}
+
+StorageInterface* StorageInterface::get(ServiceContext* service) {
+    return getStorageInterface(service).get();
+}
+
+StorageInterface* StorageInterface::get(ServiceContext& service) {
+    return getStorageInterface(service).get();
+}
+
+StorageInterface* StorageInterface::get(OperationContext* opCtx) {
+    return get(opCtx->getClient()->getServiceContext());
+}
+
+
+void StorageInterface::set(ServiceContext* service, std::unique_ptr<StorageInterface> storage) {
+    auto& storageInterface = getStorageInterface(service);
+    storageInterface = std::move(storage);
+}
 
 }  // namespace repl
 }  // namespace mongo

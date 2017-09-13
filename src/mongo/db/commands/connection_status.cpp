@@ -38,13 +38,13 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class CmdConnectionStatus : public Command {
+class CmdConnectionStatus : public BasicCommand {
 public:
-    CmdConnectionStatus() : Command("connectionStatus") {}
+    CmdConnectionStatus() : BasicCommand("connectionStatus") {}
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
@@ -55,13 +55,11 @@ public:
         h << "Returns connection-specific information such as logged-in users and their roles";
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string&,
-             BSONObj& cmdObj,
-             int,
-             string& errmsg,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        AuthorizationSession* authSession = AuthorizationSession::get(ClientBasic::getCurrent());
+        AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
 
         bool showPrivileges;
         Status status =

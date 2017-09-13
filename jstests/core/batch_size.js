@@ -32,6 +32,11 @@ assert.eq(2, t.find().sort({a: 1}).limit(2).itcount(), 'D');
 assert.eq(4, t.find().batchSize(2).itcount(), 'E');
 assert.eq(4, t.find().sort({a: 1}).batchSize(2).itcount(), 'F');
 
+// With negative batchSize. A negative batchSize value instructs the server
+// to return just a single batch of results.
+assert.eq(1, t.find().batchSize(-1).itcount(), 'G');
+assert.eq(2, t.find().batchSize(-2).itcount(), 'H');
+
 // Run the tests with the index twice in order to double check plan caching.
 t.ensureIndex({a: 1});
 for (var i = 0; i < 2; i++) {
@@ -76,9 +81,7 @@ assert.lte(explain.executionStats.totalKeysExamined, 60, 'S');
 assert.lte(explain.executionStats.totalDocsExamined, 60, 'T');
 assert.eq(explain.executionStats.nReturned, 6, 'U');
 
-
 // -------
-
 
 // During plan ranking, we treat ntoreturn as a limit. This prevents us from buffering
 // too much data in a blocking sort stage during plan ranking.
@@ -86,7 +89,9 @@ t.drop();
 
 // Generate big string to use in the object - 1MB+ String
 var bigStr = "ABCDEFGHIJKLMNBOPQRSTUVWXYZ012345687890";
-while (bigStr.length < 1000000) { bigStr = bigStr + "::" + bigStr; }
+while (bigStr.length < 1000000) {
+    bigStr = bigStr + "::" + bigStr;
+}
 
 // Insert enough documents to exceed the 32 MB in-memory sort limit.
 for (var i = 0; i < 40; i++) {

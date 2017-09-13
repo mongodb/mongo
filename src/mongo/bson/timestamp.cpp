@@ -25,21 +25,24 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/bsontypes.h"
 
+#include <cstdint>
 #include <ctime>
 #include <iostream>
 #include <limits>
 #include <sstream>
 
-#include "mongo/platform/cstdint.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
+const Timestamp Timestamp::kAllowUnstableCheckpointsSentinel = Timestamp(0, 1);
+
 Timestamp Timestamp::max() {
-    unsigned int t = static_cast<unsigned int>(std::numeric_limits<int32_t>::max());
+    unsigned int t = static_cast<unsigned int>(std::numeric_limits<uint32_t>::max());
     unsigned int i = std::numeric_limits<uint32_t>::max();
     return Timestamp(t, i);
 }
@@ -69,5 +72,12 @@ std::string Timestamp::toString() const {
     std::stringstream ss;
     ss << std::hex << secs << ':' << i;
     return ss.str();
+}
+
+
+BSONObj Timestamp::toBSON() const {
+    BSONObjBuilder bldr;
+    bldr.append("", *this);
+    return bldr.obj();
 }
 }

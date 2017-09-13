@@ -1,5 +1,5 @@
 /*
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,13 +26,13 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/stdx/memory.h"
 
 
 // This file provides mock initialization for tests which depend upon,
@@ -41,6 +41,7 @@
 
 namespace mongo {
 namespace {
+
 std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMock() {
     return stdx::make_unique<AuthzManagerExternalStateMock>();
 }
@@ -50,9 +51,5 @@ MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory)(InitializerContext* c
     return Status::OK();
 }
 
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-    return Status::OK();
-}
-}
-}
+}  // namespace
+}  // namespace mongo

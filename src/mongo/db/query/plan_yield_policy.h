@@ -30,27 +30,33 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 
+class ClockSource;
 class RecordFetcher;
 
 class PlanYieldPolicy {
 public:
-    /**
-     * If policy == WRITE_CONFLICT_RETRY_ONLY, shouldYield will only return true after
-     * forceYield has been called, and yield will only abandonSnapshot without releasing any
-     * locks.
-     */
+    virtual ~PlanYieldPolicy() {}
+
     PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
+
+    /**
+     * Only used in dbtests since we don't have access to a PlanExecutor. Since we don't have
+     * access to the PlanExecutor to grab a ClockSource from, we pass in a ClockSource directly
+     * in the constructor instead.
+     */
+    PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* cs);
 
     /**
      * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.
      * PlanExecutors give up their locks periodically in order to be fair to other
      * threads.
      */
-    bool shouldYield();
+    virtual bool shouldYield();
 
     /**
      * Resets the yield timer so that we wait for a while before yielding again.
@@ -58,36 +64,80 @@ public:
     void resetTimer();
 
     /**
-     * Used to cause a plan executor to give up locks and go to sleep. The PlanExecutor
-     * must *not* be in saved state. Handles calls to save/restore state internally.
+     * Used to cause a plan executor to release locks or storage engine state. The PlanExecutor must
+     * *not* be in saved state. Handles calls to save/restore state internally.
      *
      * If 'fetcher' is non-NULL, then we are yielding because the storage engine told us
      * that we will page fault on this record. We use 'fetcher' to retrieve the record
      * after we give up our locks.
      *
-     * Returns true if the executor was restored successfully and is still alive. Returns false
-     * if the executor got killed during yield.
+     * Returns Status::OK() if the executor was restored successfully and is still alive. Returns
+     * ErrorCodes::QueryPlanKilled if the executor got killed during yield, and
+     * ErrorCodes::ExceededTimeLimit if the operation has exceeded the time limit.
      */
-    bool yield(RecordFetcher* fetcher = NULL);
+    virtual Status yield(RecordFetcher* fetcher = NULL);
 
     /**
-     * All calls to shouldYield will return true until the next call to yield.
+     * More generic version of yield() above.  This version calls 'beforeYieldingFn' immediately
+     * before locks are yielded (if they are), and 'whileYieldingFn' before locks are restored.
+     */
+    virtual Status yield(stdx::function<void()> beforeYieldingFn,
+                         stdx::function<void()> whileYieldingFn);
+
+    /**
+     * All calls to shouldYield() will return true until the next call to yield.
      */
     void forceYield() {
-        dassert(allowedToYield());
+        dassert(canAutoYield());
         _forceYield = true;
     }
 
-    bool allowedToYield() const {
-        return _policy != PlanExecutor::YIELD_MANUAL;
+    /**
+     * Returns true if there is a possibility that a collection lock will be yielded at some point
+     * during this PlanExecutor's lifetime.
+     */
+    bool canReleaseLocksDuringExecution() const {
+        switch (_policy) {
+            case PlanExecutor::YIELD_AUTO:
+            case PlanExecutor::YIELD_MANUAL:
+            case PlanExecutor::ALWAYS_TIME_OUT:
+            case PlanExecutor::ALWAYS_MARK_KILLED: {
+                return true;
+            }
+            case PlanExecutor::NO_YIELD:
+            case PlanExecutor::WRITE_CONFLICT_RETRY_ONLY: {
+                return false;
+            }
+        }
+        MONGO_UNREACHABLE;
     }
 
-    void setPolicy(PlanExecutor::YieldPolicy policy) {
-        _policy = policy;
+    /**
+     * Returns true if this yield policy performs automatic yielding. Note 'yielding' here refers to
+     * either releasing storage engine resources via abandonSnapshot() OR yielding LockManager
+     * locks.
+     */
+    bool canAutoYield() const {
+        switch (_policy) {
+            case PlanExecutor::YIELD_AUTO:
+            case PlanExecutor::WRITE_CONFLICT_RETRY_ONLY:
+            case PlanExecutor::ALWAYS_TIME_OUT:
+            case PlanExecutor::ALWAYS_MARK_KILLED: {
+                return true;
+            }
+            case PlanExecutor::NO_YIELD:
+            case PlanExecutor::YIELD_MANUAL:
+                return false;
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    PlanExecutor::YieldPolicy getPolicy() const {
+        return _policy;
     }
 
 private:
-    PlanExecutor::YieldPolicy _policy;
+    const PlanExecutor::YieldPolicy _policy;
 
     bool _forceYield;
     ElapsedTracker _elapsedTracker;

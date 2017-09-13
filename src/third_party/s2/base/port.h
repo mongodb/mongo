@@ -685,8 +685,9 @@ extern inline void prefetch(const char *x) {}
 
 #endif  // !HAVE_ATTRIBUTE_SECTION
 
-#if defined __sun || defined _WIN32
-inline double drem(double x, double y) {
+// MongoDB modification: All of our target platforms define the C99 remainder function.
+#if 0
+inline double remainder(double x, double y) {
     double quot = x/y;
     int iquot;
     // If quot is slightly less than 0.5, we round down explicitly.  We have to

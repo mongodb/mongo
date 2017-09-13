@@ -10,13 +10,12 @@ for (var i = 0; i < 1000; i++) {
 
 // Mock a long-running count operation by sleeping for each of
 // the documents in the collection.
-s = startParallelShell(
-    "db.jstests_count_plan_summary.find({x: 1, $where: 'sleep(100)'}).count()"
-);
+var awaitShell =
+    startParallelShell("db.jstests_count_plan_summary.find({x: 1, $where: 'sleep(100)'}).count()");
 
 // Find the count op in db.currentOp() and check for the plan summary.
 assert.soon(function() {
-    var current = db.currentOp({ns: t.getFullName(), "query.count": t.getName()});
+    var current = db.currentOp({ns: t.getFullName(), "command.count": t.getName()});
 
     assert("inprog" in current);
     if (current.inprog.length === 0) {
@@ -44,4 +43,5 @@ assert.soon(function() {
     return true;
 });
 
-s();
+var exitCode = awaitShell({checkExitSuccess: false});
+assert.neq(0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");

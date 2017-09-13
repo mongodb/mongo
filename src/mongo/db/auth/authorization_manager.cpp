@@ -32,7 +32,6 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 
-#include <boost/bind.hpp>
 #include <memory>
 #include <string>
 #include <vector>
@@ -44,9 +43,11 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
@@ -54,6 +55,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/memory.h"
@@ -64,14 +66,17 @@
 
 namespace mongo {
 
+using std::begin;
+using std::end;
 using std::endl;
+using std::back_inserter;
 using std::string;
 using std::vector;
 
 AuthInfo internalSecurity;
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser,
-                                     MONGO_NO_PREREQUISITES)(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser, ("EndStartupOptionStorage"))
+(InitializerContext* const context) try {
     User* user = new User(UserName("__system", "local"));
 
     user->incrementRefCount();  // Pin this user so the ref count never drops below 1.
@@ -80,9 +85,26 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser,
     PrivilegeVector privileges;
     RoleGraph::generateUniversalPrivileges(&privileges);
     user->addPrivileges(privileges);
+
+    if (mongodGlobalParams.whitelistedClusterNetwork) {
+        const auto& whitelist = *mongodGlobalParams.whitelistedClusterNetwork;
+
+        auto restriction = stdx::make_unique<ClientSourceRestriction>(whitelist);
+        auto restrictionSet = stdx::make_unique<RestrictionSet<>>(std::move(restriction));
+        auto restrictionDocument =
+            stdx::make_unique<RestrictionDocument<>>(std::move(restrictionSet));
+
+        RestrictionDocuments clusterWhiteList(std::move(restrictionDocument));
+
+        user->setRestrictions(std::move(clusterWhiteList));
+    }
+
+
     internalSecurity.user = user;
 
     return Status::OK();
+} catch (...) {
+    return exceptionToStatus();
 }
 
 const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
@@ -103,17 +125,18 @@ const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.sy
 const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace("admin.tempusers");
 const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace("admin.temproles");
 
+const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
+                                                              "Authentication failed.");
+
 const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id"
                                                                 << "authSchema");
 
 const std::string AuthorizationManager::schemaVersionFieldName = "currentVersion";
 
-#ifndef _MSC_EXTENSIONS
 const int AuthorizationManager::schemaVersion24;
 const int AuthorizationManager::schemaVersion26Upgrade;
 const int AuthorizationManager::schemaVersion26Final;
 const int AuthorizationManager::schemaVersion28SCRAM;
-#endif
 
 /**
  * Guard object for synchronizing accesses to data cached in AuthorizationManager instances.
@@ -269,18 +292,26 @@ std::unique_ptr<AuthorizationSession> AuthorizationManager::makeAuthorizationSes
         _externalState->makeAuthzSessionExternalState(this));
 }
 
-Status AuthorizationManager::getAuthorizationVersion(OperationContext* txn, int* version) {
+void AuthorizationManager::setShouldValidateAuthSchemaOnStartup(bool validate) {
+    _startupAuthSchemaValidation = validate;
+}
+
+bool AuthorizationManager::shouldValidateAuthSchemaOnStartup() {
+    return _startupAuthSchemaValidation;
+}
+
+Status AuthorizationManager::getAuthorizationVersion(OperationContext* opCtx, int* version) {
     CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
     int newVersion = _version;
     if (schemaVersionInvalid == newVersion) {
         while (guard.otherUpdateInFetchPhase())
             guard.wait();
         guard.beginFetchPhase();
-        Status status = _externalState->getStoredAuthorizationVersion(txn, &newVersion);
+        Status status = _externalState->getStoredAuthorizationVersion(opCtx, &newVersion);
         guard.endFetchPhase();
         if (!status.isOK()) {
             warning() << "Problem fetching the stored schema version of authorization data: "
-                      << status;
+                      << redact(status);
             *version = schemaVersionInvalid;
             return status;
         }
@@ -306,7 +337,7 @@ bool AuthorizationManager::isAuthEnabled() const {
     return _authEnabled;
 }
 
-bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) {
+bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_privilegeDocsExistMutex);
     if (_privilegeDocsExist) {
         // If we know that a user exists, don't re-check.
@@ -314,7 +345,7 @@ bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) {
     }
 
     lk.unlock();
-    bool privDocsExist = _externalState->hasAnyPrivilegeDocuments(txn);
+    bool privDocsExist = _externalState->hasAnyPrivilegeDocuments(opCtx);
     lk.lock();
 
     if (privDocsExist) {
@@ -332,7 +363,7 @@ Status AuthorizationManager::getBSONForPrivileges(const PrivilegeVector& privile
         if (!ParsedPrivilege::privilegeToParsedPrivilege(*it, &privilege, &errmsg)) {
             return Status(ErrorCodes::BadValue, errmsg);
         }
-        resultArray.appendObject("privileges", privilege.toBSON());
+        resultArray.appendObject("privileges", privilege.toBSON()).transitional_ignore();
     }
     return Status::OK();
 }
@@ -346,14 +377,14 @@ Status AuthorizationManager::getBSONForRole(RoleGraph* graph,
                                                 << "does not name an existing role");
     }
     std::string id = mongoutils::str::stream() << roleName.getDB() << "." << roleName.getRole();
-    result.appendString("_id", id);
-    result.appendString(ROLE_NAME_FIELD_NAME, roleName.getRole());
-    result.appendString(ROLE_DB_FIELD_NAME, roleName.getDB());
+    result.appendString("_id", id).transitional_ignore();
+    result.appendString(ROLE_NAME_FIELD_NAME, roleName.getRole()).transitional_ignore();
+    result.appendString(ROLE_DB_FIELD_NAME, roleName.getDB()).transitional_ignore();
 
     // Build privileges array
     mutablebson::Element privilegesArrayElement =
         result.getDocument().makeElementArray("privileges");
-    result.pushBack(privilegesArrayElement);
+    result.pushBack(privilegesArrayElement).transitional_ignore();
     const PrivilegeVector& privileges = graph->getDirectPrivileges(roleName);
     Status status = getBSONForPrivileges(privileges, privilegesArrayElement);
     if (!status.isOK()) {
@@ -362,14 +393,14 @@ Status AuthorizationManager::getBSONForRole(RoleGraph* graph,
 
     // Build roles array
     mutablebson::Element rolesArrayElement = result.getDocument().makeElementArray("roles");
-    result.pushBack(rolesArrayElement);
+    result.pushBack(rolesArrayElement).transitional_ignore();
     for (RoleNameIterator roles = graph->getDirectSubordinates(roleName); roles.more();
          roles.next()) {
         const RoleName& subRole = roles.get();
         mutablebson::Element roleObj = result.getDocument().makeElementObject("");
-        roleObj.appendString(ROLE_NAME_FIELD_NAME, subRole.getRole());
-        roleObj.appendString(ROLE_DB_FIELD_NAME, subRole.getDB());
-        rolesArrayElement.pushBack(roleObj);
+        roleObj.appendString(ROLE_NAME_FIELD_NAME, subRole.getRole()).transitional_ignore();
+        roleObj.appendString(ROLE_DB_FIELD_NAME, subRole.getDB()).transitional_ignore();
+        rolesArrayElement.pushBack(roleObj).transitional_ignore();
     }
 
     return Status::OK();
@@ -384,8 +415,8 @@ Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
                       mongoutils::str::stream() << "User name from privilege document \""
                                                 << userName
                                                 << "\" doesn't match name of provided User \""
-                                                << user->getName().getUser() << "\"",
-                      0);
+                                                << user->getName().getUser()
+                                                << "\"");
     }
 
     Status status = parser.initializeUserCredentialsFromUserDocument(user, privDoc);
@@ -404,31 +435,48 @@ Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
     if (!status.isOK()) {
         return status;
     }
+    status = parser.initializeAuthenticationRestrictionsFromUserDocument(privDoc, user);
+    if (!status.isOK()) {
+        return status;
+    }
 
     return Status::OK();
 }
 
-Status AuthorizationManager::getUserDescription(OperationContext* txn,
+Status AuthorizationManager::getUserDescription(OperationContext* opCtx,
                                                 const UserName& userName,
                                                 BSONObj* result) {
-    return _externalState->getUserDescription(txn, userName, result);
+    return _externalState->getUserDescription(opCtx, userName, result);
 }
 
-Status AuthorizationManager::getRoleDescription(const RoleName& roleName,
-                                                bool showPrivileges,
+Status AuthorizationManager::getRoleDescription(OperationContext* opCtx,
+                                                const RoleName& roleName,
+                                                PrivilegeFormat privileges,
+                                                AuthenticationRestrictionsFormat restrictions,
                                                 BSONObj* result) {
-    return _externalState->getRoleDescription(roleName, showPrivileges, result);
+    return _externalState->getRoleDescription(opCtx, roleName, privileges, restrictions, result);
 }
 
-Status AuthorizationManager::getRoleDescriptionsForDB(const std::string dbname,
-                                                      bool showPrivileges,
+Status AuthorizationManager::getRolesDescription(OperationContext* opCtx,
+                                                 const std::vector<RoleName>& roleName,
+                                                 PrivilegeFormat privileges,
+                                                 AuthenticationRestrictionsFormat restrictions,
+                                                 BSONObj* result) {
+    return _externalState->getRolesDescription(opCtx, roleName, privileges, restrictions, result);
+}
+
+
+Status AuthorizationManager::getRoleDescriptionsForDB(OperationContext* opCtx,
+                                                      const std::string dbname,
+                                                      PrivilegeFormat privileges,
+                                                      AuthenticationRestrictionsFormat restrictions,
                                                       bool showBuiltinRoles,
                                                       vector<BSONObj>* result) {
     return _externalState->getRoleDescriptionsForDB(
-        dbname, showPrivileges, showBuiltinRoles, result);
+        opCtx, dbname, privileges, restrictions, showBuiltinRoles, result);
 }
 
-Status AuthorizationManager::acquireUser(OperationContext* txn,
+Status AuthorizationManager::acquireUser(OperationContext* opCtx,
                                          const UserName& userName,
                                          User** acquiredUser) {
     if (userName == internalSecurity.user->getName()) {
@@ -465,7 +513,7 @@ Status AuthorizationManager::acquireUser(OperationContext* txn,
     Status status = Status::OK();
     for (int i = 0; i < maxAcquireRetries; ++i) {
         if (authzVersion == schemaVersionInvalid) {
-            Status status = _externalState->getStoredAuthorizationVersion(txn, &authzVersion);
+            Status status = _externalState->getStoredAuthorizationVersion(opCtx, &authzVersion);
             if (!status.isOK())
                 return status;
         }
@@ -480,12 +528,13 @@ Status AuthorizationManager::acquireUser(OperationContext* txn,
             case schemaVersion28SCRAM:
             case schemaVersion26Final:
             case schemaVersion26Upgrade:
-                status = _fetchUserV2(txn, userName, &user);
+                status = _fetchUserV2(opCtx, userName, &user);
                 break;
             case schemaVersion24:
                 status = Status(ErrorCodes::AuthSchemaIncompatible,
                                 mongoutils::str::stream()
-                                    << "Authorization data schema version " << schemaVersion24
+                                    << "Authorization data schema version "
+                                    << schemaVersion24
                                     << " not supported after MongoDB version 2.6.");
                 break;
         }
@@ -518,18 +567,18 @@ Status AuthorizationManager::acquireUser(OperationContext* txn,
     return Status::OK();
 }
 
-Status AuthorizationManager::_fetchUserV2(OperationContext* txn,
+Status AuthorizationManager::_fetchUserV2(OperationContext* opCtx,
                                           const UserName& userName,
                                           std::unique_ptr<User>* acquiredUser) {
     BSONObj userObj;
-    Status status = getUserDescription(txn, userName, &userObj);
+    Status status = getUserDescription(opCtx, userName, &userObj);
     if (!status.isOK()) {
         return status;
     }
 
     // Put the new user into an unique_ptr temporarily in case there's an error while
     // initializing the user.
-    std::unique_ptr<User> user(new User(userName));
+    auto user = stdx::make_unique<User>(userName);
 
     status = _initializeUserFromPrivilegeDocument(user.get(), userObj);
     if (!status.isOK()) {
@@ -602,9 +651,9 @@ void AuthorizationManager::_invalidateUserCache_inlock() {
     _version = schemaVersionInvalid;
 }
 
-Status AuthorizationManager::initialize(OperationContext* txn) {
+Status AuthorizationManager::initialize(OperationContext* opCtx) {
     invalidateUserCache();
-    Status status = _externalState->initialize(txn);
+    Status status = _externalState->initialize(opCtx);
     if (!status.isOK())
         return status;
 
@@ -612,10 +661,10 @@ Status AuthorizationManager::initialize(OperationContext* txn) {
 }
 
 namespace {
-bool isAuthzNamespace(StringData ns) {
-    return (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
-            ns == AuthorizationManager::usersCollectionNamespace.ns() ||
-            ns == AuthorizationManager::versionCollectionNamespace.ns());
+bool isAuthzNamespace(const NamespaceString& nss) {
+    return (nss == AuthorizationManager::rolesCollectionNamespace ||
+            nss == AuthorizationManager::usersCollectionNamespace ||
+            nss == AuthorizationManager::versionCollectionNamespace);
 }
 
 bool isAuthzCollection(StringData coll) {
@@ -624,8 +673,8 @@ bool isAuthzCollection(StringData coll) {
             coll == AuthorizationManager::versionCollectionNamespace.coll());
 }
 
-bool loggedCommandOperatesOnAuthzData(const char* ns, const BSONObj& cmdObj) {
-    if (ns != AuthorizationManager::adminCommandNamespace.ns())
+bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj& cmdObj) {
+    if (nss != AuthorizationManager::adminCommandNamespace)
         return false;
     const StringData cmdName(cmdObj.firstElement().fieldNameStringData());
     if (cmdName == "drop") {
@@ -644,16 +693,16 @@ bool loggedCommandOperatesOnAuthzData(const char* ns, const BSONObj& cmdObj) {
     }
 }
 
-bool appliesToAuthzData(const char* op, const char* ns, const BSONObj& o) {
+bool appliesToAuthzData(const char* op, const NamespaceString& nss, const BSONObj& o) {
     switch (*op) {
         case 'i':
         case 'u':
         case 'd':
             if (op[1] != '\0')
                 return false;  // "db" op type
-            return isAuthzNamespace(ns);
+            return isAuthzNamespace(nss);
         case 'c':
-            return loggedCommandOperatesOnAuthzData(ns, o);
+            return loggedCommandOperatesOnAuthzData(nss, o);
             break;
         case 'n':
             return false;
@@ -670,7 +719,8 @@ StatusWith<UserName> extractUserNameFromIdString(StringData idstr) {
         return StatusWith<UserName>(ErrorCodes::FailedToParse,
                                     mongoutils::str::stream()
                                         << "_id entries for user documents must be of "
-                                           "the form <dbname>.<username>.  Found: " << idstr);
+                                           "the form <dbname>.<username>.  Found: "
+                                        << idstr);
     }
     return StatusWith<UserName>(
         UserName(idstr.substr(splitPoint + 1), idstr.substr(0, splitPoint)));
@@ -683,11 +733,11 @@ void AuthorizationManager::_updateCacheGeneration_inlock() {
 }
 
 void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
-                                                        const char* ns,
+                                                        const NamespaceString& ns,
                                                         const BSONObj& o,
                                                         const BSONObj* o2) {
-    if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
-        ns == AuthorizationManager::versionCollectionNamespace.ns()) {
+    if (ns == AuthorizationManager::rolesCollectionNamespace ||
+        ns == AuthorizationManager::versionCollectionNamespace) {
         invalidateUserCache();
         return;
     }
@@ -695,7 +745,7 @@ void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
     if (*op == 'i' || *op == 'd' || *op == 'u') {
         // If you got into this function isAuthzNamespace() must have returned true, and we've
         // already checked that it's not the roles or version collection.
-        invariant(ns == AuthorizationManager::usersCollectionNamespace.ns());
+        invariant(ns == AuthorizationManager::usersCollectionNamespace);
 
         StatusWith<UserName> userName = (*op == 'u')
             ? extractUserNameFromIdString((*o2)["_id"].str())
@@ -703,7 +753,8 @@ void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
 
         if (!userName.isOK()) {
             warning() << "Invalidating user cache based on user being updated failed, will "
-                         "invalidate the entire cache instead: " << userName.getStatus() << endl;
+                         "invalidate the entire cache instead: "
+                      << userName.getStatus();
             invalidateUserCache();
             return;
         }
@@ -713,11 +764,14 @@ void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
     }
 }
 
-void AuthorizationManager::logOp(
-    OperationContext* txn, const char* op, const char* ns, const BSONObj& o, BSONObj* o2) {
-    _externalState->logOp(txn, op, ns, o, o2);
-    if (appliesToAuthzData(op, ns, o)) {
-        _invalidateRelevantCacheData(op, ns, o, o2);
+void AuthorizationManager::logOp(OperationContext* opCtx,
+                                 const char* op,
+                                 const NamespaceString& nss,
+                                 const BSONObj& o,
+                                 const BSONObj* o2) {
+    if (appliesToAuthzData(op, nss, o)) {
+        _externalState->logOp(opCtx, op, nss, o, o2);
+        _invalidateRelevantCacheData(op, nss, o, o2);
     }
 }
 

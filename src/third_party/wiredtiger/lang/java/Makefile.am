@@ -18,6 +18,7 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/AsyncOpType.java \
 		$(JAVADESTFULL)/Connection.java \
 		$(JAVADESTFULL)/Cursor.java \
+		$(JAVADESTFULL)/Modify.java \
 		$(JAVADESTFULL)/SearchStatus.java \
 		$(JAVADESTFULL)/PackFormatInputStream.java \
 		$(JAVADESTFULL)/PackInputStream.java \
@@ -31,6 +32,7 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
 		$(JAVADESTFULL)/wiredtigerJNI.java \
+		$(JAVADESTFULL)/WT_MODIFY_LIST.java \
 		$(JAVAEXAMPLES)/ex_access.java \
 		$(JAVAEXAMPLES)/ex_all.java \
 		$(JAVAEXAMPLES)/ex_async.java \
@@ -44,10 +46,16 @@ JAVA_SRC = \
 JAVA_JUNIT = \
 		$(JAVATEST)/AutoCloseTest.java \
 		$(JAVATEST)/AsyncTest.java \
+		$(JAVATEST)/BackupCursorTest.java \
+		$(JAVATEST)/ConfigTest.java \
+		$(JAVATEST)/ConcurrentCloseTest.java \
 		$(JAVATEST)/CursorTest.java \
 		$(JAVATEST)/CursorTest02.java \
+		$(JAVATEST)/CursorTest03.java \
 		$(JAVATEST)/ExceptionTest.java \
 		$(JAVATEST)/PackTest.java \
+		$(JAVATEST)/PackTest02.java \
+		$(JAVATEST)/PackTest03.java \
 		$(JAVATEST)/WiredTigerSuite.java
 
 dist_java_JAVA = $(JAVA_SRC) @JAVA_JUNIT@

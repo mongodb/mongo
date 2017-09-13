@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -12,7 +12,7 @@ const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
 const char *usage_prefix = "[-LRVv] [-C config] [-E secretkey] [-h home]";
-int verbose;					/* Verbose flag */
+bool verbose = false;				/* Verbose flag */
 
 static const char *command;			/* Command name */
 
@@ -20,7 +20,44 @@ static const char *command;			/* Command name */
 #define	REC_LOGOFF	"log=(enabled=false)"
 #define	REC_RECOVER	"log=(recover=on)"
 
-static int usage(void);
+static void
+usage(void)
+{
+	fprintf(stderr,
+	    "WiredTiger Data Engine (version %d.%d)\n",
+	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
+	fprintf(stderr,
+	    "global options:\n"
+	    "\t" "-C\t" "wiredtiger_open configuration\n"
+	    "\t" "-h\t" "database directory\n"
+	    "\t" "-L\t" "turn logging off for debug-mode\n"
+	    "\t" "-R\t" "run recovery if configured\n"
+	    "\t" "-V\t" "display library version and exit\n"
+	    "\t" "-v\t" "verbose\n");
+	fprintf(stderr,
+	    "commands:\n"
+	    "\t" "alter\t  alter an object\n"
+	    "\t" "backup\t  database backup\n"
+	    "\t" "compact\t  compact an object\n"
+	    "\t" "copyright copyright information\n"
+	    "\t" "create\t  create an object\n"
+	    "\t" "downgrade\t  downgrade an database\n"
+	    "\t" "drop\t  drop an object\n"
+	    "\t" "dump\t  dump an object\n"
+	    "\t" "list\t  list database objects\n"
+	    "\t" "load\t  load an object\n"
+	    "\t" "loadtext  load an object from a text file\n"
+	    "\t" "printlog  display the database log\n"
+	    "\t" "read\t  read values from an object\n"
+	    "\t" "rebalance rebalance an object\n"
+	    "\t" "rename\t  rename an object\n"
+	    "\t" "salvage\t  salvage a file\n"
+	    "\t" "stat\t  display statistics for an object\n"
+	    "\t" "truncate  truncate an object, removing all content\n"
+	    "\t" "upgrade\t  upgrade an object\n"
+	    "\t" "verify\t  verify an object\n"
+	    "\t" "write\t  write values to an object\n");
+}
 
 int
 main(int argc, char *argv[])
@@ -30,13 +67,13 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
-	int logoff, recover;
+	int (*cfunc)(WT_SESSION *, WT_CONNECTION *, int, char *[]);
+	bool logoff, needconn, recover;
 	char *p, *secretkey;
 	const char *cmd_config, *config, *p1, *p2, *p3, *rec_config;
 
 	conn = NULL;
 	p = NULL;
-	secretkey = NULL;
 
 	/* Get the program name. */
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -44,6 +81,8 @@ main(int argc, char *argv[])
 	else
 		++progname;
 	command = "";
+
+	needconn = false;
 
 	/* Check the version against the library build. */
 	(void)wiredtiger_version(&major_v, & minor_v, NULL);
@@ -66,7 +105,7 @@ main(int argc, char *argv[])
 	 * needed, the user can specify -R to run recovery.
 	 */
 	rec_config = REC_ERROR;
-	logoff = recover = 0;
+	logoff = recover = false;
 	/* Check for standard options. */
 	while ((ch = __wt_getopt(progname, argc, argv, "C:E:h:LRVv")) != EOF)
 		switch (ch) {
@@ -74,8 +113,9 @@ main(int argc, char *argv[])
 			cmd_config = __wt_optarg;
 			break;
 		case 'E':			/* secret key */
+			free(secretkey);	/* lint: set more than once */
 			if ((secretkey = strdup(__wt_optarg)) == NULL) {
-				ret = util_err(NULL, errno, NULL);
+				(void)util_err(NULL, errno, NULL);
 				goto err;
 			}
 			memset(__wt_optarg, 0, strlen(__wt_optarg));
@@ -85,39 +125,47 @@ main(int argc, char *argv[])
 			break;
 		case 'L':			/* no logging */
 			rec_config = REC_LOGOFF;
-			logoff = 1;
+			logoff = true;
 			break;
 		case 'R':			/* recovery */
 			rec_config = REC_RECOVER;
-			recover = 1;
+			recover = true;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
-			return (EXIT_SUCCESS);
+			goto done;
 		case 'v':			/* verbose */
-			verbose = 1;
+			verbose = true;
 			break;
 		case '?':
 		default:
-			return (usage());
+			usage();
+			goto err;
 		}
 	if (logoff && recover) {
 		fprintf(stderr, "Only one of -L and -R is allowed.\n");
-		return (EXIT_FAILURE);
+		goto err;
 	}
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
 	/* The next argument is the command name. */
-	if (argc < 1)
-		return (usage());
+	if (argc < 1) {
+		usage();
+		goto err;
+	}
 	command = argv[0];
 
 	/* Reset getopt. */
 	__wt_optreset = __wt_optind = 1;
 
 	func = NULL;
+	cfunc = NULL;
 	switch (command[0]) {
+	case 'a':
+		if (strcmp(command, "alter") == 0)
+			func = util_alter;
+		break;
 	case 'b':
 		if (strcmp(command, "backup") == 0)
 			func = util_backup;
@@ -127,14 +175,17 @@ main(int argc, char *argv[])
 			func = util_compact;
 		else if (strcmp(command, "copyright") == 0) {
 			util_copyright();
-			return (EXIT_SUCCESS);
+			goto done;
 		} else if (strcmp(command, "create") == 0) {
 			func = util_create;
 			config = "create";
 		}
 		break;
 	case 'd':
-		if (strcmp(command, "drop") == 0)
+		if (strcmp(command, "downgrade") == 0) {
+			cfunc = util_downgrade;
+			needconn = true;
+		} else if (strcmp(command, "drop") == 0)
 			func = util_drop;
 		else if (strcmp(command, "dump") == 0)
 			func = util_dump;
@@ -159,6 +210,8 @@ main(int argc, char *argv[])
 	case 'r':
 		if (strcmp(command, "read") == 0)
 			func = util_read;
+		else if (strcmp(command, "rebalance") == 0)
+			func = util_rebalance;
 		else if (strcmp(command, "rename") == 0)
 			func = util_rename;
 		break;
@@ -169,6 +222,10 @@ main(int argc, char *argv[])
 			func = util_stat;
 			config = "statistics=(all)";
 		}
+		break;
+	case 't' :
+		if (strcmp(command, "truncate") == 0)
+			func = util_truncate;
 		break;
 	case 'u':
 		if (strcmp(command, "upgrade") == 0)
@@ -185,8 +242,10 @@ main(int argc, char *argv[])
 	default:
 		break;
 	}
-	if (func == NULL)
-		return (usage());
+	if (func == NULL && cfunc == NULL) {
+		usage();
+		goto err;
+	}
 
 	/* Build the configuration string. */
 	len = 10;					/* some slop */
@@ -203,31 +262,42 @@ main(int argc, char *argv[])
 	}
 	len += strlen(rec_config);
 	if ((p = malloc(len)) == NULL) {
-		ret = util_err(NULL, errno, NULL);
+		(void)util_err(NULL, errno, NULL);
 		goto err;
 	}
-	(void)snprintf(p, len, "%s,%s,%s%s%s%s",
+	if ((ret = __wt_snprintf(p, len, "%s,%s,%s%s%s%s",
 	    config == NULL ? "" : config,
-	    cmd_config == NULL ? "" : cmd_config, rec_config, p1, p2, p3);
+	    cmd_config == NULL ? "" : cmd_config,
+	    rec_config, p1, p2, p3)) != 0) {
+		(void)util_err(NULL, ret, NULL);
+		goto err;
+	}
 	config = p;
 
 	/* Open the database and a session. */
 	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, config, &conn)) != 0) {
-		ret = util_err(NULL, ret, NULL);
+		(void)util_err(NULL, ret, NULL);
 		goto err;
 	}
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		ret = util_err(NULL, ret, NULL);
+		(void)util_err(NULL, ret, NULL);
 		goto err;
 	}
 
 	/* Call the function. */
-	ret = func(session, argc, argv);
+	if (needconn)
+		ret = cfunc(session, conn, argc, argv);
+	else
+		ret = func(session, argc, argv);
+
+	if (0) {
+err:		ret = 1;
+	}
+done:
 
 	/* Close the database. */
-
-err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
+	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 
 	free(p);
@@ -236,50 +306,14 @@ err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-static int
-usage(void)
-{
-	fprintf(stderr,
-	    "WiredTiger Data Engine (version %d.%d)\n",
-	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
-	fprintf(stderr,
-	    "global options:\n"
-	    "\t" "-C\t" "wiredtiger_open configuration\n"
-	    "\t" "-h\t" "database directory\n"
-	    "\t" "-L\t" "turn logging off for debug-mode\n"
-	    "\t" "-R\t" "run recovery if configured\n"
-	    "\t" "-V\t" "display library version and exit\n"
-	    "\t" "-v\t" "verbose\n");
-	fprintf(stderr,
-	    "commands:\n"
-	    "\t" "backup\t  database backup\n"
-	    "\t" "compact\t  compact an object\n"
-	    "\t" "copyright copyright information\n"
-	    "\t" "create\t  create an object\n"
-	    "\t" "drop\t  drop an object\n"
-	    "\t" "dump\t  dump an object\n"
-	    "\t" "list\t  list database objects\n"
-	    "\t" "load\t  load an object\n"
-	    "\t" "loadtext\t  load an object from a text file\n"
-	    "\t" "printlog  display the database log\n"
-	    "\t" "read\t  read values from an object\n"
-	    "\t" "rename\t  rename an object\n"
-	    "\t" "salvage\t  salvage a file\n"
-	    "\t" "stat\t  display statistics for an object\n"
-	    "\t" "upgrade\t  upgrade an object\n"
-	    "\t" "verify\t  verify an object\n"
-	    "\t" "write\t  write values to an object\n");
-
-	return (EXIT_FAILURE);
-}
-
 /*
- * util_name --
+ * util_uri --
  *	Build a name.
  */
 char *
-util_name(WT_SESSION *session, const char *s, const char *type)
+util_uri(WT_SESSION *session, const char *s, const char *type)
 {
+	WT_DECL_RET;
 	size_t len;
 	char *name;
 
@@ -303,8 +337,12 @@ util_name(WT_SESSION *session, const char *s, const char *type)
 	 * the default type for the operation.
 	 */
 	if (strchr(s, ':') != NULL)
-		strcpy(name, s);
+		WT_ERR(__wt_snprintf(name, len, "%s", s));
 	else
-		snprintf(name, len, "%s:%s", type, s);
+		WT_ERR(__wt_snprintf(name, len, "%s:%s", type, s));
 	return (name);
+
+err:	free(name);
+	(void)util_err(session, ret, NULL);
+	return (NULL);
 }

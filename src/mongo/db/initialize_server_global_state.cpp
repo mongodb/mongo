@@ -38,9 +38,10 @@
 #include <signal.h>
 
 #ifndef _WIN32
-#include <syslog.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <syslog.h>
 #endif
 
 #include "mongo/base/init.h"
@@ -51,8 +52,9 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/server_options.h"
-#include "mongo/logger/logger.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/logger/console_appender.h"
+#include "mongo/logger/logger.h"
 #include "mongo/logger/message_event.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/ramlog.h"
@@ -62,10 +64,16 @@
 #include "mongo/logger/syslog_appender.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/signal_handlers_synchronous.h"
+
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
 
 namespace fs = boost::filesystem;
 
@@ -88,10 +96,6 @@ void launchSignal(int sig) {
     }
 }
 
-static void setupLaunchSignals() {
-    verify(signal(SIGUSR2, launchSignal) != SIG_ERR);
-}
-
 void signalForkSuccess() {
     if (serverGlobalParams.doFork) {
         // killing leader will propagate to parent
@@ -102,7 +106,7 @@ void signalForkSuccess() {
 
 
 static bool forkServer() {
-#ifndef _WIN32
+#if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)
     if (serverGlobalParams.doFork) {
         fassert(16447, !serverGlobalParams.logpath.empty() || serverGlobalParams.logWithSyslog);
 
@@ -111,8 +115,12 @@ static bool forkServer() {
 
         serverGlobalParams.parentProc = ProcessId::getCurrent();
 
+        // clear signal mask so that SIGUSR2 will always be caught and we can clean up the original
+        // parent process
+        clearSignalMask();
+
         // facilitate clean exit when child starts successfully
-        setupLaunchSignals();
+        verify(signal(SIGUSR2, launchSignal) != SIG_ERR);
 
         cout << "about to fork child process, waiting until server is ready for connections."
              << endl;
@@ -129,7 +137,9 @@ static bool forkServer() {
             if (WIFEXITED(pstat)) {
                 if (WEXITSTATUS(pstat)) {
                     cout << "ERROR: child process failed, exited with error number "
-                         << WEXITSTATUS(pstat) << endl;
+                         << WEXITSTATUS(pstat) << endl
+                         << "To see additional information in this output, start without "
+                         << "the \"--fork\" option." << endl;
                 } else {
                     cout << "child process started successfully, parent exiting" << endl;
                 }
@@ -198,7 +208,8 @@ void forkServerOrDie() {
 
 MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                           ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer"),
-                          ("default"))(InitializerContext*) {
+                          ("default"))
+(InitializerContext*) {
     using logger::LogManager;
     using logger::MessageEventEphemeral;
     using logger::MessageEventDetailsEncoder;
@@ -228,8 +239,9 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 #endif  // defined(_WIN32)
     } else if (!serverGlobalParams.logpath.empty()) {
         fassert(16448, !serverGlobalParams.logWithSyslog);
-        std::string absoluteLogpath = boost::filesystem::absolute(serverGlobalParams.logpath,
-                                                                  serverGlobalParams.cwd).string();
+        std::string absoluteLogpath =
+            boost::filesystem::absolute(serverGlobalParams.logpath, serverGlobalParams.cwd)
+                .string();
 
         bool exists;
 
@@ -238,29 +250,34 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         } catch (boost::filesystem::filesystem_error& e) {
             return Status(ErrorCodes::FileNotOpen,
                           mongoutils::str::stream() << "Failed probe for \"" << absoluteLogpath
-                                                    << "\": " << e.code().message());
+                                                    << "\": "
+                                                    << e.code().message());
         }
 
         if (exists) {
             if (boost::filesystem::is_directory(absoluteLogpath)) {
-                return Status(ErrorCodes::FileNotOpen,
-                              mongoutils::str::stream()
-                                  << "logpath \"" << absoluteLogpath
-                                  << "\" should name a file, not a directory.");
+                return Status(
+                    ErrorCodes::FileNotOpen,
+                    mongoutils::str::stream() << "logpath \"" << absoluteLogpath
+                                              << "\" should name a file, not a directory.");
             }
 
             if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
                 std::string renameTarget = absoluteLogpath + "." + terseCurrentTime(false);
-                if (0 == rename(absoluteLogpath.c_str(), renameTarget.c_str())) {
+                boost::system::error_code ec;
+                boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
+                if (!ec) {
                     log() << "log file \"" << absoluteLogpath << "\" exists; moved to \""
                           << renameTarget << "\".";
                 } else {
                     return Status(ErrorCodes::FileRenameFailed,
                                   mongoutils::str::stream()
                                       << "Could not rename preexisting log file \""
-                                      << absoluteLogpath << "\" to \"" << renameTarget
+                                      << absoluteLogpath
+                                      << "\" to \""
+                                      << renameTarget
                                       << "\"; run with --logappend or manually remove file: "
-                                      << errnoWithDescription());
+                                      << ec.message());
                 }
             }
         }
@@ -282,7 +299,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                     new MessageEventDetailsEncoder, writer.getValue())));
 
         if (serverGlobalParams.logAppend && exists) {
-            log() << "***** SERVER RESTARTED *****" << endl;
+            log() << "***** SERVER RESTARTED *****";
             Status status = logger::RotatableFileWriter::Use(writer.getValue()).status();
             if (!status.isOK())
                 return status;
@@ -321,8 +338,27 @@ MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
     return Status::OK();
 }
 
+// On non-windows platforms, drop rwx for group and other unless the
+// user has opted into using the system umask. To do so, we first read
+// out the current umask (by temporarily setting it to
+// no-permissions), and then or the returned umask with the
+// restrictions we want to apply and set it back. The overall effect
+// is to set the bits for 'other' and 'group', but leave umask bits
+// bits for 'user' unaltered.
+#ifndef _WIN32
+namespace {
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(honorSystemUmask, bool, false);
+MONGO_INITIALIZER(MungeUmask)(InitializerContext*) {
+    if (!honorSystemUmask) {
+        umask(umask(S_IRWXU | S_IRWXG | S_IRWXO) | S_IRWXG | S_IRWXO);
+    }
+    return Status::OK();
+}
+}  // namespace
+#endif
+
 bool initializeServerGlobalState() {
-    Listener::globalTicketHolder.resize(serverGlobalParams.maxConns);
+    Listener::globalTicketHolder.resize(serverGlobalParams.maxConns).transitional_ignore();
 
 #ifndef _WIN32
     if (!fs::is_directory(serverGlobalParams.socket)) {
@@ -347,9 +383,10 @@ bool initializeServerGlobalState() {
         }
     }
 
-    // Auto-enable auth except if clusterAuthMode is not set.
-    // clusterAuthMode is automatically set if a --keyFile parameter is provided.
-    if (clusterAuthMode != ServerGlobalParams::ClusterAuthMode_undefined) {
+    // Auto-enable auth unless we are in mixed auth/no-auth or clusterAuthMode was not provided.
+    // clusterAuthMode defaults to "keyFile" if a --keyFile parameter is provided.
+    if (clusterAuthMode != ServerGlobalParams::ClusterAuthMode_undefined &&
+        !serverGlobalParams.transitionToAuth) {
         getGlobalAuthorizationManager()->setAuthEnabled(true);
     }
 
@@ -359,7 +396,9 @@ bool initializeServerGlobalState() {
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
         setInternalUserAuthParams(
             BSON(saslCommandMechanismFieldName
-                 << "MONGODB-X509" << saslCommandUserDBFieldName << "$external"
+                 << "MONGODB-X509"
+                 << saslCommandUserDBFieldName
+                 << "$external"
                  << saslCommandUserFieldName
                  << getSSLManager()->getSSLConfiguration().clientSubjectName));
     }

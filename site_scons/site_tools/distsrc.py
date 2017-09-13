@@ -34,16 +34,31 @@ class DistSrcFile:
         return self.name
 
 class DistSrcArchive:
-    def __init__(self, archive_type, archive_file):
+    def __init__(self, archive_type, archive_file, filename, mode):
         self.archive_type = archive_type
         self.archive_file = archive_file
+        self.archive_name = filename
+        self.archive_mode = mode
 
     @staticmethod
     def Open(filename):
         if filename.endswith("tar"):
-            return DistSrcTarArchive('tar', tarfile.open(filename, 'a'))
+            return DistSrcTarArchive(
+                'tar',
+                tarfile.open(filename, 'r', format=tarfile.PAX_FORMAT),
+                filename,
+                'r',
+            )
         elif filename.endswith("zip"):
-            return DistSrcZipArchive('zip', zipfile.ZipFile(filename, 'a'))
+            return DistSrcZipArchive(
+                'zip',
+                zipfile.ZipFile(filename, 'a'),
+                filename,
+                'a',
+            )
+
+    def close(self):
+        self.archive_file.close()
 
 class DistSrcTarArchive(DistSrcArchive):
     def __iter__(self):
@@ -77,6 +92,14 @@ class DistSrcTarArchive(DistSrcArchive):
         file_metadata.gname = gname
         file_metadata.size = len(file_contents)
         file_buf = StringIO.StringIO(file_contents)
+        if self.archive_mode == 'r':
+            self.archive_file.close()
+            self.archive_file = tarfile.open(
+                self.archive_name,
+                'a',
+                format=tarfile.PAX_FORMAT,
+            )
+            self.archive_mode = 'a'
         self.archive_file.addfile(file_metadata, fileobj=file_buf)
 
     def append_file(self, filename, localfile):
@@ -135,6 +158,7 @@ def distsrc_action_generator(source, target, env, for_signature):
         archive_wrapper = DistSrcArchive.Open(str(target[0]))
         for fn in __distsrc_callbacks:
             fn(env, archive_wrapper)
+        archive_wrapper.close()
 
     target_ext = str(target[0])[-3:]
     if not target_ext in [ 'zip', 'tar' ]:

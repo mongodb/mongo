@@ -29,98 +29,123 @@
 
 #include "mongo/bson/bsontypes.h"
 
+#include "mongo/config.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-#pragma pack(1)
-struct MaxKeyData {
-    MaxKeyData() {
-        totsize = 7;
-        maxkey = MaxKey;
-        name = 0;
-        eoo = EOO;
-    }
-    int totsize;
-    char maxkey;
-    char name;
-    char eoo;
-} maxkeydata;
-BSONObj maxKey((const char*)&maxkeydata);
 
-struct MinKeyData {
-    MinKeyData() {
-        totsize = 7;
-        minkey = MinKey;
-        name = 0;
-        eoo = EOO;
-    }
-    int totsize;
-    char minkey;
-    char name;
-    char eoo;
-} minkeydata;
-BSONObj minKey((const char*)&minkeydata);
+const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
+const BSONObj kMaxBSONKey(kMaxKeyData);
 
-/*
-    struct JSObj0 {
-        JSObj0() {
-            totsize = 5;
-            eoo = EOO;
-        }
-        int totsize;
-        char eoo;
-    } js0;
-*/
-#pragma pack()
+const char kMinKeyData[] = {7, 0, 0, 0, static_cast<char>(MinKey), 0, 0};
+const BSONObj kMinBSONKey(kMinKeyData);
 
 /* take a BSONType and return the name of that type as a char* */
 const char* typeName(BSONType type) {
     switch (type) {
         case MinKey:
-            return "MinKey";
+            return "minKey";
         case EOO:
-            return "EOO";
+            return "missing";
         case NumberDouble:
-            return "NumberDouble";
+            return "double";
         case String:
-            return "String";
+            return "string";
         case Object:
-            return "Object";
+            return "object";
         case Array:
-            return "Array";
+            return "array";
         case BinData:
-            return "BinaryData";
+            return "binData";
         case Undefined:
-            return "Undefined";
+            return "undefined";
         case jstOID:
-            return "OID";
+            return "objectId";
         case Bool:
-            return "Bool";
+            return "bool";
         case Date:
-            return "Date";
+            return "date";
         case jstNULL:
-            return "NULL";
+            return "null";
         case RegEx:
-            return "RegEx";
+            return "regex";
         case DBRef:
-            return "DBRef";
+            return "dbPointer";
         case Code:
-            return "Code";
+            return "javascript";
         case Symbol:
-            return "Symbol";
+            return "symbol";
         case CodeWScope:
-            return "CodeWScope";
+            return "javascriptWithScope";
         case NumberInt:
-            return "NumberInt32";
+            return "int";
         case bsonTimestamp:
-            return "Timestamp";
+            return "timestamp";
         case NumberLong:
-            return "NumberLong64";
+            return "long";
+        case NumberDecimal:
+            return "decimal";
         // JSTypeMax doesn't make sense to turn into a string; overlaps with highest-valued type
         case MaxKey:
-            return "MaxKey";
+            return "maxKey";
         default:
-            return "Invalid";
+            return "invalid";
     }
 }
+
+std::ostream& operator<<(std::ostream& stream, BSONType type) {
+    return stream << typeName(type);
+}
+
+bool isValidBSONType(int type) {
+    switch (type) {
+        case MinKey:
+        case EOO:
+        case NumberDouble:
+        case String:
+        case Object:
+        case Array:
+        case BinData:
+        case Undefined:
+        case jstOID:
+        case Bool:
+        case Date:
+        case jstNULL:
+        case RegEx:
+        case DBRef:
+        case Code:
+        case Symbol:
+        case CodeWScope:
+        case NumberInt:
+        case bsonTimestamp:
+        case NumberLong:
+        case NumberDecimal:
+        case MaxKey:
+            return true;
+        default:
+            return false;
+    }
+}
+
+const char* typeName(BinDataType type) {
+    switch (type) {
+        case BinDataGeneral:
+            return "general";
+        case Function:
+            return "function";
+        case ByteArrayDeprecated:
+            return "byte(deprecated)";
+        case bdtUUID:
+            return "UUID(deprecated)";
+        case newUUID:
+            return "UUID";
+        case MD5Type:
+            return "MD5";
+        case bdtCustom:
+            return "Custom";
+        default:
+            return "invalid";
+    }
+}
+
 }  // namespace mongo

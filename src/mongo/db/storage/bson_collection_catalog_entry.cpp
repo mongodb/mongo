@@ -30,24 +30,92 @@
 
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 
+#include <algorithm>
+#include <numeric>
+
+#include "mongo/db/field_ref.h"
+
 namespace mongo {
+
+namespace {
+
+// An index will fail to get created if the size in bytes of its key pattern is greater than 2048.
+// We use that value to represent the largest number of path components we could ever possibly
+// expect to see in an indexed field.
+const size_t kMaxKeyPatternPathLength = 2048;
+char multikeyPathsEncodedAsBytes[kMaxKeyPatternPathLength];
+
+/**
+ * Encodes 'multikeyPaths' as binary data and appends it to 'bob'.
+ *
+ * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
+ * multikey. The object {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be appended to
+ * 'bob'.
+ */
+void appendMultikeyPathsAsBytes(BSONObj keyPattern,
+                                const MultikeyPaths& multikeyPaths,
+                                BSONObjBuilder* bob) {
+    size_t i = 0;
+    for (const auto keyElem : keyPattern) {
+        StringData keyName = keyElem.fieldNameStringData();
+        size_t numParts = FieldRef{keyName}.numParts();
+        invariant(numParts > 0);
+        invariant(numParts <= kMaxKeyPatternPathLength);
+
+        std::fill_n(multikeyPathsEncodedAsBytes, numParts, 0);
+        for (const auto multikeyComponent : multikeyPaths[i]) {
+            multikeyPathsEncodedAsBytes[multikeyComponent] = 1;
+        }
+        bob->appendBinData(keyName, numParts, BinDataGeneral, &multikeyPathsEncodedAsBytes[0]);
+
+        ++i;
+    }
+}
+
+/**
+ * Parses the path-level multikey information encoded as binary data from 'multikeyPathsObj' and
+ * sets 'multikeyPaths' as that value.
+ *
+ * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
+ * multikey. The binary data {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be parsed
+ * into std::vector<std::set<size_t>>{{0U, 1U}, {0U}}.
+ */
+void parseMultikeyPathsFromBytes(BSONObj multikeyPathsObj, MultikeyPaths* multikeyPaths) {
+    invariant(multikeyPaths);
+    for (auto elem : multikeyPathsObj) {
+        std::set<size_t> multikeyComponents;
+        int len;
+        const char* data = elem.binData(len);
+        invariant(len > 0);
+        invariant(static_cast<size_t>(len) <= kMaxKeyPatternPathLength);
+
+        for (int i = 0; i < len; ++i) {
+            if (data[i]) {
+                multikeyComponents.insert(i);
+            }
+        }
+        multikeyPaths->push_back(multikeyComponents);
+    }
+}
+
+}  // namespace
 
 BSONCollectionCatalogEntry::BSONCollectionCatalogEntry(StringData ns)
     : CollectionCatalogEntry(ns) {}
 
-CollectionOptions BSONCollectionCatalogEntry::getCollectionOptions(OperationContext* txn) const {
-    MetaData md = _getMetaData(txn);
+CollectionOptions BSONCollectionCatalogEntry::getCollectionOptions(OperationContext* opCtx) const {
+    MetaData md = _getMetaData(opCtx);
     return md.options;
 }
 
-int BSONCollectionCatalogEntry::getTotalIndexCount(OperationContext* txn) const {
-    MetaData md = _getMetaData(txn);
+int BSONCollectionCatalogEntry::getTotalIndexCount(OperationContext* opCtx) const {
+    MetaData md = _getMetaData(opCtx);
 
     return static_cast<int>(md.indexes.size());
 }
 
-int BSONCollectionCatalogEntry::getCompletedIndexCount(OperationContext* txn) const {
-    MetaData md = _getMetaData(txn);
+int BSONCollectionCatalogEntry::getCompletedIndexCount(OperationContext* opCtx) const {
+    MetaData md = _getMetaData(opCtx);
 
     int num = 0;
     for (unsigned i = 0; i < md.indexes.size(); i++) {
@@ -57,9 +125,9 @@ int BSONCollectionCatalogEntry::getCompletedIndexCount(OperationContext* txn) co
     return num;
 }
 
-BSONObj BSONCollectionCatalogEntry::getIndexSpec(OperationContext* txn,
+BSONObj BSONCollectionCatalogEntry::getIndexSpec(OperationContext* opCtx,
                                                  StringData indexName) const {
-    MetaData md = _getMetaData(txn);
+    MetaData md = _getMetaData(opCtx);
 
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
@@ -67,39 +135,53 @@ BSONObj BSONCollectionCatalogEntry::getIndexSpec(OperationContext* txn,
 }
 
 
-void BSONCollectionCatalogEntry::getAllIndexes(OperationContext* txn,
+void BSONCollectionCatalogEntry::getAllIndexes(OperationContext* opCtx,
                                                std::vector<std::string>* names) const {
-    MetaData md = _getMetaData(txn);
+    MetaData md = _getMetaData(opCtx);
 
     for (unsigned i = 0; i < md.indexes.size(); i++) {
         names->push_back(md.indexes[i].spec["name"].String());
     }
 }
 
-bool BSONCollectionCatalogEntry::isIndexMultikey(OperationContext* txn,
-                                                 StringData indexName) const {
-    MetaData md = _getMetaData(txn);
+bool BSONCollectionCatalogEntry::isIndexMultikey(OperationContext* opCtx,
+                                                 StringData indexName,
+                                                 MultikeyPaths* multikeyPaths) const {
+    MetaData md = _getMetaData(opCtx);
 
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
+
+    if (multikeyPaths && !md.indexes[offset].multikeyPaths.empty()) {
+        *multikeyPaths = md.indexes[offset].multikeyPaths;
+    }
+
     return md.indexes[offset].multikey;
 }
 
-RecordId BSONCollectionCatalogEntry::getIndexHead(OperationContext* txn,
+RecordId BSONCollectionCatalogEntry::getIndexHead(OperationContext* opCtx,
                                                   StringData indexName) const {
-    MetaData md = _getMetaData(txn);
+    MetaData md = _getMetaData(opCtx);
 
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     return md.indexes[offset].head;
 }
 
-bool BSONCollectionCatalogEntry::isIndexReady(OperationContext* txn, StringData indexName) const {
-    MetaData md = _getMetaData(txn);
+bool BSONCollectionCatalogEntry::isIndexReady(OperationContext* opCtx, StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
 
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     return md.indexes[offset].ready;
+}
+
+KVPrefix BSONCollectionCatalogEntry::getIndexPrefix(OperationContext* opCtx,
+                                                    StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].prefix;
 }
 
 // --------------------------
@@ -143,10 +225,25 @@ void BSONCollectionCatalogEntry::MetaData::rename(StringData toNS) {
     for (size_t i = 0; i < indexes.size(); i++) {
         BSONObj spec = indexes[i].spec;
         BSONObjBuilder b;
-        b.append("ns", toNS);
-        b.appendElementsUnique(spec);
+        // Add the fields in the same order they were in the original specification.
+        for (auto&& elem : spec) {
+            if (elem.fieldNameStringData() == "ns") {
+                b.append("ns", toNS);
+            } else {
+                b.append(elem);
+            }
+        }
         indexes[i].spec = b.obj();
     }
+}
+
+KVPrefix BSONCollectionCatalogEntry::MetaData::getMaxPrefix() const {
+    // Use the collection prefix as the initial max value seen. Then compare it with each index
+    // prefix. Note the oplog has no indexes so the vector of 'IndexMetaData' may be empty.
+    return std::accumulate(
+        indexes.begin(), indexes.end(), prefix, [](KVPrefix max, IndexMetaData index) {
+            return max < index.prefix ? index.prefix : max;
+        });
 }
 
 BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
@@ -160,11 +257,22 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
             sub.append("spec", indexes[i].spec);
             sub.appendBool("ready", indexes[i].ready);
             sub.appendBool("multikey", indexes[i].multikey);
+
+            if (!indexes[i].multikeyPaths.empty()) {
+                BSONObjBuilder subMultikeyPaths(sub.subobjStart("multikeyPaths"));
+                appendMultikeyPathsAsBytes(indexes[i].spec.getObjectField("key"),
+                                           indexes[i].multikeyPaths,
+                                           &subMultikeyPaths);
+                subMultikeyPaths.doneFast();
+            }
+
             sub.append("head", static_cast<long long>(indexes[i].head.repr()));
-            sub.done();
+            sub.append("prefix", indexes[i].prefix.toBSONValue());
+            sub.doneFast();
         }
-        arr.done();
+        arr.doneFast();
     }
+    b.append("prefix", prefix.toBSONValue());
     return b.obj();
 }
 
@@ -172,14 +280,15 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
     ns = obj["ns"].valuestrsafe();
 
     if (obj["options"].isABSONObj()) {
-        options.parse(obj["options"].Obj());
+        options.parse(obj["options"].Obj(), CollectionOptions::parseForStorage)
+            .transitional_ignore();
     }
 
-    BSONElement e = obj["indexes"];
-    if (e.isABSONObj()) {
-        std::vector<BSONElement> entries = e.Array();
-        for (unsigned i = 0; i < entries.size(); i++) {
-            BSONObj idx = entries[i].Obj();
+    BSONElement indexList = obj["indexes"];
+
+    if (indexList.isABSONObj()) {
+        for (BSONElement elt : indexList.Obj()) {
+            BSONObj idx = elt.Obj();
             IndexMetaData imd;
             imd.spec = idx["spec"].Obj().getOwned();
             imd.ready = idx["ready"].trueValue();
@@ -189,8 +298,16 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
                 imd.head = RecordId(idx["head_a"].Int(), idx["head_b"].Int());
             }
             imd.multikey = idx["multikey"].trueValue();
+
+            if (auto multikeyPathsElem = idx["multikeyPaths"]) {
+                parseMultikeyPathsFromBytes(multikeyPathsElem.Obj(), &imd.multikeyPaths);
+            }
+
+            imd.prefix = KVPrefix::fromBSONElement(idx["prefix"]);
             indexes.push_back(imd);
         }
     }
+
+    prefix = KVPrefix::fromBSONElement(obj["prefix"]);
 }
 }

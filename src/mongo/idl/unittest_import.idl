@@ -1,0 +1,99 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# IDL Unit Tests IDL file for testing imported structs
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+
+##################################################################################################
+#
+# Unit test structs for a single value to ensure type validation works correctly
+#
+##################################################################################################
+
+structs:
+    one_string:
+        description: UnitTest for a single string
+        fields:
+            value: string
+
+    one_int:
+        description: UnitTest for a single int
+        fields:
+            value: int
+
+    one_long:
+        description: UnitTest for a single long
+        fields:
+            value: long
+
+    one_double:
+        description: UnitTest for a single double
+        fields:
+            value: double
+
+    one_decimal:
+        description: UnitTest for a single decimal
+        fields:
+            value: decimal
+
+    one_bool:
+        description: UnitTest for a single bool
+        fields:
+            value: bool
+
+    one_bindata:
+        description: UnitTest for a single bindata_generic
+        fields:
+            value: bindata_generic
+
+    one_function:
+        description: UnitTest for a single bindata_function
+        fields:
+            value: bindata_function
+
+    one_uuid:
+        description: UnitTest for a single bindata_uuid
+        fields:
+            value: bindata_uuid
+
+    one_md5:
+        description: UnitTest for a single bindata_md5
+        fields:
+            value: bindata_md5
+
+    one_objectid:
+        description: UnitTest for a single objectid
+        fields:
+            value: objectid
+
+    one_date:
+        description: UnitTest for a single date
+        fields:
+            value: date
+
+    one_timestamp:
+        description: UnitTest for a single timestamp
+        fields:
+            value: timestamp
+
+    one_UUID:
+        description: UnitTest for a single UUID
+        fields:
+            value: uuid

@@ -28,14 +28,23 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/transport/service_executor.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/tick_source.h"
 
 namespace mongo {
@@ -44,12 +53,17 @@ class AbstractMessagingPort;
 class Client;
 class OperationContext;
 class OpObserver;
+class ServiceEntryPoint;
+
+namespace transport {
+class TransportLayer;
+}  // namespace transport
 
 /**
  * Classes that implement this interface can receive notification on killOp.
  *
- * See GlobalEnvironmentExperiment::registerKillOpListener() for more information, including
- * limitations on the lifetime of registered listeners.
+ * See registerKillOpListener() for more information,
+ * including limitations on the lifetime of registered listeners.
  */
 class KillOpListenerInterface {
 public:
@@ -204,14 +218,15 @@ public:
      *
      * The "desc" string is used to set a descriptive name for the client, used in logging.
      *
-     * If supplied, "p" is the communication channel used for communicating with the client.
+     * If supplied, "session" is the transport::Session used for communicating with the client.
      */
-    UniqueClient makeClient(std::string desc, AbstractMessagingPort* p = nullptr);
+    UniqueClient makeClient(std::string desc, transport::SessionHandle session = nullptr);
 
     /**
      * Creates a new OperationContext on "client".
      *
      * "client" must not have an active operation context.
+     *
      */
     UniqueOperationContext makeOperationContext(Client* client);
 
@@ -253,6 +268,28 @@ public:
     virtual StorageEngine* getGlobalStorageEngine() = 0;
 
     //
+    // Key manager, for HMAC keys.
+    //
+
+    /**
+     * Sets the key manager on this service context.
+     */
+    void setKeyManager(std::shared_ptr<KeysCollectionManager> keyManager) & {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _keyManager = std::move(keyManager);
+    }
+
+    /**
+     * Returns a pointer to the keys collection manager owned by this service context.
+     */
+    std::shared_ptr<KeysCollectionManager> getKeyManager() & {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _keyManager;
+    }
+
+    std::shared_ptr<KeysCollectionManager> getKeyManager() && = delete;
+
+    //
     // Global operation management.  This may not belong here and there may be too many methods
     // here.
     //
@@ -260,30 +297,35 @@ public:
     /**
      * Signal all OperationContext(s) that they have been killed.
      */
-    virtual void setKillAllOperations() = 0;
+    void setKillAllOperations();
 
     /**
      * Reset the operation kill state after a killAllOperations.
      * Used for testing.
      */
-    virtual void unsetKillAllOperations() = 0;
+    void unsetKillAllOperations();
 
     /**
      * Get the state for killing all operations.
      */
-    virtual bool getKillAllOperations() = 0;
+    bool getKillAllOperations() {
+        return _globalKill.loadRelaxed();
+    }
 
     /**
-     * @param i opid of operation to kill
-     * @return if operation was found
+     * Kills the operation "opCtx" with the code "killCode", if opCtx has not already been killed.
+     * Caller must own the lock on opCtx->getClient, and opCtx->getServiceContext() must be the same
+     *as
+     * this service context.
      **/
-    virtual bool killOperation(unsigned int opId) = 0;
+    void killOperation(OperationContext* opCtx,
+                       ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
      * Kills all operations that have a Client that is associated with an incoming user
-     * connection, except for the one associated with txn.
+     * connection, except for the one associated with opCtx.
      */
-    virtual void killAllUserOperations(const OperationContext* txn) = 0;
+    void killAllUserOperations(const OperationContext* opCtx, ErrorCodes::Error killCode);
 
     /**
      * Registers a listener to be notified each time an op is killed.
@@ -291,7 +333,64 @@ public:
      * listener does not become owned by the environment. As there is currently no way to
      * unregister, the listener object must outlive this ServiceContext object.
      */
-    virtual void registerKillOpListener(KillOpListenerInterface* listener) = 0;
+    void registerKillOpListener(KillOpListenerInterface* listener);
+
+    //
+    // Background tasks.
+    //
+
+    /**
+     * Set a periodic runner on the service context. The runner should already be
+     * started when it is moved onto the service context. The service context merely
+     * takes ownership of this object to allow it to continue running for the life of
+     * the process
+     */
+    void setPeriodicRunner(std::unique_ptr<PeriodicRunner> runner);
+
+    /**
+     * Returns a pointer to the global periodic runner owned by this service context.
+     */
+    PeriodicRunner* getPeriodicRunner() const;
+
+    //
+    // Transport.
+    //
+
+    /**
+     * Get the master TransportLayer. Routes to all other TransportLayers that
+     * may be in use within this service.
+     *
+     * See TransportLayerManager for more details.
+     */
+    transport::TransportLayer* getTransportLayer() const;
+
+    /**
+     * Get the service entry point for the service context.
+     *
+     * See ServiceEntryPoint for more details.
+     */
+    ServiceEntryPoint* getServiceEntryPoint() const;
+
+    /**
+     * Get the service executor for the service context.
+     *
+     * See ServiceStateMachine for how this is used. Some configurations may not have a service
+     * executor registered and this will return a nullptr.
+     */
+    transport::ServiceExecutor* getServiceExecutor() const;
+
+    /**
+     * Waits for the ServiceContext to be fully initialized and for all TransportLayers to have been
+     * added/started.
+     *
+     * If startup is already complete this returns immediately.
+     */
+    void waitForStartupComplete();
+
+    /*
+     * Marks initialization as complete and all transport layers as started.
+     */
+    void notifyStartupComplete();
 
     //
     // Global OpObserver.
@@ -308,19 +407,59 @@ public:
     virtual OpObserver* getOpObserver() = 0;
 
     /**
-     * Returns the tick source set in this context.
+     * Returns the tick/clock source set in this context.
      */
     TickSource* getTickSource() const;
 
     /**
-     * Replaces the current tick source with a new one. In other words, the old tick source
-     * will be destroyed. So make sure that no one is using the old tick source when
-     * calling this.
+     * Get a ClockSource implementation that may be less precise than the _preciseClockSource but
+     * may be cheaper to call.
+     */
+    ClockSource* getFastClockSource() const;
+
+    /**
+     * Get a ClockSource implementation that is very precise but may be expensive to call.
+     */
+    ClockSource* getPreciseClockSource() const;
+
+    /**
+     * Replaces the current tick/clock source with a new one. In other words, the old source will be
+     * destroyed. So make sure that no one is using the old source when calling this.
      */
     void setTickSource(std::unique_ptr<TickSource> newSource);
 
+    /**
+     * Call this method with a ClockSource implementation that may be less precise than
+     * the _preciseClockSource but may be cheaper to call.
+     */
+    void setFastClockSource(std::unique_ptr<ClockSource> newSource);
+
+    /**
+     * Call this method with a ClockSource implementation that is very precise but
+     * may be expensive to call.
+     */
+    void setPreciseClockSource(std::unique_ptr<ClockSource> newSource);
+
+    /**
+     * Binds the service entry point implementation to the service context.
+     */
+    void setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep);
+
+    /**
+     * Binds the TransportLayer to the service context. The TransportLayer should have already
+     * had setup() called successfully, but not startup().
+     *
+     * This should be a TransportLayerManager created with the global server configuration.
+     */
+    void setTransportLayer(std::unique_ptr<transport::TransportLayer> tl);
+
+    /**
+     * Binds the service executor to the service context
+     */
+    void setServiceExecutor(std::unique_ptr<transport::ServiceExecutor> exec);
+
 protected:
-    ServiceContext() = default;
+    ServiceContext();
 
     /**
      * Mutex used to synchronize access to mutable state of this ServiceContext instance,
@@ -332,7 +471,39 @@ private:
     /**
      * Returns a new OperationContext. Private, for use by makeOperationContext.
      */
-    virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client) = 0;
+    virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) = 0;
+
+    /**
+     * Kills the given operation.
+     *
+     * Caller must own the service context's _mutex.
+     */
+    void _killOperation_inlock(OperationContext* opCtx, ErrorCodes::Error killCode);
+
+    /**
+     * The key manager.
+     */
+    std::shared_ptr<KeysCollectionManager> _keyManager;
+
+    /**
+     * The periodic runner.
+     */
+    std::unique_ptr<PeriodicRunner> _runner;
+
+    /**
+     * The TransportLayer.
+     */
+    std::unique_ptr<transport::TransportLayer> _transportLayer;
+
+    /**
+     * The service entry point
+     */
+    std::unique_ptr<ServiceEntryPoint> _serviceEntryPoint;
+
+    /**
+     * The ServiceExecutor
+     */
+    std::unique_ptr<transport::ServiceExecutor> _serviceExecutor;
 
     /**
      * Vector of registered observers.
@@ -341,6 +512,29 @@ private:
     ClientSet _clients;
 
     std::unique_ptr<TickSource> _tickSource;
+
+    /**
+     * A ClockSource implementation that may be less precise than the _preciseClockSource but
+     * may be cheaper to call.
+     */
+    std::unique_ptr<ClockSource> _fastClockSource;
+
+    /**
+     * A ClockSource implementation that is very precise but may be expensive to call.
+     */
+    std::unique_ptr<ClockSource> _preciseClockSource;
+
+    // Flag set to indicate that all operations are to be interrupted ASAP.
+    AtomicWord<bool> _globalKill{false};
+
+    // protected by _mutex
+    std::vector<KillOpListenerInterface*> _killOpListeners;
+
+    // Counter for assigning operation ids.
+    AtomicUInt32 _nextOpId{1};
+
+    bool _startupComplete = false;
+    stdx::condition_variable _startupCompleteCondVar;
 };
 
 /**
@@ -356,6 +550,17 @@ bool hasGlobalServiceContext();
  * Caller does not own pointer.
  */
 ServiceContext* getGlobalServiceContext();
+
+/**
+ * Warning - This function is temporary. Do not introduce new uses of this API.
+ *
+ * Returns the singleton ServiceContext for this server process.
+ *
+ * Waits until there is a valid global ServiceContext.
+ *
+ * Caller does not own pointer.
+ */
+ServiceContext* waitAndGetGlobalServiceContext();
 
 /**
  * Sets the global ServiceContext.  If 'serviceContext' is NULL, un-sets and deletes

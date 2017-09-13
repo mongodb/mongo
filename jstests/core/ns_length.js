@@ -5,14 +5,14 @@ var maxNsLength = 127;
 var maxNsCollectionLength = 120;
 
 var myDb = db.getSiblingDB("ns_length");
-myDb.dropDatabase(); // start empty
+myDb.dropDatabase();  // start empty
 
 function mkStr(length) {
     s = "";
     while (s.length < length) {
         s += "x";
     }
-    return  s;
+    return s;
 }
 
 function canMakeCollectionWithName(name) {
@@ -36,7 +36,7 @@ function canMakeCollectionWithName(name) {
 }
 
 function canMakeIndexWithName(collection, name) {
-    var success = collection.ensureIndex({x:1}, {name: name}).ok;
+    var success = collection.ensureIndex({x: 1}, {name: name}).ok;
     if (success) {
         assert.commandWorked(collection.dropIndex(name));
     }
@@ -80,12 +80,11 @@ for (var i = maxCollectionNameLength - 3; i <= maxCollectionNameLength + 3; i++)
 }
 
 // test renaming collections with the destination around the name limit due to long indexe names
-myDb.from.ensureIndex({a:1}, {name: mkStr(100)});
-var indexNsNameOverhead = (myDb.getName() + "..$").length + 100; // index ns name - collection name
+myDb.from.ensureIndex({a: 1}, {name: mkStr(100)});
+var indexNsNameOverhead = (myDb.getName() + "..$").length + 100;  // index ns name - collection name
 var maxCollectionNameWithIndex = maxNsLength - indexNsNameOverhead;
 for (var i = maxCollectionNameWithIndex - 3; i <= maxCollectionNameWithIndex + 3; i++) {
     assert.eq(canRenameCollection("from", mkStr(i)),
               i <= maxCollectionNameWithIndex,
               "index ns name length = " + (indexNsNameOverhead + i));
 }
-

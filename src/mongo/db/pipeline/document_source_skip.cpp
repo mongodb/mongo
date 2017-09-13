@@ -28,81 +28,92 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source_skip.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-const char DocumentSourceSkip::skipName[] = "$skip";
+DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                       long long nToSkip)
+    : DocumentSource(pExpCtx), _nToSkip(nToSkip) {}
 
-DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _skip(0), _needToSkip(true) {}
+REGISTER_DOCUMENT_SOURCE(skip,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceSkip::createFromBson);
 
-const char* DocumentSourceSkip::getSourceName() const {
-    return skipName;
-}
+constexpr StringData DocumentSourceSkip::kStageName;
 
-bool DocumentSourceSkip::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
-    DocumentSourceSkip* pSkip = dynamic_cast<DocumentSourceSkip*>(pNextSource.get());
-
-    /* if it's not another $skip, we can't coalesce */
-    if (!pSkip)
-        return false;
-
-    /* we need to skip over the sum of the two consecutive $skips */
-    _skip += pSkip->_skip;
-    return true;
-}
-
-boost::optional<Document> DocumentSourceSkip::getNext() {
+DocumentSource::GetNextResult DocumentSourceSkip::getNext() {
     pExpCtx->checkForInterrupt();
 
-    if (_needToSkip) {
-        _needToSkip = false;
-        for (long long i = 0; i < _skip; i++) {
-            if (!pSource->getNext())
-                return boost::none;
+    while (_nSkippedSoFar < _nToSkip) {
+        // For performance reasons, a streaming stage must not keep references to documents across
+        // calls to getNext(). Such stages must retrieve a result from their child and then release
+        // it (or return it) before asking for another result. Failing to do so can result in extra
+        // work, since the Document/Value library must copy data on write when that data has a
+        // refcount above one.
+        auto nextInput = pSource->getNext();
+        if (!nextInput.isAdvanced()) {
+            return nextInput;
         }
+        ++_nSkippedSoFar;
     }
 
     return pSource->getNext();
 }
 
-Value DocumentSourceSkip::serialize(bool explain) const {
-    return Value(DOC(getSourceName() << _skip));
+Value DocumentSourceSkip::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+    return Value(DOC(getSourceName() << _nToSkip));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {
-    return _skip == 0 ? nullptr : this;
+    return _nToSkip == 0 ? nullptr : this;
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+    auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
+
+    if (nextLimit) {
+        // Swap the $limit before this stage, allowing a top-k sort to be possible, provided there
+        // is a $sort stage.
+        nextLimit->setLimit(nextLimit->getLimit() + _nToSkip);
+        std::swap(*itr, *std::next(itr));
+        return itr == container->begin() ? itr : std::prev(itr);
+    } else if (nextSkip) {
+        _nToSkip += nextSkip->getSkip();
+        container->erase(std::next(itr));
+        return itr;
+    }
+    return std::next(itr);
 }
 
 intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    intrusive_ptr<DocumentSourceSkip> pSource(new DocumentSourceSkip(pExpCtx));
-    return pSource;
+    const intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip) {
+    intrusive_ptr<DocumentSourceSkip> skip(new DocumentSourceSkip(pExpCtx, nToSkip));
+    return skip;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(15972,
-            str::stream() << DocumentSourceSkip::skipName
-                          << ":  the value to skip must be a number",
+            str::stream() << "Argument to $skip must be a number not a " << typeName(elem.type()),
             elem.isNumber());
+    auto nToSkip = elem.numberLong();
+    uassert(15956, "Argument to $skip cannot be negative", nToSkip >= 0);
 
-    intrusive_ptr<DocumentSourceSkip> pSkip(DocumentSourceSkip::create(pExpCtx));
-
-    pSkip->_skip = elem.numberLong();
-    uassert(15956,
-            str::stream() << DocumentSourceSkip::skipName
-                          << ":  the number to skip cannot be negative",
-            pSkip->_skip >= 0);
-
-    return pSkip;
+    return DocumentSourceSkip::create(pExpCtx, nToSkip);
 }
 }

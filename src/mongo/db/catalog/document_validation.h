@@ -56,17 +56,31 @@ class DisableDocumentValidation {
     MONGO_DISALLOW_COPYING(DisableDocumentValidation);
 
 public:
-    DisableDocumentValidation(OperationContext* txn)
-        : _txn(txn), _initialState(documentValidationDisabled(_txn)) {
-        documentValidationDisabled(_txn) = true;
+    DisableDocumentValidation(OperationContext* opCtx)
+        : _opCtx(opCtx), _initialState(documentValidationDisabled(_opCtx)) {
+        documentValidationDisabled(_opCtx) = true;
     }
 
     ~DisableDocumentValidation() {
-        documentValidationDisabled(_txn) = _initialState;
+        documentValidationDisabled(_opCtx) = _initialState;
     }
 
 private:
-    OperationContext* const _txn;
+    OperationContext* const _opCtx;
     const bool _initialState;
+};
+
+/**
+ * Disables document validation while in scope if the constructor is passed true.
+ */
+class DisableDocumentValidationIfTrue {
+public:
+    DisableDocumentValidationIfTrue(OperationContext* opCtx, bool shouldDisableValidation) {
+        if (shouldDisableValidation)
+            _documentValidationDisabler.emplace(opCtx);
+    }
+
+private:
+    boost::optional<DisableDocumentValidation> _documentValidationDisabler;
 };
 }

@@ -31,12 +31,14 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -46,10 +48,15 @@ class RecordStore;
 
 class KVCatalog {
 public:
+    class FeatureTracker;
+
     /**
-     * @param rs - does NOT take ownership
+     * @param rs - does NOT take ownership. The RecordStore must be thread-safe, in particular
+     * with concurrent calls to RecordStore::find, updateRecord, insertRecord, deleteRecord and
+     * dataFor. The KVCatalog does not utilize Cursors and those methods may omit further
+     * protection.
      */
-    KVCatalog(RecordStore* rs, bool isRsThreadSafe, bool directoryPerDb, bool directoryForIndexes);
+    KVCatalog(RecordStore* rs, bool directoryPerDb, bool directoryForIndexes);
     ~KVCatalog();
 
     void init(OperationContext* opCtx);
@@ -59,7 +66,10 @@ public:
     /**
      * @return error or ident for instance
      */
-    Status newCollection(OperationContext* opCtx, StringData ns, const CollectionOptions& options);
+    Status newCollection(OperationContext* opCtx,
+                         StringData ns,
+                         const CollectionOptions& options,
+                         KVPrefix prefix);
 
     std::string getCollectionIdent(StringData ns) const;
 
@@ -82,6 +92,11 @@ public:
 
     bool isUserDataIdent(StringData ident) const;
 
+    FeatureTracker* getFeatureTracker() const {
+        invariant(_featureTracker);
+        return _featureTracker.get();
+    }
+
 private:
     class AddIdentChange;
     class RemoveIdentChange;
@@ -100,7 +115,6 @@ private:
     bool _hasEntryCollidingWithRand() const;
 
     RecordStore* _rs;  // not owned
-    const bool _isRsThreadSafe;
     const bool _directoryPerDb;
     const bool _directoryForIndexes;
 
@@ -117,5 +131,9 @@ private:
     typedef std::map<std::string, Entry> NSToIdentMap;
     NSToIdentMap _idents;
     mutable stdx::mutex _identsLock;
+
+    // Manages the feature document that may be present in the KVCatalog. '_featureTracker' is
+    // guaranteed to be non-null after KVCatalog::init() is called.
+    std::unique_ptr<FeatureTracker> _featureTracker;
 };
 }

@@ -30,12 +30,14 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/grid.h"
 
 namespace {
 
@@ -50,15 +52,16 @@ using std::stringstream;
    Note: doesn't work with authentication enabled, except as internal operation or for
    old-style users for backwards compatibility.
 */
-class CmdClone : public Command {
+class CmdClone : public BasicCommand {
 public:
-    CmdClone() : Command("clone") {}
+    CmdClone() : BasicCommand("clone") {}
 
     virtual bool slaveOk() const {
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -67,7 +70,7 @@ public:
         help << "{clone: \"host13\"[, slaveOk: <bool>]}";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         ActionSet actions;
@@ -84,15 +87,13 @@ public:
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
-                     int,
-                     string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-            maybeDisableValidation.emplace(txn);
+            maybeDisableValidation.emplace(opCtx);
         }
 
         string from = cmdObj.getStringField("clone");
@@ -117,11 +118,10 @@ public:
 
         set<string> clonedColls;
 
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
+        Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
 
         Cloner cloner;
-        Status status = cloner.copyDb(txn, dbname, from, opts, &clonedColls);
+        Status status = cloner.copyDb(opCtx, dbname, from, opts, &clonedColls);
 
         BSONArrayBuilder barr;
         barr.append(clonedColls);

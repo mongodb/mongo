@@ -36,9 +36,7 @@ namespace executor {
 
 // This is a bitmask with the first bit set. It's used to mark connections that should be kept
 // open during stepdowns.
-#ifndef _MSC_EXTENSIONS
 const unsigned int NetworkInterface::kMessagingPortKeepOpen;
-#endif  // _MSC_EXTENSIONS
 
 NetworkInterface::NetworkInterface() {}
 NetworkInterface::~NetworkInterface() {}

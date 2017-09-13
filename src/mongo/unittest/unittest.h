@@ -40,12 +40,11 @@
 #include <utility>
 #include <vector>
 
-#include <boost/config.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -119,46 +118,52 @@
  * halts.
  */
 #define ASSERT_THROWS(STATEMENT, EXCEPTION_TYPE) \
-    ASSERT_THROWS_PRED(                          \
-        STATEMENT, EXCEPTION_TYPE, ::mongo::stdx::bind(::mongo::unittest::alwaysTrue))
+    ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE&) {}))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling what() on the thrown exception
  * does not return a string equal to EXPECTED_WHAT.
  */
-#define ASSERT_THROWS_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_WHAT)                  \
-    ASSERT_THROWS_PRED(STATEMENT,                                                     \
-                       EXCEPTION_TYPE,                                                \
-                       ::mongo::stdx::bind(std::equal_to<std::string>(),              \
-                                           (EXPECTED_WHAT),                           \
-                                           ::mongo::stdx::bind(&EXCEPTION_TYPE::what, \
-                                                               ::mongo::stdx::placeholders::_1)))
+#define ASSERT_THROWS_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_WHAT)                     \
+    ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
+                                 ASSERT_EQ(::mongo::StringData(ex.what()),               \
+                                           ::mongo::StringData(EXPECTED_WHAT));          \
+                             }))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
  * does not return an error code equal to EXPECTED_CODE.
  */
-#define ASSERT_THROWS_CODE(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE) \
-    ASSERT_THROWS_PRED(STATEMENT,                                    \
-                       EXCEPTION_TYPE,                               \
-                       ([](const EXCEPTION_TYPE& ex) { return (EXPECTED_CODE) == ex.getCode(); }))
+#define ASSERT_THROWS_CODE(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE)                     \
+    ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
+                                 ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);         \
+                             }))
 
 /**
- * Behaves like ASSERT_THROWS, above, but also fails if PREDICATE(ex) for the throw exception, ex,
- * is false.
+ * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
+ * does not return an error code equal to EXPECTED_CODE or if calling what() on the thrown exception
+ * does not return a string equal to EXPECTED_WHAT.
  */
-#define ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, PREDICATE)                              \
-    do {                                                                                      \
-        try {                                                                                 \
-            STATEMENT;                                                                        \
-            FAIL("Expected statement " #STATEMENT " to throw " #EXCEPTION_TYPE                \
-                 " but it threw nothing.");                                                   \
-        } catch (const EXCEPTION_TYPE& ex) {                                                  \
-            if (!(PREDICATE(ex))) {                                                           \
-                FAIL("Expected " #STATEMENT " to throw an exception of type " #EXCEPTION_TYPE \
-                     " where " #PREDICATE "(ex) was true, but it was false.");                \
-            }                                                                                 \
-        }                                                                                     \
+#define ASSERT_THROWS_CODE_AND_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE, EXPECTED_WHAT) \
+    ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) {     \
+                                 ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);             \
+                                 ASSERT_EQ(::mongo::StringData(ex.what()),                   \
+                                           ::mongo::StringData(EXPECTED_WHAT));              \
+                             }))
+
+/**
+ * Behaves like ASSERT_THROWS, above, but also calls CHECK(caughtException) which may contain
+ * additional assertions.
+ */
+#define ASSERT_THROWS_WITH_CHECK(STATEMENT, EXCEPTION_TYPE, CHECK)             \
+    do {                                                                       \
+        try {                                                                  \
+            STATEMENT;                                                         \
+            FAIL("Expected statement " #STATEMENT " to throw " #EXCEPTION_TYPE \
+                 " but it threw nothing.");                                    \
+        } catch (const EXCEPTION_TYPE& ex) {                                   \
+            CHECK(ex);                                                         \
+        }                                                                      \
     } while (false)
 
 #define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS)                                            \
@@ -166,7 +171,7 @@
         std::string myString(BIG_STRING);                                                       \
         std::string myContains(CONTAINS);                                                       \
         if (myString.find(myContains) == std::string::npos) {                                   \
-            str::stream err;                                                                    \
+            ::mongoutils::str::stream err;                                                      \
             err << "Expected to find " #CONTAINS " (" << myContains << ") in " #BIG_STRING " (" \
                 << myString << ")";                                                             \
             ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream();          \
@@ -289,6 +294,12 @@ protected:
 
     public:
         RegistrationAgent(const std::string& suiteName, const std::string& testName);
+        std::string getSuiteName() const;
+        std::string getTestName() const;
+
+    private:
+        const std::string _suiteName;
+        const std::string _testName;
     };
 
     /**
@@ -320,6 +331,16 @@ protected:
         return _capturedLogMessages;
     }
 
+    /**
+     * Returns the number of collected log lines containing "needle".
+     */
+    int64_t countLogLinesContaining(const std::string& needle);
+
+    /**
+     * Prints the captured log lines.
+     */
+    void printCapturedLogLines() const;
+
 private:
     /**
      * Called on the test object before running the test.
@@ -339,6 +360,7 @@ private:
     bool _isCapturingLogMessages;
     std::vector<std::string> _capturedLogMessages;
     logger::MessageLogDomain::AppenderHandle _captureAppenderHandle;
+    logger::MessageLogDomain::AppenderAutoPtr _captureAppender;
 };
 
 /**
@@ -455,6 +477,10 @@ public:
         _message = message;
     }
 
+    const std::string& what() const {
+        return getMessage();
+    }
+
     std::string toString() const;
 
 private:
@@ -467,7 +493,7 @@ class TestAssertionFailure {
 public:
     TestAssertionFailure(const std::string& file, unsigned line, const std::string& message);
     TestAssertionFailure(const TestAssertionFailure& other);
-    ~TestAssertionFailure() BOOST_NOEXCEPT_IF(false);
+    ~TestAssertionFailure() noexcept(false);
 
     TestAssertionFailure& operator=(const TestAssertionFailure& other);
 
@@ -511,12 +537,12 @@ private:
         std::shared_ptr<TestAssertionFailure> _assertion;                                     \
     }
 
-DECLARE_COMPARISON_ASSERTION(EQ, == );
-DECLARE_COMPARISON_ASSERTION(NE, != );
-DECLARE_COMPARISON_ASSERTION(LT, < );
-DECLARE_COMPARISON_ASSERTION(LTE, <= );
-DECLARE_COMPARISON_ASSERTION(GT, > );
-DECLARE_COMPARISON_ASSERTION(GTE, >= );
+DECLARE_COMPARISON_ASSERTION(EQ, ==);
+DECLARE_COMPARISON_ASSERTION(NE, !=);
+DECLARE_COMPARISON_ASSERTION(LT, <);
+DECLARE_COMPARISON_ASSERTION(LTE, <=);
+DECLARE_COMPARISON_ASSERTION(GT, >);
+DECLARE_COMPARISON_ASSERTION(GTE, >=);
 #undef DECLARE_COMPARISON_ASSERTION
 
 /**
@@ -533,12 +559,6 @@ T assertGet(StatusWith<T>&& swt) {
     ASSERT_OK(swt.getStatus());
     return std::move(swt.getValue());
 }
-
-/**
- * Hack to support the runaway test observer in dbtests.  This is a hook that
- * unit test running harnesses (unittest_main and dbtests) must implement.
- */
-void onCurrentTestNameChange(const std::string& testName);
 
 /**
  * Return a list of suite names.

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -49,8 +49,25 @@
 typedef struct {
 	WT_EXTRACTOR extractor;		/* Must come first */
 	WT_EXTENSION_API *wt_api;	/* Extension API */
-	int field_num;			/* Field to extract */
+	int field;			/* Field to extract */
+	int format_isnum;		/* Field contents are numeric */
 } CSV_EXTRACTOR;
+
+/*
+ * csv_error --
+ *	Display an error from this module in a standard way.
+ */
+static int
+csv_error(const CSV_EXTRACTOR *csv_extractor,
+    WT_SESSION *session, int err, const char *msg)
+{
+	WT_EXTENSION_API *wt_api;
+
+	wt_api = csv_extractor->wt_api;
+	(void)wt_api->err_printf(wt_api, session,
+	    "csv extraction: %s: %s", msg, wt_api->strerror(wt_api, NULL, err));
+	return (err);
+}
 
 /*
  * csv_extract --
@@ -60,29 +77,29 @@ static int
 csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value, WT_CURSOR *result_cursor)
 {
-	char *copy, *p, *pend, *valstr;
-	const CSV_EXTRACTOR *cvs_extractor;
-	int i, ret;
+	const CSV_EXTRACTOR *csv_extractor;
+	WT_EXTENSION_API *wt_api;
 	size_t len;
-	WT_EXTENSION_API *wtapi;
+	int i, ret, val;
+	char *copy, *p, *pend, *valstr;
 
 	(void)key;				/* Unused parameters */
 
-	cvs_extractor = (const CSV_EXTRACTOR *)extractor;
-	wtapi = cvs_extractor->wt_api;
+	csv_extractor = (const CSV_EXTRACTOR *)extractor;
+	wt_api = csv_extractor->wt_api;
 
 	/* Unpack the value. */
-	if ((ret = wtapi->struct_unpack(wtapi,
+	if ((ret = wt_api->struct_unpack(wt_api,
 	    session, value->data, value->size, "S", &valstr)) != 0)
 		return (ret);
 
 	p = valstr;
 	pend = strchr(p, ',');
-	for (i = 0; i < cvs_extractor->field_num && pend != NULL; i++) {
+	for (i = 0; i < csv_extractor->field && pend != NULL; i++) {
 		p = pend + 1;
 		pend = strchr(p, ',');
 	}
-	if (i == cvs_extractor->field_num) {
+	if (i == csv_extractor->field) {
 		if (pend == NULL)
 			pend = p + strlen(p);
 		/*
@@ -95,7 +112,16 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 			return (errno);
 		strncpy(copy, p, len);
 		copy[len] = '\0';
-		result_cursor->set_key(result_cursor, copy);
+		if (csv_extractor->format_isnum) {
+			if ((val = atoi(copy)) < 0) {
+				ret = csv_error(csv_extractor,
+				    session, EINVAL, "invalid key value");
+				free(copy);
+				return (ret);
+			}
+			result_cursor->set_key(result_cursor, val);
+		} else
+			result_cursor->set_key(result_cursor, copy);
 		ret = result_cursor->insert(result_cursor);
 		free(copy);
 		if (ret != 0)
@@ -107,7 +133,7 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 /*
  * csv_customize --
  *	The customize function creates a customized extractor,
- *	needed to save the field number.
+ *	needed to save the field number and format.
  */
 static int
 csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
@@ -115,20 +141,46 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 {
 	const CSV_EXTRACTOR *orig;
 	CSV_EXTRACTOR *csv_extractor;
+	WT_CONFIG_ITEM field, format;
+	WT_CONFIG_PARSER *parser;
+	WT_EXTENSION_API *wt_api;
 	long field_num;
+	int ret;
 
 	(void)session;				/* Unused parameters */
 	(void)uri;				/* Unused parameters */
 
 	orig = (const CSV_EXTRACTOR *)extractor;
-	field_num = strtol(appcfg->str, NULL, 10);
-	if (field_num < 0 || field_num > INT_MAX)
+	wt_api = orig->wt_api;
+	if ((ret = wt_api->config_parser_open(wt_api, session, appcfg->str,
+	    appcfg->len, &parser)) != 0)
+		return (ret);
+	if ((ret = parser->get(parser, "field", &field)) != 0 ||
+	    (ret = parser->get(parser, "format", &format)) != 0) {
+		if (ret == WT_NOTFOUND) {
+			(void)wt_api->err_printf(
+			    wt_api, session, "field or format not found");
+			return (WT_NOTFOUND);
+		}
+		return (ret);
+	}
+	field_num = strtol(field.str, NULL, 10);
+	if (field_num < 0 || field_num > INT_MAX) {
+		(void)wt_api->err_printf(
+		    wt_api, session, "field: invalid format");
 		return (EINVAL);
+	}
+	if (format.len != 1 || (format.str[0] != 'S' && format.str[0] != 'i')) {
+		(void)wt_api->err_printf(
+		    wt_api, session, "format: invalid format");
+		return (EINVAL);
+	}
 	if ((csv_extractor = calloc(1, sizeof(CSV_EXTRACTOR))) == NULL)
 		return (errno);
 
 	*csv_extractor = *orig;
-	csv_extractor->field_num = field_num;
+	csv_extractor->field = (int)field_num;
+	csv_extractor->format_isnum = (format.str[0] == 'i');
 	*customp = (WT_EXTRACTOR *)csv_extractor;
 	return (0);
 }

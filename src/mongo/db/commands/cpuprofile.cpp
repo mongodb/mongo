@@ -68,16 +68,16 @@ namespace {
 /**
  * Common code for the implementation of cpu profiler commands.
  */
-class CpuProfilerCommand : public Command {
+class CpuProfilerCommand : public ErrmsgCommandDeprecated {
 public:
-    CpuProfilerCommand(char const* name) : Command(name) {}
+    CpuProfilerCommand(char const* name) : ErrmsgCommandDeprecated(name) {}
     virtual bool slaveOk() const {
         return true;
     }
     virtual bool adminOnly() const {
         return true;
     }
-    virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) {
+    virtual bool localHostOnlyIfNoAuth() {
         return true;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
@@ -91,8 +91,8 @@ public:
     // This is an abuse of the global dbmutex.  We only really need to
     // ensure that only one cpuprofiler command runs at once; it would
     // be fine for it to run concurrently with other operations.
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
 };
 
@@ -103,12 +103,11 @@ class CpuProfilerStartCommand : public CpuProfilerCommand {
 public:
     CpuProfilerStartCommand() : CpuProfilerCommand(commandName) {}
 
-    virtual bool run(OperationContext* txn,
-                     std::string const& db,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
-                     BSONObjBuilder& result);
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           std::string const& db,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result);
 
     static char const* const commandName;
 } cpuProfilerStartCommandInstance;
@@ -120,12 +119,11 @@ class CpuProfilerStopCommand : public CpuProfilerCommand {
 public:
     CpuProfilerStopCommand() : CpuProfilerCommand(commandName) {}
 
-    virtual bool run(OperationContext* txn,
-                     std::string const& db,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
-                     BSONObjBuilder& result);
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           std::string const& db,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result);
 
     static char const* const commandName;
 } cpuProfilerStopCommandInstance;
@@ -133,16 +131,14 @@ public:
 char const* const CpuProfilerStartCommand::commandName = "_cpuProfilerStart";
 char const* const CpuProfilerStopCommand::commandName = "_cpuProfilerStop";
 
-bool CpuProfilerStartCommand::run(OperationContext* txn,
-                                  std::string const& db,
-                                  BSONObj& cmdObj,
-                                  int options,
-                                  std::string& errmsg,
-                                  BSONObjBuilder& result) {
-    ScopedTransaction transaction(txn, MODE_IX);
-    Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
-    // The lock here is just to prevent concurrency, nothing will write.
-    OldClientContext ctx(txn, db);
+bool CpuProfilerStartCommand::errmsgRun(OperationContext* opCtx,
+                                        std::string const& db,
+                                        const BSONObj& cmdObj,
+                                        std::string& errmsg,
+                                        BSONObjBuilder& result) {
+    // The DB lock here is just so we have IX on the global lock in order to prevent shutdown
+    Lock::DBLock dbXLock(opCtx, db, MODE_X);
+    OldClientContext ctx(opCtx, db, false /* no shard version checking */);
 
     std::string profileFilename = cmdObj[commandName]["profileFilename"].String();
     if (!::ProfilerStart(profileFilename.c_str())) {
@@ -152,15 +148,14 @@ bool CpuProfilerStartCommand::run(OperationContext* txn,
     return true;
 }
 
-bool CpuProfilerStopCommand::run(OperationContext* txn,
-                                 std::string const& db,
-                                 BSONObj& cmdObj,
-                                 int options,
-                                 std::string& errmsg,
-                                 BSONObjBuilder& result) {
-    ScopedTransaction transaction(txn, MODE_IX);
-    Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
-    OldClientContext ctx(txn, db);
+bool CpuProfilerStopCommand::errmsgRun(OperationContext* opCtx,
+                                       std::string const& db,
+                                       const BSONObj& cmdObj,
+                                       std::string& errmsg,
+                                       BSONObjBuilder& result) {
+    // The DB lock here is just so we have IX on the global lock in order to prevent shutdown
+    Lock::DBLock dbXLock(opCtx, db, MODE_X);
+    OldClientContext ctx(opCtx, db, false /* no shard version checking */);
 
     ::ProfilerStop();
     return true;

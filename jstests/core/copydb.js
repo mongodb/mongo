@@ -16,6 +16,5 @@ assert.eq(1, db2.foo.count(), "D");
 assert.eq(db1.foo.getIndexes().length, db2.foo.getIndexes().length);
 
 // Test command input validation.
-assert.commandFailed(db1.adminCommand({copydb: 1,
-                                       fromdb: db1.getName(),
-                                       todb: "copydb.invalid"})); // Name can't contain dot.
+assert.commandFailed(db1.adminCommand(
+    {copydb: 1, fromdb: db1.getName(), todb: "copydb.invalid"}));  // Name can't contain dot.

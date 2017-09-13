@@ -1,5 +1,3 @@
-// kv_storage_engine.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -32,6 +30,8 @@
 
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 
+#include <algorithm>
+
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -50,7 +50,7 @@ const std::string catalogInfo = "_mdb_catalog";
 
 class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
 public:
-    RemoveDBChange(KVStorageEngine* engine, StringData db, KVDatabaseCatalogEntry* entry)
+    RemoveDBChange(KVStorageEngine* engine, StringData db, KVDatabaseCatalogEntryBase* entry)
         : _engine(engine), _db(db.toString()), _entry(entry) {}
 
     virtual void commit() {
@@ -64,95 +64,170 @@ public:
 
     KVStorageEngine* const _engine;
     const std::string _db;
-    KVDatabaseCatalogEntry* const _entry;
+    KVDatabaseCatalogEntryBase* const _entry;
 };
 
-KVStorageEngine::KVStorageEngine(KVEngine* engine, const KVStorageEngineOptions& options)
-    : _options(options), _engine(engine), _supportsDocLocking(_engine->supportsDocLocking()) {
+KVStorageEngine::KVStorageEngine(
+    KVEngine* engine,
+    const KVStorageEngineOptions& options,
+    stdx::function<KVDatabaseCatalogEntryFactory> databaseCatalogEntryFactory)
+    : _databaseCatalogEntryFactory(std::move(databaseCatalogEntryFactory)),
+      _options(options),
+      _engine(engine),
+      _supportsDocLocking(_engine->supportsDocLocking()),
+      _supportsDBLocking(_engine->supportsDBLocking()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",
             !(options.directoryPerDB && !engine->supportsDirectoryPerDB()));
 
     OperationContextNoop opCtx(_engine->newRecoveryUnit());
 
-    if (options.forRepair && engine->hasIdent(&opCtx, catalogInfo)) {
+    bool catalogExists = engine->hasIdent(&opCtx, catalogInfo);
+
+    if (options.forRepair && catalogExists) {
         log() << "Repairing catalog metadata";
         // TODO should also validate all BSON in the catalog.
-        engine->repairIdent(&opCtx, catalogInfo);
+        engine->repairIdent(&opCtx, catalogInfo).transitional_ignore();
     }
 
-    {
+    if (!catalogExists) {
         WriteUnitOfWork uow(&opCtx);
 
-        Status status =
-            _engine->createRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions());
+        Status status = _engine->createGroupedRecordStore(
+            &opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
         if (status.code() == ErrorCodes::BadValue) {
             fassertFailedNoTrace(28562);
         }
         fassert(28520, status);
-
-        _catalogRecordStore.reset(
-            _engine->getRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions()));
-        _catalog.reset(new KVCatalog(_catalogRecordStore.get(),
-                                     _supportsDocLocking,
-                                     _options.directoryPerDB,
-                                     _options.directoryForIndexes));
-        _catalog->init(&opCtx);
-
-        std::vector<std::string> collections;
-        _catalog->getAllCollections(&collections);
-
-        for (size_t i = 0; i < collections.size(); i++) {
-            std::string coll = collections[i];
-            NamespaceString nss(coll);
-            string dbName = nss.db().toString();
-
-            // No rollback since this is only for committed dbs.
-            KVDatabaseCatalogEntry*& db = _dbs[dbName];
-            if (!db) {
-                db = new KVDatabaseCatalogEntry(dbName, this);
-            }
-
-            db->initCollection(&opCtx, coll, options.forRepair);
-        }
-
         uow.commit();
     }
 
+    _catalogRecordStore = _engine->getGroupedRecordStore(
+        &opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
+    _catalog.reset(new KVCatalog(
+        _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes));
+    _catalog->init(&opCtx);
+
+    std::vector<std::string> collections;
+    _catalog->getAllCollections(&collections);
+
+    KVPrefix maxSeenPrefix = KVPrefix::kNotPrefixed;
+    for (size_t i = 0; i < collections.size(); i++) {
+        std::string coll = collections[i];
+        NamespaceString nss(coll);
+        string dbName = nss.db().toString();
+
+        // No rollback since this is only for committed dbs.
+        KVDatabaseCatalogEntryBase*& db = _dbs[dbName];
+        if (!db) {
+            db = _databaseCatalogEntryFactory(dbName, this).release();
+        }
+
+        db->initCollection(&opCtx, coll, options.forRepair);
+        auto maxPrefixForCollection = _catalog->getMetaData(&opCtx, coll).getMaxPrefix();
+        maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
+    }
+
+    KVPrefix::setLargestPrefix(maxSeenPrefix);
     opCtx.recoveryUnit()->abandonSnapshot();
+}
 
-    // now clean up orphaned idents
-
+/**
+ * This method reconciles differences between idents the KVEngine is aware of and the
+ * KVCatalog. There are three differences to consider:
+ *
+ * First, a KVEngine may know of an ident that the KVCatalog does not. This method will drop
+ * the ident from the KVEngine.
+ *
+ * Second, a KVCatalog may have a collection ident that the KVEngine does not. This is an
+ * illegal state and this method fasserts.
+ *
+ * Third, a KVCatalog may have an index ident that the KVEngine does not. This method will
+ * rebuild the index.
+ */
+StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>>
+KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
+    // Gather all tables known to the storage engine and drop those that aren't cross-referenced
+    // in the _mdb_catalog. This can happen for two reasons.
+    //
+    // First, collection creation and deletion happen in two steps. First the storage engine
+    // creates/deletes the table, followed by the change to the _mdb_catalog. It's not assumed a
+    // storage engine can make these steps atomic.
+    //
+    // Second, a replica set node in 3.6+ on supported storage engines will only persist "stable"
+    // data to disk. That is data which replication guarantees won't be rolled back. The
+    // _mdb_catalog will reflect the "stable" set of collections/indexes. However, it's not
+    // expected for a storage engine's ability to persist stable data to extend to "stable
+    // tables".
+    std::set<std::string> engineIdents;
     {
-        // get all idents
-        std::set<std::string> allIdents;
-        {
-            std::vector<std::string> v = _engine->getAllIdents(&opCtx);
-            allIdents.insert(v.begin(), v.end());
-            allIdents.erase(catalogInfo);
+        std::vector<std::string> vec = _engine->getAllIdents(opCtx);
+        engineIdents.insert(vec.begin(), vec.end());
+        engineIdents.erase(catalogInfo);
+    }
+
+    std::set<std::string> catalogIdents;
+    {
+        std::vector<std::string> vec = _catalog->getAllIdents(opCtx);
+        catalogIdents.insert(vec.begin(), vec.end());
+    }
+
+    // Drop all idents in the storage engine that are not known to the catalog. This can happen in
+    // the case of a collection or index creation being rolled back.
+    for (const auto& it : engineIdents) {
+        if (catalogIdents.find(it) != catalogIdents.end()) {
+            continue;
         }
 
-        // remove ones still in use
-        {
-            vector<string> idents = _catalog->getAllIdents(&opCtx);
-            for (size_t i = 0; i < idents.size(); i++) {
-                allIdents.erase(idents[i]);
-            }
+        if (!_catalog->isUserDataIdent(it)) {
+            continue;
         }
 
-        for (std::set<std::string>::const_iterator it = allIdents.begin(); it != allIdents.end();
-             ++it) {
-            const std::string& toRemove = *it;
-            if (!_catalog->isUserDataIdent(toRemove))
-                continue;
-            log() << "dropping unused ident: " << toRemove;
-            WriteUnitOfWork wuow(&opCtx);
-            _engine->dropIdent(&opCtx, toRemove);
-            wuow.commit();
+        const auto& toRemove = it;
+        log() << "Dropping unknown ident: " << toRemove;
+        WriteUnitOfWork wuow(opCtx);
+        fassertStatusOK(40591, _engine->dropIdent(opCtx, toRemove));
+        wuow.commit();
+    }
+
+    // Scan all collections in the catalog and make sure their ident is known to the storage
+    // engine. An omission here is fatal. A missing ident could mean a collection drop was rolled
+    // back. Note that startup already attempts to open tables; this should only catch errors in
+    // other contexts such as `recoverToStableTimestamp`.
+    std::vector<std::string> collections;
+    _catalog->getAllCollections(&collections);
+    for (const auto& coll : collections) {
+        const auto& identForColl = _catalog->getCollectionIdent(coll);
+        if (engineIdents.find(identForColl) == engineIdents.end()) {
+            return {ErrorCodes::UnrecoverableRollbackError,
+                    str::stream() << "Expected collection does not exist. NS: " << coll
+                                  << " Ident: "
+                                  << identForColl};
         }
     }
+
+    // Scan all indexes and return those in the catalog where the storage engine does not have the
+    // corresponding ident. The caller is expected to rebuild these indexes.
+    std::vector<CollectionIndexNamePair> ret;
+    for (const auto& coll : collections) {
+        const BSONCollectionCatalogEntry::MetaData metaData = _catalog->getMetaData(opCtx, coll);
+        for (const auto& indexMetaData : metaData.indexes) {
+            const std::string& indexName = indexMetaData.name();
+            std::string indexIdent = _catalog->getIndexIdent(opCtx, coll, indexName);
+            if (engineIdents.find(indexIdent) != engineIdents.end()) {
+                continue;
+            }
+
+            log() << "Expected index data is missing, rebuilding. NS: " << coll
+                  << " Index: " << indexName << " Ident: " << indexIdent;
+
+            ret.push_back(CollectionIndexNamePair(coll, indexName));
+        }
+    }
+
+    return ret;
 }
 
 void KVStorageEngine::cleanShutdown() {
@@ -189,24 +264,24 @@ void KVStorageEngine::listDatabases(std::vector<std::string>* out) const {
     }
 }
 
-DatabaseCatalogEntry* KVStorageEngine::getDatabaseCatalogEntry(OperationContext* opCtx,
-                                                               StringData dbName) {
+KVDatabaseCatalogEntryBase* KVStorageEngine::getDatabaseCatalogEntry(OperationContext* opCtx,
+                                                                     StringData dbName) {
     stdx::lock_guard<stdx::mutex> lk(_dbsLock);
-    KVDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
+    KVDatabaseCatalogEntryBase*& db = _dbs[dbName.toString()];
     if (!db) {
         // Not registering change since db creation is implicit and never rolled back.
-        db = new KVDatabaseCatalogEntry(dbName, this);
+        db = _databaseCatalogEntryFactory(dbName, this).release();
     }
     return db;
 }
 
-Status KVStorageEngine::closeDatabase(OperationContext* txn, StringData db) {
+Status KVStorageEngine::closeDatabase(OperationContext* opCtx, StringData db) {
     // This is ok to be a no-op as there is no database layer in kv.
     return Status::OK();
 }
 
-Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
-    KVDatabaseCatalogEntry* entry;
+Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
+    KVDatabaseCatalogEntryBase* entry;
     {
         stdx::lock_guard<stdx::mutex> lk(_dbsLock);
         DBMap::const_iterator it = _dbs.find(db.toString());
@@ -220,14 +295,14 @@ Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
     // wherever possible. Eventually we want to move this up so that it can include the logOp
     // inside of the WUOW, but that would require making DB dropping happen inside the Dur
     // system for MMAPv1.
-    WriteUnitOfWork wuow(txn);
+    WriteUnitOfWork wuow(opCtx);
 
     std::list<std::string> toDrop;
     entry->getCollectionNamespaces(&toDrop);
 
     for (std::list<std::string>::iterator it = toDrop.begin(); it != toDrop.end(); ++it) {
         string coll = *it;
-        entry->dropCollection(txn, coll);
+        entry->dropCollection(opCtx, coll).transitional_ignore();
     }
     toDrop.clear();
     entry->getCollectionNamespaces(&toDrop);
@@ -235,7 +310,7 @@ Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
 
     {
         stdx::lock_guard<stdx::mutex> lk(_dbsLock);
-        txn->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
+        opCtx->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
         _dbs.erase(db.toString());
     }
 
@@ -243,20 +318,65 @@ Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
     return Status::OK();
 }
 
-int KVStorageEngine::flushAllFiles(bool sync) {
-    return _engine->flushAllFiles(sync);
+int KVStorageEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
+    return _engine->flushAllFiles(opCtx, sync);
+}
+
+Status KVStorageEngine::beginBackup(OperationContext* opCtx) {
+    // We should not proceed if we are already in backup mode
+    if (_inBackupMode)
+        return Status(ErrorCodes::BadValue, "Already in Backup Mode");
+    Status status = _engine->beginBackup(opCtx);
+    if (status.isOK())
+        _inBackupMode = true;
+    return status;
+}
+
+void KVStorageEngine::endBackup(OperationContext* opCtx) {
+    // We should never reach here if we aren't already in backup mode
+    invariant(_inBackupMode);
+    _engine->endBackup(opCtx);
+    _inBackupMode = false;
 }
 
 bool KVStorageEngine::isDurable() const {
     return _engine->isDurable();
 }
 
-Status KVStorageEngine::repairRecordStore(OperationContext* txn, const std::string& ns) {
-    Status status = _engine->repairIdent(txn, _catalog->getCollectionIdent(ns));
+bool KVStorageEngine::isEphemeral() const {
+    return _engine->isEphemeral();
+}
+
+SnapshotManager* KVStorageEngine::getSnapshotManager() const {
+    return _engine->getSnapshotManager();
+}
+
+Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const std::string& ns) {
+    Status status = _engine->repairIdent(opCtx, _catalog->getCollectionIdent(ns));
     if (!status.isOK())
         return status;
 
-    _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(txn, ns);
+    _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(opCtx, ns);
     return Status::OK();
 }
+
+void KVStorageEngine::setJournalListener(JournalListener* jl) {
+    _engine->setJournalListener(jl);
 }
+
+void KVStorageEngine::setStableTimestamp(SnapshotName stableTimestamp) {
+    _engine->setStableTimestamp(stableTimestamp);
+}
+
+void KVStorageEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
+    _engine->setInitialDataTimestamp(initialDataTimestamp);
+}
+
+bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
+    return _engine->supportsRecoverToStableTimestamp();
+}
+
+void KVStorageEngine::replicationBatchIsComplete() const {
+    return _engine->replicationBatchIsComplete();
+}
+}  // namespace mongo

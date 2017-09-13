@@ -31,40 +31,10 @@
 
 #include "mongo/db/dbmessage.h"
 
+#include "mongo/platform/strnlen.h"
+#include "mongo/rpc/object_check.h"
+
 namespace mongo {
-
-using std::string;
-using std::stringstream;
-
-string Message::toString() const {
-    stringstream ss;
-    ss << "op: " << opToString(operation()) << " len: " << size();
-    if (operation() >= 2000 && operation() < 2100) {
-        DbMessage d(*this);
-        ss << " ns: " << d.getns();
-        switch (operation()) {
-            case dbUpdate: {
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj();
-                BSONObj o = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q << " update: " << o;
-                break;
-            }
-            case dbInsert:
-                ss << d.nextJsObj();
-                break;
-            case dbDelete: {
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj();
-                ss << " flags: " << flags << " query: " << q;
-                break;
-            }
-            default:
-                ss << " CANNOT HANDLE YET";
-        }
-    }
-    return ss.str();
-}
 
 DbMessage::DbMessage(const Message& msg) : _msg(msg), _nsStart(NULL), _mark(NULL), _nsLen(0) {
     // for received messages, Message has only one buffer
@@ -117,13 +87,14 @@ const char* DbMessage::getArray(size_t count) const {
 }
 
 BSONObj DbMessage::nextJsObj() {
-    massert(10304,
+    uassert(ErrorCodes::InvalidBSON,
             "Client Error: Remaining data too small for BSON object",
             _nextjsobj != NULL && _theEnd - _nextjsobj >= 5);
 
     if (serverGlobalParams.objcheck) {
-        Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj);
-        massert(10307,
+        Status status = validateBSON(
+            _nextjsobj, _theEnd - _nextjsobj, Validator<BSONObj>::enabledBSONVersion());
+        uassert(ErrorCodes::InvalidBSON,
                 str::stream() << "Client Error: bad object in message: " << status.reason(),
                 status.isOK());
     }
@@ -168,60 +139,103 @@ T DbMessage::readAndAdvance() {
     return t;
 }
 
-void replyToQuery(int queryResultFlags,
-                  AbstractMessagingPort* p,
-                  Message& requestMsg,
-                  void* data,
-                  int size,
-                  int nReturned,
-                  int startingFrom,
-                  long long cursorId) {
-    BufBuilder b(32768);
-    b.skip(sizeof(QueryResult::Value));
-    b.appendBuf(data, size);
-    QueryResult::View qr = b.buf();
+namespace {
+template <typename Func>
+Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
+    BufBuilder b;
+    b.skip(sizeof(MSGHEADER::Layout));
+
+    bodyBuilder(b);
+
+    const int size = b.len();
+    auto out = Message(b.release());
+    out.header().setOperation(op);
+    out.header().setLen(size);
+    return out;
+}
+}
+
+Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
+    return makeMessage(dbInsert, [&](BufBuilder& b) {
+        int reservedFlags = 0;
+        if (flags & InsertOption_ContinueOnError)
+            reservedFlags |= InsertOption_ContinueOnError;
+
+        b.appendNum(reservedFlags);
+        b.appendStr(ns);
+
+        for (size_t i = 0; i < count; i++) {
+            objs[i].appendSelfToBufBuilder(b);
+        }
+    });
+}
+
+Message makeUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
+    return makeMessage(dbUpdate, [&](BufBuilder& b) {
+        const int reservedFlags = 0;
+        b.appendNum(reservedFlags);
+        b.appendStr(ns);
+        b.appendNum(flags);
+
+        query.appendSelfToBufBuilder(b);
+        update.appendSelfToBufBuilder(b);
+    });
+}
+
+Message makeRemoveMessage(StringData ns, BSONObj query, int flags) {
+    return makeMessage(dbDelete, [&](BufBuilder& b) {
+        const int reservedFlags = 0;
+        b.appendNum(reservedFlags);
+        b.appendStr(ns);
+        b.appendNum(flags);
+
+        query.appendSelfToBufBuilder(b);
+    });
+}
+
+Message makeKillCursorsMessage(long long cursorId) {
+    return makeMessage(dbKillCursors, [&](BufBuilder& b) {
+        b.appendNum((int)0);  // reserved
+        b.appendNum((int)1);  // number
+        b.appendNum(cursorId);
+    });
+}
+
+Message makeGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags) {
+    return makeMessage(dbGetMore, [&](BufBuilder& b) {
+        b.appendNum(flags);
+        b.appendStr(ns);
+        b.appendNum(nToReturn);
+        b.appendNum(cursorId);
+    });
+}
+
+OpQueryReplyBuilder::OpQueryReplyBuilder() : _buffer(32768) {
+    _buffer.skip(sizeof(QueryResult::Value));
+}
+
+Message OpQueryReplyBuilder::toQueryReply(int queryResultFlags,
+                                          int nReturned,
+                                          int startingFrom,
+                                          long long cursorId) {
+    QueryResult::View qr = _buffer.buf();
     qr.setResultFlags(queryResultFlags);
-    qr.msgdata().setLen(b.len());
+    qr.msgdata().setLen(_buffer.len());
     qr.msgdata().setOperation(opReply);
     qr.setCursorId(cursorId);
     qr.setStartingFrom(startingFrom);
     qr.setNReturned(nReturned);
-    b.decouple();
-    Message resp(qr.view2ptr(), true);
-    p->reply(requestMsg, resp, requestMsg.header().getId());
+    return Message(_buffer.release());
 }
 
-void replyToQuery(int queryResultFlags,
-                  AbstractMessagingPort* p,
-                  Message& requestMsg,
-                  const BSONObj& responseObj) {
-    replyToQuery(
-        queryResultFlags, p, requestMsg, (void*)responseObj.objdata(), responseObj.objsize(), 1);
-}
-
-void replyToQuery(int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj) {
-    Message* resp = new Message();
-    replyToQuery(queryResultFlags, *resp, obj);
-    dbresponse.response = resp;
-    dbresponse.responseTo = m.header().getId();
-}
-
-void replyToQuery(int queryResultFlags, Message& response, const BSONObj& resultObj) {
-    BufBuilder bufBuilder;
-    bufBuilder.skip(sizeof(QueryResult::Value));
-    bufBuilder.appendBuf(reinterpret_cast<void*>(const_cast<char*>(resultObj.objdata())),
-                         resultObj.objsize());
-
-    QueryResult::View queryResult = bufBuilder.buf();
-    bufBuilder.decouple();
-
-    queryResult.setResultFlags(queryResultFlags);
-    queryResult.msgdata().setLen(bufBuilder.len());
-    queryResult.msgdata().setOperation(opReply);
-    queryResult.setCursorId(0);
-    queryResult.setStartingFrom(0);
-    queryResult.setNReturned(1);
-
-    response.setData(queryResult.view2ptr(), true);  // transport will free
+DbResponse replyToQuery(int queryResultFlags,
+                        const void* data,
+                        int size,
+                        int nReturned,
+                        int startingFrom,
+                        long long cursorId) {
+    OpQueryReplyBuilder reply;
+    reply.bufBuilderForResults().appendBuf(data, size);
+    return DbResponse{reply.toQueryReply(queryResultFlags, nReturned, startingFrom, cursorId)};
 }
 }

@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
 
@@ -40,6 +41,7 @@ namespace mongo {
 class BSONObjBuilder;
 class ConnectionString;
 class ReplicaSetMonitor;
+class MongoURI;
 
 /**
  * Manages the lifetime of a set of replica set monitors.
@@ -57,6 +59,7 @@ public:
      */
     std::shared_ptr<ReplicaSetMonitor> getMonitor(StringData setName);
     std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr);
+    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const MongoURI& uri);
 
     /**
      * Retrieves the names of all sets tracked by this manager.
@@ -71,21 +74,39 @@ public:
     void removeMonitor(StringData setName);
 
     /**
-     * Removes and destroys all replica set monitors.
+     * Removes and destroys all replica set monitors. Should be used for unit tests only.
      */
     void removeAllMonitors();
+
+    /**
+     * Shuts down _taskExecutor.
+     */
+    void shutdown();
 
     /**
      * Reports information about the replica sets tracked by us, for diagnostic purposes.
      */
     void report(BSONObjBuilder* builder);
 
+    /**
+     * Returns an executor for running RSM tasks.
+     */
+    executor::TaskExecutor* getExecutor();
+
 private:
-    using ReplicaSetMonitorsMap = StringMap<std::shared_ptr<ReplicaSetMonitor>>;
+    using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
     // Protects access to the replica set monitors
     stdx::mutex _mutex;
     ReplicaSetMonitorsMap _monitors;
+
+    // Executor for monitoring replica sets.
+    std::unique_ptr<executor::TaskExecutor> _taskExecutor;
+
+    void _setupTaskExecutorInLock(const std::string& name);
+
+    // set to true when shutdown has been called.
+    bool _isShutdown{false};
 };
 
 }  // namespace mongo

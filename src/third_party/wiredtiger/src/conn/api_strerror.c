@@ -13,13 +13,11 @@
 
 /*
  * __wt_wiredtiger_error --
- *	Return a constant string for WiredTiger POSIX-standard and errors.
+ *	Return a constant string for POSIX-standard and WiredTiger errors.
  */
 const char *
 __wt_wiredtiger_error(int error)
 {
-	const char *p;
-
 	/*
 	 * Check for WiredTiger specific errors.
 	 */
@@ -38,16 +36,24 @@ __wt_wiredtiger_error(int error)
 		return ("WT_RESTART: restart the operation (internal)");
 	case WT_RUN_RECOVERY:
 		return ("WT_RUN_RECOVERY: recovery must be run to continue");
+	case WT_CACHE_FULL:
+		return ("WT_CACHE_FULL: operation would overflow cache");
 	}
 
+	/* Windows strerror doesn't support ENOTSUP. */
+	if (error == ENOTSUP)
+		return ("Operation not supported");
+
 	/*
-	 * POSIX errors are non-negative integers; check for 0 explicitly
-	 * in-case the underlying strerror doesn't handle 0, some don't.
+	 * Check for 0 in case the underlying strerror doesn't handle it, some
+	 * historically didn't.
 	 */
 	if (error == 0)
 		return ("Successful return: 0");
-	if (error > 0 && (p = strerror(error)) != NULL)
-		return (p);
+
+	/* POSIX errors are non-negative integers. */
+	if (error > 0)
+		return (strerror(error));
 
 	return (NULL);
 }

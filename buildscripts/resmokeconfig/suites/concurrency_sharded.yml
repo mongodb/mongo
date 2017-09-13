@@ -1,0 +1,16 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/concurrency/fsm_all_sharded*.js
+  exclude_files:
+  # Skip causal consistency and continuous stepdown tests because they're run in separate suites
+  - jstests/concurrency/fsm_all_sharded_causal_consistency*.js
+  - jstests/concurrency/fsm_all_sharded_with_stepdowns*.js
+
+# Concurrency tests that run against a sharded cluster start one themselves.
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands

@@ -29,22 +29,29 @@
 
 #include "mongo/platform/basic.h"
 
-#include <mutex>
-#include <vector>
 #include <string>
-#include <thread>
+#include <vector>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
-#include "mongo/util/net/listen.h"
-#include "mongo/util/net/message_port.h"
-#include "mongo/util/net/message_server.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_legacy.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/net/socket_exception.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
-#include "mongo/unittest/unittest.h"
 
 /**
  * Tests for ScopedDbConnection, particularly in connection pool management.
@@ -64,52 +71,82 @@ class OperationContext;
 
 namespace {
 
-std::mutex shutDownMutex;
-bool shuttingDown = false;
-
-}  // namespace
-
-// Symbols defined to build the binary correctly.
-bool inShutdown() {
-    std::lock_guard<std::mutex> sl(shutDownMutex);
-    return shuttingDown;
-}
-
-void signalShutdown() {}
-
-DBClientBase* createDirectClient(OperationContext* txn) {
-    return NULL;
-}
-
-void dbexit(ExitCode rc, const char* why) {
-    {
-        std::lock_guard<std::mutex> sl(shutDownMutex);
-        shuttingDown = true;
-    }
-
-    quickExit(rc);
-}
-
-void exitCleanly(ExitCode rc) {
-    dbexit(rc, "");
-}
-
-bool haveLocalShardingInfo(Client* client, const string& ns) {
-    return false;
-}
-
-namespace {
-
 const string TARGET_HOST = "localhost:27017";
 const int TARGET_PORT = 27017;
 
-class DummyMessageHandler final : public MessageHandler {
+class DummyServiceEntryPoint : public ServiceEntryPoint {
+    MONGO_DISALLOW_COPYING(DummyServiceEntryPoint);
+
 public:
-    virtual void connected(AbstractMessagingPort* p) {}
+    DummyServiceEntryPoint() {}
 
-    virtual void process(Message& m, AbstractMessagingPort* por) {}
+    virtual ~DummyServiceEntryPoint() {
+        for (auto& t : _threads) {
+            t.join();
+        }
+    }
 
-} dummyHandler;
+    void startSession(transport::SessionHandle session) override {
+        _threads.emplace_back(&DummyServiceEntryPoint::run, this, std::move(session));
+    }
+
+    // This is not used in this test, so it is only here to complete the interface of
+    // ServiceEntryPoint
+    void endAllSessions(transport::Session::TagMask tags) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void setReplyDelay(Milliseconds delay) {
+        _replyDelay = delay;
+    }
+
+    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override {
+        MONGO_UNREACHABLE;
+    }
+
+private:
+    void run(transport::SessionHandle session) {
+        Message inMessage;
+        if (!session->sourceMessage(&inMessage).wait().isOK()) {
+            return;
+        }
+
+        auto request = rpc::opMsgRequestFromAnyProtocol(inMessage);
+        commandRequestHook(request);
+
+        auto reply = rpc::makeReplyBuilder(rpc::protocolForMessage(inMessage));
+
+        BSONObjBuilder commandResponse;
+
+        // We need to handle the isMaster received during connection.
+        if (request.getCommandName() == "isMaster") {
+            commandResponse.append("maxWireVersion", WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+            commandResponse.append("minWireVersion", WireVersion::RELEASE_2_4_AND_BEFORE);
+        }
+
+        auto response = reply->setCommandReply(commandResponse.obj())
+                            .setMetadata(rpc::makeEmptyMetadata())
+                            .done();
+
+        response.header().setResponseToMsgId(inMessage.header().getId());
+
+        if (_replyDelay.count() > 0) {
+            log() << "Delaying response for " << _replyDelay;
+            sleepFor(_replyDelay);
+        }
+        if (!session->sinkMessage(response).wait().isOK()) {
+            return;
+        }
+    }
+
+    /**
+     * Subclasses can override this in order to make assertions about the command request.
+     */
+    virtual void commandRequestHook(const OpMsgRequest& request) const {}
+
+    std::vector<stdx::thread> _threads;
+    Milliseconds _replyDelay{0};
+};
 
 // TODO: Take this out and make it as a reusable class in a header file. The only
 // thing that is preventing this from happening is the dependency on the inShutdown
@@ -143,21 +180,16 @@ public:
      * @param messageHandler the message handler to use for this server. Ownership
      *     of this object is passed to this server.
      */
-    void run(MessageHandler* messsageHandler) {
-        if (_server != NULL) {
+    void run(ServiceEntryPoint* serviceEntryPoint) {
+        if (_server) {
             return;
         }
 
-        MessageServer::Options options;
+        transport::TransportLayerLegacy::Options options;
         options.port = _port;
 
-        {
-            std::lock_guard<std::mutex> sl(shutDownMutex);
-            shuttingDown = false;
-        }
-
-        _server.reset(createServer(options, messsageHandler));
-        _serverThread = std::thread(runServer, _server.get());
+        _server = stdx::make_unique<transport::TransportLayerLegacy>(options, serviceEntryPoint);
+        _serverThread = stdx::thread(runServer, _server.get());
     }
 
     /**
@@ -166,11 +198,6 @@ public:
     void stop() {
         if (!_server) {
             return;
-        }
-
-        {
-            std::lock_guard<std::mutex> sl(shutDownMutex);
-            shuttingDown = true;
         }
 
         ListeningSockets::get()->closeAll();
@@ -187,23 +214,23 @@ public:
             sleepmillis(500);
             connCount = Listener::globalTicketHolder.used();
         }
-
+        _server->shutdown();
         _server.reset();
     }
 
     /**
      * Helper method for running the server on a separate thread.
      */
-    static void runServer(MessageServer* server) {
-        server->setupSockets();
-        server->run();
+    static void runServer(transport::TransportLayerLegacy* server) {
+        server->setup().transitional_ignore();
+        server->start().transitional_ignore();
     }
 
 private:
     const int _port;
 
-    std::thread _serverThread;
-    unique_ptr<MessageServer> _server;
+    stdx::thread _serverThread;
+    unique_ptr<transport::TransportLayerLegacy> _server;
 };
 
 /**
@@ -212,29 +239,33 @@ private:
 class DummyServerFixture : public unittest::Test {
 public:
     void setUp() {
-        _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
-        _dummyServer = new DummyServer(TARGET_PORT);
+        WireSpec::instance().isInternalClient = isInternalClient();
 
-        _dummyServer->run(&dummyHandler);
+        _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
+        _dummyServer = stdx::make_unique<DummyServer>(TARGET_PORT);
+
+        _dummyServiceEntryPoint = makeServiceEntryPoint();
+        _dummyServer->run(_dummyServiceEntryPoint.get());
         DBClientConnection conn;
         Timer timer;
 
         // Make sure the dummy server is up and running before proceeding
         while (true) {
-            try {
-                conn.connect(TARGET_HOST);
+            auto connectStatus = conn.connect(HostAndPort{TARGET_HOST}, StringData());
+            if (connectStatus.isOK()) {
                 break;
-            } catch (const ConnectException&) {
-                if (timer.seconds() > 20) {
-                    FAIL("Timed out connecting to dummy server");
-                }
+            }
+            if (timer.seconds() > 20) {
+                FAIL(str::stream() << "Timed out connecting to dummy server: "
+                                   << connectStatus.toString());
             }
         }
     }
 
     void tearDown() {
         ScopedDbConnection::clearPool();
-        delete _dummyServer;
+        _dummyServer.reset();
+        _dummyServiceEntryPoint.reset();
 
         globalConnPool.setMaxPoolSize(_maxPoolSizePerHost);
     }
@@ -248,6 +279,10 @@ protected:
         ASSERT_NOT_EQUALS(a, b);
     }
 
+    void setReplyDelay(Milliseconds delay) {
+        _dummyServiceEntryPoint->setReplyDelay(delay);
+    }
+
     /**
      * Tries to grab a series of connections from the pool, perform checks on
      * them, then put them back into the globalConnPool. After that, it checks these
@@ -259,31 +294,59 @@ protected:
      */
     void checkNewConns(void (*checkFunc)(uint64_t, uint64_t),
                        uint64_t arg2,
-                       size_t newConnsToCreate) {
+                       const int newConnsToCreate) {
         vector<ScopedDbConnection*> newConnList;
-        for (size_t x = 0; x < newConnsToCreate; x++) {
+
+        for (int x = 0; x < newConnsToCreate; x++) {
             ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
             checkFunc(newConn->get()->getSockCreationMicroSec(), arg2);
             newConnList.push_back(newConn);
         }
 
-        const uint64_t oldCreationTime = curTimeMicros64();
-
+        std::set<long long> connIds;
+        int prevNumBadConns = globalConnPool.getNumBadConns(TARGET_HOST);
         for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
              iter != newConnList.end();
              ++iter) {
+
+            connIds.insert((*iter)->get()->getConnectionId());
+
+            // ScopedDbConnection::done() may not successfuly add the connection back to
+            // the pool if the connection has failed. If the connection is not addded back
+            // to the pool, we increment the number of bad connections in the pool by one
+            // (see PoolForHost::done()). We then use the number of bad connections to
+            // verify the number of connections successfully added back to the pool.
             (*iter)->done();
             delete *iter;
         }
+        int numBadConns = globalConnPool.getNumBadConns(TARGET_HOST) - prevNumBadConns;
+        const int numConnsInPool = globalConnPool.getNumAvailableConns(TARGET_HOST);
+        ASSERT_EQ(numConnsInPool, newConnsToCreate - numBadConns);
 
         newConnList.clear();
 
-        // Check that connections created after the purge was put back to the pool.
-        for (size_t x = 0; x < newConnsToCreate; x++) {
+        // Check that connections created after the purge were put back to the pool.
+        int numReusedConns = 0;
+        prevNumBadConns = globalConnPool.getNumBadConns(TARGET_HOST);
+        for (int x = 0; x < newConnsToCreate; x++) {
+            // ScopedDBConnection will attempt to reuse a connection from the pool if
+            // the pool is not empty. It may fail to reuse that connection if that
+            // connection has gone bad, in that case, it'll try to get another connection
+            // from the pool and increment the number of bad connections in the pool
+            // If the pool is empty however, it'll create a new connection.
+            // See PoolForHost::get() and DBConnectionPool::get().
             ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
-            ASSERT_LESS_THAN(newConn->get()->getSockCreationMicroSec(), oldCreationTime);
             newConnList.push_back(newConn);
+            if (connIds.count(newConn->get()->getConnectionId())) {
+                numReusedConns++;
+            }
         }
+        numBadConns = globalConnPool.getNumBadConns(TARGET_HOST) - prevNumBadConns;
+        // Each bad connection is not a reused connection. Therefore the number of reused
+        // connections plus the number of bad ones should be equal to the number of connections
+        // that were in the pool.
+        ASSERT_EQ(numConnsInPool, numReusedConns + numBadConns);
+        ASSERT_EQ(globalConnPool.getNumAvailableConns(TARGET_HOST), 0);
 
         for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
              iter != newConnList.end();
@@ -294,12 +357,28 @@ protected:
     }
 
 private:
-    static void runServer(MessageServer* server) {
-        server->setupSockets();
-        server->run();
+    static void runServer(transport::TransportLayerLegacy* server) {
+        server->setup().transitional_ignore();
+        server->start().transitional_ignore();
     }
 
-    DummyServer* _dummyServer;
+    /**
+     * Subclasses can override this in order to use a specialized service entry point.
+     */
+    virtual std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const {
+        return stdx::make_unique<DummyServiceEntryPoint>();
+    }
+
+    /**
+     * Subclasses can override this to make the client code behave like an internal client (e.g.
+     * mongod or mongos) as opposed to an external one (e.g. the shell).
+     */
+    virtual bool isInternalClient() const {
+        return false;
+    }
+
+    std::unique_ptr<DummyServer> _dummyServer;
+    std::unique_ptr<DummyServiceEntryPoint> _dummyServiceEntryPoint;
     uint32_t _maxPoolSizePerHost;
 };
 
@@ -315,6 +394,45 @@ TEST_F(DummyServerFixture, BasicScopedDbConnection) {
 
     conn2.done();
     conn3.done();
+}
+
+TEST_F(DummyServerFixture, ScopedDbConnectionWithTimeout) {
+    auto delay = Milliseconds{8000};
+    auto gracePeriod = Milliseconds{100};
+    auto uri_sw = MongoURI::parse("mongodb://" + TARGET_HOST + "/?socketTimeoutMS=4000");
+    ASSERT_OK(uri_sw.getStatus());
+    auto uri = uri_sw.getValue();
+    Date_t start, end;
+    const auto uriTimeout = Seconds{4};
+    const auto overrideTimeout = Seconds{1};
+
+    ScopedDbConnection conn1(TARGET_HOST);
+
+    setReplyDelay(delay);
+
+    log() << "Testing ConnectionString timeouts";
+    start = Date_t::now();
+    ASSERT_THROWS(ScopedDbConnection conn2(TARGET_HOST, overrideTimeout.count()), SocketException);
+    end = Date_t::now();
+    // We add 100 milliseconds here because on some platforms the connection might timeout after
+    // 997ms instead of >= 1000ms.
+    ASSERT_GTE((end - start) + gracePeriod, overrideTimeout);
+    ASSERT_LT(end - start, uriTimeout);
+
+    log() << "Testing MongoURI with explicit timeout";
+    start = Date_t::now();
+    ASSERT_THROWS(ScopedDbConnection conn4(uri, overrideTimeout.count()), AssertionException);
+    end = Date_t::now();
+    ASSERT_GTE((end - start) + gracePeriod, overrideTimeout);
+    ASSERT_LT(end - start, uriTimeout);
+
+    log() << "Testing MongoURI doesn't timeout";
+    start = Date_t::now();
+    ScopedDbConnection conn5(uri);
+    end = Date_t::now();
+    ASSERT_GREATER_THAN((end - start) + gracePeriod, uriTimeout);
+
+    setReplyDelay(Milliseconds{0});
 }
 
 TEST_F(DummyServerFixture, InvalidateBadConnInPool) {
@@ -414,6 +532,69 @@ TEST_F(DummyServerFixture, DontReturnConnGoneBadToPool) {
     checkNewConns(assertNotEqual, conn2CreationTime, 10);
 
     conn1Again.done();
+}
+
+class DummyServiceEntryPointWithInternalClientInfoCheck final : public DummyServiceEntryPoint {
+private:
+    void commandRequestHook(const OpMsgRequest& request) const final {
+        if (request.getCommandName() != "isMaster") {
+            // It's not an isMaster request. Nothing to do.
+            return;
+        }
+
+        auto internalClientElem = request.body["internalClient"];
+        ASSERT_EQ(internalClientElem.type(), BSONType::Object);
+        auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
+        auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
+        ASSERT_EQ(minWireVersionElem.type(), BSONType::NumberInt);
+        ASSERT_EQ(maxWireVersionElem.type(), BSONType::NumberInt);
+        ASSERT_EQ(minWireVersionElem.numberInt(), WireSpec::instance().outgoing.minWireVersion);
+        ASSERT_EQ(maxWireVersionElem.numberInt(), WireSpec::instance().outgoing.maxWireVersion);
+    }
+};
+
+class DummyServerFixtureWithInternalClientInfoCheck : public DummyServerFixture {
+private:
+    std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const final {
+        return stdx::make_unique<DummyServiceEntryPointWithInternalClientInfoCheck>();
+    }
+
+    bool isInternalClient() const final {
+        return true;
+    }
+};
+
+TEST_F(DummyServerFixtureWithInternalClientInfoCheck, VerifyIsMasterRequestOnConnectionOpen) {
+    // The isMaster handshake will occur on connection open. The request is verified by the test
+    // fixture.
+    ScopedDbConnection conn(TARGET_HOST);
+    conn.done();
+}
+
+class DummyServiceEntryPointWithInternalClientMissingCheck final : public DummyServiceEntryPoint {
+private:
+    void commandRequestHook(const OpMsgRequest& request) const final {
+        if (request.getCommandName() != "isMaster") {
+            // It's not an isMaster request. Nothing to do.
+            return;
+        }
+
+        ASSERT_FALSE(request.body["internalClient"]);
+    }
+};
+
+class DummyServerFixtureWithInternalClientMissingCheck : public DummyServerFixture {
+private:
+    std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const final {
+        return stdx::make_unique<DummyServiceEntryPointWithInternalClientMissingCheck>();
+    }
+};
+
+TEST_F(DummyServerFixtureWithInternalClientMissingCheck, VerifyIsMasterRequestOnConnectionOpen) {
+    // The isMaster handshake will occur on connection open. The request is verified by the test
+    // fixture.
+    ScopedDbConnection conn(TARGET_HOST);
+    conn.done();
 }
 
 }  // namespace

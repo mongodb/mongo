@@ -36,6 +36,7 @@
 
 #include "mongo/db/client.h"
 
+#include <boost/functional/hash.hpp>
 #include <string>
 #include <vector>
 
@@ -49,50 +50,63 @@
 
 namespace mongo {
 
-using logger::LogComponent;
+namespace {
+thread_local ServiceContext::UniqueClient currentClient;
+}  // namespace
 
-TSP_DECLARE(ServiceContext::UniqueClient, currentClient)
-TSP_DEFINE(ServiceContext::UniqueClient, currentClient)
-
-void Client::initThreadIfNotAlready(const char* desc) {
-    if (currentClient.getMake()->get())
+void Client::initThreadIfNotAlready(StringData desc) {
+    if (currentClient)
         return;
     initThread(desc);
 }
 
 void Client::initThreadIfNotAlready() {
-    initThreadIfNotAlready(getThreadName().c_str());
+    initThreadIfNotAlready(getThreadName());
 }
 
-void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
-    initThread(desc, getGlobalServiceContext(), mp);
+void Client::initThread(StringData desc, transport::SessionHandle session) {
+    initThread(desc, getGlobalServiceContext(), std::move(session));
 }
 
-/**
- * This must be called whenever a new thread is started, so that active threads can be tracked
- * so each thread has a Client object in TLS.
- */
-void Client::initThread(const char* desc, ServiceContext* service, AbstractMessagingPort* mp) {
-    invariant(currentClient.getMake()->get() == nullptr);
+void Client::initThread(StringData desc,
+                        ServiceContext* service,
+                        transport::SessionHandle session) {
+    invariant(!haveClient());
 
     std::string fullDesc;
-    if (mp != NULL) {
-        fullDesc = str::stream() << desc << mp->connectionId();
+    if (session) {
+        fullDesc = str::stream() << desc << session->id();
     } else {
-        fullDesc = desc;
+        fullDesc = desc.toString();
     }
 
-    setThreadName(fullDesc.c_str());
+    setThreadName(fullDesc);
 
     // Create the client obj, attach to thread
-    *currentClient.get() = service->makeClient(fullDesc, mp);
+    currentClient = service->makeClient(fullDesc, std::move(session));
 }
 
-Client::Client(std::string desc, ServiceContext* serviceContext, AbstractMessagingPort* p)
-    : ClientBasic(serviceContext, p),
+void Client::destroy() {
+    invariant(haveClient());
+    currentClient.reset(nullptr);
+}
+
+namespace {
+int64_t generateSeed(const std::string& desc) {
+    size_t seed = 0;
+    boost::hash_combine(seed, Date_t::now().asInt64());
+    boost::hash_combine(seed, desc);
+    return seed;
+}
+}  // namespace
+
+Client::Client(std::string desc, ServiceContext* serviceContext, transport::SessionHandle session)
+    : _serviceContext(serviceContext),
+      _session(std::move(session)),
       _desc(std::move(desc)),
       _threadId(stdx::this_thread::get_id()),
-      _connectionId(p ? p->connectionId() : 0) {}
+      _connectionId(_session ? _session->id() : 0),
+      _prng(generateSeed(_desc)) {}
 
 void Client::reportState(BSONObjBuilder& builder) {
     builder.append("desc", desc());
@@ -114,15 +128,15 @@ ServiceContext::UniqueOperationContext Client::makeOperationContext() {
     return getServiceContext()->makeOperationContext(this);
 }
 
-void Client::setOperationContext(OperationContext* txn) {
+void Client::setOperationContext(OperationContext* opCtx) {
     // We can only set the OperationContext once before resetting it.
-    invariant(txn != NULL && _txn == NULL);
-    _txn = txn;
+    invariant(opCtx != NULL && _opCtx == NULL);
+    _opCtx = opCtx;
 }
 
 void Client::resetOperationContext() {
-    invariant(_txn != NULL);
-    _txn = NULL;
+    invariant(_opCtx != NULL);
+    _opCtx = NULL;
 }
 
 std::string Client::clientAddress(bool includePort) const {
@@ -135,18 +149,27 @@ std::string Client::clientAddress(bool includePort) const {
     return getRemote().host();
 }
 
-ClientBasic* ClientBasic::getCurrent() {
-    return currentClient.getMake()->get();
+Client* Client::getCurrent() {
+    return currentClient.get();
 }
 
 Client& cc() {
-    Client* c = currentClient.getMake()->get();
-    verify(c);
-    return *c;
+    invariant(haveClient());
+    return *Client::getCurrent();
 }
 
 bool haveClient() {
-    return currentClient.getMake()->get();
+    return static_cast<bool>(currentClient);
+}
+
+ServiceContext::UniqueClient Client::releaseCurrent() {
+    invariant(haveClient());
+    return std::move(currentClient);
+}
+
+void Client::setCurrent(ServiceContext::UniqueClient client) {
+    invariant(!haveClient());
+    currentClient = std::move(client);
 }
 
 }  // namespace mongo

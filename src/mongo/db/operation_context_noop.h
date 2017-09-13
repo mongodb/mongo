@@ -27,87 +27,37 @@
  */
 #pragma once
 
+#include <boost/optional.hpp>
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
+class Client;
+
 class OperationContextNoop : public OperationContext {
 public:
-    OperationContextNoop() : OperationContextNoop(new RecoveryUnitNoop()) {}
-
-    OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0, ru) {}
-
-    OperationContextNoop(Client* client, unsigned int opId)
-        : OperationContextNoop(client, opId, new RecoveryUnitNoop()) {}
-
-    OperationContextNoop(Client* client, unsigned int opId, RecoveryUnit* ru)
-        : OperationContextNoop(client, opId, new LockerNoop(), ru) {}
-
-    OperationContextNoop(Client* client, unsigned int opId, Locker* locker)
-        : OperationContextNoop(client, opId, locker, new RecoveryUnitNoop()) {}
-
-    OperationContextNoop(Client* client, unsigned int opId, Locker* locker, RecoveryUnit* ru)
-        : OperationContext(client, opId, locker), _recoveryUnit(ru) {
-        _locker.reset(lockState());
+    /**
+     * These constructors are for use in legacy tests that do not need operation contexts that are
+     * properly connected to clients.
+     */
+    OperationContextNoop() : OperationContextNoop(nullptr, 0) {}
+    OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0) {
+        setRecoveryUnit(ru, kNotInUnitOfWork);
     }
 
-    virtual ~OperationContextNoop() = default;
-
-    virtual RecoveryUnit* recoveryUnit() const override {
-        return _recoveryUnit.get();
+    /**
+     * This constructor is for use by ServiceContexts, and should not be called directly.
+     */
+    OperationContextNoop(Client* client, unsigned int opId) : OperationContext(client, opId) {
+        setRecoveryUnit(new RecoveryUnitNoop(), kNotInUnitOfWork);
+        setLockState(stdx::make_unique<LockerNoop>());
     }
-
-    virtual RecoveryUnit* releaseRecoveryUnit() override {
-        return _recoveryUnit.release();
-    }
-
-    virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
-                                              RecoveryUnitState state) override {
-        RecoveryUnitState oldState = _ruState;
-        _recoveryUnit.reset(unit);
-        _ruState = state;
-        return oldState;
-    }
-
-    virtual ProgressMeter* setMessage_inlock(const char* msg,
-                                             const std::string& name,
-                                             unsigned long long progressMeterTotal,
-                                             int secondsBetween) override {
-        return &_pm;
-    }
-
-    virtual void checkForInterrupt() override {}
-    virtual Status checkForInterruptNoAssert() override {
-        return Status::OK();
-    }
-
-    virtual bool isPrimaryFor(StringData ns) override {
-        return true;
-    }
-
-    virtual std::string getNS() const override {
-        return std::string();
-    };
-
-    void setReplicatedWrites(bool writesAreReplicated = true) override {}
-
-    bool writesAreReplicated() const override {
-        return false;
-    }
-
-    virtual uint64_t getRemainingMaxTimeMicros() const override {
-        return 0;
-    }
-
-private:
-    std::unique_ptr<RecoveryUnit> _recoveryUnit;
-    std::unique_ptr<Locker> _locker;
-    ProgressMeter _pm;
 };
 
 }  // namespace mongo

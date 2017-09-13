@@ -26,10 +26,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/field_parser.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/geo/hash.h"
+#include "mongo/config.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
 
 #include <algorithm>  // for max()
@@ -49,18 +50,19 @@ std::ostream& operator<<(std::ostream& s, const GeoHash& h) {
 /*
  * GeoBitSets fills out various bit patterns that are used by GeoHash.
  * What patterns?  Look at the comments next to the fields.
- * TODO(hk): hashedToNormal is still a bit of a mystery.
  */
 class GeoBitSets {
 public:
     GeoBitSets() {
+        /*
+         * oddBitmasks' values are all possible 8-bit odd bitmasks which are used in unhash_fast():
+         * "00000000", "00000001", "00000100", "00000101", "00010000", "00010001", "00010100",
+         * "00010101", "01000000", "01000001", "01000100", "01000101", "01010000", "01010001",
+         * "01010100", "01010101"
+         */
+        unsigned oddBitmasks[16] = {0, 1, 4, 5, 16, 17, 20, 21, 64, 65, 68, 69, 80, 81, 84, 85};
         for (unsigned i = 0; i < 16; i++) {
-            unsigned fixed = 0;
-            for (int j = 0; j < 4; j++) {
-                if (i & (1 << j))
-                    fixed |= (1 << (j * 2));
-            }
-            hashedToNormal[fixed] = i;
+            hashedToNormal[oddBitmasks[i]] = i;
         }
 
         // Generate all 32 + 1 all-on bit patterns by repeatedly shifting the next bit to the
@@ -113,8 +115,11 @@ inline static long long mask64For(const int i) {
     return 1LL << (63 - i);
 }
 
-// Binary data is stored in some particular byte ordering that requires this.
-static void copyAndReverse(char* dst, const char* src) {
+// copyAndReverse is used to reverse the order of bytes when copying between BinData and GeoHash.
+// GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the quadrant.
+// In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
+// reversed on little-endian systems.
+inline static void copyAndReverse(char* dst, const char* src) {
     for (unsigned a = 0; a < 8; a++) {
         dst[a] = src[7 - a];
     }
@@ -149,23 +154,6 @@ void GeoHash::initFromString(const char* s) {
             setBit(i, 1);
 }
 
-// This only works if e is BinData.
-GeoHash::GeoHash(const BSONElement& e, unsigned bits) {
-    _bits = bits;
-    if (e.type() == BinData) {
-        int len = 0;
-        copyAndReverse((char*)&_hash, e.binData(len));
-        verify(len == 8);
-    } else {
-        cout << "GeoHash bad element: " << e << endl;
-        uassert(13047,
-                "wrong type for geo index. if you're using a pre-release version,"
-                " need to rebuild index",
-                0);
-    }
-    clearUnusedBits();
-}
-
 GeoHash::GeoHash(unsigned x, unsigned y, unsigned bits) {
     verify(bits <= 32);
     _hash = 0;
@@ -187,17 +175,80 @@ GeoHash::GeoHash(long long hash, unsigned bits) : _hash(hash), _bits(bits) {
     clearUnusedBits();
 }
 
-// TODO(hk): This is nasty and has no examples.
+/**
+ * Explanation & Example:
+ * bitset<64>(_hash) = "00000001 00000010 00000100 00001000 00010000 00100000 01000000 10000000";
+ *
+ * the reinterpret_cast() of _hash results in:
+ * c[0] = 10000000 (the last 8 bits of _hash)
+ * c[1] = 01000000 (the second to last 8 bits of _hash)
+ * ...
+ * c[6] = 00000010 (the second 8 bits of _hash)
+ * c[7] = 00000001 (the first 8 bits of _hash)
+ *
+ * Calculating the Value of Y:
+ * in the for loop,
+ * t is c[i] but with all the even bits turned off:
+ * t = 00000000 (when i is even)
+ * t = 01000000 (i = 1)
+ * t = 00010000 (i = 3)
+ * t = 00000100 (i = 5)
+ * t = 00000001 (i = 7)
+ *
+ * then for each t,
+ * get the hashedToNormal(t):
+ * hashedToNormal(t) = 0 = 00000000 (when i is even)
+ * hashedToNormal(t) = 8 = 00001000 (i = 1)
+ * hashedToNormal(t) = 4 = 00000100 (i = 3)
+ * hashedToNormal(t) = 2 = 00000010 (i = 5)
+ * hashedToNormal(t) = 1 = 00000001 (i = 7)
+ * then shift it by (4 * i) (Little Endian) then
+ * bitwise OR it with y
+ *
+ * visually, all together it looks like:
+ * y =       00000000000000000000000000000000 (32 bits)
+ * y |=                              00000000 (hashedToNormal(t) when i = 0)
+ * y |=                          00001000     (hashedToNormal(t) when i = 1)
+ * y |=                      00000000         (hashedToNormal(t) when i = 2)
+ * y |=                  00000100             (hashedToNormal(t) when i = 3)
+ * y |=              00000000                 (hashedToNormal(t) when i = 4)
+ * y |=          00000010                     (hashedToNormal(t) when i = 5)
+ * y |=      00000000                         (hashedToNormal(t) when i = 6)
+ * y |=  00000001                             (hashedToNormal(t) when i = 7)
+ * ---------------------------------------------
+ * y =       00010000001000000100000010000000
+ *
+ * Calculating the Value of X:
+ * in the for loop,
+ * t is c[i] right shifted by 1 with all the even bits turned off:
+ * t = 00000000 (when i is odd)
+ * t = 01000000 (i = 0)
+ * t = 00010000 (i = 2)
+ * t = 00000100 (i = 4)
+ * t = 00000001 (i = 6)
+ *
+ * then for each t,
+ * get the hashedToNormal(t) and shift it by (4 * i) (Little Endian) then
+ * bitwise OR it with x
+ */
 void GeoHash::unhash_fast(unsigned* x, unsigned* y) const {
     *x = 0;
     *y = 0;
     const char* c = reinterpret_cast<const char*>(&_hash);
     for (int i = 0; i < 8; i++) {
+        // 0x55 in binary is "01010101",
+        // it's an odd bitmask that we use to turn off all the even bits
         unsigned t = (unsigned)(c[i]) & 0x55;
-        *y |= (geoBitSets.hashedToNormal[t] << (4 * i));
+        int leftShift;
+#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
+        leftShift = 4 * i;
+#else
+        leftShift = 28 - (4 * i);
+#endif
+        *y |= geoBitSets.hashedToNormal[t] << leftShift;
 
         t = ((unsigned)(c[i]) >> 1) & 0x55;
-        *x |= (geoBitSets.hashedToNormal[t] << (4 * i));
+        *x |= geoBitSets.hashedToNormal[t] << leftShift;
     }
 }
 
@@ -213,7 +264,11 @@ void GeoHash::unhash_slow(unsigned* x, unsigned* y) const {
 }
 
 void GeoHash::unhash(unsigned* x, unsigned* y) const {
+#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
     unhash_fast(x, y);
+#else
+    unhash_slow(x, y);
+#endif
 }
 
 /** Is the 'bit'-th most significant bit set?  (NOT the least significant) */
@@ -416,10 +471,9 @@ GeoHash GeoHash::operator+(const std::string& s) const {
     return operator+(s.c_str());
 }
 
-/*
- * Keep the upper _bits*2 bits of _hash, clear the lower bits.
- * Maybe there's junk in there?  Not sure why this is done.
- */
+// Keep the most significant _bits*2 bits of _hash, clear the least significant bits. If shorter
+// than 64 bits, the hash occupies the higher order bits, so we ensure that the lower order bits are
+// zeroed.
 void GeoHash::clearUnusedBits() {
     // Left shift count should be less than 64
     if (_bits == 0) {
@@ -427,14 +481,22 @@ void GeoHash::clearUnusedBits() {
         return;
     }
 
-    static long long FULL = 0xFFFFFFFFFFFFFFFFLL;
-    long long mask = FULL << (64 - (_bits * 2));
-    _hash &= mask;
+    unsigned long long mask = (1LL << (64U - (_bits * 2U))) - 1LL;
+    _hash &= ~mask;
 }
 
 static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
     char buf[8];
+#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
+    // Reverse the order of bytes when copying between BinData and GeoHash.
+    // GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the
+    // quadrant.
+    // In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
+    // reversed on little-endian systems
     copyAndReverse(buf, (char*)&hash);
+#else
+    std::memcpy(buf, reinterpret_cast<char*>(&hash), 8);
+#endif
     builder->appendBinData(fieldName, 8, bdtCustom, buf);
 }
 
@@ -607,13 +669,19 @@ Status GeoHashConverter::parseParameters(const BSONObj& paramDoc,
     if (params->bits < 1 || params->bits > 32) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "bits for hash must be > 0 and <= 32, "
-                                    << "but " << params->bits << " bits were specified");
+                                    << "but "
+                                    << params->bits
+                                    << " bits were specified");
     }
 
     if (params->min >= params->max) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "region for hash must be valid and have positive area, "
-                                    << "but [" << params->min << ", " << params->max << "] "
+                                    << "but ["
+                                    << params->min
+                                    << ", "
+                                    << params->max
+                                    << "] "
                                     << "was specified");
     }
 
@@ -671,12 +739,6 @@ GeoHash GeoHashConverter::hash(const Point& p) const {
     return hash(p.x, p.y);
 }
 
-GeoHash GeoHashConverter::hash(const BSONElement& e) const {
-    if (e.isABSONObj())
-        return hash(e.embeddedObject());
-    return GeoHash(e, _params.bits);
-}
-
 GeoHash GeoHashConverter::hash(const BSONObj& o) const {
     return hash(o, NULL);
 }
@@ -714,7 +776,8 @@ GeoHash GeoHashConverter::hash(const BSONObj& o, const BSONObj* src) const {
 GeoHash GeoHashConverter::hash(double x, double y) const {
     uassert(16433,
             str::stream() << "point not in interval of [ " << _params.min << ", " << _params.max
-                          << " ]" << causedBy(BSON_ARRAY(x << y).toString()),
+                          << " ]"
+                          << causedBy(BSON_ARRAY(x << y).toString()),
             x <= _params.max && x >= _params.min && y <= _params.max && y >= _params.min);
 
     return GeoHash(convertToHashScale(x), convertToHashScale(y), _params.bits);
@@ -734,10 +797,6 @@ Point GeoHashConverter::unhashToPoint(const GeoHash& h) const {
     Point point;
     unhash(h, &point.x, &point.y);
     return point;
-}
-
-Point GeoHashConverter::unhashToPoint(const BSONElement& e) const {
-    return unhashToPoint(hash(e));
 }
 
 BSONObj GeoHashConverter::unhashToBSONObj(const GeoHash& h) const {

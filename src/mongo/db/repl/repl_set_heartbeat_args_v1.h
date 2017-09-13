@@ -98,6 +98,13 @@ public:
     }
 
     /**
+     * Returns whether or not the HostAndPort of the sender is set.
+     */
+    bool hasSender() const {
+        return _hasSender;
+    }
+
+    /**
      * The below methods set the value in the method name to 'newVal'.
      */
     void setConfigVersion(long long newVal);

@@ -46,18 +46,16 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/touch_pages.h"
 
 namespace mongo {
 
 using std::string;
 using std::stringstream;
 
-class TouchCmd : public Command {
+class TouchCmd : public ErrmsgCommandDeprecated {
 public:
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual bool adminOnly() const {
@@ -82,17 +80,14 @@ public:
         actions.addAction(ActionType::touch);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    TouchCmd() : Command("touch") {}
+    TouchCmd() : ErrmsgCommandDeprecated("touch") {}
 
-    virtual bool run(OperationContext* txn,
-                     const string& dbname,
-                     BSONObj& cmdObj,
-                     int,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
-        const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
-
-        const NamespaceString nss(ns);
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const string& dbname,
+                           const BSONObj& cmdObj,
+                           string& errmsg,
+                           BSONObjBuilder& result) {
+        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
         if (!nss.isNormal()) {
             errmsg = "bad namespace name";
             return false;
@@ -106,7 +101,7 @@ public:
             return false;
         }
 
-        AutoGetCollectionForRead context(txn, nss);
+        AutoGetCollectionForReadCommand context(opCtx, nss);
 
         Collection* collection = context.getCollection();
         if (!collection) {
@@ -115,7 +110,7 @@ public:
         }
 
         return appendCommandStatus(result,
-                                   collection->touch(txn, touch_data, touch_indexes, &result));
+                                   collection->touch(opCtx, touch_data, touch_indexes, &result));
     }
 };
 static TouchCmd touchCmd;

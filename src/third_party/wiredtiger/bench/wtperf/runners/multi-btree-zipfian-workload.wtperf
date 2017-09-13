@@ -1,0 +1,18 @@
+# Read from a set of tables with uneven distribution of data
+conn_config="cache_size=1G,eviction=(threads_max=8),file_manager=(close_idle_time=100000),checkpoint=(wait=60,log_size=2GB),session_max=1000"
+table_config="type=file"
+table_count=100
+icount=0
+random_range=1000000000
+pareto=10
+range_partition=true
+report_interval=5
+create=false
+
+run_time=600
+threads=((count=20,reads=1))
+
+# Warn if a latency over 1 second is seen
+max_latency=1000
+sample_interval=5
+sample_rate=1

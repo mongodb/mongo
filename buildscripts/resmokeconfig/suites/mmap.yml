@@ -1,22 +1,23 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/mmap_v1/*.js
+  roots:
+  - jstests/mmap_v1/*.js
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        global_vars:
-          TestData:
-            storageEngine: mmapv1
-    hooks:
-    - class: CleanEveryN
-      n: 20
-    fixture:
-      class: MongoDFixture
-      mongod_options:
-        nopreallocj: ''
-        set_parameters:
-          enableTestCommands: 1
-        storageEngine: mmapv1
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          storageEngine: mmapv1
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+      storageEngine: mmapv1

@@ -41,7 +41,17 @@ class RemoteCommandTargeterStandalone final : public RemoteCommandTargeter {
 public:
     explicit RemoteCommandTargeterStandalone(const HostAndPort& hostAndPort);
 
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+    ConnectionString connectionString() override;
+
+    StatusWith<HostAndPort> findHost(OperationContext* opCtx,
+                                     const ReadPreferenceSetting& readPref) override;
+
+    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                Milliseconds maxWait) override;
+
+    void markHostNotMaster(const HostAndPort& host, const Status& status) override;
+
+    void markHostUnreachable(const HostAndPort& host, const Status& status) override;
 
 private:
     const HostAndPort _hostAndPort;

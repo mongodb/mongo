@@ -1,0 +1,27 @@
+# -*- mode: python -*-
+
+Import("env")
+Import("endian")
+
+env = env.Clone()
+
+if env.TargetOSIs('linux'):
+    env.Append(CPPPATH=["build_linux"])
+    env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
+elif not env.TargetOSIs('windows'):
+    env.Append(CPPPATH=["build_posix"])
+    env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
+
+if env.ToolchainIs('clang', 'GCC'):
+    env.Append(CCFLAGS=['-Wno-sign-compare', '-Wno-unused-function'])
+
+if endian == "big":
+    env.Append(CPPDEFINES=['WORDS_BIGENDIAN'])
+
+env.Library(
+    target='snappy',
+    source=[
+        'snappy-c.cc',
+        'snappy.cc',
+        'snappy-sinksource.cc',
+    ])

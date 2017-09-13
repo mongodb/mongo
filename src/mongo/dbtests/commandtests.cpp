@@ -28,30 +28,86 @@
 
 #include "mongo/platform/basic.h"
 
+#include <unordered_set>
+
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/net/op_msg.h"
 
 using namespace mongo;
 
 namespace CommandTests {
 
+TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
+    const auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    NamespaceString ns("test", "doc_seq");
+    DBDirectClient db(opCtx);
+    db.dropCollection(ns.ns());
+    ASSERT_EQ(db.count(ns.ns()), 0u);
+
+    OpMsgRequest request;
+    request.body = BSON("insert" << ns.coll() << "$db" << ns.db());
+    request.sequences = {{"documents",
+                          {
+                              BSON("_id" << 1),
+                              BSON("_id" << 2),
+                              BSON("_id" << 3),
+                              BSON("_id" << 4),
+                              BSON("_id" << 5),
+                          }}};
+
+    const auto reply = db.runCommand(std::move(request));
+    ASSERT_EQ(int(reply->getProtocol()), int(rpc::Protocol::kOpMsg));
+    ASSERT_BSONOBJ_EQ(reply->getCommandReply(), BSON("n" << 5 << "ok" << 1.0));
+    ASSERT_EQ(db.count(ns.ns()), 5u);
+}
+
 using std::string;
+
+/**
+ * Default suite base, unless otherwise overridden in test specific namespace.
+ */
+class Base {
+public:
+    Base() : db(&_opCtx) {
+        db.dropCollection(ns());
+    }
+
+    const char* ns() {
+        return "test.testCollection";
+    }
+    const char* nsDb() {
+        return "test";
+    }
+    const char* nsColl() {
+        return "testCollection";
+    }
+
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_txnPtr;
+    DBDirectClient db;
+};
 
 // one namespace per command
 namespace FileMD5 {
 struct Base {
-    Base() : db(&_txn) {
+    Base() : db(&_opCtx) {
         db.dropCollection(ns());
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), BSON("files_id" << 1 << "n" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("files_id" << 1 << "n" << 1)));
     }
 
     const char* ns() {
         return "test.fs.chunks";
     }
 
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_txnPtr;
     DBDirectClient db;
 };
 struct Type0 : Base {
@@ -110,26 +166,6 @@ namespace SymbolArgument {
 // This is a historical quirk that we shall support until corrected versions of the Ruby driver
 // can be distributed. Retain these tests until MongoDB 3.0
 
-class Base {
-public:
-    Base() : db(&_txn) {
-        db.dropCollection(ns());
-    }
-
-    const char* ns() {
-        return "test.symbolarg";
-    }
-    const char* nsDb() {
-        return "test";
-    }
-    const char* nsColl() {
-        return "symbolarg";
-    }
-
-    OperationContextImpl _txn;
-    DBDirectClient db;
-};
-
 class Drop : Base {
 public:
     void run() {
@@ -159,6 +195,49 @@ public:
         bool ok = db.runCommand(nsDb(), cmd.obj(), result);
         log() << result.jsonString();
         ASSERT(ok);
+    }
+};
+
+class CreateIndexWithNoKey : Base {
+public:
+    void run() {
+        ASSERT(db.createCollection(ns()));
+
+        BSONObjBuilder indexSpec;
+
+        BSONArrayBuilder indexes;
+        indexes.append(indexSpec.obj());
+
+        BSONObjBuilder cmd;
+        cmd.append("createIndexes", nsColl());
+        cmd.append("indexes", indexes.arr());
+
+        BSONObj result;
+        bool ok = db.runCommand(nsDb(), cmd.obj(), result);
+        log() << result.jsonString();
+        ASSERT(!ok);
+    }
+};
+
+class CreateIndexWithDuplicateKey : Base {
+public:
+    void run() {
+        ASSERT(db.createCollection(ns()));
+
+        BSONObjBuilder indexSpec;
+        indexSpec.append("key", BSON("a" << 1 << "a" << 1 << "b" << 1));
+
+        BSONArrayBuilder indexes;
+        indexes.append(indexSpec.obj());
+
+        BSONObjBuilder cmd;
+        cmd.append("createIndexes", nsColl());
+        cmd.append("indexes", indexes.arr());
+
+        BSONObj result;
+        bool ok = db.runCommand(nsDb(), cmd.obj(), result);
+        log() << result.jsonString();
+        ASSERT(!ok);
     }
 };
 
@@ -212,9 +291,12 @@ public:
             cmd.append("indexes",
                        BSON_ARRAY(BSON("key" << BSON("loc"
                                                      << "geoHaystack"
-                                                     << "z" << 1.0) << "name"
+                                                     << "z"
+                                                     << 1.0)
+                                             << "name"
                                              << "loc_geoHaystack_z_1"
-                                             << "bucketSize" << static_cast<double>(0.7))));
+                                             << "bucketSize"
+                                             << static_cast<double>(0.7))));
 
             BSONObj result;
             ASSERT(db.runCommand(nsDb(), cmd.obj(), result));
@@ -253,7 +335,25 @@ public:
     }
 };
 
-}  // SymbolArgument
+}  // namespace SymbolArgument
+
+/**
+ * Tests that the 'rolesInfo' command does not return duplicate field names.
+ */
+class RolesInfoShouldNotReturnDuplicateFieldNames : Base {
+public:
+    void run() {
+        BSONObj result;
+        bool ok = db.runCommand(nsDb(), BSON("rolesInfo" << 1), result);
+        ASSERT(ok);
+
+        stdx::unordered_set<std::string> observedFields;
+        for (const auto& field : result) {
+            ASSERT(observedFields.find(field) == observedFields.end());
+            observedFields.insert(field);
+        }
+    }
+};
 
 class All : public Suite {
 public:
@@ -268,6 +368,9 @@ public:
         add<SymbolArgument::Touch>();
         add<SymbolArgument::Drop>();
         add<SymbolArgument::GeoSearch>();
+        add<SymbolArgument::CreateIndexWithNoKey>();
+        add<SymbolArgument::CreateIndexWithDuplicateKey>();
+        add<RolesInfoShouldNotReturnDuplicateFieldNames>();
     }
 };
 

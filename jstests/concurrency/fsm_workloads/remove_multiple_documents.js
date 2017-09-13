@@ -13,7 +13,7 @@ var $config = (function() {
         init: function init(db, collName) {
             this.numDocs = 200;
             for (var i = 0; i < this.numDocs; ++i) {
-                db[collName].insert({ tid: this.tid, rand: Random.rand() });
+                db[collName].insert({tid: this.tid, rand: Random.rand()});
             }
         },
 
@@ -22,35 +22,29 @@ var $config = (function() {
             var low = Random.rand();
             var high = low + 0.05 * Random.rand();
 
-            var res = db[collName].remove({
-                tid: this.tid,
-                rand: { $gte: low, $lte: high }
-            });
+            var res = db[collName].remove({tid: this.tid, rand: {$gte: low, $lte: high}});
             assertAlways.gte(res.nRemoved, 0);
             assertAlways.lte(res.nRemoved, this.numDocs);
             this.numDocs -= res.nRemoved;
         },
 
         count: function count(db, collName) {
-            var numDocs = db[collName].find({ tid: this.tid }).itcount();
+            var numDocs = db[collName].find({tid: this.tid}).itcount();
             assertWhenOwnColl.eq(this.numDocs, numDocs);
         }
     };
 
-    var transitions = {
-        init: { count: 1 },
-        count: { remove: 1 },
-        remove: {
-            remove: 0.825,
-            count: 0.125
+    var skip = function skip(cluster) {
+        // When the balancer is enabled, the nRemoved result may be inaccurate as
+        // a chunk migration may be active, causing the count function to assert.
+        if (cluster.isBalancerEnabled()) {
+            return {skip: true, msg: 'does not run when balancer is enabled.'};
         }
+        return {skip: false};
     };
 
-    return {
-        threadCount: 10,
-        iterations: 20,
-        states: states,
-        transitions: transitions
-    };
+    var transitions = {init: {count: 1}, count: {remove: 1}, remove: {remove: 0.825, count: 0.125}};
+
+    return {threadCount: 10, iterations: 20, states: states, transitions: transitions, skip: skip};
 
 })();

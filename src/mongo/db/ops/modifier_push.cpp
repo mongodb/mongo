@@ -31,13 +31,14 @@
 #include "mongo/db/ops/modifier_push.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/ops/field_checker.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/update/field_checker.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -82,29 +83,19 @@ bool inEachMode(const BSONElement& modExpr) {
     return true;
 }
 
-Status parseEachMode(ModifierPush::ModifierPushMode pushMode,
-                     const BSONElement& modExpr,
+Status parseEachMode(const BSONElement& modExpr,
                      BSONElement* eachElem,
                      BSONElement* sliceElem,
                      BSONElement* sortElem,
                      BSONElement* positionElem) {
     Status status = Status::OK();
 
-    // If in $pushAll mode, all we need is the array.
-    if (pushMode == ModifierPush::PUSH_ALL) {
-        if (modExpr.type() != Array) {
-            return Status(ErrorCodes::BadValue, "$pushAll requires an array");
-        }
-        *eachElem = modExpr;
-        return Status::OK();
-    }
-
     // The $each clause must be an array.
     *eachElem = modExpr.embeddedObject()[kEach];
     if (eachElem->type() != Array) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "The argument to $each in $push must be"
-                                       " an array but it was of type "
+                                       " an array but it was of type: "
                                     << typeName(eachElem->type()));
     }
 
@@ -148,8 +139,8 @@ Status parseEachMode(ModifierPush::ModifierPushMode pushMode,
             seenPosition = true;
         } else if (!mongoutils::str::equals(elem.fieldName(), kEach)) {
             return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "Unrecognized clause in $push: " << elem.fieldNameStringData());
+                          str::stream() << "Unrecognized clause in $push: "
+                                        << elem.fieldNameStringData());
         }
     }
 
@@ -171,10 +162,14 @@ struct ModifierPush::PreparedState {
     // Element corresponding to _fieldRef[0.._idxFound].
     mutablebson::Element elemFound;
 
+    // The size of the array before the push.
     size_t arrayPreModSize;
+
+    // The actual position at which to push the elements, in range [0, arrayPreModSize].
+    size_t actualPosition;
 };
 
-ModifierPush::ModifierPush(ModifierPush::ModifierPushMode pushMode)
+ModifierPush::ModifierPush()
     : _fieldRef(),
       _posDollar(0),
       _eachMode(false),
@@ -182,9 +177,8 @@ ModifierPush::ModifierPush(ModifierPush::ModifierPushMode pushMode)
       _slicePresent(false),
       _slice(0),
       _sortPresent(false),
-      _startPosition(std::numeric_limits<std::size_t>::max()),
+      _position(std::numeric_limits<std::int32_t>::max()),
       _sort(),
-      _pushMode(pushMode),
       _val() {}
 
 ModifierPush::~ModifierPush() {}
@@ -213,7 +207,8 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     //
@@ -225,32 +220,13 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
     BSONElement sortElem;
     BSONElement positionElem;
     switch (modExpr.type()) {
-        case Array:
-            if (_pushMode == PUSH_ALL) {
-                _eachMode = true;
-                Status status = parseEachMode(
-                    PUSH_ALL, modExpr, &_eachElem, &sliceElem, &sortElem, &positionElem);
-                if (!status.isOK()) {
-                    return status;
-                }
-            } else {
-                _val = modExpr;
-            }
-            break;
-
         case Object:
-            if (_pushMode == PUSH_ALL) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "$pushAll requires an array of values "
-                                               "but was given an embedded document.");
-            }
-
             // If any known clause ($each, $slice, or $sort) is present, we'd assume
             // we're using the $each variation of push and would parse accodingly.
             _eachMode = inEachMode(modExpr);
             if (_eachMode) {
-                Status status = parseEachMode(
-                    PUSH_NORMAL, modExpr, &_eachElem, &sliceElem, &sortElem, &positionElem);
+                Status status =
+                    parseEachMode(modExpr, &_eachElem, &sliceElem, &sortElem, &positionElem);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -260,26 +236,16 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
             break;
 
         default:
-            if (_pushMode == PUSH_ALL) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "$pushAll requires an array of values "
-                                               "but was given an " << typeName(modExpr.type()));
-            }
-
             _val = modExpr;
             break;
     }
 
     // Is slice present and correct?
     if (sliceElem.type() != EOO) {
-        if (_pushMode == PUSH_ALL) {
-            return Status(ErrorCodes::BadValue, "cannot use $slice in $pushAll");
-        }
-
         if (!sliceElem.isNumber()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The value for $slice must "
-                                           "be a numeric value not a "
+                                           "be a numeric value but was given type: "
                                         << typeName(sliceElem.type()));
         }
 
@@ -298,50 +264,40 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
 
     // Is position present and correct?
     if (positionElem.type() != EOO) {
-        if (_pushMode == PUSH_ALL) {
-            return Status(ErrorCodes::BadValue, "cannot use $position in $pushAll");
+        // Check that $position can be represented by a 32-bit integer.
+        switch (positionElem.type()) {
+            case NumberInt:
+                break;
+            case NumberLong:
+                if (positionElem.numberInt() != positionElem.numberLong()) {
+                    return Status(
+                        ErrorCodes::BadValue,
+                        "The $position value in $push must be representable as a 32-bit integer.");
+                }
+                break;
+            case NumberDouble: {
+                const auto doubleVal = positionElem.numberDouble();
+                if (doubleVal != 0.0) {
+                    if (!std::isnormal(doubleVal) || (doubleVal != positionElem.numberInt())) {
+                        return Status(ErrorCodes::BadValue,
+                                      "The $position value in $push must be representable as a "
+                                      "32-bit integer.");
+                    }
+                }
+                break;
+            }
+            default:
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The value for $position must "
+                                               "be a non-negative numeric value, not of type: "
+                                            << typeName(positionElem.type()));
         }
 
-        if (!positionElem.isNumber()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "The value for $position must "
-                                           "be a positive numeric value not a "
-                                        << typeName(positionElem.type()));
-        }
-
-        // TODO: Cleanup and unify numbers wrt getting int32/64 bson values (from doubles)
-
-        // If the value of position is not fraction, even if it's a double, we allow it. The
-        // reason here is that the shell will use doubles by default unless told otherwise.
-        const double doubleVal = positionElem.numberDouble();
-        if (doubleVal - static_cast<int64_t>(doubleVal) != 0) {
-            return Status(ErrorCodes::BadValue,
-                          "The $position value in $push cannot be fractional");
-        }
-
-        if (static_cast<double>(numeric_limits<int64_t>::max()) < doubleVal) {
-            return Status(ErrorCodes::BadValue,
-                          "The $position value in $push is too large a number.");
-        }
-
-        if (static_cast<double>(numeric_limits<int64_t>::min()) > doubleVal) {
-            return Status(ErrorCodes::BadValue,
-                          "The $position value in $push is too small a number.");
-        }
-
-        const int64_t tempVal = positionElem.numberLong();
-        if (tempVal < 0)
-            return Status(ErrorCodes::BadValue, "The $position value in $push must be positive.");
-
-        _startPosition = size_t(tempVal);
+        _position = positionElem.numberInt();
     }
 
     // Is sort present and correct?
     if (sortElem.type() != EOO) {
-        if (_pushMode == PUSH_ALL) {
-            return Status(ErrorCodes::BadValue, "cannot use $sort in $pushAll");
-        }
-
         if (sortElem.type() != Object && !sortElem.isNumber()) {
             return Status(ErrorCodes::BadValue,
                           "The $sort is invalid: use 1/-1 to sort the whole element, "
@@ -375,14 +331,14 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                 for (size_t i = 0; i < sortField.numParts(); i++) {
                     if (sortField.getPart(i).size() == 0) {
                         return Status(ErrorCodes::BadValue,
-                                      str::stream()
-                                          << "The $sort field is a dotted field "
-                                             "but has an empty part: " << sortField.dottedField());
+                                      str::stream() << "The $sort field is a dotted field "
+                                                       "but has an empty part: "
+                                                    << sortField.dottedField());
                     }
                 }
             }
 
-            _sort = PatternElementCmp(sortElem.embeddedObject());
+            _sort = PatternElementCmp(sortElem.embeddedObject(), opts.collator);
         } else {
             // Ensure the sortElem number is valid.
             if (!isPatternElement(sortElem)) {
@@ -390,13 +346,20 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                               "The $sort element value must be either 1 or -1");
             }
 
-            _sort = PatternElementCmp(BSON("" << sortElem.number()));
+            _sort = PatternElementCmp(BSON("" << sortElem.number()), opts.collator);
         }
 
         _sortPresent = true;
     }
 
     return Status::OK();
+}
+
+void ModifierPush::setCollator(const CollatorInterface* collator) {
+    invariant(!_sort.collator);
+    if (_sortPresent) {
+        _sort.collator = collator;
+    }
 }
 
 Status ModifierPush::prepare(mutablebson::Element root,
@@ -438,7 +401,9 @@ Status ModifierPush::prepare(mutablebson::Element root,
                           str::stream() << "The field '" << _fieldRef.dottedField() << "'"
                                         << " must be an array but is of type "
                                         << typeName(_preparedState->elemFound.getType())
-                                        << " in document {" << idElem.toString() << "}");
+                                        << " in document {"
+                                        << idElem.toString()
+                                        << "}");
         }
     } else {
         return status;
@@ -452,6 +417,11 @@ Status ModifierPush::prepare(mutablebson::Element root,
 }
 
 namespace {
+
+/**
+ * Add 'elem' at index 'pos' in 'arrayElem'. 'arrayElem' should be an array of size 'arraySize', and
+ * 'pos' should be in the range [0, 'arraySize'].
+ */
 Status pushFirstElement(mb::Element& arrayElem,
                         const size_t arraySize,
                         const size_t pos,
@@ -460,20 +430,20 @@ Status pushFirstElement(mb::Element& arrayElem,
     if (arraySize == 0 || pos == 0) {
         return arrayElem.pushFront(elem);
     } else {
-        // Push position is at the end, or beyond
-        if (pos >= arraySize) {
+        // Push position is at the end.
+        if (pos == arraySize) {
             return arrayElem.pushBack(elem);
         }
 
         const size_t appendPos = pos - 1;
         mutablebson::Element fromElem = getNthChild(arrayElem, appendPos);
 
-        // This should not be possible since the checks above should
-        // cover us but error just in case
+        // Error if pos > arraySize.
         if (!fromElem.ok()) {
             return Status(ErrorCodes::InvalidLength,
                           str::stream() << "The specified position (" << appendPos << "/" << pos
-                                        << ") is invalid based on the length ( " << arraySize
+                                        << ") is invalid based on the length ( "
+                                        << arraySize
                                         << ") of the array");
         }
 
@@ -490,7 +460,7 @@ Status ModifierPush::apply() const {
     // 1. Create the doc array we'll push into, if it is not there
     // 2. Add the items in the $each array (or the simple $push) to the doc array
     // 3. Sort the resulting array according to $sort clause, if present
-    // 4. Trim the resulting array according the $slice clasue, if present
+    // 4. Trim the resulting array according the $slice clause, if present
     //
     // TODO There are _lots_ of optimization opportunities that we'll consider once the
     // test coverage is adequate.
@@ -519,7 +489,8 @@ Status ModifierPush::apply() const {
 
         // createPathAt() will complete the path and attach 'elemToSet' at the end of it.
         status = pathsupport::createPathAt(
-            _fieldRef, _preparedState->idxFound, _preparedState->elemFound, baseArray);
+                     _fieldRef, _preparedState->idxFound, _preparedState->elemFound, baseArray)
+                     .getStatus();
         if (!status.isOK()) {
             return status;
         }
@@ -532,9 +503,25 @@ Status ModifierPush::apply() const {
     // This is the count of the array before we change it, or 0 if missing from the doc.
     _preparedState->arrayPreModSize = countChildren(_preparedState->elemFound);
 
+    // Compute the actual position at which to push the elements.
+    int32_t actualPosition = _position;
+    // Negative positions are subtracted from the length of the array.
+    if (actualPosition < 0) {
+        actualPosition = _preparedState->arrayPreModSize + _position;
+    }
+    // Default to adding to the end of the array if the position was too high.
+    if (actualPosition > int32_t(_preparedState->arrayPreModSize)) {
+        actualPosition = _preparedState->arrayPreModSize;
+    }
+    // Default to adding to the beginning of the array if the position was too low.
+    if (actualPosition < 0) {
+        actualPosition = 0;
+    }
+    _preparedState->actualPosition = actualPosition;
+
     // 2. Add new elements to the array either by going over the $each array or by
     // appending the (old style $push) element.
-    if (_eachMode || _pushMode == PUSH_ALL) {
+    if (_eachMode) {
         BSONObjIterator itEach(_eachElem.embeddedObject());
 
         // When adding more than one element we keep track of the previous one
@@ -552,7 +539,7 @@ Status ModifierPush::apply() const {
             if (first) {
                 status = pushFirstElement(_preparedState->elemFound,
                                           _preparedState->arrayPreModSize,
-                                          _startPosition,
+                                          _preparedState->actualPosition,
                                           elem);
             } else {
                 status = prevElem.addSiblingRight(elem);
@@ -572,8 +559,10 @@ Status ModifierPush::apply() const {
         if (!elem.ok()) {
             return Status(ErrorCodes::InternalError, "can't wrap element being $push-ed");
         }
-        return pushFirstElement(
-            _preparedState->elemFound, _preparedState->arrayPreModSize, _startPosition, elem);
+        return pushFirstElement(_preparedState->elemFound,
+                                _preparedState->arrayPreModSize,
+                                _preparedState->actualPosition,
+                                elem);
     }
 
     // 3. Sort the resulting array, if $sort was requested.
@@ -586,7 +575,7 @@ Status ModifierPush::apply() const {
         // Slice 0 means to remove all
         if (_slice == 0) {
             while (_preparedState->elemFound.ok() && _preparedState->elemFound.rightChild().ok()) {
-                _preparedState->elemFound.rightChild().remove();
+                _preparedState->elemFound.rightChild().remove().transitional_ignore();
             }
         }
 
@@ -626,15 +615,15 @@ Status ModifierPush::log(LogBuilder* logBuilder) const {
 
     // If we sorted, sliced, or added the first items to the array, make a full array copy.
     const bool doFullCopy = _slicePresent || _sortPresent ||
-        (position == 0)                                         // first element in new/empty array
-        || (_startPosition < _preparedState->arrayPreModSize);  // add in middle
+        (position == 0)  // first element in new/empty array
+        || (_preparedState->actualPosition < _preparedState->arrayPreModSize);  // add in middle
 
     if (doFullCopy) {
         return logBuilder->addToSetsWithNewFieldName(_fieldRef.dottedField(),
                                                      _preparedState->elemFound);
     } else {
         // Set only the positional elements appended
-        if (_eachMode || _pushMode == PUSH_ALL) {
+        if (_eachMode) {
             // For each input element log it as a posisional $set
             BSONObjIterator itEach(_eachElem.embeddedObject());
             while (itEach.more()) {

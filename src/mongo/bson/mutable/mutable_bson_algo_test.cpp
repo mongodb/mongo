@@ -32,11 +32,13 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/basic.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
+using mongo::CollatorInterfaceMock;
 using mongo::Status;
 using namespace mongo::mutablebson;
 
@@ -309,7 +311,7 @@ TEST_F(CountTest, CountSiblingsMany) {
 
 TEST(DeduplicateTest, ManyDuplicates) {
     Document doc(mongo::fromjson("{ x : [ 1, 2, 2, 3, 3, 3, 4, 4, 4 ] }"));
-    deduplicateChildren(doc.root().leftChild(), woEqual(false));
+    deduplicateChildren(doc.root().leftChild(), woEqual(nullptr, false));
     ASSERT_TRUE(checkDoc(doc, mongo::fromjson("{x : [ 1, 2, 3, 4 ]}")));
 }
 
@@ -327,6 +329,45 @@ TEST(FullNameTest, InsideArray) {
     Document doc(mongo::fromjson("{ x : { y: [ 1 , 2 ] } }"));
     ASSERT_EQUALS("x.y.1",
                   getFullName(doc.root().leftChild().leftChild().leftChild().rightSibling()));
+}
+
+TEST(WoLessTest, CollationAware) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    Document less(mongo::fromjson("{ x: 'cbc' }"));
+    Document greater(mongo::fromjson("{ x: 'abd' }"));
+
+    woLess comp(&collator, true);
+    ASSERT_TRUE(comp(less.root(), greater.root()));
+    ASSERT_FALSE(comp(greater.root(), less.root()));
+}
+
+TEST(WoGreaterTest, CollationAware) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    Document less(mongo::fromjson("{ x: 'cbc' }"));
+    Document greater(mongo::fromjson("{ x: 'abd' }"));
+
+    woGreater comp(&collator, true);
+    ASSERT_TRUE(comp(greater.root(), less.root()));
+    ASSERT_FALSE(comp(less.root(), greater.root()));
+}
+
+TEST(WoEqualTest, CollationAware) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Document docA(mongo::fromjson("{ x: 'not' }"));
+    Document docB(mongo::fromjson("{ x: 'equal' }"));
+
+    woEqual comp(&collator, true);
+    ASSERT_TRUE(comp(docA.root(), docB.root()));
+    ASSERT_TRUE(comp(docB.root(), docA.root()));
+}
+
+TEST(WoEqualToTest, CollationAware) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Document docA(mongo::fromjson("{ x: 'not' }"));
+    Document docB(mongo::fromjson("{ x: 'equal' }"));
+
+    woEqualTo comp(docA.root(), &collator, true);
+    ASSERT_TRUE(comp(docB.root()));
 }
 
 }  // namespace

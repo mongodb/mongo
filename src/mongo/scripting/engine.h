@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/service_context.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
@@ -38,7 +38,6 @@ typedef unsigned long long ScriptingFunction;
 typedef BSONObj (*NativeFunction)(const BSONObj& args, void* data);
 typedef std::map<std::string, ScriptingFunction> FunctionCacheMap;
 
-class DBClientWithCommands;
 class DBClientBase;
 class OperationContext;
 
@@ -56,7 +55,7 @@ public:
 
     virtual void reset() = 0;
     virtual void init(const BSONObj* data) = 0;
-    virtual void registerOperation(OperationContext* txn) = 0;
+    virtual void registerOperation(OperationContext* opCtx) = 0;
     virtual void unregisterOperation() = 0;
 
     void init(const char* data) {
@@ -64,7 +63,7 @@ public:
         init(&o);
     }
 
-    virtual void localConnectForDbEval(OperationContext* txn, const char* dbName) = 0;
+    virtual void localConnectForDbEval(OperationContext* opCtx, const char* dbName) = 0;
     virtual void externalSetup() = 0;
     virtual void setLocalDB(const std::string& localDBName) {
         _localDBName = localDBName;
@@ -74,14 +73,13 @@ public:
     virtual std::string getString(const char* field) = 0;
     virtual bool getBoolean(const char* field) = 0;
     virtual double getNumber(const char* field) = 0;
-    virtual int getNumberInt(const char* field) {
-        return (int)getNumber(field);
-    }
-    virtual long long getNumberLongLong(const char* field) {
-        return static_cast<long long>(getNumber(field));
-    }
+    virtual int getNumberInt(const char* field) = 0;
 
-    virtual void setElement(const char* field, const BSONElement& e) = 0;
+    virtual long long getNumberLongLong(const char* field) = 0;
+
+    virtual Decimal128 getNumberDecimal(const char* field) = 0;
+
+    virtual void setElement(const char* field, const BSONElement& e, const BSONObj& parent) = 0;
     virtual void setNumber(const char* field, double val) = 0;
     virtual void setString(const char* field, StringData val) = 0;
     virtual void setObject(const char* field, const BSONObj& obj, bool readOnly = true) = 0;
@@ -101,6 +99,10 @@ public:
     virtual bool isKillPending() const = 0;
 
     virtual void gc() = 0;
+
+    virtual void advanceGeneration() = 0;
+
+    virtual void requireOwnedObjects() = 0;
 
     virtual ScriptingFunction createFunction(const char* code);
 
@@ -160,13 +162,13 @@ public:
 
     void execCoreFiles();
 
-    virtual void loadStored(OperationContext* txn, bool ignoreNotConnected = false);
+    virtual void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false);
 
     /**
      * if any changes are made to .system.js, call this
      * right now its just global - slightly inefficient, but a lot simpler
      */
-    static void storedFuncMod(OperationContext* txn);
+    static void storedFuncMod(OperationContext* opCtx);
 
     static void validateObjectIdString(const std::string& str);
 
@@ -208,11 +210,7 @@ protected:
      */
     class StoredFuncModLogOpHandler;
 
-    virtual FunctionCacheMap& getFunctionCache() {
-        return _cachedFunctions;
-    }
-    virtual ScriptingFunction _createFunction(const char* code,
-                                              ScriptingFunction functionNumber = 0) = 0;
+    virtual ScriptingFunction _createFunction(const char* code) = 0;
 
     std::string _localDBName;
     int64_t _loadedVersion;
@@ -234,11 +232,25 @@ public:
         return createScope();
     }
 
+    virtual Scope* newScopeForCurrentThread() {
+        return createScopeForCurrentThread();
+    }
+
     virtual void runTest() = 0;
 
     virtual bool utf8Ok() const = 0;
 
+    virtual void enableJIT(bool value) = 0;
+    virtual bool isJITEnabled() const = 0;
+
+    virtual void enableJavaScriptProtection(bool value) = 0;
+    virtual bool isJavaScriptProtectionEnabled() const = 0;
+
+    virtual int getJSHeapLimitMB() const = 0;
+    virtual void setJSHeapLimitMB(int limit) = 0;
+
     static void setup();
+    static void dropScopeCache();
 
     /** gets a scope from the pool or a new one if pool is empty
      * @param db The db name
@@ -246,17 +258,17 @@ public:
      *                  This must include authenticated users.
      * @return the scope
      */
-    std::unique_ptr<Scope> getPooledScope(OperationContext* txn,
+    std::unique_ptr<Scope> getPooledScope(OperationContext* opCtx,
                                           const std::string& db,
                                           const std::string& scopeType);
 
     void setScopeInitCallback(void (*func)(Scope&)) {
         _scopeInitCallback = func;
     }
-    static void setConnectCallback(void (*func)(DBClientWithCommands&)) {
+    static void setConnectCallback(void (*func)(DBClientBase&)) {
         _connectCallback = func;
     }
-    static void runConnectCallback(DBClientWithCommands& c) {
+    static void runConnectCallback(DBClientBase& c) {
         if (_connectCallback)
             _connectCallback(c);
     }
@@ -270,17 +282,17 @@ public:
 
 protected:
     virtual Scope* createScope() = 0;
+    virtual Scope* createScopeForCurrentThread() = 0;
     void (*_scopeInitCallback)(Scope&);
 
 private:
-    static void (*_connectCallback)(DBClientWithCommands&);
+    static void (*_connectCallback)(DBClientBase&);
 };
 
 void installGlobalUtils(Scope& scope);
 bool hasJSReturn(const std::string& s);
 const char* jsSkipWhiteSpace(const char* raw);
 
-DBClientBase* createDirectClient(OperationContext* txn);
-
-extern ScriptEngine* globalScriptEngine;
+ScriptEngine* getGlobalScriptEngine();
+void setGlobalScriptEngine(ScriptEngine* impl);
 }

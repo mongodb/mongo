@@ -7,8 +7,8 @@
  * documents appear in both a collection scan and an index scan. The indexed
  * value is an array of numbers.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
+load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -19,7 +19,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        this.indexedValue = [0,1,2,3,4,5,6,7,8,9].map(function(n) {
+        this.indexedValue = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function(n) {
             return this.tid * 10 + n;
         }.bind(this));
     };

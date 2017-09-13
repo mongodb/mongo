@@ -28,9 +28,9 @@
 *    it in the license file.
 */
 
+#include "mongo/db/update_index_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/update_index_data.h"
 
 namespace mongo {
 

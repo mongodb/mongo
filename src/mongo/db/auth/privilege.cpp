@@ -29,6 +29,7 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege_parser.h"
 
 namespace mongo {
 
@@ -42,6 +43,13 @@ void Privilege::addPrivilegeToPrivilegeVector(PrivilegeVector* privileges,
     }
     // No privilege exists yet for this resource
     privileges->push_back(privilegeToAdd);
+}
+
+void Privilege::addPrivilegesToPrivilegeVector(PrivilegeVector* privileges,
+                                               const PrivilegeVector& privilegesToAdd) {
+    for (auto&& priv : privilegesToAdd) {
+        addPrivilegeToPrivilegeVector(privileges, priv);
+    }
 }
 
 Privilege::Privilege(const ResourcePattern& resource, const ActionType& action)

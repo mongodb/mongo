@@ -31,7 +31,9 @@
 
 #include <string>
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/time_support.h"
 
@@ -89,7 +91,7 @@ public:
     }
 
     /** init from a reference to a 12-byte array */
-    explicit OID(const unsigned char(&arr)[kOIDSize]) {
+    explicit OID(const unsigned char (&arr)[kOIDSize]) {
         std::memcpy(_data, arr, sizeof(arr));
     }
 
@@ -111,6 +113,16 @@ public:
         OID o((no_initialize_tag()));
         o.init();
         return o;
+    }
+
+    MONGO_STATIC_ASSERT_MSG(sizeof(int64_t) == kInstanceUniqueSize + kIncrementSize,
+                            "size of term must be size of instance unique + increment");
+
+    // Return OID initialized with a 8 byte term id and max Timestamp. Used for ElectionID.
+    static OID fromTerm(int64_t term) {
+        OID result;
+        result.initFromTermNumber(term);
+        return result;
     }
 
     // Caller must ensure that the buffer is valid for kOIDSize bytes.
@@ -136,6 +148,12 @@ public:
 
     /** Set to the min/max OID that could be generated at given timestamp. */
     void init(Date_t date, bool max = false);
+
+    /**
+     * Sets the contents to contain the leading max Timestamp (0x7FFFFFFF)
+     * followed by an big endian 8 byte term id
+     */
+    void initFromTermNumber(int64_t term);
 
     time_t asTimeT() const;
     Date_t asDateT() const {
@@ -186,6 +204,10 @@ public:
         return ConstDataView(_data);
     }
 
+    ConstDataRange toCDR() const {
+        return ConstDataRange(_data, kOIDSize);
+    }
+
 private:
     // Internal mutable view
     DataView _view() {
@@ -218,8 +240,6 @@ enum JsonStringFormat {
     /** 10gen format, which is close to JS format.  This form is understandable by
         javascript running inside the Mongo server via eval() */
     TenGen,
-    /** Javascript JSON compatible */
-    JS
 };
 
 inline bool operator==(const OID& lhs, const OID& rhs) {

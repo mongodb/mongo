@@ -30,10 +30,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/fts/fts_matcher.h"
-#include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_element_iterator.h"
-#include "mongo/platform/strcasestr.h"
+#include "mongo/db/fts/fts_matcher.h"
+#include "mongo/db/fts/fts_phrase_matcher.h"
+#include "mongo/db/fts/fts_tokenizer.h"
 
 namespace mongo {
 
@@ -41,18 +41,8 @@ namespace fts {
 
 using std::string;
 
-/**
- * Does the string 'phrase' occur in the string 'haystack'?  Match is case-insensitive if
- * 'caseSensitive' is false; otherwise, an exact substring match is performed.
- */
-static bool phraseMatches(const string& phrase, const string& haystack, bool caseSensitive) {
-    if (caseSensitive) {
-        return haystack.find(phrase) != string::npos;
-    }
-    return strcasestr(haystack.c_str(), phrase.c_str()) != NULL;
-}
-
-FTSMatcher::FTSMatcher(const FTSQuery& query, const FTSSpec& spec) : _query(query), _spec(spec) {}
+FTSMatcher::FTSMatcher(const FTSQueryImpl& query, const FTSSpec& spec)
+    : _query(query), _spec(spec) {}
 
 bool FTSMatcher::matches(const BSONObj& obj) const {
     if (canSkipPositiveTermCheck()) {
@@ -91,10 +81,7 @@ bool FTSMatcher::hasPositiveTerm(const BSONObj& obj) const {
 
 bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, const string& raw) const {
     std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
-
-    tokenizer->reset(raw.c_str(),
-                     _query.getCaseSensitive() ? FTSTokenizer::GenerateCaseSensitiveTokens
-                                               : FTSTokenizer::None);
+    tokenizer->reset(raw.c_str(), _getTokenizerOptions());
 
     while (tokenizer->moveNext()) {
         string word = tokenizer->get().toString();
@@ -124,10 +111,7 @@ bool FTSMatcher::hasNegativeTerm(const BSONObj& obj) const {
 
 bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, const string& raw) const {
     std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
-
-    tokenizer->reset(raw.c_str(),
-                     _query.getCaseSensitive() ? FTSTokenizer::GenerateCaseSensitiveTokens
-                                               : FTSTokenizer::None);
+    tokenizer->reset(raw.c_str(), _getTokenizerOptions());
 
     while (tokenizer->moveNext()) {
         string word = tokenizer->get().toString();
@@ -163,12 +147,35 @@ bool FTSMatcher::_phraseMatch(const string& phrase, const BSONObj& obj) const {
 
     while (it.more()) {
         FTSIteratorValue val = it.next();
-        if (phraseMatches(phrase, val._text, _query.getCaseSensitive())) {
+
+        FTSPhraseMatcher::Options matcherOptions = FTSPhraseMatcher::kNone;
+
+        if (_query.getCaseSensitive()) {
+            matcherOptions |= FTSPhraseMatcher::kCaseSensitive;
+        }
+        if (_query.getDiacriticSensitive()) {
+            matcherOptions |= FTSPhraseMatcher::kDiacriticSensitive;
+        }
+
+        if (val._language->getPhraseMatcher().phraseMatches(phrase, val._text, matcherOptions)) {
             return true;
         }
     }
 
     return false;
+}
+
+FTSTokenizer::Options FTSMatcher::_getTokenizerOptions() const {
+    FTSTokenizer::Options tokenizerOptions = FTSTokenizer::kNone;
+
+    if (_query.getCaseSensitive()) {
+        tokenizerOptions |= FTSTokenizer::kGenerateCaseSensitiveTokens;
+    }
+    if (_query.getDiacriticSensitive()) {
+        tokenizerOptions |= FTSTokenizer::kGenerateDiacriticSensitiveTokens;
+    }
+
+    return tokenizerOptions;
 }
 }
 }

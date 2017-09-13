@@ -33,16 +33,18 @@
 #include "mongo/db/repl/elect_cmd_runner.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/repl/member_heartbeat_data.h"
-#include "mongo/db/repl/replica_set_config.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
-ElectCmdRunner::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
+
+ElectCmdRunner::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                      int selfIndex,
                                      const std::vector<HostAndPort>& targets,
                                      OID round)
@@ -78,6 +80,7 @@ std::vector<RemoteCommandRequest> ElectCmdRunner::Algorithm::getRequests() const
             *it,
             "admin",
             replSetElectCmd,
+            nullptr,
             Milliseconds(30 * 1000)));  // trying to match current Socket timeout
     }
 
@@ -101,11 +104,11 @@ bool ElectCmdRunner::Algorithm::hasReceivedSufficientResponses() const {
 }
 
 void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& request,
-                                                const ResponseStatus& response) {
+                                                const RemoteCommandResponse& response) {
     ++_actualResponses;
 
     if (response.isOK()) {
-        BSONObj res = response.getValue().data;
+        BSONObj res = response.data;
         log() << "received " << res["vote"] << " votes from " << request.target;
         LOG(1) << "full elect res: " << res.toString();
         BSONElement vote(res["vote"]);
@@ -118,27 +121,26 @@ void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& requ
 
         _receivedVotes += vote._numberInt();
     } else {
-        warning() << "elect command to " << request.target << " failed: " << response.getStatus();
+        warning() << "elect command to " << request.target << " failed: " << response.status;
     }
 }
 
 ElectCmdRunner::ElectCmdRunner() : _isCanceled(false) {}
 ElectCmdRunner::~ElectCmdRunner() {}
 
-StatusWith<ReplicationExecutor::EventHandle> ElectCmdRunner::start(
-    ReplicationExecutor* executor,
-    const ReplicaSetConfig& currentConfig,
+StatusWith<executor::TaskExecutor::EventHandle> ElectCmdRunner::start(
+    executor::TaskExecutor* executor,
+    const ReplSetConfig& currentConfig,
     int selfIndex,
-    const std::vector<HostAndPort>& targets,
-    const stdx::function<void()>& onCompletion) {
-    _algorithm.reset(new Algorithm(currentConfig, selfIndex, targets, OID::gen()));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get()));
-    return _runner->start(executor, onCompletion);
+    const std::vector<HostAndPort>& targets) {
+    _algorithm = std::make_shared<Algorithm>(currentConfig, selfIndex, targets, OID::gen());
+    _runner = stdx::make_unique<ScatterGatherRunner>(_algorithm, executor);
+    return _runner->start();
 }
 
-void ElectCmdRunner::cancel(ReplicationExecutor* executor) {
+void ElectCmdRunner::cancel() {
     _isCanceled = true;
-    _runner->cancel(executor);
+    _runner->cancel();
 }
 
 int ElectCmdRunner::getReceivedVotes() const {

@@ -27,12 +27,12 @@
 
 #pragma once
 
-#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/db/repl/member_config.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
 namespace mongo {
@@ -68,7 +68,7 @@ public:
     std::string getSetName() const;
     std::string getConnectionString() const;
     std::vector<HostAndPort> getHosts() const;
-    repl::ReplicaSetConfig getReplConfig() const;
+    repl::ReplSetConfig getReplConfig() const;
     std::string getPrimary() const;
     std::vector<std::string> getSecondaries() const;
 
@@ -80,7 +80,7 @@ public:
      * Note: does not automatically select a new primary. Can be done manually by
      * calling setPrimary.
      */
-    void setConfig(const repl::ReplicaSetConfig& newConfig);
+    void setConfig(const repl::ReplSetConfig& newConfig);
 
     void setPrimary(const std::string& hostAndPort);
 
@@ -133,7 +133,7 @@ private:
 
     const std::string _setName;
     ReplNodeMap _nodeMap;
-    repl::ReplicaSetConfig _replConfig;
+    repl::ReplSetConfig _replConfig;
 
     std::string _primaryHost;
 };

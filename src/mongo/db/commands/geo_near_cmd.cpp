@@ -30,24 +30,29 @@
 
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/range_preserver.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
 
@@ -56,11 +61,11 @@ namespace mongo {
 using std::unique_ptr;
 using std::stringstream;
 
-class Geo2dFindNearCmd : public Command {
+class Geo2dFindNearCmd : public ErrmsgCommandDeprecated {
 public:
-    Geo2dFindNearCmd() : Command("geoNear") {}
+    Geo2dFindNearCmd() : ErrmsgCommandDeprecated("geoNear") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     bool slaveOk() const {
@@ -68,6 +73,17 @@ public:
     }
     bool slaveOverrideOk() const {
         return true;
+    }
+    bool supportsNonLocalReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
+        return true;
+    }
+
+    ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kRead;
+    }
+
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     void help(stringstream& h) const {
@@ -82,19 +98,18 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    bool run(OperationContext* txn,
-             const string& dbname,
-             BSONObj& cmdObj,
-             int,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         if (!cmdObj["start"].eoo()) {
             errmsg = "using deprecated 'start' argument to geoNear";
             return false;
         }
 
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-        AutoGetCollectionForRead ctx(txn, nss);
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        AutoGetCollectionForReadCommand ctx(opCtx, nss);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {
@@ -109,7 +124,8 @@ public:
         // We seek to populate this.
         string nearFieldName;
         bool using2DIndex = false;
-        if (!getFieldName(txn, collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
+        if (!getFieldName(
+                opCtx, collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
             return false;
         }
 
@@ -154,7 +170,19 @@ public:
         }
         BSONObj rewritten = queryBob.obj();
 
-        // cout << "rewritten query: " << rewritten.toString() << endl;
+        // Extract the collation, if it exists.
+        BSONObj collation;
+        {
+            BSONElement collationElt;
+            Status collationEltStatus =
+                bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElt);
+            if (!collationEltStatus.isOK() && (collationEltStatus != ErrorCodes::NoSuchKey)) {
+                return appendCommandStatus(result, collationEltStatus);
+            }
+            if (collationEltStatus.isOK()) {
+                collation = collationElt.Obj();
+            }
+        }
 
         long long numWanted = 100;
         const char* limitName = !cmdObj["num"].eoo() ? "num" : "limit";
@@ -178,30 +206,41 @@ public:
             uassert(17297, "distanceMultiplier must be non-negative", distanceMultiplier >= 0);
         }
 
-        BSONObj projObj = BSON("$pt" << BSON("$meta" << LiteParsedQuery::metaGeoNearPoint) << "$dis"
-                                     << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
+        BSONObj projObj = BSON("$pt" << BSON("$meta" << QueryRequest::metaGeoNearPoint) << "$dis"
+                                     << BSON("$meta" << QueryRequest::metaGeoNearDistance));
 
-        CanonicalQuery* cq;
-        const WhereCallbackReal whereCallback(txn, nss.db());
-
-        if (!CanonicalQuery::canonicalize(
-                 nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), &cq, whereCallback)
-                 .isOK()) {
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(rewritten);
+        qr->setProj(projObj);
+        qr->setLimit(numWanted);
+        qr->setCollation(collation);
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(opCtx,
+                                         std::move(qr),
+                                         expCtx,
+                                         extensionsCallback,
+                                         MatchExpressionParser::kAllowAllSpecialFeatures &
+                                             ~MatchExpressionParser::AllowedFeatures::kExpr);
+        if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;
         }
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into geoNear.
-        RangePreserver preserver(collection);
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
 
-        PlanExecutor* rawExec;
-        if (!getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, 0).isOK()) {
-            errmsg = "can't get query executor";
-            return false;
+        auto exec = uassertStatusOK(
+            getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0));
+
+        auto curOp = CurOp::get(opCtx);
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
         }
-
-        unique_ptr<PlanExecutor> exec(rawExec);
 
         double totalDistance = 0;
         BSONObjBuilder resultBuilder(result.subarrayStart("results"));
@@ -209,7 +248,8 @@ public:
 
         BSONObj currObj;
         long long results = 0;
-        while ((results < numWanted) && PlanExecutor::ADVANCED == exec->getNext(&currObj, NULL)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&currObj, NULL))) {
             // Come up with the correct distance.
             double dist = currObj["$dis"].number() * distanceMultiplier;
             totalDistance += dist;
@@ -232,7 +272,7 @@ public:
 
             // Don't make a too-big result object.
             if (resultBuilder.len() + resObj.objsize() > BSONObjMaxUserSize) {
-                warning() << "Too many geoNear results for query " << rewritten.toString()
+                warning() << "Too many geoNear results for query " << redact(rewritten)
                           << ", truncating output.";
                 break;
             }
@@ -246,30 +286,61 @@ public:
             }
             oneResultBuilder.append("obj", resObj);
             oneResultBuilder.done();
+
             ++results;
+
+            // Break if we have the number of requested result documents.
+            if (results >= numWanted) {
+                break;
+            }
         }
 
         resultBuilder.done();
 
+        // Return an error if execution fails for any reason.
+        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+            log() << "Plan executor error during geoNear command: " << PlanExecutor::statestr(state)
+                  << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
+
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::OperationFailed,
+                                              str::stream()
+                                                  << "Executor error during geoNear command: "
+                                                  << WorkingSetCommon::toStatusString(currObj)));
+        }
+
+        PlanSummaryStats summary;
+        Explain::getSummaryStats(*exec, &summary);
+
         // Fill out the stats subobj.
         BSONObjBuilder stats(result.subobjStart("stats"));
 
-        // Fill in nscanned from the explain.
-        PlanSummaryStats summary;
-        Explain::getSummaryStats(exec.get(), &summary);
         stats.appendNumber("nscanned", summary.totalKeysExamined);
         stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
 
-        stats.append("avgDistance", totalDistance / results);
+        if (results > 0) {
+            stats.append("avgDistance", totalDistance / results);
+        }
         stats.append("maxDistance", farthestDist);
-        stats.append("time", CurOp::get(txn)->elapsedMillis());
+        stats.appendIntOrLL("time",
+                            durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()));
         stats.done();
+
+        collection->infoCache()->notifyOfQuery(opCtx, summary.indexesUsed);
+
+        curOp->debug().setPlanSummaryMetrics(summary);
+
+        if (curOp->shouldDBProfile()) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+            curOp->debug().execStats = execStatsBob.obj();
+        }
 
         return true;
     }
 
 private:
-    bool getFieldName(OperationContext* txn,
+    bool getFieldName(OperationContext* opCtx,
                       Collection* collection,
                       IndexCatalog* indexCatalog,
                       string* fieldOut,
@@ -278,7 +349,7 @@ private:
         vector<IndexDescriptor*> idxs;
 
         // First, try 2d.
-        collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_2D, idxs);
+        collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2D, idxs);
         if (idxs.size() > 1) {
             *errOut = "more than one 2d index, not sure which to run geoNear on";
             return false;
@@ -299,7 +370,7 @@ private:
 
         // Next, 2dsphere.
         idxs.clear();
-        collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_2DSPHERE, idxs);
+        collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2DSPHERE, idxs);
         if (0 == idxs.size()) {
             *errOut = "no geo indices for geoNear";
             return false;

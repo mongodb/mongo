@@ -1,0 +1,10 @@
+# See https://www.pylint.org/
+[MESSAGES CONTROL]
+# C0301 - line-too-long - some of the type annotations are longer then 100 columns
+# E0401 - import-error - ignore imports that fail to load
+# I0011 - locally-disabled - ignore warnings about disable pylint checks
+# R0903 - too-few-public-method - pylint does not always know best
+# W0511 - fixme - ignore TODOs in comments
+# W0611 - unused-import - typing module is needed for mypy
+
+disable=fixme,import-error,line-too-long,locally-disabled,too-few-public-methods,unused-import

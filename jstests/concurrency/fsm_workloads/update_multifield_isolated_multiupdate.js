@@ -6,8 +6,8 @@
  * Does updates that affect multiple fields on multiple documents, using $isolated.
  * The collection has an index for each field, and a multikey index for all fields.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/update_multifield.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/update_multifield.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -17,7 +17,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.assertResult = function assertResult(res, db, collName, query) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
         // documents can't move during an update, because we use $isolated
-        assertWhenOwnColl.eq(this.numDocs, res.nMatched,  tojson(res));
+        assertWhenOwnColl.eq(this.numDocs, res.nMatched, tojson(res));
         if (db.getMongo().writeMode() === 'commands') {
             assertWhenOwnColl.eq(this.numDocs, res.nModified, tojson(res));
         }

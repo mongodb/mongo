@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -14,22 +14,22 @@
  */
 static int
 __drop_file(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int remove_files;
+	bool remove_files;
 	const char *filename;
 
 	WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
-	remove_files = (cval.val != 0);
+	remove_files = cval.val != 0;
 
 	filename = uri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (EINVAL);
+	WT_PREFIX_SKIP_REQUIRED(session, filename, "file:");
 
+	WT_RET(__wt_schema_backup_check(session, filename));
 	/* Close all btree handles associated with this file. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
 	    ret = __wt_conn_dhandle_close_all(session, uri, force));
 	WT_RET(ret);
 
@@ -39,10 +39,10 @@ __drop_file(
 		return (ret);
 
 	/*
-	 * Remove the underlying physical file. There is no point tracking this
-	 * operation: there is no going back from here.
+	 * Schedule the remove of the underlying physical file when the drop
+	 * completes.
 	 */
-	WT_TRET(__wt_remove_if_exists(session, filename));
+	WT_TRET(__wt_meta_track_drop(session, filename));
 
 	return (ret);
 }
@@ -53,19 +53,20 @@ __drop_file(
  */
 static int
 __drop_colgroup(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));
 
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_colgroup(
 	    session, uri, force, &table, &colgroup)) == 0) {
-		table->cg_complete = 0;
 		WT_TRET(__wt_schema_drop(session, colgroup->source, cfg));
+		if (ret == 0)
+			table->cg_complete = false;
 	}
 
 	WT_TRET(__wt_metadata_remove(session, uri));
@@ -74,22 +75,18 @@ __drop_colgroup(
 
 /*
  * __drop_index --
- *	WT_SESSION::drop for a colgroup.
+ *	WT_SESSION::drop for an index.
  */
 static int
 __drop_index(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_INDEX *idx;
 	WT_DECL_RET;
-	WT_TABLE *table;
 
-	/* If we can get the colgroup, detach it from the table. */
-	if ((ret = __wt_schema_get_index(
-	    session, uri, force, &table, &idx)) == 0) {
-		table->idx_complete = 0;
+	/* If we can get the index, detach it from the table. */
+	if ((ret = __wt_schema_get_index(session, uri, true, force, &idx)) == 0)
 		WT_TRET(__wt_schema_drop(session, idx->source, cfg));
-	}
 
 	WT_TRET(__wt_metadata_remove(session, uri));
 	return (ret);
@@ -109,12 +106,26 @@ __drop_table(
 	WT_TABLE *table;
 	const char *name;
 	u_int i;
+	bool tracked;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));
 
 	name = uri;
-	(void)WT_PREFIX_SKIP(name, "table:");
+	WT_PREFIX_SKIP_REQUIRED(session, name, "table:");
 
 	table = NULL;
-	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 1, &table));
+	tracked = false;
+
+	/*
+	 * Open the table so we can drop its column groups and indexes.
+	 *
+	 * Ideally we would keep the table locked exclusive across the drop,
+	 * but for now we rely on the global table lock to prevent the table
+	 * being reopened while it is being dropped.  One issue is that the
+	 * WT_WITHOUT_LOCKS macro can drop and reacquire the global table lock,
+	 * avoiding deadlocks while waiting for LSM operation to quiesce.
+	 */
+	WT_ERR(__wt_schema_get_table_uri(session, uri, true, 0, &table));
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -135,7 +146,7 @@ __drop_table(
 		if ((idx = table->indices[i]) == NULL)
 			continue;
 		/*
-		 * Drop the column group before updating the metadata to avoid
+		 * Drop the index before updating the metadata to avoid
 		 * the metadata for the table becoming inconsistent if we can't
 		 * get exclusive access.
 		 */
@@ -143,14 +154,23 @@ __drop_table(
 		WT_ERR(__wt_metadata_remove(session, idx->name));
 	}
 
-	WT_ERR(__wt_schema_remove_table(session, table));
-	table = NULL;
+	/* Make sure the table data handle is closed. */
+	WT_TRET(__wt_schema_release_table(session, table));
+	WT_ERR(__wt_schema_get_table_uri(
+	    session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
+	F_SET(&table->iface, WT_DHANDLE_DISCARD);
+	if (WT_META_TRACKING(session)) {
+		WT_WITH_DHANDLE(session, &table->iface,
+		    ret = __wt_meta_track_handle_lock(session, false));
+		WT_ERR(ret);
+		tracked = true;
+	}
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_ERR(__wt_metadata_remove(session, uri));
 
-err:	if (table != NULL)
-		__wt_schema_release_table(session, table);
+err:	if (table != NULL && !tracked)
+		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }
 
@@ -164,10 +184,10 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_CONFIG_ITEM cval;
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
-	int force;
+	bool force;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
-	force = (cval.val != 0);
+	force = cval.val != 0;
 
 	WT_RET(__wt_meta_track_on(session));
 
@@ -199,10 +219,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	if (ret == WT_NOTFOUND || ret == ENOENT)
 		ret = force ? 0 : ENOENT;
 
-	/* Bump the schema generation so that stale data is ignored. */
-	++S2C(session)->schema_gen;
-
-	WT_TRET(__wt_meta_track_off(session, 1, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
 	return (ret);
 }

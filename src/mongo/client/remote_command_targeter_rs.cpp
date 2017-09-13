@@ -26,14 +26,19 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter_rs.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -42,37 +47,57 @@ namespace mongo {
 RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
                                                  const std::vector<HostAndPort>& seedHosts)
     : _rsName(rsName) {
-    _rsMonitor = ReplicaSetMonitor::get(rsName);
-    if (!_rsMonitor) {
-        std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
 
-        // TODO: Replica set monitor should be entirely owned and maintained by the remote
-        //       command targeter. Otherwise, there is a slight race condition here where the
-        //       RS monitor might be created, but then before the get call it gets removed so
-        //       we end up with a NULL _rsMonitor.
-        ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
-        _rsMonitor = ReplicaSetMonitor::get(rsName);
+    std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
+    _rsMonitor = ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
+
+    LOG(1) << "Started targeter for "
+           << ConnectionString::forReplicaSet(
+                  rsName, std::vector<HostAndPort>(seedServers.begin(), seedServers.end()));
+}
+
+ConnectionString RemoteCommandTargeterRS::connectionString() {
+    return uassertStatusOK(ConnectionString::parse(_rsMonitor->getServerAddress()));
+}
+
+StatusWith<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
+    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
+    return _rsMonitor->getHostOrRefresh(readPref, maxWait);
+}
+
+StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCtx,
+                                                          const ReadPreferenceSetting& readPref) {
+    auto clock = opCtx->getServiceContext()->getFastClockSource();
+    auto startDate = clock->now();
+    while (true) {
+        const auto interruptStatus = opCtx->checkForInterruptNoAssert();
+        if (!interruptStatus.isOK()) {
+            return interruptStatus;
+        }
+        const auto host = _rsMonitor->getHostOrRefresh(readPref, Milliseconds::zero());
+        if (host.getStatus() != ErrorCodes::FailedToSatisfyReadPreference) {
+            return host;
+        }
+        // Enforce a 20-second ceiling on the time spent looking for a host. This conforms with the
+        // behavior used throughout mongos prior to version 3.4, but is not fundamentally desirable.
+        // See comment in remote_command_targeter.h for details.
+        if (clock->now() - startDate > Seconds{20}) {
+            return host;
+        }
+        sleepFor(Milliseconds{500});
     }
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(const ReadPreferenceSetting& readPref) {
-    if (!_rsMonitor) {
-        return Status(ErrorCodes::ReplicaSetNotFound,
-                      str::stream() << "unknown replica set " << _rsName);
-    }
+void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host, const Status& status) {
+    invariant(_rsMonitor);
 
-    HostAndPort hostAndPort = _rsMonitor->getHostOrRefresh(readPref);
-    if (hostAndPort.empty()) {
-        if (readPref.pref == ReadPreference::PrimaryOnly) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "No master found for set " << _rsName);
-        }
-        return Status(ErrorCodes::FailedToSatisfyReadPreference,
-                      str::stream() << "could not find host matching read preference "
-                                    << readPref.toString() << " for set " << _rsName);
-    }
+    _rsMonitor->failedHost(host, status);
+}
 
-    return hostAndPort;
+void RemoteCommandTargeterRS::markHostUnreachable(const HostAndPort& host, const Status& status) {
+    invariant(_rsMonitor);
+
+    _rsMonitor->failedHost(host, status);
 }
 
 }  // namespace mongo

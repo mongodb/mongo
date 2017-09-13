@@ -40,15 +40,36 @@ RemoteCommandTargeterMock::RemoteCommandTargeterMock()
 
 RemoteCommandTargeterMock::~RemoteCommandTargeterMock() = default;
 
-RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter* targeter) {
-    auto mock = dynamic_cast<RemoteCommandTargeterMock*>(targeter);
+std::shared_ptr<RemoteCommandTargeterMock> RemoteCommandTargeterMock::get(
+    std::shared_ptr<RemoteCommandTargeter> targeter) {
+    auto mock = std::dynamic_pointer_cast<RemoteCommandTargeterMock>(targeter);
     invariant(mock);
 
     return mock;
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreferenceSetting& readPref) {
+ConnectionString RemoteCommandTargeterMock::connectionString() {
+    return _connectionStringReturnValue;
+}
+
+StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* opCtx,
+                                                            const ReadPreferenceSetting& readPref) {
     return _findHostReturnValue;
+}
+
+StatusWith<HostAndPort> RemoteCommandTargeterMock::findHostWithMaxWait(
+    const ReadPreferenceSetting& readPref, Milliseconds maxTime) {
+
+    return _findHostReturnValue;
+}
+
+void RemoteCommandTargeterMock::markHostNotMaster(const HostAndPort& host, const Status& status) {}
+
+void RemoteCommandTargeterMock::markHostUnreachable(const HostAndPort& host, const Status& status) {
+}
+
+void RemoteCommandTargeterMock::setConnectionStringReturnValue(const ConnectionString returnValue) {
+    _connectionStringReturnValue = std::move(returnValue);
 }
 
 void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {

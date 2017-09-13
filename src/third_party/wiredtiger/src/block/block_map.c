@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -13,12 +13,19 @@
  *	Map a segment of the file in, if possible.
  */
 int
-__wt_block_map(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapp, size_t *maplenp,
-    void **mappingcookie)
+__wt_block_map(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    void *mapped_regionp, size_t *lengthp, void *mapped_cookiep)
 {
-	*(void **)mapp = NULL;
-	*maplenp = 0;
+	WT_DECL_RET;
+	WT_FILE_HANDLE *handle;
+
+	*(void **)mapped_regionp = NULL;
+	*lengthp = 0;
+	*(void **)mapped_cookiep = NULL;
+
+	/* Map support is configurable. */
+	if (!S2C(session)->mmap)
+		return (0);
 
 	/*
 	 * Turn off mapping when verifying the file, because we can't perform
@@ -29,14 +36,6 @@ __wt_block_map(
 		return (0);
 
 	/*
-	 * Turn off mapping when direct I/O is configured for the file, the
-	 * Linux open(2) documentation says applications should avoid mixing
-	 * mmap(2) of files with direct I/O to the same files.
-	 */
-	if (block->fh->direct_io)
-		return (0);
-
-	/*
 	 * Turn off mapping if the application configured a cache size maximum,
 	 * we can't control how much of the cache size we use in that case.
 	 */
@@ -44,12 +43,25 @@ __wt_block_map(
 		return (0);
 
 	/*
-	 * Map the file into memory.
-	 * Ignore errors, we'll read the file through the cache if map fails.
+	 * There may be no underlying functionality.
 	 */
-	(void)__wt_mmap(session, block->fh, mapp, maplenp, mappingcookie);
+	handle = block->fh->handle;
+	if (handle->fh_map == NULL)
+		return (0);
 
-	return (0);
+	/*
+	 * Map the file into memory.
+	 * Ignore not-supported errors, we'll read the file through the cache
+	 * if map fails.
+	 */
+	ret = handle->fh_map(handle,
+	    (WT_SESSION *)session, mapped_regionp, lengthp, mapped_cookiep);
+	if (ret == EBUSY || ret == ENOTSUP) {
+		*(void **)mapped_regionp = NULL;
+		ret = 0;
+	}
+
+	return (ret);
 }
 
 /*
@@ -57,10 +69,13 @@ __wt_block_map(
  *	Unmap any mapped-in segment of the file.
  */
 int
-__wt_block_unmap(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, void *map, size_t maplen,
-    void **mappingcookie)
+__wt_block_unmap(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, void *mapped_region, size_t length, void *mapped_cookie)
 {
+	WT_FILE_HANDLE *handle;
+
 	/* Unmap the file from memory. */
-	return (__wt_munmap(session, block->fh, map, maplen, mappingcookie));
+	handle = block->fh->handle;
+	return (handle->fh_unmap(handle,
+	    (WT_SESSION *)session, mapped_region, length, mapped_cookie));
 }

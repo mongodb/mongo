@@ -32,8 +32,6 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -47,11 +45,11 @@ AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(AuthorizationMa
     : AuthzSessionExternalStateServerCommon(authzManager) {}
 AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
-void AuthzSessionExternalStateMongod::startRequest(OperationContext* txn) {
+void AuthzSessionExternalStateMongod::startRequest(OperationContext* opCtx) {
     // No locks should be held as this happens before any database accesses occur
-    dassert(!txn->lockState()->isLocked());
+    dassert(!opCtx->lockState()->isLocked());
 
-    _checkShouldAllowLocalhost(txn);
+    _checkShouldAllowLocalhost(opCtx);
 }
 
 bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {

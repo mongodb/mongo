@@ -29,11 +29,19 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
+
+#include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
+
+REGISTER_ACCUMULATOR(first, AccumulatorFirst::create);
+
+const char* AccumulatorFirst::getOpName() const {
+    return "$first";
+}
 
 void AccumulatorFirst::processInternal(const Value& input, bool merging) {
     /* only remember the first value seen */
@@ -45,11 +53,12 @@ void AccumulatorFirst::processInternal(const Value& input, bool merging) {
     }
 }
 
-Value AccumulatorFirst::getValue(bool toBeMerged) const {
+Value AccumulatorFirst::getValue(bool toBeMerged) {
     return _first;
 }
 
-AccumulatorFirst::AccumulatorFirst() : _haveFirst(false) {
+AccumulatorFirst::AccumulatorFirst(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : Accumulator(expCtx), _haveFirst(false) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -60,11 +69,8 @@ void AccumulatorFirst::reset() {
 }
 
 
-intrusive_ptr<Accumulator> AccumulatorFirst::create() {
-    return new AccumulatorFirst();
-}
-
-const char* AccumulatorFirst::getOpName() const {
-    return "$first";
+intrusive_ptr<Accumulator> AccumulatorFirst::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new AccumulatorFirst(expCtx);
 }
 }

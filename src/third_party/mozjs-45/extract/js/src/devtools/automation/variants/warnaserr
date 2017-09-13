@@ -1,0 +1,4 @@
+--enable-threadsafe
+--enable-optimize
+--enable-warnings-as-errors
+

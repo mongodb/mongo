@@ -41,6 +41,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -50,11 +51,12 @@
 namespace mongo {
 namespace {
 
-class ClusterKillOpCommand : public Command {
+class ClusterKillOpCommand : public BasicCommand {
 public:
-    ClusterKillOpCommand() : Command("killOp") {}
+    ClusterKillOpCommand() : BasicCommand("killOp") {}
 
-    bool isWriteCommandForConfigServer() const final {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -66,7 +68,7 @@ public:
         return true;
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
         bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
@@ -74,11 +76,9 @@ public:
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& db,
-             BSONObj& cmdObj,
-             int options,
-             std::string& errmsg,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         // The format of op is shardid:opid
         // This is different than the format passed to the mongod killOp command.
@@ -89,37 +89,34 @@ public:
 
         uassert(28625,
                 str::stream() << "The op argument to killOp must be of the format shardid:opid"
-                              << " but found \"" << opToKill << '"',
+                              << " but found \""
+                              << opToKill
+                              << '"',
                 (opToKill.size() >= 3) &&                  // must have at least N:N
                     (opSepPos != std::string::npos) &&     // must have ':' as separator
                     (opSepPos != 0) &&                     // can't be :NN
                     (opSepPos != (opToKill.size() - 1)));  // can't be NN:
 
         auto shardIdent = opToKill.substr(0, opSepPos);
-        log() << "want to kill op: " << opToKill;
+        log() << "want to kill op: " << redact(opToKill);
 
         // Will throw if shard id is not found
-        auto shard = grid.shardRegistry()->getShard(shardIdent);
-        if (!shard) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::ShardNotFound,
-                       str::stream() << "shard " << shardIdent << " does not exist"));
+        auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardIdent);
+        if (!shardStatus.isOK()) {
+            return appendCommandStatus(result, shardStatus.getStatus());
         }
+        auto shard = shardStatus.getValue();
 
-        auto opId = std::stoi(opToKill.substr(opSepPos + 1));
+        int opId;
+        uassertStatusOK(parseNumberFromStringWithBase(opToKill.substr(opSepPos + 1), 10, &opId));
 
         // shardid is actually the opid - keeping for backwards compatibility.
         result.append("shard", shardIdent);
         result.append("shardid", opId);
 
         ScopedDbConnection conn(shard->getConnString());
-        BSONObj cmdRes;
-        BSONObjBuilder argsBob;
-        argsBob.append("op", opId);
-        auto args = argsBob.done();
         // intentionally ignore return value - that is how legacy killOp worked.
-        conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", args, cmdRes);
+        conn->runCommand(OpMsgRequest::fromDBAndBody("admin", BSON("killOp" << 1 << "op" << opId)));
         conn.done();
 
         // The original behavior of killOp on mongos is to always return success, regardless of

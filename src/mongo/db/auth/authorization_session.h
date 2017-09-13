@@ -44,14 +44,19 @@
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
-class ClientBasic;
+
+namespace auth {
+
+struct CreateOrUpdateRoleArgs;
+}
+class Client;
 
 /**
  * Contains all the authorization logic for a single client connection.  It contains a set of
  * the users which have been authenticated, as well as a set of privileges that have been
  * granted to those users to perform various actions.
  *
- * An AuthorizationSession object is present within every mongo::ClientBasic object.
+ * An AuthorizationSession object is present within every mongo::Client object.
  *
  * Users in the _authenticatedUsers cache may get marked as invalid by the AuthorizationManager,
  * for instance if their privileges are changed by a user or role modification command.  At the
@@ -65,23 +70,44 @@ class AuthorizationSession {
 
 public:
     /**
-     * Gets the AuthorizationSession associated with the given "client", or nullptr.
-     *
-     * The "client" object continues to own the returned AuthorizationSession.
+     * Provides a way to swap out impersonate data for the duration of the ScopedImpersonate's
+     * lifetime.
      */
-    static AuthorizationSession* get(ClientBasic* client);
+    class ScopedImpersonate {
+    public:
+        ScopedImpersonate(AuthorizationSession* authSession,
+                          std::vector<UserName>* users,
+                          std::vector<RoleName>* roles);
+        ~ScopedImpersonate();
+
+    private:
+        void swap();
+
+        AuthorizationSession& _authSession;
+        std::vector<UserName>& _users;
+        std::vector<RoleName>& _roles;
+    };
+
+    friend class ScopedImpersonate;
 
     /**
      * Gets the AuthorizationSession associated with the given "client", or nullptr.
      *
      * The "client" object continues to own the returned AuthorizationSession.
      */
-    static AuthorizationSession* get(ClientBasic& client);
+    static AuthorizationSession* get(Client* client);
+
+    /**
+     * Gets the AuthorizationSession associated with the given "client", or nullptr.
+     *
+     * The "client" object continues to own the returned AuthorizationSession.
+     */
+    static AuthorizationSession* get(Client& client);
 
     /**
      * Returns false if AuthorizationSession::get(client) would return nullptr.
      */
-    static bool exists(ClientBasic* client);
+    static bool exists(Client* client);
 
     /**
      * Sets the AuthorizationSession associated with "client" to "session".
@@ -89,7 +115,7 @@ public:
      * "session" must not be NULL, and it is only legal to call this function once
      * on each instance of "client".
      */
-    static void set(ClientBasic* client, std::unique_ptr<AuthorizationSession> session);
+    static void set(Client* client, std::unique_ptr<AuthorizationSession> session);
 
     // Takes ownership of the externalState.
     explicit AuthorizationSession(std::unique_ptr<AuthzSessionExternalState> externalState);
@@ -100,19 +126,23 @@ public:
     // Should be called at the beginning of every new request.  This performs the checks
     // necessary to determine if localhost connections should be given full access.
     // TODO: try to eliminate the need for this call.
-    void startRequest(OperationContext* txn);
+    void startRequest(OperationContext* opCtx);
 
     /**
      * Adds the User identified by "UserName" to the authorization session, acquiring privileges
      * for it in the process.
      */
-    Status addAndAuthorizeUser(OperationContext* txn, const UserName& userName);
+    Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName);
 
     // Returns the authenticated user with the given name.  Returns NULL
     // if no such user is found.
     // The user remains in the _authenticatedUsers set for this AuthorizationSession,
     // and ownership of the user stays with the AuthorizationManager
     User* lookupUser(const UserName& name);
+
+    // Returns the single user on this auth session. If no user is authenticated, or if
+    // multiple users are authenticated, this method will throw an exception.
+    User* getSingleUser();
 
     // Gets an iterator over the names of all authenticated users stored in this manager.
     UserNameIterator getAuthenticatedUserNames();
@@ -139,18 +169,19 @@ public:
     // into a state where the first user can be created.
     PrivilegeVector getDefaultPrivileges();
 
-    // Checks if this connection has the privileges necessary to perform the given query on the
-    // given namespace.
-    Status checkAuthForQuery(const NamespaceString& ns, const BSONObj& query);
+    // Checks if this connection has the privileges necessary to perform a find operation
+    // on the supplied namespace identifier.
+    Status checkAuthForFind(const NamespaceString& ns, bool hasTerm);
 
     // Checks if this connection has the privileges necessary to perform a getMore operation on
     // the identified cursor, supposing that cursor is associated with the supplied namespace
     // identifier.
-    Status checkAuthForGetMore(const NamespaceString& ns, long long cursorID);
+    Status checkAuthForGetMore(const NamespaceString& ns, long long cursorID, bool hasTerm);
 
     // Checks if this connection has the privileges necessary to perform the given update on the
     // given namespace.
-    Status checkAuthForUpdate(const NamespaceString& ns,
+    Status checkAuthForUpdate(OperationContext* opCtx,
+                              const NamespaceString& ns,
                               const BSONObj& query,
                               const BSONObj& update,
                               bool upsert);
@@ -158,16 +189,32 @@ public:
     // Checks if this connection has the privileges necessary to insert the given document
     // to the given namespace.  Correctly interprets inserts to system.indexes and performs
     // the proper auth checks for index building.
-    Status checkAuthForInsert(const NamespaceString& ns, const BSONObj& document);
+    Status checkAuthForInsert(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& document);
 
     // Checks if this connection has the privileges necessary to perform a delete on the given
     // namespace.
-    Status checkAuthForDelete(const NamespaceString& ns, const BSONObj& query);
+    Status checkAuthForDelete(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& query);
 
     // Checks if this connection has the privileges necessary to perform a killCursor on
     // the identified cursor, supposing that cursor is associated with the supplied namespace
     // identifier.
     Status checkAuthForKillCursors(const NamespaceString& ns, long long cursorID);
+
+    // Checks if this connection has the privileges necessary to run the aggregation pipeline
+    // specified in 'cmdObj' on the namespace 'ns' either directly on mongoD or via mongoS.
+    Status checkAuthForAggregate(const NamespaceString& ns, const BSONObj& cmdObj, bool isMongos);
+
+    // Checks if this connection has the privileges necessary to create 'ns' with the options
+    // supplied in 'cmdObj' either directly on mongoD or via mongoS.
+    Status checkAuthForCreate(const NamespaceString& ns, const BSONObj& cmdObj, bool isMongos);
+
+    // Checks if this connection has the privileges necessary to modify 'ns' with the options
+    // supplied in 'cmdObj' either directly on mongoD or via mongoS.
+    Status checkAuthForCollMod(const NamespaceString& ns, const BSONObj& cmdObj, bool isMongos);
 
     // Checks if this connection has the privileges necessary to grant the given privilege
     // to a role.
@@ -176,6 +223,9 @@ public:
     // Checks if this connection has the privileges necessary to revoke the given privilege
     // from a role.
     Status checkAuthorizedToRevokePrivilege(const Privilege& privilege);
+
+    // Checks if this connection has the privileges necessary to create a new role
+    bool isAuthorizedToCreateRole(const auth::CreateOrUpdateRoleArgs& args);
 
     // Utility function for isAuthorizedForActionsOnResource(
     //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
@@ -192,6 +242,10 @@ public:
     // Returns true if the current session is authenticated as the given user and that user
     // is allowed to change his/her own password
     bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName);
+
+    // Returns true if the current session is authorized to list the collections in the given
+    // database.
+    bool isAuthorizedToListCollections(StringData dbname);
 
     // Returns true if the current session is authenticated as the given user and that user
     // is allowed to change his/her own customData.
@@ -239,20 +293,41 @@ public:
     // Clears the data for impersonated users.
     void clearImpersonatedUserData();
 
+    // Returns true if the session and 'opClient's AuthorizationSession share an
+    // authenticated user. If either object has impersonated users,
+    // those users will be considered as 'authenticated' for the purpose of this check.
+    //
+    // The existence of 'opClient' must be guaranteed through locks taken by the caller.
+    bool isCoauthorizedWithClient(Client* opClient);
+
+    // Returns true if the session and 'userNameIter' share an authenticated user, or if both have
+    // no authenticated users. Impersonated users are not considered as 'authenticated' for the
+    // purpose of this check. This always returns true if auth is not enabled.
+    bool isCoauthorizedWith(UserNameIterator userNameIter);
+
     // Tells whether impersonation is active or not.  This state is set when
     // setImpersonatedUserData is called and cleared when clearImpersonatedUserData is
     // called.
     bool isImpersonating() const;
 
-private:
-    // If any users authenticated on this session are marked as invalid this updates them with
-    // up-to-date information. May require a read lock on the "admin" db to read the user data.
-    void _refreshUserInfoAsNeeded(OperationContext* txn);
-
+protected:
     // Builds a vector of all roles held by users who are authenticated on this connection. The
     // vector is stored in _authenticatedRoleNames. This function is called when users are
     // logged in or logged out, as well as when the user cache is determined to be out of date.
     void _buildAuthenticatedRolesVector();
+
+    // All Users who have been authenticated on this connection.
+    UserSet _authenticatedUsers;
+
+    // The roles of the authenticated users. This vector is generated when the authenticated
+    // users set is changed.
+    std::vector<RoleName> _authenticatedRoleNames;
+
+private:
+    // If any users authenticated on this session are marked as invalid this updates them with
+    // up-to-date information. May require a read lock on the "admin" db to read the user data.
+    void _refreshUserInfoAsNeeded(OperationContext* opCtx);
+
 
     // Checks if this connection is authorized for the given Privilege, ignoring whether or not
     // we should even be doing authorization checks in general.  Note: this may acquire a read
@@ -261,12 +336,6 @@ private:
 
     std::unique_ptr<AuthzSessionExternalState> _externalState;
 
-    // All Users who have been authenticated on this connection.
-    UserSet _authenticatedUsers;
-    // The roles of the authenticated users. This vector is generated when the authenticated
-    // users set is changed.
-    std::vector<RoleName> _authenticatedRoleNames;
-
     // A vector of impersonated UserNames and a vector of those users' RoleNames.
     // These are used in the auditing system. They are not used for authz checks.
     std::vector<UserName> _impersonatedUserNames;
@@ -274,4 +343,10 @@ private:
     bool _impersonationFlag;
 };
 
+// Returns a status encoding whether the current session in the specified `opCtx` has privilege to
+// access a cursor in the specified `cursorSessionId` parameter.  Returns `Status::OK()`, when the
+// session is accessible.  Returns a `mongo::Status` with information regarding the nature of
+// session inaccessibility when the session is not accessible.
+Status checkCursorSessionPrivilege(OperationContext* const opCtx,
+                                   const boost::optional<LogicalSessionId> cursorSessionId);
 }  // namespace mongo

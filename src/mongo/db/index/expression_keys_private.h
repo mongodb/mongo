@@ -31,11 +31,13 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/index/multikey_paths.h"
 
 namespace mongo {
 
+class CollatorInterface;
 struct TwoDIndexingParams;
 struct S2IndexingParams;
 
@@ -79,6 +81,7 @@ public:
                             HashSeed seed,
                             int hashVersion,
                             bool isSparse,
+                            const CollatorInterface* collator,
                             BSONObjSet* keys);
 
     /**
@@ -123,7 +126,8 @@ public:
     static void getS2Keys(const BSONObj& obj,
                           const BSONObj& keyPattern,
                           const S2IndexingParams& params,
-                          BSONObjSet* keys);
+                          BSONObjSet* keys,
+                          MultikeyPaths* multikeyPaths);
 };
 
 }  // namespace mongo

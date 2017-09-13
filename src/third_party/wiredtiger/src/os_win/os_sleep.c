@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -15,11 +15,22 @@
 void
 __wt_sleep(uint64_t seconds, uint64_t micro_seconds)
 {
+	DWORD dwMilliseconds;
+
 	/*
-	 * If the caller wants a small pause, set to our
-	 * smallest granularity.
+	 * Sleeping isn't documented as a memory barrier, and it's a reasonable
+	 * expectation to have. There's no reason not to explicitly include a
+	 * barrier since we're giving up the CPU, and ensures callers are never
+	 * surprised.
 	 */
-	if (seconds == 0 && micro_seconds < 1000)
-		micro_seconds = 1000;
-	Sleep(seconds * 1000 + micro_seconds / 1000);
+	WT_FULL_BARRIER();
+
+	/*
+	 * If the caller wants a small pause, set to our smallest granularity.
+	 */
+	if (seconds == 0 && micro_seconds < WT_THOUSAND)
+		micro_seconds = WT_THOUSAND;
+	dwMilliseconds = (DWORD)
+	    (seconds * WT_THOUSAND + micro_seconds / WT_THOUSAND);
+	Sleep(dwMilliseconds);
 }

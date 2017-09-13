@@ -1,43 +1,51 @@
-var st = new ShardingTest({ shards: { rs0: { nodes: 2, oplogSize: 10, verbose: 1 }}});
-var replTest = st.rs0;
+load('jstests/replsets/rslib.js');
+(function() {
+    "use strict";
 
-var config = replTest.getReplSetConfig();
-config.members[1].priority = 0;
-// Add a delay long enough so getLastError would actually 'wait' for write concern.
-config.members[1].slaveDelay = 3;
-config.version = 2;
+    var st = new ShardingTest({
+        name: "zzz",
+        shards: {
+            rs0: {
+                nodes: {n0: {}, n1: {rsConfig: {priority: 0}}},
+                oplogSize: 10,
+            }
+        },
+        verbose: 3,
+        other: {rsOptions: {verbose: 1}}
+    });
+    var replTest = st.rs0;
 
-var priConn = replTest.getPrimary();
+    var config = replTest.getReplSetConfig();
+    // Add a delay long enough so getLastError would actually 'wait' for write concern.
+    config.members[1].slaveDelay = 3;
+    config.version = replTest.getReplSetConfigFromNode().version + 1;
 
-try {
-    priConn.getDB('admin').runCommand({ replSetReconfig: config });
-} catch (x) {
-    print('reconfig closed conn');
-}
+    reconfig(replTest, config, true);
 
-assert.soon(function() {
+    assert.soon(function() {
+        var secConn = replTest.getSecondary();
+        var config = secConn.getDB('local').system.replset.findOne();
+        return config.members[1].slaveDelay == 3;
+    });
+
+    replTest.awaitSecondaryNodes();
+
+    var testDB = st.s.getDB('test');
+    testDB.adminCommand({connPoolSync: 1});
+
     var secConn = replTest.getSecondary();
-    var config = secConn.getDB('local').system.replset.findOne();
-    return config.members[1].slaveDelay == 3;
-});
+    var testDB2 = secConn.getDB('test');
 
-replTest.awaitSecondaryNodes();
+    testDB.user.insert({x: 1});
 
-var testDB = st.s.getDB('test');
-testDB.adminCommand({ connPoolSync: 1 });
+    testDB.user.ensureIndex({x: 1});
+    assert.gleOK(testDB.runCommand({getLastError: 1, w: 2}));
 
-var secConn = replTest.getSecondary();
-var testDB2 = secConn.getDB('test');
+    var priIdx = testDB.user.getIndexes();
+    var secIdx = testDB2.user.getIndexes();
 
-testDB.user.insert({ x: 1 });
+    assert.eq(priIdx.length, secIdx.length, 'pri: ' + tojson(priIdx) + ', sec: ' + tojson(secIdx));
 
-testDB.user.ensureIndex({ x: 1 });
-assert.gleOK(testDB.runCommand({ getLastError: 1, w: 2 }));
+    st.stop();
 
-var priIdx = testDB.user.getIndexes();
-var secIdx = testDB2.user.getIndexes();
-
-assert.eq(priIdx.length, secIdx.length, 'pri: ' + tojson(priIdx) + ', sec: ' + tojson(secIdx));
-
-st.stop();
-
+}());

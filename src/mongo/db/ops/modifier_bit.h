@@ -67,6 +67,8 @@ public:
     /** Converts the effects of this $bit into an equivalent $set */
     virtual Status log(LogBuilder* logBuilder) const;
 
+    virtual void setCollator(const CollatorInterface* collator){};
+
 private:
     SafeNum apply(SafeNum value) const;
 

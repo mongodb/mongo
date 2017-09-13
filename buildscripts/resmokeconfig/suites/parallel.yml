@@ -1,16 +1,19 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/parallel/*.js
+  roots:
+  - jstests/parallel/*.js
 
 executor:
-  js_test:
-    hooks:
-    - class: CleanEveryN
-      n: 20
-    fixture:
-      class: MongoDFixture
-      mongod_options:
-        nopreallocj: ''
-        set_parameters:
-          enableTestCommands: 1
+  config:
+    shell_options:
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

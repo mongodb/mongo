@@ -29,7 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <cctype>
+
 #include "mongo/util/stringutils.h"
+
+#include "mongo/base/parse_number.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 
@@ -179,6 +184,60 @@ int versionCmp(const StringData rhs, const StringData lhs) {
     }
 
     return LexNumCmp::cmp(rhs, lhs, false);
+}
+
+std::string escape(StringData sd, bool escape_slash) {
+    StringBuilder ret;
+    ret.reset(sd.size());
+    for (const auto& c : sd) {
+        switch (c) {
+            case '"':
+                ret << "\\\"";
+                break;
+            case '\\':
+                ret << "\\\\";
+                break;
+            case '/':
+                ret << (escape_slash ? "\\/" : "/");
+                break;
+            case '\b':
+                ret << "\\b";
+                break;
+            case '\f':
+                ret << "\\f";
+                break;
+            case '\n':
+                ret << "\\n";
+                break;
+            case '\r':
+                ret << "\\r";
+                break;
+            case '\t':
+                ret << "\\t";
+                break;
+            default:
+                if (c >= 0 && c <= 0x1f) {
+                    // For c < 0x7f, ASCII value == Unicode code point.
+                    ret << "\\u00" << toHexLower(&c, 1);
+                } else {
+                    ret << c;
+                }
+        }
+    }
+    return ret.str();
+}
+
+boost::optional<size_t> parseUnsignedBase10Integer(StringData fieldName) {
+    // Do not accept positions like '-4' or '+4'
+    if (!std::isdigit(fieldName[0])) {
+        return boost::none;
+    }
+    unsigned int index;
+    auto status = parseNumberFromStringWithBase<unsigned int>(fieldName, 10, &index);
+    if (status.isOK()) {
+        return static_cast<size_t>(index);
+    }
+    return boost::none;
 }
 
 }  // namespace mongo

@@ -34,29 +34,38 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
-VoteRequester::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
-                                    long long candidateId,
+using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
+
+VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
+                                    long long candidateIndex,
                                     long long term,
                                     bool dryRun,
-                                    OpTime lastOplogEntry)
+                                    OpTime lastDurableOpTime,
+                                    int primaryIndex)
     : _rsConfig(rsConfig),
-      _candidateId(candidateId),
+      _candidateIndex(candidateIndex),
       _term(term),
       _dryRun(dryRun),
-      _lastOplogEntry(lastOplogEntry) {
+      _lastDurableOpTime(lastDurableOpTime) {
     // populate targets with all voting members that aren't this node
+    long long index = 0;
     for (auto member = _rsConfig.membersBegin(); member != _rsConfig.membersEnd(); member++) {
-        if (member->isVoter() && member->getId() != candidateId) {
+        if (member->isVoter() && index != candidateIndex) {
             _targets.push_back(member->getHostAndPort());
         }
+        if (index == primaryIndex) {
+            _primaryHost = member->getHostAndPort();
+        }
+        index++;
     }
 }
 
@@ -68,88 +77,117 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     requestVotesCmdBuilder.append("setName", _rsConfig.getReplSetName());
     requestVotesCmdBuilder.append("dryRun", _dryRun);
     requestVotesCmdBuilder.append("term", _term);
-    requestVotesCmdBuilder.append("candidateId", _candidateId);
+    requestVotesCmdBuilder.append("candidateIndex", _candidateIndex);
     requestVotesCmdBuilder.append("configVersion", _rsConfig.getConfigVersion());
 
-    BSONObjBuilder lastCommittedOp(requestVotesCmdBuilder.subobjStart("lastCommittedOp"));
-    lastCommittedOp.append("ts", _lastOplogEntry.getTimestamp());
-    lastCommittedOp.append("term", _lastOplogEntry.getTerm());
-    lastCommittedOp.done();
+    _lastDurableOpTime.append(&requestVotesCmdBuilder, "lastCommittedOp");
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
 
     std::vector<RemoteCommandRequest> requests;
     for (const auto& target : _targets) {
         requests.push_back(RemoteCommandRequest(
-            target,
-            "admin",
-            requestVotesCmd,
-            Milliseconds(30 * 1000)));  // trying to match current Socket timeout
+            target, "admin", requestVotesCmd, nullptr, _rsConfig.getElectionTimeoutPeriod()));
     }
 
     return requests;
 }
 
 void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& request,
-                                               const ResponseStatus& response) {
+                                               const RemoteCommandResponse& response) {
+    auto logLine = log();
+    logLine << "VoteRequester(term " << _term << (_dryRun ? " dry run" : "") << ") ";
     _responsesProcessed++;
     if (!response.isOK()) {  // failed response
-        log() << "VoteRequester: Got failed response from " << request.target << ": "
-              << response.getStatus();
-    } else {
-        ReplSetRequestVotesResponse voteResponse;
-        voteResponse.initialize(response.getValue().data);
-        if (voteResponse.getVoteGranted()) {
-            _votes++;
-        } else {
-            log() << "VoteRequester: Got no vote from " << request.target
-                  << " because: " << voteResponse.getReason();
-        }
-
-        if (voteResponse.getTerm() > _term) {
-            _staleTerm = true;
-        }
+        logLine << "failed to receive response from " << request.target << ": " << response.status;
+        return;
     }
+    _responders.insert(request.target);
+
+    // If the primary's vote is a yes, we will set _primaryVote to be Yes.
+    if (_primaryHost == request.target) {
+        _primaryVote = PrimaryVote::No;
+    }
+    ReplSetRequestVotesResponse voteResponse;
+    const auto status = voteResponse.initialize(response.data);
+    if (!status.isOK()) {
+        logLine << "received an invalid response from " << request.target << ": " << status;
+    }
+
+    if (voteResponse.getVoteGranted()) {
+        logLine << "received a yes vote from " << request.target;
+        if (_primaryHost == request.target) {
+            _primaryVote = PrimaryVote::Yes;
+        }
+        _votes++;
+    } else {
+        logLine << "received a no vote from " << request.target << " with reason \""
+                << voteResponse.getReason() << '"';
+    }
+
+    if (voteResponse.getTerm() > _term) {
+        _staleTerm = true;
+    }
+    logLine << "; response message: " << response.data;
 }
 
 bool VoteRequester::Algorithm::hasReceivedSufficientResponses() const {
-    return _staleTerm || _votes == _rsConfig.getMajorityVoteCount() ||
+    if (_primaryHost && _primaryVote == PrimaryVote::No) {
+        return true;
+    }
+
+    if (_primaryHost && _primaryVote == PrimaryVote::Pending) {
+        return false;
+    }
+
+    return _staleTerm || _votes >= _rsConfig.getMajorityVoteCount() ||
         _responsesProcessed == static_cast<int>(_targets.size());
 }
 
-VoteRequester::VoteRequestResult VoteRequester::Algorithm::getResult() const {
+VoteRequester::Result VoteRequester::Algorithm::getResult() const {
     if (_staleTerm) {
-        return StaleTerm;
+        return Result::kStaleTerm;
+    } else if (_primaryHost && _primaryVote != PrimaryVote::Yes) {
+        return Result::kPrimaryRespondedNo;
     } else if (_votes >= _rsConfig.getMajorityVoteCount()) {
-        return SuccessfullyElected;
+        return Result::kSuccessfullyElected;
     } else {
-        return InsufficientVotes;
+        return Result::kInsufficientVotes;
     }
+}
+
+unordered_set<HostAndPort> VoteRequester::Algorithm::getResponders() const {
+    return _responders;
 }
 
 VoteRequester::VoteRequester() : _isCanceled(false) {}
 VoteRequester::~VoteRequester() {}
 
-StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(
-    ReplicationExecutor* executor,
-    const ReplicaSetConfig& rsConfig,
-    long long candidateId,
+StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
+    executor::TaskExecutor* executor,
+    const ReplSetConfig& rsConfig,
+    long long candidateIndex,
     long long term,
     bool dryRun,
-    OpTime lastOplogEntry,
-    const stdx::function<void()>& onCompletion) {
-    _algorithm.reset(new Algorithm(rsConfig, candidateId, term, dryRun, lastOplogEntry));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get()));
-    return _runner->start(executor, onCompletion);
+    OpTime lastDurableOpTime,
+    int primaryIndex) {
+    _algorithm = std::make_shared<Algorithm>(
+        rsConfig, candidateIndex, term, dryRun, lastDurableOpTime, primaryIndex);
+    _runner = stdx::make_unique<ScatterGatherRunner>(_algorithm, executor);
+    return _runner->start();
 }
 
-void VoteRequester::cancel(ReplicationExecutor* executor) {
+void VoteRequester::cancel() {
     _isCanceled = true;
-    _runner->cancel(executor);
+    _runner->cancel();
 }
 
-VoteRequester::VoteRequestResult VoteRequester::getResult() const {
+VoteRequester::Result VoteRequester::getResult() const {
     return _algorithm->getResult();
+}
+
+unordered_set<HostAndPort> VoteRequester::getResponders() const {
+    return _algorithm->getResponders();
 }
 
 }  // namespace repl

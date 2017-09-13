@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -16,9 +16,9 @@ static int
 __config_err(WT_CONFIG *conf, const char *msg, int err)
 {
 	WT_RET_MSG(conf->session, err,
-	    "Error parsing '%.*s' at byte %u: %s",
+	    "Error parsing '%.*s' at offset %" WT_PTRDIFFT_FMT ": %s",
 	    (int)(conf->end - conf->orig), conf->orig,
-	    (u_int)(conf->cur - conf->orig), msg);
+	    conf->cur - conf->orig, msg);
 }
 
 /*
@@ -26,7 +26,7 @@ __config_err(WT_CONFIG *conf, const char *msg, int err)
  *	Initialize a config handle, used to iterate through a config string of
  *	specified length.
  */
-int
+void
 __wt_config_initn(
     WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str, size_t len)
 {
@@ -36,8 +36,6 @@ __wt_config_initn(
 	conf->depth = 0;
 	conf->top = -1;
 	conf->go = NULL;
-
-	return (0);
 }
 
 /*
@@ -45,14 +43,14 @@ __wt_config_initn(
  *	Initialize a config handle, used to iterate through a NUL-terminated
  *	config string.
  */
-int
+void
 __wt_config_init(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str)
 {
 	size_t len;
 
 	len = (str == NULL) ? 0 : strlen(str);
 
-	return (__wt_config_initn(session, conf, str, len));
+	__wt_config_initn(session, conf, str, len);
 }
 
 /*
@@ -61,11 +59,11 @@ __wt_config_init(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str)
  *	extracted from another config string (used for parsing nested
  *	structures).
  */
-int
+void
 __wt_config_subinit(
     WT_SESSION_IMPL *session, WT_CONFIG *conf, WT_CONFIG_ITEM *item)
 {
-	return (__wt_config_initn(session, conf, item->str, item->len));
+	__wt_config_initn(session, conf, item->str, item->len);
 }
 
 #define	PUSH(i, t) do {							\
@@ -365,6 +363,9 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			    conf, "Unexpected character", EINVAL));
 
 		case A_DOWN:
+			if (conf->top == -1)
+				return (__config_err(
+				    conf, "Unbalanced brackets", EINVAL));
 			--conf->depth;
 			CAP(0);
 			break;
@@ -471,8 +472,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	if (conf->depth == 0)
 		return (WT_NOTFOUND);
 
-	return (__config_err(conf,
-	    "Closing brackets missing from config string", EINVAL));
+	return (__config_err(conf, "Unbalanced brackets", EINVAL));
 }
 
 /*
@@ -482,22 +482,24 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
  */
 #define	WT_SHIFT_INT64(v, s) do {					\
 	if ((v) < 0)							\
-		goto range;						\
+		goto nonum;						\
 	(v) = (int64_t)(((uint64_t)(v)) << (s));			\
+	if ((v) < 0)							\
+		goto nonum;						\
 } while (0)
 
 /*
  * __config_process_value --
  *	Deal with special config values like true / false.
  */
-static int
-__config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
+static void
+__config_process_value(WT_CONFIG_ITEM *value)
 {
 	char *endptr;
 
 	/* Empty values are okay: we can't do anything interesting with them. */
 	if (value->len == 0)
-		return (0);
+		return;
 
 	if (value->type == WT_CONFIG_ITEM_ID) {
 		if (WT_STRING_MATCH("false", value->str, value->len)) {
@@ -510,6 +512,14 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 	} else if (value->type == WT_CONFIG_ITEM_NUM) {
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
+
+		/*
+		 * If we parsed the string but the number is out of range,
+		 * treat the value as an identifier.  If an integer is
+		 * expected, that will be caught by __wt_config_check.
+		 */
+		if (value->type == WT_CONFIG_ITEM_NUM && errno == ERANGE)
+			goto nonum;
 
 		/* Check any leftover characters. */
 		while (endptr < value->str + value->len)
@@ -539,28 +549,17 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 				WT_SHIFT_INT64(value->val, 50);
 				break;
 			default:
-				/*
-				 * We didn't get a well-formed number.  That
-				 * might be okay, the required type will be
-				 * checked by __wt_config_check.
-				 */
-				value->type = WT_CONFIG_ITEM_ID;
-				break;
+				goto nonum;
 			}
-
-		/*
-		 * If we parsed the whole string but the number is out of range,
-		 * report an error.  Don't report an error for strings that
-		 * aren't well-formed integers: if an integer is expected, that
-		 * will be caught by __wt_config_check.
-		 */
-		if (value->type == WT_CONFIG_ITEM_NUM && errno == ERANGE)
-			goto range;
 	}
 
-	return (0);
-
-range:	return (__config_err(conf, "Number out of range", ERANGE));
+	if (0) {
+nonum:		/*
+		 * We didn't get a well-formed number.  That might be okay, the
+		 * required type will be checked by __wt_config_check.
+		 */
+		value->type = WT_CONFIG_ITEM_ID;
+	}
 }
 
 /*
@@ -571,7 +570,8 @@ int
 __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_RET(__config_next(conf, key, value));
-	return (__config_process_value(conf, value));
+	__config_process_value(value);
+	return (0);
 }
 
 /*
@@ -580,30 +580,30 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
  */
 static int
 __config_getraw(
-    WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value, int top)
+    WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value, bool top)
 {
 	WT_CONFIG sparser;
 	WT_CONFIG_ITEM k, v, subk;
 	WT_DECL_RET;
-	int found;
+	bool found;
 
-	found = 0;
+	found = false;
 	while ((ret = __config_next(cparser, &k, &v)) == 0) {
 		if (k.type != WT_CONFIG_ITEM_STRING &&
 		    k.type != WT_CONFIG_ITEM_ID)
 			continue;
 		if (k.len == key->len && strncmp(key->str, k.str, k.len) == 0) {
 			*value = v;
-			found = 1;
+			found = true;
 		} else if (k.len < key->len && key->str[k.len] == '.' &&
 		    strncmp(key->str, k.str, k.len) == 0) {
 			subk.str = key->str + k.len + 1;
 			subk.len = (key->len - k.len) - 1;
-			WT_RET(__wt_config_initn(
-			    cparser->session, &sparser, v.str, v.len));
-			if ((ret =
-			    __config_getraw(&sparser, &subk, value, 0)) == 0)
-				found = 1;
+			__wt_config_initn(
+			    cparser->session, &sparser, v.str, v.len);
+			if ((ret = __config_getraw(
+			    &sparser, &subk, value, false)) == 0)
+				found = true;
 			WT_RET_NOTFOUND_OK(ret);
 		}
 	}
@@ -611,7 +611,9 @@ __config_getraw(
 
 	if (!found)
 		return (WT_NOTFOUND);
-	return (top ? __config_process_value(cparser, value) : 0);
+	if (top)
+		__config_process_value(value);
+	return (0);
 }
 
 /*
@@ -639,8 +641,8 @@ __wt_config_get(WT_SESSION_IMPL *session,
 	do {
 		--cfg;
 
-		WT_RET(__wt_config_init(session, &cparser, *cfg));
-		if ((ret = __config_getraw(&cparser, key, value, 1)) == 0)
+		__wt_config_init(session, &cparser, *cfg);
+		if ((ret = __config_getraw(&cparser, key, value, true)) == 0)
 			return (0);
 		WT_RET_NOTFOUND_OK(ret);
 	} while (cfg != cfg_arg);
@@ -688,8 +690,8 @@ __wt_config_getone(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG cparser;
 
-	WT_RET(__wt_config_init(session, &cparser, config));
-	return (__config_getraw(&cparser, key, value, 1));
+	__wt_config_init(session, &cparser, config);
+	return (__config_getraw(&cparser, key, value, true));
 }
 
 /*
@@ -704,14 +706,14 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM key_item =
 	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
-	WT_RET(__wt_config_init(session, &cparser, config));
-	return (__config_getraw(&cparser, &key_item, value, 1));
+	__wt_config_init(session, &cparser, config);
+	return (__config_getraw(&cparser, &key_item, value, true));
 }
 
 /*
  * __wt_config_getones_none --
  *	Get the value for a given string key from a single config string.
- * Treat "none" as empty.
+ *	Treat "none" as empty.
  */
 int
 __wt_config_getones_none(WT_SESSION_IMPL *session,
@@ -745,11 +747,16 @@ __wt_config_gets_def(WT_SESSION_IMPL *session,
 
 	*value = false_value;
 	value->val = def;
+
 	if (cfg == NULL || cfg[0] == NULL || cfg[1] == NULL)
 		return (0);
-	else if (cfg[2] == NULL)
+
+	if (cfg[2] == NULL) {
 		WT_RET_NOTFOUND_OK(
 		    __wt_config_getones(session, cfg[1], key, value));
+		return (0);
+	}
+
 	return (__wt_config_gets(session, cfg, key, value));
 }
 
@@ -764,8 +771,8 @@ __wt_config_subgetraw(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG cparser;
 
-	WT_RET(__wt_config_initn(session, &cparser, cfg->str, cfg->len));
-	return (__config_getraw(&cparser, key, value, 1));
+	__wt_config_initn(session, &cparser, cfg->str, cfg->len);
+	return (__config_getraw(&cparser, key, value, true));
 }
 
 /*

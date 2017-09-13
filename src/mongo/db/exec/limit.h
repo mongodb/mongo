@@ -29,8 +29,8 @@
 #pragma once
 
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -42,41 +42,31 @@ namespace mongo {
  *
  * Preconditions: None.
  */
-class LimitStage : public PlanStage {
+class LimitStage final : public PlanStage {
 public:
-    LimitStage(int limit, WorkingSet* ws, PlanStage* child);
-    virtual ~LimitStage();
+    LimitStage(OperationContext* opCtx, long long limit, WorkingSet* ws, PlanStage* child);
+    ~LimitStage();
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState doWork(WorkingSetID* out) final;
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_LIMIT;
     }
 
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
 private:
     WorkingSet* _ws;
-    std::unique_ptr<PlanStage> _child;
 
     // We only return this many results.
-    int _numToReturn;
+    long long _numToReturn;
 
     // Stats
-    CommonStats _commonStats;
     LimitStats _specificStats;
 };
 

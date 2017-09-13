@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2015 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,17 +26,19 @@
 *    it in the license file.
 */
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/s2.h"
-#include "third_party/s2/s2cell.h"
-#include "third_party/s2/s2polyline.h"
-#include "third_party/s2/s2polygon.h"
-#include "third_party/s2/s2regioncoverer.h"
-
 #pragma once
 
+#include <string>
+
+#include "mongo/db/jsobj.h"
+#include "mongo/db/query/collation/collator_interface.h"
+
+class S2CellId;
+class S2RegionCoverer;
+
 namespace mongo {
+
+class GeometryContainer;
 
 // An enum describing the version of an S2 index.
 enum S2IndexVersion {
@@ -44,46 +46,41 @@ enum S2IndexVersion {
     // 2.4.0 and later.  Supports the following GeoJSON objects: Point, LineString, Polygon.
     S2_INDEX_VERSION_1 = 1,
 
-    // The current version of the S2 index, introduced in MongoDB 2.6.0.  Compatible with
+    // The second version of the S2 index, introduced in MongoDB 2.6.0.  Compatible with
     // MongoDB 2.6.0 and later.  Introduced support for the following GeoJSON objects:
     // MultiPoint, MultiLineString, MultiPolygon, GeometryCollection.
-    S2_INDEX_VERSION_2 = 2
+    S2_INDEX_VERSION_2 = 2,
+
+    // The third version of the S2 index, introduced in MongoDB 3.2.0. Introduced
+    // performance improvements and changed the key type from string to numeric
+    S2_INDEX_VERSION_3 = 3
 };
 
 struct S2IndexingParams {
     // Since we take the cartesian product when we generate keys for an insert,
     // we need a cap.
-    size_t maxKeysPerInsert;
+    std::size_t maxKeysPerInsert;
     // This is really an advisory parameter that we pass to the cover generator.  The
     // finest/coarsest index level determine the required # of cells.
     int maxCellsInCovering;
-    // What's the finest grained level that we'll index?  When we query for a point
-    // we start at that -- we index nothing finer than this.
+    // What's the finest grained level that we'll index for non-points?
     int finestIndexedLevel;
-    // And, what's the coarsest?  When we search in larger coverings we know we
-    // can stop here -- we index nothing coarser than this.
+    // And, what's the coarsest for non-points?  When we search in larger coverings
+    // we know we can stop here -- we index nothing coarser than this.
     int coarsestIndexedLevel;
     // Version of this index (specific to the index type).
     S2IndexVersion indexVersion;
-
+    // Radius of the earth in meters
     double radius;
+    // Null if this index orders strings according to the simple binary compare. If non-null,
+    // represents the collator used to generate index keys for indexed strings.
+    const CollatorInterface* collator = nullptr;
 
-    std::string toString() const {
-        std::stringstream ss;
-        ss << "maxKeysPerInsert: " << maxKeysPerInsert << std::endl;
-        ss << "maxCellsInCovering: " << maxCellsInCovering << std::endl;
-        ss << "finestIndexedLevel: " << finestIndexedLevel << std::endl;
-        ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << std::endl;
-        ss << "indexVersion: " << indexVersion << std::endl;
-        return ss.str();
-    }
+    std::string toString() const;
 
-    void configureCoverer(S2RegionCoverer* coverer) const {
-        coverer->set_min_level(coarsestIndexedLevel);
-        coverer->set_max_level(finestIndexedLevel);
-        // This is advisory; the two above are strict.
-        coverer->set_max_cells(maxCellsInCovering);
-    }
+    void configureCoverer(const GeometryContainer& geoContainer, S2RegionCoverer* coverer) const;
 };
+
+BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion);
 
 }  // namespace mongo

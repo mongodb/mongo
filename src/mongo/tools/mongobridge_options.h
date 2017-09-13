@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <iosfwd>
 #include <string>
 #include <vector>
@@ -44,12 +45,11 @@ class Environment;
 namespace moe = mongo::optionenvironment;
 
 struct MongoBridgeGlobalParams {
-    int port;
-    int delay;
-    int connectTimeoutSec;
+    int port = 0;
+    std::int64_t seed = 0;
     std::string destUri;
 
-    MongoBridgeGlobalParams() : port(0), delay(0), connectTimeoutSec(15) {}
+    MongoBridgeGlobalParams() = default;
 };
 
 extern MongoBridgeGlobalParams mongoBridgeGlobalParams;

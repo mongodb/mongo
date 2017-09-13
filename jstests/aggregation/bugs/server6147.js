@@ -16,19 +16,19 @@
 db.s6147.drop();
 
 // Populate db
-db.s6147.save({a:1});
-db.s6147.save({a:2});
+db.s6147.save({a: 1});
+db.s6147.save({a: 2});
 
 // Aggregate checking various combinations of the constant and the field
-var s6147 = db.s6147.aggregate(
-    { $project : {
-        _id : 0,
-        constantAndField : { $ne: [1, "$a"] },
-        fieldAndConstant : { $ne: ["$a", 1] },
-        constantAndConstant : { $ne: [1, 1] },
-        fieldAndField : { $ne: ["$a", "$a"] }
-    }}
-);
+var s6147 = db.s6147.aggregate({
+    $project: {
+        _id: 0,
+        constantAndField: {$ne: [1, "$a"]},
+        fieldAndConstant: {$ne: ["$a", 1]},
+        constantAndConstant: {$ne: [1, 1]},
+        fieldAndField: {$ne: ["$a", "$a"]}
+    }
+});
 
 /*
  * In both documents the constantAndConstant and fieldAndField should be false since they compare
@@ -38,16 +38,16 @@ var s6147 = db.s6147.aggregate(
  */
 var s6147result = [
     {
-        constantAndField : false,
-        fieldAndConstant : false,
-        constantAndConstant : false,
-        fieldAndField : false
+      constantAndField: false,
+      fieldAndConstant: false,
+      constantAndConstant: false,
+      fieldAndField: false
     },
     {
-        constantAndField : true,
-        fieldAndConstant : true,
-        constantAndConstant : false,
-        fieldAndField : false
+      constantAndField: true,
+      fieldAndConstant: true,
+      constantAndConstant: false,
+      fieldAndField: false
     }
 ];
 

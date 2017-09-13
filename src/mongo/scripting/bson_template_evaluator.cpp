@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <cstdlib>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -46,6 +47,7 @@ void BsonTemplateEvaluator::initializeEvaluator() {
     addOperator("CONCAT", &BsonTemplateEvaluator::evalConcat);
     addOperator("OID", &BsonTemplateEvaluator::evalObjId);
     addOperator("VARIABLE", &BsonTemplateEvaluator::evalVariable);
+    addOperator("CUR_DATE", &BsonTemplateEvaluator::evalCurrentDate);
 }
 
 BsonTemplateEvaluator::BsonTemplateEvaluator(int64_t seed) : _id(0), rng(seed) {
@@ -167,7 +169,7 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandInt(BsonTemplateEva
     if (max <= min)
         return StatusOpEvaluationError;
     // range of max-min
-    int randomNum = min + (btl->rng.nextInt32() % (max - min));
+    int randomNum = min + (btl->rng.nextInt32(max - min));
     if (range.nFields() == 3) {
         if (!range[2].isNumber())
             return StatusOpEvaluationError;
@@ -189,7 +191,7 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandPlusThread(BsonTemp
     const int max = range["1"].numberInt();
     if (max <= min)
         return StatusOpEvaluationError;
-    int randomNum = min + (btl->rng.nextInt32() % (max - min));
+    int randomNum = min + (btl->rng.nextInt32(max - min));
     randomNum += ((max - min) * btl->_id);
     out.append(fieldName, randomNum);
     return StatusSuccess;
@@ -238,6 +240,8 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalSeqInt(BsonTemplateEval
         if (!spec["mod"].isNumber())
             return StatusOpEvaluationError;
         int modval = spec["mod"].numberInt();
+        if (modval <= 0)
+            return StatusOpEvaluationError;
         curr_seqval = (curr_seqval % modval);
     }
 
@@ -266,8 +270,8 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandString(BsonTemplate
         "abcdefghijklmnopqrstuvwxyz"
         "0123456789+/";
     static const size_t alphaNumLength = sizeof(alphanum) - 1;
-    BOOST_STATIC_ASSERT(alphaNumLength == 64);
-    int32_t currentRand = 0;
+    MONGO_STATIC_ASSERT(alphaNumLength == 64);
+    uint32_t currentRand = 0;
     std::string str;
     for (int i = 0; i < length; ++i, currentRand >>= 6) {
         if (i % 5 == 0)
@@ -325,6 +329,16 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalVariable(BsonTemplateEv
     } else {
         return StatusOpEvaluationError;
     }
+}
+
+BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalCurrentDate(BsonTemplateEvaluator* btl,
+                                                                     const char* fieldName,
+                                                                     const BSONObj& in,
+                                                                     BSONObjBuilder& out) {
+    // in = { #CUR_DATE: 1 }
+    auto offset = Milliseconds(in.firstElement().numberLong());
+    out.append(fieldName, Date_t::now() + offset);
+    return StatusSuccess;
 }
 
 }  // end namespace mongo

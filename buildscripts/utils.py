@@ -15,22 +15,42 @@ import hashlib
 def getAllSourceFiles( arr=None , prefix="." ):
     if arr is None:
         arr = []
-    
+
     if not os.path.isdir( prefix ):
         # assume a file
         arr.append( prefix )
         return arr
-        
+
     for x in os.listdir( prefix ):
-        if x.startswith( "." ) or x.startswith( "pcre-" ) or x.startswith( "32bit" ) or x.startswith( "mongodb-" ) or x.startswith("debian") or x.startswith( "mongo-cxx-driver" ):
+        if ( x.startswith( "." )
+          or x.startswith( "pcre-" )
+          or x.startswith( "32bit" )
+          or x.startswith( "mongodb-" )
+          or x.startswith( "debian" )
+          or x.startswith( "mongo-cxx-driver" )
+          or x.startswith( "sqlite" )
+          or 'gotools' in x ):
             continue
-        # XXX: Avoid conflict between v8 and v8-3.25 source files in
+
+        # XXX: Avoid conflict between v8, v8-3.25 and mozjs source files in
         #      src/mongo/scripting
         #      Remove after v8-3.25 migration.
-        if x.find("v8-3.25") != -1:
+
+        if x.find("v8-3.25") != -1 or x.find("mozjs") != -1:
             continue
+
+        def isFollowableDir(prefix, full):
+            if not os.path.isdir(full):
+                return False
+            if not os.path.islink(full):
+                return True
+            # Follow softlinks in the modules directory (e.g: enterprise).
+            if os.path.split(prefix)[1] == "modules":
+                return True
+            return False;
+
         full = prefix + "/" + x
-        if os.path.isdir( full ) and not os.path.islink( full ):
+        if isFollowableDir(prefix, full):
             getAllSourceFiles( arr , full )
         else:
             if full.endswith( ".cpp" ) or full.endswith( ".h" ) or full.endswith( ".c" ):
@@ -241,4 +261,3 @@ def unicode_dammit(string, encoding='utf8'):
     #
     # name inpsired by BeautifulSoup's "UnicodeDammit"
     return string.decode(encoding, 'repr')
-

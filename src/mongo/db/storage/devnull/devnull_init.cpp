@@ -29,12 +29,14 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
-#include "mongo/db/service_context_d.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 
@@ -42,7 +44,7 @@ namespace {
 class DevNullStorageEngineFactory : public StorageEngine::Factory {
 public:
     virtual StorageEngine* create(const StorageGlobalParams& params,
-                                  const StorageEngineLockFile& lockFile) const {
+                                  const StorageEngineLockFile* lockFile) const {
         KVStorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;

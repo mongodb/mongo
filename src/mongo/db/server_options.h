@@ -28,85 +28,70 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/util/net/listen.h"  // For DEFAULT_MAX_CONN
+#include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
 
 const int DEFAULT_UNIX_PERMS = 0700;
+constexpr auto DEFAULT_MAX_CONN = 1000000;
+
+enum class ClusterRole { None, ShardServer, ConfigServer };
 
 struct ServerGlobalParams {
-    ServerGlobalParams()
-        : port(DefaultDBPort),
-          rest(false),
-          jsonp(false),
-          indexBuildRetry(true),
-          quiet(false),
-          configsvr(false),
-          cpu(false),
-          objcheck(true),
-          defaultProfile(0),
-          slowMS(100),
-          defaultLocalThresholdMillis(15),
-          moveParanoia(true),
-          noUnixSocket(false),
-          doFork(0),
-          socket("/tmp"),
-          maxConns(DEFAULT_MAX_CONN),
-          unixSocketPermissions(DEFAULT_UNIX_PERMS),
-          logAppend(false),
-          logRenameOnRotate(true),
-          logWithSyslog(false),
-          isHttpInterfaceEnabled(false) {
-        started = time(0);
-    }
-
     std::string binaryName;  // mongod or mongos
     std::string cwd;         // cwd of when process started
 
-    int port;  // --port
+    int port = DefaultDBPort;  // --port
     enum { DefaultDBPort = 27017, ConfigServerPort = 27019, ShardServerPort = 27018 };
     bool isDefaultPort() const {
         return port == DefaultDBPort;
     }
 
     std::string bind_ip;  // --bind_ip
-    bool rest;            // --rest
-    bool jsonp;           // --jsonp
+    bool enableIPv6 = false;
+    bool rest = false;  // --rest
 
-    bool indexBuildRetry;  // --noIndexBuildRetry
+    int listenBacklog = 0;  // --listenBacklog, real default is SOMAXCONN
 
-    bool quiet;  // --quiet
+    bool indexBuildRetry = true;  // --noIndexBuildRetry
 
-    bool configsvr;  // --configsvr
+    AtomicBool quiet{false};  // --quiet
 
-    bool cpu;  // --cpu show cpu time periodically
+    ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
 
-    bool objcheck;  // --objcheck
+    bool cpu = false;  // --cpu show cpu time periodically
 
-    int defaultProfile;               // --profile
-    int slowMS;                       // --time in ms that is "slow"
-    int defaultLocalThresholdMillis;  // --localThreshold in ms to consider a node local
-    bool moveParanoia;                // for move chunk paranoia
+    bool objcheck = true;  // --objcheck
 
-    bool noUnixSocket;   // --nounixsocket
-    bool doFork;         // --fork
-    std::string socket;  // UNIX domain socket directory
+    int defaultProfile = 0;                // --profile
+    int slowMS = 100;                      // --time in ms that is "slow"
+    double sampleRate = 1.0;               // --samplerate rate at which to sample slow queries
+    int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
+    bool moveParanoia = false;             // for move chunk paranoia
 
-    int maxConns;  // Maximum number of simultaneous open connections.
+    bool noUnixSocket = false;    // --nounixsocket
+    bool doFork = false;          // --fork
+    std::string socket = "/tmp";  // UNIX domain socket directory
+    std::string transportLayer;   // --transportLayer (must be either "asio" or "legacy")
 
-    int unixSocketPermissions;  // permissions for the UNIX domain socket
+    // --serviceExecutor ("adaptive", "synchronous", or "fixedForTesting")
+    std::string serviceExecutor;
 
-    std::string keyFile;  // Path to keyfile, or empty if none.
-    std::string pidFile;  // Path to pid file, or empty if none.
+    int maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
 
-    std::string logpath;     // Path to log file, if logging to a file; otherwise, empty.
-    bool logAppend;          // True if logging to a file in append mode.
-    bool logRenameOnRotate;  // True if logging should rename log files on rotate
-    bool logWithSyslog;      // True if logging to syslog; must not be set if logpath is set.
-    int syslogFacility;      // Facility used when appending messages to the syslog.
+    int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket
 
-    bool isHttpInterfaceEnabled;  // True if the dbwebserver should be enabled.
+    std::string keyFile;           // Path to keyfile, or empty if none.
+    std::string pidFile;           // Path to pid file, or empty if none.
+    std::string timeZoneInfoPath;  // Path to time zone info directory, or empty if none.
+
+    std::string logpath;            // Path to log file, if logging to a file; otherwise, empty.
+    bool logAppend = false;         // True if logging to a file in append mode.
+    bool logRenameOnRotate = true;  // True if logging should rename log files on rotate
+    bool logWithSyslog = false;     // True if logging to syslog; must not be set if logpath is set.
+    int syslogFacility;             // Facility used when appending messages to the syslog.
 
 #ifndef _WIN32
     ProcessId parentProc;  // --fork pid of initial process
@@ -117,17 +102,21 @@ struct ServerGlobalParams {
      * Switches to enable experimental (unsupported) features.
      */
     struct ExperimentalFeatures {
-        ExperimentalFeatures() : indexStatsCmdEnabled(false), storageDetailsCmdEnabled(false) {}
-        bool indexStatsCmdEnabled;      // -- enableExperimentalIndexStatsCmd
+        ExperimentalFeatures() : storageDetailsCmdEnabled(false) {}
         bool storageDetailsCmdEnabled;  // -- enableExperimentalStorageDetailsCmd
     } experimental;
 
-    time_t started;
+    time_t started = ::time(0);
 
     BSONArray argvArray;
     BSONObj parsedOpts;
-    bool isAuthEnabled = false;
-    AtomicInt32 clusterAuthMode;  // --clusterAuthMode, the internal cluster auth mode
+
+    enum AuthState { kEnabled, kDisabled, kUndefined };
+
+    AuthState authState = AuthState::kUndefined;
+
+    bool transitionToAuth = false;  // --transitionToAuth, mixed mode for rolling auth upgrade
+    AtomicInt32 clusterAuthMode;    // --clusterAuthMode, the internal cluster auth mode
 
     enum ClusterAuthModes {
         ClusterAuthMode_undefined,
@@ -151,7 +140,55 @@ struct ServerGlobalParams {
         */
         ClusterAuthMode_x509
     };
+
+    // for the YAML config, sharding._overrideShardIdentity. Can only be used when in
+    // queryableBackupMode.
+    BSONObj overrideShardIdentity;
+
+    struct FeatureCompatibility {
+        enum class Version {
+            /**
+             * In this mode, the cluster will expose a 3.4-like API. Attempts by a client to use new
+             * features in 3.6 will be rejected.
+             */
+            k34,
+
+            /**
+             * In this mode, new features in 3.6 are allowed. The system should guarantee that no
+             * 3.4 node can participate in a cluster whose feature compatibility version is 3.6.
+             */
+            k36,
+        };
+
+        // Read-only parameter featureCompatibilityVersion.
+        AtomicWord<Version> version{Version::k34};
+
+        // Read-only global isSchemaVersion36. This determines whether to give Collections UUIDs
+        // upon creation.
+        AtomicWord<bool> isSchemaVersion36{false};
+
+        // Feature validation differs depending on the role of a mongod in a replica set or
+        // master/slave configuration. Masters/primaries can accept user-initiated writes and
+        // validate based on the feature compatibility version. A secondary/slave (which is not also
+        // a master) always validates in "3.4" mode so that it can sync 3.4 features, even when in
+        // "3.2" feature compatibility mode.
+        AtomicWord<bool> validateFeaturesAsMaster{true};
+    } featureCompatibility;
+
+    std::vector<std::string> disabledSecureAllocatorDomains;
 };
 
 extern ServerGlobalParams serverGlobalParams;
+
+template <typename NameTrait>
+struct TraitNamedDomain {
+    static bool peg() {
+        const auto& dsmd = serverGlobalParams.disabledSecureAllocatorDomains;
+        const auto contains = [&](StringData dt) {
+            return std::find(dsmd.begin(), dsmd.end(), dt) != dsmd.end();
+        };
+        static const bool ret = !(contains("*"_sd) || contains(NameTrait::DomainType));
+        return ret;
+    }
+};
 }

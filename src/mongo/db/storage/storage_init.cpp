@@ -28,8 +28,14 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 
@@ -46,8 +52,15 @@ public:
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
-        return BSON("name" << storageGlobalParams.engine);
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const {
+        auto engine = opCtx->getClient()->getServiceContext()->getGlobalStorageEngine();
+        return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
+                           << bool(engine->getSnapshotManager())
+                           << "readOnly"
+                           << storageGlobalParams.readOnly
+                           << "persistent"
+                           << !engine->isEphemeral());
     }
 
 } storageSSS;

@@ -28,51 +28,16 @@
 
 #pragma once
 
-// As of VS2013, the Windows STL still doesn't have an adequate implementation
-// of std::function.
-//
-// See https://connect.microsoft.com/VisualStudio/feedback/details/768899/
-// std-function-not-compiling-in-vs2012
-//
-// The bug is fixed in VS2015.
-#if !defined(_MSC_VER) || (_MSC_VER > 1800)
-
 #include <functional>
 
 namespace mongo {
 namespace stdx {
 
-using ::std::bind;
-using ::std::function;
-namespace placeholders = ::std::placeholders;
+using ::std::bind;                             // NOLINT
+using ::std::cref;                             // NOLINT
+using ::std::function;                         // NOLINT
+using ::std::ref;                              // NOLINT
+namespace placeholders = ::std::placeholders;  // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo
-
-#else
-
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-
-namespace mongo {
-namespace stdx {
-
-using boost::bind;
-using boost::function;
-
-namespace placeholders {
-static boost::arg<1> _1;
-static boost::arg<2> _2;
-static boost::arg<3> _3;
-static boost::arg<4> _4;
-static boost::arg<5> _5;
-static boost::arg<6> _6;
-static boost::arg<7> _7;
-static boost::arg<8> _8;
-static boost::arg<9> _9;
-}  // namespace placeholders
-
-}  // namespace stdx
-}  // namespace mongo
-
-#endif

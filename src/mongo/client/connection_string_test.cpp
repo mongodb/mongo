@@ -32,18 +32,28 @@
 
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
+using unittest::assertGet;
 
-TEST(ConnectionString, EqualitySync) {
-    ConnectionString cs(ConnectionString::SYNC, "a,b,c", "");
+TEST(ConnectionString, EqualityOperatorMaster) {
+    const auto cs = assertGet(ConnectionString::parse("TestHostA:12345"));
+    ASSERT(cs == assertGet(ConnectionString::parse("TestHostA:12345")));
+    ASSERT_FALSE(cs != assertGet(ConnectionString::parse("TestHostA:12345")));
+    ASSERT(cs != assertGet(ConnectionString::parse("TestHostB:12345")));
+    ASSERT_FALSE(cs == assertGet(ConnectionString::parse("TestHostB:12345")));
+}
 
-    ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "a,b,c", "")));
-    ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "c,b,a", "")));
-    ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "c,a,b", "")));
-
-    ASSERT(!cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "d,a,b", "")));
+TEST(ConnectionString, EqualityOperatorReplicaSet) {
+    const auto cs = assertGet(ConnectionString::parse("TestRS/TestHostA:12345,TestHostB:12345"));
+    ASSERT(cs == assertGet(ConnectionString::parse("TestRS/TestHostA:12345,TestHostB:12345")));
+    ASSERT_FALSE(cs == assertGet(ConnectionString::parse("TestHostA:12345")));
+    ASSERT_FALSE(cs ==
+                 assertGet(ConnectionString::parse("TestRS/TestHostB:12345,TestHostA:12345")));
+    ASSERT_FALSE(cs ==
+                 assertGet(ConnectionString::parse("TestRS1/TestHostA:12345,TestHostB:12345")));
 }
 
 }  // namespace
+}  // namespace mongo

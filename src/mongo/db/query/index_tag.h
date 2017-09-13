@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <deque>
 #include <vector>
 
 #include "mongo/bson/util/builder.h"
@@ -40,25 +41,47 @@ class IndexTag : public MatchExpression::TagData {
 public:
     static const size_t kNoIndex;
 
-    IndexTag() : index(kNoIndex), pos(0) {}
-    IndexTag(size_t i) : index(i), pos(0) {}
-    IndexTag(size_t i, size_t p) : index(i), pos(p) {}
+    /**
+     * Assigns a leaf expression to the leading field of index 'i' where combining bounds with other
+     * leaf expressions is known to be safe.
+     */
+    IndexTag(size_t i) : index(i) {}
+
+    /**
+     * Assigns a leaf expresssion to position 'p' of index 'i' where whether it is safe to combine
+     * bounds with other leaf expressions is defined by 'canCombineBounds_'.
+     */
+    IndexTag(size_t i, size_t p, bool canCombineBounds_)
+        : index(i), pos(p), canCombineBounds(canCombineBounds_) {}
 
     virtual ~IndexTag() {}
 
     virtual void debugString(StringBuilder* builder) const {
-        *builder << " || Selected Index #" << index << " pos " << pos;
+        *builder << " || Selected Index #" << index << " pos " << pos << " combine "
+                 << canCombineBounds;
     }
 
     virtual MatchExpression::TagData* clone() const {
-        return new IndexTag(index, pos);
+        return new IndexTag(index, pos, canCombineBounds);
+    }
+
+    virtual Type getType() const {
+        return Type::IndexTag;
     }
 
     // What index should we try to use for this leaf?
-    size_t index;
+    size_t index = kNoIndex;
 
     // What position are we in the index?  (Compound.)
-    size_t pos;
+    size_t pos = 0U;
+
+    // The plan enumerator can assign multiple predicates to the same position of a multikey index
+    // when generating a self-intersection index assignment in enumerateAndIntersect().
+    // 'canCombineBounds' gives the access planner enough information to know when it is safe to
+    // intersect the bounds for multiple leaf expressions on the 'pos' field of 'index' and when it
+    // isn't. The plan enumerator should never generate an index assignment where it isn't safe to
+    // compound the bounds for multiple leaf expressions on the index.
+    bool canCombineBounds = true;
 };
 
 // used internally
@@ -112,21 +135,131 @@ public:
         ret->notFirst = notFirst;
         return ret;
     }
+
+    virtual Type getType() const {
+        return Type::RelevantTag;
+    }
 };
 
 /**
- * Tags each node of the tree with the lowest numbered index that the sub-tree rooted at that
- * node uses.
- *
- * Nodes that satisfy Indexability::nodeCanUseIndexOnOwnField are already tagged if there
- * exists an index that that node can use.
+ * An OrPushdownTag indicates that this node is a predicate that can be used inside of a sibling
+ * indexed OR.
  */
-void tagForSort(MatchExpression* tree);
+class OrPushdownTag final : public MatchExpression::TagData {
+public:
+    /**
+     * A destination to which this predicate should be pushed down, consisting of a route through
+     * the sibling indexed OR, and the tag the predicate should receive after it is pushed down.
+     */
+    struct Destination {
 
-/**
- * Sorts the tree using its IndexTag(s). Nodes that use the same index are adjacent to one
- * another.
+        Destination clone() const {
+            Destination clone;
+            clone.route = route;
+            clone.tagData.reset(tagData->clone());
+            return clone;
+        }
+
+        void debugString(StringBuilder* builder) const {
+            *builder << " || Move to ";
+            bool firstPosition = true;
+            for (auto position : route) {
+                if (!firstPosition) {
+                    *builder << ",";
+                }
+                firstPosition = false;
+                *builder << position;
+            }
+            tagData->debugString(builder);
+        }
+
+        /**
+         * The route along which the predicate should be pushed down. This starts at the
+         * indexed OR sibling of the predicate. Each value in 'route' is the index of a child in
+         * an indexed OR.
+         * For example, if the MatchExpression tree is:
+         *         AND
+         *        /    \
+         *   {a: 5}    OR
+         *           /    \
+         *         AND    {e: 9}
+         *       /     \
+         *    {b: 6}   OR
+         *           /    \
+         *       {c: 7}  {d: 8}
+         * and the predicate is {a: 5}, then the path {0, 1} means {a: 5} should be
+         * AND-combined with {d: 8}.
+         */
+        std::deque<size_t> route;
+
+        // The TagData that the predicate should be tagged with after it is pushed down.
+        std::unique_ptr<MatchExpression::TagData> tagData;
+    };
+
+    void debugString(StringBuilder* builder) const override {
+        if (_indexTag) {
+            _indexTag->debugString(builder);
+        }
+        for (const auto& dest : _destinations) {
+            dest.debugString(builder);
+        }
+    }
+
+    MatchExpression::TagData* clone() const override {
+        std::unique_ptr<OrPushdownTag> clone = stdx::make_unique<OrPushdownTag>();
+        for (const auto& dest : _destinations) {
+            clone->addDestination(dest.clone());
+        }
+        if (_indexTag) {
+            clone->setIndexTag(_indexTag->clone());
+        }
+        return clone.release();
+    }
+
+    Type getType() const override {
+        return Type::OrPushdownTag;
+    }
+
+    void addDestination(Destination dest) {
+        _destinations.push_back(std::move(dest));
+    }
+
+    const std::vector<Destination>& getDestinations() const {
+        return _destinations;
+    }
+
+    /**
+     *  Releases ownership of the destinations.
+     */
+    std::vector<Destination> releaseDestinations() {
+        std::vector<Destination> destinations;
+        destinations.swap(_destinations);
+        return destinations;
+    }
+
+    void setIndexTag(MatchExpression::TagData* indexTag) {
+        _indexTag.reset(indexTag);
+    }
+
+    const MatchExpression::TagData* getIndexTag() const {
+        return _indexTag.get();
+    }
+
+    std::unique_ptr<MatchExpression::TagData> releaseIndexTag() {
+        return std::move(_indexTag);
+    }
+
+private:
+    std::vector<Destination> _destinations;
+
+    // The index tag the predicate should receive at its current position in the tree.
+    std::unique_ptr<MatchExpression::TagData> _indexTag;
+};
+
+/*
+ * Reorders the nodes according to their tags as needed for access planning. 'tree' should be a
+ * tagged MatchExpression tree in canonical order.
  */
-void sortUsingTags(MatchExpression* tree);
+void prepareForAccessPlanning(MatchExpression* tree);
 
 }  // namespace mongo

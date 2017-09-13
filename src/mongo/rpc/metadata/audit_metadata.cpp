@@ -49,26 +49,14 @@ AuditMetadata::AuditMetadata(boost::optional<UsersAndRoles> impersonatedUsersAnd
 #if !defined(MONGO_ENTERPRISE_VERSION)
 
 StatusWith<AuditMetadata> AuditMetadata::readFromMetadata(const BSONObj&) {
-    return AuditMetadata(boost::none);
+    return AuditMetadata{};
+}
+
+StatusWith<AuditMetadata> AuditMetadata::readFromMetadata(const BSONElement&) {
+    return AuditMetadata{};
 }
 
 Status AuditMetadata::writeToMetadata(BSONObjBuilder*) const {
-    return Status::OK();
-}
-
-Status AuditMetadata::downconvert(const BSONObj& command,
-                                  const BSONObj&,
-                                  BSONObjBuilder* commandBob,
-                                  int*) {
-    commandBob->appendElements(command);
-    return Status::OK();
-}
-
-Status AuditMetadata::upconvert(const BSONObj& command,
-                                const int,
-                                BSONObjBuilder* commandBob,
-                                BSONObjBuilder*) {
-    commandBob->appendElements(command);
     return Status::OK();
 }
 
@@ -78,9 +66,6 @@ const boost::optional<AuditMetadata::UsersAndRoles>& AuditMetadata::getImpersona
     const {
     return _impersonatedUsersAndRoles;
 }
-
-const char kLegacyImpersonatedUsersFieldName[] = "impersonatedUsers";
-const char kLegacyImpersonatedRolesFieldName[] = "impersonatedRoles";
 
 }  // namespace rpc
 }  // namespace mongo

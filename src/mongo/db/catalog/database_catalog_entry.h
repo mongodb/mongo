@@ -72,10 +72,18 @@ public:
     virtual void markIndexSafe24AndUp(OperationContext* opCtx) = 0;
 
     /**
-     * @return true if current files on disk are compatibile with the current version.
-     *              if we return false, then an upgrade will be required
+     * Returns whethers the data files are compatible with the current code:
+     *
+     *   - Status::OK() if the data files are compatible with the current code.
+     *
+     *   - ErrorCodes::CanRepairToDowngrade if the data files are incompatible with the current
+     *     code, but a --repair would make them compatible. For example, when rebuilding all indexes
+     *     in the data files would resolve the incompatibility.
+     *
+     *   - ErrorCodes::MustUpgrade if the data files are incompatible with the current code and a
+     *     newer version is required to start up.
      */
-    virtual bool currentFilesCompatible(OperationContext* opCtx) const = 0;
+    virtual Status currentFilesCompatible(OperationContext* opCtx) const = 0;
 
     // ----
 
@@ -88,16 +96,16 @@ public:
     virtual RecordStore* getRecordStore(StringData ns) const = 0;
 
     // Ownership passes to caller
-    virtual IndexAccessMethod* getIndex(OperationContext* txn,
+    virtual IndexAccessMethod* getIndex(OperationContext* opCtx,
                                         const CollectionCatalogEntry* collection,
                                         IndexCatalogEntry* index) = 0;
 
-    virtual Status createCollection(OperationContext* txn,
+    virtual Status createCollection(OperationContext* opCtx,
                                     StringData ns,
                                     const CollectionOptions& options,
                                     bool allocateDefaultSpace) = 0;
 
-    virtual Status renameCollection(OperationContext* txn,
+    virtual Status renameCollection(OperationContext* opCtx,
                                     StringData fromNS,
                                     StringData toNS,
                                     bool stayTemp) = 0;

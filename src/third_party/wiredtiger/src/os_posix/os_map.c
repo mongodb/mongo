@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -9,68 +9,91 @@
 #include "wt_internal.h"
 
 /*
- * __wt_mmap --
+ * __wt_posix_map --
  *	Map a file into memory.
  */
 int
-__wt_mmap(WT_SESSION_IMPL *session,
-    WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie)
+__wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session,
+    void *mapped_regionp, size_t *lenp, void *mapped_cookiep)
 {
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
+	size_t len;
+	wt_off_t file_size;
 	void *map;
-	size_t orig_size;
 
-	WT_UNUSED(mappingcookie);
+	WT_UNUSED(mapped_cookiep);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)fh;
 
 	/*
-	 * Record the current size and only map and set that as the length, it
-	 * could change between the map call and when we set the return length.
-	 * For the same reason we could actually map past the end of the file;
-	 * we don't read bytes past the end of the file though, so as long as
-	 * the map call succeeds, it's all OK.
+	 * Mapping isn't possible if direct I/O configured for the file, the
+	 * Linux open(2) documentation says applications should avoid mixing
+	 * mmap(2) of files with direct I/O to the same files.
 	 */
-	orig_size = (size_t)fh->size;
-	if ((map = mmap(NULL, orig_size,
+	if (pfh->direct_io)
+		return (ENOTSUP);
+
+	/*
+	 * There's no locking here to prevent the underlying file from changing
+	 * underneath us, our caller needs to ensure consistency of the mapped
+	 * region vs. any other file activity.
+	 */
+	WT_RET(fh->fh_size(fh, wt_session, &file_size));
+	len = (size_t)file_size;
+
+	__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: memory-map: %" WT_SIZET_FMT " bytes", fh->name, len);
+
+	if ((map = mmap(NULL, len,
 	    PROT_READ,
 #ifdef MAP_NOCORE
 	    MAP_NOCORE |
 #endif
 	    MAP_PRIVATE,
-	    fh->fd, (wt_off_t)0)) == MAP_FAILED) {
-		WT_RET_MSG(session, __wt_errno(),
-		    "%s map error: failed to map %" WT_SIZET_FMT " bytes",
-		    fh->name, orig_size);
-	}
-	(void)__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: map %p: %" WT_SIZET_FMT " bytes", fh->name, map, orig_size);
+	    pfh->fd, (wt_off_t)0)) == MAP_FAILED)
+		WT_RET_MSG(session,
+		    __wt_errno(), "%s: memory-map: mmap", fh->name);
 
-	*(void **)mapp = map;
-	*lenp = orig_size;
+	*(void **)mapped_regionp = map;
+	*lenp = len;
 	return (0);
 }
 
-#define	WT_VM_PAGESIZE	4096
-
+#ifdef HAVE_POSIX_MADVISE
 /*
- * __wt_mmap_preload --
+ * __wt_posix_map_preload --
  *	Cause a section of a memory map to be faulted in.
  */
 int
-__wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
+__wt_posix_map_preload(WT_FILE_HANDLE *fh,
+    WT_SESSION *wt_session, const void *map, size_t length, void *mapped_cookie)
 {
-#ifdef HAVE_POSIX_MADVISE
-	/* Linux requires the address be aligned to a 4KB boundary. */
-	WT_BM *bm = S2BT(session)->bm;
+	WT_BM *bm;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(WT_VM_PAGESIZE - 1));
-	size += WT_PTRDIFF(p, blk);
+	WT_SESSION_IMPL *session;
+	void *blk;
+
+	WT_UNUSED(mapped_cookie);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	conn = S2C(session);
+	bm = S2BT(session)->bm;
+
+	/* Linux requires the address be aligned to a 4KB boundary. */
+	blk = (void *)((uintptr_t)map & ~(uintptr_t)(conn->page_size - 1));
+	length += WT_PTRDIFF(map, blk);
 
 	/* XXX proxy for "am I doing a scan?" -- manual read-ahead */
 	if (F_ISSET(session, WT_SESSION_NO_CACHE)) {
 		/* Read in 2MB blocks every 1MB of data. */
-		if (((uintptr_t)((uint8_t *)blk + size) &
+		if (((uintptr_t)((uint8_t *)blk + length) &
 		    (uintptr_t)((1<<20) - 1)) < (uintptr_t)blk)
 			return (0);
-		size = WT_MIN(WT_MAX(20 * size, 2 << 20),
+		length = WT_MIN(WT_MAX(20 * length, 2 << 20),
 		    WT_PTRDIFF((uint8_t *)bm->map + bm->maplen, blk));
 	}
 
@@ -78,60 +101,72 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
 	 * Manual pages aren't clear on whether alignment is required for the
 	 * size, so we will be conservative.
 	 */
-	size &= ~(size_t)(WT_VM_PAGESIZE - 1);
+	length &= ~(size_t)(conn->page_size - 1);
+	if (length <= (size_t)conn->page_size)
+		return (0);
 
-	if (size > WT_VM_PAGESIZE &&
-	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
-		WT_RET_MSG(session, ret, "posix_madvise will need");
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(p);
-	WT_UNUSED(size);
+	WT_SYSCALL(posix_madvise(blk, length, POSIX_MADV_WILLNEED), ret);
+	if (ret == 0)
+		return (0);
+
+	WT_RET_MSG(session, ret,
+	    "%s: memory-map preload: posix_madvise: POSIX_MADV_WILLNEED",
+	    fh->name);
+}
 #endif
 
-	return (0);
-}
-
+#ifdef HAVE_POSIX_MADVISE
 /*
- * __wt_mmap_discard --
+ * __wt_posix_map_discard --
  *	Discard a chunk of the memory map.
  */
 int
-__wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
+__wt_posix_map_discard(WT_FILE_HANDLE *fh,
+    WT_SESSION *wt_session, void *map, size_t length, void *mapped_cookie)
 {
-#ifdef HAVE_POSIX_MADVISE
-	/* Linux requires the address be aligned to a 4KB boundary. */
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(WT_VM_PAGESIZE - 1));
-	size += WT_PTRDIFF(p, blk);
+	WT_SESSION_IMPL *session;
+	void *blk;
 
-	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) != 0)
-		WT_RET_MSG(session, ret, "posix_madvise don't need");
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(p);
-	WT_UNUSED(size);
-#endif
-	return (0);
+	WT_UNUSED(mapped_cookie);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	conn = S2C(session);
+
+	/* Linux requires the address be aligned to a 4KB boundary. */
+	blk = (void *)((uintptr_t)map & ~(uintptr_t)(conn->page_size - 1));
+	length += WT_PTRDIFF(map, blk);
+
+	WT_SYSCALL(posix_madvise(blk, length, POSIX_MADV_DONTNEED), ret);
+	if (ret == 0)
+		return (0);
+
+	WT_RET_MSG(session, ret,
+	    "%s: memory-map discard: posix_madvise: POSIX_MADV_DONTNEED",
+	    fh->name);
 }
+#endif
 
 /*
- * __wt_munmap --
+ * __wt_posix_unmap --
  *	Remove a memory mapping.
  */
 int
-__wt_munmap(WT_SESSION_IMPL *session,
-    WT_FH *fh, void *map, size_t len, void **mappingcookie)
+__wt_posix_unmap(WT_FILE_HANDLE *fh, WT_SESSION *wt_session,
+    void *mapped_region, size_t len, void *mapped_cookie)
 {
-	WT_UNUSED(mappingcookie);
+	WT_SESSION_IMPL *session;
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: unmap %p: %" WT_SIZET_FMT " bytes", fh->name, map, len));
+	WT_UNUSED(mapped_cookie);
 
-	if (munmap(map, len) == 0)
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: memory-unmap: %" WT_SIZET_FMT " bytes", fh->name, len);
+
+	if (munmap(mapped_region, len) == 0)
 		return (0);
 
-	WT_RET_MSG(session, __wt_errno(),
-	    "%s unmap error: failed to unmap %" WT_SIZET_FMT " bytes",
-	    fh->name, len);
+	WT_RET_MSG(session, __wt_errno(), "%s: memory-unmap: munmap", fh->name);
 }

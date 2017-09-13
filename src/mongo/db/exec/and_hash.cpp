@@ -30,8 +30,9 @@
 
 #include "mongo/db/exec/and_common-inl.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace {
@@ -46,38 +47,36 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 const size_t AndHashStage::kLookAheadWorks = 10;
 
 // static
 const char* AndHashStage::kStageType = "AND_HASH";
 
-AndHashStage::AndHashStage(WorkingSet* ws, const Collection* collection)
-    : _collection(collection),
+AndHashStage::AndHashStage(OperationContext* opCtx, WorkingSet* ws, const Collection* collection)
+    : PlanStage(kStageType, opCtx),
+      _collection(collection),
       _ws(ws),
       _hashingChildren(true),
       _currentChild(0),
-      _commonStats(kStageType),
       _memUsage(0),
       _maxMemUsage(kDefaultMaxMemUsageBytes) {}
 
-AndHashStage::AndHashStage(WorkingSet* ws, const Collection* collection, size_t maxMemUsage)
-    : _collection(collection),
+AndHashStage::AndHashStage(OperationContext* opCtx,
+                           WorkingSet* ws,
+                           const Collection* collection,
+                           size_t maxMemUsage)
+    : PlanStage(kStageType, opCtx),
+      _collection(collection),
       _ws(ws),
       _hashingChildren(true),
       _currentChild(0),
-      _commonStats(kStageType),
       _memUsage(0),
       _maxMemUsage(maxMemUsage) {}
 
-AndHashStage::~AndHashStage() {
-    for (size_t i = 0; i < _children.size(); ++i) {
-        delete _children[i];
-    }
-}
-
 void AndHashStage::addChild(PlanStage* child) {
-    _children.push_back(child);
+    _children.emplace_back(child);
 }
 
 size_t AndHashStage::getMemUsage() const {
@@ -108,12 +107,7 @@ bool AndHashStage::isEOF() {
         _children[_children.size() - 1]->isEOF();
 }
 
-PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState AndHashStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -135,8 +129,9 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
         // a result.  If it's EOF this whole stage will be EOF.  If it produces a
         // result we cache it for later.
         for (size_t i = 0; i < _children.size(); ++i) {
-            PlanStage* child = _children[i];
+            auto& child = _children[i];
             for (size_t j = 0; j < kLookAheadWorks; ++j) {
+                // Cache the result in _lookAheadResults[i].
                 StageState childStatus = child->work(&_lookAheadResults[i]);
 
                 if (PlanStage::IS_EOF == childStatus) {
@@ -145,9 +140,10 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
                     _dataMap.clear();
                     return PlanStage::IS_EOF;
                 } else if (PlanStage::ADVANCED == childStatus) {
-                    // We have a result cached in _lookAheadResults[i].  Stop looking at this
-                    // child.
-                    break;
+                    // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we
+                    // yield.
+                    _ws->get(_lookAheadResults[i])->makeObjOwnedIfNeeded();
+                    break;  // Stop looking at this child.
                 } else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
                     // Propage error to parent.
                     *out = _lookAheadResults[i];
@@ -223,16 +219,15 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
 
     // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
     // with this WSM.
-    if (!member->hasLoc()) {
+    if (!member->hasRecordId()) {
         _ws->flagForReview(*out);
         return PlanStage::NEED_TIME;
     }
 
-    DataMap::iterator it = _dataMap.find(member->loc);
+    DataMap::iterator it = _dataMap.find(member->recordId);
     if (_dataMap.end() == it) {
         // Child's output wasn't in every previous child.  Throw it out.
         _ws->free(*out);
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else {
         // Child's output was in every previous child.  Merge any key data in
@@ -240,11 +235,9 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
         WorkingSetID hashID = it->second;
         _dataMap.erase(it);
 
-        WorkingSetMember* olderMember = _ws->get(hashID);
-        AndCommon::mergeFrom(olderMember, *member);
+        AndCommon::mergeFrom(_ws, hashID, *member);
         _ws->free(*out);
 
-        ++_commonStats.advanced;
         *out = hashID;
         return PlanStage::ADVANCED;
     }
@@ -271,24 +264,25 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
 
         // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
         // with this WSM.
-        if (!member->hasLoc()) {
+        if (!member->hasRecordId()) {
             _ws->flagForReview(id);
             return PlanStage::NEED_TIME;
         }
 
-        if (!_dataMap.insert(std::make_pair(member->loc, id)).second) {
-            // Didn't insert because we already had this loc inside the map. This should only
+        if (!_dataMap.insert(std::make_pair(member->recordId, id)).second) {
+            // Didn't insert because we already had this RecordId inside the map. This should only
             // happen if we're seeing a newer copy of the same doc in a more recent snapshot.
             // Throw out the newer copy of the doc.
             _ws->free(id);
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
+
+        // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+        member->makeObjOwnedIfNeeded();
 
         // Update memory stats.
         _memUsage += member->getMemUsage();
 
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == childStatus) {
         // Done reading child 0.
@@ -300,7 +294,6 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
             return PlanStage::IS_EOF;
         }
 
-        ++_commonStats.needTime;
         _specificStats.mapAfterChild.push_back(_dataMap.size());
 
         return PlanStage::NEED_TIME;
@@ -317,10 +310,7 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
         }
         return childStatus;
     } else {
-        if (PlanStage::NEED_TIME == childStatus) {
-            ++_commonStats.needTime;
-        } else if (PlanStage::NEED_YIELD == childStatus) {
-            ++_commonStats.needYield;
+        if (PlanStage::NEED_YIELD == childStatus) {
             *out = id;
         }
 
@@ -339,27 +329,27 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
 
         // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
         // with this WSM.
-        if (!member->hasLoc()) {
+        if (!member->hasRecordId()) {
             _ws->flagForReview(id);
             return PlanStage::NEED_TIME;
         }
 
-        verify(member->hasLoc());
-        if (_dataMap.end() == _dataMap.find(member->loc)) {
+        verify(member->hasRecordId());
+        if (_dataMap.end() == _dataMap.find(member->recordId)) {
             // Ignore.  It's not in any previous child.
         } else {
             // We have a hit.  Copy data into the WSM we already have.
-            _seenMap.insert(member->loc);
-            WorkingSetMember* olderMember = _ws->get(_dataMap[member->loc]);
+            _seenMap.insert(member->recordId);
+            WorkingSetID olderMemberID = _dataMap[member->recordId];
+            WorkingSetMember* olderMember = _ws->get(olderMemberID);
             size_t memUsageBefore = olderMember->getMemUsage();
 
-            AndCommon::mergeFrom(olderMember, *member);
+            AndCommon::mergeFrom(_ws, olderMemberID, *member);
 
             // Update memory stats.
             _memUsage += olderMember->getMemUsage() - memUsageBefore;
         }
         _ws->free(id);
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == childStatus) {
         // Finished with a child.
@@ -400,7 +390,6 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
             _hashingChildren = false;
         }
 
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
         *out = id;
@@ -415,10 +404,7 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
         }
         return childStatus;
     } else {
-        if (PlanStage::NEED_TIME == childStatus) {
-            ++_commonStats.needTime;
-        } else if (PlanStage::NEED_YIELD == childStatus) {
-            ++_commonStats.needYield;
+        if (PlanStage::NEED_YIELD == childStatus) {
             *out = id;
         }
 
@@ -426,31 +412,12 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
     }
 }
 
-void AndHashStage::saveState() {
-    ++_commonStats.yields;
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->saveState();
-    }
-}
-
-void AndHashStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->restoreState(opCtx);
-    }
-}
-
-void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void AndHashStage::doInvalidate(OperationContext* opCtx,
+                                const RecordId& dl,
+                                InvalidationType type) {
+    // TODO remove this since calling isEOF is illegal inside of doInvalidate().
     if (isEOF()) {
         return;
-    }
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->invalidate(txn, dl, type);
     }
 
     // Invalidation can happen to our warmup results.  If that occurs just
@@ -458,8 +425,8 @@ void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, Invalid
     for (size_t i = 0; i < _lookAheadResults.size(); ++i) {
         if (WorkingSet::INVALID_ID != _lookAheadResults[i]) {
             WorkingSetMember* member = _ws->get(_lookAheadResults[i]);
-            if (member->hasLoc() && member->loc == dl) {
-                WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+            if (member->hasRecordId() && member->recordId == dl) {
+                WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
                 _ws->flagForReview(_lookAheadResults[i]);
                 _lookAheadResults[i] = WorkingSet::INVALID_ID;
             }
@@ -476,7 +443,7 @@ void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, Invalid
     if (_dataMap.end() != it) {
         WorkingSetID id = it->second;
         WorkingSetMember* member = _ws->get(id);
-        verify(member->loc == dl);
+        verify(member->recordId == dl);
 
         if (_hashingChildren) {
             ++_specificStats.flaggedInProgress;
@@ -487,8 +454,8 @@ void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, Invalid
         // Update memory stats.
         _memUsage -= member->getMemUsage();
 
-        // The loc is about to be invalidated.  Fetch it and clear the loc.
-        WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+        // The RecordId is about to be invalidated.  Fetch it and clear the RecordId.
+        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
 
         // Add the WSID to the to-be-reviewed list in the WS.
         _ws->flagForReview(id);
@@ -498,27 +465,19 @@ void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, Invalid
     }
 }
 
-vector<PlanStage*> AndHashStage::getChildren() const {
-    return _children;
-}
-
-PlanStageStats* AndHashStage::getStats() {
+unique_ptr<PlanStageStats> AndHashStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     _specificStats.memLimit = _maxMemUsage;
     _specificStats.memUsage = _memUsage;
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_HASH));
-    ret->specific.reset(new AndHashStats(_specificStats));
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_AND_HASH);
+    ret->specific = make_unique<AndHashStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats());
+        ret->children.emplace_back(_children[i]->getStats());
     }
 
-    return ret.release();
-}
-
-const CommonStats* AndHashStage::getCommonStats() const {
-    return &_commonStats;
+    return ret;
 }
 
 const SpecificStats* AndHashStage::getSpecificStats() const {

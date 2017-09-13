@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -37,7 +37,7 @@ retry:
 	 */
 	while (last_consume == async->head &&
 	    async->flush_state != WT_ASYNC_FLUSHING) {
-		WT_STAT_FAST_CONN_INCR(session, async_nowork);
+		WT_STAT_CONN_INCR(session, async_nowork);
 		if (++tries < MAX_ASYNC_YIELD)
 			/*
 			 * Initially when we find no work, allow other
@@ -57,7 +57,6 @@ retry:
 			return (0);
 		if (!F_ISSET(conn, WT_CONN_SERVER_ASYNC))
 			return (0);
-		WT_RET(WT_SESSION_CHECK_PANIC(session));
 		WT_ORDERED_READ(last_consume, async->alloc_tail);
 	}
 	if (async->flush_state == WT_ASYNC_FLUSHING)
@@ -67,7 +66,7 @@ retry:
 	 * a race, try again.
 	 */
 	my_consume = last_consume + 1;
-	if (!WT_ATOMIC_CAS8(async->alloc_tail, last_consume, my_consume))
+	if (!__wt_atomic_cas64(&async->alloc_tail, last_consume, my_consume))
 		goto retry;
 	/*
 	 * This item of work is ours to process.  Clear it out of the
@@ -81,7 +80,7 @@ retry:
 	WT_ASSERT(session, async->cur_queue > 0);
 	WT_ASSERT(session, *op != NULL);
 	WT_ASSERT(session, (*op)->state == WT_ASYNCOP_ENQUEUED);
-	(void)WT_ATOMIC_SUB4(async->cur_queue, 1);
+	(void)__wt_atomic_sub32(&async->cur_queue, 1);
 	(*op)->state = WT_ASYNCOP_WORKING;
 
 	if (*op == &async->flush_op)
@@ -102,13 +101,12 @@ retry:
  * __async_flush_wait --
  *	Wait for the final worker to finish flushing.
  */
-static int
+static void
 __async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async, uint64_t my_gen)
 {
 	while (async->flush_state == WT_ASYNC_FLUSHING &&
 	    async->flush_gen == my_gen)
-		WT_RET(__wt_cond_wait(session, async->flush_cond, 10000));
-	return (0);
+		__wt_cond_wait(session, async->flush_cond, 10000, NULL);
 }
 
 /*
@@ -135,7 +133,7 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	if (op->optype == WT_AOP_COMPACT)
 		return (0);
 	WT_ASSERT(session, op->format != NULL);
-	STAILQ_FOREACH(ac, &worker->cursorqh, q) {
+	TAILQ_FOREACH(ac, &worker->cursorqh, q) {
 		if (op->format->cfg_hash == ac->cfg_hash &&
 		    op->format->uri_hash == ac->uri_hash) {
 			/*
@@ -156,7 +154,7 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	ac->cfg_hash = op->format->cfg_hash;
 	ac->uri_hash = op->format->uri_hash;
 	ac->c = c;
-	STAILQ_INSERT_HEAD(&worker->cursorqh, ac, q);
+	TAILQ_INSERT_HEAD(&worker->cursorqh, ac, q);
 	worker->num_cursors++;
 	*cursorp = c;
 	return (0);
@@ -216,9 +214,8 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			__wt_cursor_set_raw_value(&asyncop->c, &val);
 			break;
 		case WT_AOP_NONE:
-		default:
-			WT_RET_MSG(session, EINVAL, "Unknown async optype %d\n",
-			    op->optype);
+			WT_RET_MSG(session, EINVAL,
+			    "Unknown async optype %d", (int)op->optype);
 	}
 	return (0);
 }
@@ -284,7 +281,7 @@ WT_THREAD_RET
 __wt_async_worker(void *arg)
 {
 	WT_ASYNC *async;
-	WT_ASYNC_CURSOR *ac, *acnext;
+	WT_ASYNC_CURSOR *ac;
 	WT_ASYNC_OP_IMPL *op;
 	WT_ASYNC_WORKER_STATE worker;
 	WT_CONNECTION_IMPL *conn;
@@ -297,17 +294,16 @@ __wt_async_worker(void *arg)
 	async = conn->async;
 
 	worker.num_cursors = 0;
-	STAILQ_INIT(&worker.cursorqh);
+	TAILQ_INIT(&worker.cursorqh);
 	while (F_ISSET(conn, WT_CONN_SERVER_ASYNC) &&
 	    F_ISSET(session, WT_SESSION_SERVER_ASYNC)) {
 		WT_ERR(__async_op_dequeue(conn, session, &op));
 		if (op != NULL && op != &async->flush_op) {
 			/*
-			 * If an operation fails, we want the worker thread to
-			 * keep running, unless there is a panic.
+			 * Operation failure doesn't cause the worker thread to
+			 * exit.
 			 */
 			(void)__async_worker_op(session, op, &worker);
-			WT_ERR(WT_SESSION_CHECK_PANIC(session));
 		} else if (async->flush_state == WT_ASYNC_FLUSHING) {
 			/*
 			 * Worker flushing going on.  Last worker to the party
@@ -316,7 +312,7 @@ __wt_async_worker(void *arg)
 			 * the queue.
 			 */
 			WT_ORDERED_READ(flush_gen, async->flush_gen);
-			if (WT_ATOMIC_ADD4(async->flush_count, 1) ==
+			if (__wt_atomic_add32(&async->flush_count, 1) ==
 			    conn->async_workers) {
 				/*
 				 * We're last.  All workers accounted for so
@@ -327,15 +323,13 @@ __wt_async_worker(void *arg)
 				 */
 				WT_PUBLISH(async->flush_state,
 				    WT_ASYNC_FLUSH_COMPLETE);
-				WT_ERR(__wt_cond_signal(session,
-				    async->flush_cond));
+				__wt_cond_signal(session, async->flush_cond);
 			} else
 				/*
 				 * We need to wait for the last worker to
 				 * signal the condition.
 				 */
-				WT_ERR(__async_flush_wait(
-				    session, async, flush_gen));
+				__async_flush_wait(session, async, flush_gen);
 		}
 	}
 
@@ -346,12 +340,10 @@ err:		WT_PANIC_MSG(session, ret, "async worker error");
 	 * Worker thread cleanup, close our cached cursors and free all the
 	 * WT_ASYNC_CURSOR structures.
 	 */
-	ac = STAILQ_FIRST(&worker.cursorqh);
-	while (ac != NULL) {
-		acnext = STAILQ_NEXT(ac, q);
+	while ((ac = TAILQ_FIRST(&worker.cursorqh)) != NULL) {
+		TAILQ_REMOVE(&worker.cursorqh, ac, q);
 		WT_TRET(ac->c->close(ac->c));
 		__wt_free(session, ac);
-		ac = acnext;
 	}
 	return (WT_THREAD_RET_VALUE);
 }

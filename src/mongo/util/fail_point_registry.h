@@ -64,6 +64,13 @@ public:
      */
     void freeze();
 
+    /**
+     * Creates a new FailPointServerParameter for each failpoint in the registry. This allows the
+     * failpoint to be set on the command line via --setParameter, but is only allowed when
+     * running with '--setParameter enableTestCommands=1'.
+     */
+    void registerAllFailPointsAsServerParameters();
+
 private:
     bool _frozen;
     unordered_map<std::string, FailPoint*> _fpMap;

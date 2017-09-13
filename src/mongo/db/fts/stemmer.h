@@ -31,8 +31,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
 #include "third_party/libstemmer_c/include/libstemmer.h"
@@ -53,7 +51,14 @@ public:
     Stemmer(const FTSLanguage* language);
     ~Stemmer();
 
-    std::string stem(StringData word) const;
+    /**
+     * Stems an input word.
+     *
+     * The returned StringData is valid until the next call to any method on this object. Since the
+     * input may be returned unmodified, the output's lifetime may also expire when the input's
+     * does.
+     */
+    StringData stem(StringData word) const;
 
 private:
     struct sb_stemmer* _stemmer;

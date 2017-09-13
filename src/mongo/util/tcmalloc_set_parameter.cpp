@@ -26,9 +26,15 @@
  *    it in the license file.
  */
 
+#ifdef _WIN32
+#define NVALGRIND
+#endif
+
 #include "mongo/platform/basic.h"
 
-#include "gperftools/malloc_extension.h"
+#include <algorithm>
+#include <gperftools/malloc_extension.h>
+#include <valgrind/valgrind.h>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
@@ -37,6 +43,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
 namespace {
@@ -48,7 +55,7 @@ public:
     explicit TcmallocNumericPropertyServerParameter(const std::string& serverParameterName,
                                                     const std::string& tcmallocPropertyName);
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
     virtual Status set(const BSONElement& newValueElement);
     virtual Status setFromString(const std::string& str);
 
@@ -64,7 +71,7 @@ TcmallocNumericPropertyServerParameter::TcmallocNumericPropertyServerParameter(
                       true /* change at runtime */),
       _tcmallocPropertyName(tcmallocPropertyName) {}
 
-void TcmallocNumericPropertyServerParameter::append(OperationContext* txn,
+void TcmallocNumericPropertyServerParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder& b,
                                                     const std::string& name) {
     size_t value;
@@ -78,24 +85,28 @@ Status TcmallocNumericPropertyServerParameter::set(const BSONElement& newValueEl
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected server parameter " << newValueElement.fieldName()
                                     << " to have numeric type, but found "
-                                    << newValueElement.toString(false) << " of type "
+                                    << newValueElement.toString(false)
+                                    << " of type "
                                     << typeName(newValueElement.type()));
     }
     long long valueAsLongLong = newValueElement.safeNumberLong();
     if (valueAsLongLong < 0 ||
         static_cast<unsigned long long>(valueAsLongLong) > std::numeric_limits<size_t>::max()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Value " << newValueElement.toString(false) << " is out of range for "
-                          << newValueElement.fieldName() << "; expected a value between 0 and "
+        return Status(
+            ErrorCodes::BadValue,
+            str::stream() << "Value " << newValueElement.toString(false) << " is out of range for "
+                          << newValueElement.fieldName()
+                          << "; expected a value between 0 and "
                           << std::min<unsigned long long>(std::numeric_limits<size_t>::max(),
                                                           std::numeric_limits<long long>::max()));
     }
-    if (!MallocExtension::instance()->SetNumericProperty(_tcmallocPropertyName.c_str(),
-                                                         static_cast<size_t>(valueAsLongLong))) {
-        return Status(ErrorCodes::InternalError,
-                      str::stream() << "Failed to set internal tcmalloc property "
-                                    << _tcmallocPropertyName);
+    if (!RUNNING_ON_VALGRIND) {
+        if (!MallocExtension::instance()->SetNumericProperty(
+                _tcmallocPropertyName.c_str(), static_cast<size_t>(valueAsLongLong))) {
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Failed to set internal tcmalloc property "
+                                        << _tcmallocPropertyName);
+        }
     }
     return Status::OK();
 }
@@ -118,14 +129,23 @@ TcmallocNumericPropertyServerParameter tcmallocAggressiveMemoryDecommit(
     "tcmallocAggressiveMemoryDecommit", "tcmalloc.aggressive_memory_decommit");
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
-                          MONGO_NO_PREREQUISITES,
-                          ("BeginStartupOptionHandling"))(InitializerContext*) {
+                          ("SystemInfo"),
+                          ("BeginStartupOptionHandling"))
+(InitializerContext*) {
     // Before processing the command line options, if the user has not specified a value in via
     // the environment, set tcmalloc.max_total_thread_cache_bytes to its default value.
     if (getenv("TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES")) {
         return Status::OK();
     }
-    return tcmallocMaxTotalThreadCacheBytesParameter.setFromString("0x40000000" /* 1024MB */);
+
+    ProcessInfo pi;
+    size_t systemMemorySizeMB = pi.getMemSizeMB();
+    size_t defaultTcMallocCacheSize = 1024 * 1024 * 1024;  // 1024MB in bytes
+    size_t derivedTcMallocCacheSize =
+        (systemMemorySizeMB / 8) * 1024 * 1024;  // 1/8 of system memory in bytes
+    size_t cacheSize = std::min(defaultTcMallocCacheSize, derivedTcMallocCacheSize);
+
+    return tcmallocMaxTotalThreadCacheBytesParameter.setFromString(std::to_string(cacheSize));
 }
 
 }  // namespace

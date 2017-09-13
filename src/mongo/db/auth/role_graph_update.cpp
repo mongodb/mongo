@@ -26,14 +26,18 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/db/ops/update_driver.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -47,6 +51,7 @@ struct RoleInfo {
     RoleName name;
     std::vector<RoleName> roles;
     PrivilegeVector privileges;
+    std::shared_ptr<RestrictionDocument<>> restrictions;
 };
 
 /**
@@ -85,7 +90,9 @@ Status checkIdMatchesRoleName(const BSONElement& idElement, const RoleName& role
         return Status(ErrorCodes::FailedToParse,
                       mongoutils::str::stream()
                           << "Role document _id fields must be encoded as the string "
-                             "dbname.rolename.  Found " << idField << " for "
+                             "dbname.rolename.  Found "
+                          << idField
+                          << " for "
                           << roleName.getFullName());
     }
     return Status::OK();
@@ -106,6 +113,27 @@ Status getRoleNameFromIdField(const BSONElement& idElement, RoleName* roleName) 
                       "Role document _id fields must have the form dbname.rolename");
     }
     *roleName = RoleName(idField.substr(dotPos + 1), idField.substr(0, dotPos));
+    return Status::OK();
+}
+
+/**
+ * Parses information about authenticationRestrictions from a BSON document
+ */
+Status parseAuthenticationRestrictions(const BSONElement& elem, RoleInfo* role) {
+    if (elem.eoo()) {
+        return Status::OK();
+    }
+
+    if (elem.type() != Array) {
+        return Status(ErrorCodes::TypeMismatch,
+                      "'authenticationRestricitons' field must be an array");
+    }
+
+    auto restrictions = parseAuthenticationRestriction(BSONArray(elem.Obj()));
+    if (!restrictions.isOK()) {
+        return restrictions.getStatus();
+    }
+    role->restrictions = std::move(restrictions.getValue());
     return Status::OK();
 }
 
@@ -134,6 +162,11 @@ Status parseRoleFromDocument(const BSONObj& doc, RoleInfo* role) {
         role->roles.push_back(possessedRoleName);
     }
 
+    status = parseAuthenticationRestrictions(doc["authenticationRestrictions"], role);
+    if (!status.isOK()) {
+        return status;
+    }
+
     BSONElement privilegesElement;
     status = bsonExtractTypedField(doc, "privileges", Array, &privilegesElement);
     if (!status.isOK())
@@ -151,7 +184,7 @@ Status handleOplogInsert(RoleGraph* roleGraph, const BSONObj& insertedObj) {
     Status status = parseRoleFromDocument(insertedObj, &role);
     if (!status.isOK())
         return status;
-    status = roleGraph->replaceRole(role.name, role.roles, role.privileges);
+    status = roleGraph->replaceRole(role.name, role.roles, role.privileges, role.restrictions);
     return status;
 }
 
@@ -160,7 +193,8 @@ Status handleOplogInsert(RoleGraph* roleGraph, const BSONObj& insertedObj) {
  *
  * Treats all updates as upserts.
  */
-Status handleOplogUpdate(RoleGraph* roleGraph,
+Status handleOplogUpdate(OperationContext* opCtx,
+                         RoleGraph* roleGraph,
                          const BSONObj& updatePattern,
                          const BSONObj& queryPattern) {
     RoleName roleToUpdate;
@@ -170,7 +204,10 @@ Status handleOplogUpdate(RoleGraph* roleGraph,
 
     UpdateDriver::Options updateOptions;
     UpdateDriver driver(updateOptions);
-    status = driver.parse(updatePattern);
+
+    // Oplog updates do not have array filters.
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    status = driver.parse(updatePattern, arrayFilters);
     if (!status.isOK())
         return status;
 
@@ -178,12 +215,22 @@ Status handleOplogUpdate(RoleGraph* roleGraph,
     status = AuthorizationManager::getBSONForRole(roleGraph, roleToUpdate, roleDocument.root());
     if (status == ErrorCodes::RoleNotFound) {
         // The query pattern will only contain _id, no other immutable fields are present
-        status = driver.populateDocumentWithQueryFields(queryPattern, NULL, roleDocument);
+        const FieldRef idFieldRef("_id");
+        FieldRefSet immutablePaths;
+        invariant(immutablePaths.insert(&idFieldRef));
+        status = driver.populateDocumentWithQueryFields(
+            opCtx, queryPattern, immutablePaths, roleDocument);
     }
     if (!status.isOK())
         return status;
 
-    status = driver.update(StringData(), &roleDocument);
+    // The original document can be empty because it is only needed for validation of immutable
+    // paths.
+    const BSONObj emptyOriginal;
+    const bool validateForStorage = false;
+    const FieldRefSet emptyImmutablePaths;
+    status = driver.update(
+        StringData(), emptyOriginal, &roleDocument, validateForStorage, emptyImmutablePaths);
     if (!status.isOK())
         return status;
 
@@ -192,7 +239,7 @@ Status handleOplogUpdate(RoleGraph* roleGraph,
     status = parseRoleFromDocument(roleDocument.getObject(), &role);
     if (!status.isOK())
         return status;
-    status = roleGraph->replaceRole(role.name, role.roles, role.privileges);
+    status = roleGraph->replaceRole(role.name, role.roles, role.privileges, role.restrictions);
 
     return status;
 }
@@ -259,6 +306,12 @@ Status handleOplogCommand(RoleGraph* roleGraph, const BSONObj& cmdObj) {
         // We don't care about these if they're not on the roles collection.
         return Status::OK();
     }
+
+    if ((cmdName == "collMod") && (cmdObj.nFields() == 1)) {
+        // We also don't care about empty modifications even if they are on roles collection
+        return Status::OK();
+    }
+
     //  No other commands expected.  Warn.
     return Status(ErrorCodes::OplogOperationUnsupported, "Unsupported oplog operation");
 }
@@ -269,15 +322,16 @@ Status RoleGraph::addRoleFromDocument(const BSONObj& doc) {
     Status status = parseRoleFromDocument(doc, &role);
     if (!status.isOK())
         return status;
-    status = replaceRole(role.name, role.roles, role.privileges);
+    status = replaceRole(role.name, role.roles, role.privileges, role.restrictions);
     return status;
 }
 
-Status RoleGraph::handleLogOp(const char* op,
+Status RoleGraph::handleLogOp(OperationContext* opCtx,
+                              const char* op,
                               const NamespaceString& ns,
                               const BSONObj& o,
                               const BSONObj* o2) {
-    if (op == StringData("db", StringData::LiteralTag()))
+    if (op == "db"_sd)
         return Status::OK();
     if (op[0] == '\0' || op[1] != '\0') {
         return Status(ErrorCodes::BadValue,
@@ -307,7 +361,7 @@ Status RoleGraph::handleLogOp(const char* op,
                 return Status(ErrorCodes::InternalError,
                               "Missing query pattern in update oplog entry.");
             }
-            return handleOplogUpdate(this, o, *o2);
+            return handleOplogUpdate(opCtx, this, o, *o2);
         case 'd':
             return handleOplogDelete(this, o);
         case 'n':

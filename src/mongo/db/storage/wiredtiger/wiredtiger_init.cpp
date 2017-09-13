@@ -29,25 +29,28 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#if defined(__linux__)
+#include <sys/vfs.h>
+#endif
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/service_context_d.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -57,12 +60,43 @@ class WiredTigerFactory : public StorageEngine::Factory {
 public:
     virtual ~WiredTigerFactory() {}
     virtual StorageEngine* create(const StorageGlobalParams& params,
-                                  const StorageEngineLockFile& lockFile) const {
-        if (lockFile.createdByUncleanShutdown()) {
+                                  const StorageEngineLockFile* lockFile) const {
+        if (lockFile && lockFile->createdByUncleanShutdown()) {
             warning() << "Recovering data from the last clean checkpoint.";
         }
-        WiredTigerKVEngine* kv = new WiredTigerKVEngine(
-            params.dbpath, wiredTigerGlobalOptions.engineConfig, params.dur, params.repair);
+
+#if defined(__linux__)
+// This is from <linux/magic.h> but that isn't available on all systems.
+// Note that the magic number for ext4 is the same as ext2 and ext3.
+#define EXT4_SUPER_MAGIC 0xEF53
+        {
+            struct statfs fs_stats;
+            int ret = statfs(params.dbpath.c_str(), &fs_stats);
+
+            if (ret == 0 && fs_stats.f_type == EXT4_SUPER_MAGIC) {
+                log() << startupWarningsLog;
+                log() << "** WARNING: Using the XFS filesystem is strongly recommended with the "
+                         "WiredTiger storage engine"
+                      << startupWarningsLog;
+                log() << "**          See "
+                         "http://dochub.mongodb.org/core/prodnotes-filesystem"
+                      << startupWarningsLog;
+            }
+        }
+#endif
+
+        size_t cacheMB = WiredTigerUtil::getCacheSizeMB(wiredTigerGlobalOptions.cacheSizeGB);
+        const bool ephemeral = false;
+        WiredTigerKVEngine* kv =
+            new WiredTigerKVEngine(getCanonicalName().toString(),
+                                   params.dbpath,
+                                   getGlobalServiceContext()->getFastClockSource(),
+                                   wiredTigerGlobalOptions.engineConfig,
+                                   cacheMB,
+                                   params.dur,
+                                   ephemeral,
+                                   params.repair,
+                                   params.readOnly);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
         // Intentionally leaked.
@@ -102,6 +136,19 @@ public:
             return status;
         }
 
+        // If the 'groupCollections' field does not exist in the 'storage.bson' file, the
+        // data-format of existing tables is as if 'groupCollections' is false. Passing this in
+        // prevents validation from accepting 'params.groupCollections' being true when a "group
+        // collections" aware mongod is launched on an 3.4- dbpath.
+        const bool kDefaultGroupCollections = false;
+        status =
+            metadata.validateStorageEngineOption("groupCollections",
+                                                 params.groupCollections,
+                                                 boost::optional<bool>(kDefaultGroupCollections));
+        if (!status.isOK()) {
+            return status;
+        }
+
         return Status::OK();
     }
 
@@ -109,8 +156,12 @@ public:
         BSONObjBuilder builder;
         builder.appendBool("directoryPerDB", params.directoryperdb);
         builder.appendBool("directoryForIndexes", wiredTigerGlobalOptions.directoryForIndexes);
-        WiredTigerCustomizationHooks::get(getGlobalServiceContext())->appendUID(&builder);
+        builder.appendBool("groupCollections", params.groupCollections);
         return builder.obj();
+    }
+
+    bool supportsReadOnly() const final {
+        return true;
     }
 };
 }  // namespace

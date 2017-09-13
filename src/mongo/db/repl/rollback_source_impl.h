@@ -32,10 +32,12 @@
 
 #include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/rollback_source.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
-class DBClientConnection;
+class DBClientBase;
 
 namespace repl {
 
@@ -45,9 +47,18 @@ namespace repl {
 
 class RollbackSourceImpl : public RollbackSource {
 public:
-    explicit RollbackSourceImpl(DBClientConnection* conn, const std::string& collectionName);
+    /**
+     * Type of function to return a connection to the sync source.
+     */
+    using GetConnectionFn = stdx::function<DBClientBase*()>;
+
+    RollbackSourceImpl(GetConnectionFn getConnection,
+                       const HostAndPort& source,
+                       const std::string& collectionName);
 
     const OplogInterface& getOplog() const override;
+
+    const HostAndPort& getSource() const override;
 
     int getRollbackId() const override;
 
@@ -55,12 +66,21 @@ public:
 
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
 
-    void copyCollectionFromRemote(OperationContext* txn, const NamespaceString& nss) const override;
+    std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+                                                      UUID uuid,
+                                                      const BSONObj& filter) const override;
+
+    void copyCollectionFromRemote(OperationContext* opCtx,
+                                  const NamespaceString& nss) const override;
+
+    StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+                                                const UUID& uuid) const override;
 
     StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
 
 private:
-    DBClientConnection* _conn;
+    GetConnectionFn _getConnection;
+    HostAndPort _source;
     std::string _collectionName;
     OplogInterfaceRemote _oplog;
 };

@@ -30,70 +30,82 @@
 
 #include "mongo/db/exec/working_set_common.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 
 // static
-bool WorkingSetCommon::fetchAndInvalidateLoc(OperationContext* txn,
-                                             WorkingSetMember* member,
-                                             const Collection* collection) {
+bool WorkingSetCommon::fetchAndInvalidateRecordId(OperationContext* opCtx,
+                                                  WorkingSetMember* member,
+                                                  const Collection* collection) {
     // Already in our desired state.
-    if (member->state == WorkingSetMember::OWNED_OBJ) {
+    if (member->getState() == WorkingSetMember::OWNED_OBJ) {
         return true;
     }
 
     // We can't do anything without a RecordId.
-    if (!member->hasLoc()) {
+    if (!member->hasRecordId()) {
         return false;
     }
 
     // Do the fetch, invalidate the DL.
-    member->obj = collection->docFor(txn, member->loc);
+    member->obj = collection->docFor(opCtx, member->recordId);
     member->obj.setValue(member->obj.value().getOwned());
+    member->recordId = RecordId();
+    member->transitionToOwnedObj();
 
-    member->state = WorkingSetMember::OWNED_OBJ;
-    member->loc = RecordId();
     return true;
 }
 
 void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
-    dassert(supportsDocLocking());
+    if (!supportsDocLocking()) {
+        // Non doc-locking storage engines use invalidations, so we don't need to examine the
+        // buffered working set ids. But we do need to clear the set of ids in order to keep our
+        // memory utilization in check.
+        workingSet->getAndClearYieldSensitiveIds();
+        return;
+    }
 
-    for (WorkingSet::iterator it = workingSet->begin(); it != workingSet->end(); ++it) {
-        if (it->state == WorkingSetMember::LOC_AND_IDX) {
-            it->isSuspicious = true;
-        } else if (it->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ) {
-            // We already have the data so convert directly to owned state.
-            it->obj.setValue(it->obj.value().getOwned());
-            it->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
+    for (auto id : workingSet->getAndClearYieldSensitiveIds()) {
+        if (workingSet->isFree(id)) {
+            continue;
+        }
+
+        // We may see the same member twice, so anything we do here should be idempotent.
+        WorkingSetMember* member = workingSet->get(id);
+        if (member->getState() == WorkingSetMember::RID_AND_IDX) {
+            member->isSuspicious = true;
         }
     }
 }
 
 // static
-bool WorkingSetCommon::fetch(OperationContext* txn,
-                             WorkingSetMember* member,
-                             unowned_ptr<RecordCursor> cursor) {
+bool WorkingSetCommon::fetch(OperationContext* opCtx,
+                             WorkingSet* workingSet,
+                             WorkingSetID id,
+                             unowned_ptr<SeekableRecordCursor> cursor) {
+    WorkingSetMember* member = workingSet->get(id);
+
     // The RecordFetcher should already have been transferred out of the WSM and used.
     invariant(!member->hasFetcher());
 
     // We should have a RecordId but need to retrieve the obj. Get the obj now and reset all WSM
     // state appropriately.
-    invariant(member->hasLoc());
+    invariant(member->hasRecordId());
 
     member->obj.reset();
-    auto record = cursor->seekExact(member->loc);
+    auto record = cursor->seekExact(member->recordId);
     if (!record) {
         return false;
     }
 
-    member->obj = {txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
+    member->obj = {opCtx->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
 
     if (member->isSuspicious) {
         // Make sure that all of the keyData is still valid for this copy of the document.
@@ -102,8 +114,14 @@ bool WorkingSetCommon::fetch(OperationContext* txn,
         // unneeded due to the structure of the plan.
         invariant(!member->keyData.empty());
         for (size_t i = 0; i < member->keyData.size(); i++) {
-            BSONObjSet keys;
-            member->keyData[i].index->getKeys(member->obj.value(), &keys);
+            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            // There's no need to compute the prefixes of the indexed fields that cause the index to
+            // be multikey when ensuring the keyData is still valid.
+            MultikeyPaths* multikeyPaths = nullptr;
+            member->keyData[i].index->getKeys(member->obj.value(),
+                                              IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                                              &keys,
+                                              multikeyPaths);
             if (!keys.count(member->keyData[i].keyData)) {
                 // document would no longer be at this position in the index.
                 return false;
@@ -114,24 +132,8 @@ bool WorkingSetCommon::fetch(OperationContext* txn,
     }
 
     member->keyData.clear();
-    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    workingSet->transitionToRecordIdAndObj(id);
     return true;
-}
-
-// static
-void WorkingSetCommon::initFrom(WorkingSetMember* dest, const WorkingSetMember& src) {
-    dest->loc = src.loc;
-    dest->obj = src.obj;
-    dest->keyData = src.keyData;
-    dest->state = src.state;
-
-    // Merge computed data.
-    typedef WorkingSetComputedDataType WSCD;
-    for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
-        if (src.hasComputed(i)) {
-            dest->addComputed(src.getComputed(i)->clone());
-        }
-    }
 }
 
 // static
@@ -150,8 +152,8 @@ WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status
 
     WorkingSetID wsid = ws->allocate();
     WorkingSetMember* member = ws->get(wsid);
-    member->state = WorkingSetMember::OWNED_OBJ;
     member->obj = Snapshotted<BSONObj>(SnapshotId(), buildMemberStatusObject(status));
+    member->transitionToOwnedObj();
 
     return wsid;
 }
@@ -186,8 +188,7 @@ void WorkingSetCommon::getStatusMemberObject(const WorkingSet& ws,
 // static
 Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
     invariant(WorkingSetCommon::isValidStatusMemberObject(memberObj));
-    return Status(static_cast<ErrorCodes::Error>(memberObj["code"].numberInt()),
-                  memberObj["errmsg"]);
+    return Status(ErrorCodes::fromInt(memberObj["code"].numberInt()), memberObj["errmsg"]);
 }
 
 // static

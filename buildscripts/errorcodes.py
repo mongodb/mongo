@@ -6,12 +6,18 @@ Parses .cpp files for assertions and verifies assertion codes are distinct.
 Optionally replaces zero codes in source code with new distinct values.
 """
 
+import bisect
 import os
-import re
-import utils
 import sys
+import utils
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
+
+try:
+    import regex as re
+except ImportError:
+    print("*** Run 'pip2 install --user regex' to speed up error code checking")
+    import re
 
 ASSERT_NAMES = [ "uassert" , "massert", "fassert", "fassertFailed" ]
 MINIMUM_CODE = 10000
@@ -19,8 +25,9 @@ MINIMUM_CODE = 10000
 codes = []
 
 # Each AssertLocation identifies the C++ source location of an assertion
-AssertLocation = namedtuple( "AssertLocation", ['sourceFile', 'lineNum', 'lines', 'code'] )
+AssertLocation = namedtuple( "AssertLocation", ['sourceFile', 'byteOffset', 'lines', 'code'] )
 
+list_files = False
 
 # Of historical interest only
 def assignErrorCodes():
@@ -50,55 +57,55 @@ def parseSourceFiles( callback ):
     quick = [ "assert" , "Exception"]
 
     patterns = [
-        re.compile( r"[umsg]asser(?:t|ted)(?:NoTrace)? *\( *(\d+)" ) ,
-        re.compile( r"(?:User|Msg|MsgAssertion)Exception *\( *(\d+)" ),
-        re.compile( r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)? *\( *(\d+)" ),
+        re.compile( r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE ) ,
+        re.compile( r"(?:DB|Assertion)Exception\s*\(\s*(\d+)", re.MULTILINE ),
+        re.compile( r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
+                    re.MULTILINE ),
     ]
 
     bad = [ re.compile( r"^\s*assert *\(" ) ]
 
-    for sourceFile in utils.getAllSourceFiles():
-        if not sourceFile.find( "src/mongo/" ) >= 0:
-            # Skip generated sources
-            continue
+    for sourceFile in utils.getAllSourceFiles(prefix='src/mongo/'):
+        if list_files:
+            print 'scanning file: ' + sourceFile
 
         with open(sourceFile) as f:
-            line_iterator = enumerate(f, 1)
-            for (lineNum, line) in line_iterator:
+            text = f.read()
 
-                # See if we can skip regexes
-                if not any([zz in line for zz in quick]):
-                    continue
+            if not any([zz in text for zz in quick]):
+                continue
 
-                for b in bad:
-                    if b.search(line):
-                        msg = "Bare assert prohibited. Replace with [umwdf]assert"
-                        print( "%s:%s: %s\n%s" % (sourceFile, lineNum, msg, line) )
-                        raise Exception(msg)
+            # TODO: move check for bad assert type to the linter.
+            for b in bad:
+                if b.search(text):
+                    msg = "Bare assert prohibited. Replace with [umwdf]assert"
+                    print( "%s: %s" % (sourceFile, msg) )
+                    raise Exception(msg)
 
-                # no more than one pattern should ever match
-                matches = [x for x in [p.search(line) for p in patterns]
-                           if x]
-                assert len(matches) <= 1, matches
-                if matches:
-                    match = matches[0]
+            matchiters = [p.finditer(text) for p in patterns]
+            for matchiter in matchiters:
+                for match in matchiter:
                     code = match.group(1)
                     span = match.span()
 
-                    # Advance to statement terminator iff not on this line
-                    lines = [line.strip()]
+                    thisLoc = AssertLocation(sourceFile,
+                                             span[1],
+                                             text[span[0]:span[1]],
+                                             code)
 
-                    if not isTerminated(lines):
-                        for (_lineNum, line) in line_iterator:
-                            lines.append(line.strip())
-                            if isTerminated(lines):
-                                break
-
-                    thisLoc = AssertLocation(sourceFile, lineNum, lines, code)
                     callback( thisLoc )
 
-        # end for sourceFile loop
+# Converts an absolute position in a file into a line number.
+def getLineForPosition(loc, _file_cache={}):
+    if loc.sourceFile not in _file_cache:
+        with open(loc.sourceFile) as f:
+            text = f.read()
+            line_offsets = [0]
+            for line in text.splitlines(True):
+                line_offsets.append(line_offsets[-1] + len(line))
+            _file_cache[loc.sourceFile] = line_offsets
 
+    return bisect.bisect(_file_cache[loc.sourceFile], loc.byteOffset)
 
 def isTerminated( lines ):
     """Given .cpp/.h source lines as text, determine if assert is terminated."""
@@ -159,12 +166,12 @@ def readErrorCodes():
         bad = seen[code]
         errors.append( bad )
         print( "ZERO_CODE:" )
-        print( "  %s:%d:%s" % (bad.sourceFile, bad.lineNum, bad.lines[0]) )
+        print( "  %s:%d:%s" % (bad.sourceFile, getLineForPosition(bad), bad.lines) )
 
     for code, locations in dups.items():
         print( "DUPLICATE IDS: %s" % code )
         for loc in locations:
-            print( "  %s:%d:%s" % (loc.sourceFile, loc.lineNum, loc.lines[0]) )
+            print( "  %s:%d:%s" % (loc.sourceFile, getLineForPosition(loc), loc.lines) )
 
     return (codes, errors)
 
@@ -181,25 +188,30 @@ def replaceBadCodes( errors, nextCode ):
     skip_errors = [e for e in errors if int(e.code) != 0]
 
     for loc in skip_errors:
-        print "SKIPPING NONZERO code=%s: %s:%s" % (loc.code, loc.sourceFile, loc.lineNum)
+        print ("SKIPPING NONZERO code=%s: %s:%s"
+                % (loc.code, loc.sourceFile, getLineForPosition(loc)))
 
-    for assertLoc in zero_errors:
-        (sourceFile, lineNum, lines, code) = assertLoc
+    # Dedupe, sort, and reverse so we don't have to update offsets as we go.
+    for assertLoc in reversed(sorted(set(zero_errors))):
+        (sourceFile, byteOffset, lines, code) = assertLoc
+        lineNum = getLineForPosition(assertLoc)
         print "UPDATING_FILE: %s:%s" % (sourceFile, lineNum)
 
         ln = lineNum - 1
 
         with open(sourceFile, 'r+') as f:
-            fileLines = f.readlines()
-            line = fileLines[ln]
-            print "LINE_%d_BEFORE:%s" % (lineNum, line.rstrip())
-            line = re.sub(r'(\( *)(\d+)',
-                          r'\g<1>' + str(nextCode),
-                          line)
-            print "LINE_%d_AFTER :%s" % (lineNum, line.rstrip())
-            fileLines[ln] = line
+            print "LINE_%d_BEFORE:%s" % (lineNum, f.readlines()[ln].rstrip())
+
             f.seek(0)
-            f.writelines(fileLines)
+            text = f.read()
+            assert text[byteOffset-1] == '0'
+            f.seek(0)
+            f.write(text[:byteOffset-1])
+            f.write(str(nextCode))
+            f.write(text[byteOffset:])
+            f.seek(0)
+
+            print "LINE_%d_AFTER :%s" % (lineNum, f.readlines()[ln].rstrip())
         nextCode += 1
 
 
@@ -236,79 +248,35 @@ def getBestMessage( lines , codeStr ):
 
     return err.strip()
 
-
-def writeMarkdownReport( codes, outfile ):
-    """Write errors.md report to filesystem in Markdown format
-
-    Args:
-        codes: list of AssertLocation
-        outfile: string path to a file to overwrite
-    """
-
-    baseurl = "http://github.com/mongodb/mongo/blob/master"
-
-    if os.path.exists(outfile):
-        i = open(outfile, "r" )
-        i.close()
-
-    out = open(outfile, 'wb')
-    out.write("MongoDB Error Codes\n")
-    out.write("===================\n\n")
-    out.write("This file is generated by errorcodes.py. Do not edit.\n\n")
-
-    prev = ""
-    seen = {}
-
-    # Sort by sourceFile, then code
-    codes.sort( key=lambda loc: loc.sourceFile+"-"+loc.code )
-
-    for assertLoc in codes:
-        if assertLoc.code in seen:
-            continue
-        seen[assertLoc.code] = True
-
-        (sourceFile, lineNum, lines, code) = assertLoc
-
-        if sourceFile.startswith("./"):
-            sourceFile = sourceFile[2:]
-
-        if sourceFile != prev:
-            out.write("\n\n%s\n----\n" % sourceFile)
-            prev = sourceFile
-
-        url = "%s/%s#L%s" % (baseurl, sourceFile, lineNum)
-        message = getBestMessage(lines, str(code))
-        out.write("* %s [code](%s) %s\n" % (code, url, message))
-
-    out.write( "\n" )
-    out.close()
-
-
 def main():
     parser = OptionParser(description=__doc__.strip())
     parser.add_option("--fix", dest="replace",
                       action="store_true", default=False,
                       help="Fix zero codes in source files [default: %default]")
-    parser.add_option("-o", dest="outfile",
-                      default="docs/errors.md",
-                      help="Report file [default: %default]")
-    parser.add_option("--report", type="choice",
-                      choices=["none", "markdown"], default="none",
-                      help="What format report should be generated. " \
-                           "Possible options: [none, markdown]")
+    parser.add_option("-q", "--quiet", dest="quiet",
+                      action="store_true", default=False,
+                      help="Suppress output on success [default: %default]")
+    parser.add_option("--list-files", dest="list_files",
+                      action="store_true", default=False,
+                      help="Print the name of each file as it is scanned [default: %default]")
     (options, args) = parser.parse_args()
+
+    global list_files
+    list_files = options.list_files
 
     (codes, errors) = readErrorCodes()
     ok = len(errors) == 0
+
+    if ok and options.quiet:
+        return
+
     next = getNextCode()
 
     print("ok: %s" % ok)
     print("next: %s" % next)
 
     if ok:
-        reportStyle = options.report
-        if reportStyle == "markdown":
-            writeMarkdownReport(codes, options.outfile)
+        sys.exit(0)
     elif options.replace:
         replaceBadCodes(errors, next)
     else:

@@ -35,16 +35,16 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-// static
-const int MatchExpressionParser::kMaximumTreeDepth = 100;
-
 Status MatchExpressionParser::_parseTreeList(const BSONObj& arr,
                                              ListOfMatchExpression* out,
-                                             int level) {
+                                             const CollatorInterface* collator,
+                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             AllowedFeatureSet allowedFeatures,
+                                             bool topLevel) {
     if (arr.isEmpty())
         return Status(ErrorCodes::BadValue, "$and/$or/$nor must be a nonempty array");
 
@@ -55,27 +55,32 @@ Status MatchExpressionParser::_parseTreeList(const BSONObj& arr,
         if (e.type() != Object)
             return Status(ErrorCodes::BadValue, "$or/$and/$nor entries need to be full objects");
 
-        StatusWithMatchExpression sub = _parse(e.Obj(), level);
+        StatusWithMatchExpression sub =
+            _parse(e.Obj(), collator, expCtx, allowedFeatures, topLevel);
         if (!sub.isOK())
             return sub.getStatus();
 
-        out->add(sub.getValue());
+        out->add(sub.getValue().release());
     }
     return Status::OK();
 }
 
-StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
-                                                           const BSONElement& e,
-                                                           int level) {
+StatusWithMatchExpression MatchExpressionParser::_parseNot(
+    const char* name,
+    const BSONElement& e,
+    const CollatorInterface* collator,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
+    bool topLevel) {
     if (e.type() == RegEx) {
         StatusWithMatchExpression s = _parseRegexElement(name, e);
         if (!s.isOK())
             return s;
-        std::unique_ptr<NotMatchExpression> n(new NotMatchExpression());
-        Status s2 = n->init(s.getValue());
+        std::unique_ptr<NotMatchExpression> n = stdx::make_unique<NotMatchExpression>();
+        Status s2 = n->init(s.getValue().release());
         if (!s2.isOK())
             return StatusWithMatchExpression(s2);
-        return StatusWithMatchExpression(n.release());
+        return {std::move(n)};
     }
 
     if (e.type() != Object)
@@ -85,8 +90,9 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
     if (notObject.isEmpty())
         return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot be empty");
 
-    std::unique_ptr<AndMatchExpression> theAnd(new AndMatchExpression());
-    Status s = _parseSub(name, notObject, theAnd.get(), level);
+    std::unique_ptr<AndMatchExpression> theAnd = stdx::make_unique<AndMatchExpression>();
+    Status s =
+        _parseSub(name, notObject, theAnd.get(), collator, expCtx, allowedFeatures, topLevel);
     if (!s.isOK())
         return StatusWithMatchExpression(s);
 
@@ -96,11 +102,11 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
         if (theAnd->getChild(i)->matchType() == MatchExpression::REGEX)
             return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot have a regex");
 
-    std::unique_ptr<NotMatchExpression> theNot(new NotMatchExpression());
+    std::unique_ptr<NotMatchExpression> theNot = stdx::make_unique<NotMatchExpression>();
     s = theNot->init(theAnd.release());
     if (!s.isOK())
         return StatusWithMatchExpression(s);
 
-    return StatusWithMatchExpression(theNot.release());
+    return {std::move(theNot)};
 }
 }

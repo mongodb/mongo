@@ -7,8 +7,8 @@
  * may match.
  * Other workloads that need an index { a: 1, b: 1 } can extend this
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/yield.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_workloads/yield.js');       // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -24,9 +24,7 @@ var $config = extendWorkload($config, function($config, $super) {
             matches.push(i);
         }
 
-        var cursor = db[collName].find({ a: { $in: matches } })
-                                 .sort({ b: -1 })
-                                 .batchSize(this.batchSize);
+        var cursor = db[collName].find({a: {$in: matches}}).sort({b: -1}).batchSize(this.batchSize);
 
         var verifier = function sortMergeVerifier(doc, prevDoc) {
             var correctOrder = true;
@@ -40,17 +38,16 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
-        var newA = Random.randInt($config.data.nDocs);
-        var newB = Random.randInt($config.data.nDocs);
-        return { $set: { a: newA, b: newB } };
+        var newA = Random.randInt(this.nDocs);
+        var newB = Random.randInt(this.nDocs);
+        return {$set: {a: newA, b: newB}};
     };
 
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        assertAlways.commandWorked(db[collName].ensureIndex({ a: 1, b: 1 }));
+        assertAlways.commandWorked(db[collName].ensureIndex({a: 1, b: 1}));
     };
 
     return $config;
 });
-

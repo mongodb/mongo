@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -19,7 +19,7 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 	WT_DLH *dlh;
 
 	WT_RET(__wt_calloc_one(session, &dlh));
-	WT_ERR(__wt_strdup(session, path, &dlh->name));
+	WT_ERR(__wt_strdup(session, path == NULL ? "local" : path, &dlh->name));
 
 	if ((dlh->handle = dlopen(path, RTLD_LAZY)) == NULL)
 		WT_ERR_MSG(
@@ -39,7 +39,7 @@ err:		__wt_free(session, dlh->name);
  */
 int
 __wt_dlsym(WT_SESSION_IMPL *session,
-    WT_DLH *dlh, const char *name, int fail, void *sym_ret)
+    WT_DLH *dlh, const char *name, bool fail, void *sym_ret)
 {
 	void *sym;
 

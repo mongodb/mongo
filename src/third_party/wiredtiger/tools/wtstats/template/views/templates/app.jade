@@ -1,0 +1,45 @@
+#app
+  nav#navbar(role='navigation').navbar.navbar-default
+    .container-fluid
+      .navbar-header
+        .navbar-brand 
+          .brand-image(data-hook='menu-toggle')
+
+      ul.nav.navbar-right
+        li(data-hook='sample-warning').navbar-text
+          .alert.alert-warning(title="warning: more series data points than pixels. data is being sub-sampled to improve performance. To avoid sub-sampling, increase the browser window width or zoom in.")
+            i#menubtn.fa.fa-warning
+            span sub-sampling
+
+        li.navbar-text
+          i#menubtn.fa.fa-clock-o
+          span x-axis
+          div(data-toggle='buttons', data-hook='xSetting').btn-group
+            label.btn.btn-default.active
+              input(type='radio', name='xSetting', id='relative', value='relative', checked)
+              | relative
+            label.btn.btn-default
+              input(type='radio', name='xSetting', id='absolute', value='absolute') 
+              | absolute
+
+        li.navbar-text
+          i#menubtn.fa.fa-line-chart
+          span y-axis
+          div(data-toggle='buttons', data-hook='ySetting').btn-group
+            label.btn.btn-default.active
+              input(type='radio', name='ySetting', value='linear', checked)
+              | linear
+            label.btn.btn-default
+              input(type='radio', name='ySetting', value='log-scale') 
+              | log-scale
+
+  #wrapper
+    #sidebar-wrapper
+      .sidebar-nav
+        div(data-hook='sidebar')
+      
+    .container-fluid
+      .row
+        div.col-md-12
+          div(data-hook='chart')
+

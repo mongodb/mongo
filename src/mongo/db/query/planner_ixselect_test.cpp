@@ -32,16 +32,19 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
-#include <memory>
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/text.h"
+#include <memory>
 
 using namespace mongo;
 
 namespace {
+
+constexpr CollatorInterface* kSimpleCollator = nullptr;
 
 using std::unique_ptr;
 using std::string;
@@ -50,11 +53,11 @@ using std::vector;
 /**
  * Utility function to create MatchExpression
  */
-MatchExpression* parseMatchExpression(const BSONObj& obj) {
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, collator);
     ASSERT_TRUE(status.isOK());
-    MatchExpression* expr(status.getValue());
-    return expr;
+    return std::move(status.getValue());
 }
 
 /**
@@ -154,8 +157,11 @@ TEST(QueryPlannerIXSelectTest, GetFieldsArrayNegation) {
 /**
  * Performs a pre-order traversal of expression tree. Validates
  * that all tagged nodes contain an instance of RelevantTag.
+ * Finds all indices included in RelevantTags, and returns them in the 'indices' out-parameter.
  */
-void findRelevantTaggedNodePaths(MatchExpression* root, vector<string>* paths) {
+void findRelevantTaggedNodePathsAndIndices(MatchExpression* root,
+                                           vector<string>* paths,
+                                           std::set<size_t>* indices) {
     MatchExpression::TagData* tag = root->getTag();
     if (tag) {
         StringBuilder buf;
@@ -168,38 +174,51 @@ void findRelevantTaggedNodePaths(MatchExpression* root, vector<string>* paths) {
             FAIL(ss);
         }
         paths->push_back(r->path);
+        for (auto const& index : r->first) {
+            indices->insert(index);
+        }
+        for (auto const& index : r->notFirst) {
+            indices->insert(index);
+        }
     }
     for (size_t i = 0; i < root->numChildren(); ++i) {
-        findRelevantTaggedNodePaths(root->getChild(i), paths);
+        findRelevantTaggedNodePathsAndIndices(root->getChild(i), paths, indices);
     }
 }
 
 /**
- * Parses a MatchExpression from query string and passes that along with
- * prefix to rateIndices.
- * Verifies results against list of expected paths.
- * For now, we're only interested in which nodes are tagged.
- * In future, we may expand this test function to include
- * validate which indices are assigned to a node.
+ * Parses a MatchExpression from query string and passes that along with prefix, collator, and
+ * indices to rateIndices. Verifies results against list of expected paths and expected indices. In
+ * future, we may expand this test function to validate which indices are assigned to which node.
  */
-void testRateIndicesTaggedNodePaths(const char* query,
-                                    const char* prefix,
-                                    const char* expectedPathsStr) {
+void testRateIndices(const char* query,
+                     const char* prefix,
+                     const CollatorInterface* collator,
+                     const vector<IndexEntry>& indices,
+                     const char* expectedPathsStr,
+                     const std::set<size_t>& expectedIndices) {
     // Parse and rate query. Some of the nodes in the rated tree
     // will be tagged after the rating process.
     BSONObj obj = fromjson(query);
     unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
 
-    // Currently, we tag every indexable node even when no compatible
-    // index is available. Hence, it is fine to pass an empty vector of
-    // indices to rateIndices().
-    vector<IndexEntry> indices;
-    QueryPlannerIXSelect::rateIndices(expr.get(), prefix, indices);
+    QueryPlannerIXSelect::rateIndices(expr.get(), prefix, indices, collator);
 
-    // Retrieve a list of paths embedded in
+    // Retrieve a list of paths and a set of indices embedded in
     // tagged nodes.
     vector<string> paths;
-    findRelevantTaggedNodePaths(expr.get(), &paths);
+    std::set<size_t> actualIndices;
+    findRelevantTaggedNodePathsAndIndices(expr.get(), &paths, &actualIndices);
+
+    // Compare the expected indices with the actual indices.
+    if (actualIndices != expectedIndices) {
+        mongoutils::str::stream ss;
+        ss << "rateIndices(query=" << query << ", prefix=" << prefix
+           << "): expected indices did not match actual indices. expected: "
+           << toString(expectedIndices.begin(), expectedIndices.end())
+           << ". actual: " << toString(actualIndices.begin(), actualIndices.end());
+        FAIL(ss);
+    }
 
     // Compare with expected list of paths.
     // First verify number of paths retrieved.
@@ -227,6 +246,21 @@ void testRateIndicesTaggedNodePaths(const char* query,
            << toString(paths.begin(), paths.end());
         FAIL(ss);
     }
+}
+
+/**
+ * Calls testRateIndices with an empty set of indices and a null collation, so we only test which
+ * nodes are tagged.
+ */
+void testRateIndicesTaggedNodePaths(const char* query,
+                                    const char* prefix,
+                                    const char* expectedPathsStr) {
+    // Currently, we tag every indexable node even when no compatible
+    // index is available. Hence, it is fine to pass an empty vector of
+    // indices to rateIndices().
+    vector<IndexEntry> indices;
+    std::set<size_t> expectedIndices;
+    testRateIndices(query, prefix, nullptr, indices, expectedPathsStr, expectedIndices);
 }
 
 /**
@@ -267,6 +301,684 @@ TEST(QueryPlannerIXSelectTest, RateIndicesTaggedNodePathsNegation) {
 TEST(QueryPlannerIXSelectTest, RateIndicesTaggedNodePathArrayNegation) {
     testRateIndicesTaggedNodePaths("{a: {$elemMatch: {b: {$ne: 1}}}}", "", "a.b,a.b");
     testRateIndicesTaggedNodePaths("{a: {$all: [{$elemMatch: {b: {$ne: 1}}}]}}", "", "a.b,a.b");
+}
+
+/**
+ * $not within $elemMatch should not attempt to use a sparse index for $exists:false.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchNotExistsShouldNotUseSparseIndex) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    idxEntry.sparse = true;
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$elemMatch: {$not: {$exists: true}}}}",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "",
+                    expectedIndices);
+}
+
+/**
+ * $in with a null value within $elemMatch can use a sparse index.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchInNullValueShouldUseSparseIndex) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    idxEntry.sparse = true;
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: {$elemMatch: {$in: [null]}}}", "", kSimpleCollator, indices, "a", expectedIndices);
+}
+
+/**
+ * $geo queries within $elemMatch should not use a normal B-tree index.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchGeoShouldNotUseBtreeIndex) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices;
+    testRateIndices(R"({a: {$elemMatch: {$geoWithin: {$geometry: {type: 'Polygon', 
+                      coordinates: [[[0,0],[0,1],[1,0],[0,0]]]}}}}})",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "a",
+                    expectedIndices);
+}
+
+/**
+ * $eq with a null value within $elemMatch can use a sparse index.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchEqNullValueShouldUseSparseIndex) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    idxEntry.sparse = true;
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: {$elemMatch: {$eq: null}}}", "", kSimpleCollator, indices, "a", expectedIndices);
+}
+
+/**
+ * $elemMatch with multiple children will not use an index if any child is incompatible.
+ */
+TEST(QueryPlannerIXSelectTest, ElemMatchMultipleChildrenShouldRequireAllToBeCompatible) {
+    std::vector<IndexEntry> indices;
+    auto idxEntry = IndexEntry(BSON("a" << 1));
+    idxEntry.sparse = true;
+    indices.push_back(idxEntry);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$elemMatch: {$eq: null, $not: {$exists: true}}}}",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "",
+                    expectedIndices);
+}
+
+/**
+ * If the collator is null, we select the relevant index with a null collator.
+ */
+TEST(QueryPlannerIXSelectTest, NullCollatorsMatch) {
+    std::vector<IndexEntry> indices;
+    indices.push_back(IndexEntry(BSON("a" << 1)));
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: 'string'}", "", nullptr, indices, "a", expectedIndices);
+}
+
+/**
+ * If the collator is not null, we do not select the relevant index with a null collator.
+ */
+TEST(QueryPlannerIXSelectTest, NonNullCollatorDoesNotMatchIndexWithNullCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    std::vector<IndexEntry> indices;
+    indices.push_back(IndexEntry(BSON("a" << 1)));
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: 'string'}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If the collator is null, we do not select the relevant index with a non-null collator.
+ */
+TEST(QueryPlannerIXSelectTest, NullCollatorDoesNotMatchIndexWithNonNullCollator) {
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: 'string'}", "", nullptr, indices, "a", expectedIndices);
+}
+
+/**
+ * If the collator is non-null, we select the relevant index with an equal collator.
+ */
+TEST(QueryPlannerIXSelectTest, EqualCollatorsMatch) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: 'string'}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If the collator is non-null, we do not select the relevant index with an unequal collator.
+ */
+TEST(QueryPlannerIXSelectTest, UnequalCollatorsDoNotMatch) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: 'string'}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If no string comparison is done, unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparison) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: 1}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt string comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, StringGTUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$gt: 'string'}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt string comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, StringGTEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$gt: 'string'}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt array comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, ArrayGTUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$gt: ['string']}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt array comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, ArrayGTEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$gt: ['string']}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt object comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, NestedObjectGTUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$gt: {b: 'string'}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt object comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, NestedObjectGTEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$gt: {b : 'string'}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gte string comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, StringGTEUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$gte: 'string'}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gte string comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, StringGTEEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$gte: 'string'}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $lt string comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, StringLTUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$lt: 'string'}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $lt string comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, StringLTEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$lt: 'string'}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $lte string comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, StringLTEUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$lte: 'string'}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $lte string comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, StringLTEEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$lte: 'string'}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If no string comparison is done in an 'in' expression, unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparisonInExpression) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$in: [1, 2]}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'in' expression, matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonInExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$in: [1, 2, 'b', 3]}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'in' expression, matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonInExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$in: [1, 2, 'b', 3]}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If no string comparison is done in a 'not' expression, unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparisonNotExpression) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$not: {$gt: 1}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in a 'not' expression, matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonNotExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$not: {$gt: 'a'}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in a 'not' expression, matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonNotExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$not: {$gt: 'a'}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If no string comparison is done in an elemMatch value, unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparisonElemMatchValueExpression) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$elemMatch: {$gt: 1}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an elemMatch value, matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonElemMatchValueExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices(
+        "{a: {$elemMatch: {$gt: 'string'}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an elemMatch value, matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonElemMatchValueExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: {$elemMatch: {$gt: 'string'}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If no string comparison is done in an 'in' in a 'not', unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparisonNotInExpression) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$not: {$in: [1]}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'in' in a 'not', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonNotInExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$not: {$in: ['a']}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'in' in a 'not', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonNotInExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$not: {$in: ['a']}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If no string comparison is done in a 'nin', unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparisonNinExpression) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$nin: [1]}}", "", &collator, indices, "a,a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in a 'nin', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonNinExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$nin: ['a']}}", "", &collator, indices, "a,a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in a 'nin', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonNinExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$nin: ['a']}}", "", &collator, indices, "a,a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'or', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonOrExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{$or: [{a: 'string'}]}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'or', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonOrExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{$or: [{a: 'string'}]}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'and', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonAndExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{$and: [{a: 'string'}]}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'and', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonAndExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{$and: [{a: 'string'}]}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'all', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonAllExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$all: ['string']}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an 'all', matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonAllExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$all: ['string']}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an elemMatch object, matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonElemMatchObjectExpressionUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a.b" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices(
+        "{a: {$elemMatch: {b: 'string'}}}", "", &collator, indices, "a.b", expectedIndices);
+}
+
+/**
+ * If string comparison is done in an elemMatch object, matching collators are required.
+ */
+TEST(QueryPlannerIXSelectTest, StringComparisonElemMatchObjectExpressionEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a.b" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: {$elemMatch: {b: 'string'}}}", "", &collator, indices, "a.b", expectedIndices);
+}
+
+/**
+ * If no string comparison is done in a query containing $mod, unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparisonMod) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$mod: [2, 0]}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If no string comparison is done in a query containing $exists, unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparisonExists) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$exists: true}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * If no string comparison is done in a query containing $type, unequal collators are allowed.
+ */
+TEST(QueryPlannerIXSelectTest, NoStringComparisonType) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    std::set<std::string> testPatterns = {
+        "{a: {$type: 'string'}}", "{a: {$type: 'object'}}", "{a: {$type: 'array'}}"};
+    for (const auto& pattern : testPatterns) {
+        testRateIndices(pattern.c_str(), "", &collator, indices, "a", expectedIndices);
+    }
 }
 
 }  // namespace

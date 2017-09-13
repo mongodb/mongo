@@ -27,9 +27,16 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/global_timestamp.h"
+
+#include <vector>
+
+#include "mongo/bson/bson_depth.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -38,18 +45,58 @@ using std::string;
 
 using namespace mongoutils;
 
-StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
+namespace {
+/**
+ * Validates the nesting depth of 'obj', returning a non-OK status if it exceeds the limit.
+ */
+Status validateDepth(const BSONObj& obj) {
+    std::vector<BSONObjIterator> frames;
+    frames.reserve(16);
+    frames.emplace_back(obj);
+
+    while (!frames.empty()) {
+        const auto elem = frames.back().next();
+        if (elem.type() == BSONType::Object || elem.type() == BSONType::Array) {
+            if (MONGO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage())) {
+                // We're exactly at the limit, so descending to the next level would exceed
+                // the maximum depth.
+                return {ErrorCodes::Overflow,
+                        str::stream() << "cannot insert document because it exceeds "
+                                      << BSONDepth::getMaxDepthForUserStorage()
+                                      << " levels of nesting"};
+            }
+            frames.emplace_back(elem.embeddedObject());
+        }
+
+        if (!frames.back().more()) {
+            frames.pop_back();
+        }
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
+StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj& doc) {
     if (doc.objsize() > BSONObjMaxUserSize)
         return StatusWith<BSONObj>(ErrorCodes::BadValue,
                                    str::stream() << "object to insert too large"
-                                                 << ". size in bytes: " << doc.objsize()
-                                                 << ", max size: " << BSONObjMaxUserSize);
+                                                 << ". size in bytes: "
+                                                 << doc.objsize()
+                                                 << ", max size: "
+                                                 << BSONObjMaxUserSize);
 
-    bool firstElementIsId = doc.firstElement().fieldNameStringData() == "_id";
+    auto depthStatus = validateDepth(doc);
+    if (!depthStatus.isOK()) {
+        return depthStatus;
+    }
+
+    bool firstElementIsId = false;
     bool hasTimestampToFix = false;
+    bool hadId = false;
     {
         BSONObjIterator i(doc);
-        while (i.more()) {
+        for (bool isFirstElement = true; i.more(); isFirstElement = false) {
             BSONElement e = i.next();
 
             if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
@@ -58,18 +105,18 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
                 hasTimestampToFix = true;
             }
 
-            const char* fieldName = e.fieldName();
+            auto fieldName = e.fieldNameStringData();
 
             if (fieldName[0] == '$') {
-                return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                           str::stream()
-                                               << "Document can't have $ prefixed field names: "
-                                               << e.fieldName());
+                return StatusWith<BSONObj>(
+                    ErrorCodes::BadValue,
+                    str::stream() << "Document can't have $ prefixed field names: " << fieldName);
             }
 
             // check no regexp for _id (SERVER-9502)
             // also, disallow undefined and arrays
-            if (str::equals(fieldName, "_id")) {
+            // Make sure _id isn't duplicated (SERVER-19361).
+            if (fieldName == "_id") {
                 if (e.type() == RegEx) {
                     return StatusWith<BSONObj>(ErrorCodes::BadValue, "can't use a regex for _id");
                 }
@@ -86,14 +133,19 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
                     if (!s.isOK())
                         return StatusWith<BSONObj>(s);
                 }
+                if (hadId) {
+                    return StatusWith<BSONObj>(ErrorCodes::BadValue,
+                                               "can't have multiple _id fields in one document");
+                } else {
+                    hadId = true;
+                    firstElementIsId = isFirstElement;
+                }
             }
         }
     }
 
     if (firstElementIsId && !hasTimestampToFix)
         return StatusWith<BSONObj>(BSONObj());
-
-    bool hadId = firstElementIsId;
 
     BSONObjIterator i(doc);
 
@@ -105,7 +157,6 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
         BSONElement e = doc["_id"];
         if (e.type()) {
             b.append(e);
-            hadId = true;
         } else {
             b.appendOID("_id", NULL, true);
         }
@@ -116,7 +167,8 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
         if (hadId && e.fieldNameStringData() == "_id") {
             // no-op
         } else if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
-            b.append(e.fieldName(), getNextGlobalTimestamp());
+            auto nextTime = LogicalClock::get(service)->reserveTicks(1);
+            b.append(e.fieldName(), nextTime.asTimestamp());
         } else {
             b.append(e);
         }
@@ -134,7 +186,7 @@ Status userAllowedWriteNS(const NamespaceString& ns) {
 
 Status userAllowedWriteNS(StringData db, StringData coll) {
     if (coll == "system.profile") {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to '" << db << ".system.profile'");
     }
     return userAllowedCreateNS(db, coll);
@@ -144,27 +196,29 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     // validity checking
 
     if (db.size() == 0)
-        return Status(ErrorCodes::BadValue, "db cannot be blank");
+        return Status(ErrorCodes::InvalidNamespace, "db cannot be blank");
 
-    if (!NamespaceString::validDBName(db))
-        return Status(ErrorCodes::BadValue, "invalid db name");
+    if (!NamespaceString::validDBName(db, NamespaceString::DollarInDbNameBehavior::Allow))
+        return Status(ErrorCodes::InvalidNamespace, "invalid db name");
 
     if (coll.size() == 0)
-        return Status(ErrorCodes::BadValue, "collection cannot be blank");
+        return Status(ErrorCodes::InvalidNamespace, "collection cannot be blank");
 
     if (!NamespaceString::validCollectionName(coll))
-        return Status(ErrorCodes::BadValue, "invalid collection name");
+        return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
 
     if (db.size() + 1 /* dot */ + coll.size() > NamespaceString::MaxNsCollectionLen)
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "fully qualified namespace " << db << '.' << coll << " is too long "
-                          << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)");
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "fully qualified namespace " << db << '.' << coll
+                                    << " is too long "
+                                    << "(max is "
+                                    << NamespaceString::MaxNsCollectionLen
+                                    << " bytes)");
 
     // check spceial areas
 
     if (db == "system")
-        return Status(ErrorCodes::BadValue, "cannot use 'system' database");
+        return Status(ErrorCodes::InvalidNamespace, "cannot use 'system' database");
 
 
     if (coll.startsWith("system.")) {
@@ -176,8 +230,12 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
             return Status::OK();
         if (coll == "system.users")
             return Status::OK();
+        if (coll == DurableViewCatalog::viewsCollectionName())
+            return Status::OK();
         if (db == "admin") {
             if (coll == "system.version")
+                return Status::OK();
+            if (coll == "system.sessions")
                 return Status::OK();
             if (coll == "system.roles")
                 return Status::OK();
@@ -185,12 +243,16 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
                 return Status::OK();
             if (coll == "system.backup_users")
                 return Status::OK();
+            if (coll == "system.keys")
+                return Status::OK();
         }
         if (db == "local") {
             if (coll == "system.replset")
                 return Status::OK();
+            if (coll == "system.healthlog")
+                return Status::OK();
         }
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to '" << db << "." << coll << "'");
     }
 

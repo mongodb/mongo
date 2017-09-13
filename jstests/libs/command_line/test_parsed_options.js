@@ -4,26 +4,22 @@
 function mergeOptions(obj1, obj2) {
     var obj3 = {};
     for (var attrname in obj1) {
-        if (typeof obj1[attrname] === "object" &&
-            typeof obj2[attrname] !== "undefined") {
+        if (typeof obj1[attrname] === "object" && typeof obj2[attrname] !== "undefined") {
             if (typeof obj2[attrname] !== "object") {
                 throw Error("Objects being merged must have the same structure");
             }
             obj3[attrname] = mergeOptions(obj1[attrname], obj2[attrname]);
-        }
-        else {
+        } else {
             obj3[attrname] = obj1[attrname];
         }
     }
     for (var attrname in obj2) {
-        if (typeof obj2[attrname] === "object" &&
-            typeof obj1[attrname] !== "undefined") {
+        if (typeof obj2[attrname] === "object" && typeof obj1[attrname] !== "undefined") {
             if (typeof obj1[attrname] !== "object") {
                 throw Error("Objects being merged must have the same structure");
             }
             // Already handled above
-        }
-        else {
+        } else {
             obj3[attrname] = obj2[attrname];
         }
     }
@@ -45,12 +41,10 @@ function mergeOptions(obj1, obj2) {
 //
 var getCmdLineOptsBaseMongod;
 function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
-
     // Get the options object returned by "getCmdLineOpts" when we spawn a mongod using our test
     // framework without passing any additional options.  We need this because the framework adds
     // options of its own, and we only want to compare against the options we care about.
     function getBaseOptsObject() {
-
         // Start mongod with no options
         var baseMongod = MongoRunner.runMongod();
 
@@ -58,7 +52,7 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
         var getCmdLineOptsBaseMongod = baseMongod.adminCommand("getCmdLineOpts");
 
         // Stop the mongod we used to get the options
-        MongoRunner.stopMongod(baseMongod.port);
+        MongoRunner.stopMongod(baseMongod);
 
         return getCmdLineOptsBaseMongod;
     }
@@ -96,8 +90,7 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
     try {
         mongod.getDB("admin").createUser({user: "root", pwd: "pass", roles: ["root"]});
         mongod.getDB("admin").auth("root", "pass");
-    }
-    catch (ex) {
+    } catch (ex) {
     }
 
     // Get the parsed options
@@ -121,7 +114,7 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
 
     // Cleanup
     mongod.getDB("admin").logout();
-    MongoRunner.stopMongod(mongod.port);
+    MongoRunner.stopMongod(mongod);
 }
 
 // Test that the parsed result of setting certain command line options has the correct format in
@@ -139,16 +132,29 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
 //
 var getCmdLineOptsBaseMongos;
 function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
+    "use strict";
 
     // Get the options object returned by "getCmdLineOpts" when we spawn a mongos using our test
     // framework without passing any additional options.  We need this because the framework adds
     // options of its own, and we only want to compare against the options we care about.
     function getCmdLineOptsFromMongos(mongosOptions) {
         // Start mongod with no options
-        var baseMongod1 = MongoRunner.runMongod();
-        var baseMongod2 = MongoRunner.runMongod();
-        var baseMongod3 = MongoRunner.runMongod();
-        var configdbStr = baseMongod1.host + "," + baseMongod2.host + "," + baseMongod3.host;
+        var baseMongod = MongoRunner.runMongod(
+            {configsvr: "", journal: "", replSet: "csrs", storageEngine: "wiredTiger"});
+        assert.commandWorked(baseMongod.adminCommand({
+            replSetInitiate:
+                {_id: "csrs", configsvr: true, members: [{_id: 0, host: baseMongod.host}]}
+        }));
+        var configdbStr = "csrs/" + baseMongod.host;
+        var ismasterResult;
+        assert.soon(
+            function() {
+                ismasterResult = baseMongod.adminCommand("ismaster");
+                return ismasterResult.ismaster;
+            },
+            function() {
+                return tojson(ismasterResult);
+            });
 
         var options = Object.merge(mongosOptions, {configdb: configdbStr});
         var baseMongos = MongoRunner.runMongos(options);
@@ -161,9 +167,7 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
 
         // Stop the mongod and mongos we used to get the options
         MongoRunner.stopMongos(baseMongos);
-        MongoRunner.stopMongod(baseMongod1);
-        MongoRunner.stopMongod(baseMongod2);
-        MongoRunner.stopMongod(baseMongod3);
+        MongoRunner.stopMongod(baseMongod);
 
         return getCmdLineOptsResult;
     }

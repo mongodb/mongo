@@ -28,22 +28,26 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
+#include "mongo/db/repl/optime.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-class BSONObj;
+class BalancerConfiguration;
 class CatalogCache;
-class CatalogManager;
-class DBConfig;
-class SettingsType;
+class ShardingCatalogClient;
+class ClusterCursorManager;
+class OperationContext;
+class ServiceContext;
 class ShardRegistry;
-template <typename T>
-class StatusWith;
 
+namespace executor {
+struct ConnectionPoolStats;
+class NetworkInterface;
+class TaskExecutorPool;
+}  // namespace executor
 
 /**
  * Holds the global sharding context. Single instance exists for a running server. Exists on
@@ -52,72 +56,138 @@ class StatusWith;
 class Grid {
 public:
     Grid();
+    ~Grid();
+
+    using CustomConnectionPoolStatsFn = stdx::function<void(executor::ConnectionPoolStats* stats)>;
 
     /**
-     * Called at startup time so the global sharding services (catalog manager, shard registry)
-     * can be set. This method must be called once and once only for the lifetime of the
-     * service.
+     * Retrieves the instance of Grid associated with the current service/operation context.
+     */
+    static Grid* get(ServiceContext* serviceContext);
+    static Grid* get(OperationContext* operationContext);
+
+    /**
+     * Called at startup time so the global sharding services can be set. This method must be called
+     * once and once only for the lifetime of the service.
      *
      * NOTE: Unit-tests are allowed to call it more than once, provided they reset the object's
      *       state using clearForUnitTests.
      */
-    void init(std::unique_ptr<CatalogManager> catalogManager,
-              std::unique_ptr<ShardRegistry> shardRegistry);
+    void init(std::unique_ptr<ShardingCatalogClient> catalogClient,
+              std::unique_ptr<CatalogCache> catalogCache,
+              std::unique_ptr<ShardRegistry> shardRegistry,
+              std::unique_ptr<ClusterCursorManager> cursorManager,
+              std::unique_ptr<BalancerConfiguration> balancerConfig,
+              std::unique_ptr<executor::TaskExecutorPool> executorPool,
+              executor::NetworkInterface* network);
 
     /**
-     * Implicitly creates the specified database as non-sharded.
+     * If the instance as which this sharding component is running (config/shard/mongos) uses
+     * additional connection pools other than the default, this function will be present and can be
+     * used to obtain statistics about them. Otherwise, the value will be unset.
      */
-    StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(const std::string& dbName);
+    CustomConnectionPoolStatsFn getCustomConnectionPoolStatsFn() const;
+    void setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn);
 
     /**
+     * Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
+     * it can be deleted.
      * @return true if shards and config servers are allowed to use 'localhost' in address
      */
     bool allowLocalHost() const;
 
     /**
+     * Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
+     * it can be deleted.
      * @param whether to allow shards and config servers to use 'localhost' in address
      */
     void setAllowLocalHost(bool allow);
 
-    /**
-     * Returns true if the balancer should be running. Caller is responsible
-     * for making sure settings has the balancer key.
-     */
-    bool shouldBalance(const SettingsType& balancerSettings) const;
-
-    /**
-     * Returns true if the config server settings indicate that the balancer should be active.
-     */
-    bool getConfigShouldBalance() const;
-
-    CatalogManager* catalogManager() const {
-        return _catalogManager.get();
+    ShardingCatalogClient* catalogClient() const {
+        return _catalogClient.get();
     }
+
     CatalogCache* catalogCache() const {
         return _catalogCache.get();
     }
+
     ShardRegistry* shardRegistry() const {
         return _shardRegistry.get();
     }
+
+    ClusterCursorManager* getCursorManager() const {
+        return _cursorManager.get();
+    }
+
+    executor::TaskExecutorPool* getExecutorPool() const {
+        return _executorPool.get();
+    }
+
+    executor::NetworkInterface* getNetwork() {
+        return _network;
+    }
+
+    BalancerConfiguration* getBalancerConfiguration() const {
+        return _balancerConfig.get();
+    }
+
+    /**
+     * Returns the the last optime that a shard or config server has reported as the current
+     * committed optime on the config server.
+     * NOTE: This is not valid to call on a config server instance.
+     */
+    repl::OpTime configOpTime() const;
+
+    /**
+     * Called whenever a mongos or shard gets a response from a config server or shard and updates
+     * what we've seen as the last config server optime.
+     * NOTE: This is not valid to call on a config server instance.
+     */
+    void advanceConfigOpTime(repl::OpTime opTime);
 
     /**
      * Clears the grid object so that it can be reused between test executions. This will not
      * be necessary if grid is hanging off the global ServiceContext and each test gets its
      * own service context.
      *
+     * Note: shardRegistry()->shutdown() must be called before this method is called.
+     *
      * NOTE: Do not use this outside of unit-tests.
      */
     void clearForUnitTests();
 
 private:
-    std::unique_ptr<CatalogManager> _catalogManager;
+    std::unique_ptr<ShardingCatalogClient> _catalogClient;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
+    std::unique_ptr<ClusterCursorManager> _cursorManager;
+    std::unique_ptr<BalancerConfiguration> _balancerConfig;
 
-    // can 'localhost' be used in shard addresses?
-    bool _allowLocalShard;
+    // Executor pool for scheduling work and remote commands to shards and config servers. Each
+    // contained executor has a connection hook set on it for sending/receiving sharding metadata.
+    std::unique_ptr<executor::TaskExecutorPool> _executorPool;
+
+    // Network interface being used by the fixed executor in _executorPool.  Used for asking
+    // questions about the network configuration, such as getting the current server's hostname.
+    executor::NetworkInterface* _network{nullptr};
+
+    CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
+
+    // Protects _configOpTime.
+    mutable stdx::mutex _mutex;
+
+    // Last known highest opTime from the config server that should be used when doing reads.
+    // This value is updated any time a shard or mongos talks to a config server or a shard.
+    repl::OpTime _configOpTime;
+
+    // Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
+    // it can be deleted.
+    // Can 'localhost' be used in shard addresses?
+    bool _allowLocalShard{true};
 };
 
+// Reference to the global Grid instance. Do not use in new code. Use one of the Grid::get methods
+// instead.
 extern Grid grid;
 
 }  // namespace mongo

@@ -2,89 +2,65 @@
 
 Import('env')
 
-env.Library(
-    target='hostandport',
-    source=[
-        'hostandport.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
-    ],
-)
-
-env.CppUnitTest(
-    target='hostandport_test',
-    source=[
-        'hostandport_test.cpp'
-    ],
-    LIBDEPS=[
-        'hostandport',
-    ],
-)
-
-env.Library(
-    target='ssl_manager',
-    source=[
-        'ssl_manager.cpp',
-        'ssl_options.cpp',
-        'ssl_expiration.cpp',
-        ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        ],
-)
+env = env.Clone()
 
 env.Library(
     target='network',
     source=[
-        "httpclient.cpp",
+        "cidr.cpp",
+        "hostandport.cpp",
+        "hostname_canonicalization.cpp",
         "listen.cpp",
         "message.cpp",
         "message_port.cpp",
+        "op_msg.cpp",
+        "private/socket_poll.cpp",
+        "private/ssl_expiration.cpp",
         "sock.cpp",
-        "socket_poll.cpp",
+        "sockaddr.cpp",
+        "socket_exception.cpp",
+        "ssl_manager.cpp",
+        "ssl_options.cpp",
+        "thread_idle_callback.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/auth_rolename',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/mongo/util/decorable',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        'hostandport',
-        'ssl_manager'
+        '$BUILD_DIR/mongo/util/winutil',
     ],
 )
 
 env.CppUnitTest(
-    target='sock_test',
+    target='network_test',
     source=[
+        'cidr_test.cpp',
+        'hostandport_test.cpp',
+        'op_msg_test.cpp',
         'sock_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/concurrency/synchronization',
+        '$BUILD_DIR/mongo/util/fail_point',
         'network',
     ],
 )
 
-env.Library(
-    target="message_server_port",
+env.CppIntegrationTest(
+    target='op_msg_integration_test',
     source=[
-        "message_server_port.cpp",
+        'op_msg_integration_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/stats/counters',
-    ],
-)
-
-env.Library(
-    target='miniwebserver',
-    source=[
-        'miniwebserver.cpp',
-    ],
-    LIBDEPS=[
+        'network',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

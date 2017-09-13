@@ -27,10 +27,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/safe_num.h"
 
 namespace mongo {
@@ -257,7 +258,7 @@ public:
     bool hasValue() const;
 
     /** Returns true if this element is a numeric type (e.g. NumberLong). Currently, the
-     *  only numeric BSON types are NumberLong, NumberInt, and NumberDouble.
+     *  only numeric BSON types are NumberLong, NumberInt, NumberDouble, and NumberDecimal.
      */
     bool isNumeric() const;
 
@@ -323,6 +324,9 @@ public:
     /** Get the value from a long valued Element. */
     inline int64_t getValueLong() const;
 
+    /** Get the value from a decimal valued Element. */
+    inline Decimal128 getValueDecimal() const;
+
     /** Returns true if this Element is the min key type. */
     inline bool isValueMinKey() const;
 
@@ -346,7 +350,9 @@ public:
      *   Returns 0 if this == other either tautologically, or according to woCompare.
      *   Returns 1 if this > other according to BSONElement::woCompare
      */
-    int compareWithElement(const ConstElement& other, bool considerFieldName = true) const;
+    int compareWithElement(const ConstElement& other,
+                           const StringData::ComparatorInterface* comparator,
+                           bool considerFieldName = true) const;
 
     /** Compare this Element with BSONElement 'other'. You should not call this on the root
      *  Element of the Document because the root Element does not have a field name. Use
@@ -356,7 +362,9 @@ public:
      *   Returns 0 if this == other either tautologically, or according to woCompare.
      *   Returns 1 if this > other according to BSONElement::woCompare
      */
-    int compareWithBSONElement(const BSONElement& other, bool considerFieldName = true) const;
+    int compareWithBSONElement(const BSONElement& other,
+                               const StringData::ComparatorInterface* comparator,
+                               bool considerFieldName = true) const;
 
     /** Compare this Element, which must be an Object or an Array, with 'other'.
      *
@@ -364,7 +372,9 @@ public:
      *   Returns 0 if this object == other either tautologically, or according to woCompare.
      *   Returns 1 if this object > other according to BSONElement::woCompare
      */
-    int compareWithBSONObj(const BSONObj& other, bool considerFieldName = true) const;
+    int compareWithBSONObj(const BSONObj& other,
+                           const StringData::ComparatorInterface* comparator,
+                           bool considerFieldName = true) const;
 
 
     //
@@ -443,6 +453,9 @@ public:
     /** Set the value of this Element to the given long integer */
     Status setValueLong(int64_t value);
 
+    /** Set the value of this Element to the given decimal. */
+    Status setValueDecimal(Decimal128 value);
+
     /** Set the value of this Element to MinKey. */
     Status setValueMinKey();
 
@@ -465,6 +478,12 @@ public:
      *  SafeNum value.
      */
     Status setValueSafeNum(const SafeNum value);
+
+    /** Set the value of this Element to the value from another Element.
+     *
+     * The name of this Element is not modified.
+     */
+    Status setValueElement(ConstElement setFrom);
 
 
     //
@@ -565,6 +584,9 @@ public:
 
     /** Append the provided long integer as a new field with the provided name. */
     Status appendLong(StringData fieldName, int64_t value);
+
+    /** Append the provided decimal as a new field with the provided name. */
+    Status appendDecimal(StringData fieldName, Decimal128 value);
 
     /** Append a max key as a new field with the provided name. */
     Status appendMinKey(StringData fieldName);

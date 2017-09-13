@@ -31,22 +31,11 @@
 
 #pragma once
 
-
-#include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-
-class OperationContext;
-
 namespace repl {
-
-class ReplicationCoordinator;
-class OpTime;
-
-// {"$natural": -1 }
-extern const BSONObj reverseNaturalObj;
 
 /**
  * Authenticates conn using the server's cluster-membership credentials.
@@ -86,12 +75,15 @@ public:
     BSONObj findOne(const char* ns, const Query& q) {
         return conn()->findOne(ns, q, 0, QueryOption_SlaveOk);
     }
-    BSONObj getLastOp(const std::string& ns) {
-        return findOne(ns.c_str(), Query().sort(reverseNaturalObj));
+    BSONObj findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter) {
+        // Note that the findOneByUUID() function of DBClient passes SlaveOK to the client.
+        BSONObj foundDoc;
+        std::tie(foundDoc, std::ignore) = conn()->findOneByUUID(db, uuid, filter);
+        return foundDoc;
     }
 
     /* SO_TIMEOUT (send/recv time out) for our DBClientConnections */
-    static const int tcp_timeout = 30;
+    static const Seconds kSocketTimeout;
 
     /* ok to call if already connected */
     bool connect(const HostAndPort& host);
@@ -102,11 +94,7 @@ public:
         return cursor.get() != 0;
     }
 
-    void query(const char* ns, Query query, int nToReturn, int nToSkip, const BSONObj* fields = 0);
-
     void tailingQuery(const char* ns, const BSONObj& query);
-
-    void tailingQueryGTE(const char* ns, Timestamp t);
 
     bool more() {
         uassert(15910, "Doesn't have cursor for reading oplog", cursor.get());
@@ -118,19 +106,9 @@ public:
         return cursor->moreInCurrentBatch();
     }
 
-    int currentBatchMessageSize() {
-        if (NULL == cursor->getMessage())
-            return 0;
-        return cursor->getMessage()->size();
-    }
-
     BSONObj nextSafe() {
         return cursor->nextSafe();
     }
-    BSONObj next() {
-        return cursor->next();
-    }
-
 
     // master/slave only
     void peek(std::vector<BSONObj>& v, int n) {
@@ -142,21 +120,6 @@ public:
     void putBack(BSONObj op) {
         cursor->putBack(op);
     }
-
-    HostAndPort getHost() const;
-
-    /**
-     * Connects this OplogReader to a valid sync source, using the provided lastOpTimeFetched
-     * and ReplicationCoordinator objects.
-     * If this function fails to connect to a sync source that is viable, this OplogReader
-     * is left unconnected, where this->conn() equals NULL.
-     * In the process of connecting, this function may add items to the repl coordinator's
-     * sync source blacklist.
-     * This function may throw DB exceptions.
-     */
-    void connectToSyncSource(OperationContext* txn,
-                             const OpTime& lastOpTimeFetched,
-                             ReplicationCoordinator* replCoord);
 };
 
 }  // namespace repl

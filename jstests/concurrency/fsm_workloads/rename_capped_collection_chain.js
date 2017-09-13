@@ -7,7 +7,7 @@
  * command against it. The previous "to" namespace is used as the next "from"
  * namespace.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = (function() {
 
@@ -27,10 +27,7 @@ var $config = (function() {
             this.fromCollName = uniqueCollectionName(this.prefix, this.tid, 0);
             this.num = 1;
 
-            var options = {
-                capped: true,
-                size: 4096
-            };
+            var options = {capped: true, size: 4096};
 
             assertAlways.commandWorked(db.createCollection(this.fromCollName, options));
             assertWhenOwnDB(db[this.fromCollName].isCapped());
@@ -44,17 +41,11 @@ var $config = (function() {
             this.fromCollName = toCollName;
         }
 
-        return {
-            init: init,
-            rename: rename
-        };
+        return {init: init, rename: rename};
 
     })();
 
-    var transitions = {
-        init: { rename: 1 },
-        rename: { rename: 1 }
-    };
+    var transitions = {init: {rename: 1}, rename: {rename: 1}};
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');

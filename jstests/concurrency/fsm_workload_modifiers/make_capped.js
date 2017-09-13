@@ -14,13 +14,12 @@
  */
 
 function makeCapped($config, $super) {
-
     $config.setup = function setup(db, collName, cluster) {
         assertWhenOwnColl(function() {
             db[collName].drop();
             assertAlways.commandWorked(db.createCollection(collName, {
                 capped: true,
-                size: 16384 // bytes
+                size: 16384  // bytes
             }));
         });
 
@@ -35,6 +34,14 @@ function makeCapped($config, $super) {
                 // failures due to collection truncation
                 globalAssertLevel = AssertLevel.ALWAYS;
                 $super.states.find.apply(this, arguments);
+            } catch (e) {
+                if (e.message.indexOf('CappedPositionLost') >= 0) {
+                    // Ignore errors when a cursor's position in the capped collection is deleted.
+                    // Reads from the beginning of a capped collection are not guaranteed to succeed
+                    // when there are concurrent inserts that cause a truncation.
+                    return;
+                }
+                throw e;
             } finally {
                 globalAssertLevel = oldAssertLevel;
             }

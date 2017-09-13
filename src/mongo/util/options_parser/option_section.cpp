@@ -90,14 +90,14 @@ OptionDescription& OptionSection::addOptionChaining(
         if (option._dottedName == oditerator->_dottedName) {
             StringBuilder sb;
             sb << "Attempted to register option with duplicate dottedName: " << option._dottedName;
-            throw DBException(sb.str(), ErrorCodes::InternalError);
+            throw DBException(ErrorCodes::InternalError, sb.str());
         }
         // Allow options with empty singleName since some options are not allowed on the command
         // line
         if (!option._singleName.empty() && option._singleName == oditerator->_singleName) {
             StringBuilder sb;
             sb << "Attempted to register option with duplicate singleName: " << option._singleName;
-            throw DBException(sb.str(), ErrorCodes::InternalError);
+            throw DBException(ErrorCodes::InternalError, sb.str());
         }
         // Deprecated dotted names should not conflict with dotted names or deprecated dotted
         // names of any other options.
@@ -107,7 +107,7 @@ OptionDescription& OptionSection::addOptionChaining(
             StringBuilder sb;
             sb << "Attempted to register option with duplicate deprecated dotted name "
                << "(with another option's dotted name): " << option._dottedName;
-            throw DBException(sb.str(), ErrorCodes::BadValue);
+            throw DBException(ErrorCodes::BadValue, sb.str());
         }
         for (std::vector<std::string>::const_iterator i =
                  oditerator->_deprecatedDottedNames.begin();
@@ -119,7 +119,7 @@ OptionDescription& OptionSection::addOptionChaining(
                 StringBuilder sb;
                 sb << "Attempted to register option with duplicate deprecated dotted name " << *i
                    << " (other option " << oditerator->_dottedName << ")";
-                throw DBException(sb.str(), ErrorCodes::BadValue);
+                throw DBException(ErrorCodes::BadValue, sb.str());
             }
         }
     }
@@ -474,7 +474,7 @@ Status OptionSection::getAllOptions(std::vector<OptionDescription>* options) con
 
     std::list<OptionSection>::const_iterator ositerator;
     for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
-        ositerator->getAllOptions(options);
+        ositerator->getAllOptions(options).transitional_ignore();
     }
 
     return Status::OK();
@@ -490,7 +490,7 @@ Status OptionSection::getDefaults(std::map<Key, Value>* values) const {
 
     std::list<OptionSection>::const_iterator ositerator;
     for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
-        ositerator->getDefaults(values);
+        ositerator->getDefaults(values).transitional_ignore();
     }
 
     return Status::OK();
@@ -511,7 +511,7 @@ Status OptionSection::countOptions(int* numOptions, bool visibleOnly, OptionSour
     std::list<OptionSection>::const_iterator ositerator;
     for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
         int numSubOptions = 0;
-        ositerator->countOptions(&numSubOptions, visibleOnly, sources);
+        ositerator->countOptions(&numSubOptions, visibleOnly, sources).transitional_ignore();
         *numOptions += numSubOptions;
     }
 
@@ -531,7 +531,7 @@ Status OptionSection::getConstraints(std::vector<std::shared_ptr<Constraint>>* c
 
     std::list<OptionSection>::const_iterator ositerator;
     for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
-        ositerator->getConstraints(constraints);
+        ositerator->getConstraints(constraints).transitional_ignore();
     }
 
     return Status::OK();

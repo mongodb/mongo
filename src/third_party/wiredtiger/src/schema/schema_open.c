@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -20,8 +20,8 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 {
 	const char *tablename;
 
-	tablename = table->name;
-	(void)WT_PREFIX_SKIP(tablename, "table:");
+	tablename = table->iface.name;
+	WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 
 	return ((table->ncolgroups == 0) ?
 	    __wt_buf_fmt(session, buf, "colgroup:%s", tablename) :
@@ -54,7 +54,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 
-	WT_ERR(__wt_config_subinit(session, &cparser, &table->cgconf));
+	__wt_config_subinit(session, &cparser, &table->cgconf);
 
 	/* Open each column group. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -100,17 +100,16 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 		WT_ERR(__wt_buf_init(session, buf, 0));
 		WT_ERR(__wt_struct_plan(session,
-		    table, table->colconf.str, table->colconf.len, 1, buf));
+		    table, table->colconf.str, table->colconf.len, true, buf));
 		WT_ERR(__wt_strndup(
 		    session, buf->data, buf->size, &table->plan));
 	}
 
-	table->cg_complete = 1;
+	table->cg_complete = true;
 
 err:	__wt_scr_free(session, &buf);
 	__wt_schema_destroy_colgroup(session, &colgroup);
-	if (cgconfig != NULL)
-		__wt_free(session, cgconfig);
+	__wt_free(session, cgconfig);
 	return (ret);
 }
 
@@ -176,7 +175,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	    session, idx->config, "columns", &idx->colconf));
 
 	/* Start with the declared index columns. */
-	WT_ERR(__wt_config_subinit(session, &colconf, &idx->colconf));
+	__wt_config_subinit(session, &colconf, &idx->colconf);
 	for (npublic_cols = 0;
 	    (ret = __wt_config_next(&colconf, &ckey, &cval)) == 0;
 	    ++npublic_cols)
@@ -203,7 +202,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	 * Now add any primary key columns from the table that are not
 	 * already part of the index key.
 	 */
-	WT_ERR(__wt_config_subinit(session, &colconf, &table->colconf));
+	__wt_config_subinit(session, &colconf, &table->colconf);
 	for (i = 0; i < table->nkey_columns &&
 	    (ret = __wt_config_next(&colconf, &ckey, &cval)) == 0;
 	    i++) {
@@ -228,7 +227,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 		goto err;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &plan));
-	WT_ERR(__wt_struct_plan(session, table, buf->data, buf->size, 0, plan));
+	WT_ERR(__wt_struct_plan(
+	    session, table, buf->data, buf->size, false, plan));
 	WT_ERR(__wt_strndup(session, plan->data, plan->size, &idx->key_plan));
 
 	/* Set up the cursor key format (the visible columns). */
@@ -250,7 +250,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	/* TODO Optimize to use index columns in preference to table lookups. */
 	WT_ERR(__wt_buf_init(session, plan, 0));
 	WT_ERR(__wt_struct_plan(session,
-	    table, table->colconf.str, table->colconf.len, 1, plan));
+	    table, table->colconf.str, table->colconf.len, true, plan));
 	WT_ERR(__wt_strndup(session, plan->data, plan->size, &idx->value_plan));
 
 err:	__wt_scr_free(session, &buf);
@@ -259,11 +259,11 @@ err:	__wt_scr_free(session, &buf);
 }
 
 /*
- * __wt_schema_open_index --
- *	Open one or more indices for a table.
+ * __schema_open_index --
+ *	Open one or more indices for a table (internal version).
  */
-int
-__wt_schema_open_index(WT_SESSION_IMPL *session,
+static int
+__schema_open_index(WT_SESSION_IMPL *session,
     WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp)
 {
 	WT_CURSOR *cursor;
@@ -271,7 +271,8 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	u_int i;
-	int cmp, match;
+	int cmp;
+	bool match;
 	const char *idxconf, *name, *tablename, *uri;
 
 	/* Check if we've already done the work. */
@@ -280,16 +281,16 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 	cursor = NULL;
 	idx = NULL;
-	match = 0;
+	match = false;
 
 	/* Build a search key. */
-	tablename = table->name;
-	(void)WT_PREFIX_SKIP(tablename, "table:");
+	tablename = table->iface.name;
+	WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 	WT_ERR(__wt_scr_alloc(session, 512, &tmp));
 	WT_ERR(__wt_buf_fmt(session, tmp, "index:%s:", tablename));
 
 	/* Find matching indices. */
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, tmp->data);
 	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
 		ret = cursor->next(cursor);
@@ -374,13 +375,28 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	/* If we did a full pass, we won't need to do it again. */
 	if (idxname == NULL) {
 		table->nindices = i;
-		table->idx_complete = 1;
+		table->idx_complete = true;
 	}
 
-err:	__wt_scr_free(session, &tmp);
+err:	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 	WT_TRET(__wt_schema_destroy_index(session, &idx));
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
+
+	__wt_scr_free(session, &tmp);
+	return (ret);
+}
+
+/*
+ * __wt_schema_open_index --
+ *	Open one or more indices for a table.
+ */
+int
+__wt_schema_open_index(WT_SESSION_IMPL *session,
+    WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp)
+{
+	WT_DECL_RET;
+
+	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+	    ret = __schema_open_index(session, table, idxname, len, indexp));
 	return (ret);
 }
 
@@ -395,108 +411,70 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
 }
 
 /*
- * __wt_schema_open_table --
- *	Open a named table.
+ * __schema_open_table --
+ *	Open the data handle for a table (internal version).
  */
-int
-__wt_schema_open_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
+static int
+__schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
-	WT_CURSOR *cursor;
-	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_TABLE *table;
-	const char *tconfig;
-	char *tablename;
+	const char *tablename;
+	const char **table_cfg;
 
-	cursor = NULL;
-	table = NULL;
-	tablename = NULL;
+	table = (WT_TABLE *)session->dhandle;
+	table_cfg = table->iface.cfg;
+	tablename = table->iface.name;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
+	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));
-	WT_ERR(__wt_strndup(session, buf->data, buf->size, &tablename));
-
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
-	cursor->set_key(cursor, tablename);
-	WT_ERR(cursor->search(cursor));
-	WT_ERR(cursor->get_value(cursor, &tconfig));
-
-	WT_ERR(__wt_calloc_one(session, &table));
-	table->name = tablename;
-	tablename = NULL;
-	table->name_hash = __wt_hash_city64(name, namelen);
-
-	WT_ERR(__wt_config_getones(session, tconfig, "columns", &cval));
-
-	WT_ERR(__wt_config_getones(session, tconfig, "key_format", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->key_format));
-	WT_ERR(__wt_config_getones(session, tconfig, "value_format", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->value_format));
-	WT_ERR(__wt_strdup(session, tconfig, &table->config));
+	WT_RET(__wt_config_gets(session, table_cfg, "columns", &cval));
+	WT_RET(__wt_config_gets(session, table_cfg, "key_format", &cval));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &table->key_format));
+	WT_RET(__wt_config_gets(session, table_cfg, "value_format", &cval));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &table->value_format));
 
 	/* Point to some items in the copy to save re-parsing. */
-	WT_ERR(__wt_config_getones(session, table->config,
-	    "columns", &table->colconf));
+	WT_RET(__wt_config_gets(
+	    session, table_cfg, "columns", &table->colconf));
 
 	/*
 	 * Count the number of columns: tables are "simple" if the columns
 	 * are not named.
 	 */
-	WT_ERR(__wt_config_subinit(session, &cparser, &table->colconf));
-	table->is_simple = 1;
+	__wt_config_subinit(session, &cparser, &table->colconf);
+	table->is_simple = true;
 	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
-		table->is_simple = 0;
-	if (ret != WT_NOTFOUND)
-		goto err;
+		table->is_simple = false;
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Check that the columns match the key and value formats. */
 	if (!table->is_simple)
-		WT_ERR(__wt_schema_colcheck(session,
+		WT_RET(__wt_schema_colcheck(session,
 		    table->key_format, table->value_format, &table->colconf,
 		    &table->nkey_columns, NULL));
 
-	WT_ERR(__wt_config_getones(session, table->config,
-	    "colgroups", &table->cgconf));
+	WT_RET(__wt_config_gets(
+	    session, table_cfg, "colgroups", &table->cgconf));
 
 	/* Count the number of column groups. */
-	WT_ERR(__wt_config_subinit(session, &cparser, &table->cgconf));
+	__wt_config_subinit(session, &cparser, &table->cgconf);
 	table->ncolgroups = 0;
 	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
 		++table->ncolgroups;
-	if (ret != WT_NOTFOUND)
-		goto err;
+	WT_RET_NOTFOUND_OK(ret);
 
 	if (table->ncolgroups > 0 && table->is_simple)
-		WT_ERR_MSG(session, EINVAL,
+		WT_RET_MSG(session, EINVAL,
 		    "%s requires a table with named columns", tablename);
 
-	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
-	WT_ERR(__wt_schema_open_colgroups(session, table));
+	WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
+	WT_RET(__wt_schema_open_colgroups(session, table));
 
-	if (!ok_incomplete && !table->cg_complete)
-		WT_ERR_MSG(session, EINVAL, "'%s' cannot be used "
-		    "until all column groups are created",
-		    table->name);
-
-	/* Copy the schema generation into the new table. */
-	table->schema_gen = S2C(session)->schema_gen;
-
-	*tablep = table;
-
-	if (0) {
-err:		WT_TRET(__wt_schema_destroy_table(session, &table));
-	}
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
-
-	__wt_free(session, tablename);
-	__wt_scr_free(session, &buf);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -505,13 +483,15 @@ err:		WT_TRET(__wt_schema_destroy_table(session, &table));
  */
 int
 __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
-    const char *uri, int quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
+    const char *uri, bool quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
 {
 	WT_COLGROUP *colgroup;
 	WT_TABLE *table;
 	const char *tablename, *tend;
 	u_int i;
 
+	if (tablep != NULL)
+		*tablep = NULL;
 	*colgroupp = NULL;
 
 	tablename = uri;
@@ -522,7 +502,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 		tend = tablename + strlen(tablename);
 
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
+	    tablename, WT_PTRDIFF(tend, tablename), false, 0, &table));
 
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		colgroup = table->cgroups[i];
@@ -531,12 +511,13 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 			if (tablep != NULL)
 				*tablep = table;
 			else
-				__wt_schema_release_table(session, table);
+				WT_RET(
+				    __wt_schema_release_table(session, table));
 			return (0);
 		}
 	}
 
-	__wt_schema_release_table(session, table);
+	WT_RET(__wt_schema_release_table(session, table));
 	if (quiet)
 		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
@@ -548,7 +529,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
  */
 int
 __wt_schema_get_index(WT_SESSION_IMPL *session,
-    const char *uri, int quiet, WT_TABLE **tablep, WT_INDEX **indexp)
+    const char *uri, bool invalidate, bool quiet, WT_INDEX **indexp)
 {
 	WT_DECL_RET;
 	WT_INDEX *idx;
@@ -564,28 +545,25 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 		return (__wt_bad_object_type(session, uri));
 
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
+	    tablename, WT_PTRDIFF(tend, tablename), false, 0, &table));
 
 	/* Try to find the index in the table. */
 	for (i = 0; i < table->nindices; i++) {
 		idx = table->indices[i];
-		if (strcmp(idx->name, uri) == 0) {
-			if (tablep != NULL)
-				*tablep = table;
-			else
-				__wt_schema_release_table(session, table);
+		if (idx != NULL && strcmp(idx->name, uri) == 0) {
 			*indexp = idx;
-			return (0);
+			goto done;
 		}
 	}
 
 	/* Otherwise, open it. */
 	WT_ERR(__wt_schema_open_index(
 	    session, table, tend + 1, strlen(tend + 1), indexp));
-	if (tablep != NULL)
-		*tablep = table;
 
-err:	__wt_schema_release_table(session, table);
+done:	if (invalidate)
+		table->idx_complete = false;
+
+err:	WT_TRET(__wt_schema_release_table(session, table));
 	WT_RET(ret);
 
 	if (*indexp != NULL)
@@ -594,4 +572,20 @@ err:	__wt_schema_release_table(session, table);
 	if (quiet)
 		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
+}
+
+/*
+ * __wt_schema_open_table --
+ *	Open a named table.
+ */
+int
+__wt_schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_DECL_RET;
+
+	WT_WITH_TABLE_WRITE_LOCK(session,
+	    WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		ret = __schema_open_table(session, cfg)));
+
+	return (ret);
 }

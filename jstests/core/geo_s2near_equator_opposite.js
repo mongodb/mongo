@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Tests geo near with 2 points diametrically opposite to each other
 // on the equator
 // First reported in SERVER-11830 as a regression in 2.5
@@ -14,12 +18,18 @@ t.ensureIndex({loc: '2dsphere'});
 // upper bound for half of earth's circumference in meters
 var dist = 40075000 / 2 + 1;
 
-var nearSphereCount = t.find({loc: {$nearSphere:
-    {$geometry: {type: 'Point', coordinates: [180, 0]}, $maxDistance: dist}}}).itcount();
-var nearCount = t.find({loc: {$near:
-    {$geometry: {type: 'Point', coordinates: [180, 0]}, $maxDistance: dist}}}).itcount();
-var geoNearResult = db.runCommand({geoNear: t.getName(),  near:
-    {type: 'Point', coordinates: [180, 0]}, spherical: true});
+var nearSphereCount =
+    t.find({
+         loc: {
+             $nearSphere: {$geometry: {type: 'Point', coordinates: [180, 0]}, $maxDistance: dist}
+         }
+     }).itcount();
+var nearCount =
+    t.find({
+         loc: {$near: {$geometry: {type: 'Point', coordinates: [180, 0]}, $maxDistance: dist}}
+     }).itcount();
+var geoNearResult = db.runCommand(
+    {geoNear: t.getName(), near: {type: 'Point', coordinates: [180, 0]}, spherical: true});
 
 print('nearSphere count = ' + nearSphereCount);
 print('near count = ' + nearCount);

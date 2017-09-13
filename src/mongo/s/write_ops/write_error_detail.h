@@ -33,7 +33,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/bson_serializable.h"
 
 namespace mongo {
 
@@ -41,9 +40,7 @@ namespace mongo {
  * This class represents the layout and content of a insert/update/delete runCommand,
  * the response side.
  */
-class WriteErrorDetail : public BSONSerializable {
-    MONGO_DISALLOW_COPYING(WriteErrorDetail);
-
+class WriteErrorDetail {
 public:
     //
     // schema declarations
@@ -59,7 +56,6 @@ public:
     //
 
     WriteErrorDetail();
-    virtual ~WriteErrorDetail();
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(WriteErrorDetail* other) const;
@@ -68,33 +64,29 @@ public:
     // bson serializable interface implementation
     //
 
-    virtual bool isValid(std::string* errMsg) const;
-    virtual BSONObj toBSON() const;
-    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-    virtual void clear();
-    virtual std::string toString() const;
+    bool isValid(std::string* errMsg) const;
+    BSONObj toBSON() const;
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
+    void clear();
+    std::string toString() const;
 
     //
     // individual field accessors
     //
 
     void setIndex(int index);
-    void unsetIndex();
     bool isIndexSet() const;
     int getIndex() const;
 
     void setErrCode(int errCode);
-    void unsetErrCode();
     bool isErrCodeSet() const;
     int getErrCode() const;
 
     void setErrInfo(const BSONObj& errInfo);
-    void unsetErrInfo();
     bool isErrInfoSet() const;
     const BSONObj& getErrInfo() const;
 
     void setErrMessage(StringData errMessage);
-    void unsetErrMessage();
     bool isErrMessageSet() const;
     const std::string& getErrMessage() const;
 

@@ -1,0 +1,35 @@
+1e7bf0c636b8cca54dd83456a0f8fa219343e2a1 Bug 608195 - part 2 - extend ToPrecision to tell use whether exponential notation was used
+diff --git a/mfbt/double-conversion/double-conversion.cc b/mfbt/double-conversion/double-conversion.cc
+index febba6c..394b6a0 100644
+--- a/mfbt/double-conversion/double-conversion.cc
++++ b/mfbt/double-conversion/double-conversion.cc
+@@ -283,7 +283,9 @@ bool DoubleToStringConverter::ToExponential(
+ 
+ bool DoubleToStringConverter::ToPrecision(double value,
+                                           int precision,
++                                          bool* used_exponential_notation,
+                                           StringBuilder* result_builder) const {
++  *used_exponential_notation = false;
+   if (Double(value).IsSpecial()) {
+     return HandleSpecialValues(value, result_builder);
+   }
+@@ -325,6 +327,7 @@ bool DoubleToStringConverter::ToPrecision(double value,
+       decimal_rep[i] = '0';
+     }
+ 
++    *used_exponential_notation = true;
+     CreateExponentialRepresentation(decimal_rep,
+                                     precision,
+                                     exponent,
+diff --git a/mfbt/double-conversion/double-conversion.h b/mfbt/double-conversion/double-conversion.h
+index 0900ba0..957575c 100644
+--- a/mfbt/double-conversion/double-conversion.h
++++ b/mfbt/double-conversion/double-conversion.h
+@@ -270,6 +270,7 @@ class DoubleToStringConverter {
+   // exponent character, the exponent's sign, and at most 3 exponent digits).
+   MFBT_API bool ToPrecision(double value,
+                    int precision,
++                   bool* used_exponential_notation,
+                    StringBuilder* result_builder) const;
+ 
+   enum DtoaMode {

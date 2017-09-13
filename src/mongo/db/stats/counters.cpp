@@ -43,7 +43,7 @@ using std::endl;
 
 OpCounters::OpCounters() {}
 
-void OpCounters::incInsertInWriteLock(int n) {
+void OpCounters::gotInserts(int n) {
     RARELY _checkWrap();
     _insert.fetchAndAdd(n);
 }
@@ -100,7 +100,6 @@ void OpCounters::gotOp(int op, bool isCommand) {
             break;
         case dbKillCursors:
         case opReply:
-        case dbMsg:
             break;
         default:
             log() << "OpCounters::gotOp unknown op: " << op << endl;
@@ -135,34 +134,69 @@ BSONObj OpCounters::getObj() const {
     return b.obj();
 }
 
-void NetworkCounter::hit(long long bytesIn, long long bytesOut) {
-    const long long MAX = 1ULL << 60;
+void NetworkCounter::hitPhysicalIn(long long bytes) {
+    static const int64_t MAX = 1ULL << 60;
 
     // don't care about the race as its just a counter
-    bool overflow = _bytesIn > MAX || _bytesOut > MAX;
+    const bool overflow = _physicalBytesIn.loadRelaxed() > MAX;
 
     if (overflow) {
-        _lock.lock();
-        _overflows++;
-        _bytesIn = bytesIn;
-        _bytesOut = bytesOut;
-        _requests = 1;
-        _lock.unlock();
+        _physicalBytesIn.store(bytes);
     } else {
-        _lock.lock();
-        _bytesIn += bytesIn;
-        _bytesOut += bytesOut;
-        _requests++;
-        _lock.unlock();
+        _physicalBytesIn.fetchAndAdd(bytes);
+    }
+}
+
+void NetworkCounter::hitPhysicalOut(long long bytes) {
+    static const int64_t MAX = 1ULL << 60;
+
+    // don't care about the race as its just a counter
+    const bool overflow = _physicalBytesOut.loadRelaxed() > MAX;
+
+    if (overflow) {
+        _physicalBytesOut.store(bytes);
+    } else {
+        _physicalBytesOut.fetchAndAdd(bytes);
+    }
+}
+
+void NetworkCounter::hitLogicalIn(long long bytes) {
+    static const int64_t MAX = 1ULL << 60;
+
+    // don't care about the race as its just a counter
+    const bool overflow = _together.logicalBytesIn.loadRelaxed() > MAX;
+
+    if (overflow) {
+        _together.logicalBytesIn.store(bytes);
+        // The requests field only gets incremented here (and not in hitPhysical) because the
+        // hitLogical and hitPhysical are each called for each operation. Incrementing it in both
+        // functions would double-count the number of operations.
+        _together.requests.store(1);
+    } else {
+        _together.logicalBytesIn.fetchAndAdd(bytes);
+        _together.requests.fetchAndAdd(1);
+    }
+}
+
+void NetworkCounter::hitLogicalOut(long long bytes) {
+    static const int64_t MAX = 1ULL << 60;
+
+    // don't care about the race as its just a counter
+    const bool overflow = _logicalBytesOut.loadRelaxed() > MAX;
+
+    if (overflow) {
+        _logicalBytesOut.store(bytes);
+    } else {
+        _logicalBytesOut.fetchAndAdd(bytes);
     }
 }
 
 void NetworkCounter::append(BSONObjBuilder& b) {
-    _lock.lock();
-    b.appendNumber("bytesIn", _bytesIn);
-    b.appendNumber("bytesOut", _bytesOut);
-    b.appendNumber("numRequests", _requests);
-    _lock.unlock();
+    b.append("bytesIn", static_cast<long long>(_together.logicalBytesIn.loadRelaxed()));
+    b.append("bytesOut", static_cast<long long>(_logicalBytesOut.loadRelaxed()));
+    b.append("physicalBytesIn", static_cast<long long>(_physicalBytesIn.loadRelaxed()));
+    b.append("physicalBytesOut", static_cast<long long>(_physicalBytesOut.loadRelaxed()));
+    b.append("numRequests", static_cast<long long>(_together.requests.loadRelaxed()));
 }
 
 

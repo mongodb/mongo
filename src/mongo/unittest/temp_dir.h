@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#pragma once
+
 #include <string>
 
 #include "mongo/base/disallow_copying.h"

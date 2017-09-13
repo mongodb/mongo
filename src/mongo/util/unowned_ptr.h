@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/static_assert.hpp>
 #include <memory>
 #include <type_traits>
 
@@ -59,20 +58,16 @@ struct unowned_ptr {
     unowned_ptr(T* p) : _p(p) {}
 
     template <typename U, typename = IfConvertibleFrom<U>>
-    unowned_ptr(U* p)
-        : _p(p) {}
+    unowned_ptr(U* p) : _p(p) {}
 
     template <typename U, typename = IfConvertibleFrom<U>>
-    unowned_ptr(const unowned_ptr<U>& p)
-        : _p(p) {}
+    unowned_ptr(const unowned_ptr<U>& p) : _p(p) {}
+
+    template <typename U, typename Deleter, typename = IfConvertibleFrom<U>>
+    unowned_ptr(const std::unique_ptr<U, Deleter>& p) : _p(p.get()) {}
 
     template <typename U, typename = IfConvertibleFrom<U>>
-    unowned_ptr(const std::unique_ptr<U>& p)
-        : _p(p.get()) {}
-
-    template <typename U, typename = IfConvertibleFrom<U>>
-    unowned_ptr(const std::shared_ptr<U>& p)
-        : _p(p.get()) {}
+    unowned_ptr(const std::shared_ptr<U>& p) : _p(p.get()) {}
 
     //
     // Modifiers

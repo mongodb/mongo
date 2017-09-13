@@ -32,13 +32,57 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/death_test.h"
 
 namespace mongo {
 
 using std::string;
+
+TEST(ComparisonMatchExpression, ComparisonMatchExpressionsWithUnequalCollatorsAreUnequal) {
+    CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kReverseString);
+    EqualityMatchExpression eq1;
+    eq1.setCollator(&collator1);
+    CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    EqualityMatchExpression eq2;
+    eq2.setCollator(&collator2);
+    ASSERT(!eq1.equivalent(&eq2));
+}
+
+TEST(ComparisonMatchExpression, ComparisonMatchExpressionsWithEqualCollatorsAreEqual) {
+    CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    EqualityMatchExpression eq1;
+    eq1.setCollator(&collator1);
+    CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    EqualityMatchExpression eq2;
+    eq2.setCollator(&collator2);
+    ASSERT(eq1.equivalent(&eq2));
+}
+
+TEST(ComparisonMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
+    BSONObj operand = BSON("a"
+                           << "string");
+    EqualityMatchExpression eq;
+    ASSERT(eq.init("a", operand["a"]).isOK());
+    ASSERT(!eq.matchesBSON(BSON("a"
+                                << "string2"),
+                           NULL));
+}
+
+TEST(ComparisonMatchExpression, StringMatchingRespectsCollation) {
+    BSONObj operand = BSON("a"
+                           << "string");
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    EqualityMatchExpression eq;
+    eq.setCollator(&collator);
+    ASSERT(eq.init("a", operand["a"]).isOK());
+    ASSERT(eq.matchesBSON(BSON("a"
+                               << "string2"),
+                          NULL));
+}
 
 TEST(EqOp, MatchesElement) {
     BSONObj operand = BSON("a" << 5);
@@ -46,23 +90,23 @@ TEST(EqOp, MatchesElement) {
     BSONObj notMatch = BSON("a" << 6);
 
     EqualityMatchExpression eq;
-    eq.init("", operand["a"]);
+    eq.init("", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesSingleElement(match.firstElement()));
     ASSERT(!eq.matchesSingleElement(notMatch.firstElement()));
 
     ASSERT(eq.equivalent(&eq));
 }
 
-TEST(EqOp, InvalidEooOperand) {
+DEATH_TEST(EqOp, InvalidEooOperand, "Invariant failure _rhs") {
     BSONObj operand;
     EqualityMatchExpression eq;
-    ASSERT(!eq.init("", operand.firstElement()).isOK());
+    eq.init("", operand.firstElement()).ignore();
 }
 
 TEST(EqOp, MatchesScalar) {
     BSONObj operand = BSON("a" << 5);
     EqualityMatchExpression eq;
-    eq.init("a", operand["a"]);
+    eq.init("a", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << 5.0), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << 4), NULL));
 }
@@ -70,7 +114,7 @@ TEST(EqOp, MatchesScalar) {
 TEST(EqOp, MatchesArrayValue) {
     BSONObj operand = BSON("a" << 5);
     EqualityMatchExpression eq;
-    eq.init("a", operand["a"]);
+    eq.init("a", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), NULL));
 }
@@ -78,7 +122,7 @@ TEST(EqOp, MatchesArrayValue) {
 TEST(EqOp, MatchesReferencedObjectValue) {
     BSONObj operand = BSON("a.b" << 5);
     EqualityMatchExpression eq;
-    eq.init("a.b", operand["a.b"]);
+    eq.init("a.b", operand["a.b"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << BSON("b" << 5)), NULL));
     ASSERT(eq.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(5))), NULL));
     ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 5))), NULL));
@@ -87,7 +131,7 @@ TEST(EqOp, MatchesReferencedObjectValue) {
 TEST(EqOp, MatchesReferencedArrayValue) {
     BSONObj operand = BSON("a.0" << 5);
     EqualityMatchExpression eq;
-    eq.init("a.0", operand["a.0"]);
+    eq.init("a.0", operand["a.0"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(5)), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), NULL));
 }
@@ -95,7 +139,7 @@ TEST(EqOp, MatchesReferencedArrayValue) {
 TEST(EqOp, MatchesNull) {
     BSONObj operand = BSON("a" << BSONNULL);
     EqualityMatchExpression eq;
-    eq.init("a", operand["a"]);
+    eq.init("a", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSONObj(), NULL));
     ASSERT(eq.matchesBSON(BSON("a" << BSONNULL), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << 4), NULL));
@@ -108,7 +152,7 @@ TEST(EqOp, MatchesNull) {
 TEST(EqOp, MatchesNestedNull) {
     BSONObj operand = BSON("a.b" << BSONNULL);
     EqualityMatchExpression eq;
-    eq.init("a.b", operand["a.b"]);
+    eq.init("a.b", operand["a.b"]).transitional_ignore();
     // null matches any empty object that is on a subpath of a.b
     ASSERT(eq.matchesBSON(BSONObj(), NULL));
     ASSERT(eq.matchesBSON(BSON("a" << BSONObj()), NULL));
@@ -128,7 +172,7 @@ TEST(EqOp, MatchesNestedNull) {
 TEST(EqOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << MinKey);
     EqualityMatchExpression eq;
-    eq.init("a", operand["a"]);
+    eq.init("a", operand["a"]).transitional_ignore();
     ASSERT(eq.matchesBSON(BSON("a" << MinKey), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << MaxKey), NULL));
     ASSERT(!eq.matchesBSON(BSON("a" << 4), NULL));
@@ -157,7 +201,7 @@ TEST(EqOp, MatchesFullArray) {
 TEST(EqOp, MatchesThroughNestedArray) {
     BSONObj operand = BSON("a.b.c.d" << 3);
     EqualityMatchExpression eq;
-    eq.init("a.b.c.d", operand["a.b.c.d"]);
+    eq.init("a.b.c.d", operand["a.b.c.d"]).transitional_ignore();
     BSONObj obj = fromjson("{a:{b:[{c:[{d:1},{d:2}]},{c:[{d:3}]}]}}");
     ASSERT(eq.matchesBSON(obj, NULL));
 }
@@ -200,9 +244,9 @@ TEST(EqOp, Equality1) {
 
     BSONObj operand = BSON("a" << 5 << "b" << 5 << "c" << 4);
 
-    eq1.init("a", operand["a"]);
-    eq2.init("a", operand["b"]);
-    eq3.init("c", operand["c"]);
+    eq1.init("a", operand["a"]).transitional_ignore();
+    eq2.init("a", operand["b"]).transitional_ignore();
+    eq3.init("c", operand["c"]).transitional_ignore();
 
     ASSERT(eq1.equivalent(&eq1));
     ASSERT(eq1.equivalent(&eq2));
@@ -274,10 +318,10 @@ TEST(LtOp, MatchesElement) {
     ASSERT(!lt.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-TEST(LtOp, InvalidEooOperand) {
+DEATH_TEST(LtOp, InvalidEooOperand, "Invariant failure _rhs") {
     BSONObj operand;
     LTMatchExpression lt;
-    ASSERT(!lt.init("", operand.firstElement()).isOK());
+    lt.init("", operand.firstElement()).ignore();
 }
 
 TEST(LtOp, MatchesScalar) {
@@ -440,10 +484,10 @@ TEST(LteOp, MatchesElement) {
     ASSERT(!lte.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-TEST(LteOp, InvalidEooOperand) {
+DEATH_TEST(LteOp, InvalidEooOperand, "Invariant failure _rhs") {
     BSONObj operand;
     LTEMatchExpression lte;
-    ASSERT(!lte.init("", operand.firstElement()).isOK());
+    lte.init("", operand.firstElement()).ignore();
 }
 
 TEST(LteOp, MatchesScalar) {
@@ -599,10 +643,10 @@ TEST(LteOp, ElemMatchKey) {
    }
 */
 
-TEST(GtOp, InvalidEooOperand) {
+DEATH_TEST(GtOp, InvalidEooOperand, "Invariant failure _rhs") {
     BSONObj operand;
     GTMatchExpression gt;
-    ASSERT(!gt.init("", operand.firstElement()).isOK());
+    gt.init("", operand.firstElement()).ignore();
 }
 
 TEST(GtOp, MatchesScalar) {
@@ -745,7 +789,7 @@ TEST(GtOp, ElemMatchKey) {
    }
 */
 
-TEST(ComparisonMatchExpression, MatchesElement) {
+TEST(GteOp, MatchesElement) {
     BSONObj operand = BSON("$gte" << 5);
     BSONObj match = BSON("a" << 5.5);
     BSONObj equalMatch = BSON("a" << 5);
@@ -760,13 +804,13 @@ TEST(ComparisonMatchExpression, MatchesElement) {
     ASSERT(!gte.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-TEST(ComparisonMatchExpression, InvalidEooOperand) {
+DEATH_TEST(GteOp, InvalidEooOperand, "Invariant failure _rhs") {
     BSONObj operand;
     GTEMatchExpression gte;
-    ASSERT(!gte.init("", operand.firstElement()).isOK());
+    gte.init("", operand.firstElement()).ignore();
 }
 
-TEST(ComparisonMatchExpression, MatchesScalar) {
+TEST(GteOp, MatchesScalar) {
     BSONObj operand = BSON("$gte" << 5);
     GTEMatchExpression gte;
     ASSERT(gte.init("a", operand["$gte"]).isOK());
@@ -774,7 +818,7 @@ TEST(ComparisonMatchExpression, MatchesScalar) {
     ASSERT(!gte.matchesBSON(BSON("a" << 4), NULL));
 }
 
-TEST(ComparisonMatchExpression, MatchesArrayValue) {
+TEST(GteOp, MatchesArrayValue) {
     BSONObj operand = BSON("$gte" << 5);
     GTEMatchExpression gte;
     ASSERT(gte.init("a", operand["$gte"]).isOK());
@@ -782,7 +826,7 @@ TEST(ComparisonMatchExpression, MatchesArrayValue) {
     ASSERT(!gte.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), NULL));
 }
 
-TEST(ComparisonMatchExpression, MatchesWholeArray) {
+TEST(GteOp, MatchesWholeArray) {
     BSONObj operand = BSON("$gte" << BSON_ARRAY(5));
     GTEMatchExpression gte;
     ASSERT(gte.init("a", operand["$gte"]).isOK());
@@ -796,7 +840,7 @@ TEST(ComparisonMatchExpression, MatchesWholeArray) {
     ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), NULL));
 }
 
-TEST(ComparisonMatchExpression, MatchesNull) {
+TEST(GteOp, MatchesNull) {
     BSONObj operand = BSON("$gte" << BSONNULL);
     GTEMatchExpression gte;
     ASSERT(gte.init("a", operand["$gte"]).isOK());
@@ -807,7 +851,7 @@ TEST(ComparisonMatchExpression, MatchesNull) {
     ASSERT(gte.matchesBSON(BSON("b" << 4), NULL));
 }
 
-TEST(ComparisonMatchExpression, MatchesDotNotationNull) {
+TEST(GteOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$gte" << BSONNULL);
     GTEMatchExpression gte;
     ASSERT(gte.init("a.b", operand["$gte"]).isOK());
@@ -821,7 +865,7 @@ TEST(ComparisonMatchExpression, MatchesDotNotationNull) {
     ASSERT(!gte.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 4))), NULL));
 }
 
-TEST(ComparisonMatchExpression, MatchesMinKey) {
+TEST(GteOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << MinKey);
     GTEMatchExpression gte;
     ASSERT(gte.init("a", operand["a"]).isOK());
@@ -830,7 +874,7 @@ TEST(ComparisonMatchExpression, MatchesMinKey) {
     ASSERT(gte.matchesBSON(BSON("a" << 4), NULL));
 }
 
-TEST(ComparisonMatchExpression, MatchesMaxKey) {
+TEST(GteOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << MaxKey);
     GTEMatchExpression gte;
     ASSERT(gte.init("a", operand["a"]).isOK());
@@ -839,7 +883,7 @@ TEST(ComparisonMatchExpression, MatchesMaxKey) {
     ASSERT(!gte.matchesBSON(BSON("a" << 4), NULL));
 }
 
-TEST(ComparisonMatchExpression, ElemMatchKey) {
+TEST(GteOp, ElemMatchKey) {
     BSONObj operand = BSON("$gte" << 5);
     GTEMatchExpression gte;
     ASSERT(gte.init("a", operand["$gte"]).isOK());
@@ -853,57 +897,6 @@ TEST(ComparisonMatchExpression, ElemMatchKey) {
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
-
-/**
-   TEST( GteOp, MatchesIndexKeyScalar ) {
-   BSONObj operand = BSON( "$gte" << 6 );
-   GteOp gte;
-   ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   gte.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   gte.matchesIndexKey( BSON( "" << 5 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   gte.matchesIndexKey( BSON( "" << BSON_ARRAY( 7 ) ), indexSpec ) );
-   }
-
-   TEST( GteOp, MatchesIndexKeyMissing ) {
-   BSONObj operand = BSON( "$gte" << 6 );
-   GteOp gte;
-   ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "b" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   gte.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   gte.matchesIndexKey( BSON( "" << 4 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   gte.matchesIndexKey( BSON( "" << BSON_ARRAY( 8 << 6 ) ), indexSpec ) );
-   }
-
-   TEST( GteOp, MatchesIndexKeyArray ) {
-   BSONObj operand = BSON( "$gte" << BSON_ARRAY( 4 << 5 ) );
-   GteOp gte;
-   ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   gte.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-   }
-
-   TEST( GteOp, MatchesIndexKeyArrayValue ) {
-   BSONObj operand = BSON( "$gte" << 6 );
-   GteOp gte;
-   ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "loc" << "mockarrayvalue" << "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   gte.matchesIndexKey( BSON( "" << "dummygeohash" << "" << 6 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   gte.matchesIndexKey( BSON( "" << "dummygeohash" << "" << 3 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   gte.matchesIndexKey( BSON( "" << "dummygeohash" <<
-   "" << BSON_ARRAY( 8 << 6 << 4 ) ), indexSpec ) );
-   }
-*/
 
 TEST(RegexMatchExpression, MatchesElementExact) {
     BSONObj match = BSON("a"
@@ -1140,44 +1133,51 @@ TEST(RegexMatchExpression, Equality1) {
     ASSERT(!r1.equivalent(&r4));
 }
 
-/**
-   TEST( RegexMatchExpression, MatchesIndexKeyScalar ) {
-   RegexMatchExpression regex;
-   ASSERT( regex.init( "a", "xyz", "" ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   regex.matchesIndexKey( BSON( "" << "z xyz" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   regex.matchesIndexKey( BSON( "" << "xy" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   regex.matchesIndexKey( BSON( "" << BSON_ARRAY( "xyz" ) ), indexSpec ) );
-   }
+TEST(RegexMatchExpression, RegexCannotContainEmbeddedNullByte) {
+    RegexMatchExpression regex;
+    {
+        const auto embeddedNull = "a\0b"_sd;
+        ASSERT_NOT_OK(regex.init("path", embeddedNull, ""));
+    }
 
-   TEST( RegexMatchExpression, MatchesIndexKeyMissing ) {
-   RegexMatchExpression regex;
-   ASSERT( regex.init( "a", "xyz", "" ).isOK() );
-   IndexSpec indexSpec( BSON( "b" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   regex.matchesIndexKey( BSON( "" << "z xyz" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   regex.matchesIndexKey( BSON( "" << "xy" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   regex.matchesIndexKey( BSON( "" << BSON_ARRAY( 8 << "xyz" ) ), indexSpec ) );
-   }
+    {
+        const auto singleNullByte = "\0"_sd;
+        ASSERT_NOT_OK(regex.init("path", singleNullByte, ""));
+    }
 
-   TEST( RegexMatchExpression, MatchesIndexKeyArrayValue ) {
-   RegexMatchExpression regex;
-   ASSERT( regex.init( "a", "xyz", "" ).isOK() );
-   IndexSpec indexSpec( BSON( "loc" << "mockarrayvalue" << "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   regex.matchesIndexKey( BSON( "" << "dummygeohash" << "" << "xyz" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   regex.matchesIndexKey( BSON( "" << "dummygeohash" << "" << "z" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   regex.matchesIndexKey( BSON( "" << "dummygeohash" <<
-   "" << BSON_ARRAY( "r" << 6 << "xyz" ) ), indexSpec ) );
-   }
-*/
+    {
+        const auto leadingNullByte = "\0bbbb"_sd;
+        ASSERT_NOT_OK(regex.init("path", leadingNullByte, ""));
+    }
+
+    {
+        const auto trailingNullByte = "bbbb\0"_sd;
+        ASSERT_NOT_OK(regex.init("path", trailingNullByte, ""));
+    }
+}
+
+TEST(RegexMatchExpression, RegexOptionsStringCannotContainEmbeddedNullByte) {
+    RegexMatchExpression regex;
+    {
+        const auto embeddedNull = "a\0b"_sd;
+        ASSERT_NOT_OK(regex.init("path", "pattern", embeddedNull));
+    }
+
+    {
+        const auto singleNullByte = "\0"_sd;
+        ASSERT_NOT_OK(regex.init("path", "pattern", singleNullByte));
+    }
+
+    {
+        const auto leadingNullByte = "\0bbbb"_sd;
+        ASSERT_NOT_OK(regex.init("path", "pattern", leadingNullByte));
+    }
+
+    {
+        const auto trailingNullByte = "bbbb\0"_sd;
+        ASSERT_NOT_OK(regex.init("path", "pattern", trailingNullByte));
+    }
+}
 
 TEST(ModMatchExpression, MatchesElement) {
     BSONObj match = BSON("a" << 1);
@@ -1240,10 +1240,10 @@ TEST(ModMatchExpression, Equality1) {
     ModMatchExpression m3;
     ModMatchExpression m4;
 
-    m1.init("a", 1, 2);
-    m2.init("a", 2, 2);
-    m3.init("a", 1, 1);
-    m4.init("b", 1, 2);
+    m1.init("a", 1, 2).transitional_ignore();
+    m2.init("a", 2, 2).transitional_ignore();
+    m3.init("a", 1, 1).transitional_ignore();
+    m4.init("b", 1, 2).transitional_ignore();
 
     ASSERT(m1.equivalent(&m1));
     ASSERT(!m1.equivalent(&m2));
@@ -1314,190 +1314,27 @@ TEST(ExistsMatchExpression, ElemMatchKey) {
 TEST(ExistsMatchExpression, Equivalent) {
     ExistsMatchExpression e1;
     ExistsMatchExpression e2;
-    e1.init("a");
-    e2.init("b");
+    e1.init("a").transitional_ignore();
+    e2.init("b").transitional_ignore();
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
 }
-
-/**
-   TEST( ExistsMatchExpression, MatchesIndexKey ) {
-   BSONObj operand = BSON( "$exists" << true );
-   ExistsMatchExpression exists;
-   ASSERT( exists.init( "a", operand[ "$exists" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   BSONObj indexKey = BSON( "" << 1 );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   exists.matchesIndexKey( indexKey, indexSpec ) );
-   }
-*/
-
-
-TEST(TypeMatchExpression, MatchesElementStringType) {
-    BSONObj match = BSON("a"
-                         << "abc");
-    BSONObj notMatch = BSON("a" << 5);
-    TypeMatchExpression type;
-    ASSERT(type.init("", String).isOK());
-    ASSERT(type.matchesSingleElement(match["a"]));
-    ASSERT(!type.matchesSingleElement(notMatch["a"]));
-}
-
-TEST(TypeMatchExpression, MatchesElementNullType) {
-    BSONObj match = BSON("a" << BSONNULL);
-    BSONObj notMatch = BSON("a"
-                            << "abc");
-    TypeMatchExpression type;
-    ASSERT(type.init("", jstNULL).isOK());
-    ASSERT(type.matchesSingleElement(match["a"]));
-    ASSERT(!type.matchesSingleElement(notMatch["a"]));
-}
-
-TEST(TypeMatchExpression, InvalidTypeMatchExpressionerand) {
-    // If the provided type number is not a valid BSONType, it is not a parse error.  The
-    // operator will simply not match anything.
-    BSONObj notMatch1 = BSON("a" << BSONNULL);
-    BSONObj notMatch2 = BSON("a"
-                             << "abc");
-    TypeMatchExpression type;
-    ASSERT(type.init("", JSTypeMax + 1).isOK());
-    ASSERT(!type.matchesSingleElement(notMatch1["a"]));
-    ASSERT(!type.matchesSingleElement(notMatch2["a"]));
-}
-
-TEST(TypeMatchExpression, MatchesScalar) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a", Bool).isOK());
-    ASSERT(type.matchesBSON(BSON("a" << true), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << 1), NULL));
-}
-
-TEST(TypeMatchExpression, MatchesArray) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a", NumberInt).isOK());
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(4)), NULL));
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(4 << "a")), NULL));
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY("a" << 4)), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY("a")), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), NULL));
-}
-
-TEST(TypeMatchExpression, MatchesOuterArray) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a", Array).isOK());
-    // The outer array is not matched.
-    ASSERT(!type.matchesBSON(BSON("a" << BSONArray()), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(4 << "a")), NULL));
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(BSONArray() << 2)), NULL));
-    ASSERT(!type.matchesBSON(BSON("a"
-                                  << "bar"),
-                             NULL));
-}
-
-TEST(TypeMatchExpression, MatchesObject) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a", Object).isOK());
-    ASSERT(type.matchesBSON(BSON("a" << BSON("b" << 1)), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << 1), NULL));
-}
-
-TEST(TypeMatchExpression, MatchesDotNotationFieldObject) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a.b", Object).isOK());
-    ASSERT(type.matchesBSON(BSON("a" << BSON("b" << BSON("c" << 1))), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << BSON("b" << 1)), NULL));
-}
-
-TEST(TypeMatchExpression, MatchesDotNotationArrayElementArray) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a.0", Array).isOK());
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(1))), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY("b")), NULL));
-}
-
-TEST(TypeMatchExpression, MatchesDotNotationArrayElementScalar) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a.0", String).isOK());
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY("b")), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(1)), NULL));
-}
-
-TEST(TypeMatchExpression, MatchesDotNotationArrayElementObject) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a.0", Object).isOK());
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 1))), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(1)), NULL));
-}
-
-TEST(TypeMatchExpression, MatchesNull) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a", jstNULL).isOK());
-    ASSERT(type.matchesBSON(BSON("a" << BSONNULL), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << 4), NULL));
-    ASSERT(!type.matchesBSON(BSONObj(), NULL));
-}
-
-TEST(TypeMatchExpression, ElemMatchKey) {
-    TypeMatchExpression type;
-    ASSERT(type.init("a.b", String).isOK());
-    MatchDetails details;
-    details.requestElemMatchKey();
-    ASSERT(!type.matchesBSON(BSON("a" << 1), &details));
-    ASSERT(!details.hasElemMatchKey());
-    ASSERT(type.matchesBSON(BSON("a" << BSON("b"
-                                             << "string")),
-                            &details));
-    ASSERT(!details.hasElemMatchKey());
-    ASSERT(type.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY("string"))), &details));
-    ASSERT(details.hasElemMatchKey());
-    ASSERT_EQUALS("0", details.elemMatchKey());
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(2 << BSON("b" << BSON_ARRAY("string")))),
-                            &details));
-    ASSERT(details.hasElemMatchKey());
-    ASSERT_EQUALS("1", details.elemMatchKey());
-}
-
-TEST(TypeMatchExpression, Equivalent) {
-    TypeMatchExpression e1;
-    TypeMatchExpression e2;
-    TypeMatchExpression e3;
-    e1.init("a", String);
-    e2.init("a", NumberDouble);
-    e3.init("b", String);
-
-    ASSERT(e1.equivalent(&e1));
-    ASSERT(!e1.equivalent(&e2));
-    ASSERT(!e1.equivalent(&e3));
-}
-
-
-/**
-   TEST( TypeMatchExpression, MatchesIndexKey ) {
-   BSONObj operand = BSON( "$type" << 2 );
-   TypeMatchExpression type;
-   ASSERT( type.init( "a", operand[ "$type" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   BSONObj indexKey = BSON( "" << "q" );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   type.matchesIndexKey( indexKey, indexSpec ) );
-   }
-*/
-
 
 TEST(InMatchExpression, MatchesElementSingle) {
     BSONArray operand = BSON_ARRAY(1);
     BSONObj match = BSON("a" << 1);
     BSONObj notMatch = BSON("a" << 2);
     InMatchExpression in;
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
     ASSERT(in.matchesSingleElement(match["a"]));
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
 
 TEST(InMatchExpression, MatchesEmpty) {
     InMatchExpression in;
-    in.init("a");
+    in.init("a").transitional_ignore();
 
     BSONObj notMatch = BSON("a" << 2);
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
@@ -1508,10 +1345,8 @@ TEST(InMatchExpression, MatchesEmpty) {
 TEST(InMatchExpression, MatchesElementMultiple) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1);
     InMatchExpression in;
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
-    in.getArrayFilterEntries()->addEquality(operand[2]);
-    in.getArrayFilterEntries()->addEquality(operand[3]);
+    std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     BSONObj matchFirst = BSON("a" << 1);
     BSONObj matchSecond = BSON("a"
@@ -1528,8 +1363,9 @@ TEST(InMatchExpression, MatchesElementMultiple) {
 TEST(InMatchExpression, MatchesScalar) {
     BSONObj operand = BSON_ARRAY(5);
     InMatchExpression in;
-    in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << 5.0), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << 4), NULL));
@@ -1538,8 +1374,9 @@ TEST(InMatchExpression, MatchesScalar) {
 TEST(InMatchExpression, MatchesArrayValue) {
     BSONObj operand = BSON_ARRAY(5);
     InMatchExpression in;
-    in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), NULL));
@@ -1550,8 +1387,9 @@ TEST(InMatchExpression, MatchesNull) {
     BSONObj operand = BSON_ARRAY(BSONNULL);
 
     InMatchExpression in;
-    in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSONObj(), NULL));
     ASSERT(in.matchesBSON(BSON("a" << BSONNULL), NULL));
@@ -1564,16 +1402,17 @@ TEST(InMatchExpression, MatchesUndefined) {
     BSONObj operand = BSON_ARRAY(BSONUndefined);
 
     InMatchExpression in;
-    in.init("a");
-    Status s = in.getArrayFilterEntries()->addEquality(operand.firstElement());
-    ASSERT_NOT_OK(s);
+    in.init("a").transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_NOT_OK(in.setEqualities(std::move(equalities)));
 }
 
 TEST(InMatchExpression, MatchesMinKey) {
     BSONObj operand = BSON_ARRAY(MinKey);
     InMatchExpression in;
-    in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << MinKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MaxKey), NULL));
@@ -1583,8 +1422,9 @@ TEST(InMatchExpression, MatchesMinKey) {
 TEST(InMatchExpression, MatchesMaxKey) {
     BSONObj operand = BSON_ARRAY(MaxKey);
     InMatchExpression in;
-    in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.init("a").transitional_ignore();
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << MaxKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MinKey), NULL));
@@ -1594,10 +1434,9 @@ TEST(InMatchExpression, MatchesMaxKey) {
 TEST(InMatchExpression, MatchesFullArray) {
     BSONObj operand = BSON_ARRAY(BSON_ARRAY(1 << 2) << 4 << 5);
     InMatchExpression in;
-    in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
-    in.getArrayFilterEntries()->addEquality(operand[2]);
+    in.init("a").transitional_ignore();
+    std::vector<BSONElement> equalities{operand[0], operand[1], operand[2]};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3)), NULL));
@@ -1608,9 +1447,9 @@ TEST(InMatchExpression, MatchesFullArray) {
 TEST(InMatchExpression, ElemMatchKey) {
     BSONObj operand = BSON_ARRAY(5 << 2);
     InMatchExpression in;
-    in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
+    in.init("a").transitional_ignore();
+    std::vector<BSONElement> equalities{operand[0], operand[1]};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
 
     MatchDetails details;
     details.requestElemMatchKey();
@@ -1623,78 +1462,670 @@ TEST(InMatchExpression, ElemMatchKey) {
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
-/**
-TEST( InMatchExpression, MatchesIndexKeyScalar ) {
-    BSONObj operand = BSON( "$in" << BSON_ARRAY( 6 << 5 ) );
-    InMatchExpression in;
-    ASSERT( in.init( "a", operand[ "$in" ] ).isOK() );
-    IndexSpec indexSpec( BSON( "a" << 1 ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << 5 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << 4 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << BSON_ARRAY( 6 ) ), indexSpec ) );
+TEST(InMatchExpression, InMatchExpressionsWithDifferentNumbersOfElementsAreUnequal) {
+    BSONObj obj = BSON(""
+                       << "string");
+    InMatchExpression eq1;
+    InMatchExpression eq2;
+    std::vector<BSONElement> equalities{obj.firstElement()};
+    ASSERT_OK(eq1.setEqualities(std::move(equalities)));
+    ASSERT(!eq1.equivalent(&eq2));
 }
 
-TEST( InMatchExpression, MatchesIndexKeyMissing ) {
-    BSONObj operand = BSON( "$in" << BSON_ARRAY( 6 ) );
-    ComparisonMatchExpression eq
-        ASSERT( eq.init( "a", operand[ "$in" ] ).isOK() );
-    IndexSpec indexSpec( BSON( "b" << 1 ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            eq.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            eq.matchesIndexKey( BSON( "" << 4 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            eq.matchesIndexKey( BSON( "" << BSON_ARRAY( 8 << 6 ) ), indexSpec ) );
+TEST(InMatchExpression, InMatchExpressionsWithUnequalCollatorsAreUnequal) {
+    CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kReverseString);
+    InMatchExpression eq1;
+    eq1.setCollator(&collator1);
+    CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    InMatchExpression eq2;
+    eq2.setCollator(&collator2);
+    ASSERT(!eq1.equivalent(&eq2));
 }
 
-TEST( InMatchExpression, MatchesIndexKeyArray ) {
-    BSONObj operand = BSON( "$in" << BSON_ARRAY( 4 << BSON_ARRAY( 5 ) ) );
-    InMatchExpression in;
-    ASSERT( in.init( "a", operand[ "$in" ] ).isOK() );
-    IndexSpec indexSpec( BSON( "a" << 1 ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            in.matchesIndexKey( BSON( "" << 4 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            in.matchesIndexKey( BSON( "" << 5 ), indexSpec ) );
+TEST(InMatchExpression, InMatchExpressionsWithEqualCollatorsAreEqual) {
+    CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    InMatchExpression eq1;
+    eq1.setCollator(&collator1);
+    CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    InMatchExpression eq2;
+    eq2.setCollator(&collator2);
+    ASSERT(eq1.equivalent(&eq2));
 }
 
-TEST( InMatchExpression, MatchesIndexKeyArrayValue ) {
-    BSONObjBuilder inArray;
-    inArray.append( "0", 4 ).append( "1", 5 ).appendRegex( "2", "abc", "" );
-    BSONObj operand = BSONObjBuilder().appendArray( "$in", inArray.obj() ).obj();
-    InMatchExpression in;
-    ASSERT( in.init( "a", operand[ "$in" ] ).isOK() );
-    IndexSpec indexSpec( BSON( "loc" << "mockarrayvalue" << "a" << 1 ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" << "" << 4 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" << "" << 6 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" << "" << "abcd" ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSONObjBuilder()
-                                .append( "", "dummygeohash" )
-                                .appendRegex( "", "abc", "" ).obj(),
-                                indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" << "" << "ab" ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" <<
-                                      "" << BSON_ARRAY( 8 << 5 ) ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" <<
-                                      "" << BSON_ARRAY( 8 << 9 ) ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" <<
-                                      "" << BSON_ARRAY( 8 << "abc" ) ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" <<
-                                      "" << BSON_ARRAY( 8 << "ac" ) ), indexSpec ) );
+TEST(InMatchExpression, InMatchExpressionsWithCollationEquivalentElementsAreEqual) {
+    BSONObj obj1 = BSON(""
+                        << "string1");
+    BSONObj obj2 = BSON(""
+                        << "string2");
+    CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    InMatchExpression eq1;
+    eq1.setCollator(&collator1);
+    CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    InMatchExpression eq2;
+    eq2.setCollator(&collator2);
+
+    std::vector<BSONElement> equalities1{obj1.firstElement()};
+    ASSERT_OK(eq1.setEqualities(std::move(equalities1)));
+
+    std::vector<BSONElement> equalities2{obj2.firstElement()};
+    ASSERT_OK(eq2.setEqualities(std::move(equalities2)));
+
+    ASSERT(eq1.equivalent(&eq2));
 }
-*/
+
+TEST(InMatchExpression, InMatchExpressionsWithCollationNonEquivalentElementsAreUnequal) {
+    BSONObj obj1 = BSON(""
+                        << "string1");
+    BSONObj obj2 = BSON(""
+                        << "string2");
+    CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kReverseString);
+    InMatchExpression eq1;
+    eq1.setCollator(&collator1);
+    CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kReverseString);
+    InMatchExpression eq2;
+    eq2.setCollator(&collator2);
+
+    std::vector<BSONElement> equalities1{obj1.firstElement()};
+    ASSERT_OK(eq1.setEqualities(std::move(equalities1)));
+
+    std::vector<BSONElement> equalities2{obj2.firstElement()};
+    ASSERT_OK(eq2.setEqualities(std::move(equalities2)));
+
+    ASSERT(!eq1.equivalent(&eq2));
+}
+
+TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
+    BSONArray operand = BSON_ARRAY("string");
+    BSONObj notMatch = BSON("a"
+                            << "string2");
+    InMatchExpression in;
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
+    ASSERT(!in.matchesSingleElement(notMatch["a"]));
+}
+
+TEST(InMatchExpression, StringMatchingRespectsCollation) {
+    BSONArray operand = BSON_ARRAY("string");
+    BSONObj match = BSON("a"
+                         << "string2");
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    InMatchExpression in;
+    in.setCollator(&collator);
+    std::vector<BSONElement> equalities{operand.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
+    ASSERT(in.matchesSingleElement(match["a"]));
+}
+
+TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualities) {
+    BSONObj obj1 = BSON(""
+                        << "string1");
+    BSONObj obj2 = BSON(""
+                        << "string2");
+    CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
+    InMatchExpression in;
+    in.setCollator(&collatorAlwaysEqual);
+    std::vector<BSONElement> equalities{obj1.firstElement(), obj2.firstElement()};
+    ASSERT_OK(in.setEqualities(std::move(equalities)));
+    ASSERT(in.getEqualities().size() == 1);
+    in.setCollator(&collatorReverseString);
+    ASSERT(in.getEqualities().size() == 2);
+    ASSERT(in.getEqualities().count(obj1.firstElement()));
+    ASSERT(in.getEqualities().count(obj2.firstElement()));
+}
+
+std::vector<uint32_t> bsonArrayToBitPositions(const BSONArray& ba) {
+    std::vector<uint32_t> bitPositions;
+
+    // Convert BSONArray of bit positions to int vector
+    for (const auto& elt : ba) {
+        bitPositions.push_back(elt._numberInt());
+    }
+
+    return bitPositions;
+}
+
+TEST(BitTestMatchExpression, DoesNotMatchOther) {
+    std::vector<uint32_t> bitPositions;
+
+    BSONObj notMatch1 = fromjson("{a: {}}");     // Object
+    BSONObj notMatch2 = fromjson("{a: null}");   // Null
+    BSONObj notMatch3 = fromjson("{a: []}");     // Array
+    BSONObj notMatch4 = fromjson("{a: true}");   // Boolean
+    BSONObj notMatch5 = fromjson("{a: ''}");     // String
+    BSONObj notMatch6 = fromjson("{a: 5.5}");    // Non-integral Double
+    BSONObj notMatch7 = fromjson("{a: NaN}");    // NaN
+    BSONObj notMatch8 = fromjson("{a: 1e100}");  // Too-Large Double
+    BSONObj notMatch9 = fromjson("{a: ObjectId('000000000000000000000000')}");  // OID
+    BSONObj notMatch10 = fromjson("{a: Date(54)}");                             // Date
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositions));
+    ASSERT_OK(ballc.init("a", bitPositions));
+    ASSERT_OK(banys.init("a", bitPositions));
+    ASSERT_OK(banyc.init("a", bitPositions));
+    ASSERT_EQ((size_t)0, balls.numBitPositions());
+    ASSERT_EQ((size_t)0, ballc.numBitPositions());
+    ASSERT_EQ((size_t)0, banys.numBitPositions());
+    ASSERT_EQ((size_t)0, banyc.numBitPositions());
+    ASSERT(!balls.matchesSingleElement(notMatch1["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch2["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch3["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch4["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch5["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch6["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch7["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch8["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch9["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch10["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch1["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch2["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch3["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch4["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch5["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch6["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch7["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch8["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch9["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch10["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch1["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch2["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch3["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch4["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch5["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch6["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch7["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch8["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch9["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch10["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch1["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch2["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch3["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch4["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch5["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch6["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch7["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch8["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch9["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch10["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchBinaryWithLongBitMask) {
+    long long bitMask = 54;
+
+    BSONObj match = fromjson("{a: {$binary: 'NgAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitMask));
+    ASSERT_OK(ballc.init("a", bitMask));
+    ASSERT_OK(banys.init("a", bitMask));
+    ASSERT_OK(banyc.init("a", bitMask));
+    std::vector<uint32_t> bitPositions = balls.getBitPositions();
+    ASSERT(balls.matchesSingleElement(match["a"]));
+    ASSERT(!ballc.matchesSingleElement(match["a"]));
+    ASSERT(banys.matchesSingleElement(match["a"]));
+    ASSERT(!banyc.matchesSingleElement(match["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask) {
+    const char* bitMaskSet = "\x36\x00\x00\x00";
+    const char* bitMaskClear = "\xC9\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
+
+    BSONObj match = fromjson("{a: 54}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitMaskSet, 4));
+    ASSERT_OK(ballc.init("a", bitMaskClear, 9));
+    ASSERT_OK(banys.init("a", bitMaskSet, 4));
+    ASSERT_OK(banyc.init("a", bitMaskClear, 9));
+    ASSERT(balls.matchesSingleElement(match["a"]));
+    ASSERT(ballc.matchesSingleElement(match["a"]));
+    ASSERT(banys.matchesSingleElement(match["a"]));
+    ASSERT(banyc.matchesSingleElement(match["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchesEmpty) {
+    std::vector<uint32_t> bitPositions;
+
+    BSONObj match1 = fromjson("{a: NumberInt(54)}");
+    BSONObj match2 = fromjson("{a: NumberLong(54)}");
+    BSONObj match3 = fromjson("{a: 54.0}");
+    BSONObj match4 = fromjson("{a: {$binary: '2AAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositions));
+    ASSERT_OK(ballc.init("a", bitPositions));
+    ASSERT_OK(banys.init("a", bitPositions));
+    ASSERT_OK(banyc.init("a", bitPositions));
+    ASSERT_EQ((size_t)0, balls.numBitPositions());
+    ASSERT_EQ((size_t)0, ballc.numBitPositions());
+    ASSERT_EQ((size_t)0, banys.numBitPositions());
+    ASSERT_EQ((size_t)0, banyc.numBitPositions());
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
+    ASSERT(balls.matchesSingleElement(match3["a"]));
+    ASSERT(balls.matchesSingleElement(match4["a"]));
+    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(ballc.matchesSingleElement(match3["a"]));
+    ASSERT(ballc.matchesSingleElement(match4["a"]));
+    ASSERT(!banys.matchesSingleElement(match1["a"]));
+    ASSERT(!banys.matchesSingleElement(match2["a"]));
+    ASSERT(!banys.matchesSingleElement(match3["a"]));
+    ASSERT(!banys.matchesSingleElement(match4["a"]));
+    ASSERT(!banyc.matchesSingleElement(match1["a"]));
+    ASSERT(!banyc.matchesSingleElement(match2["a"]));
+    ASSERT(!banyc.matchesSingleElement(match3["a"]));
+    ASSERT(!banyc.matchesSingleElement(match4["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchesInteger) {
+    BSONArray bas = BSON_ARRAY(1 << 2 << 4 << 5);
+    BSONArray bac = BSON_ARRAY(0 << 3 << 600);
+    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
+    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
+
+    BSONObj match1 = fromjson("{a: NumberInt(54)}");
+    BSONObj match2 = fromjson("{a: NumberLong(54)}");
+    BSONObj match3 = fromjson("{a: 54.0}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositionsSet));
+    ASSERT_OK(ballc.init("a", bitPositionsClear));
+    ASSERT_OK(banys.init("a", bitPositionsSet));
+    ASSERT_OK(banyc.init("a", bitPositionsClear));
+    ASSERT_EQ((size_t)4, balls.numBitPositions());
+    ASSERT_EQ((size_t)3, ballc.numBitPositions());
+    ASSERT_EQ((size_t)4, banys.numBitPositions());
+    ASSERT_EQ((size_t)3, banyc.numBitPositions());
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
+    ASSERT(balls.matchesSingleElement(match3["a"]));
+    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(ballc.matchesSingleElement(match3["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match3["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match3["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchesNegativeInteger) {
+    BSONArray bas = BSON_ARRAY(1 << 3 << 6 << 7 << 33);
+    BSONArray bac = BSON_ARRAY(0 << 2 << 4 << 5);
+    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
+    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
+
+    BSONObj match1 = fromjson("{a: NumberInt(-54)}");
+    BSONObj match2 = fromjson("{a: NumberLong(-54)}");
+    BSONObj match3 = fromjson("{a: -54.0}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositionsSet));
+    ASSERT_OK(ballc.init("a", bitPositionsClear));
+    ASSERT_OK(banys.init("a", bitPositionsSet));
+    ASSERT_OK(banyc.init("a", bitPositionsClear));
+    ASSERT_EQ((size_t)5, balls.numBitPositions());
+    ASSERT_EQ((size_t)4, ballc.numBitPositions());
+    ASSERT_EQ((size_t)5, banys.numBitPositions());
+    ASSERT_EQ((size_t)4, banyc.numBitPositions());
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
+    ASSERT(balls.matchesSingleElement(match3["a"]));
+    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(ballc.matchesSingleElement(match3["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match3["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match3["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchesIntegerWithBitMask) {
+    long long bitMaskSet = 54;
+    long long bitMaskClear = 201;
+
+    BSONObj match1 = fromjson("{a: NumberInt(54)}");
+    BSONObj match2 = fromjson("{a: NumberLong(54)}");
+    BSONObj match3 = fromjson("{a: 54.0}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitMaskSet));
+    ASSERT_OK(ballc.init("a", bitMaskClear));
+    ASSERT_OK(banys.init("a", bitMaskSet));
+    ASSERT_OK(banyc.init("a", bitMaskClear));
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
+    ASSERT(balls.matchesSingleElement(match3["a"]));
+    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(ballc.matchesSingleElement(match3["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match3["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match3["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchesNegativeIntegerWithBitMask) {
+    long long bitMaskSet = 10;
+    long long bitMaskClear = 5;
+
+    BSONObj match1 = fromjson("{a: NumberInt(-54)}");
+    BSONObj match2 = fromjson("{a: NumberLong(-54)}");
+    BSONObj match3 = fromjson("{a: -54.0}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitMaskSet));
+    ASSERT_OK(ballc.init("a", bitMaskClear));
+    ASSERT_OK(banys.init("a", bitMaskSet));
+    ASSERT_OK(banyc.init("a", bitMaskClear));
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
+    ASSERT(balls.matchesSingleElement(match3["a"]));
+    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(ballc.matchesSingleElement(match3["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match3["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match3["a"]));
+}
+
+TEST(BitTestMatchExpression, DoesNotMatchInteger) {
+    BSONArray bas = BSON_ARRAY(1 << 2 << 4 << 5 << 6);
+    BSONArray bac = BSON_ARRAY(0 << 3 << 1);
+    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
+    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
+
+    BSONObj match1 = fromjson("{a: NumberInt(54)}");
+    BSONObj match2 = fromjson("{a: NumberLong(54)}");
+    BSONObj match3 = fromjson("{a: 54.0}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositionsSet));
+    ASSERT_OK(ballc.init("a", bitPositionsClear));
+    ASSERT_OK(banys.init("a", bitPositionsSet));
+    ASSERT_OK(banyc.init("a", bitPositionsClear));
+    ASSERT_EQ((size_t)5, balls.numBitPositions());
+    ASSERT_EQ((size_t)3, ballc.numBitPositions());
+    ASSERT_EQ((size_t)5, banys.numBitPositions());
+    ASSERT_EQ((size_t)3, banyc.numBitPositions());
+    ASSERT(!balls.matchesSingleElement(match1["a"]));
+    ASSERT(!balls.matchesSingleElement(match2["a"]));
+    ASSERT(!balls.matchesSingleElement(match3["a"]));
+    ASSERT(!ballc.matchesSingleElement(match1["a"]));
+    ASSERT(!ballc.matchesSingleElement(match2["a"]));
+    ASSERT(!ballc.matchesSingleElement(match3["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match3["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match3["a"]));
+}
+
+TEST(BitTestMatchExpression, DoesNotMatchIntegerWithBitMask) {
+    long long bitMaskSet = 118;
+    long long bitMaskClear = 11;
+
+    BSONObj match1 = fromjson("{a: NumberInt(54)}");
+    BSONObj match2 = fromjson("{a: NumberLong(54)}");
+    BSONObj match3 = fromjson("{a: 54.0}");
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitMaskSet));
+    ASSERT_OK(ballc.init("a", bitMaskClear));
+    ASSERT_OK(banys.init("a", bitMaskSet));
+    ASSERT_OK(banyc.init("a", bitMaskClear));
+    ASSERT(!balls.matchesSingleElement(match1["a"]));
+    ASSERT(!balls.matchesSingleElement(match2["a"]));
+    ASSERT(!balls.matchesSingleElement(match3["a"]));
+    ASSERT(!ballc.matchesSingleElement(match1["a"]));
+    ASSERT(!ballc.matchesSingleElement(match2["a"]));
+    ASSERT(!ballc.matchesSingleElement(match3["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match3["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match3["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchesBinary1) {
+    BSONArray bas = BSON_ARRAY(1 << 2 << 4 << 5);
+    BSONArray bac = BSON_ARRAY(0 << 3 << 600);
+    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
+    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
+
+    BSONObj match1 = fromjson("{a: {$binary: 'NgAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+    // Base64 to Binary: 00110110...
+    BSONObj match2 = fromjson("{a: {$binary: 'NgAjqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
+    // Base64 to Binary: 00110110...
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositionsSet));
+    ASSERT_OK(ballc.init("a", bitPositionsClear));
+    ASSERT_OK(banys.init("a", bitPositionsSet));
+    ASSERT_OK(banyc.init("a", bitPositionsClear));
+    ASSERT_EQ((size_t)4, balls.numBitPositions());
+    ASSERT_EQ((size_t)3, ballc.numBitPositions());
+    ASSERT_EQ((size_t)4, banys.numBitPositions());
+    ASSERT_EQ((size_t)3, banyc.numBitPositions());
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
+    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchesBinary2) {
+    BSONArray bas = BSON_ARRAY(21 << 22 << 8 << 9);
+    BSONArray bac = BSON_ARRAY(20 << 23 << 612);
+    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
+    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
+
+    BSONObj match1 = fromjson("{a: {$binary: 'AANgAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+    // Base64 to Binary: 00000000 00000011 01100000
+    BSONObj match2 = fromjson("{a: {$binary: 'JANgqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
+    // Base64 to Binary: ........ 00000011 01100000
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositionsSet));
+    ASSERT_OK(ballc.init("a", bitPositionsClear));
+    ASSERT_OK(banys.init("a", bitPositionsSet));
+    ASSERT_OK(banyc.init("a", bitPositionsClear));
+    ASSERT_EQ((size_t)4, balls.numBitPositions());
+    ASSERT_EQ((size_t)3, ballc.numBitPositions());
+    ASSERT_EQ((size_t)4, banys.numBitPositions());
+    ASSERT_EQ((size_t)3, banyc.numBitPositions());
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
+    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+}
+
+TEST(BitTestMatchExpression, MatchesBinaryWithBitMask) {
+    const char* bas = "\0\x03\x60\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+    const char* bac = "\0\xFC\x9F\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
+    BSONObj match1 = fromjson("{a: {$binary: 'AANgAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+    // Base64 to Binary: 00000000 00000011 01100000
+    BSONObj match2 = fromjson("{a: {$binary: 'JANgAwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
+    // Base64 to Binary: ........ 00000011 01100000
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+    ASSERT_OK(balls.init("a", bas, 21));
+    ASSERT_OK(ballc.init("a", bac, 21));
+    ASSERT_OK(banys.init("a", bas, 21));
+    ASSERT_OK(banyc.init("a", bac, 21));
+    ASSERT(balls.matchesSingleElement(match1["a"]));
+    ASSERT(balls.matchesSingleElement(match2["a"]));
+    ASSERT(ballc.matchesSingleElement(match1["a"]));
+    ASSERT(ballc.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+}
+
+TEST(BitTestMatchExpression, DoesNotMatchBinary1) {
+    BSONArray bas = BSON_ARRAY(1 << 2 << 4 << 5 << 6);
+    BSONArray bac = BSON_ARRAY(0 << 3 << 1);
+    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
+    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
+
+    BSONObj match1 = fromjson("{a: {$binary: 'NgAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+    // Base64 to Binary: 00110110...
+    BSONObj match2 = fromjson("{a: {$binary: 'NgAjqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
+    // Base64 to Binary: 00110110...
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositionsSet));
+    ASSERT_OK(ballc.init("a", bitPositionsClear));
+    ASSERT_OK(banys.init("a", bitPositionsSet));
+    ASSERT_OK(banyc.init("a", bitPositionsClear));
+    ASSERT_EQ((size_t)5, balls.numBitPositions());
+    ASSERT_EQ((size_t)3, ballc.numBitPositions());
+    ASSERT_EQ((size_t)5, banys.numBitPositions());
+    ASSERT_EQ((size_t)3, banyc.numBitPositions());
+    ASSERT(!balls.matchesSingleElement(match1["a"]));
+    ASSERT(!balls.matchesSingleElement(match2["a"]));
+    ASSERT(!ballc.matchesSingleElement(match1["a"]));
+    ASSERT(!ballc.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+}
+
+TEST(BitTestMatchExpression, DoesNotMatchBinary2) {
+    BSONArray bas = BSON_ARRAY(21 << 22 << 23 << 24 << 25);
+    BSONArray bac = BSON_ARRAY(20 << 23 << 21);
+    std::vector<uint32_t> bitPositionsSet = bsonArrayToBitPositions(bas);
+    std::vector<uint32_t> bitPositionsClear = bsonArrayToBitPositions(bac);
+
+    BSONObj match1 = fromjson("{a: {$binary: 'AANgAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+    // Base64 to Binary: 00000000 00000011 01100000
+    BSONObj match2 = fromjson("{a: {$binary: 'JANgqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
+    // Base64 to Binary: ........ 00000011 01100000
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+
+    ASSERT_OK(balls.init("a", bitPositionsSet));
+    ASSERT_OK(ballc.init("a", bitPositionsClear));
+    ASSERT_OK(banys.init("a", bitPositionsSet));
+    ASSERT_OK(banyc.init("a", bitPositionsClear));
+    ASSERT_EQ((size_t)5, balls.numBitPositions());
+    ASSERT_EQ((size_t)3, ballc.numBitPositions());
+    ASSERT_EQ((size_t)5, banys.numBitPositions());
+    ASSERT_EQ((size_t)3, banyc.numBitPositions());
+    ASSERT(!balls.matchesSingleElement(match1["a"]));
+    ASSERT(!balls.matchesSingleElement(match2["a"]));
+    ASSERT(!ballc.matchesSingleElement(match1["a"]));
+    ASSERT(!ballc.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+}
+
+TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
+    const char* bas = "\0\x03\x60\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xFF";
+    const char* bac = "\0\xFD\x9F\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xFF";
+
+    BSONObj match1 = fromjson("{a: {$binary: 'AANgAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
+    // Base64 to Binary: 00000000 00000011 01100000
+    BSONObj match2 = fromjson("{a: {$binary: 'JANgAwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
+    // Base64 to Binary: ........ 00000011 01100000
+
+    BitsAllSetMatchExpression balls;
+    BitsAllClearMatchExpression ballc;
+    BitsAnySetMatchExpression banys;
+    BitsAnyClearMatchExpression banyc;
+    ASSERT_OK(balls.init("a", bas, 22));
+    ASSERT_OK(ballc.init("a", bac, 22));
+    ASSERT_OK(banys.init("a", bas, 22));
+    ASSERT_OK(banyc.init("a", bac, 22));
+    ASSERT(!balls.matchesSingleElement(match1["a"]));
+    ASSERT(!balls.matchesSingleElement(match2["a"]));
+    ASSERT(!ballc.matchesSingleElement(match1["a"]));
+    ASSERT(!ballc.matchesSingleElement(match2["a"]));
+    ASSERT(banys.matchesSingleElement(match1["a"]));
+    ASSERT(banys.matchesSingleElement(match2["a"]));
+    ASSERT(banyc.matchesSingleElement(match1["a"]));
+    ASSERT(banyc.matchesSingleElement(match2["a"]));
+}
 }

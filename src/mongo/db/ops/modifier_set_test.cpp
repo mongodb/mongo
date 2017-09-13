@@ -29,6 +29,8 @@
 
 #include "mongo/db/ops/modifier_set.h"
 
+#include <cstdint>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"
@@ -36,8 +38,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -116,6 +117,33 @@ TEST(SimpleMod, PrepareNoOp) {
 
     ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
     ASSERT_TRUE(execInfo.noOp);
+}
+
+TEST(SimpleMod, PrepareNotNoOp) {
+    Document doc(fromjson("{a: NumberInt(2)}"));
+    Mod setMod(fromjson("{$set: {a: NumberLong(2)}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+}
+
+TEST(SimpleMod, PrepareIdentityOpOnDeserializedIsNotANoOp) {
+    Document doc(fromjson("{a: { b: NumberInt(0)}}"));
+
+    // Apply a mutation to the document that will make it non-serialized.
+    doc.root()["a"]["b"].setValueInt(2).transitional_ignore();
+
+    // Apply an op that would be a no-op.
+    Mod setMod(fromjson("{$set: {a: {b : NumberInt(2)}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
 }
 
 TEST(SimpleMod, PrepareSetOnInsert) {
@@ -233,6 +261,17 @@ TEST(DottedMod, PrepareNoOp) {
 
     ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
     ASSERT_TRUE(execInfo.noOp);
+}
+
+TEST(DottedMod, PrepareNotNoOp) {
+    Document doc(fromjson("{a: {b: NumberLong(2)}}"));
+    Mod setMod(fromjson("{$set: {'a.b': NumberInt(2)}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
+    ASSERT_FALSE(execInfo.noOp);
 }
 
 TEST(DottedMod, PreparePathNotViable) {
@@ -369,6 +408,17 @@ TEST(IndexedMod, PrepareNoOp) {
 
     ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
     ASSERT_TRUE(execInfo.noOp);
+}
+
+TEST(IndexedMod, PrepareNotNoOp) {
+    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2.0}]}"));
+    Mod setMod(fromjson("{$set: {'a.2.b': NumberInt(2)}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
+    ASSERT_FALSE(execInfo.noOp);
 }
 
 TEST(IndexedMod, PrepareNonViablePath) {
@@ -736,9 +786,9 @@ TEST(Ephemeral, ApplySetModToEphemeralDocument) {
     // $set.
     Document doc;
     Element x = doc.makeElementObject("x");
-    doc.root().pushBack(x);
+    doc.root().pushBack(x).transitional_ignore();
     Element a = doc.makeElementInt("a", 100);
-    x.pushBack(a);
+    x.pushBack(a).transitional_ignore();
 
     Mod setMod(fromjson("{ $set: { x: { a: 100, b: 2 }}}"), true);
 

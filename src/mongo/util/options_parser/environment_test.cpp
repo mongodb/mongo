@@ -27,9 +27,9 @@
 
 #include "mongo/bson/util/builder.h"
 
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
-#include "mongo/unittest/unittest.h"
 
 namespace {
 
@@ -46,7 +46,7 @@ TEST(Environment, EmptyValue) {
 TEST(Environment, Immutable) {
     moe::Environment environment;
     moe::ImmutableKeyConstraint immutableKeyConstraint(moe::Key("port"));
-    environment.addKeyConstraint(&immutableKeyConstraint);
+    environment.addKeyConstraint(&immutableKeyConstraint).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("port"), moe::Value(5)));
     ASSERT_OK(environment.validate());
     ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value(0)));
@@ -55,7 +55,7 @@ TEST(Environment, Immutable) {
 TEST(Environment, OutOfRange) {
     moe::Environment environment;
     moe::NumericKeyConstraint numericKeyConstraint(moe::Key("port"), 1000, 65535);
-    environment.addKeyConstraint(&numericKeyConstraint);
+    environment.addKeyConstraint(&numericKeyConstraint).transitional_ignore();
     ASSERT_OK(environment.validate());
     ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value(0)));
 }
@@ -63,7 +63,7 @@ TEST(Environment, OutOfRange) {
 TEST(Environment, NonNumericRangeConstraint) {
     moe::Environment environment;
     moe::NumericKeyConstraint numericKeyConstraint(moe::Key("port"), 1000, 65535);
-    environment.addKeyConstraint(&numericKeyConstraint);
+    environment.addKeyConstraint(&numericKeyConstraint).transitional_ignore();
     ASSERT_OK(environment.validate());
     ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value("string")));
 }
@@ -71,7 +71,7 @@ TEST(Environment, NonNumericRangeConstraint) {
 TEST(Environment, BadType) {
     moe::Environment environment;
     moe::TypeKeyConstraint<int> typeKeyConstraintInt(moe::Key("port"));
-    environment.addKeyConstraint(&typeKeyConstraintInt);
+    environment.addKeyConstraint(&typeKeyConstraintInt).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("port"), moe::Value("string")));
     ASSERT_NOT_OK(environment.validate());
 }
@@ -79,9 +79,9 @@ TEST(Environment, BadType) {
 TEST(Environment, AllowNumeric) {
     moe::Environment environment;
     moe::TypeKeyConstraint<long> typeKeyConstraintLong(moe::Key("port"));
-    environment.addKeyConstraint(&typeKeyConstraintLong);
+    environment.addKeyConstraint(&typeKeyConstraintLong).transitional_ignore();
     moe::TypeKeyConstraint<int> typeKeyConstraintInt(moe::Key("port"));
-    environment.addKeyConstraint(&typeKeyConstraintInt);
+    environment.addKeyConstraint(&typeKeyConstraintInt).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("port"), moe::Value(1)));
     ASSERT_OK(environment.validate());
 }
@@ -89,7 +89,7 @@ TEST(Environment, AllowNumeric) {
 TEST(Environment, MutuallyExclusive) {
     moe::Environment environment;
     moe::MutuallyExclusiveKeyConstraint constraint(moe::Key("key"), moe::Key("otherKey"));
-    environment.addKeyConstraint(&constraint);
+    environment.addKeyConstraint(&constraint).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
     ASSERT_OK(environment.set(moe::Key("otherKey"), moe::Value(1)));
     ASSERT_NOT_OK(environment.validate());
@@ -98,7 +98,7 @@ TEST(Environment, MutuallyExclusive) {
 TEST(Environment, RequiresOther) {
     moe::Environment environment;
     moe::RequiresOtherKeyConstraint constraint(moe::Key("key"), moe::Key("otherKey"));
-    environment.addKeyConstraint(&constraint);
+    environment.addKeyConstraint(&constraint).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
     ASSERT_NOT_OK(environment.validate());
     ASSERT_OK(environment.set(moe::Key("otherKey"), moe::Value(1)));
@@ -108,7 +108,7 @@ TEST(Environment, RequiresOther) {
 TEST(Environment, StringFormat) {
     moe::Environment environment;
     moe::StringFormatKeyConstraint constraint(moe::Key("key"), "[0-9]", "[0-9]");
-    environment.addKeyConstraint(&constraint);
+    environment.addKeyConstraint(&constraint).transitional_ignore();
     ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
     ASSERT_NOT_OK(environment.validate());
     ASSERT_OK(environment.set(moe::Key("key"), moe::Value(std::string("a"))));
@@ -137,7 +137,7 @@ TEST(ToBSONTests, NormalValues) {
                                      << "string");
     // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
     // based on the sort order of keys in a std::map.
-    ASSERT_EQUALS(obj, environment.toBSON());
+    ASSERT_BSONOBJ_EQ(obj, environment.toBSON());
 }
 
 TEST(ToBSONTests, DottedValues) {
@@ -146,10 +146,12 @@ TEST(ToBSONTests, DottedValues) {
     ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(true)));
     ASSERT_OK(environment.set(moe::Key("val1.dotted2"), moe::Value(std::string("string"))));
     mongo::BSONObj obj = BSON("val1" << BSON("dotted1" << 6 << "dotted2"
-                                                       << "string") << "val2" << true);
+                                                       << "string")
+                                     << "val2"
+                                     << true);
     // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
     // based on the sort order of keys in a std::map.
-    ASSERT_EQUALS(obj, environment.toBSON());
+    ASSERT_BSONOBJ_EQ(obj, environment.toBSON());
 }
 
 TEST(ToBSONTests, DeepDottedValues) {
@@ -161,11 +163,14 @@ TEST(ToBSONTests, DeepDottedValues) {
     ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(6.0)));
     mongo::BSONObj obj =
         BSON("val1" << BSON("first1" << BSON("second1" << BSON("third1" << 6 << "third2" << true)
-                                                       << "second2" << BSON("third1" << false))
+                                                       << "second2"
+                                                       << BSON("third1" << false))
                                      << "first2"
-                                     << "string") << "val2" << 6.0);
+                                     << "string")
+                    << "val2"
+                    << 6.0);
     // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
     // based on the sort order of keys in a std::map.
-    ASSERT_EQUALS(obj, environment.toBSON());
+    ASSERT_BSONOBJ_EQ(obj, environment.toBSON());
 }
 }  // unnamed namespace

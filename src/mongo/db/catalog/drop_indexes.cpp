@@ -48,43 +48,34 @@
 
 namespace mongo {
 namespace {
-Status wrappedRun(OperationContext* txn,
-                  const StringData& dbname,
-                  const std::string& toDeleteNs,
-                  Database* const db,
+Status wrappedRun(OperationContext* opCtx,
+                  Collection* collection,
                   const BSONObj& jsobj,
                   BSONObjBuilder* anObjBuilder) {
-    if (!serverGlobalParams.quiet) {
-        LOG(0) << "CMD: dropIndexes " << toDeleteNs;
-    }
-    Collection* collection = db ? db->getCollection(toDeleteNs) : nullptr;
-
-    // If db/collection does not exist, short circuit and return.
-    if (!db || !collection) {
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
-    }
-
-    OldClientContext ctx(txn, toDeleteNs);
-    BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs);
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    anObjBuilder->appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(txn));
-
+    anObjBuilder->appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(opCtx));
 
     BSONElement f = jsobj.getField("index");
     if (f.type() == String) {
         std::string indexToDelete = f.valuestr();
 
         if (indexToDelete == "*") {
-            Status s = indexCatalog->dropAllIndexes(txn, false);
-            if (!s.isOK()) {
-                return s;
+            std::map<std::string, BSONObj> droppedIndexes;
+            indexCatalog->dropAllIndexes(opCtx, false, &droppedIndexes);
+
+            // We log one op for every dropped index so that we can roll them back if necessary.
+            for (auto const& idx : droppedIndexes) {
+                opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+                    opCtx, collection->ns(), collection->uuid(), idx.first, idx.second);
             }
+
             anObjBuilder->append("msg", "non-_id indexes dropped for collection");
             return Status::OK();
         }
 
-        IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, indexToDelete);
+        IndexDescriptor* desc =
+            collection->getIndexCatalog()->findIndexByName(opCtx, indexToDelete);
         if (desc == NULL) {
             return Status(ErrorCodes::IndexNotFound,
                           str::stream() << "index not found with name [" << indexToDelete << "]");
@@ -94,31 +85,57 @@ Status wrappedRun(OperationContext* txn,
             return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
         }
 
-        Status s = indexCatalog->dropIndex(txn, desc);
+        Status s = indexCatalog->dropIndex(opCtx, desc);
         if (!s.isOK()) {
             return s;
         }
+
+        opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+            opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
 
         return Status::OK();
     }
 
     if (f.type() == Object) {
-        IndexDescriptor* desc =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, f.embeddedObject());
-        if (desc == NULL) {
-            return Status(ErrorCodes::InvalidOptions,
-                          str::stream()
-                              << "can't find index with key: " << f.embeddedObject().toString());
+        std::vector<IndexDescriptor*> indexes;
+        collection->getIndexCatalog()->findIndexesByKeyPattern(
+            opCtx, f.embeddedObject(), false, &indexes);
+        if (indexes.empty()) {
+            return Status(ErrorCodes::IndexNotFound,
+                          str::stream() << "can't find index with key: " << f.embeddedObject());
+        } else if (indexes.size() > 1) {
+            return Status(ErrorCodes::AmbiguousIndexKeyPattern,
+                          str::stream() << indexes.size() << " indexes found for key: "
+                                        << f.embeddedObject()
+                                        << ", identify by name instead."
+                                        << " Conflicting indexes: "
+                                        << indexes[0]->infoObj()
+                                        << ", "
+                                        << indexes[1]->infoObj());
         }
 
+        IndexDescriptor* desc = indexes[0];
         if (desc->isIdIndex()) {
             return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
         }
 
-        Status s = indexCatalog->dropIndex(txn, desc);
+        if (desc->indexName() == "*") {
+            // Dropping an index named '*' results in an drop-index oplog entry with a name of '*',
+            // which in 3.6 and later is interpreted by replication as meaning "drop all indexes on
+            // this collection".
+            return Status(ErrorCodes::InvalidOptions,
+                          "cannot drop an index named '*' by key pattern.  You must drop the "
+                          "entire collection, drop all indexes on the collection by using an index "
+                          "name of '*', or downgrade to 3.4 to drop only this index.");
+        }
+
+        Status s = indexCatalog->dropIndex(opCtx, desc);
         if (!s.isOK()) {
             return s;
         }
+
+        opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+            opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
 
         return Status::OK();
     }
@@ -127,35 +144,51 @@ Status wrappedRun(OperationContext* txn,
 }
 }  // namespace
 
-Status dropIndexes(OperationContext* txn,
-                   const NamespaceString& ns,
+Status dropIndexes(OperationContext* opCtx,
+                   const NamespaceString& nss,
                    const BSONObj& idxDescriptor,
                    BSONObjBuilder* result) {
-    StringData dbName = ns.db();
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetDb autoDb(txn, dbName, MODE_X);
+    return writeConflictRetry(
+        opCtx, "dropIndexes", nss.db(), [opCtx, &nss, &idxDescriptor, result] {
+            AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
 
-        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns);
+            bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss);
 
-        if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while dropping indexes in "
-                                        << ns.toString());
-        }
+            if (userInitiatedWritesAndNotPrimary) {
+                return Status(ErrorCodes::NotMaster,
+                              str::stream() << "Not primary while dropping indexes in "
+                                            << nss.ns());
+            }
 
-        WriteUnitOfWork wunit(txn);
-        Status status = wrappedRun(txn, dbName, ns, autoDb.getDb(), idxDescriptor, result);
-        if (!status.isOK()) {
-            return status;
-        }
-        getGlobalServiceContext()->getOpObserver()->onDropIndex(
-            txn, dbName.toString() + ".$cmd", idxDescriptor);
-        wunit.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropIndexes", dbName);
-    return Status::OK();
+            if (!serverGlobalParams.quiet.load()) {
+                LOG(0) << "CMD: dropIndexes " << nss;
+            }
+
+            // If db/collection does not exist, short circuit and return.
+            Database* db = autoDb.getDb();
+            Collection* collection = db ? db->getCollection(opCtx, nss) : nullptr;
+            if (!db || !collection) {
+                if (db && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
+                    return Status(ErrorCodes::CommandNotSupportedOnView,
+                                  str::stream() << "Cannot drop indexes on view " << nss.ns());
+                }
+
+                return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+            }
+
+            WriteUnitOfWork wunit(opCtx);
+            OldClientContext ctx(opCtx, nss.ns());
+            BackgroundOperation::assertNoBgOpInProgForNs(nss);
+
+            Status status = wrappedRun(opCtx, collection, idxDescriptor, result);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            wunit.commit();
+            return Status::OK();
+        });
 }
 
 }  // namespace mongo

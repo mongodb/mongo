@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -7,6 +7,7 @@
  */
 
 #include "util.h"
+#include "util_dump.h"
 #include "util_load.h"
 
 /*
@@ -28,8 +29,8 @@ typedef struct {
 	WT_SESSION *session;    /* associated session */
 	ULINE line;		/* current line */
 	const char *p;		/* points to cur position in line.mem */
-	int ateof;		/* current token is EOF */
-	int peeking;		/* peeking at next token */
+	bool ateof;		/* current token is EOF */
+	bool peeking;		/* peeking at next token */
 	int toktype;		/* next token, defined by __wt_json_token() */
 	const char *tokstart;	/* next token start (points into line.mem) */
 	size_t toklen;		/* next token length */
@@ -71,8 +72,8 @@ json_column_group_index(WT_SESSION *session,
     JSON_INPUT_STATE *ins, CONFIG_LIST *clp, int idx)
 {
 	WT_DECL_RET;
+	bool isconfig;
 	char *config, *p, *uri;
-	int isconfig;
 
 	uri = NULL;
 	config = NULL;
@@ -144,18 +145,23 @@ static int
 json_kvraw_append(WT_SESSION *session,
     JSON_INPUT_STATE *ins, const char *str, size_t len)
 {
-	char *tmp;
+	WT_DECL_RET;
 	size_t needsize;
+	char *tmp;
 
 	if (len > 0) {
 		needsize = strlen(ins->kvraw) + len + 2;
 		if ((tmp = malloc(needsize)) == NULL)
 			return (util_err(session, errno, NULL));
-		snprintf(tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str);
+		WT_ERR(__wt_snprintf(
+		    tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str));
 		free(ins->kvraw);
 		ins->kvraw = tmp;
 	}
 	return (0);
+
+err:	free(tmp);
+	return (util_err(session, ret, NULL));
 }
 
 /*
@@ -180,15 +186,14 @@ json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
 		goto err;
 	}
 	resultlen += 1;
-	if ((result = (char *)malloc((size_t)resultlen)) == NULL) {
+	if ((result = malloc((size_t)resultlen)) == NULL) {
 		ret = util_err(session, errno, NULL);
 		goto err;
 	}
 	*resultp = result;
 	resultcpy = result;
-	if ((ret = __wt_json_strncpy(&resultcpy, (size_t)resultlen, src,
-	    srclen))
-	    != 0) {
+	if ((ret = __wt_json_strncpy(
+	    session, &resultcpy, (size_t)resultlen, src, srclen)) != 0) {
 		ret = util_err(session, ret, NULL);
 		goto err;
 	}
@@ -213,12 +218,12 @@ json_data(WT_SESSION *session,
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+	size_t gotnolen, keystrlen;
+	uint64_t gotno, recno;
+	int nfield, nkeys, toktype, tret;
+	bool isrec;
 	char config[64], *endp, *uri;
 	const char *keyformat;
-	int isrec, nfield, nkeys, toktype, tret;
-	size_t keystrlen;
-	ssize_t gotnolen;
-	uint64_t gotno, recno;
 
 	cursor = NULL;
 	uri = NULL;
@@ -236,19 +241,22 @@ json_data(WT_SESSION *session,
 		goto err;
 
 	uri = clp->list[0];
-	(void)snprintf(config, sizeof(config),
+	if ((ret = __wt_snprintf(config, sizeof(config),
 	    "dump=json%s%s",
 	    LF_ISSET(LOAD_JSON_APPEND) ? ",append" : "",
-	    LF_ISSET(LOAD_JSON_NO_OVERWRITE) ? ",overwrite=false" : "");
+	    LF_ISSET(LOAD_JSON_NO_OVERWRITE) ? ",overwrite=false" : "")) != 0) {
+		ret = util_err(session, ret, NULL);
+		goto err;
+	}
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0) {
-		ret = util_err(session, ret, "%s: session.open", uri);
+		ret = util_err(session, ret, "%s: session.open_cursor", uri);
 		goto err;
 	}
 	keyformat = cursor->key_format;
-	isrec = (strcmp(keyformat, "r") == 0);
+	isrec = strcmp(keyformat, "r") == 0;
 	for (nkeys = 0; *keyformat; keyformat++)
-		if (!isdigit(*keyformat))
+		if (!__wt_isdigit((u_char)*keyformat))
 			nkeys++;
 
 	recno = 0;
@@ -256,7 +264,7 @@ json_data(WT_SESSION *session,
 		nfield = 0;
 		JSON_EXPECT(session, ins, '{');
 		if (ins->kvraw == NULL) {
-			if ((ins->kvraw = (char *)malloc(1)) == NULL) {
+			if ((ins->kvraw = malloc(1)) == NULL) {
 				ret = util_err(session, errno, NULL);
 				goto err;
 			}
@@ -273,9 +281,8 @@ json_data(WT_SESSION *session,
 				/* Verify the dump has recnos in order. */
 				recno++;
 				gotno = __wt_strtouq(ins->tokstart, &endp, 0);
-				gotnolen = (endp - ins->tokstart);
-				if (recno != gotno ||
-				    ins->toklen != (size_t)gotnolen) {
+				gotnolen = (size_t)(endp - ins->tokstart);
+				if (recno != gotno || ins->toklen != gotnolen) {
 					ret = util_err(session, 0,
 					    "%s: recno out of order", uri);
 					goto err;
@@ -345,20 +352,44 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 {
 	CONFIG_LIST cl;
 	WT_DECL_RET;
-	char *config, *tableuri;
-	int toktype;
 	static const char *json_markers[] = {
 	    "\"config\"", "\"colgroups\"", "\"indices\"", "\"data\"", NULL };
+	char *config, *tableuri;
+	int curversion, toktype;
+	bool hasversion;
 
 	memset(&cl, 0, sizeof(cl));
 	tableuri = NULL;
+	hasversion = false;
+
 	JSON_EXPECT(session, ins, '{');
 	while (json_peek(session, ins) == 's') {
 		JSON_EXPECT(session, ins, 's');
 		tableuri = realloc(tableuri, ins->toklen);
-		snprintf(tableuri, ins->toklen, "%.*s",
-		    (int)(ins->toklen - 2), ins->tokstart + 1);
+		if ((ret = __wt_snprintf(tableuri, ins->toklen,
+		    "%.*s", (int)(ins->toklen - 2), ins->tokstart + 1)) != 0) {
+			ret = util_err(session, ret, NULL);
+			goto err;
+		}
 		JSON_EXPECT(session, ins, ':');
+		if (!hasversion) {
+			if (strcmp(tableuri, DUMP_JSON_VERSION_MARKER) != 0) {
+				ret = util_err(session, ENOTSUP,
+				    "missing \"%s\"", DUMP_JSON_VERSION_MARKER);
+				goto err;
+			}
+			hasversion = true;
+			JSON_EXPECT(session, ins, 's');
+			if ((curversion = atoi(ins->tokstart + 1)) <= 0 ||
+			    curversion > DUMP_JSON_SUPPORTED_VERSION) {
+				ret = util_err(session, ENOTSUP,
+				    "unsupported JSON dump version \"%.*s\"",
+				    (int)(ins->toklen - 1), ins->tokstart + 1);
+				goto err;
+			}
+			JSON_EXPECT(session, ins, ',');
+			continue;
+		}
 
 		/*
 		 * Allow any ordering of 'config', 'colgroups',
@@ -407,6 +438,9 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 				    flags)) != 0)
 					goto err;
 				config_list_free(&cl);
+				free(ins->kvraw);
+				ins->kvraw = NULL;
+				config_list_free(&cl);
 				break;
 			}
 			else
@@ -448,7 +482,7 @@ json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
 
 	if (!ins->peeking) {
 		while (!ins->ateof) {
-			while (isspace(*ins->p))
+			while (__wt_isspace((u_char)*ins->p))
 				ins->p++;
 			if (*ins->p)
 				break;
@@ -462,7 +496,7 @@ json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
 				ins->kvrawstart = 0;
 			}
 			if (util_read_line(
-			    session, &ins->line, 1, &ins->ateof)) {
+			    session, &ins->line, true, &ins->ateof)) {
 				ins->toktype = -1;
 				ret = -1;
 				goto err;
@@ -476,7 +510,7 @@ json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
 		    &ins->toktype, &ins->tokstart,
 		    &ins->toklen) != 0)
 			ins->toktype = -1;
-		ins->peeking = 1;
+		ins->peeking = true;
 	}
 	if (0) {
 	err:	if (ret == 0)
@@ -498,7 +532,7 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 	if (json_peek(session, ins) < 0)
 		return (1);
 	ins->p += ins->toklen;
-	ins->peeking = 0;
+	ins->peeking = false;
 	if (ins->toktype != wanttok) {
 		fprintf(stderr,
 		    "%s: %d: %" WT_SIZET_FMT ": expected %s, got %s\n",
@@ -524,15 +558,14 @@ json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
 	const char *hit;
 	const char **match;
 
-	if (ins->kvraw != NULL)
-		return (1);
-
+	WT_ASSERT((WT_SESSION_IMPL *)session, ins->kvraw == NULL);
 	hit = NULL;
 	while (!ins->ateof) {
 		for (match = matches; *match != NULL; match++)
 			if ((hit = strstr(ins->p, *match)) != NULL)
 				goto out;
-		if (util_read_line(session, &ins->line, 1, &ins->ateof)) {
+		if (util_read_line(session, &ins->line, true, &ins->ateof)
+		    != 0) {
 			ins->toktype = -1;
 			return (1);
 		}
@@ -545,7 +578,7 @@ out:
 
 	/* Set to this token. */
 	ins->p = hit;
-	ins->peeking = 0;
+	ins->peeking = false;
 	ins->toktype = 0;
 	(void)json_peek(session, ins);
 	return (0);
@@ -563,7 +596,7 @@ util_load_json(WT_SESSION *session, const char *filename, uint32_t flags)
 
 	memset(&instate, 0, sizeof(instate));
 	instate.session = session;
-	if (util_read_line(session, &instate.line, 0, &instate.ateof))
+	if (util_read_line(session, &instate.line, false, &instate.ateof))
 		return (1);
 	instate.p = (const char *)instate.line.mem;
 	instate.linenum = 1;

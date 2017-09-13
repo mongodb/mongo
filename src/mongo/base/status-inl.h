@@ -44,11 +44,11 @@ inline Status& Status::operator=(const Status& other) {
     return *this;
 }
 
-inline Status::Status(Status&& other) BOOST_NOEXCEPT : _error(other._error) {
+inline Status::Status(Status&& other) noexcept : _error(other._error) {
     other._error = nullptr;
 }
 
-inline Status& Status::operator=(Status&& other) BOOST_NOEXCEPT {
+inline Status& Status::operator=(Status&& other) noexcept {
     unref(_error);
     _error = other._error;
     other._error = nullptr;
@@ -60,7 +60,7 @@ inline Status::~Status() {
 }
 
 inline bool Status::isOK() const {
-    return code() == ErrorCodes::OK;
+    return !_error;
 }
 
 inline ErrorCodes::Error Status::code() const {
@@ -69,14 +69,6 @@ inline ErrorCodes::Error Status::code() const {
 
 inline std::string Status::codeString() const {
     return ErrorCodes::errorString(code());
-}
-
-inline std::string Status::reason() const {
-    return _error ? _error->reason : std::string();
-}
-
-inline int Status::location() const {
-    return _error ? _error->location : 0;
 }
 
 inline AtomicUInt32::WordType Status::refCount() const {

@@ -3,7 +3,7 @@
 # Create wtstats.template.html file
 
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 # We require npm which may not be installed.
 type npm > /dev/null 2>&1 || {

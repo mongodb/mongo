@@ -28,9 +28,11 @@
 
 #pragma once
 
-
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/value_internal.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class BSONElement;
@@ -57,6 +59,28 @@ class BSONElement;
  */
 class Value {
 public:
+    /**
+     * Operator overloads for relops return a DeferredComparison which can subsequently be evaluated
+     * by a ValueComparator.
+     */
+    struct DeferredComparison {
+        enum class Type {
+            kLT,
+            kLTE,
+            kEQ,
+            kGT,
+            kGTE,
+            kNE,
+        };
+
+        DeferredComparison(Type type, const Value& lhs, const Value& rhs)
+            : type(type), lhs(lhs), rhs(rhs) {}
+
+        Type type;
+        const Value& lhs;
+        const Value& rhs;
+    };
+
     /** Construct a Value
      *
      *  All types not listed will be rejected rather than converted (see private for why)
@@ -71,14 +95,16 @@ public:
     explicit Value(int value) : _storage(NumberInt, value) {}
     explicit Value(long long value) : _storage(NumberLong, value) {}
     explicit Value(double value) : _storage(NumberDouble, value) {}
+    explicit Value(const Decimal128& value) : _storage(NumberDecimal, value) {}
     explicit Value(const Timestamp& value) : _storage(bsonTimestamp, value) {}
     explicit Value(const OID& value) : _storage(jstOID, value) {}
     explicit Value(StringData value) : _storage(String, value) {}
     explicit Value(const std::string& value) : _storage(String, StringData(value)) {}
-    explicit Value(const char* value) : _storage(String, StringData(value)) {}
     explicit Value(const Document& doc) : _storage(Object, doc) {}
     explicit Value(const BSONObj& obj);
     explicit Value(const BSONArray& arr);
+    explicit Value(const std::vector<BSONObj>& vec);
+    explicit Value(const std::vector<Document>& vec);
     explicit Value(std::vector<Value> vec) : _storage(Array, new RCVector(std::move(vec))) {}
     explicit Value(const BSONBinData& bd) : _storage(BinData, bd) {}
     explicit Value(const BSONRegEx& re) : _storage(RegEx, re) {}
@@ -91,6 +117,12 @@ public:
     explicit Value(const MinKeyLabeler&) : _storage(MinKey) {}        // MINKEY
     explicit Value(const MaxKeyLabeler&) : _storage(MaxKey) {}        // MAXKEY
     explicit Value(const Date_t& date) : _storage(Date, date.toMillisSinceEpoch()) {}
+    explicit Value(const UUID& uuid)
+        : _storage(BinData,
+                   BSONBinData(uuid.toCDR().data(), uuid.toCDR().length(), BinDataType::newUUID)) {}
+
+    explicit Value(const char*) = delete;  // Use StringData instead to prevent accidentally
+                                           // terminating the string at the first null byte.
 
     // TODO: add an unsafe version that can share storage with the BSONElement
     /// Deep-convert from BSONElement to Value
@@ -120,7 +152,14 @@ public:
     /// true if type represents a number
     bool numeric() const {
         return _storage.type == NumberDouble || _storage.type == NumberLong ||
-            _storage.type == NumberInt;
+            _storage.type == NumberInt || _storage.type == NumberDecimal;
+    }
+
+    /**
+     * Return true if the Value is an array.
+     */
+    bool isArray() const {
+        return _storage.type == Array;
     }
 
     /**
@@ -138,12 +177,13 @@ public:
      *  Asserts if the requested value type is not exactly correct.
      *  See coerceTo methods below for a more type-flexible alternative.
      */
+    Decimal128 getDecimal() const;
     double getDouble() const;
     std::string getString() const;
     Document getDocument() const;
     OID getOid() const;
     bool getBool() const;
-    long long getDate() const;  // in milliseconds
+    Date_t getDate() const;
     Timestamp getTimestamp() const;
     const char* getRegex() const;
     const char* getRegexFlags() const;
@@ -151,6 +191,7 @@ public:
     std::string getCode() const;
     int getInt() const;
     long long getLong() const;
+    UUID getUuid() const;
     const std::vector<Value>& getArray() const {
         return _storage.getArray();
     }
@@ -162,11 +203,20 @@ public:
     /// Access a field of a subdocument. Returns Value() if missing or getType() != Object
     Value operator[](StringData name) const;
 
-    /// Add this value to the BSON object under construction.
-    void addToBsonObj(BSONObjBuilder* pBuilder, StringData fieldName) const;
+    /**
+     * Recursively serializes this value as a field in the object in 'builder' with the field name
+     * 'fieldName'. This function throws a AssertionException if the recursion exceeds the server's
+     * BSON depth limit.
+     */
+    void addToBsonObj(BSONObjBuilder* builder,
+                      StringData fieldName,
+                      size_t recursionLevel = 1) const;
 
-    /// Add this field to the BSON array under construction.
-    void addToBsonArray(BSONArrayBuilder* pBuilder) const;
+    /**
+     * Recursively serializes this value as an element in the array in 'builder'. This function
+     * throws a AssertionException if the recursion exceeds the server's BSON depth limit.
+     */
+    void addToBsonArray(BSONArrayBuilder* builder, size_t recursionLevel = 1) const;
 
     // Support BSONObjBuilder and BSONArrayBuilder "stream" API
     friend BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val);
@@ -184,33 +234,58 @@ public:
     int coerceToInt() const;
     long long coerceToLong() const;
     double coerceToDouble() const;
+    Decimal128 coerceToDecimal() const;
     Timestamp coerceToTimestamp() const;
-    long long coerceToDate() const;
-    time_t coerceToTimeT() const;
-    tm coerceToTm() const;  // broken-out time struct (see man gmtime)
+    Date_t coerceToDate() const;
 
+    //
+    // Comparison API.
+    //
+    // Value instances can be compared either using Value::compare() or via operator overloads.
+    // Most callers should prefer operator overloads. Note that the operator overloads return a
+    // DeferredComparison, which must be subsequently evaluated by a ValueComparator. See
+    // value_comparator.h for details.
+    //
 
-    /** Compare two Values.
+    /**
+     * Compare two Values. Most Values should prefer to use ValueComparator instead. See
+     * value_comparator.h for details.
+     *
+     *  Pass a non-null StringData::ComparatorInterface if special string comparison semantics are
+     *  required. If the comparator is null, then a simple binary compare is used for strings. This
+     *  comparator is only used for string *values*; field names are always compared using simple
+     *  binary compare.
+     *
      *  @returns an integer less than zero, zero, or an integer greater than
      *           zero, depending on whether lhs < rhs, lhs == rhs, or lhs > rhs
      *  Warning: may return values other than -1, 0, or 1
      */
-    static int compare(const Value& lhs, const Value& rhs);
+    static int compare(const Value& lhs,
+                       const Value& rhs,
+                       const StringData::ComparatorInterface* stringComparator);
 
-    friend bool operator==(const Value& v1, const Value& v2) {
-        if (v1._storage.identical(v2._storage)) {
-            // Simple case
-            return true;
-        }
-        return (Value::compare(v1, v2) == 0);
+    friend DeferredComparison operator==(const Value& lhs, const Value& rhs) {
+        return DeferredComparison(DeferredComparison::Type::kEQ, lhs, rhs);
     }
 
-    friend bool operator!=(const Value& v1, const Value& v2) {
-        return !(v1 == v2);
+    friend DeferredComparison operator!=(const Value& lhs, const Value& rhs) {
+        return DeferredComparison(DeferredComparison::Type::kNE, lhs, rhs);
     }
 
-    friend bool operator<(const Value& lhs, const Value& rhs) {
-        return (Value::compare(lhs, rhs) < 0);
+    friend DeferredComparison operator<(const Value& lhs, const Value& rhs) {
+        return DeferredComparison(DeferredComparison::Type::kLT, lhs, rhs);
+    }
+
+    friend DeferredComparison operator<=(const Value& lhs, const Value& rhs) {
+        return DeferredComparison(DeferredComparison::Type::kLTE, lhs, rhs);
+    }
+
+    friend DeferredComparison operator>(const Value& lhs, const Value& rhs) {
+        return DeferredComparison(DeferredComparison::Type::kGT, lhs, rhs);
+    }
+
+    friend DeferredComparison operator>=(const Value& lhs, const Value& rhs) {
+        return DeferredComparison(DeferredComparison::Type::kGTE, lhs, rhs);
     }
 
     /// This is for debugging, logging, etc. See getString() for how to extract a string.
@@ -231,17 +306,16 @@ public:
     /// Get the approximate memory size of the value, in bytes. Includes sizeof(Value)
     size_t getApproximateSize() const;
 
-    /** Calculate a hash value.
+    /**
+     * Calculate a hash value.
      *
-     *  Meant to be used to create composite hashes suitable for
-     *  hashed container classes such as unordered_map<>.
+     * Meant to be used to create composite hashes suitable for hashed container classes such as
+     * unordered_map<>.
+     *
+     * Most callers should prefer the utilities in ValueComparator for hashing and creating function
+     * objects for computing the hash. See value_comparator.h.
      */
-    void hash_combine(size_t& seed) const;
-
-    /// struct Hash is defined to enable the use of Values as keys in unordered_map.
-    struct Hash : std::unary_function<const Value&, size_t> {
-        size_t operator()(const Value& rV) const;
-    };
+    void hash_combine(size_t& seed, const StringData::ComparatorInterface* stringComparator) const;
 
     /// Call this after memcpying to update ref counts if needed
     void memcpyed() const {
@@ -258,6 +332,11 @@ public:
     Value getOwned() const {
         return *this;
     }
+
+    /// Members to support parsing/deserialization from IDL generated code.
+    void serializeForIDL(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeForIDL(BSONArrayBuilder* builder) const;
+    static Value deserializeForIDL(const BSONElement& element);
 
 private:
     /** This is a "honeypot" to prevent unexpected implicit conversions to the accepted argument
@@ -276,17 +355,31 @@ private:
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr
 };
-BOOST_STATIC_ASSERT(sizeof(Value) == 16);
+MONGO_STATIC_ASSERT(sizeof(Value) == 16);
 
-typedef unordered_set<Value, Value::Hash> ValueSet;
-}
-
-namespace std {
-// This is used by std::sort and others
-template <>
 inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
     lhs.swap(rhs);
 }
+
+/**
+ * This class is identical to Value, but supports implicit creation from any of the types explicitly
+ * supported by Value.
+ */
+class ImplicitValue : public Value {
+public:
+    template <typename T>
+    ImplicitValue(T arg) : Value(std::move(arg)) {}
+
+    /**
+     * Converts a vector of Implicit values to a single Value object.
+     */
+    static Value convertToValue(const std::vector<ImplicitValue>& vec) {
+        std::vector<Value> values;
+        for_each(
+            vec.begin(), vec.end(), ([&](const ImplicitValue& val) { values.push_back(val); }));
+        return Value(values);
+    }
+};
 }
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
@@ -296,12 +389,6 @@ namespace mongo {
 inline size_t Value::getArrayLength() const {
     verify(getType() == Array);
     return getArray().size();
-}
-
-inline size_t Value::Hash::operator()(const Value& v) const {
-    size_t seed = 0xf0afbeef;
-    v.hash_combine(seed);
-    return seed;
 }
 
 inline StringData Value::getStringData() const {
@@ -323,9 +410,9 @@ inline bool Value::getBool() const {
     return _storage.boolValue;
 }
 
-inline long long Value::getDate() const {
+inline Date_t Value::getDate() const {
     verify(getType() == Date);
-    return _storage.dateValue;
+    return Date_t::fromMillisSinceEpoch(_storage.dateValue);
 }
 
 inline Timestamp Value::getTimestamp() const {
@@ -366,5 +453,11 @@ inline long long Value::getLong() const {
 
     verify(type == NumberLong);
     return _storage.longValue;
+}
+
+inline UUID Value::getUuid() const {
+    verify(_storage.binDataType() == BinDataType::newUUID);
+    auto stringData = _storage.getString();
+    return UUID::fromCDR({stringData.rawData(), stringData.size()});
 }
 };

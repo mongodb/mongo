@@ -33,7 +33,13 @@
 #include <cstring>
 #include <iosfwd>
 #include <limits>
+#include <stdexcept>
 #include <string>
+
+#include "mongo/stdx/type_traits.h"
+#define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#include "mongo/util/invariant.h"
+#undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 
 namespace mongo {
 
@@ -51,34 +57,66 @@ namespace mongo {
  *    rawData() terminates with a null.
  */
 class StringData {
+    struct TrustedInitTag {};
+    constexpr StringData(const char* c, size_t len, TrustedInitTag) : _data(c), _size(len) {}
+
 public:
-    /** Constructs an empty std::string data */
-    StringData() : _data(NULL), _size(0) {}
+    // Declared in string_data_comparator_interface.h.
+    class ComparatorInterface;
+
+    // Iterator type
+    using const_iterator = const char*;
+
+    /** Constructs an empty StringData. */
+    constexpr StringData() = default;
 
     /**
-     * Constructs a StringData, for the case where the length of std::string is not known. 'c'
-     * must be a pointer to a null-terminated string.
+     * Constructs a StringData, for the case where the length of the
+     * string is not known. 'c' must either be NULL, or a pointer to a
+     * null-terminated string.
      */
-    StringData(const char* str) : _data(str), _size((str == NULL) ? 0 : std::strlen(str)) {}
+    StringData(const char* str) : StringData(str, str ? std::strlen(str) : 0) {}
 
     /**
-     * Constructs a StringData explicitly, for the case where the length of the std::string is
-     * already known. 'c' must be a pointer to a null-terminated string, and len must
-     * be the length that strlen(c) would return, a.k.a the index of the terminator in c.
+     * Constructs a StringData, for the case of a std::string. We can
+     * use the trusted init path with no follow on checks because
+     * string::data is assured to never return nullptr.
      */
-    StringData(const char* c, size_t len) : _data(c), _size(len) {}
-
-    /** Constructs a StringData, for the case of a string. */
-    StringData(const std::string& s) : _data(s.c_str()), _size(s.size()) {}
+    StringData(const std::string& s) : StringData(s.data(), s.length(), TrustedInitTag()) {}
 
     /**
-     * Constructs a StringData explicitly, for the case of a literal whose size is known at
-     * compile time.
+     * Constructs a StringData with an explicit length. 'c' must
+     * either be NULL (in which case len must be zero), or be a
+     * pointer into a character array. The StringData will refer to
+     * the first 'len' characters starting at 'c'. The range of
+     * characters c to c+len must be valid.
      */
-    struct LiteralTag {};
-    template <size_t N>
-    StringData(const char(&val)[N], LiteralTag)
-        : _data(&val[0]), _size(N - 1) {}
+    StringData(const char* c, size_t len) : StringData(c, len, TrustedInitTag()) {
+        invariant(_data || (_size == 0));
+    }
+
+    /**
+     * Constructs a StringData from a user defined literal.  This allows
+     * for constexpr creation of StringData's that are known at compile time.
+     */
+    constexpr friend StringData operator"" _sd(const char* c, std::size_t len);
+
+    /**
+     * Constructs a StringData with begin and end iterators. begin points to the beginning of the
+     * string. end points to the position past the end of the string. In a null-terminated string,
+     * end points to the null-terminator.
+     *
+     * We template the second parameter to ensure if StringData is called with 0 in the second
+     * parameter, the (ptr,len) constructor is chosen instead.
+     */
+    template <
+        typename InputIt,
+        typename = stdx::enable_if_t<std::is_same<StringData::const_iterator, InputIt>::value>>
+    StringData(InputIt begin, InputIt end) {
+        invariant(begin && end);
+        _data = begin;
+        _size = std::distance(begin, end);
+    }
 
     /**
      * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
@@ -124,48 +162,36 @@ public:
      * null-terminated, so if using this without checking size(), you are likely doing
      * something wrong.
      */
-    const char* rawData() const {
+    constexpr const char* rawData() const {
         return _data;
     }
 
-    size_t size() const {
+    constexpr size_t size() const {
         return _size;
     }
-    bool empty() const {
+    constexpr bool empty() const {
         return size() == 0;
     }
     std::string toString() const {
         return std::string(_data, size());
     }
-    char operator[](unsigned pos) const {
+    constexpr char operator[](unsigned pos) const {
         return _data[pos];
     }
-
-    /**
-     * Functor compatible with std::hash for std::unordered_{map,set}
-     * Warning: The hash function is subject to change. Do not use in cases where hashes need
-     *          to be consistent across versions.
-     */
-    struct Hasher {
-        size_t operator()(StringData str) const;
-    };
 
     //
     // iterators
     //
-
-    typedef const char* const_iterator;
-
-    const_iterator begin() const {
+    constexpr const_iterator begin() const {
         return rawData();
     }
-    const_iterator end() const {
+    constexpr const_iterator end() const {
         return rawData() + size();
     }
 
 private:
-    const char* _data;  // is not guaranted to be null terminated (see "notes" above)
-    size_t _size;       // 'size' does not include the null terminator
+    const char* _data = nullptr;  // is not guaranted to be null terminated (see "notes" above)
+    size_t _size = 0;             // 'size' does not include the null terminator
 };
 
 inline bool operator==(StringData lhs, StringData rhs) {
@@ -194,6 +220,129 @@ inline bool operator>=(StringData lhs, StringData rhs) {
 
 std::ostream& operator<<(std::ostream& stream, StringData value);
 
-}  // namespace mongo
+constexpr StringData operator"" _sd(const char* c, std::size_t len) {
+    return StringData(c, len, StringData::TrustedInitTag{});
+}
 
-#include "mongo/base/string_data-inl.h"
+inline int StringData::compare(StringData other) const {
+    // It is illegal to pass nullptr to memcmp. It is an invariant of
+    // StringData that if _data is nullptr, _size is zero. If asked to
+    // compare zero bytes, memcmp returns zero (how could they
+    // differ?). So, if either StringData object has a nullptr _data
+    // object, then memcmp would return zero. Achieve this by assuming
+    // zero, and only calling memcmp if both pointers are valid.
+    int res = 0;
+    if (_data && other._data)
+        res = memcmp(_data, other._data, std::min(_size, other._size));
+
+    if (res != 0)
+        return res > 0 ? 1 : -1;
+
+    if (_size == other._size)
+        return 0;
+
+    return _size > other._size ? 1 : -1;
+}
+
+inline bool StringData::equalCaseInsensitive(StringData other) const {
+    if (other.size() != size())
+        return false;
+
+    for (size_t x = 0; x < size(); x++) {
+        char a = _data[x];
+        char b = other._data[x];
+        if (a == b)
+            continue;
+        if (tolower(a) == tolower(b))
+            continue;
+        return false;
+    }
+
+    return true;
+}
+
+inline void StringData::copyTo(char* dest, bool includeEndingNull) const {
+    if (_data)
+        memcpy(dest, _data, size());
+    if (includeEndingNull)
+        dest[size()] = 0;
+}
+
+inline size_t StringData::find(char c, size_t fromPos) const {
+    if (fromPos >= size())
+        return std::string::npos;
+
+    const void* x = memchr(_data + fromPos, c, _size - fromPos);
+    if (x == 0)
+        return std::string::npos;
+    return static_cast<size_t>(static_cast<const char*>(x) - _data);
+}
+
+inline size_t StringData::find(StringData needle) const {
+    size_t mx = size();
+    size_t needleSize = needle.size();
+
+    if (needleSize == 0)
+        return 0;
+    else if (needleSize > mx)
+        return std::string::npos;
+
+    mx -= needleSize;
+
+    for (size_t i = 0; i <= mx; i++) {
+        if (memcmp(_data + i, needle._data, needleSize) == 0)
+            return i;
+    }
+    return std::string::npos;
+}
+
+inline size_t StringData::rfind(char c, size_t fromPos) const {
+    const size_t sz = size();
+    if (fromPos > sz)
+        fromPos = sz;
+
+    for (const char* cur = _data + fromPos; cur > _data; --cur) {
+        if (*(cur - 1) == c)
+            return (cur - _data) - 1;
+    }
+    return std::string::npos;
+}
+
+inline StringData StringData::substr(size_t pos, size_t n) const {
+    if (pos > size())
+        throw std::out_of_range("out of range");
+
+    // truncate to end of string
+    if (n > size() - pos)
+        n = size() - pos;
+
+    return StringData(_data + pos, n);
+}
+
+inline bool StringData::startsWith(StringData prefix) const {
+    // TODO: Investigate an optimized implementation.
+    return substr(0, prefix.size()) == prefix;
+}
+
+inline bool StringData::endsWith(StringData suffix) const {
+    // TODO: Investigate an optimized implementation.
+    const size_t thisSize = size();
+    const size_t suffixSize = suffix.size();
+    if (suffixSize > thisSize)
+        return false;
+    return substr(thisSize - suffixSize) == suffix;
+}
+
+inline std::string operator+(std::string lhs, StringData rhs) {
+    if (!rhs.empty())
+        lhs.append(rhs.rawData(), rhs.size());
+    return lhs;
+}
+
+inline std::string operator+(StringData lhs, std::string rhs) {
+    if (!lhs.empty())
+        rhs.insert(0, lhs.rawData(), lhs.size());
+    return rhs;
+}
+
+}  // namespace mongo

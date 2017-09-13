@@ -28,95 +28,34 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/smart_ptr.hpp>
+#include "mongo/db/pipeline/document_source_project.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/value.h"
+#include <boost/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::string;
-using std::vector;
+using parsed_aggregation_projection::ParsedAggregationProjection;
 
-const char DocumentSourceProject::projectName[] = "$project";
+REGISTER_DOCUMENT_SOURCE(project,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceProject::createFromBson);
 
-DocumentSourceProject::DocumentSourceProject(const intrusive_ptr<ExpressionContext>& pExpCtx,
-                                             const intrusive_ptr<ExpressionObject>& exprObj)
-    : DocumentSource(pExpCtx), pEO(exprObj) {}
-
-const char* DocumentSourceProject::getSourceName() const {
-    return projectName;
-}
-
-boost::optional<Document> DocumentSourceProject::getNext() {
-    pExpCtx->checkForInterrupt();
-
-    boost::optional<Document> input = pSource->getNext();
-    if (!input)
-        return boost::none;
-
-    /* create the result document */
-    const size_t sizeHint = pEO->getSizeHint();
-    MutableDocument out(sizeHint);
-    out.copyMetaDataFrom(*input);
-
-    /*
-      Use the ExpressionObject to create the base result.
-
-      If we're excluding fields at the top level, leave out the _id if
-      it is found, because we took care of it above.
-    */
-    _variables->setRoot(*input);
-    pEO->addToDocument(out, *input, _variables.get());
-    _variables->clearRoot();
-
-    return out.freeze();
-}
-
-intrusive_ptr<DocumentSource> DocumentSourceProject::optimize() {
-    intrusive_ptr<Expression> pE(pEO->optimize());
-    pEO = boost::dynamic_pointer_cast<ExpressionObject>(pE);
-    return this;
-}
-
-Value DocumentSourceProject::serialize(bool explain) const {
-    return Value(DOC(getSourceName() << pEO->serialize(explain)));
+intrusive_ptr<DocumentSource> DocumentSourceProject::create(
+    BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
+        expCtx, ParsedAggregationProjection::create(expCtx, projectSpec), "$project"));
+    return project;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    /* validate */
-    uassert(15969,
-            str::stream() << projectName << " specification must be an object",
-            elem.type() == Object);
-
-    Expression::ObjectCtx objectCtx(Expression::ObjectCtx::DOCUMENT_OK |
-                                    Expression::ObjectCtx::TOP_LEVEL |
-                                    Expression::ObjectCtx::INCLUSION_OK);
-
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
-    intrusive_ptr<Expression> parsed = Expression::parseObject(elem.Obj(), &objectCtx, vps);
-    ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
-    massert(16402, "parseObject() returned wrong type of Expression", exprObj);
-    uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());
-
-    intrusive_ptr<DocumentSourceProject> pProject(new DocumentSourceProject(pExpCtx, exprObj));
-    pProject->_variables.reset(new Variables(idGenerator.getIdCount()));
-
-    BSONObj projectObj = elem.Obj();
-    pProject->_raw = projectObj.getOwned();
-
-    return pProject;
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(15969, "$project specification must be an object", elem.type() == Object);
+    return DocumentSourceProject::create(elem.Obj(), expCtx);
 }
 
-DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(DepsTracker* deps) const {
-    vector<string> path;  // empty == top-level
-    pEO->addDependencies(deps, &path);
-    return EXHAUSTIVE_FIELDS;
-}
-}
+}  // namespace mongo

@@ -1,15 +1,15 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
 
+#define	WT_PTRDIFFT_FMT	"td"			/* ptrdiff_t format string */
 #define	WT_SIZET_FMT	"zu"			/* size_t format string */
 
-#define	WT_COMPILER_TYPE_ALIGN(x)
-
+/* Lint-specific attributes. */
 #define	WT_PACKED_STRUCT_BEGIN(name)					\
 	struct name {
 #define	WT_PACKED_STRUCT_END						\
@@ -18,40 +18,71 @@
 #define	WT_GCC_FUNC_ATTRIBUTE(x)
 #define	WT_GCC_FUNC_DECL_ATTRIBUTE(x)
 
-#define	__WT_ATOMIC_ADD(v, val)						\
-    ((v) += (val))
-#define	__WT_ATOMIC_FETCH_ADD(v, val)					\
-    ((v) += (val), (v))
-#define	__WT_ATOMIC_CAS(v, old, new)					\
-    ((v) = ((v) == (old) ? (new) : (old)), (v) == (old))
-#define	__WT_ATOMIC_STORE(v, val)					\
-    ((v) = (val))
-#define	__WT_ATOMIC_SUB(v, val)						\
-    ((v) -= (val), (v))
+#define	WT_ATOMIC_FUNC(name, ret, type)					\
+static inline ret							\
+__wt_atomic_add##name(type *vp, type v)					\
+{									\
+	*vp += v;							\
+	return (*vp);							\
+}									\
+static inline ret							\
+__wt_atomic_fetch_add##name(type *vp, type v)				\
+{									\
+	type orig;							\
+									\
+	orig = *vp;							\
+	*vp += v;							\
+	return (orig);							\
+}									\
+static inline ret							\
+__wt_atomic_store##name(type *vp, type v)				\
+{									\
+	type orig;							\
+									\
+	orig = *vp;							\
+	*vp = v;							\
+	return (orig);							\
+}									\
+static inline ret							\
+__wt_atomic_sub##name(type *vp, type v)					\
+{									\
+	*vp -= v;							\
+	return (*vp);							\
+}									\
+static inline bool							\
+__wt_atomic_cas##name(type *vp, type orig, type new)			\
+{									\
+	if (*vp == orig) {						\
+		*vp = new;						\
+		return (true);						\
+	}								\
+	return (false);							\
+}
 
-#define	WT_ATOMIC_ADD1(v, val)		__WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_FETCH_ADD1(v, val)	__WT_ATOMIC_FETCH_ADD(v, val)
-#define	WT_ATOMIC_CAS1(v, old, new)	__WT_ATOMIC_CAS(v, old, new)
-#define	WT_ATOMIC_STORE1(v, val)	__WT_ATOMIC_STORE(v, val)
-#define	WT_ATOMIC_SUB1(v, val)		__WT_ATOMIC_SUB(v, val)
+WT_ATOMIC_FUNC(8, uint8_t, uint8_t)
+WT_ATOMIC_FUNC(16, uint16_t, uint16_t)
+WT_ATOMIC_FUNC(32, uint32_t, uint32_t)
+WT_ATOMIC_FUNC(v32, uint32_t, volatile uint32_t)
+WT_ATOMIC_FUNC(i32, int32_t, int32_t)
+WT_ATOMIC_FUNC(iv32, int32_t, volatile int32_t)
+WT_ATOMIC_FUNC(64, uint64_t, uint64_t)
+WT_ATOMIC_FUNC(v64, uint64_t, volatile uint64_t)
+WT_ATOMIC_FUNC(i64, int64_t, int64_t)
+WT_ATOMIC_FUNC(iv64, int64_t, volatile int64_t)
+WT_ATOMIC_FUNC(size, size_t, size_t)
 
-#define	WT_ATOMIC_ADD2(v, val)		__WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_FETCH_ADD2(v, val)	__WT_ATOMIC_FETCH_ADD(v, val)
-#define	WT_ATOMIC_CAS2(v, old, new)	__WT_ATOMIC_CAS(v, old, new)
-#define	WT_ATOMIC_STORE2(v, val)	__WT_ATOMIC_STORE(v, val)
-#define	WT_ATOMIC_SUB2(v, val)		__WT_ATOMIC_SUB(v, val)
-
-#define	WT_ATOMIC_ADD4(v, val)		__WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_FETCH_ADD4(v, val)	__WT_ATOMIC_FETCH_ADD(v, val)
-#define	WT_ATOMIC_CAS4(v, old, new)	__WT_ATOMIC_CAS(v, old, new)
-#define	WT_ATOMIC_STORE4(v, val)	__WT_ATOMIC_STORE(v, val)
-#define	WT_ATOMIC_SUB4(v, val)		__WT_ATOMIC_SUB(v, val)
-
-#define	WT_ATOMIC_ADD8(v, val)		__WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_FETCH_ADD8(v, val)	__WT_ATOMIC_FETCH_ADD(v, val)
-#define	WT_ATOMIC_CAS8(v, old, new)	__WT_ATOMIC_CAS(v, old, new)
-#define	WT_ATOMIC_STORE8(v, val)	__WT_ATOMIC_STORE(v, val)
-#define	WT_ATOMIC_SUB8(v, val)		__WT_ATOMIC_SUB(v, val)
+/*
+ * __wt_atomic_cas_ptr --
+ *	Pointer compare and swap.
+ */
+static inline bool
+__wt_atomic_cas_ptr(void *vp, void *orig, void *new) {
+	if (*(void **)vp == orig) {
+		*(void **)vp = new;
+		return (true);
+	}
+	return (false);
+}
 
 static inline void WT_BARRIER(void) { return; }
 static inline void WT_FULL_BARRIER(void) { return; }

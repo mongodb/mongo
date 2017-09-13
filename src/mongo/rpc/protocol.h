@@ -28,13 +28,17 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <type_traits>
 
 #include "mongo/base/status_with.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
+class BSONObj;
+class OperationContext;
 namespace rpc {
 
 /**
@@ -53,9 +57,14 @@ enum class Protocol : std::uint64_t {
     kOpQuery = 1 << 0,
 
     /**
-     * The post-3.2 OP_COMMAND protocol.
+     * The 3.2-3.6 OP_COMMAND protocol.
      */
     kOpCommandV1 = 1 << 1,
+
+    /**
+     * The 3.6+ OP_MSG protocol.
+     */
+    kOpMsg = 1 << 2,
 };
 
 /**
@@ -71,9 +80,22 @@ namespace supports {
 const ProtocolSet kNone = ProtocolSet{0};
 const ProtocolSet kOpQueryOnly = static_cast<ProtocolSet>(Protocol::kOpQuery);
 const ProtocolSet kOpCommandOnly = static_cast<ProtocolSet>(Protocol::kOpCommandV1);
-const ProtocolSet kAll = kOpQueryOnly | kOpCommandOnly;
+const ProtocolSet kOpMsgOnly = static_cast<ProtocolSet>(Protocol::kOpMsg);
+const ProtocolSet kAll = kOpQueryOnly | kOpCommandOnly | kOpMsgOnly;
 
 }  // namespace supports
+
+Protocol protocolForMessage(const Message& message);
+
+/**
+ * Returns the protocol used to initiate the current operation.
+ */
+Protocol getOperationProtocol(OperationContext* opCtx);
+
+/**
+ * Sets the protocol used to initiate the current operation.
+ */
+void setOperationProtocol(OperationContext* opCtx, Protocol protocol);
 
 /**
  * Returns the newest protocol supported by two parties.
@@ -94,6 +116,31 @@ StatusWith<StringData> toString(ProtocolSet protocols);
  * 'supports' namespace are supported
  */
 StatusWith<ProtocolSet> parseProtocolSet(StringData repr);
+
+/**
+ * Validates client and server wire version. The server is returned from isMaster, and the client is
+ * from WireSpec.instance().
+ */
+Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo server);
+
+/**
+ * Struct to pass around information about protocol set and wire version.
+ */
+struct ProtocolSetAndWireVersionInfo {
+    ProtocolSet protocolSet;
+    WireVersionInfo version;
+};
+
+/**
+ * Determines the ProtocolSet of a remote server from an isMaster reply.
+ */
+StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
+    const BSONObj& isMasterReply);
+
+/**
+  * Computes supported protocols from wire versions.
+  */
+ProtocolSet computeProtocolSet(const WireVersionInfo version);
 
 }  // namespace rpc
 }  // namespace mongo

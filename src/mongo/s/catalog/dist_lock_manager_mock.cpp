@@ -34,71 +34,102 @@
 
 #include <algorithm>
 
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-using stdx::chrono::milliseconds;
-
 namespace {
 
-void NoLockFuncSet(StringData name,
-                   StringData whyMessage,
-                   milliseconds waitFor,
-                   milliseconds lockTryInterval) {
+void NoLockFuncSet(StringData name, StringData whyMessage, Milliseconds waitFor) {
     FAIL(str::stream() << "Lock not expected to be called. "
-                       << "Name: " << name << ", whyMessage: " << whyMessage
-                       << ", waitFor: " << waitFor << ", lockTryInterval: " << lockTryInterval);
+                       << "Name: "
+                       << name
+                       << ", whyMessage: "
+                       << whyMessage
+                       << ", waitFor: "
+                       << waitFor);
 }
 
 }  // namespace
 
-DistLockManagerMock::DistLockManagerMock()
-    : _lockReturnStatus{Status::OK()}, _lockChecker{NoLockFuncSet} {}
+DistLockManagerMock::DistLockManagerMock(std::unique_ptr<DistLockCatalog> catalog)
+    : _catalog(std::move(catalog)), _lockReturnStatus{Status::OK()}, _lockChecker{NoLockFuncSet} {}
 
 void DistLockManagerMock::startUp() {}
 
-void DistLockManagerMock::shutDown() {
+void DistLockManagerMock::shutDown(OperationContext* opCtx) {
     uassert(28659, "DistLockManagerMock shut down with outstanding locks present", _locks.empty());
 }
 
-StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
-    StringData name, StringData whyMessage, milliseconds waitFor, milliseconds lockTryInterval) {
-    _lockChecker(name, whyMessage, waitFor, lockTryInterval);
+std::string DistLockManagerMock::getProcessID() {
+    return "Mock dist lock manager process id";
+}
+
+StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationContext* opCtx,
+                                                                  StringData name,
+                                                                  StringData whyMessage,
+                                                                  const OID& lockSessionID,
+                                                                  Milliseconds waitFor) {
+    _lockChecker(name, whyMessage, waitFor);
     _lockChecker = NoLockFuncSet;
 
     if (!_lockReturnStatus.isOK()) {
         return _lockReturnStatus;
     }
 
-    if (_locks.end() != std::find_if(_locks.begin(),
-                                     _locks.end(),
-                                     [name](LockInfo info) -> bool { return info.name == name; })) {
+    if (_locks.end() != std::find_if(_locks.begin(), _locks.end(), [name](LockInfo info) -> bool {
+            return info.name == name;
+        })) {
         return Status(ErrorCodes::LockBusy,
                       str::stream() << "Lock \"" << name << "\" is already taken");
     }
 
     LockInfo info;
     info.name = name.toString();
-    info.lockID = DistLockHandle::gen();
+    info.lockID = lockSessionID;
     _locks.push_back(info);
 
-    return DistLockManager::ScopedDistLock(info.lockID, this);
+    return info.lockID;
 }
 
-void DistLockManagerMock::unlock(const DistLockHandle& lockHandle) {
+StatusWith<DistLockHandle> DistLockManagerMock::tryLockWithLocalWriteConcern(
+    OperationContext* opCtx, StringData name, StringData whyMessage, const OID& lockSessionID) {
+    // Not yet implemented
+    MONGO_UNREACHABLE;
+}
+
+void DistLockManagerMock::unlockAll(OperationContext* opCtx, const std::string& processID) {
+    // Not yet implemented
+    MONGO_UNREACHABLE;
+}
+
+void DistLockManagerMock::unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) {
     std::vector<LockInfo>::iterator it =
-        std::find_if(_locks.begin(),
-                     _locks.end(),
-                     [&lockHandle](LockInfo info) -> bool { return info.lockID == lockHandle; });
+        std::find_if(_locks.begin(), _locks.end(), [&lockHandle](LockInfo info) -> bool {
+            return info.lockID == lockHandle;
+        });
     if (it == _locks.end()) {
         return;
     }
     _locks.erase(it);
 }
 
-Status DistLockManagerMock::checkStatus(const DistLockHandle& lockHandle) {
+void DistLockManagerMock::unlock(OperationContext* opCtx,
+                                 const DistLockHandle& lockHandle,
+                                 StringData name) {
+    std::vector<LockInfo>::iterator it =
+        std::find_if(_locks.begin(), _locks.end(), [&lockHandle, &name](LockInfo info) -> bool {
+            return ((info.lockID == lockHandle) && (info.name == name));
+        });
+    if (it == _locks.end()) {
+        return;
+    }
+    _locks.erase(it);
+}
+
+Status DistLockManagerMock::checkStatus(OperationContext* opCtx, const DistLockHandle& lockHandle) {
     return Status::OK();
 }
 
@@ -106,4 +137,5 @@ void DistLockManagerMock::expectLock(LockFunc checker, Status status) {
     _lockReturnStatus = std::move(status);
     _lockChecker = checker;
 }
-}
+
+}  // namespace mongo

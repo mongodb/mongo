@@ -78,7 +78,8 @@ private:
 
 class GeoMatchExpression : public LeafMatchExpression {
 public:
-    GeoMatchExpression() : LeafMatchExpression(GEO) {}
+    GeoMatchExpression() : LeafMatchExpression(GEO), _canSkipValidation(false) {}
+
     virtual ~GeoMatchExpression() {}
 
     /**
@@ -86,27 +87,35 @@ public:
      */
     Status init(StringData path, const GeoExpression* query, const BSONObj& rawObj);
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    virtual LeafMatchExpression* shallowClone() const;
+    virtual std::unique_ptr<MatchExpression> shallowClone() const;
+
+    void setCanSkipValidation(bool val) {
+        _canSkipValidation = val;
+    }
+
+    bool getCanSkipValidation() const {
+        return _canSkipValidation;
+    }
 
     const GeoExpression& getGeoExpression() const {
         return *_query;
     }
-    const BSONObj getRawObj() const {
-        return _rawObj;
-    }
 
 private:
+    // The original geo specification provided by the user.
     BSONObj _rawObj;
+
     // Share ownership of our query with all of our clones
     std::shared_ptr<const GeoExpression> _query;
+    bool _canSkipValidation;
 };
 
 
@@ -159,26 +168,28 @@ public:
 
     Status init(StringData path, const GeoNearExpression* query, const BSONObj& rawObj);
 
-    // This shouldn't be called and as such will crash.  GeoNear always requires an index.
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    /**
+     * Stub implementation that should never be called, since geoNear execution requires an
+     * appropriate geo index.
+     */
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    virtual LeafMatchExpression* shallowClone() const;
+    virtual std::unique_ptr<MatchExpression> shallowClone() const;
 
     const GeoNearExpression& getData() const {
         return *_query;
     }
-    const BSONObj getRawObj() const {
-        return _rawObj;
-    }
 
 private:
+    // The original geo specification provided by the user.
     BSONObj _rawObj;
+
     // Share ownership of our query with all of our clones
     std::shared_ptr<const GeoNearExpression> _query;
 };

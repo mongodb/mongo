@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -76,6 +76,7 @@ typedef struct {
 	u_char *shift_forw;		/* Encrypt shift data from secretkey */
 	u_char *shift_back;		/* Decrypt shift data from secretkey */
 	size_t shift_len;		/* Length of shift* byte arrays */
+	bool force_error;		/* Force a decrypt error for testing */
 
 } ROTN_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
@@ -84,12 +85,29 @@ typedef struct {
 #define	IV_LEN		16
 
 /*
- * make_cksum --
+ * rotn_error --
+ *	Display an error from this module in a standard way.
+ */
+static int
+rotn_error(
+    ROTN_ENCRYPTOR *encryptor, WT_SESSION *session, int err, const char *msg)
+{
+	WT_EXTENSION_API *wt_api;
+
+	wt_api = encryptor->wt_api;
+	(void)wt_api->err_printf(wt_api, session,
+	    "rotn encryption: %s: %s",
+	    msg, wt_api->strerror(wt_api, NULL, err));
+	return (err);
+}
+
+/*
+ * make_checksum --
  *	This is where one would call a checksum function on the encrypted
  *	buffer.  Here we just put a constant value in it.
  */
 static void
-make_cksum(uint8_t *dst)
+make_checksum(uint8_t *dst)
 {
 	int i;
 	/*
@@ -172,7 +190,8 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;		/* Unused */
 
 	if (dst_len < src_len + CHKSUM_LEN + IV_LEN)
-		return (ENOMEM);
+		return (rotn_error(rotn_encryptor, session,
+		    ENOMEM, "encrypt buffer not big enough"));
 
 	/*
 	 * !!! Most implementations would verify any needed
@@ -195,7 +214,7 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Checksum the encrypted buffer and add the IV.
 	 */
 	i = 0;
-	make_cksum(&dst[i]);
+	make_checksum(&dst[i]);
 	i += CHKSUM_LEN;
 	make_iv(&dst[i]);
 	*result_lenp = dst_len;
@@ -221,13 +240,18 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;		/* Unused */
 
 	/*
+	 * For certain tests, force an error we can recognize.
+	 */
+	if (rotn_encryptor->force_error)
+		return (-1000);
+
+	/*
 	 * Make sure it is big enough.
 	 */
 	mylen = src_len - (CHKSUM_LEN + IV_LEN);
-	if (dst_len < mylen) {
-		fprintf(stderr, "Rotate: ENOMEM ERROR\n");
-		return (ENOMEM);
-	}
+	if (dst_len < mylen)
+		return (rotn_error(rotn_encryptor, session,
+		    ENOMEM, "decrypt buffer not big enough"));
 
 	/*
 	 * !!! Most implementations would verify the checksum here.
@@ -311,7 +335,8 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		 * In this demonstration, we expect keyid to be a number.
 		 */
 		if ((keyid_val = atoi(keyid.str)) < 0) {
-			ret = EINVAL;
+			ret = rotn_error(rotn_encryptor,
+			    NULL, EINVAL, "rotn_customize: invalid keyid");
 			goto err;
 		}
 		if ((rotn_encryptor->keyid = malloc(keyid.len + 1)) == NULL) {
@@ -342,7 +367,8 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 			else if ('A' <= secret.str[i] && secret.str[i] <= 'Z')
 				base = 'A';
 			else {
-				ret = EINVAL;
+				ret = rotn_error(rotn_encryptor, NULL,
+				    EINVAL, "rotn_customize: invalid key");
 				goto err;
 			}
 			base -= (u_char)keyid_val;
@@ -396,6 +422,30 @@ rotn_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 }
 /*! [WT_ENCRYPTOR terminate] */
 
+/*
+ * rotn_configure --
+ *	WiredTiger no-op encryption configuration.
+ */
+static int
+rotn_configure(ROTN_ENCRYPTOR *rotn_encryptor, WT_CONFIG_ARG *config)
+{
+	WT_CONFIG_ITEM v;
+	WT_EXTENSION_API *wt_api;	/* Extension API */
+	int ret;
+
+	wt_api = rotn_encryptor->wt_api;
+
+	/* Get the configuration string. */
+	if ((ret = wt_api->config_get(
+	    wt_api, NULL, config, "rotn_force_error", &v)) == 0)
+		rotn_encryptor->force_error = v.val != 0;
+	else if (ret != WT_NOTFOUND)
+		return (rotn_error(rotn_encryptor, NULL, EINVAL,
+		    "error parsing config"));
+
+	return (0);
+}
+
 /*! [WT_ENCRYPTOR initialization function] */
 /*
  * wiredtiger_extension_init --
@@ -405,8 +455,7 @@ int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	ROTN_ENCRYPTOR *rotn_encryptor;
-
-	(void)config;				/* Unused parameters */
+	int ret;
 
 	if ((rotn_encryptor = calloc(1, sizeof(ROTN_ENCRYPTOR))) == NULL)
 		return (errno);
@@ -423,9 +472,12 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	rotn_encryptor->encryptor.sizing = rotn_sizing;
 	rotn_encryptor->encryptor.customize = rotn_customize;
 	rotn_encryptor->encryptor.terminate = rotn_terminate;
-
 	rotn_encryptor->wt_api = connection->get_extension_api(connection);
 
+	if ((ret = rotn_configure(rotn_encryptor, config)) != 0) {
+		free(rotn_encryptor);
+		return (ret);
+	}
 						/* Load the encryptor */
 	return (connection->add_encryptor(
 	    connection, "rotn", (WT_ENCRYPTOR *)rotn_encryptor, NULL));

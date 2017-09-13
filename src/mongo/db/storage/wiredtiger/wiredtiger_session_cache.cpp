@@ -31,38 +31,65 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/mongod_options.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, int cachePartition, int epoch)
-    : _cachePartition(cachePartition), _epoch(epoch), _session(NULL), _cursorsOut(0) {
-    int ret = conn->open_session(conn, NULL, "isolation=snapshot", &_session);
-    invariantWTOK(ret);
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
+    : _epoch(epoch),
+      _cursorEpoch(cursorEpoch),
+      _session(NULL),
+      _cursorGen(0),
+      _cursorsCached(0),
+      _cursorsOut(0) {
+    invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
+}
+
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
+                                     WiredTigerSessionCache* cache,
+                                     uint64_t epoch,
+                                     uint64_t cursorEpoch)
+    : _epoch(epoch),
+      _cursorEpoch(cursorEpoch),
+      _cache(cache),
+      _session(NULL),
+      _cursorGen(0),
+      _cursorsCached(0),
+      _cursorsOut(0) {
+    invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
 }
 
 WiredTigerSession::~WiredTigerSession() {
     if (_session) {
-        int ret = _session->close(_session, NULL);
-        invariantWTOK(ret);
+        invariantWTOK(_session->close(_session, NULL));
     }
 }
 
 WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, bool forRecordStore) {
-    {
-        Cursors& cursors = _curmap[id];
-        if (!cursors.empty()) {
-            WT_CURSOR* save = cursors.back();
-            cursors.pop_back();
+    // Find the most recently used cursor
+    for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
+        if (i->_id == id) {
+            WT_CURSOR* c = i->_cursor;
+            _cursors.erase(i);
             _cursorsOut++;
-            return save;
+            _cursorsCached--;
+            return c;
         }
     }
+
     WT_CURSOR* c = NULL;
     int ret = _session->open_cursor(
         _session, uri.c_str(), NULL, forRecordStore ? "" : "overwrite=false", &c);
@@ -78,156 +105,289 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
     invariant(cursor);
     _cursorsOut--;
 
-    Cursors& cursors = _curmap[id];
-    if (cursors.size() > 10u) {
+    invariantWTOK(cursor->reset(cursor));
+
+    // Cursors are pushed to the front of the list and removed from the back
+    _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor));
+    _cursorsCached++;
+
+    // "Old" is defined as not used in the last N**2 operations, if we have N cursors cached.
+    // The reasoning here is to imagine a workload with N tables performing operations randomly
+    // across all of them (i.e., each cursor has 1/N chance of used for each operation).  We
+    // would like to cache N cursors in that case, so any given cursor could go N**2 operations
+    // in between use.
+    while (_cursorGen - _cursors.back()._gen > 10000) {
+        cursor = _cursors.back()._cursor;
+        _cursors.pop_back();
+        _cursorsCached--;
         invariantWTOK(cursor->close(cursor));
-    } else {
-        invariantWTOK(cursor->reset(cursor));
-        cursors.push_back(cursor);
     }
 }
 
-void WiredTigerSession::closeAllCursors() {
+void WiredTigerSession::closeAllCursors(const std::string& uri) {
     invariant(_session);
-    for (CursorMap::iterator i = _curmap.begin(); i != _curmap.end(); ++i) {
-        Cursors& cursors = i->second;
-        for (size_t j = 0; j < cursors.size(); j++) {
-            WT_CURSOR* cursor = cursors[j];
-            if (cursor) {
-                int ret = cursor->close(cursor);
-                invariantWTOK(ret);
-            }
+
+    for (auto i = _cursors.begin(); i != _cursors.end();) {
+        WT_CURSOR* cursor = i->_cursor;
+        if (cursor && uri == cursor->uri) {
+            invariantWTOK(cursor->close(cursor));
+            i = _cursors.erase(i);
+        } else
+            ++i;
+    }
+}
+
+void WiredTigerSession::closeCursorsForQueuedDrops(WiredTigerKVEngine* engine) {
+    invariant(_session);
+
+    _cursorEpoch = _cache->getCursorEpoch();
+    auto toDrop = engine->filterCursorsWithQueuedDrops(&_cursors);
+
+    for (auto i = toDrop.begin(); i != toDrop.end(); i++) {
+        WT_CURSOR* cursor = i->_cursor;
+        if (cursor) {
+            invariantWTOK(cursor->close(cursor));
         }
     }
-    _curmap.clear();
 }
 
 namespace {
-AtomicUInt64 nextCursorId(1);
-AtomicUInt64 cachePartitionGen(0);
+AtomicUInt64 nextTableId(1);
 }
 // static
-uint64_t WiredTigerSession::genCursorId() {
-    return nextCursorId.fetchAndAdd(1);
+uint64_t WiredTigerSession::genTableId() {
+    return nextTableId.fetchAndAdd(1);
 }
 
 // -----------------------
 
 WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
-    : _engine(engine), _conn(engine->getConnection()), _shuttingDown(0) {}
+    : _engine(engine), _conn(engine->getConnection()), _snapshotManager(_conn), _shuttingDown(0) {}
 
 WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn)
-    : _engine(NULL), _conn(conn), _shuttingDown(0) {}
+    : _engine(NULL), _conn(conn), _snapshotManager(_conn), _shuttingDown(0) {}
 
 WiredTigerSessionCache::~WiredTigerSessionCache() {
     shuttingDown();
 }
 
 void WiredTigerSessionCache::shuttingDown() {
-    if (_shuttingDown.load())
-        return;
-    _shuttingDown.store(1);
+    uint32_t actual = _shuttingDown.load();
+    uint32_t expected;
 
-    {
-        // This ensures that any calls, which are currently inside of getSession/releaseSession
-        // will be able to complete before we start cleaning up the pool. Any others, which are
-        // about to enter will return immediately because of _shuttingDown == true.
-        stdx::lock_guard<boost::shared_mutex> lk(_shutdownLock);
+    // Try to atomically set _shuttingDown flag, but just return if another thread was first.
+    do {
+        expected = actual;
+        actual = _shuttingDown.compareAndSwap(expected, expected | kShuttingDownMask);
+        if (actual & kShuttingDownMask)
+            return;
+    } while (actual != expected);
+
+    // Spin as long as there are threads in releaseSession
+    while (_shuttingDown.load() != kShuttingDownMask) {
+        sleepmillis(1);
     }
 
     closeAll();
+    _snapshotManager.shutdown();
 }
 
-void WiredTigerSessionCache::closeAll() {
-    for (int i = 0; i < NumSessionCachePartitions; i++) {
-        SessionPool swapPool;
+void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableCheckpoint) {
+    // For inMemory storage engines, the data is "as durable as it's going to get".
+    // That is, a restart is equivalent to a complete node failure.
+    if (isEphemeral()) {
+        return;
+    }
 
+    const int shuttingDown = _shuttingDown.fetchAndAdd(1);
+    ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
+
+    uassert(ErrorCodes::ShutdownInProgress,
+            "Cannot wait for durability because a shutdown is in progress",
+            !(shuttingDown & kShuttingDownMask));
+
+    // Stable checkpoints are only meaningful in a replica set. Replication sets the "stable
+    // timestamp". If the stable timestamp is unset, WiredTiger takes a full checkpoint, which is
+    // incidentally what we want. A "true" stable checkpoint (a stable timestamp was set on the
+    // WT_CONNECTION, i.e: replication is on) requires `forceCheckpoint` to be true and journaling
+    // to be enabled.
+    if (stableCheckpoint && getGlobalReplSettings().usingReplSets()) {
+        invariant(forceCheckpoint && _engine->isDurable());
+    }
+
+    // When forcing a checkpoint with journaling enabled, don't synchronize with other
+    // waiters, as a log flush is much cheaper than a full checkpoint.
+    if (forceCheckpoint && _engine->isDurable()) {
+        UniqueWiredTigerSession session = getSession();
+        WT_SESSION* s = session->getSession();
         {
-            stdx::unique_lock<SpinLock> scopedLock(_cache[i].lock);
-            _cache[i].pool.swap(swapPool);
-            _cache[i].epoch++;
+            stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
+            JournalListener::Token token = _journalListener->getToken();
+            const bool keepOldBehavior = true;
+            if (keepOldBehavior) {
+                invariantWTOK(s->checkpoint(s, nullptr));
+            } else {
+                std::string config =
+                    stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
+                invariantWTOK(s->checkpoint(s, config.c_str()));
+            }
+            _journalListener->onDurable(token);
         }
+        LOG(4) << "created checkpoint (forced)";
+        return;
+    }
 
-        // New sessions will be created if need be outside of the lock
-        for (size_t i = 0; i < swapPool.size(); i++) {
-            delete swapPool[i];
-        }
+    uint32_t start = _lastSyncTime.load();
+    // Do the remainder in a critical section that ensures only a single thread at a time
+    // will attempt to synchronize.
+    stdx::unique_lock<stdx::mutex> lk(_lastSyncMutex);
+    uint32_t current = _lastSyncTime.loadRelaxed();  // synchronized with writes through mutex
+    if (current != start) {
+        // Someone else synced already since we read lastSyncTime, so we're done!
+        return;
+    }
+    _lastSyncTime.store(current + 1);
 
-        swapPool.clear();
+    // Nobody has synched yet, so we have to sync ourselves.
+    auto session = getSession();
+    WT_SESSION* s = session->getSession();
+
+    // This gets the token (OpTime) from the last write, before flushing (either the journal, or a
+    // checkpoint), and then reports that token (OpTime) as a durable write.
+    stdx::unique_lock<stdx::mutex> jlk(_journalListenerMutex);
+    JournalListener::Token token = _journalListener->getToken();
+
+    // Use the journal when available, or a checkpoint otherwise.
+    if (_engine && _engine->isDurable()) {
+        invariantWTOK(s->log_flush(s, "sync=on"));
+        LOG(4) << "flushed journal";
+    } else {
+        invariantWTOK(s->checkpoint(s, NULL));
+        LOG(4) << "created checkpoint";
+    }
+    _journalListener->onDurable(token);
+}
+
+void WiredTigerSessionCache::closeAllCursors(const std::string& uri) {
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
+        (*i)->closeAllCursors(uri);
     }
 }
 
-WiredTigerSession* WiredTigerSessionCache::getSession() {
-    boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);
+void WiredTigerSessionCache::closeCursorsForQueuedDrops() {
+    // Increment the cursor epoch so that all cursors from this epoch are closed.
+    _cursorEpoch.fetchAndAdd(1);
 
-    // We should never be able to get here after _shuttingDown is set, because no new
-    // operations should be allowed to start.
-    invariant(!_shuttingDown.loadRelaxed());
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
+        (*i)->closeCursorsForQueuedDrops(_engine);
+    }
+}
 
-    // Spread sessions uniformly across the cache partitions
-    const int cachePartition = cachePartitionGen.addAndFetch(1) % NumSessionCachePartitions;
-
-    int epoch;
+void WiredTigerSessionCache::closeAll() {
+    // Increment the epoch as we are now closing all sessions with this epoch.
+    SessionCache swap;
 
     {
-        stdx::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
-        epoch = _cache[cachePartition].epoch;
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        _epoch.fetchAndAdd(1);
+        _sessions.swap(swap);
+    }
 
-        if (!_cache[cachePartition].pool.empty()) {
-            WiredTigerSession* cachedSession = _cache[cachePartition].pool.back();
-            _cache[cachePartition].pool.pop_back();
+    for (SessionCache::iterator i = swap.begin(); i != swap.end(); i++) {
+        delete (*i);
+    }
+}
 
-            return cachedSession;
+bool WiredTigerSessionCache::isEphemeral() {
+    return _engine && _engine->isEphemeral();
+}
+
+UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
+    // We should never be able to get here after _shuttingDown is set, because no new
+    // operations should be allowed to start.
+    invariant(!(_shuttingDown.loadRelaxed() & kShuttingDownMask));
+
+    {
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        if (!_sessions.empty()) {
+            // Get the most recently used session so that if we discard sessions, we're
+            // discarding older ones
+            WiredTigerSession* cachedSession = _sessions.back();
+            _sessions.pop_back();
+            return UniqueWiredTigerSession(cachedSession);
         }
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return new WiredTigerSession(_conn, cachePartition, epoch);
+    return UniqueWiredTigerSession(
+        new WiredTigerSession(_conn, this, _epoch.load(), _cursorEpoch.load()));
 }
 
 void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     invariant(session);
     invariant(session->cursorsOut() == 0);
 
-    boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);
-    if (_shuttingDown.loadRelaxed()) {
-        // Leak the session in order to avoid race condition with clean shutdown, where the
-        // storage engine is ripped from underneath transactions, which are not "active"
-        // (i.e., do not have any locks), but are just about to delete the recovery unit.
-        // See SERVER-16031 for more information.
+    const int shuttingDown = _shuttingDown.fetchAndAdd(1);
+    ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
+
+    if (shuttingDown & kShuttingDownMask) {
+        // There is a race condition with clean shutdown, where the storage engine is ripped from
+        // underneath OperationContexts, which are not "active" (i.e., do not have any locks), but
+        // are just about to delete the recovery unit. See SERVER-16031 for more information. Since
+        // shutting down the WT_CONNECTION will close all WT_SESSIONS, we shouldn't also try to
+        // directly close this session.
+        session->_session = nullptr;  // Prevents calling _session->close() in destructor.
+        delete session;
         return;
     }
 
-    // This checks that we are only caching idle sessions and not something which might hold
-    // locks or otherwise prevent truncation.
     {
         WT_SESSION* ss = session->getSession();
         uint64_t range;
+        // This checks that we are only caching idle sessions and not something which might hold
+        // locks or otherwise prevent truncation.
         invariantWTOK(ss->transaction_pinned_range(ss, &range));
         invariant(range == 0);
+
+        // Release resources in the session we're about to cache.
+        invariantWTOK(ss->reset(ss));
     }
 
-    const int cachePartition = session->_getCachePartition();
+    // If the cursor epoch has moved on, close all cursors in the session.
+    uint64_t cursorEpoch = _cursorEpoch.load();
+    if (session->_getCursorEpoch() != cursorEpoch)
+        session->closeCursorsForQueuedDrops(_engine);
+
     bool returnedToCache = false;
+    uint64_t currentEpoch = _epoch.load();
 
-    if (cachePartition >= 0) {
-        stdx::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
-
-        invariant(session->_getEpoch() <= _cache[cachePartition].epoch);
-
-        if (session->_getEpoch() == _cache[cachePartition].epoch) {
-            _cache[cachePartition].pool.push_back(session);
+    if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        if (session->_getEpoch() == _epoch.load()) {  // recheck inside the lock for correctness
             returnedToCache = true;
+            _sessions.push_back(session);
         }
-    }
+    } else
+        invariant(session->_getEpoch() < currentEpoch);
 
-    // Do all cleanup outside of the cache partition spinlock.
-    if (!returnedToCache) {
+    if (!returnedToCache)
         delete session;
-    }
 
-    if (_engine && _engine->haveDropsQueued()) {
-        _engine->dropAllQueued();
-    }
+    if (_engine && _engine->haveDropsQueued())
+        _engine->dropSomeQueuedIdents();
 }
+
+
+void WiredTigerSessionCache::setJournalListener(JournalListener* jl) {
+    stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
+    _journalListener = jl;
 }
+
+void WiredTigerSessionCache::WiredTigerSessionDeleter::operator()(
+    WiredTigerSession* session) const {
+    session->_cache->releaseSession(session);
+}
+
+}  // namespace mongo

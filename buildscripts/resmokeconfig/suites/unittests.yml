@@ -1,7 +1,7 @@
+test_kind: cpp_unit_test
+
 selector:
-  cpp_unit_test:
-    root: build/unittests.txt
+  root: build/unittests.txt
 
 executor:
-  cpp_unit_test:
-    config: {}
+  config: {}

@@ -32,8 +32,8 @@
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped_iterator.h"
 
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
+#include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_test_help.h"
 
 #include "mongo/unittest/unittest.h"
@@ -49,45 +49,48 @@ using std::vector;
 // Should be in BSS so unused portions should be free.
 char zeros[20 * 1024 * 1024] = {};
 
-class DummyCappedDocumentDeleteCallback : public CappedDocumentDeleteCallback {
+class DummyCappedCallback : public CappedCallback {
 public:
-    Status aboutToDeleteCapped(OperationContext* txn, const RecordId& loc, RecordData data) {
+    Status aboutToDeleteCapped(OperationContext* opCtx, const RecordId& loc, RecordData data) {
         deleted.push_back(DiskLoc::fromRecordId(loc));
         return Status::OK();
     }
+
+    void notifyCappedWaitersIfNeeded() {}
+
     vector<DiskLoc> deleted;
 };
 
 void simpleInsertTest(const char* buf, int size) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
 
     string myns = "test.simple1";
-    CappedRecordStoreV1 rs(&txn, &cb, myns, md, &em, false);
+    CappedRecordStoreV1 rs(&opCtx, &cb, myns, md, &em, false);
 
-    rs.increaseStorageSize(&txn, 1024, false);
+    rs.increaseStorageSize(&opCtx, 1024, false);
 
-    ASSERT_NOT_OK(rs.insertRecord(&txn, buf, 3, 1000).getStatus());
+    ASSERT_NOT_OK(rs.insertRecord(&opCtx, buf, 3, Timestamp(), true).getStatus());
 
-    rs.insertRecord(&txn, buf, size, 10000);
+    ASSERT_OK(rs.insertRecord(&opCtx, buf, size, Timestamp(), true).getStatus());
 
     {
         BSONObjBuilder b;
-        int64_t storageSize = rs.storageSize(&txn, &b);
+        int64_t storageSize = rs.storageSize(&opCtx, &b);
         BSONObj obj = b.obj();
         ASSERT_EQUALS(1, obj["numExtents"].numberInt());
         ASSERT_EQUALS(storageSize, em.quantizeExtentSize(1024));
     }
 
     for (int i = 0; i < 1000; i++) {
-        ASSERT_OK(rs.insertRecord(&txn, buf, size, 10000).getStatus());
+        ASSERT_OK(rs.insertRecord(&opCtx, buf, size, Timestamp(), true).getStatus());
     }
 
     long long start = md->numRecords();
     for (int i = 0; i < 1000; i++) {
-        ASSERT_OK(rs.insertRecord(&txn, buf, size, 10000).getStatus());
+        ASSERT_OK(rs.insertRecord(&opCtx, buf, size, Timestamp(), true).getStatus());
     }
     ASSERT_EQUALS(start, md->numRecords());
     ASSERT_GREATER_THAN(start, 100);
@@ -102,37 +105,40 @@ TEST(CappedRecordStoreV1, SimpleInsertSize8) {
 }
 
 TEST(CappedRecordStoreV1, EmptySingleExtent) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 100}, {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1100), 900}, {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc().setInvalid());  // unlooped
     }
 }
 
 TEST(CappedRecordStoreV1, FirstLoopWithSingleExtentExactSize) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         LocAndSize records[] = {{DiskLoc(0, 1000), 100},
@@ -142,12 +148,14 @@ TEST(CappedRecordStoreV1, FirstLoopWithSingleExtentExactSize) {
                                 {DiskLoc(0, 1400), 100},
                                 {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1500), 50}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());  // unlooped
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());  // unlooped
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1200), 100},  // first old record
@@ -159,18 +167,18 @@ TEST(CappedRecordStoreV1, FirstLoopWithSingleExtentExactSize) {
             {DiskLoc(0, 1100), 100},  // gap after newest record XXX this is probably a bug
             {DiskLoc(0, 1500), 50},   // gap at end of extent
             {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
     }
 }
 
 TEST(CappedRecordStoreV1, NonFirstLoopWithSingleExtentExactSize) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         LocAndSize records[] = {{DiskLoc(0, 1000), 100},
@@ -180,12 +188,14 @@ TEST(CappedRecordStoreV1, NonFirstLoopWithSingleExtentExactSize) {
                                 {DiskLoc(0, 1400), 100},
                                 {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1500), 50}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc(0, 1000));
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1200), 100},  // first old record
@@ -197,7 +207,7 @@ TEST(CappedRecordStoreV1, NonFirstLoopWithSingleExtentExactSize) {
             {DiskLoc(0, 1100), 100},  // gap after newest record XXX this is probably a bug
             {DiskLoc(0, 1500), 50},   // gap at end of extent
             {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
     }
@@ -207,11 +217,11 @@ TEST(CappedRecordStoreV1, NonFirstLoopWithSingleExtentExactSize) {
  * Current code always tries to leave 24 bytes to create a DeletedRecord.
  */
 TEST(CappedRecordStoreV1, WillLoopWithout24SpareBytes) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         LocAndSize records[] = {{DiskLoc(0, 1000), 100},
@@ -221,12 +231,14 @@ TEST(CappedRecordStoreV1, WillLoopWithout24SpareBytes) {
                                 {DiskLoc(0, 1400), 100},
                                 {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1500), 123}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc(0, 1000));
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1200), 100},  // first old record
@@ -237,18 +249,18 @@ TEST(CappedRecordStoreV1, WillLoopWithout24SpareBytes) {
         LocAndSize drecs[] = {{DiskLoc(0, 1100), 100},  // gap after newest record
                               {DiskLoc(0, 1500), 123},  // gap at end of extent
                               {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
     }
 }
 
 TEST(CappedRecordStoreV1, WontLoopWith24SpareBytes) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         LocAndSize records[] = {{DiskLoc(0, 1000), 100},
@@ -258,12 +270,14 @@ TEST(CappedRecordStoreV1, WontLoopWith24SpareBytes) {
                                 {DiskLoc(0, 1400), 100},
                                 {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1500), 124}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc(0, 1000));
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 100},
@@ -275,30 +289,32 @@ TEST(CappedRecordStoreV1, WontLoopWith24SpareBytes) {
                              {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1600), 24},  // gap at end of extent
                               {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
     }
 }
 
 TEST(CappedRecordStoreV1, MoveToSecondExtentUnLooped) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         // Two extents, each with 1000 bytes.
         LocAndSize records[] = {
             {DiskLoc(0, 1000), 500}, {DiskLoc(0, 1500), 300}, {DiskLoc(0, 1800), 100}, {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1900), 100}, {DiskLoc(1, 1000), 1000}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 500},
@@ -308,18 +324,18 @@ TEST(CappedRecordStoreV1, MoveToSecondExtentUnLooped) {
                              {DiskLoc(1, 1000), 100},
                              {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1900), 100}, {DiskLoc(1, 1100), 900}, {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(1, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc().setInvalid());  // unlooped
     }
 }
 
 TEST(CappedRecordStoreV1, MoveToSecondExtentLooped) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         // Two extents, each with 1000 bytes.
@@ -331,12 +347,14 @@ TEST(CappedRecordStoreV1, MoveToSecondExtentLooped) {
                                 {DiskLoc(1, 1300), 600},
                                 {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1900), 100}, {DiskLoc(1, 1900), 100}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc(0, 1000));
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&txn, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 500},
@@ -347,7 +365,7 @@ TEST(CappedRecordStoreV1, MoveToSecondExtentLooped) {
                              {}};
         LocAndSize drecs[] = {
             {DiskLoc(0, 1800), 200}, {DiskLoc(1, 1200), 100}, {DiskLoc(1, 1900), 100}, {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(1, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(1, 1000));
     }
@@ -355,45 +373,45 @@ TEST(CappedRecordStoreV1, MoveToSecondExtentLooped) {
 
 // Larger than storageSize (fails early)
 TEST(CappedRecordStoreV1, OversizedRecordHuge) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    StatusWith<RecordId> status = rs.insertRecord(&txn, zeros, 16000, false);
+    StatusWith<RecordId> status = rs.insertRecord(&opCtx, zeros, 16000, Timestamp(), false);
     ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
-    ASSERT_EQUALS(status.getStatus().location(), 16328);
+    ASSERT_STRING_CONTAINS(status.getStatus().reason(), "larger than capped size");
 }
 
 // Smaller than storageSize, but larger than usable space (fails late)
 TEST(CappedRecordStoreV1, OversizedRecordMedium) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
     StatusWith<RecordId> status =
-        rs.insertRecord(&txn, zeros, 1004 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&opCtx, zeros, 1004 - MmapV1RecordHeader::HeaderSize, Timestamp(), false);
     ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
-    ASSERT_EQUALS(status.getStatus().location(), 28575);
+    ASSERT_STRING_CONTAINS(status.getStatus().reason(), "doesn't fit");
 }
 
 //
@@ -406,28 +424,36 @@ TEST(CappedRecordStoreV1, OversizedRecordMedium) {
  * This is a minimal example that shows the current allocator laying out records out-of-order.
  */
 TEST(CappedRecordStoreV1Scrambler, Minimal) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         // Starting with a single empty 1000 byte extent.
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());  // unlooped
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());  // unlooped
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
-    rs.insertRecord(&txn, zeros, 500 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 300 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(
-        &txn, zeros, 400 - MmapV1RecordHeader::HeaderSize, false);  // won't fit at end so wraps
-    rs.insertRecord(&txn, zeros, 120 - MmapV1RecordHeader::HeaderSize, false);  // fits at end
-    rs.insertRecord(
-        &txn, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);  // fits in earlier hole
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 500 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 300 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 400 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());  // won't fit at end so wraps
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 120 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());  // fits at end
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());  // fits in earlier hole
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1500), 300},  // 2nd insert
@@ -436,7 +462,7 @@ TEST(CappedRecordStoreV1Scrambler, Minimal) {
                              {DiskLoc(0, 1400), 60},   // 5th
                              {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1460), 40}, {DiskLoc(0, 1920), 80}, {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
     }
@@ -447,51 +473,107 @@ TEST(CappedRecordStoreV1Scrambler, Minimal) {
  * that leaves 4 deleted records in a single extent.
  */
 TEST(CappedRecordStoreV1Scrambler, FourDeletedRecordsInSingleExtent) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
-    CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+    DummyCappedCallback cb;
+    CappedRecordStoreV1 rs(&opCtx, &cb, "test.foo", md, &em, false);
 
     {
         // Starting with a single empty 1000 byte extent.
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());  // unlooped
-        initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());  // unlooped
+        initializeV1RS(&opCtx, records, drecs, NULL, &em, md);
     }
 
     // This list of sizes was empirically generated to achieve this outcome. Don't think too
     // much about them.
-    rs.insertRecord(&txn, zeros, 500 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 300 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 304 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 76 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 76 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 56 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 104 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 146 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 146 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 40 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 40 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 36 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
-    rs.insertRecord(&txn, zeros, 64 - MmapV1RecordHeader::HeaderSize, false);
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 500 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 300 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 304 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 76 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 76 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 56 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 104 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 146 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 146 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 40 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 40 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 36 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 100 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 96 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 200 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 60 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
+    ASSERT_OK(
+        rs.insertRecord(&opCtx, zeros, 64 - MmapV1RecordHeader::HeaderSize, Timestamp(), false)
+            .getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1148), 148},
@@ -509,7 +591,7 @@ TEST(CappedRecordStoreV1Scrambler, FourDeletedRecordsInSingleExtent) {
                               {DiskLoc(0, 1912), 24},
                               {DiskLoc(0, 1628), 84},
                               {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
         ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
         ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
     }
@@ -523,7 +605,7 @@ TEST(CappedRecordStoreV1Scrambler, FourDeletedRecordsInSingleExtent) {
 class CollscanHelper {
 public:
     CollscanHelper(int nExtents)
-        : md(new DummyRecordStoreV1MetaData(true, 0)), rs(&txn, &cb, ns(), md, &em, false) {
+        : md(new DummyRecordStoreV1MetaData(true, 0)), rs(&opCtx, &cb, ns(), md, &em, false) {
         LocAndSize recs[] = {{}};
         LocAndSize drecs[8];
         ASSERT_LESS_THAN(nExtents, 8);
@@ -534,9 +616,9 @@ public:
         drecs[nExtents].loc = DiskLoc();
         drecs[nExtents].size = 0;
 
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());  // unlooped
-        initializeV1RS(&txn, recs, drecs, NULL, &em, md);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());  // unlooped
+        initializeV1RS(&opCtx, recs, drecs, NULL, &em, md);
     }
 
     // Insert bypasses standard alloc/insert routines to use the extent we want.
@@ -548,7 +630,7 @@ public:
         BSONObj o = b.done();
         int len = o.objsize();
         Extent* e = em.getExtent(ext);
-        e = txn.recoveryUnit()->writing(e);
+        e = opCtx.recoveryUnit()->writing(e);
         int ofs;
         if (e->lastRecord.isNull()) {
             ofs = ext.getOfs() + (e->_extentData - (char*)e);
@@ -557,7 +639,7 @@ public:
         }
         DiskLoc dl(ext.a(), ofs);
         MmapV1RecordHeader* r = em.recordForV1(dl);
-        r = (MmapV1RecordHeader*)txn.recoveryUnit()->writingPtr(
+        r = (MmapV1RecordHeader*)opCtx.recoveryUnit()->writingPtr(
             r, MmapV1RecordHeader::HeaderSize + len);
         r->lengthWithHeaders() = MmapV1RecordHeader::HeaderSize + len;
         r->extentOfs() = e->myLoc.getOfs();
@@ -567,7 +649,7 @@ public:
         if (e->firstRecord.isNull())
             e->firstRecord = dl;
         else
-            txn.recoveryUnit()->writingInt(em.recordForV1(e->lastRecord)->nextOfs()) = ofs;
+            opCtx.recoveryUnit()->writingInt(em.recordForV1(e->lastRecord)->nextOfs()) = ofs;
         e->lastRecord = dl;
         return dl;
     }
@@ -576,7 +658,7 @@ public:
     void walkAndCount(int expectedCount) {
         // Walk the collection going forward.
         {
-            CappedRecordStoreV1Iterator cursor(&txn, &rs, /*forward=*/true);
+            CappedRecordStoreV1Iterator cursor(&opCtx, &rs, /*forward=*/true);
             int resultCount = 0;
             while (auto record = cursor.next()) {
                 ++resultCount;
@@ -587,7 +669,7 @@ public:
 
         // Walk the collection going backwards.
         {
-            CappedRecordStoreV1Iterator cursor(&txn, &rs, /*forward=*/false);
+            CappedRecordStoreV1Iterator cursor(&opCtx, &rs, /*forward=*/false);
             int resultCount = expectedCount;
             while (auto record = cursor.next()) {
                 --resultCount;
@@ -601,12 +683,12 @@ public:
         return "unittests.QueryStageCollectionScanCapped";
     }
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyRecordStoreV1MetaData* md;
     DummyExtentManager em;
 
 private:
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs;
 };
 
@@ -618,27 +700,27 @@ TEST(CappedRecordStoreV1QueryStage, CollscanCappedBase) {
 
 TEST(CappedRecordStoreV1QueryStage, CollscanEmptyLooped) {
     CollscanHelper h(1);
-    h.md->setCapFirstNewRecord(&h.txn, DiskLoc());
+    h.md->setCapFirstNewRecord(&h.opCtx, DiskLoc());
     h.walkAndCount(0);
 }
 
 TEST(CappedRecordStoreV1QueryStage, CollscanEmptyMultiExtentLooped) {
     CollscanHelper h(3);
-    h.md->setCapFirstNewRecord(&h.txn, DiskLoc());
+    h.md->setCapFirstNewRecord(&h.opCtx, DiskLoc());
     h.walkAndCount(0);
 }
 
 TEST(CappedRecordStoreV1QueryStage, CollscanSingle) {
     CollscanHelper h(1);
 
-    h.md->setCapFirstNewRecord(&h.txn, h.insert(h.md->capExtent(), 0));
+    h.md->setCapFirstNewRecord(&h.opCtx, h.insert(h.md->capExtent(), 0));
     h.walkAndCount(1);
 }
 
 TEST(CappedRecordStoreV1QueryStage, CollscanNewCapFirst) {
     CollscanHelper h(1);
     DiskLoc x = h.insert(h.md->capExtent(), 0);
-    h.md->setCapFirstNewRecord(&h.txn, x);
+    h.md->setCapFirstNewRecord(&h.opCtx, x);
     h.insert(h.md->capExtent(), 1);
     h.walkAndCount(2);
 }
@@ -646,7 +728,7 @@ TEST(CappedRecordStoreV1QueryStage, CollscanNewCapFirst) {
 TEST(CappedRecordStoreV1QueryStage, CollscanNewCapMiddle) {
     CollscanHelper h(1);
     h.insert(h.md->capExtent(), 0);
-    h.md->setCapFirstNewRecord(&h.txn, h.insert(h.md->capExtent(), 1));
+    h.md->setCapFirstNewRecord(&h.opCtx, h.insert(h.md->capExtent(), 1));
     h.insert(h.md->capExtent(), 2);
     h.walkAndCount(3);
 }
@@ -654,59 +736,59 @@ TEST(CappedRecordStoreV1QueryStage, CollscanNewCapMiddle) {
 TEST(CappedRecordStoreV1QueryStage, CollscanFirstExtent) {
     CollscanHelper h(2);
     h.insert(h.md->capExtent(), 0);
-    h.insert(h.md->lastExtent(&h.txn), 1);
-    h.md->setCapFirstNewRecord(&h.txn, h.insert(h.md->capExtent(), 2));
+    h.insert(h.md->lastExtent(&h.opCtx), 1);
+    h.md->setCapFirstNewRecord(&h.opCtx, h.insert(h.md->capExtent(), 2));
     h.insert(h.md->capExtent(), 3);
     h.walkAndCount(4);
 }
 
 TEST(CappedRecordStoreV1QueryStage, CollscanLastExtent) {
     CollscanHelper h(2);
-    h.md->setCapExtent(&h.txn, h.md->lastExtent(&h.txn));
+    h.md->setCapExtent(&h.opCtx, h.md->lastExtent(&h.opCtx));
     h.insert(h.md->capExtent(), 0);
-    h.insert(h.md->firstExtent(&h.txn), 1);
-    h.md->setCapFirstNewRecord(&h.txn, h.insert(h.md->capExtent(), 2));
+    h.insert(h.md->firstExtent(&h.opCtx), 1);
+    h.md->setCapFirstNewRecord(&h.opCtx, h.insert(h.md->capExtent(), 2));
     h.insert(h.md->capExtent(), 3);
     h.walkAndCount(4);
 }
 
 TEST(CappedRecordStoreV1QueryStage, CollscanMidExtent) {
     CollscanHelper h(3);
-    h.md->setCapExtent(&h.txn, h.em.getExtent(h.md->firstExtent(&h.txn))->xnext);
+    h.md->setCapExtent(&h.opCtx, h.em.getExtent(h.md->firstExtent(&h.opCtx))->xnext);
     h.insert(h.md->capExtent(), 0);
-    h.insert(h.md->lastExtent(&h.txn), 1);
-    h.insert(h.md->firstExtent(&h.txn), 2);
-    h.md->setCapFirstNewRecord(&h.txn, h.insert(h.md->capExtent(), 3));
+    h.insert(h.md->lastExtent(&h.opCtx), 1);
+    h.insert(h.md->firstExtent(&h.opCtx), 2);
+    h.md->setCapFirstNewRecord(&h.opCtx, h.insert(h.md->capExtent(), 3));
     h.insert(h.md->capExtent(), 4);
     h.walkAndCount(5);
 }
 
 TEST(CappedRecordStoreV1QueryStage, CollscanAloneInExtent) {
     CollscanHelper h(3);
-    h.md->setCapExtent(&h.txn, h.em.getExtent(h.md->firstExtent(&h.txn))->xnext);
-    h.insert(h.md->lastExtent(&h.txn), 0);
-    h.insert(h.md->firstExtent(&h.txn), 1);
-    h.md->setCapFirstNewRecord(&h.txn, h.insert(h.md->capExtent(), 2));
+    h.md->setCapExtent(&h.opCtx, h.em.getExtent(h.md->firstExtent(&h.opCtx))->xnext);
+    h.insert(h.md->lastExtent(&h.opCtx), 0);
+    h.insert(h.md->firstExtent(&h.opCtx), 1);
+    h.md->setCapFirstNewRecord(&h.opCtx, h.insert(h.md->capExtent(), 2));
     h.walkAndCount(3);
 }
 
 TEST(CappedRecordStoreV1QueryStage, CollscanFirstInExtent) {
     CollscanHelper h(3);
-    h.md->setCapExtent(&h.txn, h.em.getExtent(h.md->firstExtent(&h.txn))->xnext);
-    h.insert(h.md->lastExtent(&h.txn), 0);
-    h.insert(h.md->firstExtent(&h.txn), 1);
-    h.md->setCapFirstNewRecord(&h.txn, h.insert(h.md->capExtent(), 2));
+    h.md->setCapExtent(&h.opCtx, h.em.getExtent(h.md->firstExtent(&h.opCtx))->xnext);
+    h.insert(h.md->lastExtent(&h.opCtx), 0);
+    h.insert(h.md->firstExtent(&h.opCtx), 1);
+    h.md->setCapFirstNewRecord(&h.opCtx, h.insert(h.md->capExtent(), 2));
     h.insert(h.md->capExtent(), 3);
     h.walkAndCount(4);
 }
 
 TEST(CappedRecordStoreV1QueryStage, CollscanLastInExtent) {
     CollscanHelper h(3);
-    h.md->setCapExtent(&h.txn, h.em.getExtent(h.md->firstExtent(&h.txn))->xnext);
+    h.md->setCapExtent(&h.opCtx, h.em.getExtent(h.md->firstExtent(&h.opCtx))->xnext);
     h.insert(h.md->capExtent(), 0);
-    h.insert(h.md->lastExtent(&h.txn), 1);
-    h.insert(h.md->firstExtent(&h.txn), 2);
-    h.md->setCapFirstNewRecord(&h.txn, h.insert(h.md->capExtent(), 3));
+    h.insert(h.md->lastExtent(&h.opCtx), 1);
+    h.insert(h.md->firstExtent(&h.opCtx), 2);
+    h.md->setCapFirstNewRecord(&h.opCtx, h.insert(h.md->capExtent(), 3));
     h.walkAndCount(4);
 }
 }

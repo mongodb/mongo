@@ -30,15 +30,16 @@
 
 #include "mongo/db/exec/collection_scan.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -48,39 +49,33 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* CollectionScan::kStageType = "COLLSCAN";
 
-CollectionScan::CollectionScan(OperationContext* txn,
+CollectionScan::CollectionScan(OperationContext* opCtx,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
-    : _txn(txn),
+    : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
       _filter(filter),
       _params(params),
       _isDead(false),
-      _wsidForFetch(_workingSet->allocate()),
-      _commonStats(kStageType) {
+      _wsidForFetch(_workingSet->allocate()) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
-
-    // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
-    // for anything other than passing up NEED_YIELD. We use the loc and owned obj state, but
-    // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
-    WorkingSetMember* member = _workingSet->get(_wsidForFetch);
-    member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
 }
 
-PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     if (_isDead) {
-        Status status(ErrorCodes::InternalError, "CollectionScan died");
+        Status status(
+            ErrorCodes::CappedPositionLost,
+            str::stream()
+                << "CollectionScan died due to position in capped collection being deleted. "
+                << "Last seen record id: "
+                << _lastSeenId);
         *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
         return PlanStage::DEAD;
     }
@@ -98,7 +93,21 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
     try {
         if (needToMakeCursor) {
             const bool forward = _params.direction == CollectionScanParams::FORWARD;
-            _cursor = _params.collection->getCursor(_txn, forward);
+
+            if (forward && !_params.tailable && _params.collection->ns().isOplog()) {
+                // Forward, non-tailable scans from the oplog need to wait until all oplog entries
+                // before the read begins to be visible. This isn't needed for reverse scans because
+                // we only hide oplog entries from forward scans, and it isn't necessary for tailing
+                // cursors because they ignore EOF and will eventually see all writes. Forward,
+                // non-tailable scans are the only case where a meaningful EOF will be seen that
+                // might not include writes that finished before the read started. This also must be
+                // done before we create the cursor as that is when we establish the endpoint for
+                // the cursor.
+                _params.collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(
+                    getOpCtx());
+            }
+
+            _cursor = _params.collection->getCursor(getOpCtx(), forward);
 
             if (!_lastSeenId.isNull()) {
                 invariant(_params.tailable);
@@ -110,14 +119,16 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
                 // time we'd need to create a cursor after already getting a record out of it.
                 if (!_cursor->seekExact(_lastSeenId)) {
                     _isDead = true;
-                    Status status(ErrorCodes::InternalError,
-                                  "CollectionScan died: Unexpected RecordId");
+                    Status status(ErrorCodes::CappedPositionLost,
+                                  str::stream() << "CollectionScan died due to failure to restore "
+                                                << "tailable cursor position. "
+                                                << "Last seen record id: "
+                                                << _lastSeenId);
                     *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                     return PlanStage::DEAD;
                 }
             }
 
-            _commonStats.needTime++;
             return PlanStage::NEED_TIME;
         }
 
@@ -131,13 +142,12 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
                 WorkingSetMember* member = _workingSet->get(_wsidForFetch);
                 member->setFetcher(fetcher.release());
                 *out = _wsidForFetch;
-                _commonStats.needYield++;
                 return PlanStage::NEED_YIELD;
             }
 
             record = _cursor->next();
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         // Leave us in a state to try again next time.
         if (needToMakeCursor)
             _cursor.reset();
@@ -162,9 +172,9 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
 
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
-    member->loc = record->id;
-    member->obj = {_txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
-    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    member->recordId = record->id;
+    member->obj = {getOpCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
+    _workingSet->transitionToRecordIdAndObj(id);
 
     return returnIfMatches(member, id, out);
 }
@@ -175,12 +185,13 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
     ++_specificStats.docsTested;
 
     if (Filter::passes(member, _filter)) {
+        if (_params.stopApplyingFilterAfterFirstMatch) {
+            _filter = nullptr;
+        }
         *out = memberID;
-        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     } else {
         _workingSet->free(memberID);
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
 }
@@ -189,9 +200,9 @@ bool CollectionScan::isEOF() {
     return _commonStats.isEOF || _isDead;
 }
 
-void CollectionScan::invalidate(OperationContext* txn, const RecordId& id, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void CollectionScan::doInvalidate(OperationContext* opCtx,
+                                  const RecordId& id,
+                                  InvalidationType type) {
     // We don't care about mutations since we apply any filters to the result when we (possibly)
     // return it.
     if (INVALIDATION_DELETION != type) {
@@ -202,7 +213,7 @@ void CollectionScan::invalidate(OperationContext* txn, const RecordId& id, Inval
 
     // Deletions can harm the underlying RecordCursor so we must pass them down.
     if (_cursor) {
-        _cursor->invalidate(id);
+        _cursor->invalidate(opCtx, id);
     }
 
     if (_params.tailable && id == _lastSeenId) {
@@ -212,47 +223,41 @@ void CollectionScan::invalidate(OperationContext* txn, const RecordId& id, Inval
     }
 }
 
-void CollectionScan::saveState() {
-    _txn = NULL;
-    ++_commonStats.yields;
+void CollectionScan::doSaveState() {
     if (_cursor) {
-        _cursor->savePositioned();
+        _cursor->save();
     }
 }
 
-void CollectionScan::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-    ++_commonStats.unyields;
+void CollectionScan::doRestoreState() {
     if (_cursor) {
-        if (!_cursor->restore(opCtx)) {
-            warning() << "Collection dropped or state deleted during yield of CollectionScan: "
-                      << opCtx->getNS();
+        if (!_cursor->restore()) {
             _isDead = true;
         }
     }
 }
 
-vector<PlanStage*> CollectionScan::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
+void CollectionScan::doDetachFromOperationContext() {
+    if (_cursor)
+        _cursor->detachFromOperationContext();
 }
 
-PlanStageStats* CollectionScan::getStats() {
+void CollectionScan::doReattachToOperationContext() {
+    if (_cursor)
+        _cursor->reattachToOperationContext(getOpCtx());
+}
+
+unique_ptr<PlanStageStats> CollectionScan::getStats() {
     // Add a BSON representation of the filter to the stats tree, if there is one.
     if (NULL != _filter) {
         BSONObjBuilder bob;
-        _filter->toBSON(&bob);
+        _filter->serialize(&bob);
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COLLSCAN));
-    ret->specific.reset(new CollectionScanStats(_specificStats));
-    return ret.release();
-}
-
-const CommonStats* CollectionScan::getCommonStats() const {
-    return &_commonStats;
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COLLSCAN);
+    ret->specific = make_unique<CollectionScanStats>(_specificStats);
+    return ret;
 }
 
 const SpecificStats* CollectionScan::getSpecificStats() const {

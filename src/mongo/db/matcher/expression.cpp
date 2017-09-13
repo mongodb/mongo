@@ -30,8 +30,8 @@
 
 #include "mongo/db/matcher/expression.h"
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
@@ -55,22 +55,35 @@ bool MatchExpression::matchesBSON(const BSONObj& doc, MatchDetails* details) con
     return matches(&mydoc, details);
 }
 
-
-void AtomicMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << "$atomic\n";
+bool MatchExpression::matchesBSONElement(BSONElement elem, MatchDetails* details) const {
+    BSONElementViewMatchableDocument matchableDoc(elem);
+    return matches(&matchableDoc, details);
 }
 
-void AtomicMatchExpression::toBSON(BSONObjBuilder* out) const {
-    out->append("$isolated", 1);
+void MatchExpression::setCollator(const CollatorInterface* collator) {
+    for (size_t i = 0; i < numChildren(); ++i) {
+        getChild(i)->setCollator(collator);
+    }
+
+    _doSetCollator(collator);
 }
 
-void FalseMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << "$false\n";
-}
+void MatchExpression::addDependencies(DepsTracker* deps) const {
+    for (size_t i = 0; i < numChildren(); ++i) {
 
-void FalseMatchExpression::toBSON(BSONObjBuilder* out) const {
-    out->append("$false", 1);
+        // Don't recurse through MatchExpression nodes which require an entire array or entire
+        // subobject for matching.
+        const auto type = matchType();
+        switch (type) {
+            case MatchExpression::ELEM_MATCH_VALUE:
+            case MatchExpression::ELEM_MATCH_OBJECT:
+            case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
+                continue;
+            default:
+                getChild(i)->addDependencies(deps);
+        }
+    }
+
+    _doAddDependencies(deps);
 }
 }

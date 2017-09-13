@@ -29,19 +29,21 @@
 #include "mongo/db/ops/modifier_push.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/ordering.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -50,6 +52,7 @@ namespace {
 using mongo::BSONObj;
 using mongo::BSONObjBuilder;
 using mongo::BSONArrayBuilder;
+using mongo::CollatorInterfaceMock;
 using mongo::fromjson;
 using mongo::LogBuilder;
 using mongo::ModifierInterface;
@@ -64,6 +67,8 @@ using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using std::sort;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 void combineVec(const vector<int>& origVec,
                 const vector<int>& modVec,
@@ -113,8 +118,8 @@ struct ProjectKeyCmp {
         if (useWholeValue) {
             ret = left.woCompare(right, Ordering::make(sortPattern), false);
         } else {
-            BSONObj lhsKey = left.extractFields(sortPattern, true);
-            BSONObj rhsKey = right.extractFields(sortPattern, true);
+            BSONObj lhsKey = dps::extractElementsBasedOnTemplate(left, sortPattern, true);
+            BSONObj rhsKey = dps::extractElementsBasedOnTemplate(right, sortPattern, true);
             ret = lhsKey.woCompare(rhsKey, sortPattern);
         }
         return ret < 0;
@@ -359,52 +364,6 @@ TEST(Init, PushEachWithEmptySort) {
 }
 
 //
-// If in $pushAll semantics, do we check the array and that nothing else is there?
-//
-
-TEST(Init, PushAllSimple) {
-    BSONObj modObj = fromjson("{$pushAll: {x: [0]}}");
-    ModifierPush mod(ModifierPush::PUSH_ALL);
-    ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
-}
-
-TEST(Init, PushAllMultiple) {
-    BSONObj modObj = fromjson("{$pushAll: {x: [1,2,3]}}");
-    ModifierPush mod(ModifierPush::PUSH_ALL);
-    ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
-}
-
-TEST(Init, PushAllObject) {
-    BSONObj modObj = fromjson("{$pushAll: {x: [{a:1},{a:2}]}}");
-    ModifierPush mod(ModifierPush::PUSH_ALL);
-    ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
-}
-
-TEST(Init, PushAllMixed) {
-    BSONObj modObj = fromjson("{$pushAll: {x: [1,{a:2}]}}");
-    ModifierPush mod(ModifierPush::PUSH_ALL);
-    ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
-}
-
-TEST(Init, PushAllWrongType) {
-    BSONObj modObj = fromjson("{$pushAll: {x: 1}}");
-    ModifierPush mod(ModifierPush::PUSH_ALL);
-    ASSERT_NOT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-}
-
-TEST(Init, PushAllNotArray) {
-    BSONObj modObj = fromjson("{$pushAll: {x: {a:1}}}");
-    ModifierPush mod(ModifierPush::PUSH_ALL);
-    ASSERT_NOT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-}
-
-//
 // Are all clauses present? Is anything extroneous? Is anything duplicated?
 //
 
@@ -476,19 +435,17 @@ TEST(Init, PushEachWithSortFirst) {
 // Simple mod
 //
 
-/** Helper to build and manipulate a $push or a $pushAll mod. */
+/** Helper to build and manipulate a $push mod. */
 class Mod {
 public:
     Mod() : _mod() {}
 
-    explicit Mod(BSONObj modObj)
-        : _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$pushAll")
-                   ? ModifierPush::PUSH_ALL
-                   : ModifierPush::PUSH_NORMAL) {
+    explicit Mod(BSONObj modObj,
+                 ModifierInterface::Options options = ModifierInterface::Options::normal())
+        : _mod() {
         _modObj = modObj;
         StringData modName = modObj.firstElement().fieldName();
-        ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+        ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(), options));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -659,13 +616,13 @@ TEST(SimpleObjMod, PrepareApplyNormal) {
 }
 
 TEST(SimpleObjMod, PrepareApplyDotted) {
-    Document doc(fromjson(
-        "{ _id : 1 , "
-        "  question : 'a', "
-        "  choices : { "
-        "            first : { choice : 'b' }, "
-        "            second : { choice : 'c' } }"
-        "}"));
+    Document doc(
+        fromjson("{ _id : 1 , "
+                 "  question : 'a', "
+                 "  choices : { "
+                 "            first : { choice : 'b' }, "
+                 "            second : { choice : 'c' } }"
+                 "}"));
     Mod pushMod(fromjson("{$push: {'choices.first.votes': 1}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -676,13 +633,12 @@ TEST(SimpleObjMod, PrepareApplyDotted) {
 
     ASSERT_OK(pushMod.apply());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson(
-                      "{ _id : 1 , "
-                      "  question : 'a', "
-                      "  choices : { "
-                      "            first : { choice : 'b', votes: [1]}, "
-                      "            second : { choice : 'c' } }"
-                      "}"),
+    ASSERT_EQUALS(fromjson("{ _id : 1 , "
+                           "  question : 'a', "
+                           "  choices : { "
+                           "            first : { choice : 'b', votes: [1]}, "
+                           "            second : { choice : 'c' } }"
+                           "}"),
                   doc);
 
     Document logDoc;
@@ -692,73 +648,6 @@ TEST(SimpleObjMod, PrepareApplyDotted) {
     ASSERT_EQUALS(fromjson("{$set: {'choices.first.votes':[1]}}"), logDoc);
 }
 
-
-//
-// $pushAll Variation
-//
-
-TEST(PushAll, PrepareApplyEmpty) {
-    Document doc(fromjson("{a: []}"));
-    Mod pushMod(fromjson("{$pushAll: {a: [1]}}"));
-
-    ModifierInterface::ExecInfo execInfo;
-    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
-
-    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-    ASSERT_FALSE(execInfo.noOp);
-
-    ASSERT_OK(pushMod.apply());
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(doc, fromjson("{a: [1]}"));
-
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    ASSERT_OK(pushMod.log(&logBuilder));
-    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-    ASSERT_EQUALS(logDoc, fromjson("{$set: {a: [1]}}"));
-}
-
-TEST(PushAll, PrepareApplyInexistent) {
-    Document doc(fromjson("{}"));
-    Mod pushMod(fromjson("{$pushAll: {a: [1]}}"));
-
-    ModifierInterface::ExecInfo execInfo;
-    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
-
-    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-    ASSERT_FALSE(execInfo.noOp);
-
-    ASSERT_OK(pushMod.apply());
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(doc, fromjson("{a: [1]}"));
-
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    ASSERT_OK(pushMod.log(&logBuilder));
-    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-    ASSERT_EQUALS(logDoc, fromjson("{$set: {a: [1]}}"));
-}
-
-TEST(PushAll, PrepareApplyNormal) {
-    Document doc(fromjson("{a: [0]}"));
-    Mod pushMod(fromjson("{$pushAll: {a: [1,2]}}"));
-
-    ModifierInterface::ExecInfo execInfo;
-    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
-
-    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-    ASSERT_FALSE(execInfo.noOp);
-
-    ASSERT_OK(pushMod.apply());
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(doc, fromjson("{a: [0,1,2]}"));
-
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    ASSERT_OK(pushMod.log(&logBuilder));
-    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-    ASSERT_EQUALS(logDoc, fromjson("{$set: {'a.1': 1, 'a.2':2}}"));
-}
 
 //
 // Simple $each mod
@@ -1012,6 +901,36 @@ TEST(SortPushEach, MixedSortEmbeddedField) {
     ASSERT_EQUALS(BSON("$set" << expectedObj), logDoc);
 }
 
+TEST(SortPushEach, SortRespectsCollationFromOptions) {
+    Document doc(fromjson("{a: ['dd', 'fc', 'gb'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    Mod pushMod(fromjson("{$push: {a: {$each: ['ha'], $sort: 1}}}"),
+                ModifierInterface::Options::normal(&collator));
+    const BSONObj expectedObj = fromjson("{a: ['ha', 'gb', 'fc', 'dd']}");
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQUALS(expectedObj, doc);
+}
+
+TEST(SortPushEach, SortRespectsCollationFromSetCollator) {
+    Document doc(fromjson("{a: ['dd', 'fc', 'gb'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    Mod pushMod(fromjson("{$push: {a: {$each: ['ha'], $sort: 1}}}"));
+    pushMod.mod().setCollator(&collator);
+    const BSONObj expectedObj = fromjson("{a: ['ha', 'gb', 'fc', 'dd']}");
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQUALS(expectedObj, doc);
+}
+
 /**
  * This fixture supports building $push mods with parameterized $each arrays and $slices.
  * It always assume that the array being operated on is called 'a'. To build a mod, one
@@ -1059,8 +978,9 @@ public:
             arrBuilder.append(*it);
         }
 
-        _modObj = BSON("$push" << BSON("a" << BSON("$each" << arrBuilder.arr() << "$slice" << slice
-                                                           << "$sort" << sort)));
+        _modObj = BSON(
+            "$push" << BSON(
+                "a" << BSON("$each" << arrBuilder.arr() << "$slice" << slice << "$sort" << sort)));
 
         ASSERT_OK(_mod.init(_modObj["$push"].embeddedObject().firstElement(),
                             ModifierInterface::Options::normal()));
@@ -1271,7 +1191,6 @@ TEST_F(SlicedMod, ObjectArrayFromExisting) {
 
 TEST(ToPosition, BadInputs) {
     const char* const bad[] = {
-        "{$push: {a: { $each: [1], $position:-1}}}",
         "{$push: {a: { $each: [1], $position:'s'}}}",
         "{$push: {a: { $each: [1], $position:{}}}}",
         "{$push: {a: { $each: [1], $position:[0]}}}",
@@ -1279,14 +1198,15 @@ TEST(ToPosition, BadInputs) {
         "{$push: {a: { $each: [1], $position:3.000000000001}}}",
         "{$push: {a: { $each: [1], $position:1.2}}}",
         "{$push: {a: { $each: [1], $position:-1.2}}}",
-        "{$push: {a: { $each: [1], $position:9.0e19}}}",
-        "{$push: {a: { $each: [1], $position:-9.0e19}}}",
+        "{$push: {a: { $each: [1], $position:2147483648}}}",
+        "{$push: {a: { $each: [1], $position:-2147483649}}}",
+        "{$push: {a: { $each: [1], $position:NaN}}}",
         NULL,
     };
 
     int i = 0;
     while (bad[i] != NULL) {
-        ModifierPush pushMod(ModifierPush::PUSH_NORMAL);
+        ModifierPush pushMod;
         BSONObj modObj = fromjson(bad[i]);
         ASSERT_NOT_OK(pushMod.init(modObj.firstElement().embeddedObject().firstElement(),
                                    ModifierInterface::Options::normal()));
@@ -1435,6 +1355,111 @@ TEST(ToPosition, Back) {
     ASSERT_OK(pushMod.log(&logBuilder));
     ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
     ASSERT_EQUALS(fromjson("{$set: {'a.1':1}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionEmptyArray) {
+    Document doc(fromjson("{a: []}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [1], $position: -1}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [1]}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionOneElementArray) {
+    Document doc(fromjson("{a: [0]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [1], $position: -1}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [1, 0]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [1, 0]}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionMultiElementArray) {
+    Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [5], $position: -2}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [0, 1, 2, 5, 3, 4]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [0, 1, 2, 5, 3, 4]}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionOutOfBoundsDefaultsToBeginning) {
+    Document doc(fromjson("{a: [0]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [1], $position: -2}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [1, 0]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [1, 0]}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionPushMultipleElements) {
+    Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [5, 6, 7], $position: -2}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [0, 1, 2, 5, 6, 7, 3, 4]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [0, 1, 2, 5, 6, 7, 3, 4]}}"), logDoc);
 }
 
 }  // unnamed namespace

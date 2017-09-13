@@ -45,6 +45,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/logger/log_domain.h"
 #include "mongo/logger/logger.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
@@ -70,6 +71,24 @@ const char* strsignal(int signalNum) {
             return "UNKNOWN";
     }
 }
+
+void endProcessWithSignal(int signalNum) {
+    RaiseException(EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, NULL);
+}
+
+#else
+
+void endProcessWithSignal(int signalNum) {
+    // This works by restoring the system-default handler for the given signal and re-raising it, in
+    // order to get the system default termination behavior (i.e., dumping core, or just exiting).
+    struct sigaction defaultedSignals;
+    memset(&defaultedSignals, 0, sizeof(defaultedSignals));
+    defaultedSignals.sa_handler = SIG_DFL;
+    sigemptyset(&defaultedSignals.sa_mask);
+    invariant(sigaction(signalNum, &defaultedSignals, nullptr) == 0);
+    raise(signalNum);
+}
+
 #endif
 
 // This should only be used with MallocFreeOSteam
@@ -89,7 +108,7 @@ public:
     }
 
 private:
-    static const size_t maxLogLineSize = 16 * 1000;
+    static const size_t maxLogLineSize = 100 * 1000;
     char _buffer[maxLogLineSize];
 };
 
@@ -112,26 +131,50 @@ private:
 
 MallocFreeOStream mallocFreeOStream;
 
-// This guards mallocFreeOStream. While locking a pthread_mutex isn't guaranteed to be
-// signal-safe, this file does it anyway. The assumption is that the main safety risk to locking
-// a mutex is that you could deadlock with yourself. That risk is protected against by only
-// locking the mutex in fatal functions that log then exit. There is a remaining risk that one
-// of these functions recurses (possible if logging segfaults while handing a segfault). This is
-// currently acceptable because if things are that broken, there is little we can do about it.
-//
-// If in the future, we decide to be more strict about posix signal safety, we could switch to
-// an atomic test-and-set loop, possibly with a mechanism for detecting signals raised while
-// handling other signals.
-stdx::mutex streamMutex;
+/**
+ * Instances of this type guard the mallocFreeOStream. While locking a mutex isn't guaranteed to
+ * be signal-safe, this file does it anyway. The assumption is that the main safety risk to
+ * locking a mutex is that you could deadlock with yourself. That risk is protected against by
+ * only locking the mutex in fatal functions that log then exit. There is a remaining risk that
+ * one of these functions recurses (possible if logging segfaults while handing a
+ * segfault). This is currently acceptable because if things are that broken, there is little we
+ * can do about it.
+ *
+ * If in the future, we decide to be more strict about posix signal safety, we could switch to
+ * an atomic test-and-set loop, possibly with a mechanism for detecting signals raised while
+ * handling other signals.
+ */
+class MallocFreeOStreamGuard {
+public:
+    explicit MallocFreeOStreamGuard() : _lk(_streamMutex, stdx::defer_lock) {
+        if (terminateDepth++) {
+            quickExit(EXIT_ABRUPT);
+        }
+        _lk.lock();
+    }
 
-// must hold streamMutex to call
+private:
+    static stdx::mutex _streamMutex;
+    static thread_local int terminateDepth;
+    stdx::unique_lock<stdx::mutex> _lk;
+};
+
+stdx::mutex MallocFreeOStreamGuard::_streamMutex;
+thread_local int MallocFreeOStreamGuard::terminateDepth = 0;
+
+// must hold MallocFreeOStreamGuard to call
 void writeMallocFreeStreamToLog() {
-    logger::globalLogDomain()->append(logger::MessageEventEphemeral(
-        Date_t::now(), logger::LogSeverity::Severe(), getThreadName(), mallocFreeOStream.str()));
+    logger::globalLogDomain()
+        ->append(logger::MessageEventEphemeral(Date_t::now(),
+                                               logger::LogSeverity::Severe(),
+                                               getThreadName(),
+                                               mallocFreeOStream.str())
+                     .setIsTruncatable(false))
+        .transitional_ignore();
     mallocFreeOStream.rewind();
 }
 
-// must hold streamMutex to call
+// must hold MallocFreeOStreamGuard to call
 void printSignalAndBacktrace(int signalNum) {
     mallocFreeOStream << "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").\n";
     printStackTrace(mallocFreeOStream);
@@ -141,10 +184,10 @@ void printSignalAndBacktrace(int signalNum) {
 // this will be called in certain c++ error cases, for example if there are two active
 // exceptions
 void myTerminate() {
-    stdx::lock_guard<stdx::mutex> lk(streamMutex);
+    MallocFreeOStreamGuard lk{};
 
     // In c++11 we can recover the current exception to print it.
-    if (std::exception_ptr eptr = std::current_exception()) {
+    if (std::current_exception()) {
         mallocFreeOStream << "terminate() called. An exception is active;"
                           << " attempting to gather more information";
         writeMallocFreeStreamToLog();
@@ -152,7 +195,7 @@ void myTerminate() {
         const std::type_info* typeInfo = nullptr;
         try {
             try {
-                std::rethrow_exception(eptr);
+                throw;
             } catch (const DBException& ex) {
                 typeInfo = &typeid(ex);
                 mallocFreeOStream << "DBException::toString(): " << ex.toString() << '\n';
@@ -185,21 +228,15 @@ void myTerminate() {
 
     printStackTrace(mallocFreeOStream);
     writeMallocFreeStreamToLog();
-
-#if defined(_WIN32)
-    doMinidump();
-#endif
-
     breakpoint();
-    quickExit(EXIT_ABRUPT);
+    endProcessWithSignal(SIGABRT);
 }
 
 void abruptQuit(int signalNum) {
-    stdx::lock_guard<stdx::mutex> lk(streamMutex);
+    MallocFreeOStreamGuard lk{};
     printSignalAndBacktrace(signalNum);
-
-    // Don't go through normal shutdown procedure. It may make things worse.
-    quickExit(EXIT_ABRUPT);
+    breakpoint();
+    endProcessWithSignal(signalNum);
 }
 
 #if defined(_WIN32)
@@ -212,9 +249,6 @@ void myInvalidParameterHandler(const wchar_t* expression,
     severe() << "Invalid parameter detected in function " << toUtf8String(function)
              << " File: " << toUtf8String(file) << " Line: " << line;
     severe() << "Expression: " << toUtf8String(expression);
-
-    doMinidump();
-
     severe() << "immediate exit due to invalid parameter";
 
     abruptQuit(SIGABRT);
@@ -222,18 +256,14 @@ void myInvalidParameterHandler(const wchar_t* expression,
 
 void myPureCallHandler() {
     severe() << "Pure call handler invoked";
-
-    doMinidump();
-
     severe() << "immediate exit due to invalid pure call";
-
     abruptQuit(SIGABRT);
 }
 
 #else
 
 void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void*) {
-    stdx::lock_guard<stdx::mutex> lk(streamMutex);
+    MallocFreeOStreamGuard lk{};
 
     const char* action = (signalNum == SIGSEGV || signalNum == SIGBUS) ? "access" : "operation";
     mallocFreeOStream << "Invalid " << action << " at address: " << siginfo->si_addr;
@@ -245,51 +275,97 @@ void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void*) {
 
     printSignalAndBacktrace(signalNum);
     breakpoint();
-    quickExit(EXIT_ABRUPT);
+    endProcessWithSignal(signalNum);
 }
 
 #endif
 
 }  // namespace
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 void setupSynchronousSignalHandlers() {
     std::set_terminate(myTerminate);
     std::set_new_handler(reportOutOfMemoryErrorAndExit);
 
-    // SIGABRT is the only signal we want handled by signal handlers on both windows and posix.
-    invariant(signal(SIGABRT, abruptQuit) != SIG_ERR);
-
 #if defined(_WIN32)
+    invariant(signal(SIGABRT, abruptQuit) != SIG_ERR);
     _set_purecall_handler(myPureCallHandler);
     _set_invalid_parameter_handler(myInvalidParameterHandler);
     setWindowsUnhandledExceptionFilter();
 #else
-    invariant(signal(SIGHUP, SIG_IGN) != SIG_ERR);
-    invariant(signal(SIGUSR2, SIG_IGN) != SIG_ERR);
-    invariant(signal(SIGPIPE, SIG_IGN) != SIG_ERR);
+    {
+        struct sigaction ignoredSignals;
+        memset(&ignoredSignals, 0, sizeof(ignoredSignals));
+        ignoredSignals.sa_handler = SIG_IGN;
+        sigemptyset(&ignoredSignals.sa_mask);
 
-    struct sigaction addrSignals;
-    memset(&addrSignals, 0, sizeof(struct sigaction));
-    addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
-    sigemptyset(&addrSignals.sa_mask);
-    addrSignals.sa_flags = SA_SIGINFO;
+        invariant(sigaction(SIGHUP, &ignoredSignals, nullptr) == 0);
+        invariant(sigaction(SIGUSR2, &ignoredSignals, nullptr) == 0);
+        invariant(sigaction(SIGPIPE, &ignoredSignals, nullptr) == 0);
+    }
+    {
+        struct sigaction plainSignals;
+        memset(&plainSignals, 0, sizeof(plainSignals));
+        plainSignals.sa_handler = abruptQuit;
+        sigemptyset(&plainSignals.sa_mask);
 
-    // ^\ is the stronger ^C. Log and quit hard without waiting for cleanup.
-    invariant(signal(SIGQUIT, abruptQuit) != SIG_ERR);
+        // ^\ is the stronger ^C. Log and quit hard without waiting for cleanup.
+        invariant(sigaction(SIGQUIT, &plainSignals, nullptr) == 0);
 
-    invariant(sigaction(SIGSEGV, &addrSignals, 0) == 0);
-    invariant(sigaction(SIGBUS, &addrSignals, 0) == 0);
-    invariant(sigaction(SIGILL, &addrSignals, 0) == 0);
-    invariant(sigaction(SIGFPE, &addrSignals, 0) == 0);
+#if __has_feature(address_sanitizer)
+        // Sanitizers may be configured to call abort(). If so, we should omit our signal handler.
+        bool shouldRegister = true;
+        constexpr std::array<StringData, 5> sanitizerConfigVariable{"ASAN_OPTIONS"_sd,
+                                                                    "TSAN_OPTIONS"_sd,
+                                                                    "MSAN_OPTIONS"_sd,
+                                                                    "UBSAN_OPTIONS"_sd,
+                                                                    "LSAN_OPTIONS"_sd};
+        for (const StringData& option : sanitizerConfigVariable) {
+            StringData configString(getenv(option.rawData()));
+            if (configString.find("abort_on_error=1") != std::string::npos ||
+                configString.find("abort_on_error=true") != std::string::npos) {
+                shouldRegister = false;
+            }
+        }
+        if (shouldRegister) {
+            invariant(sigaction(SIGABRT, &plainSignals, nullptr) == 0);
+        }
+#else
+        invariant(sigaction(SIGABRT, &plainSignals, nullptr) == 0);
+#endif
+    }
+    {
+        struct sigaction addrSignals;
+        memset(&addrSignals, 0, sizeof(addrSignals));
+        addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
+        sigemptyset(&addrSignals.sa_mask);
+        addrSignals.sa_flags = SA_SIGINFO;
 
+        invariant(sigaction(SIGSEGV, &addrSignals, nullptr) == 0);
+        invariant(sigaction(SIGBUS, &addrSignals, nullptr) == 0);
+        invariant(sigaction(SIGILL, &addrSignals, nullptr) == 0);
+        invariant(sigaction(SIGFPE, &addrSignals, nullptr) == 0);
+    }
     setupSIGTRAPforGDB();
 #endif
 }
 
 void reportOutOfMemoryErrorAndExit() {
-    stdx::lock_guard<stdx::mutex> lk(streamMutex);
+    MallocFreeOStreamGuard lk{};
     printStackTrace(mallocFreeOStream << "out of memory.\n");
     writeMallocFreeStreamToLog();
     quickExit(EXIT_ABRUPT);
+}
+
+void clearSignalMask() {
+#ifndef _WIN32
+    // We need to make sure that all signals are unmasked so signals are handled correctly
+    sigset_t unblockSignalMask;
+    invariant(sigemptyset(&unblockSignalMask) == 0);
+    invariant(sigprocmask(SIG_SETMASK, &unblockSignalMask, nullptr) == 0);
+#endif
 }
 }  // namespace mongo

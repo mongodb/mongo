@@ -32,14 +32,19 @@
 
 #include <utility>
 
+#include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/geoparser.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/geo/s2.h"
-#include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
+#include "mongo/db/index/s2_common.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -49,6 +54,8 @@
 namespace {
 
 using namespace mongo;
+
+namespace dps = ::mongo::dotted_path_support;
 
 //
 // Helper functions for getHaystackKeys
@@ -75,27 +82,16 @@ void addKey(const string& root, const BSONElement& e, BSONObjSet* keys) {
 // Helper functions for getS2Keys
 //
 
-static void S2KeysFromRegion(S2RegionCoverer* coverer,
-                             const S2Region& region,
-                             vector<string>* out) {
-    vector<S2CellId> covering;
-    coverer->GetCovering(region, &covering);
-    for (size_t i = 0; i < covering.size(); ++i) {
-        out->push_back(covering[i].toString());
-    }
-}
-
-
 Status S2GetKeysForElement(const BSONElement& element,
                            const S2IndexingParams& params,
-                           vector<string>* out) {
+                           vector<S2CellId>* out) {
     GeometryContainer geoContainer;
     Status status = geoContainer.parseFromStorage(element);
     if (!status.isOK())
         return status;
 
     S2RegionCoverer coverer;
-    params.configureCoverer(&coverer);
+    params.configureCoverer(geoContainer, &coverer);
 
     // Don't index big polygon
     if (geoContainer.getNativeCRS() == STRICT_SPHERE) {
@@ -119,21 +115,24 @@ Status S2GetKeysForElement(const BSONElement& element,
 
     invariant(geoContainer.hasS2Region());
 
-    S2KeysFromRegion(&coverer, geoContainer.getS2Region(), out);
+    coverer.GetCovering(geoContainer.getS2Region(), out);
     return Status::OK();
 }
 
 
 /**
- *  Get the index keys for elements that are GeoJSON.
- *  Used by getS2Keys.
+ * Fills 'out' with the S2 keys that should be generated for 'elements' in a 2dsphere index.
+ *
+ * Returns true if an indexed element of the document uses multiple cells for its covering, and
+ * returns false otherwise.
  */
-void getS2GeoKeys(const BSONObj& document,
+bool getS2GeoKeys(const BSONObj& document,
                   const BSONElementSet& elements,
                   const S2IndexingParams& params,
                   BSONObjSet* out) {
+    bool everGeneratedMultipleCells = false;
     for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-        vector<string> cells;
+        vector<S2CellId> cells;
         Status status = S2GetKeysForElement(*i, params, &cells);
         uassert(16755,
                 str::stream() << "Can't extract geo keys: " << document << "  " << status.reason(),
@@ -143,11 +142,11 @@ void getS2GeoKeys(const BSONObj& document,
                 "Unable to generate keys for (likely malformed) geometry: " + document.toString(),
                 cells.size() > 0);
 
-        for (vector<string>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
-            BSONObjBuilder b;
-            b.append("", *it);
-            out->insert(b.obj());
+        for (vector<S2CellId>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
+            out->insert(S2CellIdToIndexKey(*it, params.indexVersion));
         }
+
+        everGeneratedMultipleCells = everGeneratedMultipleCells || cells.size() > 1;
     }
 
     if (0 == out->size()) {
@@ -155,13 +154,14 @@ void getS2GeoKeys(const BSONObj& document,
         b.appendNull("");
         out->insert(b.obj());
     }
+    return everGeneratedMultipleCells;
 }
 
 /**
- * Expands array and appends items to 'out'.
- * Used by getOneLiteralKey.
+ * Fills 'out' with the keys that should be generated for an array value 'obj' in a 2dsphere index.
+ * A key is generated for each element of the array value 'obj'.
  */
-void getS2LiteralKeysArray(const BSONObj& obj, BSONObjSet* out) {
+void getS2LiteralKeysArray(const BSONObj& obj, const CollatorInterface* collator, BSONObjSet* out) {
     BSONObjIterator objIt(obj);
     if (!objIt.more()) {
         // Empty arrays are indexed as undefined.
@@ -172,33 +172,44 @@ void getS2LiteralKeysArray(const BSONObj& obj, BSONObjSet* out) {
         // Non-empty arrays are exploded.
         while (objIt.more()) {
             BSONObjBuilder b;
-            b.appendAs(objIt.next(), "");
+            CollationIndexKey::collationAwareIndexKeyAppend(objIt.next(), collator, &b);
             out->insert(b.obj());
         }
     }
 }
 
 /**
- * If 'elt' is an array, expands elt and adds items to 'out'.
- * Otherwise, adds 'elt' as a single element.
- * Used by getLiteralKeys.
+ * Fills 'out' with the keys that should be generated for a value 'elt' in a 2dsphere index. If
+ * 'elt' is an array value, then a key is generated for each element of the array value 'obj'.
+ *
+ * Returns true if 'elt' is an array value and returns false otherwise.
  */
-void getS2OneLiteralKey(const BSONElement& elt, BSONObjSet* out) {
+bool getS2OneLiteralKey(const BSONElement& elt,
+                        const CollatorInterface* collator,
+                        BSONObjSet* out) {
     if (Array == elt.type()) {
-        getS2LiteralKeysArray(elt.Obj(), out);
+        getS2LiteralKeysArray(elt.Obj(), collator, out);
+        return true;
     } else {
         // One thing, not an array, index as-is.
         BSONObjBuilder b;
-        b.appendAs(elt, "");
+        CollationIndexKey::collationAwareIndexKeyAppend(elt, collator, &b);
         out->insert(b.obj());
     }
+    return false;
 }
 
 /**
- * elements is a non-geo field.  Add the values literally, expanding arrays.
- * Used by getS2Keys.
+ * Fills 'out' with the non-geo keys that should be generated for 'elements' in a 2dsphere index. If
+ * any element in 'elements' is an array value, then a key is generated for each element of that
+ * array value.
+ *
+ * Returns true if any element of 'elements' is an array value and returns false otherwise.
  */
-void getS2LiteralKeys(const BSONElementSet& elements, BSONObjSet* out) {
+bool getS2LiteralKeys(const BSONElementSet& elements,
+                      const CollatorInterface* collator,
+                      BSONObjSet* out) {
+    bool foundIndexedArrayValue = false;
     if (0 == elements.size()) {
         // Missing fields are indexed as null.
         BSONObjBuilder b;
@@ -206,9 +217,11 @@ void getS2LiteralKeys(const BSONElementSet& elements, BSONObjSet* out) {
         out->insert(b.obj());
     } else {
         for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-            getS2OneLiteralKey(*i, out);
+            const bool thisElemIsArray = getS2OneLiteralKey(*i, collator, out);
+            foundIndexedArrayValue = foundIndexedArrayValue || thisElemIsArray;
         }
     }
+    return foundIndexedArrayValue;
 }
 
 }  // namespace
@@ -224,16 +237,16 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                                       const TwoDIndexingParams& params,
                                       BSONObjSet* keys,
                                       std::vector<BSONObj>* locs) {
-    BSONElementMSet bSet;
+    BSONElementMultiSet bSet;
 
     // Get all the nested location fields, but don't return individual elements from
     // the last array, if it exists.
-    obj.getFieldsDotted(params.geo.c_str(), bSet, false);
+    dps::extractAllElementsAlongPath(obj, params.geo.c_str(), bSet, false);
 
     if (bSet.empty())
         return;
 
-    for (BSONElementMSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI) {
+    for (BSONElementMultiSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI) {
         BSONElement geo = *setI;
 
         if (geo.eoo() || !geo.isABSONObj())
@@ -297,7 +310,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                  ++i) {
                 // Get *all* fields for the index key
                 BSONElementSet eSet;
-                obj.getFieldsDotted(i->first, eSet);
+                dps::extractAllElementsAlongPath(obj, i->first, eSet);
 
                 if (eSet.size() == 0)
                     b.appendNull("");
@@ -334,9 +347,20 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         HashSeed seed,
                                         int hashVersion,
                                         bool isSparse,
+                                        const CollatorInterface* collator,
                                         BSONObjSet* keys) {
     const char* cstr = hashedField.c_str();
-    BSONElement fieldVal = obj.getFieldDottedOrArray(cstr);
+    BSONElement fieldVal = dps::extractElementAtPath(obj, cstr);
+
+    // Convert strings to comparison keys.
+    BSONObj fieldValObj;
+    if (!fieldVal.eoo()) {
+        BSONObjBuilder bob;
+        CollationIndexKey::collationAwareIndexKeyAppend(fieldVal, collator, &bob);
+        fieldValObj = bob.obj();
+        fieldVal = fieldValObj.firstElement();
+    }
+
     uassert(16766,
             "Error: hashed indexes do not currently support array values",
             fieldVal.type() != Array);
@@ -362,7 +386,7 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
                                             const std::vector<std::string>& otherFields,
                                             double bucketSize,
                                             BSONObjSet* keys) {
-    BSONElement loc = obj.getFieldDotted(geoField);
+    BSONElement loc = dps::extractElementAtPath(obj, geoField);
 
     if (loc.eoo()) {
         return;
@@ -387,9 +411,8 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
 
     BSONElementSet all;
 
-    // This is getFieldsDotted (plural not singular) since the object we're indexing
-    // may be an array.
-    obj.getFieldsDotted(otherFields[0], all);
+    // The object we're indexing may be an array.
+    dps::extractAllElementsAlongPath(obj, otherFields[0], all);
 
     if (all.size() == 0) {
         // We're indexing a document that doesn't have the secondary non-geo field present.
@@ -426,27 +449,42 @@ std::string ExpressionKeysPrivate::makeHaystackString(int hashedX, int hashedY) 
 void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
                                       const BSONObj& keyPattern,
                                       const S2IndexingParams& params,
-                                      BSONObjSet* keys) {
-    BSONObjSet keysToAdd;
+                                      BSONObjSet* keys,
+                                      MultikeyPaths* multikeyPaths) {
+    BSONObjSet keysToAdd = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     // Does one of our documents have a geo field?
     bool haveGeoField = false;
 
-    // We output keys in the same order as the fields we index.
-    BSONObjIterator i(keyPattern);
-    while (i.more()) {
-        BSONElement e = i.next();
+    if (multikeyPaths) {
+        invariant(multikeyPaths->empty());
+        multikeyPaths->resize(keyPattern.nFields());
+    }
 
+    size_t posInIdx = 0;
+
+    // We output keys in the same order as the fields we index.
+    for (const auto keyElem : keyPattern) {
         // First, we get the keys that this field adds.  Either they're added literally from
         // the value of the field, or they're transformed if the field is geo.
         BSONElementSet fieldElements;
-        // false means Don't expand the last array, duh.
-        obj.getFieldsDotted(e.fieldName(), fieldElements, false);
+        const bool expandArrayOnTrailingField = false;
+        std::set<size_t>* arrayComponents = multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
+        dps::extractAllElementsAlongPath(
+            obj, keyElem.fieldName(), fieldElements, expandArrayOnTrailingField, arrayComponents);
 
-        BSONObjSet keysForThisField;
-        if (IndexNames::GEO_2DSPHERE == e.valuestr()) {
-            if (S2_INDEX_VERSION_2 == params.indexVersion) {
-                // For V2,
+        // Trailing array values aren't being expanded, so we still need to determine whether the
+        // last component of the indexed path 'keyElem.fieldName()' causes the index to be multikey.
+        // We say that it does if
+        //   (a) the last component of the indexed path ever refers to an array value (regardless of
+        //       the number of array elements)
+        //   (b) the last component of the indexed path ever refers to GeoJSON data that requires
+        //       multiple cells for its covering.
+        bool lastPathComponentCausesIndexToBeMultikey;
+        BSONObjSet keysForThisField = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+        if (IndexNames::GEO_2DSPHERE == keyElem.valuestr()) {
+            if (params.indexVersion >= S2_INDEX_VERSION_2) {
+                // For >= V2,
                 // geo: null,
                 // geo: undefined
                 // geo: []
@@ -466,31 +504,40 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
                     }
                 }
 
-                // V2 2dsphere indices require that at least one geo field to be present in a
+                // >= V2 2dsphere indices require that at least one geo field to be present in a
                 // document in order to index it.
                 if (fieldElements.size() > 0) {
                     haveGeoField = true;
                 }
             }
 
-            getS2GeoKeys(obj, fieldElements, params, &keysForThisField);
+            lastPathComponentCausesIndexToBeMultikey =
+                getS2GeoKeys(obj, fieldElements, params, &keysForThisField);
         } else {
-            getS2LiteralKeys(fieldElements, &keysForThisField);
+            lastPathComponentCausesIndexToBeMultikey =
+                getS2LiteralKeys(fieldElements, params.collator, &keysForThisField);
         }
 
         // We expect there to be the missing field element present in the keys if data is
         // missing.  So, this should be non-empty.
         verify(!keysForThisField.empty());
 
+        if (multikeyPaths && lastPathComponentCausesIndexToBeMultikey) {
+            const size_t pathLengthOfThisField = FieldRef{keyElem.fieldNameStringData()}.numParts();
+            invariant(pathLengthOfThisField > 0);
+            (*multikeyPaths)[posInIdx].insert(pathLengthOfThisField - 1);
+        }
+
         // We take the Cartesian product of all of the keys.  This requires that we have
         // some keys to take the Cartesian product with.  If keysToAdd.empty(), we
         // initialize it.
         if (keysToAdd.empty()) {
             keysToAdd = keysForThisField;
+            ++posInIdx;
             continue;
         }
 
-        BSONObjSet updatedKeysToAdd;
+        BSONObjSet updatedKeysToAdd = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         for (BSONObjSet::const_iterator it = keysToAdd.begin(); it != keysToAdd.end(); ++it) {
             for (BSONObjSet::const_iterator newIt = keysForThisField.begin();
                  newIt != keysForThisField.end();
@@ -502,10 +549,11 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
             }
         }
         keysToAdd = updatedKeysToAdd;
+        ++posInIdx;
     }
 
-    // Make sure that if we're V2 there's at least one geo field present in the doc.
-    if (S2_INDEX_VERSION_2 == params.indexVersion) {
+    // Make sure that if we're >= V2 there's at least one geo field present in the doc.
+    if (params.indexVersion >= S2_INDEX_VERSION_2) {
         if (!haveGeoField) {
             return;
         }
@@ -513,7 +561,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
 
     if (keysToAdd.size() > params.maxKeysPerInsert) {
         warning() << "Insert of geo object generated a high number of keys."
-                  << " num keys: " << keysToAdd.size() << " obj inserted: " << obj;
+                  << " num keys: " << keysToAdd.size() << " obj inserted: " << redact(obj);
     }
 
     *keys = keysToAdd;

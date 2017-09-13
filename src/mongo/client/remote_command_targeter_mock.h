@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -41,13 +42,38 @@ public:
     /**
      * Shortcut for unit-tests.
      */
-    static RemoteCommandTargeterMock* get(RemoteCommandTargeter* targeter);
+    static std::shared_ptr<RemoteCommandTargeterMock> get(
+        std::shared_ptr<RemoteCommandTargeter> targeter);
+
+    /**
+     * Returns the value last set by setConnectionStringReturnValue.
+     */
+    ConnectionString connectionString() override;
 
     /**
      * Returns the return value last set by setFindHostReturnValue.
      * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
      */
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                Milliseconds maxWait) override;
+
+    StatusWith<HostAndPort> findHost(OperationContext* opCtx,
+                                     const ReadPreferenceSetting& readPref) override;
+
+    /**
+     * No-op for the mock.
+     */
+    void markHostNotMaster(const HostAndPort& host, const Status& status) override;
+
+    /**
+     * No-op for the mock.
+     */
+    void markHostUnreachable(const HostAndPort& host, const Status& status) override;
+
+    /**
+     * Sets the return value for the next call to connectionString.
+     */
+    void setConnectionStringReturnValue(const ConnectionString returnValue);
 
     /**
      * Sets the return value for the next call to findHost.
@@ -55,6 +81,7 @@ public:
     void setFindHostReturnValue(StatusWith<HostAndPort> returnValue);
 
 private:
+    ConnectionString _connectionStringReturnValue;
     StatusWith<HostAndPort> _findHostReturnValue;
 };
 

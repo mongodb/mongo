@@ -33,7 +33,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/stdx/functional.h"
 
@@ -48,24 +50,33 @@ class AuthzManagerExternalStateMongos : public AuthzManagerExternalState {
 
 public:
     AuthzManagerExternalStateMongos();
-    virtual ~AuthzManagerExternalStateMongos();
+    ~AuthzManagerExternalStateMongos() override;
 
-    virtual Status initialize(OperationContext* txn);
+    Status initialize(OperationContext* opCtx) override;
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) override;
-    virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
-    virtual Status getUserDescription(OperationContext* txn,
-                                      const UserName& userName,
-                                      BSONObj* result);
-    virtual Status getRoleDescription(const RoleName& roleName,
-                                      bool showPrivileges,
-                                      BSONObj* result);
-    virtual Status getRoleDescriptionsForDB(const std::string dbname,
-                                            bool showPrivileges,
-                                            bool showBuiltinRoles,
-                                            std::vector<BSONObj>* result);
+    Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
+    Status getUserDescription(OperationContext* opCtx,
+                              const UserName& userName,
+                              BSONObj* result) override;
+    Status getRoleDescription(OperationContext* opCtx,
+                              const RoleName& roleName,
+                              PrivilegeFormat showPrivileges,
+                              AuthenticationRestrictionsFormat,
+                              BSONObj* result) override;
+    Status getRolesDescription(OperationContext* opCtx,
+                               const std::vector<RoleName>& roles,
+                               PrivilegeFormat showPrivileges,
+                               AuthenticationRestrictionsFormat,
+                               BSONObj* result) override;
+    Status getRoleDescriptionsForDB(OperationContext* opCtx,
+                                    const std::string& dbname,
+                                    PrivilegeFormat showPrivileges,
+                                    AuthenticationRestrictionsFormat,
+                                    bool showBuiltinRoles,
+                                    std::vector<BSONObj>* result) override;
 
-    bool hasAnyPrivilegeDocuments(OperationContext* txn) override;
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
 };
 
 }  // namespace mongo

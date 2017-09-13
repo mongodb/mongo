@@ -42,17 +42,17 @@
 #include "mongo/db/db.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_index.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
 
 NamespaceDetails::NamespaceDetails(const DiskLoc& loc, bool capped) {
-    BOOST_STATIC_ASSERT(sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails));
+    MONGO_STATIC_ASSERT(sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails));
 
     /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
     firstExtent = lastExtent = capExtent = loc;
@@ -82,38 +82,37 @@ NamespaceDetails::NamespaceDetails(const DiskLoc& loc, bool capped) {
     memset(_reserved, 0, sizeof(_reserved));
 }
 
-NamespaceDetails::Extra* NamespaceDetails::allocExtra(OperationContext* txn,
+NamespaceDetails::Extra* NamespaceDetails::allocExtra(OperationContext* opCtx,
                                                       StringData ns,
                                                       NamespaceIndex& ni,
                                                       int nindexessofar) {
     // Namespace details must always be changed under an exclusive DB lock
     const NamespaceString nss(ns);
-    invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
     int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
     verify(i >= 0 && i <= 1);
 
     Namespace fullns(ns);
-    Namespace extrans(fullns.extraName(i));  // throws UserException if ns name too long
+    Namespace extrans(fullns.extraName(i));  // throws AssertionException if ns name too long
 
-    massert(10350, "allocExtra: base ns missing?", this);
     massert(10351, "allocExtra: extra already exists", ni.details(extrans) == 0);
 
     Extra temp;
     temp.init();
 
-    ni.add_ns(txn, extrans, reinterpret_cast<NamespaceDetails*>(&temp));
+    ni.add_ns(opCtx, extrans, reinterpret_cast<NamespaceDetails*>(&temp));
     Extra* e = reinterpret_cast<NamespaceDetails::Extra*>(ni.details(extrans));
 
     long ofs = e->ofsFrom(this);
     if (i == 0) {
         verify(_extraOffset == 0);
-        *txn->recoveryUnit()->writing(&_extraOffset) = ofs;
+        *opCtx->recoveryUnit()->writing(&_extraOffset) = ofs;
         verify(extra() == e);
     } else {
         Extra* hd = extra();
         verify(hd->next(this) == 0);
-        hd->setNext(txn, ofs);
+        hd->setNext(opCtx, ofs);
     }
     return e;
 }
@@ -126,7 +125,7 @@ IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) {
     Extra* e = extra();
     if (!e) {
         if (missingExpected)
-            throw MsgAssertionException(13283, "Missing Extra");
+            throw AssertionException(13283, "Missing Extra");
         massert(14045, "missing Extra", e);
     }
     int i = idxNo - NIndexesBase;
@@ -134,7 +133,7 @@ IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) {
         e = e->next(this);
         if (!e) {
             if (missingExpected)
-                throw MsgAssertionException(14823, "missing extra");
+                throw AssertionException(14823, "missing extra");
             massert(14824, "missing Extra", e);
         }
         i -= NIndexesExtra;
@@ -151,7 +150,7 @@ const IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) const
     const Extra* e = extra();
     if (!e) {
         if (missingExpected)
-            throw MsgAssertionException(17421, "Missing Extra");
+            throw AssertionException(17421, "Missing Extra");
         massert(17422, "missing Extra", e);
     }
     int i = idxNo - NIndexesBase;
@@ -159,7 +158,7 @@ const IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) const
         e = e->next(this);
         if (!e) {
             if (missingExpected)
-                throw MsgAssertionException(17423, "missing extra");
+                throw AssertionException(17423, "missing extra");
             massert(17424, "missing Extra", e);
         }
         i -= NIndexesExtra;
@@ -177,7 +176,7 @@ NamespaceDetails::IndexIterator::IndexIterator(const NamespaceDetails* _d,
 }
 
 // must be called when renaming a NS to fix up extra
-void NamespaceDetails::copyingFrom(OperationContext* txn,
+void NamespaceDetails::copyingFrom(OperationContext* opCtx,
                                    StringData thisns,
                                    NamespaceIndex& ni,
                                    NamespaceDetails* src) {
@@ -185,35 +184,35 @@ void NamespaceDetails::copyingFrom(OperationContext* txn,
     Extra* se = src->extra();
     int n = NIndexesBase;
     if (se) {
-        Extra* e = allocExtra(txn, thisns, ni, n);
+        Extra* e = allocExtra(opCtx, thisns, ni, n);
         while (1) {
             n += NIndexesExtra;
             e->copy(this, *se);
             se = se->next(src);
             if (se == 0)
                 break;
-            Extra* nxt = allocExtra(txn, thisns, ni, n);
-            e->setNext(txn, nxt->ofsFrom(this));
+            Extra* nxt = allocExtra(opCtx, thisns, ni, n);
+            e->setNext(opCtx, nxt->ofsFrom(this));
             e = nxt;
         }
         verify(_extraOffset);
     }
 }
 
-NamespaceDetails* NamespaceDetails::writingWithoutExtra(OperationContext* txn) {
-    return txn->recoveryUnit()->writing(this);
+NamespaceDetails* NamespaceDetails::writingWithoutExtra(OperationContext* opCtx) {
+    return opCtx->recoveryUnit()->writing(this);
 }
 
 
 // XXX - this method should go away
-NamespaceDetails* NamespaceDetails::writingWithExtra(OperationContext* txn) {
+NamespaceDetails* NamespaceDetails::writingWithExtra(OperationContext* opCtx) {
     for (Extra* e = extra(); e; e = e->next(this)) {
-        txn->recoveryUnit()->writing(e);
+        opCtx->recoveryUnit()->writing(e);
     }
-    return writingWithoutExtra(txn);
+    return writingWithoutExtra(opCtx);
 }
 
-void NamespaceDetails::setMaxCappedDocs(OperationContext* txn, long long max) {
+void NamespaceDetails::setMaxCappedDocs(OperationContext* opCtx, long long max) {
     massert(16499,
             "max in a capped collection has to be < 2^31 or -1",
             CollectionOptions::validMaxCappedDocs(&max));
@@ -223,21 +222,21 @@ void NamespaceDetails::setMaxCappedDocs(OperationContext* txn, long long max) {
 /* ------------------------------------------------------------------------- */
 
 
-int NamespaceDetails::_catalogFindIndexByName(OperationContext* txn,
+int NamespaceDetails::_catalogFindIndexByName(OperationContext* opCtx,
                                               const Collection* coll,
                                               StringData name,
                                               bool includeBackgroundInProgress) const {
     IndexIterator i = ii(includeBackgroundInProgress);
     while (i.more()) {
-        const BSONObj obj = coll->docFor(txn, i.next().info.toRecordId()).value();
+        const BSONObj obj = coll->docFor(opCtx, i.next().info.toRecordId()).value();
         if (name == obj.getStringField("name"))
             return i.pos() - 1;
     }
     return -1;
 }
 
-void NamespaceDetails::Extra::setNext(OperationContext* txn, long ofs) {
-    *txn->recoveryUnit()->writing(&_next) = ofs;
+void NamespaceDetails::Extra::setNext(OperationContext* opCtx, long ofs) {
+    *opCtx->recoveryUnit()->writing(&_next) = ofs;
 }
 
 }  // namespace mongo

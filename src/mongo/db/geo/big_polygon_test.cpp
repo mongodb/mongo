@@ -28,8 +28,8 @@
 
 #include "mongo/db/geo/big_polygon.h"
 
-#include "mongo/bson/util/builder.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -80,7 +80,8 @@ typedef PointBuilder points;
 TEST(BigSimplePolygon, Basic) {
     // A 20x20 square centered at [0,0]
     BigSimplePolygon bigPoly20(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                             << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                             << LatLng(-10.0, -10.0)
+                                             << LatLng(-10.0, 10.0)));
 
     // A 10x10 square centered at [0,0]
     S2Polygon poly10(loopVec(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0) << LatLng(-5.0, -5.0)
@@ -93,7 +94,8 @@ TEST(BigSimplePolygon, Basic) {
 
     // A 20x20 square centered at [0,20]
     BigSimplePolygon bigPoly20Offset(loop(points() << LatLng(10.0, 30.0) << LatLng(10.0, 10.0)
-                                                   << LatLng(-10.0, 10.0) << LatLng(-10.0, 30.0)));
+                                                   << LatLng(-10.0, 10.0)
+                                                   << LatLng(-10.0, 30.0)));
 
     ASSERT_LESS_THAN(bigPoly20Offset.GetArea(), 2 * M_PI);
     ASSERT_LESS_THAN(poly10.GetArea(), bigPoly20Offset.GetArea());
@@ -105,15 +107,18 @@ TEST(BigSimplePolygon, BasicWithHole) {
     // A 30x30 square centered at [0,0] with a 20X20 hole
     vector<S2Loop*> loops;
     loops.push_back(loop(points() << LatLng(15.0, 15.0) << LatLng(15.0, -15.0)
-                                  << LatLng(-15.0, -15.0) << LatLng(-15.0, 15.0)));
+                                  << LatLng(-15.0, -15.0)
+                                  << LatLng(-15.0, 15.0)));
     loops.push_back(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                  << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                  << LatLng(-10.0, -10.0)
+                                  << LatLng(-10.0, 10.0)));
 
     S2Polygon holePoly(&loops);
 
     // A 16X16 square centered at [0,0]
     BigSimplePolygon bigPoly16(loop(points() << LatLng(8.0, 8.0) << LatLng(8.0, -8.0)
-                                             << LatLng(-8.0, -8.0) << LatLng(-8.0, 8.0)));
+                                             << LatLng(-8.0, -8.0)
+                                             << LatLng(-8.0, 8.0)));
 
     ASSERT_LESS_THAN(bigPoly16.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly16.Contains(holePoly));
@@ -121,7 +126,8 @@ TEST(BigSimplePolygon, BasicWithHole) {
 
     // A big polygon bigger than the hole.
     BigSimplePolygon bigPoly24(loop(points() << LatLng(12.0, 12.0) << LatLng(12.0, -12.0)
-                                             << LatLng(-12.0, -12.0) << LatLng(-12.0, 12.0)));
+                                             << LatLng(-12.0, -12.0)
+                                             << LatLng(-12.0, 12.0)));
     ASSERT_LESS_THAN(bigPoly24.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly24.Contains(holePoly));
     ASSERT_TRUE(bigPoly24.Intersects(holePoly));
@@ -132,10 +138,12 @@ TEST(BigSimplePolygon, BasicWithHoleAndShell) {
     vector<S2Loop*> loops;
     // Border
     loops.push_back(loop(points() << LatLng(15.0, 15.0) << LatLng(15.0, -15.0)
-                                  << LatLng(-15.0, -15.0) << LatLng(-15.0, 15.0)));
+                                  << LatLng(-15.0, -15.0)
+                                  << LatLng(-15.0, 15.0)));
     // Hole
     loops.push_back(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                  << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                  << LatLng(-10.0, -10.0)
+                                  << LatLng(-10.0, 10.0)));
     // Shell
     loops.push_back(loop(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0) << LatLng(-5.0, -5.0)
                                   << LatLng(-5.0, 5.0)));
@@ -143,21 +151,24 @@ TEST(BigSimplePolygon, BasicWithHoleAndShell) {
 
     // A 16X16 square centered at [0,0] containing the shell
     BigSimplePolygon bigPoly16(loop(points() << LatLng(8.0, 8.0) << LatLng(8.0, -8.0)
-                                             << LatLng(-8.0, -8.0) << LatLng(-8.0, 8.0)));
+                                             << LatLng(-8.0, -8.0)
+                                             << LatLng(-8.0, 8.0)));
     ASSERT_LESS_THAN(bigPoly16.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly16.Contains(shellPoly));
     ASSERT_TRUE(bigPoly16.Intersects(shellPoly));
 
     // Try a big polygon bigger than the hole.
     BigSimplePolygon bigPoly24(loop(points() << LatLng(12.0, 12.0) << LatLng(12.0, -12.0)
-                                             << LatLng(-12.0, -12.0) << LatLng(-12.0, 12.0)));
+                                             << LatLng(-12.0, -12.0)
+                                             << LatLng(-12.0, 12.0)));
     ASSERT_LESS_THAN(bigPoly24.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly24.Contains(shellPoly));
     ASSERT_TRUE(bigPoly24.Intersects(shellPoly));
 
     // Try a big polygon smaller than the shell.
     BigSimplePolygon bigPoly8(loop(points() << LatLng(4.0, 4.0) << LatLng(4.0, -4.0)
-                                            << LatLng(-4.0, -4.0) << LatLng(-4.0, 4.0)));
+                                            << LatLng(-4.0, -4.0)
+                                            << LatLng(-4.0, 4.0)));
     ASSERT_LESS_THAN(bigPoly8.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly8.Contains(shellPoly));
     ASSERT_TRUE(bigPoly8.Intersects(shellPoly));
@@ -166,7 +177,8 @@ TEST(BigSimplePolygon, BasicWithHoleAndShell) {
 TEST(BigSimplePolygon, BasicComplement) {
     // Everything *not* in a 20x20 square centered at [0,0]
     BigSimplePolygon bigPoly20Comp(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                                 << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                                 << LatLng(-10.0, -10.0)
+                                                 << LatLng(-10.0, 10.0)));
     bigPoly20Comp.Invert();
 
     // A 10x10 square centered at [0,0]
@@ -179,7 +191,8 @@ TEST(BigSimplePolygon, BasicComplement) {
 
     // A 10x10 square centered at [0,20], contained by bigPoly20Comp
     S2Polygon poly10Contained(loopVec(points() << LatLng(25.0, 25.0) << LatLng(25.0, 15.0)
-                                               << LatLng(15.0, 15.0) << LatLng(15.0, 25.0)));
+                                               << LatLng(15.0, 15.0)
+                                               << LatLng(15.0, 25.0)));
 
     ASSERT_LESS_THAN(poly10Contained.GetArea(), bigPoly20Comp.GetArea());
     ASSERT(bigPoly20Comp.Contains(poly10Contained));
@@ -188,7 +201,8 @@ TEST(BigSimplePolygon, BasicComplement) {
     // A 30x30 square centered at [0,0], so that bigPoly20Comp contains its complement entirely,
     // which is not allowed by S2.
     S2Polygon poly30(loopVec(points() << LatLng(15.0, 15.0) << LatLng(15.0, -15.0)
-                                      << LatLng(-15.0, -15.0) << LatLng(-15.0, 15.0)));
+                                      << LatLng(-15.0, -15.0)
+                                      << LatLng(-15.0, 15.0)));
     ASSERT_LESS_THAN(poly30.GetArea(), bigPoly20Comp.GetArea());
     ASSERT_FALSE(bigPoly20Comp.Contains(poly30));
     ASSERT_TRUE(bigPoly20Comp.Intersects(poly30));
@@ -197,7 +211,8 @@ TEST(BigSimplePolygon, BasicComplement) {
 TEST(BigSimplePolygon, BasicIntersects) {
     // Everything *not* in a 20x20 square centered at [0,0]
     BigSimplePolygon bigPoly20(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                             << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                             << LatLng(-10.0, -10.0)
+                                             << LatLng(-10.0, 10.0)));
     bigPoly20.Invert();
 
     // A 10x10 square centered at [10,10] (partial overlap)
@@ -212,16 +227,19 @@ TEST(BigSimplePolygon, BasicComplementWithHole) {
     // A 30x30 square centered at [0,0] with a 20X20 hole
     vector<S2Loop*> loops;
     loops.push_back(loop(points() << LatLng(15.0, 15.0) << LatLng(15.0, -15.0)
-                                  << LatLng(-15.0, -15.0) << LatLng(-15.0, 15.0)));
+                                  << LatLng(-15.0, -15.0)
+                                  << LatLng(-15.0, 15.0)));
     loops.push_back(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                  << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                  << LatLng(-10.0, -10.0)
+                                  << LatLng(-10.0, 10.0)));
 
     S2Polygon holePoly(&loops);
 
     // 1. BigPolygon doesn't touch holePoly
     // Everything *not* in a 40x40 square centered at [0,0]
     BigSimplePolygon bigPoly40Comp(loop(points() << LatLng(20.0, 20.0) << LatLng(20.0, -20.0)
-                                                 << LatLng(-20.0, -20.0) << LatLng(-20.0, 20.0)));
+                                                 << LatLng(-20.0, -20.0)
+                                                 << LatLng(-20.0, 20.0)));
     bigPoly40Comp.Invert();
     ASSERT_GREATER_THAN(bigPoly40Comp.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly40Comp.Contains(holePoly));
@@ -230,7 +248,8 @@ TEST(BigSimplePolygon, BasicComplementWithHole) {
     // 2. BigPolygon intersects holePoly
     // Everything *not* in a 24X24 square centered at [0,0]
     BigSimplePolygon bigPoly24Comp(loop(points() << LatLng(12.0, 12.0) << LatLng(12.0, -12.0)
-                                                 << LatLng(-12.0, -12.0) << LatLng(-12.0, 12.0)));
+                                                 << LatLng(-12.0, -12.0)
+                                                 << LatLng(-12.0, 12.0)));
     bigPoly24Comp.Invert();
     ASSERT_GREATER_THAN(bigPoly24Comp.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly24Comp.Contains(holePoly));
@@ -239,7 +258,8 @@ TEST(BigSimplePolygon, BasicComplementWithHole) {
     // 3. BigPolygon contains holePoly
     // Everything *not* in a 16X16 square centered at [0,0]
     BigSimplePolygon bigPoly16Comp(loop(points() << LatLng(8.0, 8.0) << LatLng(8.0, -8.0)
-                                                 << LatLng(-8.0, -8.0) << LatLng(-8.0, 8.0)));
+                                                 << LatLng(-8.0, -8.0)
+                                                 << LatLng(-8.0, 8.0)));
     bigPoly16Comp.Invert();
     ASSERT_GREATER_THAN(bigPoly16Comp.GetArea(), 2 * M_PI);
     ASSERT_TRUE(bigPoly16Comp.Contains(holePoly));
@@ -261,10 +281,12 @@ TEST(BigSimplePolygon, BasicComplementWithHoleAndShell) {
     vector<S2Loop*> loops;
     // Border
     loops.push_back(loop(points() << LatLng(15.0, 15.0) << LatLng(15.0, -15.0)
-                                  << LatLng(-15.0, -15.0) << LatLng(-15.0, 15.0)));
+                                  << LatLng(-15.0, -15.0)
+                                  << LatLng(-15.0, 15.0)));
     // Hole
     loops.push_back(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                  << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                  << LatLng(-10.0, -10.0)
+                                  << LatLng(-10.0, 10.0)));
     // Shell
     loops.push_back(loop(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0) << LatLng(-5.0, -5.0)
                                   << LatLng(-5.0, 5.0)));
@@ -273,7 +295,8 @@ TEST(BigSimplePolygon, BasicComplementWithHoleAndShell) {
     // 1. BigPolygon doesn't touch shellPoly
     // Everything *not* in a 40x40 square centered at [0,0]
     BigSimplePolygon bigPoly40Comp(loop(points() << LatLng(20.0, 20.0) << LatLng(20.0, -20.0)
-                                                 << LatLng(-20.0, -20.0) << LatLng(-20.0, 20.0)));
+                                                 << LatLng(-20.0, -20.0)
+                                                 << LatLng(-20.0, 20.0)));
     bigPoly40Comp.Invert();
     ASSERT_GREATER_THAN(bigPoly40Comp.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly40Comp.Contains(shellPoly));
@@ -282,7 +305,8 @@ TEST(BigSimplePolygon, BasicComplementWithHoleAndShell) {
     // 2. BigPolygon intersects shellPoly
     // Everything *not* in a 24X24 square centered at [0,0]
     BigSimplePolygon bigPoly24Comp(loop(points() << LatLng(12.0, 12.0) << LatLng(12.0, -12.0)
-                                                 << LatLng(-12.0, -12.0) << LatLng(-12.0, 12.0)));
+                                                 << LatLng(-12.0, -12.0)
+                                                 << LatLng(-12.0, 12.0)));
     bigPoly24Comp.Invert();
     ASSERT_GREATER_THAN(bigPoly24Comp.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly24Comp.Contains(shellPoly));
@@ -291,7 +315,8 @@ TEST(BigSimplePolygon, BasicComplementWithHoleAndShell) {
     // 3. BigPolygon contains shellPoly's outer ring
     // Everything *not* in a 16X16 square centered at [0,0]
     BigSimplePolygon bigPoly16Comp(loop(points() << LatLng(8.0, 8.0) << LatLng(8.0, -8.0)
-                                                 << LatLng(-8.0, -8.0) << LatLng(-8.0, 8.0)));
+                                                 << LatLng(-8.0, -8.0)
+                                                 << LatLng(-8.0, 8.0)));
     bigPoly16Comp.Invert();
     ASSERT_GREATER_THAN(bigPoly16Comp.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly16Comp.Contains(shellPoly));
@@ -309,7 +334,8 @@ TEST(BigSimplePolygon, BasicComplementWithHoleAndShell) {
 
     // 5. BigPolygon contain shellPoly (CW)
     BigSimplePolygon bigPolyCompOffset(loop(points() << LatLng(6.0, 6.0) << LatLng(6.0, 8.0)
-                                                     << LatLng(-6.0, 8.0) << LatLng(-6.0, 6.0)));
+                                                     << LatLng(-6.0, 8.0)
+                                                     << LatLng(-6.0, 6.0)));
     ASSERT_GREATER_THAN(bigPolyCompOffset.GetArea(), 2 * M_PI);
     ASSERT_TRUE(bigPolyCompOffset.Contains(shellPoly));
     ASSERT_TRUE(bigPolyCompOffset.Intersects(shellPoly));
@@ -318,11 +344,13 @@ TEST(BigSimplePolygon, BasicComplementWithHoleAndShell) {
 TEST(BigSimplePolygon, BasicWinding) {
     // A 20x20 square centered at [0,0] (CCW)
     BigSimplePolygon bigPoly20(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                             << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                             << LatLng(-10.0, -10.0)
+                                             << LatLng(-10.0, 10.0)));
 
     // Everything *not* in a 20x20 square centered at [0,0] (CW)
     BigSimplePolygon bigPoly20Comp(loop(points() << LatLng(10.0, 10.0) << LatLng(-10.0, 10.0)
-                                                 << LatLng(-10.0, -10.0) << LatLng(10.0, -10.0)));
+                                                 << LatLng(-10.0, -10.0)
+                                                 << LatLng(10.0, -10.0)));
 
     ASSERT_LESS_THAN(bigPoly20.GetArea(), 2 * M_PI);
     ASSERT_GREATER_THAN(bigPoly20Comp.GetArea(), 2 * M_PI);
@@ -331,11 +359,13 @@ TEST(BigSimplePolygon, BasicWinding) {
 TEST(BigSimplePolygon, LineRelations) {
     // A 20x20 square centered at [0,0]
     BigSimplePolygon bigPoly20(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                             << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                             << LatLng(-10.0, -10.0)
+                                             << LatLng(-10.0, 10.0)));
 
     // A 10x10 line circling [0,0]
     S2Polyline line10(pointVec(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0)
-                                        << LatLng(-5.0, -5.0) << LatLng(-5.0, 5.0)));
+                                        << LatLng(-5.0, -5.0)
+                                        << LatLng(-5.0, 5.0)));
 
     ASSERT_LESS_THAN(bigPoly20.GetArea(), 2 * M_PI);
     ASSERT(bigPoly20.Contains(line10));
@@ -355,12 +385,14 @@ TEST(BigSimplePolygon, LineRelations) {
 TEST(BigSimplePolygon, LineRelationsComplement) {
     // A 20x20 square centered at [0,0]
     BigSimplePolygon bigPoly20Comp(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
-                                                 << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+                                                 << LatLng(-10.0, -10.0)
+                                                 << LatLng(-10.0, 10.0)));
     bigPoly20Comp.Invert();
 
     // A 10x10 line circling [0,0]
     S2Polyline line10(pointVec(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0)
-                                        << LatLng(-5.0, -5.0) << LatLng(-5.0, 5.0)));
+                                        << LatLng(-5.0, -5.0)
+                                        << LatLng(-5.0, 5.0)));
 
     ASSERT_GREATER_THAN(bigPoly20Comp.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly20Comp.Contains(line10));
@@ -373,7 +405,8 @@ TEST(BigSimplePolygon, LineRelationsComplement) {
 
     // A 10x10 line circling [0,0]
     S2Polyline line30(pointVec(points() << LatLng(15.0, 15.0) << LatLng(15.0, -15.0)
-                                        << LatLng(-15.0, -15.0) << LatLng(-15.0, 15.0)));
+                                        << LatLng(-15.0, -15.0)
+                                        << LatLng(-15.0, 15.0)));
     ASSERT_TRUE(bigPoly20Comp.Contains(line30));
     ASSERT_TRUE(bigPoly20Comp.Intersects(line30));
 }
@@ -381,11 +414,13 @@ TEST(BigSimplePolygon, LineRelationsComplement) {
 TEST(BigSimplePolygon, LineRelationsWinding) {
     // Everything *not* in a 20x20 square centered at [0,0] (CW winding)
     BigSimplePolygon bigPoly20Comp(loop(points() << LatLng(10.0, 10.0) << LatLng(-10.0, 10.0)
-                                                 << LatLng(-10.0, -10.0) << LatLng(10.0, -10.0)));
+                                                 << LatLng(-10.0, -10.0)
+                                                 << LatLng(10.0, -10.0)));
 
     // A 10x10 line circling [0,0]
     S2Polyline line10(pointVec(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0)
-                                        << LatLng(-5.0, -5.0) << LatLng(-5.0, 5.0)));
+                                        << LatLng(-5.0, -5.0)
+                                        << LatLng(-5.0, 5.0)));
 
     ASSERT_GREATER_THAN(bigPoly20Comp.GetArea(), 2 * M_PI);
     ASSERT_FALSE(bigPoly20Comp.Contains(line10));
@@ -395,11 +430,13 @@ TEST(BigSimplePolygon, LineRelationsWinding) {
 TEST(BigSimplePolygon, PolarContains) {
     // Square 10 degrees from the north pole [90,0]
     BigSimplePolygon bigNorthPoly(loop(points() << LatLng(80.0, 0.0) << LatLng(80.0, 90.0)
-                                                << LatLng(80.0, 180.0) << LatLng(80.0, -90.0)));
+                                                << LatLng(80.0, 180.0)
+                                                << LatLng(80.0, -90.0)));
 
     // Square 5 degrees from the north pole [90, 0]
     S2Polygon northPoly(loopVec(points() << LatLng(85.0, 0.0) << LatLng(85.0, 90.0)
-                                         << LatLng(85.0, 180.0) << LatLng(85.0, -90.0)));
+                                         << LatLng(85.0, 180.0)
+                                         << LatLng(85.0, -90.0)));
 
     ASSERT_LESS_THAN(bigNorthPoly.GetArea(), 2 * M_PI);
     ASSERT_LESS_THAN(northPoly.GetArea(), bigNorthPoly.GetArea());
@@ -410,7 +447,8 @@ TEST(BigSimplePolygon, PolarContains) {
 TEST(BigSimplePolygon, PolarContainsWithHoles) {
     // Square 10 degrees from the north pole [90,0]
     BigSimplePolygon bigNorthPoly(loop(points() << LatLng(80.0, 0.0) << LatLng(80.0, 90.0)
-                                                << LatLng(80.0, 180.0) << LatLng(80.0, -90.0)));
+                                                << LatLng(80.0, 180.0)
+                                                << LatLng(80.0, -90.0)));
 
     // Square 5 degrees from the north pole [90, 0] with a concentric hole 1 degree from the
     // north pole
@@ -429,7 +467,8 @@ TEST(BigSimplePolygon, PolarContainsWithHoles) {
 TEST(BigSimplePolygon, PolarIntersectsWithHoles) {
     // Square 10 degrees from the north pole [90,0]
     BigSimplePolygon bigNorthPoly(loop(points() << LatLng(80.0, 0.0) << LatLng(80.0, 90.0)
-                                                << LatLng(80.0, 180.0) << LatLng(80.0, -90.0)));
+                                                << LatLng(80.0, 180.0)
+                                                << LatLng(80.0, -90.0)));
 
     // 5-degree square with 1-degree-wide concentric hole, centered on [80.0, 0.0]
     vector<S2Loop*> loops;
@@ -472,7 +511,8 @@ void checkConsistency(const BigSimplePolygon& bigPoly,
 TEST(BigSimplePolygon, ShareEdgeDisjoint) {
     // Big polygon smaller than a hemisphere.
     BigSimplePolygon bigPoly(loop(points() << LatLng(80.0, 0.0) << LatLng(-80.0, 0.0)
-                                           << LatLng(-80.0, 90.0) << LatLng(80.0, 90.0)));
+                                           << LatLng(-80.0, 90.0)
+                                           << LatLng(80.0, 90.0)));
     ASSERT_LESS_THAN(bigPoly.GetArea(), 2 * M_PI);
 
     // Vertex point and collinear point
@@ -481,10 +521,12 @@ TEST(BigSimplePolygon, ShareEdgeDisjoint) {
 
     // Polygon shares one edge
     S2Polygon poly(loopVec(points() << LatLng(80.0, 0.0) << LatLng(-80.0, 0.0)
-                                    << LatLng(-80.0, -10.0) << LatLng(80.0, -10.0)));
+                                    << LatLng(-80.0, -10.0)
+                                    << LatLng(80.0, -10.0)));
     // Polygon shares a segment of one edge
     S2Polygon collinearPoly(loopVec(points() << LatLng(50.0, 0.0) << LatLng(-50.0, 0.0)
-                                             << LatLng(-50.0, -10.0) << LatLng(50.0, -10.0)));
+                                             << LatLng(-50.0, -10.0)
+                                             << LatLng(50.0, -10.0)));
 
     // Line
     S2Polyline line(
@@ -495,9 +537,12 @@ TEST(BigSimplePolygon, ShareEdgeDisjoint) {
 
     // Big polygon larger than a hemisphere.
     BigSimplePolygon expandedBigPoly(loop(points() << LatLng(80.0, 0.0) << LatLng(-80.0, 0.0)
-                                                   << LatLng(-80.0, 90.0) << LatLng(-80.0, 180.0)
-                                                   << LatLng(-80.0, -90.0) << LatLng(80.0, -90.0)
-                                                   << LatLng(80.0, 180.0) << LatLng(80.0, 90.0)));
+                                                   << LatLng(-80.0, 90.0)
+                                                   << LatLng(-80.0, 180.0)
+                                                   << LatLng(-80.0, -90.0)
+                                                   << LatLng(80.0, -90.0)
+                                                   << LatLng(80.0, 180.0)
+                                                   << LatLng(80.0, 90.0)));
     ASSERT_GREATER_THAN(expandedBigPoly.GetArea(), 2 * M_PI);
 
     checkConsistency(bigPoly, expandedBigPoly, point);
@@ -525,15 +570,18 @@ TEST(BigSimplePolygon, ShareEdgeDisjoint) {
 TEST(BigSimplePolygon, ShareEdgeContained) {
     // Big polygon smaller than a hemisphere.
     BigSimplePolygon bigPoly(loop(points() << LatLng(80.0, 0.0) << LatLng(-80.0, 0.0)
-                                           << LatLng(-80.0, 90.0) << LatLng(80.0, 90.0)));
+                                           << LatLng(-80.0, 90.0)
+                                           << LatLng(80.0, 90.0)));
     ASSERT_LESS_THAN(bigPoly.GetArea(), 2 * M_PI);
 
     // Polygon
     S2Polygon poly(loopVec(points() << LatLng(80.0, 0.0) << LatLng(-80.0, 0.0)
-                                    << LatLng(-80.0, 10.0) << LatLng(80.0, 10.0)));
+                                    << LatLng(-80.0, 10.0)
+                                    << LatLng(80.0, 10.0)));
     // Polygon shares a segment of one edge
     S2Polygon collinearPoly(loopVec(points() << LatLng(50.0, 0.0) << LatLng(-50.0, 0.0)
-                                             << LatLng(-50.0, 10.0) << LatLng(50.0, 10.0)));
+                                             << LatLng(-50.0, 10.0)
+                                             << LatLng(50.0, 10.0)));
     // Line
     S2Polyline line(
         pointVec(points() << LatLng(80.0, 0.0) << LatLng(-80.0, 0.0) << LatLng(0.0, 10.0)));
@@ -543,9 +591,12 @@ TEST(BigSimplePolygon, ShareEdgeContained) {
 
     // Big polygon larger than a hemisphere.
     BigSimplePolygon expandedBigPoly(loop(points() << LatLng(80.0, 0.0) << LatLng(-80.0, 0.0)
-                                                   << LatLng(-80.0, 90.0) << LatLng(-80.0, 180.0)
-                                                   << LatLng(-80.0, -90.0) << LatLng(80.0, -90.0)
-                                                   << LatLng(80.0, 180.0) << LatLng(80.0, 90.0)));
+                                                   << LatLng(-80.0, 90.0)
+                                                   << LatLng(-80.0, 180.0)
+                                                   << LatLng(-80.0, -90.0)
+                                                   << LatLng(80.0, -90.0)
+                                                   << LatLng(80.0, 180.0)
+                                                   << LatLng(80.0, 90.0)));
     ASSERT_GREATER_THAN(expandedBigPoly.GetArea(), 2 * M_PI);
 
     checkConsistency(bigPoly, expandedBigPoly, poly);

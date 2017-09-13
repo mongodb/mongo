@@ -1,7 +1,7 @@
 #! /bin/sh
 
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 # Insulate against locale-specific sort order and IFS from the user's env
 LC_ALL=C
@@ -25,7 +25,7 @@ build() {
 	    $l |
 	    sed -e 's/WT_PACKED_STRUCT_BEGIN(\(.*\))/struct \1 {/' \
 	        -e 's/WT_COMPILER_TYPE_ALIGN(.*)[ ]*//' \
-	        -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort | \
+	        -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort -u | \
 	while read t n; do
 		upper=`echo $n | sed -e 's/^__//' | tr [a-z] [A-Z]`
 		echo "$t $n;"
@@ -44,7 +44,7 @@ build() {
 check() {
 	# Complain about unused #typedefs.
 	# List of files to search.
-	l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
+	l=`sed -e '/^[a-z]/!d' -e 's/[	 ].*$//' -e 's,^,../,' filelist`
 	l="$l `echo ../src/utilities/*.c`"
 
 	(

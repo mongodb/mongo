@@ -2,20 +2,20 @@
 
 var t = db.getmore_error;
 
-for (var i=0; i < 10; i++) {
+for (var i = 0; i < 10; i++) {
     t.insert({_id: i});
 }
 
-var cursor = t.find().batchSize(2); // 1 is a special case
+var cursor = t.find().batchSize(2);  // 1 is a special case
 
 // first batch (only one from OP_QUERY)
-assert.eq(cursor.next(), {_id:0});
-assert.eq(cursor.next(), {_id:1});
+assert.eq(cursor.next(), {_id: 0});
+assert.eq(cursor.next(), {_id: 1});
 assert.eq(cursor.objsLeftInBatch(), 0);
 
 // second batch (first from OP_GETMORE)
-assert.eq(cursor.next(), {_id:2});
-assert.eq(cursor.next(), {_id:3});
+assert.eq(cursor.next(), {_id: 2});
+assert.eq(cursor.next(), {_id: 3});
 assert.eq(cursor.objsLeftInBatch(), 0);
 
 /*

@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+class RecordCursor;
+
 /**
  * OplogStart walks a collection backwards to find the first object in the collection that
  * matches the query.  It's used by replication to efficiently find where the oplog should be
@@ -58,39 +60,35 @@ namespace mongo {
  * Why is this a stage?  Because we want to yield, and we want to be notified of RecordId
  * invalidations.  :(
  */
-class OplogStart : public PlanStage {
+class OplogStart final : public PlanStage {
 public:
     // Does not take ownership.
-    OplogStart(OperationContext* txn,
+    OplogStart(OperationContext* opCtx,
                const Collection* collection,
                MatchExpression* filter,
                WorkingSet* ws);
-    virtual ~OplogStart();
 
-    virtual StageState work(WorkingSetID* out);
-    virtual bool isEOF();
+    StageState doWork(WorkingSetID* out) final;
+    bool isEOF() final;
 
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-
-    virtual std::vector<PlanStage*> getChildren() const;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
+    void doSaveState() final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext() final;
 
     // Returns empty PlanStageStats object
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
     //
-    // Exec stats -- do not call these for the oplog start stage.
+    // Exec stats -- do not call for the oplog start stage.
     //
-    virtual const CommonStats* getCommonStats() const {
+
+    const SpecificStats* getSpecificStats() const final {
         return NULL;
     }
 
-    virtual const SpecificStats* getSpecificStats() const {
-        return NULL;
-    }
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_OPLOG_START;
     }
 
@@ -113,12 +111,6 @@ private:
     void switchToExtentHopping();
 
     StageState workExtentHopping(WorkingSetID* out);
-
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
-
-    // If we're backwards scanning we just punt to a collscan.
-    std::unique_ptr<CollectionScan> _cs;
 
     // This is only used for the extent hopping scan.
     std::vector<std::unique_ptr<RecordCursor>> _subIterators;

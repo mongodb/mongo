@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <string>
 
@@ -35,8 +36,11 @@
 #ifdef MONGO_CONFIG_SSL
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 
 #include <openssl/err.h>
@@ -68,24 +72,41 @@ public:
 };
 
 struct SSLConfiguration {
-    SSLConfiguration() : serverSubjectName(""), clientSubjectName(""), hasCA(false) {}
+    SSLConfiguration() : serverSubjectName(""), clientSubjectName("") {}
     SSLConfiguration(const std::string& serverSubjectName,
                      const std::string& clientSubjectName,
-                     const Date_t& serverCertificateExpirationDate,
-                     bool hasCA)
+                     const Date_t& serverCertificateExpirationDate)
         : serverSubjectName(serverSubjectName),
           clientSubjectName(clientSubjectName),
-          serverCertificateExpirationDate(serverCertificateExpirationDate),
-          hasCA(hasCA) {}
+          serverCertificateExpirationDate(serverCertificateExpirationDate) {}
 
+    bool isClusterMember(StringData subjectName) const;
     BSONObj getServerStatusBSON() const;
     std::string serverSubjectName;
     std::string clientSubjectName;
     Date_t serverCertificateExpirationDate;
-    bool hasCA;
+    bool hasCA = false;
 };
 
-class SSLManagerInterface {
+/**
+ * Stores information about a globally unique OID.
+ */
+class ASN1OID {
+public:
+    ASN1OID(std::string identifier, std::string shortDescription, std::string longDescription)
+        : identifier(std::move(identifier)),
+          shortDescription(std::move(shortDescription)),
+          longDescription(std::move(longDescription)) {}
+
+    std::string identifier;        // An OID
+    std::string shortDescription;  // A brief description of the entity associated with the OID
+    std::string longDescription;   // A long form description of the entity associated with the OID
+};
+const ASN1OID mongodbRolesOID("1.3.6.1.4.1.34601.2.1.1",
+                              "MongoRoles",
+                              "Sequence of MongoDB Database Roles");
+
+class SSLManagerInterface : public Decorable<SSLManagerInterface> {
 public:
     static std::unique_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
 
@@ -109,15 +130,13 @@ public:
      * Fetches a peer certificate and validates it if it exists
      * Throws SocketException on failure
      * @return a std::string containing the certificate's subject name.
+     *
+     * This version of parseAndValidatePeerCertificate is deprecated because it throws a
+     * SocketException upon failure. New code should prefer the version that returns
+     * a StatusWith instead.
      */
-    virtual std::string parseAndValidatePeerCertificate(const SSLConnection* conn,
-                                                        const std::string& remoteHost) = 0;
-
-    /**
-     * Cleans up SSL thread local memory; use at thread exit
-     * to avoid memory leaks
-     */
-    virtual void cleanupThreadLocals() = 0;
+    virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(
+        const SSLConnection* conn, const std::string& remoteHost) = 0;
 
     /**
      * Gets the SSLConfiguration containing all information about the current SSL setup
@@ -146,11 +165,39 @@ public:
     virtual int SSL_shutdown(SSLConnection* conn) = 0;
 
     virtual void SSL_free(SSLConnection* conn) = 0;
+
+    enum class ConnectionDirection { kIncoming, kOutgoing };
+
+    /**
+     * Initializes an OpenSSL context according to the provided settings. Only settings which are
+     * acceptable on non-blocking connections are set. "direction" specifies whether the SSL_CTX
+     * will be used to make outgoing connections or accept incoming connections.
+     */
+    virtual Status initSSLContext(SSL_CTX* context,
+                                  const SSLParams& params,
+                                  ConnectionDirection direction) = 0;
+
+    /**
+     * Fetches a peer certificate and validates it if it exists. If validation fails, but weak
+     * validation is enabled, boost::none will be returned. If validation fails, and invalid
+     * certificates are not allowed, a non-OK status will be returned. If validation is successful,
+     * an engaged optional containing the certificate's subject name, and any roles acquired by
+     * X509 authorization will be returned.
+     */
+    virtual StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
+        SSL* ssl, const std::string& remoteHost) = 0;
 };
 
 // Access SSL functions through this instance.
 SSLManagerInterface* getSSLManager();
 
 extern bool isSSLServer;
+
+/**
+ * The global SSL configuration. This should be accessed only after global initialization has
+ * completed. If it must be accessed in an initializer, the initializer should have
+ * "EndStartupOptionStorage" as a prerequisite.
+ */
+const SSLParams& getSSLGlobalParams();
 }
 #endif  // #ifdef MONGO_CONFIG_SSL

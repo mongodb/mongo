@@ -28,6 +28,7 @@
 
 #include "mongo/util/fail_point_registry.h"
 
+#include "mongo/util/fail_point_server_parameter.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -54,10 +55,17 @@ Status FailPointRegistry::addFailPoint(const string& name, FailPoint* failPoint)
 }
 
 FailPoint* FailPointRegistry::getFailPoint(const string& name) const {
-    return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(NULL));
+    return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(nullptr));
 }
 
 void FailPointRegistry::freeze() {
     _frozen = true;
+}
+
+void FailPointRegistry::registerAllFailPointsAsServerParameters() {
+    for (auto it = _fpMap.begin(); it != _fpMap.end(); ++it) {
+        // Intentionally leaked.
+        new FailPointServerParameter(it->first, it->second);
+    }
 }
 }

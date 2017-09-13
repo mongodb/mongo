@@ -1,0 +1,41 @@
+/*! @m_page{{c,java},shared_cache,Per-process shared caches}
+
+WiredTiger supports sharing a single cache among multiple databases within
+a process.
+
+An application configures a shared cache by specifying a shared_cache name
+to the ::wiredtiger_open function. Applications can optionally
+set a minimum amount of cache any connection in the pool will be assigned
+and the granularity at which the cache pool is redistributed among
+connections - called the chunk size.
+
+The shared cache implementation assigns a certain amount of cache to each
+participating database. Each database manages its allocated cache
+as it would when not using a shared cache - thus databases using a shared
+cache can have different eviction policies. There is a thread that monitors
+the cache usage of each database and redistributes the cache among
+participants according to where it is most likely to improve performance.
+The cache is redistributed in chunks which are of a configurable size. Once
+a database has had a chunk of cache added or removed it will be given
+time to start effectively using that cache before it is considered for further
+adjustment. If a small chunk size is configured it will take longer for the
+shared cache to adjust to changes in participants. Reallocation of resources
+happens periodically and whenever a database joins the shared cache.
+
+The reallocation of resources is determined by comparing the amount of eviction
+activity in a particular database to that of the other participating databases.
+
+When a database is opened it will be allocated the amount of cache configured
+as the shared cache minimum, regardless of whether the cache pool is currently
+fully utilized. Other databases will have their assigned cache size
+reduced so the total cache size used will return within the bounds - there
+may be a period when the actual usage exceeds the configured maximum.
+This is especially likely if many databases join the shared cache in a short
+period. When a database is closed any resources it is using are distributed
+among the other databases.
+
+WiredTiger shared cache tuning options can be configured when first opening a
+database via ::wiredtiger_open or changed after open using the
+WT_CONNECTION::reconfigure method.
+
+ */

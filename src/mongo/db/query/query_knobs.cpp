@@ -44,8 +44,6 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheEvictionRatio, double, 10.0);
 
-MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWriteOpsBetweenFlush, int, 1000);
-
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxOrSolutions, int, 10);
@@ -68,4 +66,15 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecMaxBlockingSortBytes, int, 32 * 1
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldIterations, int, 128);
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldPeriodMS, int, 10);
 
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryFacetBufferSizeBytes, int, 100 * 1024 * 1024);
+
+MONGO_EXPORT_SERVER_PARAMETER(internalInsertMaxBatchSize,
+                              int,
+                              internalQueryExecYieldIterations.load() / 2);
+
+MONGO_EXPORT_SERVER_PARAMETER(internalDocumentSourceCursorBatchSizeBytes, int, 4 * 1024 * 1024);
+
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerGenerateCoveredWholeIndexScans, bool, false);
+
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryIgnoreUnknownJSONSchemaKeywords, bool, false);
 }  // namespace mongo

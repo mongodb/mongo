@@ -32,15 +32,16 @@
 
 #include "mongo/db/storage/mmap_v1/dur_journal_writer.h"
 
-#include <boost/bind.hpp>
-
 #include "mongo/db/client.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace dur {
@@ -56,15 +57,19 @@ namespace {
  * (2) TODO should we do this using N threads? Would be quite easy see Hackenberg paper table
  *  5 and 6. 2 threads might be a good balance.
  */
-void WRITETODATAFILES(const JSectHeader& h, const AlignedBuilder& uncompressed) {
+void WRITETODATAFILES(OperationContext* opCtx,
+                      const JSectHeader& h,
+                      const AlignedBuilder& uncompressed) {
     Timer t;
 
     LOG(4) << "WRITETODATAFILES BEGIN";
 
-    RecoveryJob::get().processSection(&h, uncompressed.buf(), uncompressed.len(), NULL);
+    RecoveryJob::get().processSection(opCtx, &h, uncompressed.buf(), uncompressed.len(), NULL);
 
     const long long m = t.micros();
     stats.curr()->_writeToDataFilesMicros += m;
+
+    setLastSeqNumberWrittenToSharedView(h.seqNumber);
 
     LOG(4) << "journal WRITETODATAFILES " << m / 1000.0 << "ms";
 }
@@ -107,8 +112,8 @@ private:
 // JournalWriter
 //
 
-JournalWriter::JournalWriter(NotifyAll* commitNotify,
-                             NotifyAll* applyToDataFilesNotify,
+JournalWriter::JournalWriter(CommitNotifier* commitNotify,
+                             CommitNotifier* applyToDataFilesNotify,
                              size_t numBuffers)
     : _commitNotify(commitNotify),
       _applyToDataFilesNotify(applyToDataFilesNotify),
@@ -178,7 +183,7 @@ JournalWriter::Buffer* JournalWriter::newBuffer() {
     return buffer;
 }
 
-void JournalWriter::writeBuffer(Buffer* buffer, NotifyAll::When commitNumber) {
+void JournalWriter::writeBuffer(Buffer* buffer, CommitNotifier::When commitNumber) {
     invariant(buffer->_commitNumber == 0);
     invariant((commitNumber > _lastCommitNumber) || (buffer->_isShutdown && (commitNumber == 0)));
 
@@ -209,7 +214,11 @@ void JournalWriter::_journalWriterThread() {
 
     try {
         while (true) {
-            Buffer* const buffer = _journalQueue.blockingPop();
+            Buffer* const buffer = [&] {
+                MONGO_IDLE_THREAD_BLOCK;
+                return _journalQueue.blockingPop();
+            }();
+
             BufferGuard bufferGuard(buffer, &_readyQueue);
 
             if (buffer->_isShutdown) {
@@ -236,20 +245,20 @@ void JournalWriter::_journalWriterThread() {
             WRITETOJOURNAL(buffer->_header, buffer->_builder);
 
             // Data is now persisted in the journal, which is sufficient for acknowledging
-            // getLastError
+            // durability.
+            dur::getJournalListener()->onDurable(buffer->journalListenerToken);
             _commitNotify->notifyAll(buffer->_commitNumber);
 
             // Apply the journal entries on top of the shared view so that when flush is
             // requested it would write the latest.
-            WRITETODATAFILES(buffer->_header, buffer->_builder);
+            WRITETODATAFILES(cc().makeOperationContext().get(), buffer->_header, buffer->_builder);
 
             // Data is now persisted on the shared view, so notify any potential journal file
             // cleanup waiters.
             _applyToDataFilesNotify->notifyAll(buffer->_commitNumber);
         }
     } catch (const DBException& e) {
-        severe() << "dbexception in journalWriterThread causing immediate shutdown: "
-                 << e.toString();
+        severe() << "dbexception in journalWriterThread causing immediate shutdown: " << redact(e);
         invariant(false);
     } catch (const std::ios_base::failure& e) {
         severe() << "ios_base exception in journalWriterThread causing immediate shutdown: "
@@ -260,7 +269,8 @@ void JournalWriter::_journalWriterThread() {
                  << e.what();
         invariant(false);
     } catch (const std::exception& e) {
-        severe() << "exception in journalWriterThread causing immediate shutdown: " << e.what();
+        severe() << "exception in journalWriterThread causing immediate shutdown: "
+                 << redact(e.what());
         invariant(false);
     } catch (...) {
         severe() << "unhandled exception in journalWriterThread causing immediate shutdown";

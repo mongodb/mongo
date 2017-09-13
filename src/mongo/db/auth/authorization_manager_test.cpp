@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 /**
  * Unit tests of the AuthorizationManager type.
  */
@@ -32,22 +34,31 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
+#include "mongo/util/net/message_port.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)
 
 namespace mongo {
 namespace {
+
+void setX509PeerInfo(const transport::SessionHandle& session, SSLPeerInfo info) {
+    auto& sslPeerInfo = SSLPeerInfo::forSession(session);
+    sslPeerInfo = info;
+}
 
 using std::vector;
 
@@ -157,7 +168,7 @@ public:
             authzManager->invalidateUserCache();
     }
 
-    void setUp() {
+    void setUp() override {
         auto localExternalState = stdx::make_unique<AuthzManagerExternalStateMock>();
         externalState = localExternalState.get();
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
@@ -171,62 +182,370 @@ public:
 };
 
 TEST_F(AuthorizationManagerTest, testAcquireV2User) {
-    externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+    OperationContextNoop opCtx;
 
-    OperationContextNoop txn;
-
-    ASSERT_OK(
-        externalState->insertPrivilegeDocument(&txn,
-                                               BSON("_id"
-                                                    << "admin.v2read"
-                                                    << "user"
-                                                    << "v2read"
-                                                    << "db"
-                                                    << "test"
-                                                    << "credentials" << BSON("MONGODB-CR"
-                                                                             << "password")
-                                                    << "roles" << BSON_ARRAY(BSON("role"
-                                                                                  << "read"
-                                                                                  << "db"
-                                                                                  << "test"))),
-                                               BSONObj()));
-    ASSERT_OK(
-        externalState->insertPrivilegeDocument(&txn,
-                                               BSON("_id"
-                                                    << "admin.v2cluster"
-                                                    << "user"
-                                                    << "v2cluster"
-                                                    << "db"
-                                                    << "admin"
-                                                    << "credentials" << BSON("MONGODB-CR"
-                                                                             << "password")
-                                                    << "roles" << BSON_ARRAY(BSON("role"
-                                                                                  << "clusterAdmin"
-                                                                                  << "db"
-                                                                                  << "admin"))),
-                                               BSONObj()));
+    ASSERT_OK(externalState->insertPrivilegeDocument(&opCtx,
+                                                     BSON("_id"
+                                                          << "admin.v2read"
+                                                          << "user"
+                                                          << "v2read"
+                                                          << "db"
+                                                          << "test"
+                                                          << "credentials"
+                                                          << BSON("MONGODB-CR"
+                                                                  << "password")
+                                                          << "roles"
+                                                          << BSON_ARRAY(BSON("role"
+                                                                             << "read"
+                                                                             << "db"
+                                                                             << "test"))),
+                                                     BSONObj()));
+    ASSERT_OK(externalState->insertPrivilegeDocument(&opCtx,
+                                                     BSON("_id"
+                                                          << "admin.v2cluster"
+                                                          << "user"
+                                                          << "v2cluster"
+                                                          << "db"
+                                                          << "admin"
+                                                          << "credentials"
+                                                          << BSON("MONGODB-CR"
+                                                                  << "password")
+                                                          << "roles"
+                                                          << BSON_ARRAY(BSON("role"
+                                                                             << "clusterAdmin"
+                                                                             << "db"
+                                                                             << "admin"))),
+                                                     BSONObj()));
 
     User* v2read;
-    ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2read", "test"), &v2read));
+    ASSERT_OK(authzManager->acquireUser(&opCtx, UserName("v2read", "test"), &v2read));
     ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
     ASSERT(v2read->isValid());
     ASSERT_EQUALS(1U, v2read->getRefCount());
     RoleNameIterator roles = v2read->getRoles();
     ASSERT_EQUALS(RoleName("read", "test"), roles.next());
     ASSERT_FALSE(roles.more());
+    auto privilegeMap = v2read->getPrivileges();
+    auto testDBPrivilege = privilegeMap[ResourcePattern::forDatabaseName("test")];
+    ASSERT(testDBPrivilege.getActions().contains(ActionType::find));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
     authzManager->releaseUser(v2read);
 
     User* v2cluster;
-    ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2cluster", "admin"), &v2cluster));
+    ASSERT_OK(authzManager->acquireUser(&opCtx, UserName("v2cluster", "admin"), &v2cluster));
     ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
     ASSERT(v2cluster->isValid());
     ASSERT_EQUALS(1U, v2cluster->getRefCount());
     RoleNameIterator clusterRoles = v2cluster->getRoles();
     ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
     ASSERT_FALSE(clusterRoles.more());
+    privilegeMap = v2cluster->getPrivileges();
+    auto clusterPrivilege = privilegeMap[ResourcePattern::forClusterResource()];
+    ASSERT(clusterPrivilege.getActions().contains(ActionType::serverStatus));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
     authzManager->releaseUser(v2cluster);
+}
+
+TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
+    ServiceContextNoop serviceContext;
+    transport::TransportLayerMock transportLayer{};
+    transport::SessionHandle session = transportLayer.createSession();
+    setX509PeerInfo(
+        session,
+        SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("readWrite", "test")}));
+    ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
+    ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
+
+    User* x509User;
+    ASSERT_OK(
+        authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"), &x509User));
+    ASSERT(x509User->isValid());
+
+    stdx::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
+                                                RoleName("readWrite", "test")};
+    RoleNameIterator roles = x509User->getRoles();
+    stdx::unordered_set<RoleName> acquiredRoles;
+    while (roles.more()) {
+        acquiredRoles.insert(roles.next());
+    }
+    ASSERT_TRUE(expectedRoles == acquiredRoles);
+
+    const User::ResourcePrivilegeMap& privileges = x509User->getPrivileges();
+    ASSERT_FALSE(privileges.empty());
+    auto privilegeIt = privileges.find(ResourcePattern::forDatabaseName("test"));
+    ASSERT(privilegeIt != privileges.end());
+    ASSERT(privilegeIt->second.includesAction(ActionType::insert));
+
+
+    authzManager->releaseUser(x509User);
+}
+
+TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
+    ServiceContextNoop serviceContext;
+    transport::TransportLayerMock transportLayer{};
+    transport::SessionHandle session = transportLayer.createSession();
+    setX509PeerInfo(
+        session,
+        SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("write", "test")}));
+    ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
+    ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
+
+    User* x509User;
+    ASSERT_NOT_OK(
+        authzManager->acquireUser(opCtx.get(), UserName("CN=10gen.com", "$external"), &x509User));
+}
+
+TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
+    ServiceContextNoop serviceContext;
+    transport::TransportLayerMock transportLayer{};
+    transport::SessionHandle session = transportLayer.createSession();
+    setX509PeerInfo(session, {});
+    ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
+    ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
+
+    User* x509User;
+    ASSERT_NOT_OK(
+        authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"), &x509User));
+}
+
+/**
+ * An implementation of AuthzManagerExternalStateMock that overrides the getUserDescription method
+ * to return the user document unmodified from how it was inserted.  When using this insert user
+ * documents in the format that would be returned from a usersInfo command run with
+ * showPrivilges:true, rather than the format that would normally be stored in a system.users
+ * collection.  The main difference between using this mock and the normal
+ * AuthzManagerExternalStateMock is that with this one you should specify the 'inheritedPrivileges'
+ * field in any user documents added.
+ */
+class AuthzManagerExternalStateMockWithExplicitUserPrivileges
+    : public AuthzManagerExternalStateMock {
+public:
+    /**
+     * This version of getUserDescription just loads the user doc directly as it was inserted into
+     * the mock's user document catalog, without performing any role resolution.  This way the tests
+     * can control exactly what privileges are returned for the user.
+     */
+    Status getUserDescription(OperationContext* opCtx,
+                              const UserName& userName,
+                              BSONObj* result) override {
+        return _getUserDocument(opCtx, userName, result);
+    }
+
+private:
+    Status _getUserDocument(OperationContext* opCtx, const UserName& userName, BSONObj* userDoc) {
+        Status status = findOne(opCtx,
+                                AuthorizationManager::usersCollectionNamespace,
+                                BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                                     << userName.getUser()
+                                     << AuthorizationManager::USER_DB_FIELD_NAME
+                                     << userName.getDB()),
+                                userDoc);
+        if (status == ErrorCodes::NoMatchingDocument) {
+            status = Status(ErrorCodes::UserNotFound,
+                            mongoutils::str::stream() << "Could not find user "
+                                                      << userName.getFullName());
+        }
+        return status;
+    }
+};
+
+class AuthorizationManagerWithExplicitUserPrivilegesTest : public ::mongo::unittest::Test {
+public:
+    virtual ~AuthorizationManagerWithExplicitUserPrivilegesTest() {
+        if (authzManager)
+            authzManager->invalidateUserCache();
+    }
+
+    virtual void setUp() {
+        auto localExternalState =
+            stdx::make_unique<AuthzManagerExternalStateMockWithExplicitUserPrivileges>();
+        externalState = localExternalState.get();
+        externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        authzManager = stdx::make_unique<AuthorizationManager>(std::move(localExternalState));
+        externalState->setAuthorizationManager(authzManager.get());
+        authzManager->setAuthEnabled(true);
+    }
+
+    std::unique_ptr<AuthorizationManager> authzManager;
+    AuthzManagerExternalStateMockWithExplicitUserPrivileges* externalState;
+};
+
+// Tests SERVER-21535, unrecognized actions should be ignored rather than causing errors.
+TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
+    OperationContextNoop opCtx;
+
+    ASSERT_OK(
+        externalState->insertPrivilegeDocument(&opCtx,
+                                               BSON("_id"
+                                                    << "admin.myUser"
+                                                    << "user"
+                                                    << "myUser"
+                                                    << "db"
+                                                    << "test"
+                                                    << "credentials"
+                                                    << BSON("MONGODB-CR"
+                                                            << "password")
+                                                    << "roles"
+                                                    << BSON_ARRAY(BSON("role"
+                                                                       << "myRole"
+                                                                       << "db"
+                                                                       << "test"))
+                                                    << "inheritedPrivileges"
+                                                    << BSON_ARRAY(BSON(
+                                                           "resource" << BSON("db"
+                                                                              << "test"
+                                                                              << "collection"
+                                                                              << "")
+                                                                      << "actions"
+                                                                      << BSON_ARRAY("find"
+                                                                                    << "fakeAction"
+                                                                                    << "insert")))),
+                                               BSONObj()));
+
+    User* myUser;
+    ASSERT_OK(authzManager->acquireUser(&opCtx, UserName("myUser", "test"), &myUser));
+    ASSERT_EQUALS(UserName("myUser", "test"), myUser->getName());
+    ASSERT(myUser->isValid());
+    ASSERT_EQUALS(1U, myUser->getRefCount());
+    RoleNameIterator roles = myUser->getRoles();
+    ASSERT_EQUALS(RoleName("myRole", "test"), roles.next());
+    ASSERT_FALSE(roles.more());
+    auto privilegeMap = myUser->getPrivileges();
+    auto testDBPrivilege = privilegeMap[ResourcePattern::forDatabaseName("test")];
+    ActionSet actions = testDBPrivilege.getActions();
+    ASSERT(actions.contains(ActionType::find));
+    ASSERT(actions.contains(ActionType::insert));
+    actions.removeAction(ActionType::find);
+    actions.removeAction(ActionType::insert);
+    ASSERT(actions.empty());
+
+    // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+    authzManager->releaseUser(myUser);
+}
+
+// These tests ensure that the AuthorizationManager registers a
+// Change on the RecoveryUnit, when an Op is reported that could
+// modify role data. This Change is might recompute
+// the RoleGraph when executed.
+class AuthorizationManagerLogOpTest : public AuthorizationManagerTest {
+public:
+    class MockRecoveryUnit : public RecoveryUnitNoop {
+    public:
+        MockRecoveryUnit(size_t* registeredChanges) : _registeredChanges(registeredChanges) {}
+
+        virtual void registerChange(Change* change) final {
+            // RecoveryUnitNoop takes ownership of the Change
+            RecoveryUnitNoop::registerChange(change);
+            ++(*_registeredChanges);
+        }
+
+    private:
+        size_t* _registeredChanges;
+    };
+
+    virtual void setUp() override {
+        opCtx.setRecoveryUnit(recoveryUnit, OperationContext::kNotInUnitOfWork);
+        AuthorizationManagerTest::setUp();
+    }
+
+    OperationContextNoop opCtx;
+    size_t registeredChanges = 0;
+    MockRecoveryUnit* recoveryUnit = new MockRecoveryUnit(&registeredChanges);
+};
+
+TEST_F(AuthorizationManagerLogOpTest, testDropDatabaseAddsRecoveryUnits) {
+    authzManager->logOp(&opCtx,
+                        "c",
+                        {"admin", "$cmd"},
+                        BSON("dropDatabase"
+                             << "1"),
+                        nullptr);
+    ASSERT_EQ(size_t(1), registeredChanges);
+}
+
+TEST_F(AuthorizationManagerLogOpTest, testDropAuthCollectionAddsRecoveryUnits) {
+    authzManager->logOp(&opCtx,
+                        "c",
+                        {"admin", "$cmd"},
+                        BSON("drop"
+                             << "system.users"),
+                        nullptr);
+    ASSERT_EQ(size_t(1), registeredChanges);
+
+    authzManager->logOp(&opCtx,
+                        "c",
+                        {"admin", "$cmd"},
+                        BSON("drop"
+                             << "system.roles"),
+                        nullptr);
+    ASSERT_EQ(size_t(2), registeredChanges);
+
+    authzManager->logOp(&opCtx,
+                        "c",
+                        {"admin", "$cmd"},
+                        BSON("drop"
+                             << "system.version"),
+                        nullptr);
+    ASSERT_EQ(size_t(3), registeredChanges);
+
+    authzManager->logOp(&opCtx,
+                        "c",
+                        {"admin", "$cmd"},
+                        BSON("drop"
+                             << "system.profile"),
+                        nullptr);
+    ASSERT_EQ(size_t(3), registeredChanges);
+}
+
+TEST_F(AuthorizationManagerLogOpTest, testCreateAnyCollectionAddsNoRecoveryUnits) {
+    authzManager->logOp(&opCtx,
+                        "c",
+                        {"admin", "$cmd"},
+                        BSON("create"
+                             << "system.users"),
+                        nullptr);
+
+    authzManager->logOp(&opCtx,
+                        "c",
+                        {"admin", "$cmd"},
+                        BSON("create"
+                             << "system.profile"),
+                        nullptr);
+
+    authzManager->logOp(&opCtx,
+                        "c",
+                        {"admin", "$cmd"},
+                        BSON("create"
+                             << "system.other"),
+                        nullptr);
+
+    ASSERT_EQ(size_t(0), registeredChanges);
+}
+
+TEST_F(AuthorizationManagerLogOpTest, testRawInsertToRolesCollectionAddsRecoveryUnits) {
+    authzManager->logOp(&opCtx,
+                        "i",
+                        {"admin", "system.profile"},
+                        BSON("_id"
+                             << "admin.user"),
+                        nullptr);
+    ASSERT_EQ(size_t(0), registeredChanges);
+
+    authzManager->logOp(&opCtx,
+                        "i",
+                        {"admin", "system.users"},
+                        BSON("_id"
+                             << "admin.user"),
+                        nullptr);
+    ASSERT_EQ(size_t(0), registeredChanges);
+
+    authzManager->logOp(&opCtx,
+                        "i",
+                        {"admin", "system.roles"},
+                        BSON("_id"
+                             << "admin.user"),
+                        nullptr);
+    ASSERT_EQ(size_t(1), registeredChanges);
 }
 
 }  // namespace

@@ -44,9 +44,9 @@ public:
      *
      * If 'out' is not NULL, sets 'out' to the first node of type 'type' encountered.
      */
-    static bool hasNode(MatchExpression* root,
+    static bool hasNode(const MatchExpression* root,
                         MatchExpression::MatchType type,
-                        MatchExpression** out = NULL) {
+                        const MatchExpression** out = NULL) {
         if (type == root->matchType()) {
             if (NULL != out) {
                 *out = root;

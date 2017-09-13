@@ -10,8 +10,7 @@ assert.eq(1, coll.count({$text: {$search: "run"}}));
 // Test search with a "language alias" only recognized in textIndexVersion:1 (note that the stopword
 // machinery doesn't recognize these aliases).
 coll.drop();
-assert.commandWorked(coll.ensureIndex({a: "text"},
-                                      {default_language: "eng", textIndexVersion: 1}));
+assert.commandWorked(coll.ensureIndex({a: "text"}, {default_language: "eng", textIndexVersion: 1}));
 assert.writeOK(coll.insert({a: "running"}));
 assert.eq(1, coll.count({$text: {$search: "run"}}));
 

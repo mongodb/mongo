@@ -49,7 +49,7 @@ public:
 
     virtual bool serverIsArbiter() const;
 
-    virtual void startRequest(OperationContext* txn);
+    virtual void startRequest(OperationContext* opCtx);
 };
 
 }  // namespace mongo

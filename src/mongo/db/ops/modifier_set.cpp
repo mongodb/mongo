@@ -30,9 +30,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/ops/field_checker.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/update/field_checker.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -88,7 +88,8 @@ Status ModifierSet::init(const BSONElement& modExpr, const Options& opts, bool* 
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     //
@@ -152,16 +153,24 @@ Status ModifierSet::prepare(mutablebson::Element root,
     // in-place and no-op logic
     //
 
-    // If the field path is not fully present, then this mod cannot be in place, nor is a
-    // noOp.
+    // If the field path is not fully present, then this mod cannot be in place, nor is it a noOp.
     if (!_preparedState->elemFound.ok() || _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
         return Status::OK();
     }
 
-    // If the value being $set is the same as the one already in the doc, than this is a
-    // noOp.
+    // If the value being $set is the same as the one already in the doc, than this is a noOp. We
+    // use binary equality to compare so that any change to the document is considered, unlike using
+    // a comparison that winds up in woCompare (see SERVER-16801). In the case where elemFound
+    // doesn't have a serialized representation, we just declare the operation to not be a
+    // no-op. This is potentially a missed optimization, but is unlikely to cause much pain since in
+    // the normal update workflow we only admit one modification on any path from a leaf to the
+    // document root. In that domain, hasValue will always be true. We may encounter a
+    // non-serialized elemFound in the case where our base document is the result of calling
+    // populateDocumentWithQueryFields, so this could cause us to do slightly more work than
+    // strictly necessary in the case where an update (w upsert:true) becomes an insert.
     if (_preparedState->elemFound.ok() && _preparedState->idxFound == (_fieldRef.numParts() - 1) &&
-        _preparedState->elemFound.compareWithBSONElement(_val, false /*ignore field*/) == 0) {
+        _preparedState->elemFound.hasValue() &&
+        _preparedState->elemFound.getValue().binaryEqualValues(_val)) {
         execInfo->noOp = _preparedState->noOp = true;
     }
 
@@ -235,7 +244,8 @@ Status ModifierSet::apply() const {
 
     // createPathAt() will complete the path and attach 'elemToSet' at the end of it.
     return pathsupport::createPathAt(
-        _fieldRef, _preparedState->idxFound, _preparedState->elemFound, elemToSet);
+               _fieldRef, _preparedState->idxFound, _preparedState->elemFound, elemToSet)
+        .getStatus();
 }
 
 Status ModifierSet::log(LogBuilder* logBuilder) const {

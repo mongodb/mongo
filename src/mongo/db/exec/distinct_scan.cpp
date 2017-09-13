@@ -28,53 +28,61 @@
 
 #include "mongo/db/exec/distinct_scan.h"
 
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
-DistinctScan::DistinctScan(OperationContext* txn,
+DistinctScan::DistinctScan(OperationContext* opCtx,
                            const DistinctParams& params,
                            WorkingSet* workingSet)
-    : _txn(txn),
+    : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
       _descriptor(params.descriptor),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
       _params(params),
-      _checker(&_params.bounds, _descriptor->keyPattern(), _params.direction),
-      _commonStats(kStageType) {
+      _checker(&_params.bounds, _descriptor->keyPattern(), _params.direction) {
     _specificStats.keyPattern = _params.descriptor->keyPattern();
+    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
+        invariant(collationElement.isABSONObj());
+        _specificStats.collation = collationElement.Obj().getOwned();
+    }
     _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.indexVersion = _params.descriptor->version();
+    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
+    _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
+    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(getOpCtx());
+    _specificStats.isUnique = _params.descriptor->unique();
+    _specificStats.isSparse = _params.descriptor->isSparse();
+    _specificStats.isPartial = _params.descriptor->isPartial();
+    _specificStats.direction = _params.direction;
 
     // Set up our initial seek. If there is no valid data, just mark as EOF.
     _commonStats.isEOF = !_checker.getStartSeekPoint(&_seekPoint);
 }
 
-PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
-    ++_commonStats.works;
+PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF)
         return PlanStage::IS_EOF;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     boost::optional<IndexKeyEntry> kv;
     try {
         if (!_cursor)
-            _cursor = _iam->newCursor(_txn, _params.direction == 1);
+            _cursor = _iam->newCursor(getOpCtx(), _params.direction == 1);
         kv = _cursor->seek(_seekPoint);
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         *out = WorkingSet::INVALID_ID;
         return PlanStage::NEED_YIELD;
     }
@@ -89,7 +97,6 @@ PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
     switch (_checker.checkKey(kv->key, &_seekPoint)) {
         case IndexBoundsChecker::MUST_ADVANCE:
             // Try again next time. The checker has adjusted the _seekPoint.
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
 
         case IndexBoundsChecker::DONE:
@@ -111,12 +118,11 @@ PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
             // Package up the result for the caller.
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
-            member->loc = kv->loc;
+            member->recordId = kv->loc;
             member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), kv->key, _iam));
-            member->state = WorkingSetMember::LOC_AND_IDX;
+            _workingSet->transitionToRecordIdAndIdx(id);
 
             *out = id;
-            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
     }
     invariant(false);
@@ -126,41 +132,38 @@ bool DistinctScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void DistinctScan::saveState() {
-    _txn = NULL;
-    ++_commonStats.yields;
-
+void DistinctScan::doSaveState() {
     // We always seek, so we don't care where the cursor is.
     if (_cursor)
         _cursor->saveUnpositioned();
 }
 
-void DistinctScan::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-    ++_commonStats.unyields;
-
+void DistinctScan::doRestoreState() {
     if (_cursor)
-        _cursor->restore(opCtx);
+        _cursor->restore();
 }
 
-void DistinctScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
+void DistinctScan::doDetachFromOperationContext() {
+    if (_cursor)
+        _cursor->detachFromOperationContext();
 }
 
-vector<PlanStage*> DistinctScan::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
+void DistinctScan::doReattachToOperationContext() {
+    if (_cursor)
+        _cursor->reattachToOperationContext(getOpCtx());
 }
 
-PlanStageStats* DistinctScan::getStats() {
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT_SCAN));
-    ret->specific.reset(new DistinctScanStats(_specificStats));
-    return ret.release();
-}
+unique_ptr<PlanStageStats> DistinctScan::getStats() {
+    // Serialize the bounds to BSON if we have not done so already. This is done here rather than in
+    // the constructor in order to avoid the expensive serialization operation unless the distinct
+    // command is being explained.
+    if (_specificStats.indexBounds.isEmpty()) {
+        _specificStats.indexBounds = _params.bounds.toBSON();
+    }
 
-const CommonStats* DistinctScan::getCommonStats() const {
-    return &_commonStats;
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_DISTINCT_SCAN);
+    ret->specific = make_unique<DistinctScanStats>(_specificStats);
+    return ret;
 }
 
 const SpecificStats* DistinctScan::getSpecificStats() const {

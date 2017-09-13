@@ -12,7 +12,7 @@ t.save(c);
 t.save(d);
 t.ensureIndex({p: "2d"});
 
-var res = t.runCommand("geoNear", {near: [0,0]});
+var res = t.runCommand("geoNear", {near: [0, 0]});
 assert.close(3, res.stats.avgDistance, "A");
 
 assert.close(0, res.results[0].dis, "B1");
@@ -27,7 +27,7 @@ assert.eq(c._id, res.results[2].obj._id, "D2");
 assert.close(6, res.results[3].dis, "E1");
 assert.eq(d._id, res.results[3].obj._id, "E2");
 
-res = t.runCommand("geoNear", {near: [0,0], distanceMultiplier: 2});
+res = t.runCommand("geoNear", {near: [0, 0], distanceMultiplier: 2});
 assert.close(6, res.stats.avgDistance, "F");
 assert.close(0, res.results[0].dis, "G");
 assert.close(2, res.results[1].dis, "H");

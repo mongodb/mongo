@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -44,7 +44,7 @@
  * Record numbers are stored in 64-bit unsigned integers, meaning the largest
  * record number is "really, really big".
  */
-#define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 1024)
+#define	WT_BTREE_MAX_OBJECT_SIZE	((uint32_t)(UINT32_MAX - 1024))
 
 /*
  * A location in a file is a variable-length cookie, but it has a maximum size
@@ -56,6 +56,12 @@
 
 /* Evict pages if we see this many consecutive deleted records. */
 #define	WT_BTREE_DELETE_THRESHOLD	1000
+
+/*
+ * Minimum size of the chunks (in percentage of the page size) a page gets split
+ * into during reconciliation.
+ */
+#define	WT_BTREE_MIN_SPLIT_PCT		50
 
 /*
  * WT_BTREE --
@@ -88,7 +94,8 @@ struct __wt_btree {
 	uint32_t maxleafpage;		/* Leaf page max size */
 	uint32_t maxleafkey;		/* Leaf page max key size */
 	uint32_t maxleafvalue;		/* Leaf page max value size */
-	uint64_t maxmempage;		/* In memory page max size */
+	uint64_t maxmempage;		/* In-memory page max size */
+	uint64_t splitmempage;		/* In-memory split trigger size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
@@ -102,9 +109,9 @@ struct __wt_btree {
 	 * Reconciliation...
 	 */
 	u_int dictionary;		/* Dictionary slots */
-	int   internal_key_truncate;	/* Internal key truncate */
+	bool  internal_key_truncate;	/* Internal key truncate */
 	int   maximum_depth;		/* Maximum tree depth */
-	int   prefix_compression;	/* Prefix compression */
+	bool  prefix_compression;	/* Prefix compression */
 	u_int prefix_compression_min;	/* Prefix compression min */
 #define	WT_SPLIT_DEEPEN_MIN_CHILD_DEF	10000
 	u_int split_deepen_min_child;	/* Minimum entries to deepen tree */
@@ -113,28 +120,46 @@ struct __wt_btree {
 	int   split_pct;		/* Split page percent */
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 	WT_KEYED_ENCRYPTOR *kencryptor;	/* Page encryptor */
-	WT_RWLOCK *ovfl_lock;		/* Overflow lock */
+	WT_RWLOCK ovfl_lock;		/* Overflow lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
 
-	WT_REF root;			/* Root page reference */
-	int modified;			/* If the tree ever modified */
-	int bulk_load_ok;		/* Bulk-load is a possibility */
+	WT_REF	root;			/* Root page reference */
+	bool	modified;		/* If the tree ever modified */
+	uint8_t	original;		/* Newly created: bulk-load possible
+					   (want a bool but needs atomic cas) */
+
+	bool lsm_primary;		/* Handle is/was the LSM primary */
 
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
-	uint64_t checkpoint_gen;	/* Checkpoint generation */
-	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
 	uint64_t write_gen;		/* Write generation */
+	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
+	WT_DECL_TIMESTAMP(rec_max_timestamp)
 
-	WT_REF  *evict_ref;		/* Eviction thread's location */
-	uint64_t evict_priority;	/* Relative priority of cached pages */
-	u_int    evict_walk_period;	/* Skip this many LRU walks */
-	u_int    evict_walk_skips;	/* Number of walks skipped */
+	uint64_t checkpoint_gen;	/* Checkpoint generation */
+	volatile enum {
+		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
+	} checkpointing;		/* Checkpoint in progress */
+
+	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
+	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
+	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
+
+	WT_REF	   *evict_ref;		/* Eviction thread's location */
+	uint64_t    evict_priority;	/* Relative priority of cached pages */
+	u_int	    evict_walk_period;	/* Skip this many LRU walks */
+	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
+	u_int	    evict_walk_skips;	/* Number of walks skipped */
+	int32_t	    evict_disabled;	/* Eviction disabled count */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-
-	int checkpointing;		/* Checkpoint in progress */
+	enum {				/* Start position for eviction walk */
+		WT_EVICT_WALK_NEXT,
+		WT_EVICT_WALK_PREV,
+		WT_EVICT_WALK_RAND_NEXT,
+		WT_EVICT_WALK_RAND_PREV
+	} evict_start_type;
 
 	/*
 	 * We flush pages from the tree (in order to make checkpoint faster),
@@ -144,20 +169,26 @@ struct __wt_btree {
 	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
-#define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
-#define	WT_BTREE_IN_MEMORY	0x00200	/* Cache-resident object */
-#define	WT_BTREE_NO_EVICTION	0x00400	/* Disable eviction */
-#define	WT_BTREE_NO_LOGGING	0x00800	/* Disable logging */
-#define	WT_BTREE_SALVAGE	0x01000	/* Handle is for salvage */
-#define	WT_BTREE_SKIP_CKPT	0x02000	/* Handle skipped checkpoint */
-#define	WT_BTREE_UPGRADE	0x04000	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x08000	/* Handle is for verify */
+#define	WT_BTREE_ALTER		0x000100 /* Handle is for alter */
+#define	WT_BTREE_BULK		0x000200 /* Bulk-load handle */
+#define	WT_BTREE_CLOSED		0x000400 /* Handle closed */
+#define	WT_BTREE_IGNORE_CACHE	0x000800 /* Cache-resident object */
+#define	WT_BTREE_IN_MEMORY	0x001000 /* Cache-resident object */
+#define	WT_BTREE_LOOKASIDE	0x002000 /* Look-aside table */
+#define	WT_BTREE_NO_CHECKPOINT	0x004000 /* Disable checkpoints */
+#define	WT_BTREE_NO_LOGGING	0x008000 /* Disable logging */
+#define	WT_BTREE_REBALANCE	0x010000 /* Handle is for rebalance */
+#define	WT_BTREE_SALVAGE	0x020000 /* Handle is for salvage */
+#define	WT_BTREE_SKIP_CKPT	0x040000 /* Handle skipped checkpoint */
+#define	WT_BTREE_UPGRADE	0x080000 /* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x100000 /* Handle is for verify */
 	uint32_t flags;
 };
 
 /* Flags that make a btree handle special (not for normal use). */
 #define	WT_BTREE_SPECIAL_FLAGS	 					\
-	(WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
+	(WT_BTREE_ALTER | WT_BTREE_BULK | WT_BTREE_REBALANCE |		\
+	WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
 
 /*
  * WT_SALVAGE_COOKIE --
@@ -168,5 +199,5 @@ struct __wt_salvage_cookie {
 	uint64_t skip;				/* Initial items to skip */
 	uint64_t take;				/* Items to take */
 
-	int	 done;				/* Ignore the rest */
+	bool	 done;				/* Ignore the rest */
 };

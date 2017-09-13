@@ -1,0 +1,12 @@
+# This file is used to exclude suites, tasks or tests from running in the burn_in_test task.
+selector:
+  js_test:
+    # Exclude list of resmoke.py suite names.
+    exclude_suites:
+    # Exclude list of etc/evergreen.yml task names.
+    exclude_tasks:
+    # Exclude list of jstests file names.
+    exclude_tests:
+    # SERVER-27653 - Blacklist concurrency test runners to avoid potential issues from attempting
+    # to run them in parallel with each other.
+    - jstests/concurrency/fsm_all*.js

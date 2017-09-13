@@ -35,17 +35,20 @@
 #include <algorithm>
 #include <math.h>
 #include <memory>
-#include "boost/thread/locks.hpp"
+#include <vector>
+
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 namespace {
@@ -58,6 +61,7 @@ const char kEncodeChildrenEnd = ']';
 const char kEncodeChildrenSeparator = ',';
 const char kEncodeSortSection = '~';
 const char kEncodeProjectionSection = '|';
+const char kEncodeCollationSection = '#';
 
 /**
  * Encode user-provided string. Cache key delimiters seen in the
@@ -74,6 +78,7 @@ void encodeUserString(StringData s, StringBuilder* keyBuilder) {
             case kEncodeChildrenSeparator:
             case kEncodeSortSection:
             case kEncodeProjectionSection:
+            case kEncodeCollationSection:
             case '\\':
                 *keyBuilder << '\\';
             // Fall through to default case.
@@ -84,82 +89,141 @@ void encodeUserString(StringData s, StringBuilder* keyBuilder) {
 }
 
 /**
- * 2-character encoding of MatchExpression::MatchType.
+ * String encoding of MatchExpression::MatchType.
  */
 const char* encodeMatchType(MatchExpression::MatchType mt) {
     switch (mt) {
         case MatchExpression::AND:
             return "an";
-            break;
+
         case MatchExpression::OR:
             return "or";
-            break;
+
         case MatchExpression::NOR:
             return "nr";
-            break;
+
         case MatchExpression::NOT:
             return "nt";
-            break;
+
         case MatchExpression::ELEM_MATCH_OBJECT:
             return "eo";
-            break;
+
         case MatchExpression::ELEM_MATCH_VALUE:
             return "ev";
-            break;
+
         case MatchExpression::SIZE:
             return "sz";
-            break;
+
         case MatchExpression::LTE:
             return "le";
-            break;
+
         case MatchExpression::LT:
             return "lt";
-            break;
+
         case MatchExpression::EQ:
             return "eq";
-            break;
+
         case MatchExpression::GT:
             return "gt";
-            break;
+
         case MatchExpression::GTE:
             return "ge";
-            break;
+
         case MatchExpression::REGEX:
             return "re";
-            break;
+
         case MatchExpression::MOD:
             return "mo";
-            break;
+
         case MatchExpression::EXISTS:
             return "ex";
-            break;
+
         case MatchExpression::MATCH_IN:
             return "in";
-            break;
+
         case MatchExpression::TYPE_OPERATOR:
             return "ty";
-            break;
+
         case MatchExpression::GEO:
             return "go";
-            break;
+
         case MatchExpression::WHERE:
             return "wh";
-            break;
-        case MatchExpression::ATOMIC:
-            return "at";
-            break;
+
         case MatchExpression::ALWAYS_FALSE:
             return "af";
-            break;
+
+        case MatchExpression::ALWAYS_TRUE:
+            return "at";
+
         case MatchExpression::GEO_NEAR:
             return "gn";
-            break;
+
         case MatchExpression::TEXT:
             return "te";
-            break;
+
+        case MatchExpression::BITS_ALL_SET:
+            return "ls";
+
+        case MatchExpression::BITS_ALL_CLEAR:
+            return "lc";
+
+        case MatchExpression::BITS_ANY_SET:
+            return "ys";
+
+        case MatchExpression::BITS_ANY_CLEAR:
+            return "yc";
+
+        case MatchExpression::EXPRESSION:
+            return "xp";
+
+        case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+            return "internalSchemaAllElemMatchFromIndex";
+
+        case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+            return "internalSchemaAllowedProperties";
+
+        case MatchExpression::INTERNAL_SCHEMA_COND:
+            return "internalSchemaCond";
+
+        case MatchExpression::INTERNAL_SCHEMA_FMOD:
+            return "internalSchemaFmod";
+
+        case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
+            return "internalSchemaMinItems";
+
+        case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
+            return "internalSchemaMaxItems";
+
+        case MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS:
+            return "internalSchemaUniqueItems";
+
+        case MatchExpression::INTERNAL_SCHEMA_XOR:
+            return "internalSchemaXor";
+
+        case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
+            return "internalSchemaObjectMatch";
+
+        case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
+            return "internalSchemaMinLength";
+
+        case MatchExpression::INTERNAL_SCHEMA_MAX_LENGTH:
+            return "internalSchemaMaxLength";
+
+        case MatchExpression::INTERNAL_SCHEMA_MIN_PROPERTIES:
+            return "internalSchemaMinProperties";
+
+        case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
+            return "internalSchemaMaxProperties";
+
+        case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+            return "internalSchemaMatchArrayIndex";
+
+        case MatchExpression::INTERNAL_SCHEMA_TYPE:
+            return "internalSchemaType";
+
         default:
-            verify(0);
-            return "";
+            MONGO_UNREACHABLE;
     }
 }
 
@@ -242,49 +306,48 @@ void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree, StringBuil
 //
 
 bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
-    const LiteParsedQuery& lpq = query.getParsed();
+    const QueryRequest& qr = query.getQueryRequest();
     const MatchExpression* expr = query.root();
 
     // Collection scan
     // No sort order requested
-    if (lpq.getSort().isEmpty() && expr->matchType() == MatchExpression::AND &&
+    if (qr.getSort().isEmpty() && expr->matchType() == MatchExpression::AND &&
         expr->numChildren() == 0) {
         return false;
     }
 
     // Hint provided
-    if (!lpq.getHint().isEmpty()) {
+    if (!qr.getHint().isEmpty()) {
         return false;
     }
 
     // Min provided
     // Min queries are a special case of hinted queries.
-    if (!lpq.getMin().isEmpty()) {
+    if (!qr.getMin().isEmpty()) {
         return false;
     }
 
     // Max provided
     // Similar to min, max queries are a special case of hinted queries.
-    if (!lpq.getMax().isEmpty()) {
+    if (!qr.getMax().isEmpty()) {
         return false;
     }
 
-    // Explain queries are not-cacheable. This is primarily because of
-    // the need to generate current and accurate information in allPlans.
-    // If the explain report is generated by the cached plan runner using
-    // stale information from the cache for the losing plans, allPlans would
-    // simply be wrong.
-    if (lpq.isExplain()) {
+    // We don't read or write from the plan cache for explain. This ensures
+    // that explain queries don't affect cache state, and it also makes
+    // sure that we can always generate information regarding rejected plans
+    // and/or trial period execution of candidate plans.
+    if (qr.isExplain()) {
         return false;
     }
 
     // Tailable cursors won't get cached, just turn into collscans.
-    if (query.getParsed().isTailable()) {
+    if (query.getQueryRequest().isTailable()) {
         return false;
     }
 
     // Snapshot is really a hint.
-    if (query.getParsed().isSnapshot()) {
+    if (query.getQueryRequest().isSnapshot()) {
         return false;
     }
 
@@ -301,6 +364,7 @@ CachedSolution::CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& en
       query(entry.query.getOwned()),
       sort(entry.sort.getOwned()),
       projection(entry.projection.getOwned()),
+      collation(entry.collation.getOwned()),
       decisionWorks(entry.decision->stats[0]->common.works) {
     // CachedSolution should not having any references into
     // cache entry. All relevant data should be cloned/copied.
@@ -349,18 +413,20 @@ PlanCacheEntry::~PlanCacheEntry() {
 }
 
 PlanCacheEntry* PlanCacheEntry::clone() const {
-    OwnedPointerVector<QuerySolution> solutions;
+    std::vector<std::unique_ptr<QuerySolution>> solutions;
     for (size_t i = 0; i < plannerData.size(); ++i) {
-        QuerySolution* qs = new QuerySolution();
+        auto qs = stdx::make_unique<QuerySolution>();
         qs->cacheData.reset(plannerData[i]->clone());
-        solutions.mutableVector().push_back(qs);
+        solutions.push_back(std::move(qs));
     }
-    PlanCacheEntry* entry = new PlanCacheEntry(solutions.vector(), decision->clone());
+    PlanCacheEntry* entry = new PlanCacheEntry(
+        transitional_tools_do_not_use::unspool_vector(solutions), decision->clone());
 
     // Copy query shape.
     entry->query = query.getOwned();
     entry->sort = sort.getOwned();
     entry->projection = projection.getOwned();
+    entry->collation = collation.getOwned();
 
     // Copy performance stats.
     for (size_t i = 0; i < feedback.size(); ++i) {
@@ -375,6 +441,7 @@ PlanCacheEntry* PlanCacheEntry::clone() const {
 std::string PlanCacheEntry::toString() const {
     return str::stream() << "(query: " << query.toString() << ";sort: " << sort.toString()
                          << ";projection: " << projection.toString()
+                         << ";collation: " << collation.toString()
                          << ";solutions: " << plannerData.size() << ")";
 }
 
@@ -395,7 +462,9 @@ PlanCacheIndexTree* PlanCacheIndexTree::clone() const {
     if (NULL != entry.get()) {
         root->index_pos = index_pos;
         root->setIndexEntry(*entry.get());
+        root->canCombineBounds = canCombineBounds;
     }
+    root->orPushdowns = orPushdowns;
 
     for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
          it != children.end();
@@ -420,7 +489,21 @@ std::string PlanCacheIndexTree::toString(int indents) const {
     } else {
         result << std::string(3 * indents, '-') << "Leaf ";
         if (NULL != entry.get()) {
-            result << entry->keyPattern.toString() << ", pos: " << index_pos;
+            result << entry->name << ", pos: " << index_pos << ", can combine? "
+                   << canCombineBounds;
+        }
+        for (const auto& orPushdown : orPushdowns) {
+            result << "Move to ";
+            bool firstPosition = true;
+            for (auto position : orPushdown.route) {
+                if (!firstPosition) {
+                    result << ",";
+                }
+                firstPosition = false;
+                result << position;
+            }
+            result << ": " << orPushdown.indexName << ", pos: " << orPushdown.position
+                   << ", can combine? " << orPushdown.canCombineBounds << ". ";
         }
         result << '\n';
     }
@@ -465,9 +548,9 @@ std::string SolutionCacheData::toString() const {
 // PlanCache
 //
 
-PlanCache::PlanCache() : _cache(internalQueryCacheSize) {}
+PlanCache::PlanCache() : _cache(internalQueryCacheSize.load()) {}
 
-PlanCache::PlanCache(const std::string& ns) : _cache(internalQueryCacheSize), _ns(ns) {}
+PlanCache::PlanCache(const std::string& ns) : _cache(internalQueryCacheSize.load()), _ns(ns) {}
 
 PlanCache::~PlanCache() {}
 
@@ -490,13 +573,13 @@ void PlanCache::encodeKeyForMatch(const MatchExpression* tree, StringBuilder* ke
     }
 
     // Encode indexability.
-    const IndexabilityDiscriminators& discriminators =
+    const IndexToDiscriminatorMap& discriminators =
         _indexabilityState.getDiscriminators(tree->path());
     if (!discriminators.empty()) {
         *keyBuilder << kEncodeDiscriminatorsBegin;
         // For each discriminator on this path, append the character '0' or '1'.
-        for (const IndexabilityDiscriminator& discriminator : discriminators) {
-            *keyBuilder << discriminator(tree);
+        for (auto&& indexAndDiscriminatorPair : discriminators) {
+            *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
         }
         *keyBuilder << kEncodeDiscriminatorsEnd;
     }
@@ -521,7 +604,7 @@ void PlanCache::encodeKeyForMatch(const MatchExpression* tree, StringBuilder* ke
 /**
  * Encodes sort order into cache key.
  * Sort order is normalized because it provided by
- * LiteParsedQuery.
+ * QueryRequest.
  */
 void PlanCache::encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) const {
     if (sortObj.isEmpty()) {
@@ -534,7 +617,7 @@ void PlanCache::encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuild
     while (it.more()) {
         BSONElement elt = it.next();
         // $meta text score
-        if (LiteParsedQuery::isTextScoreMeta(elt)) {
+        if (QueryRequest::isTextScoreMeta(elt)) {
             *keyBuilder << "t";
         }
         // Ascending
@@ -562,12 +645,6 @@ void PlanCache::encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuild
  * This handles all the special projection types ($meta, $elemMatch, etc.)
  */
 void PlanCache::encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuilder) const {
-    if (projObj.isEmpty()) {
-        return;
-    }
-
-    *keyBuilder << kEncodeProjectionSection;
-
     // Sorts the BSON elements by field name using a map.
     std::map<StringData, BSONElement> elements;
 
@@ -575,7 +652,18 @@ void PlanCache::encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuild
     while (it.more()) {
         BSONElement elt = it.next();
         StringData fieldName = elt.fieldNameStringData();
+
+        // Internal callers may add $-prefixed fields to the projection. These are not part of a
+        // user query, and therefore are not considered part of the cache key.
+        if (fieldName[0] == '$') {
+            continue;
+        }
+
         elements[fieldName] = elt;
+    }
+
+    if (!elements.empty()) {
+        *keyBuilder << kEncodeProjectionSection;
     }
 
     // Read elements in order of field name
@@ -584,7 +672,7 @@ void PlanCache::encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuild
          ++i) {
         const BSONElement& elt = (*i).second;
 
-        if (elt.isSimpleType()) {
+        if (elt.type() != BSONType::Object) {
             // For inclusion/exclusion projections, we encode as "i" or "e".
             *keyBuilder << (elt.trueValue() ? "i" : "e");
         } else {
@@ -621,17 +709,30 @@ Status PlanCache::add(const CanonicalQuery& query,
     }
 
     PlanCacheEntry* entry = new PlanCacheEntry(solns, why);
-    const LiteParsedQuery& pq = query.getParsed();
-    entry->query = pq.getFilter().getOwned();
-    entry->sort = pq.getSort().getOwned();
-    entry->projection = pq.getProj().getOwned();
+    const QueryRequest& qr = query.getQueryRequest();
+    entry->query = qr.getFilter().getOwned();
+    entry->sort = qr.getSort().getOwned();
+    if (query.getCollator()) {
+        entry->collation = query.getCollator()->getSpec().toBSON();
+    }
+
+    // Strip projections on $-prefixed fields, as these are added by internal callers of the query
+    // system and are not considered part of the user projection.
+    BSONObjBuilder projBuilder;
+    for (auto elem : qr.getProj()) {
+        if (elem.fieldName()[0] == '$') {
+            continue;
+        }
+        projBuilder.append(elem);
+    }
+    entry->projection = projBuilder.obj();
 
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
     std::unique_ptr<PlanCacheEntry> evictedEntry = _cache.add(computeKey(query), entry);
 
     if (NULL != evictedEntry.get()) {
         LOG(1) << _ns << ": plan cache maximum size exceeded - "
-               << "removed least recently used entry " << evictedEntry->toString();
+               << "removed least recently used entry " << redact(evictedEntry->toString());
     }
 
     return Status::OK();
@@ -670,7 +771,7 @@ Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* fee
     invariant(entry);
 
     // We store up to a constant number of feedback entries.
-    if (entry->feedback.size() < size_t(internalQueryCacheFeedbacksStored)) {
+    if (entry->feedback.size() < static_cast<size_t>(internalQueryCacheFeedbacksStored.load())) {
         entry->feedback.push_back(autoFeedback.release());
     }
 
@@ -685,14 +786,13 @@ Status PlanCache::remove(const CanonicalQuery& canonicalQuery) {
 void PlanCache::clear() {
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
     _cache.clear();
-    _writeOperations.store(0);
 }
 
 PlanCacheKey PlanCache::computeKey(const CanonicalQuery& cq) const {
     StringBuilder keyBuilder;
     encodeKeyForMatch(cq.root(), &keyBuilder);
-    encodeKeyForSort(cq.getParsed().getSort(), &keyBuilder);
-    encodeKeyForProj(cq.getParsed().getProj(), &keyBuilder);
+    encodeKeyForSort(cq.getQueryRequest().getSort(), &keyBuilder);
+    encodeKeyForProj(cq.getQueryRequest().getProj(), &keyBuilder);
     return keyBuilder.str();
 }
 
@@ -733,18 +833,6 @@ bool PlanCache::contains(const CanonicalQuery& cq) const {
 size_t PlanCache::size() const {
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
     return _cache.size();
-}
-
-void PlanCache::notifyOfWriteOp() {
-    // It's fine to clear the cache multiple times if multiple threads
-    // increment the counter to kPlanCacheMaxWriteOperations or greater.
-    if (_writeOperations.addAndFetch(1) < internalQueryCacheWriteOpsBetweenFlush) {
-        return;
-    }
-
-    LOG(1) << _ns << ": clearing collection plan cache - " << internalQueryCacheWriteOpsBetweenFlush
-           << " write operations detected since last refresh.";
-    clear();
 }
 
 void PlanCache::notifyOfIndexEntries(const std::vector<IndexEntry>& indexEntries) {

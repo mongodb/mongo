@@ -36,13 +36,11 @@
 
 namespace mongo {
 
-class ClientBasic;
+class Client;
 
 namespace copydb {
 
-Status checkAuthForCopydbCommand(ClientBasic* client,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj);
+Status checkAuthForCopydbCommand(Client* client, const std::string& dbname, const BSONObj& cmdObj);
 
 }  // namespace copydb
 }  // namespace mongo

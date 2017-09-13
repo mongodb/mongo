@@ -57,7 +57,7 @@ var assertWithLevel = function(level) {
         var doassertSaved = doassert;
         try {
             doassert = quietlyDoAssert;
-            fn.apply(assert, args); // functions typically get called on 'assert'
+            fn.apply(assert, args);  // functions typically get called on 'assert'
         } finally {
             doassert = doassertSaved;
         }

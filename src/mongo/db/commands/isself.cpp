@@ -39,13 +39,13 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class IsSelfCommand : public Command {
+class IsSelfCommand : public BasicCommand {
 public:
-    IsSelfCommand() : Command("_isSelf") {}
+    IsSelfCommand() : BasicCommand("_isSelf") {}
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual void help(stringstream& help) const {
@@ -54,11 +54,9 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
-             int,
-             string& errmsg,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         result.append("id", repl::instanceId);
         return true;

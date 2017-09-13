@@ -34,7 +34,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/instance.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_test_help.h"
 #include "mongo/unittest/unittest.h"
@@ -64,18 +63,18 @@ public:
 
 protected:
     void checkValidNumKeys(int nKeys) {
-        OperationContextNoop txn;
-        ASSERT_EQUALS(nKeys, _helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        OperationContextNoop opCtx;
+        ASSERT_EQUALS(nKeys, _helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
     }
 
     Status insert(const BSONObj& key, const DiskLoc dl, bool dupsAllowed = true) {
-        OperationContextNoop txn;
-        return _helper.btree.insert(&txn, key, dl, dupsAllowed);
+        OperationContextNoop opCtx;
+        return _helper.btree.insert(&opCtx, key, dl, dupsAllowed);
     }
 
     bool unindex(const BSONObj& key) {
-        OperationContextNoop txn;
-        return _helper.btree.unindex(&txn, key, _helper.dummyDiskLoc);
+        OperationContextNoop opCtx;
+        return _helper.btree.unindex(&opCtx, key, _helper.dummyDiskLoc);
     }
 
     void locate(const BSONObj& key,
@@ -93,9 +92,10 @@ protected:
                 int direction) {
         int pos;
         DiskLoc loc;
-        OperationContextNoop txn;
-        ASSERT_EQUALS(expectedFound,
-                      _helper.btree.locate(&txn, key, _helper.dummyDiskLoc, direction, &pos, &loc));
+        OperationContextNoop opCtx;
+        ASSERT_EQUALS(
+            expectedFound,
+            _helper.btree.locate(&opCtx, key, _helper.dummyDiskLoc, direction, &pos, &loc));
         ASSERT_EQUALS(expectedLocation, loc);
         ASSERT_EQUALS(expectedPos, pos);
     }
@@ -117,8 +117,8 @@ protected:
     }
 
     BucketType* head() const {
-        OperationContextNoop txn;
-        return _helper.btree.getBucket(&txn, _helper.headManager.getHead(&txn));
+        OperationContextNoop opCtx;
+        return _helper.btree.getBucket(&opCtx, _helper.headManager.getHead(&opCtx));
     }
 
     void forcePackBucket(const RecordId bucketLoc) {
@@ -139,8 +139,8 @@ protected:
 
     int bucketRebalancedSeparatorPos(const RecordId bucketLoc, int leftIndex) {
         BucketType* bucket = _helper.btree.getBucket(NULL, bucketLoc);
-        OperationContextNoop txn;
-        return _helper.btree._rebalancedSeparatorPos(&txn, bucket, leftIndex);
+        OperationContextNoop opCtx;
+        return _helper.btree._rebalancedSeparatorPos(&opCtx, bucket, leftIndex);
     }
 
     FullKey getKey(const RecordId bucketLoc, int pos) const {
@@ -156,20 +156,20 @@ protected:
     }
 
     DiskLoc newBucket() {
-        OperationContextNoop txn;
-        return _helper.btree._addBucket(&txn);
+        OperationContextNoop opCtx;
+        return _helper.btree._addBucket(&opCtx);
     }
 
     /**
      * Sets the nextChild pointer for the bucket at the specified location.
      */
     void setBucketNextChild(const DiskLoc bucketLoc, const DiskLoc nextChild) {
-        OperationContextNoop txn;
+        OperationContextNoop opCtx;
 
-        BucketType* bucket = _helper.btree.getBucket(&txn, bucketLoc);
+        BucketType* bucket = _helper.btree.getBucket(&opCtx, bucketLoc);
         bucket->nextChild = nextChild;
 
-        _helper.btree.fixParentPtrs(&txn, bucket, bucketLoc);
+        _helper.btree.fixParentPtrs(&opCtx, bucket, bucketLoc);
     }
 
 protected:
@@ -184,8 +184,8 @@ template <class OnDiskFormat>
 class SimpleCreate : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         this->checkValidNumKeys(0);
     }
@@ -195,14 +195,14 @@ template <class OnDiskFormat>
 class SimpleInsertDelete : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         BSONObj key = simpleKey('z');
-        this->insert(key, this->_helper.dummyDiskLoc);
+        this->insert(key, this->_helper.dummyDiskLoc).transitional_ignore();
 
         this->checkValidNumKeys(1);
-        this->locate(key, 0, true, this->_helper.headManager.getHead(&txn), 1);
+        this->locate(key, 0, true, this->_helper.headManager.getHead(&opCtx), 1);
 
         this->unindex(key);
 
@@ -215,15 +215,15 @@ template <class OnDiskFormat>
 class SplitUnevenBucketBase : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 10; ++i) {
             BSONObj shortKey = simpleKey(shortToken(i), 1);
-            this->insert(shortKey, this->_helper.dummyDiskLoc);
+            this->insert(shortKey, this->_helper.dummyDiskLoc).transitional_ignore();
 
             BSONObj longKey = simpleKey(longToken(i), 800);
-            this->insert(longKey, this->_helper.dummyDiskLoc);
+            this->insert(longKey, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         this->checkValidNumKeys(20);
@@ -279,17 +279,17 @@ template <class OnDiskFormat>
 class MissingLocate : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 3; ++i) {
             BSONObj k = simpleKey('b' + 2 * i);
-            this->insert(k, this->_helper.dummyDiskLoc);
+            this->insert(k, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
-        locateExtended(1, 'a', 'b', this->_helper.headManager.getHead(&txn));
-        locateExtended(1, 'c', 'd', this->_helper.headManager.getHead(&txn));
-        locateExtended(1, 'e', 'f', this->_helper.headManager.getHead(&txn));
+        locateExtended(1, 'a', 'b', this->_helper.headManager.getHead(&opCtx));
+        locateExtended(1, 'c', 'd', this->_helper.headManager.getHead(&opCtx));
+        locateExtended(1, 'e', 'f', this->_helper.headManager.getHead(&opCtx));
         locateExtended(1, 'g', 'g' + 1, RecordId());  // of course, 'h' isn't in the index.
 
         // old behavior
@@ -299,9 +299,9 @@ public:
         //       locateExtended( -1, 'g', 'f', dl() );
 
         locateExtended(-1, 'a', 'a' - 1, RecordId());  // of course, 'a' - 1 isn't in the index
-        locateExtended(-1, 'c', 'b', this->_helper.headManager.getHead(&txn));
-        locateExtended(-1, 'e', 'd', this->_helper.headManager.getHead(&txn));
-        locateExtended(-1, 'g', 'f', this->_helper.headManager.getHead(&txn));
+        locateExtended(-1, 'c', 'b', this->_helper.headManager.getHead(&opCtx));
+        locateExtended(-1, 'e', 'd', this->_helper.headManager.getHead(&opCtx));
+        locateExtended(-1, 'g', 'f', this->_helper.headManager.getHead(&opCtx));
     }
 
 private:
@@ -317,44 +317,44 @@ template <class OnDiskFormat>
 class MissingLocateMultiBucket : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
-        this->insert(simpleKey('A', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('B', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('C', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('D', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('E', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('F', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('G', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('H', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('J', 800), this->_helper.dummyDiskLoc);
+        this->insert(simpleKey('A', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('B', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('C', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('D', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('E', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('F', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('G', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('H', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('J', 800), this->_helper.dummyDiskLoc).transitional_ignore();
 
         // This causes split
-        this->insert(simpleKey('I', 800), this->_helper.dummyDiskLoc);
+        this->insert(simpleKey('I', 800), this->_helper.dummyDiskLoc).transitional_ignore();
 
         int pos;
         DiskLoc loc;
 
         // 'E' is the split point and should be in the head the rest should be ~50/50
         const BSONObj splitPoint = simpleKey('E', 800);
-        this->_helper.btree.locate(&txn, splitPoint, this->_helper.dummyDiskLoc, 1, &pos, &loc);
-        ASSERT_EQUALS(this->_helper.headManager.getHead(&txn), loc.toRecordId());
+        this->_helper.btree.locate(&opCtx, splitPoint, this->_helper.dummyDiskLoc, 1, &pos, &loc);
+        ASSERT_EQUALS(this->_helper.headManager.getHead(&opCtx), loc.toRecordId());
         ASSERT_EQUALS(0, pos);
 
         // Find the one before 'E'
         int largePos;
         DiskLoc largeLoc;
         this->_helper.btree.locate(
-            &txn, splitPoint, this->_helper.dummyDiskLoc, 1, &largePos, &largeLoc);
-        this->_helper.btree.advance(&txn, &largeLoc, &largePos, -1);
+            &opCtx, splitPoint, this->_helper.dummyDiskLoc, 1, &largePos, &largeLoc);
+        this->_helper.btree.advance(&opCtx, &largeLoc, &largePos, -1);
 
         // Find the one after 'E'
         int smallPos;
         DiskLoc smallLoc;
         this->_helper.btree.locate(
-            &txn, splitPoint, this->_helper.dummyDiskLoc, 1, &smallPos, &smallLoc);
-        this->_helper.btree.advance(&txn, &smallLoc, &smallPos, 1);
+            &opCtx, splitPoint, this->_helper.dummyDiskLoc, 1, &smallPos, &smallLoc);
+        this->_helper.btree.advance(&opCtx, &smallLoc, &smallPos, 1);
 
         ASSERT_NOT_EQUALS(smallLoc, largeLoc);
         ASSERT_NOT_EQUALS(smallLoc, loc);
@@ -369,44 +369,44 @@ template <class OnDiskFormat>
 class SERVER983 : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
-        this->insert(simpleKey('A', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('B', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('C', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('D', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('E', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('F', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('G', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('H', 800), this->_helper.dummyDiskLoc);
-        this->insert(simpleKey('I', 800), this->_helper.dummyDiskLoc);
+        this->insert(simpleKey('A', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('B', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('C', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('D', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('E', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('F', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('G', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('H', 800), this->_helper.dummyDiskLoc).transitional_ignore();
+        this->insert(simpleKey('I', 800), this->_helper.dummyDiskLoc).transitional_ignore();
 
         // This will cause split
-        this->insert(simpleKey('J', 800), this->_helper.dummyDiskLoc);
+        this->insert(simpleKey('J', 800), this->_helper.dummyDiskLoc).transitional_ignore();
 
         int pos;
         DiskLoc loc;
 
         // 'H' is the maximum 'large' interval key, 90% should be < 'H' and 10% larger
         const BSONObj splitPoint = simpleKey('H', 800);
-        this->_helper.btree.locate(&txn, splitPoint, this->_helper.dummyDiskLoc, 1, &pos, &loc);
-        ASSERT_EQUALS(this->_helper.headManager.getHead(&txn), loc.toRecordId());
+        this->_helper.btree.locate(&opCtx, splitPoint, this->_helper.dummyDiskLoc, 1, &pos, &loc);
+        ASSERT_EQUALS(this->_helper.headManager.getHead(&opCtx), loc.toRecordId());
         ASSERT_EQUALS(0, pos);
 
         // Find the one before 'H'
         int largePos;
         DiskLoc largeLoc;
         this->_helper.btree.locate(
-            &txn, splitPoint, this->_helper.dummyDiskLoc, 1, &largePos, &largeLoc);
-        this->_helper.btree.advance(&txn, &largeLoc, &largePos, -1);
+            &opCtx, splitPoint, this->_helper.dummyDiskLoc, 1, &largePos, &largeLoc);
+        this->_helper.btree.advance(&opCtx, &largeLoc, &largePos, -1);
 
         // Find the one after 'H'
         int smallPos;
         DiskLoc smallLoc;
         this->_helper.btree.locate(
-            &txn, splitPoint, this->_helper.dummyDiskLoc, 1, &smallPos, &smallLoc);
-        this->_helper.btree.advance(&txn, &smallLoc, &smallPos, 1);
+            &opCtx, splitPoint, this->_helper.dummyDiskLoc, 1, &smallPos, &smallLoc);
+        this->_helper.btree.advance(&opCtx, &smallLoc, &smallPos, 1);
 
         ASSERT_NOT_EQUALS(smallLoc, largeLoc);
         ASSERT_NOT_EQUALS(smallLoc, loc);
@@ -418,18 +418,18 @@ template <class OnDiskFormat>
 class DontReuseUnused : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 10; ++i) {
             const BSONObj k = simpleKey('b' + 2 * i, 800);
-            this->insert(k, this->_helper.dummyDiskLoc);
+            this->insert(k, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         const BSONObj root = simpleKey('p', 800);
         this->unindex(root);
 
-        this->insert(root, this->_helper.dummyDiskLoc);
+        this->insert(root, this->_helper.dummyDiskLoc).transitional_ignore();
         this->locate(root, 0, true, this->head()->nextChild, 1);
     }
 };
@@ -438,12 +438,12 @@ template <class OnDiskFormat>
 class MergeBucketsTestBase : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 10; ++i) {
             const BSONObj k = simpleKey('b' + 2 * i, 800);
-            this->insert(k, this->_helper.dummyDiskLoc);
+            this->insert(k, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         // numRecords() - 1, because this->_helper.dummyDiskLoc is actually in the record store too
@@ -454,7 +454,7 @@ public:
 
         long long unusedCount = 0;
         ASSERT_EQUALS(expectedCount,
-                      this->_helper.btree.fullValidate(&txn, &unusedCount, true, false, 0));
+                      this->_helper.btree.fullValidate(&opCtx, &unusedCount, true, false, 0));
         ASSERT_EQUALS(0, unusedCount);
     }
 
@@ -494,12 +494,12 @@ template <class OnDiskFormat>
 class MergeBucketsDontReplaceHead : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         for (int i = 0; i < 18; ++i) {
             const BSONObj k = simpleKey('a' + i, 800);
-            this->insert(k, this->_helper.dummyDiskLoc);
+            this->insert(k, this->_helper.dummyDiskLoc).transitional_ignore();
         }
 
         // numRecords(NULL) - 1, because fixedDiskLoc is actually in the record store too
@@ -510,7 +510,7 @@ public:
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL) - 1);
 
         long long unusedCount = 0;
-        ASSERT_EQUALS(17, this->_helper.btree.fullValidate(&txn, &unusedCount, true, false, 0));
+        ASSERT_EQUALS(17, this->_helper.btree.fullValidate(&opCtx, &unusedCount, true, false, 0));
         ASSERT_EQUALS(0, unusedCount);
     }
 };
@@ -519,11 +519,11 @@ template <class OnDiskFormat>
 class MergeBucketsDelInternal : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{d:{b:{a:null},bb:null,_:{c:null}},_:{f:{e:null},_:{g:null}}}");
-        ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -532,7 +532,7 @@ public:
                                << "bb");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
@@ -545,11 +545,11 @@ template <class OnDiskFormat>
 class MergeBucketsRightNull : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{d:{b:{a:null},bb:null,cc:{c:null}},_:{f:{e:null},h:{g:null}}}");
-        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -558,7 +558,7 @@ public:
                                << "bb");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
@@ -574,12 +574,12 @@ template <class OnDiskFormat>
 class DontMergeSingleBucket : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{d:{b:{a:null},c:null}}");
 
-        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -588,7 +588,7 @@ public:
                                << "c");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -601,12 +601,12 @@ template <class OnDiskFormat>
 class ParentMergeNonRightToLeft : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{d:{b:{a:null},bb:null,cc:{c:null}},i:{f:{e:null},h:{g:null}}}");
 
-        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -615,7 +615,7 @@ public:
                                << "bb");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // Child does not currently replace parent in this case. Also, the tree
         // has 6 buckets + 1 for the this->_helper.dummyDiskLoc.
@@ -629,12 +629,12 @@ template <class OnDiskFormat>
 class ParentMergeNonRightToRight : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{d:{b:{a:null},cc:{c:null}},i:{f:{e:null},ff:null,h:{g:null}}}");
 
-        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -643,7 +643,7 @@ public:
                                << "ff");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // Child does not currently replace parent in this case. Also, the tree
         // has 6 buckets + 1 for the this->_helper.dummyDiskLoc.
@@ -657,15 +657,15 @@ template <class OnDiskFormat>
 class CantMergeRightNoMerge : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{d:{b:{a:null},bb:null,cc:{c:null}},"
             "dd:null,"
             "_:{f:{e:null},h:{g:null}}}");
 
-        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -674,7 +674,7 @@ public:
                                << "bb");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -690,12 +690,12 @@ template <class OnDiskFormat>
 class CantMergeLeftNoMerge : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{c:{b:{a:null}},d:null,_:{f:{e:null},g:null}}");
 
-        ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
@@ -704,7 +704,7 @@ public:
                                << "g");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(6, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(6, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
@@ -717,12 +717,12 @@ template <class OnDiskFormat>
 class MergeOption : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{c:{b:{a:null}},f:{e:{d:null},ee:null},_:{h:{g:null}}}");
 
-        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -731,7 +731,7 @@ public:
                                << "ee");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
@@ -744,12 +744,12 @@ template <class OnDiskFormat>
 class ForceMergeLeft : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{c:{b:{a:null}},f:{e:{d:null},ee:null},ff:null,_:{h:{g:null}}}");
 
-        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -758,7 +758,7 @@ public:
                                << "ee");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
@@ -771,12 +771,12 @@ template <class OnDiskFormat>
 class ForceMergeRight : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{c:{b:{a:null}},cc:null,f:{e:{d:null},ee:null},_:{h:{g:null}}}");
 
-        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
@@ -785,7 +785,7 @@ public:
                                << "ee");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
@@ -798,12 +798,12 @@ template <class OnDiskFormat>
 class RecursiveMerge : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{h:{e:{b:{a:null},c:null,d:null},g:{f:null}},j:{i:null}}");
 
-        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
@@ -812,7 +812,7 @@ public:
                                << "c");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -826,12 +826,12 @@ template <class OnDiskFormat>
 class RecursiveMergeRightBucket : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{h:{e:{b:{a:null},c:null,d:null},g:{f:null}},_:{i:null}}");
 
-        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
@@ -840,7 +840,7 @@ public:
                                << "c");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -853,12 +853,12 @@ template <class OnDiskFormat>
 class RecursiveMergeDoubleRightBucket : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{h:{e:{b:{a:null},c:null,d:null},_:{f:null}},_:{i:null}}");
 
-        ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
@@ -867,7 +867,7 @@ public:
                                << "c");
         verify(this->unindex(k));
 
-        ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -883,20 +883,20 @@ public:
     MergeSizeTestBase() : _count(0) {}
 
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         const BSONObj& topKey = biggestKey('m');
 
         DiskLoc leftChild = this->newBucket();
         builder.push(
-            DiskLoc::fromRecordId(this->_helper.headManager.getHead(&txn)), topKey, leftChild);
+            DiskLoc::fromRecordId(this->_helper.headManager.getHead(&opCtx)), topKey, leftChild);
         _count++;
 
         DiskLoc rightChild = this->newBucket();
-        this->setBucketNextChild(DiskLoc::fromRecordId(this->_helper.headManager.getHead(&txn)),
+        this->setBucketNextChild(DiskLoc::fromRecordId(this->_helper.headManager.getHead(&opCtx)),
                                  rightChild);
 
         _count += builder.fillBucketToExactSize(leftChild, leftSize(), 'a');
@@ -925,7 +925,8 @@ public:
         const char* keys = delKeys();
         for (const char* i = keys; *i; ++i) {
             long long unused = 0;
-            ASSERT_EQUALS(_count, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+            ASSERT_EQUALS(_count,
+                          this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
             ASSERT_EQUALS(0, unused);
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
@@ -938,7 +939,7 @@ public:
         }
 
         long long unused = 0;
-        ASSERT_EQUALS(_count, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(_count, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
         ASSERT_EQUALS(0, unused);
 
         validate();
@@ -1186,14 +1187,14 @@ protected:
     }
 
     virtual void initCheck() {
-        OperationContextNoop txn;
-        _oldTop = this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson();
+        OperationContextNoop opCtx;
+        _oldTop = this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson();
     }
 
     virtual void validate() {
-        OperationContextNoop txn;
-        ASSERT_NOT_EQUALS(_oldTop,
-                          this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        OperationContextNoop opCtx;
+        ASSERT_BSONOBJ_NE(_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson());
     }
 
 private:
@@ -1213,14 +1214,14 @@ protected:
     }
 
     virtual void initCheck() {
-        OperationContextNoop txn;
-        _oldTop = this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson();
+        OperationContextNoop opCtx;
+        _oldTop = this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson();
     }
 
     virtual void validate() {
-        OperationContextNoop txn;
-        ASSERT_TRUE(_oldTop !=
-                    this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        OperationContextNoop opCtx;
+        ASSERT_BSONOBJ_NE(_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson());
     }
 
 private:
@@ -1231,15 +1232,15 @@ template <class OnDiskFormat>
 class BalanceOneLeftToRight : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null},"
             "b:{$20:null,$30:null,$40:null,$50:null,a:null},"
             "_:{c:null}}");
 
-        ASSERT_EQUALS(14, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(14, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1247,7 +1248,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x40, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1263,15 +1264,15 @@ template <class OnDiskFormat>
 class BalanceOneRightToLeft : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:{$1:null,$2:null,$3:null,$4:null},"
             "b:{$20:null,$30:null,$40:null,$50:null,$60:null,$70:null},"
             "_:{c:null}}");
 
-        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1279,7 +1280,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x3, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1295,8 +1296,8 @@ template <class OnDiskFormat>
 class BalanceThreeLeftToRight : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$20:{$1:{$0:null},$3:{$2:null},$5:{$4:null},$7:{$6:null},"
@@ -1304,7 +1305,7 @@ public:
             "b:{$30:null,$40:{$35:null},$50:{$45:null}},"
             "_:{c:null}}");
 
-        ASSERT_EQUALS(23, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(23, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 14 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(15, this->_helper.recordStore.numRecords(NULL));
@@ -1312,7 +1313,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x30, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(22, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(22, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 14 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(15, this->_helper.recordStore.numRecords(NULL));
@@ -1330,8 +1331,8 @@ template <class OnDiskFormat>
 class BalanceThreeRightToLeft : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$20:{$1:{$0:null},$3:{$2:null},$5:null,_:{$14:null}},"
@@ -1340,7 +1341,7 @@ public:
             "$90:{$85:null},$100:{$95:null}},"
             "_:{c:null}}");
 
-        ASSERT_EQUALS(25, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(25, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 15 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(16, this->_helper.recordStore.numRecords(NULL));
@@ -1348,7 +1349,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x5, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(24, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(24, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 15 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(16, this->_helper.recordStore.numRecords(NULL));
@@ -1366,14 +1367,14 @@ template <class OnDiskFormat>
 class BalanceSingleParentKey : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null},"
             "_:{$20:null,$30:null,$40:null,$50:null,a:null}}");
 
-        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -1381,7 +1382,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x40, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -1396,8 +1397,8 @@ template <class OnDiskFormat>
 class PackEmptyBucket : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null}");
 
@@ -1405,7 +1406,7 @@ public:
                                << "a");
         ASSERT(this->unindex(k));
 
-        this->forcePackBucket(this->_helper.headManager.getHead(&txn));
+        this->forcePackBucket(this->_helper.headManager.getHead(&opCtx));
 
         typename BtreeLogicTestBase<OnDiskFormat>::BucketType* headBucket = this->head();
 
@@ -1426,8 +1427,8 @@ template <class OnDiskFormat>
 class PackedDataSizeEmptyBucket : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null}");
 
@@ -1435,7 +1436,7 @@ public:
                                << "a");
         ASSERT(this->unindex(k));
 
-        this->forcePackBucket(this->_helper.headManager.getHead(&txn));
+        this->forcePackBucket(this->_helper.headManager.getHead(&opCtx));
 
         typename BtreeLogicTestBase<OnDiskFormat>::BucketType* headBucket = this->head();
 
@@ -1450,25 +1451,25 @@ template <class OnDiskFormat>
 class BalanceSingleParentKeyPackParent : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null},"
             "_:{$20:null,$30:null,$40:null,$50:null,a:null}}");
 
-        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
         // force parent pack
-        this->forcePackBucket(this->_helper.headManager.getHead(&txn));
+        this->forcePackBucket(this->_helper.headManager.getHead(&opCtx));
 
         const BSONObj k = BSON("" << bigNumString(0x40, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -1483,8 +1484,8 @@ template <class OnDiskFormat>
 class BalanceSplitParent : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10$10:{$1:null,$2:null,$3:null,$4:null},"
@@ -1492,7 +1493,7 @@ public:
             "$200:null,$300:null,$400:null,$500:null,$600:null,"
             "$700:null,$800:null,$900:null,_:{c:null}}");
 
-        ASSERT_EQUALS(22, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(22, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1500,7 +1501,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x3, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(21, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(21, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
@@ -1517,15 +1518,15 @@ template <class OnDiskFormat>
 class RebalancedSeparatorBase : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(treeSpec());
         modTree();
 
         ASSERT_EQUALS(
             expectedSeparator(),
-            this->bucketRebalancedSeparatorPos(this->_helper.headManager.getHead(&txn), 0));
+            this->bucketRebalancedSeparatorPos(this->_helper.headManager.getHead(&opCtx), 0));
     }
 
     virtual string treeSpec() const = 0;
@@ -1659,14 +1660,14 @@ class NoMoveAtLowWaterMarkRight : public MergeSizeJustRightRight<OnDiskFormat> {
     }
 
     virtual void initCheck() {
-        OperationContextNoop txn;
-        _oldTop = this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson();
+        OperationContextNoop opCtx;
+        _oldTop = this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson();
     }
 
     virtual void validate() {
-        OperationContextNoop txn;
-        ASSERT_EQUALS(_oldTop,
-                      this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        OperationContextNoop opCtx;
+        ASSERT_BSONOBJ_EQ(_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson());
     }
 
     virtual bool merge() const {
@@ -1687,10 +1688,10 @@ class MoveBelowLowWaterMarkRight : public NoMoveAtLowWaterMarkRight<OnDiskFormat
     }
 
     virtual void validate() {
-        OperationContextNoop txn;
+        OperationContextNoop opCtx;
         // Different top means we rebalanced
-        ASSERT_NOT_EQUALS(this->_oldTop,
-                          this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        ASSERT_BSONOBJ_NE(this->_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson());
     }
 };
 
@@ -1700,14 +1701,14 @@ class NoMoveAtLowWaterMarkLeft : public MergeSizeJustRightLeft<OnDiskFormat> {
         return MergeSizeJustRightLeft<OnDiskFormat>::leftSize() + 1;
     }
     virtual void initCheck() {
-        OperationContextNoop txn;
-        this->_oldTop = this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson();
+        OperationContextNoop opCtx;
+        this->_oldTop = this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson();
     }
 
     virtual void validate() {
-        OperationContextNoop txn;
-        ASSERT_EQUALS(this->_oldTop,
-                      this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        OperationContextNoop opCtx;
+        ASSERT_BSONOBJ_EQ(this->_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson());
     }
     virtual bool merge() const {
         return false;
@@ -1727,10 +1728,10 @@ class MoveBelowLowWaterMarkLeft : public NoMoveAtLowWaterMarkLeft<OnDiskFormat> 
     }
 
     virtual void validate() {
-        OperationContextNoop txn;
+        OperationContextNoop opCtx;
         // Different top means we rebalanced
-        ASSERT_NOT_EQUALS(this->_oldTop,
-                          this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        ASSERT_BSONOBJ_NE(this->_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&opCtx), 0).data.toBson());
     }
 };
 
@@ -1738,15 +1739,15 @@ template <class OnDiskFormat>
 class PreferBalanceLeft : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null},"
             "$20:{$11:null,$12:null,$13:null,$14:null},"
             "_:{$30:null}}");
 
-        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1754,7 +1755,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x12, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1770,15 +1771,15 @@ template <class OnDiskFormat>
 class PreferBalanceRight : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:{$1:null},"
             "$20:{$11:null,$12:null,$13:null,$14:null},"
             "_:{$31:null,$32:null,$33:null,$34:null,$35:null,$36:null}}");
 
-        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1786,7 +1787,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x12, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1802,15 +1803,15 @@ template <class OnDiskFormat>
 class RecursiveMergeThenBalance : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:{$5:{$1:null,$2:null},$8:{$6:null,$7:null}},"
             "_:{$20:null,$30:null,$40:null,$50:null,"
             "$60:null,$70:null,$80:null,$90:null}}");
 
-        ASSERT_EQUALS(15, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(15, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
@@ -1818,7 +1819,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x7, 800));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(14, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(14, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -1833,12 +1834,12 @@ template <class OnDiskFormat>
 class DelEmptyNoNeighbors : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{b:{a:null}}");
 
-        ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
@@ -1847,7 +1848,7 @@ public:
                                << "a");
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(1, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(1, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
@@ -1860,12 +1861,12 @@ template <class OnDiskFormat>
 class DelEmptyEmptyNeighbors : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null,c:{b:null},d:null}");
 
-        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
@@ -1874,7 +1875,7 @@ public:
                                << "b");
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, NULL, true, false, 0));
+        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&opCtx, NULL, true, false, 0));
 
         // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
@@ -1887,13 +1888,13 @@ template <class OnDiskFormat>
 class DelInternal : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null,c:{b:null},d:null}");
 
         long long unused = 0;
-        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
@@ -1903,7 +1904,7 @@ public:
                                << "c");
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
@@ -1917,17 +1918,17 @@ template <class OnDiskFormat>
 class DelInternalReplaceWithUnused : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null,c:{b:null},d:null}");
 
         const DiskLoc prevChildBucket =
-            this->getKey(this->_helper.headManager.getHead(&txn), 1).prevChildBucket;
+            this->getKey(this->_helper.headManager.getHead(&opCtx), 1).prevChildBucket;
         this->markKeyUnused(prevChildBucket, 0);
 
         long long unused = 0;
-        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
@@ -1938,7 +1939,7 @@ public:
         ASSERT(this->unindex(k));
 
         unused = 0;
-        ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
@@ -1953,13 +1954,13 @@ template <class OnDiskFormat>
 class DelInternalReplaceRight : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null,_:{b:null}}");
 
         long long unused = 0;
-        ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
@@ -1970,7 +1971,7 @@ public:
         ASSERT(this->unindex(k));
 
         unused = 0;
-        ASSERT_EQUALS(1, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(1, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
@@ -1984,13 +1985,13 @@ template <class OnDiskFormat>
 class DelInternalPromoteKey : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null,y:{d:{c:{b:null}},_:{e:null}},z:null}");
 
         long long unused = 0;
-        ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
@@ -2001,7 +2002,7 @@ public:
         ASSERT(this->unindex(k));
 
         unused = 0;
-        ASSERT_EQUALS(6, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(6, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -2015,13 +2016,13 @@ template <class OnDiskFormat>
 class DelInternalPromoteRightKey : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null,_:{e:{c:null},_:{f:null}}}");
 
         long long unused = 0;
-        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -2032,7 +2033,7 @@ public:
         ASSERT(this->unindex(k));
 
         unused = 0;
-        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
@@ -2046,13 +2047,13 @@ template <class OnDiskFormat>
 class DelInternalReplacementPrevNonNull : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null,d:{c:{b:null}},e:null}");
 
         long long unused = 0;
-        ASSERT_EQUALS(5, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(5, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -2062,7 +2063,7 @@ public:
                                << "d");
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -2071,7 +2072,7 @@ public:
         builder.checkStructure("{a:null,d:{c:{b:null}},e:null}");
 
         // Check 'unused' key
-        ASSERT(this->getKey(this->_helper.headManager.getHead(&txn), 1).recordLoc.getOfs() & 1);
+        ASSERT(this->getKey(this->_helper.headManager.getHead(&opCtx), 1).recordLoc.getOfs() & 1);
     }
 };
 
@@ -2079,13 +2080,13 @@ template <class OnDiskFormat>
 class DelInternalReplacementNextNonNull : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree("{a:null,_:{c:null,_:{d:null}}}");
 
         long long unused = 0;
-        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -2095,7 +2096,7 @@ public:
                                << "a");
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
@@ -2104,7 +2105,7 @@ public:
         builder.checkStructure("{a:null,_:{c:null,_:{d:null}}}");
 
         // Check 'unused' key
-        ASSERT(this->getKey(this->_helper.headManager.getHead(&txn), 0).recordLoc.getOfs() & 1);
+        ASSERT(this->getKey(this->_helper.headManager.getHead(&opCtx), 0).recordLoc.getOfs() & 1);
     }
 };
 
@@ -2112,15 +2113,15 @@ template <class OnDiskFormat>
 class DelInternalSplitPromoteLeft : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:null,$20:null,$30$10:{$25:{$23:null},_:{$27:null}},"
             "$40:null,$50:null,$60:null,$70:null,$80:null,$90:null,$100:null}");
 
         long long unused = 0;
-        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -2129,7 +2130,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x30, 0x10));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -2146,15 +2147,15 @@ template <class OnDiskFormat>
 class DelInternalSplitPromoteRight : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        ArtificialTreeBuilder<OnDiskFormat> builder(&txn, &this->_helper);
+        OperationContextNoop opCtx;
+        ArtificialTreeBuilder<OnDiskFormat> builder(&opCtx, &this->_helper);
 
         builder.makeTree(
             "{$10:null,$20:null,$30:null,$40:null,$50:null,$60:null,$70:null,"
             "$80:null,$90:null,$100$10:{$95:{$93:null},_:{$97:null}}}");
 
         long long unused = 0;
-        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -2163,7 +2164,7 @@ public:
         const BSONObj k = BSON("" << bigNumString(0x100, 0x10));
         ASSERT(this->unindex(k));
 
-        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, &unused, true, false, 0));
+        ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&opCtx, &unused, true, false, 0));
 
         // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
         ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
@@ -2179,18 +2180,18 @@ template <class OnDiskFormat>
 class LocateEmptyForward : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         BSONObj key1 = simpleKey('a');
-        this->insert(key1, this->_helper.dummyDiskLoc);
+        this->insert(key1, this->_helper.dummyDiskLoc).transitional_ignore();
         BSONObj key2 = simpleKey('b');
-        this->insert(key2, this->_helper.dummyDiskLoc);
+        this->insert(key2, this->_helper.dummyDiskLoc).transitional_ignore();
         BSONObj key3 = simpleKey('c');
-        this->insert(key3, this->_helper.dummyDiskLoc);
+        this->insert(key3, this->_helper.dummyDiskLoc).transitional_ignore();
 
         this->checkValidNumKeys(3);
-        this->locate(BSONObj(), 0, false, this->_helper.headManager.getHead(&txn), 1);
+        this->locate(BSONObj(), 0, false, this->_helper.headManager.getHead(&opCtx), 1);
     }
 };
 
@@ -2198,15 +2199,15 @@ template <class OnDiskFormat>
 class LocateEmptyReverse : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         BSONObj key1 = simpleKey('a');
-        this->insert(key1, this->_helper.dummyDiskLoc);
+        this->insert(key1, this->_helper.dummyDiskLoc).transitional_ignore();
         BSONObj key2 = simpleKey('b');
-        this->insert(key2, this->_helper.dummyDiskLoc);
+        this->insert(key2, this->_helper.dummyDiskLoc).transitional_ignore();
         BSONObj key3 = simpleKey('c');
-        this->insert(key3, this->_helper.dummyDiskLoc);
+        this->insert(key3, this->_helper.dummyDiskLoc).transitional_ignore();
 
         this->checkValidNumKeys(3);
         this->locate(BSONObj(), -1, false, DiskLoc(), -1);
@@ -2217,28 +2218,28 @@ template <class OnDiskFormat>
 class DuplicateKeys : public BtreeLogicTestBase<OnDiskFormat> {
 public:
     void run() {
-        OperationContextNoop txn;
-        this->_helper.btree.initAsEmpty(&txn);
+        OperationContextNoop opCtx;
+        this->_helper.btree.initAsEmpty(&opCtx).transitional_ignore();
 
         BSONObj key1 = simpleKey('z');
         ASSERT_OK(this->insert(key1, this->_helper.dummyDiskLoc, true));
         this->checkValidNumKeys(1);
-        this->locate(key1, 0, true, this->_helper.headManager.getHead(&txn), 1);
+        this->locate(key1, 0, true, this->_helper.headManager.getHead(&opCtx), 1);
 
-        // Attempt to insert a dup key/value.
-        ASSERT_EQUALS(ErrorCodes::DuplicateKeyValue,
-                      this->insert(key1, this->_helper.dummyDiskLoc, true));
+        // Attempt to insert a dup key/value, which is okay.
+        ASSERT_EQUALS(Status::OK(), this->insert(key1, this->_helper.dummyDiskLoc, true));
         this->checkValidNumKeys(1);
-        this->locate(key1, 0, true, this->_helper.headManager.getHead(&txn), 1);
+        this->locate(key1, 0, true, this->_helper.headManager.getHead(&opCtx), 1);
 
         // Attempt to insert a dup key/value with dupsAllowed=false.
         ASSERT_EQUALS(ErrorCodes::DuplicateKeyValue,
                       this->insert(key1, this->_helper.dummyDiskLoc, false));
         this->checkValidNumKeys(1);
-        this->locate(key1, 0, true, this->_helper.headManager.getHead(&txn), 1);
+        this->locate(key1, 0, true, this->_helper.headManager.getHead(&opCtx), 1);
 
         // Add another record to produce another diskloc.
-        StatusWith<RecordId> s = this->_helper.recordStore.insertRecord(&txn, "a", 1, false);
+        StatusWith<RecordId> s =
+            this->_helper.recordStore.insertRecord(&opCtx, "a", 1, Timestamp(), false);
 
         ASSERT_TRUE(s.isOK());
         ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
@@ -2254,7 +2255,7 @@ public:
         this->checkValidNumKeys(2);
 
         // Clean up.
-        this->_helper.recordStore.deleteRecord(&txn, s.getValue());
+        this->_helper.recordStore.deleteRecord(&opCtx, s.getValue());
         ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
     }
 };
@@ -2332,14 +2333,14 @@ public:
             }
 
             long long unused = 0;
-            ASSERT_EQUALS( 0, bt()->fullValidate(&txn,  dl(), order(), &unused, true ) );
+            ASSERT_EQUALS( 0, bt()->fullValidate(&opCtx,  dl(), order(), &unused, true ) );
 
             for ( long long i = 50000; i < 50100; ++i ) {
                 insert( i );
             }
 
             long long unused2 = 0;
-            ASSERT_EQUALS( 100, bt()->fullValidate(&txn,  dl(), order(), &unused2, true ) );
+            ASSERT_EQUALS( 100, bt()->fullValidate(&opCtx,  dl(), order(), &unused2, true ) );
 
 //            log() << "old unused: " << unused << ", new unused: " << unused2 << endl;
 //

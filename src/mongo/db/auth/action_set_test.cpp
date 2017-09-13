@@ -156,5 +156,17 @@ TEST(ActionSetTest, anyAction) {
     ASSERT_NOT_EQUALS("anyAction", set.toString());
 }
 
+TEST(ActionSetTest, constructor) {
+    ActionSet set1{};
+    ASSERT_TRUE(set1.empty());
+
+    ActionSet set2{ActionType::find};
+    ASSERT_EQUALS("find", set2.toString());
+
+    ActionSet set3{ActionType::find, ActionType::insert};
+    ASSERT_TRUE(set3.contains(ActionType::find));
+    ASSERT_TRUE(set3.contains(ActionType::insert));
+}
+
 }  // namespace
 }  // namespace mongo

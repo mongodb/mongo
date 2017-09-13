@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -40,6 +40,7 @@ import com.wiredtiger.db.WiredTigerPackingException;
 public class PackFormatInputStream {
 
     protected String format;
+    protected boolean isRaw;
     protected int formatOff;
     protected int formatRepeatCount;
 
@@ -48,8 +49,9 @@ public class PackFormatInputStream {
      *
      * \param format the encoded format backing string.
      */
-    protected PackFormatInputStream(String format) {
+    protected PackFormatInputStream(String format, boolean isRaw) {
         this.format = format;
+        this.isRaw = isRaw;
         formatOff = 0;
         formatRepeatCount = 0;
     }
@@ -114,6 +116,9 @@ public class PackFormatInputStream {
     throws WiredTigerPackingException {
 
         char expected = getType();
+        if (isRaw)
+            throw new WiredTigerPackingException(
+                "Format mismatch for raw mode");
         if (Character.toLowerCase(expected) != Character.toLowerCase(asking))
             throw new WiredTigerPackingException(
                 "Format mismatch. Wanted: " + asking + ", got: " + expected);
@@ -180,5 +185,12 @@ public class PackFormatInputStream {
         }
         return valueLen;
     }
-}
 
+    /**
+     * Return whether there is an explicit length indicated in the format
+     * string.
+     */
+    protected boolean hasLength() {
+        return (getIntFromFormat(false) > 0);
+    }
+}

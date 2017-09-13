@@ -30,8 +30,8 @@
 
 #include <string>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
@@ -45,7 +45,7 @@ namespace mongo {
  * quotes.  JSON unicode escape sequences (of the form \uXXXX) are
  * converted to utf8.
  *
- * @throws MsgAssertionException if parsing fails.  The message included with
+ * @throws AssertionException if parsing fails.  The message included with
  * this assertion includes the character offset where parsing failed.
  */
 BSONObj fromjson(const std::string& str);
@@ -73,7 +73,7 @@ bool isArray(StringData str);
  * Convert a BSONArray to a JSON string.
  *
  * @param arr The BSON Array.
- * @param format The JSON format (JS, TenGen, Strict).
+ * @param format The JSON format (TenGen, Strict).
  * @param pretty Enables pretty output.
  */
 std::string tojson(const BSONArray& arr, JsonStringFormat format = Strict, bool pretty = false);
@@ -107,6 +107,7 @@ public:
      *   | NUMBER
      *   | NUMBERINT
      *   | NUMBERLONG
+     *   | NUMBERDECIMAL
      *   | OBJECT
      *   | ARRAY
      *
@@ -152,6 +153,7 @@ private:
      *   | REFOBJECT
      *   | UNDEFINEDOBJECT
      *   | NUMBERLONGOBJECT
+     *   | NUMBERDECIMALOBJECT
      *   | MINKEYOBJECT
      *   | MAXKEYOBJECT
      *
@@ -225,6 +227,12 @@ private:
     Status numberLongObject(StringData fieldName, BSONObjBuilder&);
 
     /*
+     * NUMBERDECIMALOBJECT :
+     *     { FIELD("$numberDecimal") : "<number>" }
+     */
+    Status numberDecimalObject(StringData fieldName, BSONObjBuilder&);
+
+    /*
      * MINKEYOBJECT :
      *     { FIELD("$minKey") : 1 }
      */
@@ -280,6 +288,12 @@ private:
      *     NumberLong( <number> )
      */
     Status numberLong(StringData fieldName, BSONObjBuilder&);
+
+    /*
+     * NUMBERDECIMAL :
+     *     NumberDecimal( <number> )
+     */
+    Status numberDecimal(StringData fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERINT :

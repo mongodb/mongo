@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -12,7 +12,10 @@
  */
 typedef CONDITION_VARIABLE	wt_cond_t;
 typedef CRITICAL_SECTION	wt_mutex_t;
-typedef HANDLE			wt_thread_t;
+typedef struct {
+	bool created;
+	HANDLE id;
+} wt_thread_t;
 
 /*
  * Thread callbacks need to match the return signature of _beginthreadex.
@@ -39,19 +42,9 @@ struct timespec {
  * These are POSIX types which Windows lacks
  * Eventually WiredTiger will migrate away from these types
  */
-typedef uint32_t	u_int;
+typedef unsigned int	u_int;
 typedef unsigned char	u_char;
-typedef uint64_t	u_long;
-
-/* <= VS 2013 is not C99 compat */
-#if _MSC_VER < 1900
-#define	snprintf _wt_snprintf
-
-_Check_return_opt_ int __cdecl _wt_snprintf(
-    _Out_writes_(_MaxCount) char * _DstBuf,
-    _In_ size_t _MaxCount,
-    _In_z_ _Printf_format_string_ const char * _Format, ...);
-#endif
+typedef unsigned long	u_long;
 
 /*
  * Windows does have ssize_t
@@ -60,18 +53,6 @@ _Check_return_opt_ int __cdecl _wt_snprintf(
 #ifndef HAVE_SSIZE_T
 typedef int ssize_t;
 #endif
-
-/*
- * Provide a custom version of vsnprintf that returns the
- * needed buffer length instead of -1 on truncation
- */
-#define	vsnprintf _wt_vsnprintf
-
-_Check_return_opt_ int __cdecl _wt_vsnprintf(
-    _Out_writes_(_MaxCount) char * _DstBuf,
-    _In_ size_t _MaxCount,
-    _In_z_ _Printf_format_string_ const char * _Format,
-    va_list _ArgList);
 
 /* Provide a custom version of localtime_r */
 struct tm *localtime_r(const time_t* timer, struct tm* result);

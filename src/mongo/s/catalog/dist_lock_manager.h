@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/stdx/chrono.h"
@@ -35,6 +36,7 @@
 namespace mongo {
 
 using DistLockHandle = OID;
+class OperationContext;
 class Status;
 template <typename T>
 class StatusWith;
@@ -60,8 +62,12 @@ class StatusWith;
  */
 class DistLockManager {
 public:
-    static const stdx::chrono::milliseconds kDefaultSingleLockAttemptTimeout;
-    static const stdx::chrono::milliseconds kDefaultLockRetryInterval;
+    // Default timeout which will be used if one is not passed to the lock method.
+    static const Seconds kDefaultLockTimeout;
+
+    // Timeout value, which specifies that if the lock is not available immediately, no attempt
+    // should be made to wait for it to become free.
+    static const Milliseconds kSingleLockAttemptTimeout;
 
     /**
      * RAII type for distributed lock. Not meant to be shared across multiple threads.
@@ -70,8 +76,9 @@ public:
         MONGO_DISALLOW_COPYING(ScopedDistLock);
 
     public:
-        ScopedDistLock();  // TODO: SERVER-18007
-        ScopedDistLock(DistLockHandle lockHandle, DistLockManager* lockManager);
+        ScopedDistLock(OperationContext* opCtx,
+                       DistLockHandle lockHandle,
+                       DistLockManager* lockManager);
         ~ScopedDistLock();
 
         ScopedDistLock(ScopedDistLock&& other);
@@ -83,14 +90,29 @@ public:
         Status checkStatus();
 
     private:
+        OperationContext* _opCtx;
         DistLockHandle _lockID;
         DistLockManager* _lockManager;  // Not owned here.
     };
 
     virtual ~DistLockManager() = default;
 
+    /**
+     * Performs bootstrapping for the manager. Implementation do not need to guarantee
+     * thread safety so callers should employ proper synchronization when calling this method.
+     */
     virtual void startUp() = 0;
-    virtual void shutDown() = 0;
+
+    /**
+     * Cleanup the manager's resources. Implementations do not need to guarantee thread safety
+     * so callers should employ proper synchronization when calling this method.
+     */
+    virtual void shutDown(OperationContext* opCtx) = 0;
+
+    /**
+     * Returns the process ID for this DistLockManager.
+     */
+    virtual std::string getProcessID() = 0;
 
     /**
      * Tries multiple times to lock, using the specified lock try interval, until
@@ -105,22 +127,59 @@ public:
      * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
      * Returns ErrorCodes::LockBusy if the lock is being held.
      */
-    virtual StatusWith<ScopedDistLock> lock(
-        StringData name,
-        StringData whyMessage,
-        stdx::chrono::milliseconds waitFor = kDefaultSingleLockAttemptTimeout,
-        stdx::chrono::milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
+    StatusWith<ScopedDistLock> lock(OperationContext* opCtx,
+                                    StringData name,
+                                    StringData whyMessage,
+                                    Milliseconds waitFor);
 
-protected:
+    /**
+     * Same behavior as lock(...) above, except takes a specific lock session ID "lockSessionID"
+     * instead of randomly generating one internally.
+     *
+     * This is useful for a process running on the config primary after a failover. A lock can be
+     * immediately reacquired if "lockSessionID" matches that of the lock, rather than waiting for
+     * the inactive lock to expire.
+     */
+    virtual StatusWith<DistLockHandle> lockWithSessionID(OperationContext* opCtx,
+                                                         StringData name,
+                                                         StringData whyMessage,
+                                                         const OID& lockSessionID,
+                                                         Milliseconds waitFor) = 0;
+
+    /**
+     * Specialized locking method, which only succeeds if the specified lock name is not held by
+     * anyone. Uses local write concern and does not attempt to overtake the lock or check whether
+     * the lock lease has expired.
+     */
+    virtual StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* opCtx,
+                                                                    StringData name,
+                                                                    StringData whyMessage,
+                                                                    const OID& lockSessionID) = 0;
+
     /**
      * Unlocks the given lockHandle. Will attempt to retry again later if the config
      * server is not reachable.
      */
-    virtual void unlock(const DistLockHandle& lockHandle) = 0;
+    virtual void unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) = 0;
 
+    /**
+     * Unlocks the lock specified by "lockHandle" and "name". Will attempt to retry again later if
+     * the config server is not reachable.
+     */
+    virtual void unlock(OperationContext* opCtx,
+                        const DistLockHandle& lockHandle,
+                        StringData name) = 0;
+
+    /**
+     * Makes a best-effort attempt to unlock all locks owned by the given processID.
+     */
+    virtual void unlockAll(OperationContext* opCtx, const std::string& processID) = 0;
+
+protected:
     /**
      * Checks if the lockHandle still exists in the config server.
      */
-    virtual Status checkStatus(const DistLockHandle& lockHandle) = 0;
+    virtual Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockHandle) = 0;
 };
-}
+
+}  // namespace mongo

@@ -33,6 +33,7 @@
 #include <boost/filesystem/path.hpp>
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -46,7 +47,10 @@ inline Namespace& Namespace::operator=(StringData ns) {
     // use for reads which does not fill with zeroes, and keep the zeroing behavior on writes.
     //
     memset(buf, 0, sizeof(buf));
-    uassert(10080, "ns name too long, max size is 127 bytes", ns.size() <= MaxNsLen);
+    uassert(10080,
+            str::stream() << "ns name " << ns << " (size: " << ns.size()
+                          << ") too long, max size is 127 bytes",
+            ns.size() <= MaxNsLen);
     uassert(17380, "ns name can't contain embedded '\0' byte", ns.find('\0') == std::string::npos);
     ns.copyTo(buf, true);
     return *this;

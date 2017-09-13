@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+class CollatorInterface;
 // External params for the merge sort stage.  Declared below.
 class MergeSortStageParams;
 
@@ -53,33 +54,27 @@ class MergeSortStageParams;
  * Preconditions: For each field in 'pattern' all inputs in the child must handle a
  * getFieldDotted for that field.
  */
-class MergeSortStage : public PlanStage {
+class MergeSortStage final : public PlanStage {
 public:
-    MergeSortStage(const MergeSortStageParams& params,
+    MergeSortStage(OperationContext* opCtx,
+                   const MergeSortStageParams& params,
                    WorkingSet* ws,
                    const Collection* collection);
-    virtual ~MergeSortStage();
 
     void addChild(PlanStage* child);
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState doWork(WorkingSetID* out) final;
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_SORT_MERGE;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
@@ -93,14 +88,15 @@ private:
     // The pattern that we're sorting by.
     BSONObj _pattern;
 
+    // Null if this merge sort stage orders strings according to simple binary compare. If non-null,
+    // represents the collator used to compare strings.
+    const CollatorInterface* _collator;
+
     // Are we deduplicating on RecordId?
     bool _dedup;
 
     // Which RecordIds have we seen?
     unordered_set<RecordId, RecordId::Hasher> _seen;
-
-    // Owned by us.  All the children we're reading from.
-    std::vector<PlanStage*> _children;
 
     // In order to pick the next smallest value, we need each child work(...) until it produces
     // a result.  This is the queue of children that haven't given us a result yet.
@@ -131,7 +127,8 @@ private:
     // The comparison function used in our priority queue.
     class StageWithValueComparison {
     public:
-        StageWithValueComparison(WorkingSet* ws, BSONObj pattern) : _ws(ws), _pattern(pattern) {}
+        StageWithValueComparison(WorkingSet* ws, BSONObj pattern, const CollatorInterface* collator)
+            : _ws(ws), _pattern(pattern), _collator(collator) {}
 
         // Is lhs less than rhs?  Note that priority_queue is a max heap by default so we invert
         // the return from the expected value.
@@ -140,6 +137,7 @@ private:
     private:
         WorkingSet* _ws;
         BSONObj _pattern;
+        const CollatorInterface* _collator;
     };
 
     // The min heap of the results we're returning.
@@ -149,17 +147,20 @@ private:
     std::list<StageWithValue> _mergingData;
 
     // Stats
-    CommonStats _commonStats;
     MergeSortStats _specificStats;
 };
 
 // Parameters that must be provided to a MergeSortStage
 class MergeSortStageParams {
 public:
-    MergeSortStageParams() : dedup(true) {}
+    MergeSortStageParams() : collator(NULL), dedup(true) {}
 
     // How we're sorting.
     BSONObj pattern;
+
+    // Null if this merge sort stage orders strings according to simple binary compare. If non-null,
+    // represents the collator used to compare strings.
+    const CollatorInterface* collator;
 
     // Do we deduplicate on RecordId?
     bool dedup;

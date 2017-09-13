@@ -33,38 +33,40 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/expression_path.h"
 
 namespace mongo {
 
-class ArrayMatchingMatchExpression : public MatchExpression {
+/**
+ * A path match expression which does not expand arrays at the end of the path, and which only
+ * matches if the path contains an array.
+ */
+class ArrayMatchingMatchExpression : public PathMatchExpression {
 public:
-    ArrayMatchingMatchExpression(MatchType matchType) : MatchExpression(matchType) {}
+    ArrayMatchingMatchExpression(MatchType matchType) : PathMatchExpression(matchType) {}
+
     virtual ~ArrayMatchingMatchExpression() {}
 
-    Status initPath(StringData path);
-
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details) const;
-
     /**
-     * @param e - has to be an array.  calls matchesArray with e as an array
+     * Returns whether or not the nested array, represented as the object 'anArray', matches.
+     *
+     * 'anArray' must be the nested array at this expression's path.
      */
-    virtual bool matchesSingleElement(const BSONElement& e) const;
-
     virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const = 0;
 
-    bool equivalent(const MatchExpression* other) const;
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    const StringData path() const {
-        return _path;
+    bool equivalent(const MatchExpression* other) const override;
+
+    bool shouldExpandLeafArray() const final {
+        return false;
     }
 
-private:
-    StringData _path;
-    ElementPath _elementPath;
+    MatchCategory getCategory() const final {
+        return MatchCategory::kArrayMatching;
+    }
 };
 
 class ElemMatchObjectMatchExpression : public ArrayMatchingMatchExpression {
@@ -74,18 +76,23 @@ public:
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
 
-    virtual ElemMatchObjectMatchExpression* shallowClone() const {
-        ElemMatchObjectMatchExpression* e = new ElemMatchObjectMatchExpression();
-        e->init(path(), _sub->shallowClone());
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ElemMatchObjectMatchExpression> e =
+            stdx::make_unique<ElemMatchObjectMatchExpression>();
+        e->init(path(), _sub->shallowClone().release()).transitional_ignore();
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
+
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
+    }
 
     virtual size_t numChildren() const {
         return 1;
@@ -93,6 +100,14 @@ public:
 
     virtual MatchExpression* getChild(size_t i) const {
         return _sub.get();
+    }
+
+    std::unique_ptr<MatchExpression> releaseChild() {
+        return std::move(_sub);
+    }
+
+    void resetChild(std::unique_ptr<MatchExpression> newChild) {
+        _sub = std::move(newChild);
     }
 
 private:
@@ -110,21 +125,22 @@ public:
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
 
-    virtual ElemMatchValueMatchExpression* shallowClone() const {
-        ElemMatchValueMatchExpression* e = new ElemMatchValueMatchExpression();
-        e->init(path());
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<ElemMatchValueMatchExpression> e =
+            stdx::make_unique<ElemMatchValueMatchExpression>();
+        e->init(path()).transitional_ignore();
         for (size_t i = 0; i < _subs.size(); ++i) {
-            e->add(_subs[i]->shallowClone());
+            e->add(_subs[i]->shallowClone().release());
         }
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
     }
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual std::vector<MatchExpression*>* getChildVector() {
         return &_subs;
@@ -149,20 +165,32 @@ public:
     SizeMatchExpression() : ArrayMatchingMatchExpression(SIZE) {}
     Status init(StringData path, int size);
 
-    virtual SizeMatchExpression* shallowClone() const {
-        SizeMatchExpression* e = new SizeMatchExpression();
-        e->init(path(), _size);
+    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+        std::unique_ptr<SizeMatchExpression> e = stdx::make_unique<SizeMatchExpression>();
+        e->init(path(), _size).transitional_ignore();
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return e;
+        return std::move(e);
+    }
+
+    size_t numChildren() const override {
+        return 0;
+    }
+
+    MatchExpression* getChild(size_t i) const override {
+        return nullptr;
+    }
+
+    std::vector<MatchExpression*>* getChildVector() final {
+        return nullptr;
     }
 
     virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 

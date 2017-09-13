@@ -31,7 +31,6 @@
 #include "mongo/db/keypattern.h"
 
 #include "mongo/db/index_names.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -55,6 +54,35 @@ bool KeyPattern::isHashedKeyPattern(const BSONObj& pattern) {
     return IndexNames::HASHED == IndexNames::findPluginName(pattern);
 }
 
+StringBuilder& operator<<(StringBuilder& sb, const KeyPattern& keyPattern) {
+    // Rather than return BSONObj::toString() we construct a keyPattern string manually. This allows
+    // us to avoid the cost of writing numeric direction to the str::stream which will then undergo
+    // expensive number to string conversion.
+    sb << "{ ";
+
+    bool first = true;
+    for (auto&& elem : keyPattern._pattern) {
+        if (first) {
+            first = false;
+        } else {
+            sb << ", ";
+        }
+
+        if (mongo::String == elem.type()) {
+            sb << elem;
+        } else if (elem.number() >= 0) {
+            // The canonical check as to whether a key pattern element is "ascending" or
+            // "descending" is (elem.number() >= 0). This is defined by the Ordering class.
+            sb << elem.fieldNameStringData() << ": 1";
+        } else {
+            sb << elem.fieldNameStringData() << ": -1";
+        }
+    }
+
+    sb << " }";
+    return sb;
+}
+
 BSONObj KeyPattern::extendRangeBound(const BSONObj& bound, bool makeUpperInclusive) const {
     BSONObjBuilder newBound(bound.objsize());
 
@@ -69,7 +97,8 @@ BSONObj KeyPattern::extendRangeBound(const BSONObj& bound, bool makeUpperInclusi
         BSONElement patElt = pat.next();
         massert(16634,
                 str::stream() << "field names of bound " << bound
-                              << " do not match those of keyPattern " << _pattern,
+                              << " do not match those of keyPattern "
+                              << _pattern,
                 str::equals(srcElt.fieldName(), patElt.fieldName()));
         newBound.append(srcElt);
     }

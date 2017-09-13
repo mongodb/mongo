@@ -28,10 +28,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/matcher/path.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/path_internal.h"
-#include "mongo/db/matcher/path.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 
@@ -50,14 +50,10 @@ void ElementIterator::Context::reset() {
     _element = BSONElement();
 }
 
-void ElementIterator::Context::reset(BSONElement element,
-                                     BSONElement arrayOffset,
-                                     bool outerArray) {
+void ElementIterator::Context::reset(BSONElement element, BSONElement arrayOffset) {
     _element = element;
     _arrayOffset = arrayOffset;
-    _outerArray = outerArray;
 }
-
 
 // ------
 
@@ -72,12 +68,12 @@ bool SimpleArrayElementIterator::more() {
 ElementIterator::Context SimpleArrayElementIterator::next() {
     if (_iterator.more()) {
         Context e;
-        e.reset(_iterator.next(), BSONElement(), false);
+        e.reset(_iterator.next(), BSONElement());
         return e;
     }
     _returnArrayLast = false;
     Context e;
-    e.reset(_theArray, BSONElement(), true);
+    e.reset(_theArray, BSONElement());
     return e;
 }
 
@@ -87,17 +83,28 @@ BSONElementIterator::BSONElementIterator() {
     _path = NULL;
 }
 
-BSONElementIterator::BSONElementIterator(const ElementPath* path, const BSONObj& context)
-    : _path(path), _context(context) {
-    _state = BEGIN;
-    // log() << "path: " << path.fieldRef().dottedField() << " context: " << context << endl;
+BSONElementIterator::BSONElementIterator(const ElementPath* path,
+                                         size_t suffixIndex,
+                                         BSONElement elementToIterate)
+    : _path(path), _state(BEGIN) {
+    _setTraversalStart(suffixIndex, elementToIterate);
+}
+
+BSONElementIterator::BSONElementIterator(const ElementPath* path, const BSONObj& objectToIterate)
+    : _path(path), _state(BEGIN) {
+    _traversalStart =
+        getFieldDottedOrArray(objectToIterate, _path->fieldRef(), &_traversalStartIndex);
 }
 
 BSONElementIterator::~BSONElementIterator() {}
 
-void BSONElementIterator::reset(const ElementPath* path, const BSONObj& context) {
+void BSONElementIterator::reset(const ElementPath* path,
+                                size_t suffixIndex,
+                                BSONElement elementToIterate) {
     _path = path;
-    _context = context;
+    _traversalStartIndex = 0;
+    _traversalStart = BSONElement();
+    _setTraversalStart(suffixIndex, elementToIterate);
     _state = BEGIN;
     _next.reset();
 
@@ -105,6 +112,32 @@ void BSONElementIterator::reset(const ElementPath* path, const BSONObj& context)
     _subCursorPath.reset();
 }
 
+void BSONElementIterator::reset(const ElementPath* path, const BSONObj& objectToIterate) {
+    _path = path;
+    _traversalStartIndex = 0;
+    _traversalStart =
+        getFieldDottedOrArray(objectToIterate, _path->fieldRef(), &_traversalStartIndex);
+    _state = BEGIN;
+    _next.reset();
+
+    _subCursor.reset();
+    _subCursorPath.reset();
+}
+
+void BSONElementIterator::_setTraversalStart(size_t suffixIndex, BSONElement elementToIterate) {
+    invariant(_path->fieldRef().numParts() >= suffixIndex);
+
+    if (suffixIndex == _path->fieldRef().numParts()) {
+        _traversalStart = elementToIterate;
+    } else {
+        if (elementToIterate.type() == BSONType::Object) {
+            _traversalStart = getFieldDottedOrArray(
+                elementToIterate.Obj(), _path->fieldRef(), &_traversalStartIndex, suffixIndex);
+        } else if (elementToIterate.type() == BSONType::Array) {
+            _traversalStart = elementToIterate;
+        }
+    }
+}
 
 void BSONElementIterator::ArrayIterationState::reset(const FieldRef& ref, int start) {
     restOfPath = ref.dottedField(start).toString();
@@ -153,15 +186,18 @@ bool BSONElementIterator::subCursorHasMore() {
         if (_arrayIterationState.isArrayOffsetMatch(_arrayIterationState._current.fieldName())) {
             if (_arrayIterationState.nextEntireRest()) {
                 // Our path terminates at the array offset.  _next should point at the current
-                // array element.
-                _next.reset(_arrayIterationState._current, _arrayIterationState._current, true);
+                // array element. _next._arrayOffset should be EOO, since this is not an implicit
+                // array traversal.
+                _next.reset(_arrayIterationState._current, BSONElement());
                 _arrayIterationState._current = BSONElement();
                 return true;
             }
 
             _subCursorPath.reset(new ElementPath());
-            _subCursorPath->init(_arrayIterationState.restOfPath.substr(
-                _arrayIterationState.nextPieceOfPath.size() + 1));
+            _subCursorPath
+                ->init(_arrayIterationState.restOfPath.substr(
+                    _arrayIterationState.nextPieceOfPath.size() + 1))
+                .transitional_ignore();
             _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
 
             // If we're here, we must be able to traverse nonleaf arrays.
@@ -170,6 +206,10 @@ bool BSONElementIterator::subCursorHasMore() {
 
             _subCursor.reset(
                 new BSONElementIterator(_subCursorPath.get(), _arrayIterationState._current.Obj()));
+
+            // Set _arrayIterationState._current to EOO. This is not an implicit array traversal, so
+            // we should not override the array offset of the subcursor with the current array
+            // offset.
             _arrayIterationState._current = BSONElement();
         }
     }
@@ -191,18 +231,15 @@ bool BSONElementIterator::more() {
     }
 
     if (_state == BEGIN) {
-        size_t idxPath = 0;
-        BSONElement e = getFieldDottedOrArray(_context, _path->fieldRef(), &idxPath);
-
-        if (e.type() != Array) {
-            _next.reset(e, BSONElement(), false);
+        if (_traversalStart.type() != Array) {
+            _next.reset(_traversalStart, BSONElement());
             _state = DONE;
             return true;
         }
 
         // It's an array.
 
-        _arrayIterationState.reset(_path->fieldRef(), idxPath + 1);
+        _arrayIterationState.reset(_path->fieldRef(), _traversalStartIndex + 1);
 
         if (_arrayIterationState.hasMore && !_path->shouldTraverseNonleafArrays()) {
             // Don't allow traversing the array.
@@ -210,12 +247,12 @@ bool BSONElementIterator::more() {
             return false;
         } else if (!_arrayIterationState.hasMore && !_path->shouldTraverseLeafArray()) {
             // Return the leaf array.
-            _next.reset(e, BSONElement(), true);
+            _next.reset(_traversalStart, BSONElement());
             _state = DONE;
             return true;
         }
 
-        _arrayIterationState.startIterator(e);
+        _arrayIterationState.startIterator(_traversalStart);
         _state = IN_ARRAY;
 
         invariant(_next.element().eoo());
@@ -229,7 +266,7 @@ bool BSONElementIterator::more() {
             if (!_arrayIterationState.hasMore) {
                 // Our path terminates at this array.  _next should point at the current array
                 // element.
-                _next.reset(eltInArray, eltInArray, false);
+                _next.reset(eltInArray, eltInArray);
                 return true;
             }
 
@@ -240,7 +277,7 @@ bool BSONElementIterator::more() {
                 // The current array element is a subdocument.  See if the subdocument generates
                 // any elements matching the remaining subpath.
                 _subCursorPath.reset(new ElementPath());
-                _subCursorPath->init(_arrayIterationState.restOfPath);
+                _subCursorPath->init(_arrayIterationState.restOfPath).transitional_ignore();
                 _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
 
                 _subCursor.reset(new BSONElementIterator(_subCursorPath.get(), eltInArray.Obj()));
@@ -255,8 +292,9 @@ bool BSONElementIterator::more() {
 
                 if (_arrayIterationState.nextEntireRest()) {
                     // Our path terminates at the array offset.  _next should point at the
-                    // current array element.
-                    _next.reset(eltInArray, eltInArray, false);
+                    // current array element. _next._arrayOffset should be EOO, since this is not an
+                    // implicit array traversal.
+                    _next.reset(eltInArray, BSONElement());
                     return true;
                 }
 
@@ -265,8 +303,10 @@ bool BSONElementIterator::more() {
                     // The current array element is itself an array.  See if the nested array
                     // has any elements matching the remainihng.
                     _subCursorPath.reset(new ElementPath());
-                    _subCursorPath->init(_arrayIterationState.restOfPath.substr(
-                        _arrayIterationState.nextPieceOfPath.size() + 1));
+                    _subCursorPath
+                        ->init(_arrayIterationState.restOfPath.substr(
+                            _arrayIterationState.nextPieceOfPath.size() + 1))
+                        .transitional_ignore();
                     _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
                     BSONElementIterator* real = new BSONElementIterator(
                         _subCursorPath.get(), _arrayIterationState._current.Obj());
@@ -274,7 +314,12 @@ bool BSONElementIterator::more() {
                     real->_arrayIterationState.reset(_subCursorPath->fieldRef(), 0);
                     real->_arrayIterationState.startIterator(eltInArray);
                     real->_state = IN_ARRAY;
+
+                    // Set _arrayIterationState._current to EOO. This is not an implicit array
+                    // traversal, so we should not override the array offset of the subcursor with
+                    // the current array offset.
                     _arrayIterationState._current = BSONElement();
+
                     if (subCursorHasMore()) {
                         return true;
                     }
@@ -286,7 +331,7 @@ bool BSONElementIterator::more() {
             return false;
         }
 
-        _next.reset(_arrayIterationState._theArray, BSONElement(), true);
+        _next.reset(_arrayIterationState._theArray, BSONElement());
         _state = DONE;
         return true;
     }

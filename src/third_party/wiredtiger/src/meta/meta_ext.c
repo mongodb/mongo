@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -88,6 +88,7 @@ __wt_ext_metadata_update(WT_EXTENSION_API *wt_api,
 int
 __wt_metadata_get_ckptlist(
     WT_SESSION *session, const char *name, WT_CKPT **ckptbasep)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	return (__wt_meta_ckptlist_get(
 	    (WT_SESSION_IMPL *)session, name, ckptbasep));
@@ -99,6 +100,7 @@ __wt_metadata_get_ckptlist(
  */
 void
 __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	__wt_meta_ckptlist_free((WT_SESSION_IMPL *)session, ckptbase);
+	__wt_meta_ckptlist_free((WT_SESSION_IMPL *)session, &ckptbase);
 }

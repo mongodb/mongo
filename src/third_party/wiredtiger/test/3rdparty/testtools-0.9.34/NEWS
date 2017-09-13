@@ -1,0 +1,1281 @@
+testtools NEWS
+++++++++++++++
+
+Changes and improvements to testtools_, grouped by release.
+
+
+NEXT
+~~~~
+
+0.9.34
+~~~~~~
+
+Improvements
+------------
+
+* Added ability for ``testtools.TestCase`` instances to force a test to
+  fail, even if no assertions failed. (Thomi Richards)
+
+* Added ``testtools.content.StacktraceContent``, a content object that
+  automatically creates a ``StackLinesContent`` object containing the current
+  stack trace. (Thomi Richards)
+
+* ``AnyMatch`` is now exported properly in ``testtools.matchers``.
+  (Robert Collins, Rob Kennedy, github #44)
+
+* In Python 3.3, if there are duplicate test ids, tests.sort() will
+  fail and raise TypeError. Detect the duplicate test ids firstly in
+  sorted_tests() to ensure that all test ids are unique.
+  (Kui Shi, #1243922)
+
+* ``json_content`` is now in the ``__all__`` attribute for
+  ``testtools.content``. (Robert Collins)
+
+* Network tests now bind to 127.0.0.1 to avoid (even temporary) network
+  visible ports. (Benedikt Morbach, github #46)
+
+* Test listing now explicitly indicates by printing 'Failed to import' and
+  exiting (2) when an import has failed rather than only signalling through the
+  test name. (Robert Collins, #1245672)
+
+* ``test_compat.TestDetectEncoding.test_bom`` now works on Python 3.3 - the
+  corner case with euc_jp is no longer permitted in Python 3.3 so we can
+  skip it. (Martin [gz], #1251962)
+
+0.9.33
+~~~~~~
+
+Improvements
+------------
+
+* Added ``addDetailuniqueName`` method to ``testtools.TestCase`` class.
+  (Thomi Richards)
+
+* Removed some unused code from ``testtools.content.TracebackContent``.
+  (Thomi Richards)
+
+* Added ``testtools.StackLinesContent``: a content object for displaying
+  pre-processed stack lines. (Thomi Richards)
+
+* ``StreamSummary`` was calculating testsRun incorrectly: ``exists`` status
+  tests were counted as run tests, but they are not.
+  (Robert Collins, #1203728)
+
+0.9.32
+~~~~~~
+
+Regular maintenance release.  Special thanks to new contributor, Xiao Hanyu!
+
+Changes
+-------
+
+ * ``testttols.compat._format_exc_info`` has been refactored into several
+   smaller functions. (Thomi Richards)
+
+Improvements
+------------
+
+* Stacktrace filtering no longer hides unittest frames that are surrounded by
+  user frames. We will reenable this when we figure out a better algorithm for
+  retaining meaning. (Robert Collins, #1188420)
+
+* The compatibility code for skipped tests with unittest2 was broken.
+  (Robert Collins, #1190951)
+
+* Various documentation improvements (Clint Byrum, Xiao Hanyu).
+
+0.9.31
+~~~~~~
+
+Improvements
+------------
+
+* ``ExpectedException`` now accepts a msg parameter for describing an error,
+  much the same as assertEquals etc. (Robert Collins)
+
+0.9.30
+~~~~~~
+
+A new sort of TestResult, the StreamResult has been added, as a prototype for
+a revised standard library test result API.  Expect this API to change.
+Although we will try to preserve compatibility for early adopters, it is
+experimental and we might need to break it if it turns out to be unsuitable.
+
+Improvements
+------------
+* ``assertRaises`` works properly for exception classes that have custom 
+  metaclasses
+
+* ``ConcurrentTestSuite`` was silently eating exceptions that propagate from
+  the test.run(result) method call. Ignoring them is fine in a normal test
+  runner, but when they happen in a different thread, the thread that called
+  suite.run() is not in the stack anymore, and the exceptions are lost. We now
+  create a synthetic test recording any such exception.
+  (Robert Collins, #1130429)
+
+* Fixed SyntaxError raised in ``_compat2x.py`` when installing via Python 3.
+  (Will Bond, #941958)
+
+* New class ``StreamResult`` which defines the API for the new result type.
+  (Robert Collins)
+
+* New support class ``ConcurrentStreamTestSuite`` for convenient construction
+  and utilisation of ``StreamToQueue`` objects. (Robert Collins)
+
+* New support class ``CopyStreamResult`` which forwards events onto multiple
+  ``StreamResult`` objects (each of which receives all the events).
+  (Robert Collins)
+
+* New support class ``StreamSummary`` which summarises a ``StreamResult``
+  stream compatibly with ``TestResult`` code. (Robert Collins)
+
+* New support class ``StreamTagger`` which adds or removes tags from
+  ``StreamResult`` events. (RobertCollins)
+
+* New support class ``StreamToDict`` which converts a ``StreamResult`` to a
+  series of dicts describing a test. Useful for writing trivial stream
+  analysers. (Robert Collins)
+
+* New support class ``TestControl`` which permits cancelling an in-progress
+  run. (Robert Collins)
+
+* New support class ``StreamFailFast`` which calls a ``TestControl`` instance
+  to abort the test run when a failure is detected. (Robert Collins)
+
+* New support class ``ExtendedToStreamDecorator`` which translates both regular
+  unittest TestResult API calls and the ExtendedTestResult API which testtools
+  has supported into the StreamResult API. ExtendedToStreamDecorator also
+  forwards calls made in the StreamResult API, permitting it to be used
+  anywhere a StreamResult is used. Key TestResult query methods like
+  wasSuccessful and shouldStop are synchronised with the StreamResult API
+  calls, but the detailed statistics like the list of errors are not - a
+  separate consumer will be created to support that.
+  (Robert Collins)
+
+* New support class ``StreamToExtendedDecorator`` which translates
+  ``StreamResult`` API calls into ``ExtendedTestResult`` (or any older
+  ``TestResult``) calls. This permits using un-migrated result objects with
+  new runners / tests. (Robert Collins)
+
+* New support class ``StreamToQueue`` for sending messages to one
+  ``StreamResult`` from multiple threads. (Robert Collins)
+
+* New support class ``TimestampingStreamResult`` which adds a timestamp to
+  events with no timestamp. (Robert Collins)
+
+* New ``TestCase`` decorator ``DecorateTestCaseResult`` that adapts the
+  ``TestResult`` or ``StreamResult`` a case will be run with, for ensuring that
+  a particular result object is used even if the runner running the test doesn't
+  know to use it. (Robert Collins)
+
+* New test support class ``testtools.testresult.doubles.StreamResult``, which
+  captures all the StreamResult events. (Robert Collins)
+
+* ``PlaceHolder`` can now hold tags, and applies them before, and removes them
+  after, the test. (Robert Collins)
+
+* ``PlaceHolder`` can now hold timestamps, and applies them before the test and
+  then before the outcome. (Robert Collins)
+
+* ``StreamResultRouter`` added. This is useful for demultiplexing - e.g. for
+  partitioning analysis of events or sending feedback encapsulated in
+  StreamResult events back to their source. (Robert Collins)
+
+* ``testtools.run.TestProgram`` now supports the ``TestRunner`` taking over
+  responsibility for formatting the output of ``--list-tests``.
+  (Robert Collins)
+
+* The error message for setUp and tearDown upcall errors was broken on Python
+  3.4. (Monty Taylor, Robert Collins, #1140688)
+
+* The repr of object() on pypy includes the object id, which was breaking a
+  test that accidentally depended on the CPython repr for object().
+  (Jonathan Lange)
+
+0.9.29
+~~~~~~
+
+A simple bug fix, and better error messages when you don't up-call.
+
+Changes
+-------
+
+* ``testtools.content_type.ContentType`` incorrectly used ',' rather than ';'
+  to separate parameters. (Robert Collins)
+
+Improvements
+------------
+
+* ``testtools.compat.unicode_output_stream`` was wrapping a stream encoder
+  around ``io.StringIO`` and ``io.TextIOWrapper`` objects, which was incorrect.
+  (Robert Collins)
+
+* Report the name of the source file for setUp and tearDown upcall errors.
+  (Monty Taylor)
+
+0.9.28
+~~~~~~
+
+Testtools has moved VCS - https://github.com/testing-cabal/testtools/ is
+the new home. Bug tracking is still on Launchpad, and releases are on Pypi.
+
+We made this change to take advantage of the richer ecosystem of tools around
+Git, and to lower the barrier for new contributors.
+
+Improvements
+------------
+
+* New ``testtools.testcase.attr`` and ``testtools.testcase.WithAttributes``
+  helpers allow marking up test case methods with simple labels. This permits
+  filtering tests with more granularity than organising them into modules and
+  test classes. (Robert Collins)
+
+0.9.27
+~~~~~~
+
+Improvements
+------------
+
+* New matcher ``HasLength`` for matching the length of a collection.
+  (Robert Collins)
+
+* New matcher ``MatchesPredicateWithParams`` make it still easier to create
+  ad hoc matchers. (Robert Collins)
+
+* We have a simpler release process in future - see doc/hacking.rst.
+  (Robert Collins)
+
+0.9.26
+~~~~~~
+
+Brown paper bag fix: failed to document the need for setup to be able to use
+extras. Compounded by pip not supporting setup_requires.
+
+Changes
+-------
+
+* setup.py now can generate egg_info even if extras is not available.
+  Also lists extras in setup_requires for easy_install.
+  (Robert Collins, #1102464)
+
+0.9.25
+~~~~~~
+
+Changes
+-------
+
+* ``python -m testtools.run --load-list`` will now preserve any custom suites
+  (such as ``testtools.FixtureSuite`` or ``testresources.OptimisingTestSuite``)
+  rather than flattening them.
+  (Robert Collins, #827175)
+
+* Testtools now depends on extras, a small library split out from it to contain
+  generally useful non-testing facilities. Since extras has been around for a
+  couple of testtools releases now, we're making this into a hard dependency of
+  testtools. (Robert Collins)
+
+* Testtools now uses setuptools rather than distutils so that we can document
+  the extras dependency. (Robert Collins)
+
+Improvements
+------------
+
+* Testtools will no longer override test code registered details called
+  'traceback' when reporting caught exceptions from test code.
+  (Robert Collins, #812793)
+
+0.9.24
+~~~~~~
+
+Changes
+-------
+
+* ``testtools.run discover`` will now sort the tests it discovered. This is a 
+  workaround for http://bugs.python.org/issue16709. Non-standard test suites
+  are preserved, and their ``sort_tests()`` method called (if they have such an
+  attribute). ``testtools.testsuite.sorted_tests(suite, True)`` can be used by
+  such suites to do a local sort. (Robert Collins, #1091512)
+
+* ``ThreadsafeForwardingResult`` now defines a stub ``progress`` method, which
+  fixes ``testr run`` of streams containing progress markers (by discarding the 
+  progress data). (Robert Collins, #1019165)
+
+0.9.23
+~~~~~~
+
+Changes
+-------
+
+* ``run.TestToolsTestRunner`` now accepts the verbosity, buffer and failfast
+  arguments the upstream python TestProgram code wants to give it, making it
+  possible to support them in a compatible fashion. (Robert Collins)
+
+Improvements
+------------
+
+* ``testtools.run`` now supports the ``-f`` or ``--failfast`` parameter.
+  Previously it was advertised in the help but ignored.
+  (Robert Collins, #1090582)
+
+* ``AnyMatch`` added, a new matcher that matches when any item in a collection
+  matches the given matcher.  (Jonathan Lange)
+
+* Spelling corrections to documentation.  (Vincent Ladeuil)
+
+* ``TestProgram`` now has a sane default for its ``testRunner`` argument.
+  (Vincent Ladeuil)
+
+* The test suite passes on Python 3 again. (Robert Collins)
+
+0.9.22
+~~~~~~
+
+Improvements
+------------
+
+* ``content_from_file`` and ``content_from_stream`` now accept seek_offset and
+  seek_whence parameters allowing them to be used to grab less than the full
+  stream, or to be used with StringIO streams. (Robert Collins, #1088693)
+
+0.9.21
+~~~~~~
+
+Improvements
+------------
+
+* ``DirContains`` correctly exposed, after being accidentally hidden in the
+  great matcher re-organization of 0.9.17.  (Jonathan Lange)
+
+
+0.9.20
+~~~~~~
+
+Three new matchers that'll rock your world.
+
+Improvements
+------------
+
+* New, powerful matchers that match items in a dictionary:
+
+  - ``MatchesDict``, match every key in a dictionary with a key in a
+    dictionary of matchers.  For when the set of expected keys is equal to the
+    set of observed keys.
+
+  - ``ContainsDict``, every key in a dictionary of matchers must be
+    found in a dictionary, and the values for those keys must match.  For when
+    the set of expected keys is a subset of the set of observed keys.
+
+  - ``ContainedByDict``, every key in a dictionary must be found in
+    a dictionary of matchers.  For when the set of expected keys is a superset
+    of the set of observed keys.
+
+  The names are a little confusing, sorry.  We're still trying to figure out
+  how to present the concept in the simplest way possible.
+
+
+0.9.19
+~~~~~~
+
+How embarrassing!  Three releases in two days.
+
+We've worked out the kinks and have confirmation from our downstreams that
+this is all good.  Should be the last release for a little while.  Please
+ignore 0.9.18 and 0.9.17.
+
+Improvements
+------------
+
+* Include the matcher tests in the release, allowing the tests to run and
+  pass from the release tarball.  (Jonathan Lange)
+
+* Fix cosmetic test failures in Python 3.3, introduced during release 0.9.17.
+  (Jonathan Lange)
+
+
+0.9.18
+~~~~~~
+
+Due to an oversight, release 0.9.18 did not contain the new
+``testtools.matchers`` package and was thus completely broken.  This release
+corrects that, returning us all to normality.
+
+0.9.17
+~~~~~~
+
+This release brings better discover support and Python3.x improvements. There
+are still some test failures on Python3.3 but they are cosmetic - the library
+is as usable there as on any other Python 3 release.
+
+Changes
+-------
+
+* The ``testtools.matchers`` package has been split up.  No change to the
+  public interface.  (Jonathan Lange)
+
+Improvements
+------------
+
+* ``python -m testtools.run discover . --list`` now works. (Robert Collins)
+
+* Correctly handling of bytes vs text in JSON content type. (Martin [gz])
+
+
+0.9.16
+~~~~~~
+
+Some new matchers and a new content helper for JSON content.
+
+This is the first release of testtools to drop support for Python 2.4 and 2.5.
+If you need support for either of those versions, please use testtools 0.9.15.
+
+Improvements
+------------
+
+* New content helper, ``json_content`` (Jonathan Lange)
+
+* New matchers:
+
+  * ``ContainsAll`` for asserting one thing is a subset of another
+    (Raphaël Badin)
+
+  * ``SameMembers`` for asserting two iterators have the same members.
+    (Jonathan Lange)
+
+* Reraising of exceptions in Python 3 is more reliable. (Martin [gz])
+
+
+0.9.15
+~~~~~~
+
+This is the last release to support Python2.4 and 2.5. It brings in a slew of
+improvements to test tagging and concurrency, making running large test suites
+with partitioned workers more reliable and easier to reproduce exact test
+ordering in a given worker. See our sister project ``testrepository`` for a
+test runner that uses these features.
+
+Changes
+-------
+
+* ``PlaceHolder`` and ``ErrorHolder`` now support being given result details.
+  (Robert Collins)
+
+* ``ErrorHolder`` is now just a function - all the logic is in ``PlaceHolder``.
+  (Robert Collins)
+
+* ``TestResult`` and all other ``TestResult``-like objects in testtools
+  distinguish between global tags and test-local tags, as per the subunit
+  specification.  (Jonathan Lange)
+
+* This is the **last** release of testtools that supports Python 2.4 or 2.5.
+  These releases are no longer supported by the Python community and do not
+  receive security updates. If this affects you, you will need to either
+  stay on this release or perform your own backports.
+  (Jonathan Lange, Robert Collins)
+
+* ``ThreadsafeForwardingResult`` now forwards global tags as test-local tags,
+  making reasoning about the correctness of the multiplexed stream simpler.
+  This preserves the semantic value (what tags apply to a given test) while
+  consuming less stream size (as no negative-tag statement is needed).
+  (Robert Collins, Gary Poster, #986434)
+
+Improvements
+------------
+
+* API documentation corrections. (Raphaël Badin)
+
+* ``ConcurrentTestSuite`` now takes an optional ``wrap_result`` parameter
+  that can be used to wrap the ``ThreadsafeForwardingResults`` created by
+  the suite.  (Jonathan Lange)
+
+* ``Tagger`` added.  It's a new ``TestResult`` that tags all tests sent to
+  it with a particular set of tags.  (Jonathan Lange)
+
+* ``testresultdecorator`` brought over from subunit.  (Jonathan Lange)
+
+* All ``TestResult`` wrappers now correctly forward ``current_tags`` from
+  their wrapped results, meaning that ``current_tags`` can always be relied
+  upon to return the currently active tags on a test result.
+
+* ``TestByTestResult``, a ``TestResult`` that calls a method once per test,
+  added.  (Jonathan Lange)
+
+* ``ThreadsafeForwardingResult`` correctly forwards ``tags()`` calls where
+  only one of ``new_tags`` or ``gone_tags`` are specified.
+  (Jonathan Lange, #980263)
+
+* ``ThreadsafeForwardingResult`` no longer leaks local tags from one test
+  into all future tests run.  (Jonathan Lange, #985613)
+
+* ``ThreadsafeForwardingResult`` has many, many more tests.  (Jonathan Lange)
+
+
+0.9.14
+~~~~~~
+
+Our sister project, `subunit <https://launchpad.net/subunit>`_, was using a
+private API that was deleted in the 0.9.13 release.  This release restores
+that API in order to smooth out the upgrade path.
+
+If you don't use subunit, then this release won't matter very much to you.
+
+
+0.9.13
+~~~~~~
+
+Plenty of new matchers and quite a few critical bug fixes (especially to do
+with stack traces from failed assertions).  A net win for all.
+
+Changes
+-------
+
+* ``MatchesAll`` now takes an ``first_only`` keyword argument that changes how
+  mismatches are displayed.  If you were previously passing matchers to
+  ``MatchesAll`` with keyword arguments, then this change might affect your
+  test results.  (Jonathan Lange)
+
+Improvements
+------------
+
+* Actually hide all of the testtools stack for assertion failures. The
+  previous release promised clean stack, but now we actually provide it.
+  (Jonathan Lange, #854769)
+
+* ``assertRaises`` now includes the ``repr`` of the callable that failed to raise
+  properly. (Jonathan Lange, #881052)
+
+* Asynchronous tests no longer hang when run with trial.
+  (Jonathan Lange, #926189)
+
+* ``Content`` objects now have an ``as_text`` method to convert their contents
+  to Unicode text.  (Jonathan Lange)
+
+* Failed equality assertions now line up. (Jonathan Lange, #879339)
+
+* ``FullStackRunTest`` no longer aborts the test run if a test raises an
+  error.  (Jonathan Lange)
+
+* ``MatchesAll`` and ``MatchesListwise`` both take a ``first_only`` keyword
+  argument.  If True, they will report only on the first mismatch they find,
+  and not continue looking for other possible mismatches.
+  (Jonathan Lange)
+
+* New helper, ``Nullary`` that turns callables with arguments into ones that
+  don't take arguments.  (Jonathan Lange)
+
+* New matchers:
+
+  * ``DirContains`` matches the contents of a directory.
+    (Jonathan Lange, James Westby)
+
+  * ``DirExists`` matches if a directory exists.
+    (Jonathan Lange, James Westby)
+
+  * ``FileContains`` matches the contents of a file.
+    (Jonathan Lange, James Westby)
+
+  * ``FileExists`` matches if a file exists.
+    (Jonathan Lange, James Westby)
+
+  * ``HasPermissions`` matches the permissions of a file.  (Jonathan Lange)
+
+  * ``MatchesPredicate`` matches if a predicate is true.  (Jonathan Lange)
+
+  * ``PathExists`` matches if a path exists.  (Jonathan Lange, James Westby)
+
+  * ``SamePath`` matches if two paths are the same.  (Jonathan Lange)
+
+  * ``TarballContains`` matches the contents of a tarball.  (Jonathan Lange)
+
+* ``MultiTestResult`` supports the ``tags`` method.
+  (Graham Binns, Francesco Banconi, #914279)
+
+* ``ThreadsafeForwardingResult`` supports the ``tags`` method.
+  (Graham Binns, Francesco Banconi, #914279)
+
+* ``ThreadsafeForwardingResult`` no longer includes semaphore acquisition time
+  in the test duration (for implicitly timed test runs).
+  (Robert Collins, #914362)
+
+0.9.12
+~~~~~~
+
+This is a very big release.  We've made huge improvements on three fronts:
+ 1. Test failures are way nicer and easier to read
+ 2. Matchers and ``assertThat`` are much more convenient to use
+ 3. Correct handling of extended unicode characters
+
+We've trimmed off the fat from the stack trace you get when tests fail, we've
+cut out the bits of error messages that just didn't help, we've made it easier
+to annotate mismatch failures, to compare complex objects and to match raised
+exceptions.
+
+Testing code was never this fun.
+
+Changes
+-------
+
+* ``AfterPreproccessing`` renamed to ``AfterPreprocessing``, which is a more
+  correct spelling.  Old name preserved for backwards compatibility, but is
+  now deprecated.  Please stop using it.
+  (Jonathan Lange, #813460)
+
+* ``assertThat`` raises ``MismatchError`` instead of
+  ``TestCase.failureException``.  ``MismatchError`` is a subclass of
+  ``AssertionError``, so in most cases this change will not matter. However,
+  if ``self.failureException`` has been set to a non-default value, then
+  mismatches will become test errors rather than test failures.
+
+* ``gather_details`` takes two dicts, rather than two detailed objects.
+  (Jonathan Lange, #801027)
+
+* ``MatchesRegex`` mismatch now says "<value> does not match /<regex>/" rather
+  than "<regex> did not match <value>". The regular expression contains fewer
+  backslashes too. (Jonathan Lange, #818079)
+
+* Tests that run with ``AsynchronousDeferredRunTest`` now have the ``reactor``
+  attribute set to the running reactor. (Jonathan Lange, #720749)
+
+Improvements
+------------
+
+* All public matchers are now in ``testtools.matchers.__all__``.
+  (Jonathan Lange, #784859)
+
+* ``assertThat`` can actually display mismatches and matchers that contain
+  extended unicode characters. (Jonathan Lange, Martin [gz], #804127)
+
+* ``assertThat`` output is much less verbose, displaying only what the mismatch
+  tells us to display. Old-style verbose output can be had by passing
+  ``verbose=True`` to assertThat. (Jonathan Lange, #675323, #593190)
+
+* ``assertThat`` accepts a message which will be used to annotate the matcher.
+  This can be given as a third parameter or as a keyword parameter.
+  (Robert Collins)
+
+* Automated the Launchpad part of the release process.
+  (Jonathan Lange, #623486)
+
+* Correctly display non-ASCII unicode output on terminals that claim to have a
+  unicode encoding. (Martin [gz], #804122)
+
+* ``DocTestMatches`` correctly handles unicode output from examples, rather
+  than raising an error. (Martin [gz], #764170)
+
+* ``ErrorHolder`` and ``PlaceHolder`` added to docs. (Jonathan Lange, #816597)
+
+* ``ExpectedException`` now matches any exception of the given type by
+  default, and also allows specifying a ``Matcher`` rather than a mere regular
+  expression. (Jonathan Lange, #791889)
+
+* ``FixtureSuite`` added, allows test suites to run with a given fixture.
+  (Jonathan Lange)
+
+* Hide testtools's own stack frames when displaying tracebacks, making it
+  easier for test authors to focus on their errors.
+  (Jonathan Lange, Martin [gz], #788974)
+
+* Less boilerplate displayed in test failures and errors.
+  (Jonathan Lange, #660852)
+
+* ``MatchesException`` now allows you to match exceptions against any matcher,
+  rather than just regular expressions.  (Jonathan Lange, #791889)
+
+* ``MatchesException`` now permits a tuple of types rather than a single type
+  (when using the type matching mode).  (Robert Collins)
+
+* ``MatchesStructure.byEquality`` added to make the common case of matching
+  many attributes by equality much easier.  ``MatchesStructure.byMatcher``
+  added in case folk want to match by things other than equality.
+  (Jonathan Lange)
+
+* New convenience assertions, ``assertIsNone`` and ``assertIsNotNone``.
+  (Christian Kampka)
+
+* New matchers:
+
+  * ``AllMatch`` matches many values against a single matcher.
+    (Jonathan Lange, #615108)
+
+  * ``Contains``. (Robert Collins)
+
+  * ``GreaterThan``. (Christian Kampka)
+
+* New helper, ``safe_hasattr`` added. (Jonathan Lange)
+
+* ``reraise`` added to ``testtools.compat``. (Jonathan Lange)
+
+
+0.9.11
+~~~~~~
+
+This release brings consistent use of super for better compatibility with
+multiple inheritance, fixed Python3 support, improvements in fixture and mather
+outputs and a compat helper for testing libraries that deal with bytestrings.
+
+Changes
+-------
+
+* ``TestCase`` now uses super to call base ``unittest.TestCase`` constructor,
+  ``setUp`` and ``tearDown``. (Tim Cole, #771508)
+
+* If, when calling ``useFixture`` an error occurs during fixture set up, we
+  still attempt to gather details from the fixture. (Gavin Panella)
+
+
+Improvements
+------------
+
+* Additional compat helper for ``BytesIO`` for libraries that build on
+  testtools and are working on Python 3 porting. (Robert Collins)
+
+* Corrected documentation for ``MatchesStructure`` in the test authors
+  document.  (Jonathan Lange)
+
+* ``LessThan`` error message now says something that is logically correct.
+  (Gavin Panella, #762008)
+
+* Multiple details from a single fixture are now kept separate, rather than
+  being mooshed together. (Gavin Panella, #788182)
+
+* Python 3 support now back in action. (Martin [gz], #688729)
+
+* ``try_import`` and ``try_imports`` have a callback that is called whenever
+  they fail to import a module.  (Martin Pool)
+
+
+0.9.10
+~~~~~~
+
+The last release of testtools could not be easy_installed.  This is considered
+severe enough for a re-release.
+
+Improvements
+------------
+
+* Include ``doc/`` in the source distribution, making testtools installable
+  from PyPI again (Tres Seaver, #757439)
+
+
+0.9.9
+~~~~~
+
+Many, many new matchers, vastly expanded documentation, stacks of bug fixes,
+better unittest2 integration.  If you've ever wanted to try out testtools but
+been afraid to do so, this is the release to try.
+
+
+Changes
+-------
+
+* The timestamps generated by ``TestResult`` objects when no timing data has
+  been received are now datetime-with-timezone, which allows them to be
+  sensibly serialised and transported. (Robert Collins, #692297)
+
+Improvements
+------------
+
+* ``AnnotatedMismatch`` now correctly returns details.
+  (Jonathan Lange, #724691)
+
+* distutils integration for the testtools test runner. Can now use it for
+  'python setup.py test'. (Christian Kampka, #693773)
+
+* ``EndsWith`` and ``KeysEqual`` now in testtools.matchers.__all__.
+  (Jonathan Lange, #692158)
+
+* ``MatchesException`` extended to support a regular expression check against
+  the str() of a raised exception.  (Jonathan Lange)
+
+* ``MultiTestResult`` now forwards the ``time`` API. (Robert Collins, #692294)
+
+* ``MultiTestResult`` now documented in the manual. (Jonathan Lange, #661116)
+
+* New content helpers ``content_from_file``, ``content_from_stream`` and
+  ``attach_file`` make it easier to attach file-like objects to a
+  test. (Jonathan Lange, Robert Collins, #694126)
+
+* New ``ExpectedException`` context manager to help write tests against things
+  that are expected to raise exceptions. (Aaron Bentley)
+
+* New matchers:
+
+  * ``MatchesListwise`` matches an iterable of matchers against an iterable
+    of values. (Michael Hudson-Doyle)
+
+  * ``MatchesRegex`` matches a string against a regular expression.
+    (Michael Hudson-Doyle)
+
+  * ``MatchesStructure`` matches attributes of an object against given
+    matchers.  (Michael Hudson-Doyle)
+
+  * ``AfterPreproccessing`` matches values against a matcher after passing them
+    through a callable.  (Michael Hudson-Doyle)
+
+  * ``MatchesSetwise`` matches an iterable of matchers against an iterable of
+    values, without regard to order.  (Michael Hudson-Doyle)
+
+* ``setup.py`` can now build a snapshot when Bazaar is installed but the tree
+  is not a Bazaar tree. (Jelmer Vernooij)
+
+* Support for running tests using distutils (Christian Kampka, #726539)
+
+* Vastly improved and extended documentation. (Jonathan Lange)
+
+* Use unittest2 exception classes if available. (Jelmer Vernooij)
+
+
+0.9.8
+~~~~~
+
+In this release we bring some very interesting improvements:
+
+* new matchers for exceptions, sets, lists, dicts and more.
+
+* experimental (works but the contract isn't supported) twisted reactor
+  support.
+
+* The built in runner can now list tests and filter tests (the -l and
+  --load-list options).
+
+Changes
+-------
+
+* addUnexpectedSuccess is translated to addFailure for test results that don't
+  know about addUnexpectedSuccess.  Further, it fails the entire result for
+  all testtools TestResults (i.e. wasSuccessful() returns False after
+  addUnexpectedSuccess has been called). Note that when using a delegating
+  result such as ThreadsafeForwardingResult, MultiTestResult or
+  ExtendedToOriginalDecorator then the behaviour of addUnexpectedSuccess is
+  determined by the delegated to result(s).
+  (Jonathan Lange, Robert Collins, #654474, #683332)
+
+* startTestRun will reset any errors on the result.  That is, wasSuccessful()
+  will always return True immediately after startTestRun() is called. This
+  only applies to delegated test results (ThreadsafeForwardingResult,
+  MultiTestResult and ExtendedToOriginalDecorator) if the delegated to result
+  is a testtools test result - we cannot reliably reset the state of unknown
+  test result class instances. (Jonathan Lange, Robert Collins, #683332)
+
+* Responsibility for running test cleanups has been moved to ``RunTest``.
+  This change does not affect public APIs and can be safely ignored by test
+  authors.  (Jonathan Lange, #662647)
+
+Improvements
+------------
+
+* New matchers:
+
+  * ``EndsWith`` which complements the existing ``StartsWith`` matcher.
+    (Jonathan Lange, #669165)
+
+  * ``MatchesException`` matches an exception class and parameters. (Robert
+    Collins)
+
+  * ``KeysEqual`` matches a dictionary with particular keys.  (Jonathan Lange)
+
+* ``assertIsInstance`` supports a custom error message to be supplied, which
+  is necessary when using ``assertDictEqual`` on Python 2.7 with a
+  ``testtools.TestCase`` base class. (Jelmer Vernooij)
+
+* Experimental support for running tests that return Deferreds.
+  (Jonathan Lange, Martin [gz])
+
+* Provide a per-test decorator, run_test_with, to specify which RunTest
+  object to use for a given test.  (Jonathan Lange, #657780)
+
+* Fix the runTest parameter of TestCase to actually work, rather than raising
+  a TypeError.  (Jonathan Lange, #657760)
+
+* Non-release snapshots of testtools will now work with buildout.
+  (Jonathan Lange, #613734)
+
+* Malformed SyntaxErrors no longer blow up the test suite.  (Martin [gz])
+
+* ``MismatchesAll.describe`` no longer appends a trailing newline.
+  (Michael Hudson-Doyle, #686790)
+
+* New helpers for conditionally importing modules, ``try_import`` and
+  ``try_imports``.  (Jonathan Lange)
+
+* ``Raises`` added to the ``testtools.matchers`` module - matches if the
+  supplied callable raises, and delegates to an optional matcher for validation
+  of the exception. (Robert Collins)
+
+* ``raises`` added to the ``testtools.matchers`` module - matches if the
+  supplied callable raises and delegates to ``MatchesException`` to validate
+  the exception. (Jonathan Lange)
+
+* Tests will now pass on Python 2.6.4 : an ``Exception`` change made only in
+  2.6.4 and reverted in Python 2.6.5 was causing test failures on that version.
+  (Martin [gz], #689858).
+
+* ``testtools.TestCase.useFixture`` has been added to glue with fixtures nicely.
+  (Robert Collins)
+
+* ``testtools.run`` now supports ``-l`` to list tests rather than executing
+  them. This is useful for integration with external test analysis/processing
+  tools like subunit and testrepository. (Robert Collins)
+
+* ``testtools.run`` now supports ``--load-list``, which takes a file containing
+  test ids, one per line, and intersects those ids with the tests found. This
+  allows fine grained control of what tests are run even when the tests cannot
+  be named as objects to import (e.g. due to test parameterisation via
+  testscenarios). (Robert Collins)
+
+* Update documentation to say how to use testtools.run() on Python 2.4.
+  (Jonathan Lange, #501174)
+
+* ``text_content`` conveniently converts a Python string to a Content object.
+  (Jonathan Lange, James Westby)
+
+
+
+0.9.7
+~~~~~
+
+Lots of little cleanups in this release; many small improvements to make your
+testing life more pleasant.
+
+Improvements
+------------
+
+* Cleanups can raise ``testtools.MultipleExceptions`` if they have multiple
+  exceptions to report. For instance, a cleanup which is itself responsible for
+  running several different internal cleanup routines might use this.
+
+* Code duplication between assertEqual and the matcher Equals has been removed.
+
+* In normal circumstances, a TestCase will no longer share details with clones
+  of itself. (Andrew Bennetts, bug #637725)
+
+* Less exception object cycles are generated (reduces peak memory use between
+  garbage collection). (Martin [gz])
+
+* New matchers 'DoesNotStartWith' and 'StartsWith' contributed by Canonical
+  from the Launchpad project. Written by James Westby.
+
+* Timestamps as produced by subunit protocol clients are now forwarded in the
+  ThreadsafeForwardingResult so correct test durations can be reported.
+  (Martin [gz], Robert Collins, #625594)
+
+* With unittest from Python 2.7 skipped tests will now show only the reason
+  rather than a serialisation of all details. (Martin [gz], #625583)
+
+* The testtools release process is now a little better documented and a little
+  smoother.  (Jonathan Lange, #623483, #623487)
+
+
+0.9.6
+~~~~~
+
+Nothing major in this release, just enough small bits and pieces to make it
+useful enough to upgrade to.
+
+In particular, a serious bug in assertThat() has been fixed, it's easier to
+write Matchers, there's a TestCase.patch() method for those inevitable monkey
+patches and TestCase.assertEqual gives slightly nicer errors.
+
+Improvements
+------------
+
+* 'TestCase.assertEqual' now formats errors a little more nicely, in the
+  style of bzrlib.
+
+* Added `PlaceHolder` and `ErrorHolder`, TestCase-like objects that can be
+  used to add results to a `TestResult`.
+
+* 'Mismatch' now takes optional description and details parameters, so
+  custom Matchers aren't compelled to make their own subclass.
+
+* jml added a built-in UTF8_TEXT ContentType to make it slightly easier to
+  add details to test results. See bug #520044.
+
+* Fix a bug in our built-in matchers where assertThat would blow up if any
+  of them failed. All built-in mismatch objects now provide get_details().
+
+* New 'Is' matcher, which lets you assert that a thing is identical to
+  another thing.
+
+* New 'LessThan' matcher which lets you assert that a thing is less than
+  another thing.
+
+* TestCase now has a 'patch()' method to make it easier to monkey-patching
+  objects in tests. See the manual for more information. Fixes bug #310770.
+
+* MultiTestResult methods now pass back return values from the results it
+  forwards to.
+
+0.9.5
+~~~~~
+
+This release fixes some obscure traceback formatting issues that probably
+weren't affecting you but were certainly breaking our own test suite.
+
+Changes
+-------
+
+* Jamu Kakar has updated classes in testtools.matchers and testtools.runtest
+  to be new-style classes, fixing bug #611273.
+
+Improvements
+------------
+
+* Martin[gz] fixed traceback handling to handle cases where extract_tb returns
+  a source line of None. Fixes bug #611307.
+
+* Martin[gz] fixed an unicode issue that was causing the tests to fail,
+  closing bug #604187.
+
+* testtools now handles string exceptions (although why would you want to use
+  them?) and formats their tracebacks correctly. Thanks to Martin[gz] for
+  fixing bug #592262.
+
+0.9.4
+~~~~~
+
+This release overhauls the traceback formatting layer to deal with Python 2
+line numbers and traceback objects often being local user encoded strings
+rather than unicode objects. Test discovery has also been added and Python 3.1
+is also supported. Finally, the Mismatch protocol has been extended to let
+Matchers collaborate with tests in supplying detailed data about failures.
+
+Changes
+-------
+
+* testtools.utils has been renamed to testtools.compat. Importing
+  testtools.utils will now generate a deprecation warning.
+
+Improvements
+------------
+
+* Add machinery for Python 2 to create unicode tracebacks like those used by
+  Python 3. This means testtools no longer throws on encountering non-ascii
+  filenames, source lines, or exception strings when displaying test results.
+  Largely contributed by Martin[gz] with some tweaks from Robert Collins.
+
+* James Westby has supplied test discovery support using the Python 2.7
+  TestRunner in testtools.run. This requires the 'discover' module. This
+  closes bug #250764.
+
+* Python 3.1 is now supported, thanks to Martin[gz] for a partial patch.
+  This fixes bug #592375.
+
+* TestCase.addCleanup has had its docstring corrected about when cleanups run.
+
+* TestCase.skip is now deprecated in favour of TestCase.skipTest, which is the
+  Python2.7 spelling for skip. This closes bug #560436.
+
+* Tests work on IronPython patch from Martin[gz] applied.
+
+* Thanks to a patch from James Westby testtools.matchers.Mismatch can now
+  supply a get_details method, which assertThat will query to provide
+  additional attachments. This can be used to provide additional detail
+  about the mismatch that doesn't suite being included in describe(). For
+  instance, if the match process was complex, a log of the process could be
+  included, permitting debugging.
+
+* testtools.testresults.real._StringException will now answer __str__ if its
+  value is unicode by encoding with UTF8, and vice versa to answer __unicode__.
+  This permits subunit decoded exceptions to contain unicode and still format
+  correctly.
+
+0.9.3
+~~~~~
+
+More matchers, Python 2.4 support, faster test cloning by switching to copy
+rather than deepcopy and better output when exceptions occur in cleanups are
+the defining characteristics of this release.
+
+Improvements
+------------
+
+* New matcher "Annotate" that adds a simple string message to another matcher,
+  much like the option 'message' parameter to standard library assertFoo
+  methods.
+
+* New matchers "Not" and "MatchesAll". "Not" will invert another matcher, and
+  "MatchesAll" that needs a successful match for all of its arguments.
+
+* On Python 2.4, where types.FunctionType cannot be deepcopied, testtools will
+  now monkeypatch copy._deepcopy_dispatch using the same trivial patch that
+  added such support to Python 2.5. The monkey patch is triggered by the
+  absence of FunctionType from the dispatch dict rather than a version check.
+  Bug #498030.
+
+* On windows the test 'test_now_datetime_now' should now work reliably.
+
+* TestCase.getUniqueInteger and TestCase.getUniqueString now have docstrings.
+
+* TestCase.getUniqueString now takes an optional prefix parameter, so you can
+  now use it in circumstances that forbid strings with '.'s, and such like.
+
+* testtools.testcase.clone_test_with_new_id now uses copy.copy, rather than
+  copy.deepcopy. Tests that need a deeper copy should use the copy protocol to
+  control how they are copied. Bug #498869.
+
+* The backtrace test result output tests should now pass on windows and other
+  systems where os.sep is not '/'.
+
+* When a cleanUp or tearDown exception occurs, it is now accumulated as a new
+  traceback in the test details, rather than as a separate call to addError / 
+  addException. This makes testtools work better with most TestResult objects
+  and fixes bug #335816.
+
+
+0.9.2
+~~~~~
+
+Python 3 support, more matchers and better consistency with Python 2.7 --
+you'd think that would be enough for a point release. Well, we here on the
+testtools project think that you deserve more.
+
+We've added a hook so that user code can be called just-in-time whenever there
+is an exception, and we've also factored out the "run" logic of test cases so
+that new outcomes can be added without fiddling with the actual flow of logic.
+
+It might sound like small potatoes, but it's changes like these that will
+bring about the end of test frameworks.
+
+
+Improvements
+------------
+
+* A failure in setUp and tearDown now report as failures not as errors.
+
+* Cleanups now run after tearDown to be consistent with Python 2.7's cleanup
+  feature.
+
+* ExtendedToOriginalDecorator now passes unrecognised attributes through
+  to the decorated result object, permitting other extensions to the
+  TestCase -> TestResult protocol to work.
+
+* It is now possible to trigger code just-in-time after an exception causes
+  a test outcome such as failure or skip. See the testtools MANUAL or
+  ``pydoc testtools.TestCase.addOnException``. (bug #469092)
+
+* New matcher Equals which performs a simple equality test.
+
+* New matcher MatchesAny which looks for a match of any of its arguments.
+
+* TestCase no longer breaks if a TestSkipped exception is raised with no
+  parameters.
+
+* TestCase.run now clones test cases before they are run and runs the clone.
+  This reduces memory footprint in large test runs - state accumulated on
+  test objects during their setup and execution gets freed when test case
+  has finished running unless the TestResult object keeps a reference.
+  NOTE: As test cloning uses deepcopy, this can potentially interfere if
+  a test suite has shared state (such as the testscenarios or testresources
+  projects use).  Use the __deepcopy__ hook to control the copying of such
+  objects so that the shared references stay shared.
+
+* Testtools now accepts contributions without copyright assignment under some
+  circumstances. See HACKING for details.
+
+* Testtools now provides a convenient way to run a test suite using the
+  testtools result object: python -m testtools.run testspec [testspec...].
+
+* Testtools now works on Python 3, thanks to Benjamin Peterson.
+
+* Test execution now uses a separate class, testtools.RunTest to run single
+  tests. This can be customised and extended in a more consistent fashion than
+  the previous run method idiom. See pydoc for more information.
+
+* The test doubles that testtools itself uses are now available as part of
+  the testtools API in testtols.testresult.doubles.
+
+* TracebackContent now sets utf8 as the charset encoding, rather than not
+  setting one and encoding with the default encoder.
+
+* With python2.7 testtools.TestSkipped will be the unittest.case.SkipTest
+  exception class making skips compatible with code that manually raises the
+  standard library exception. (bug #490109)
+
+Changes
+-------
+
+* TestCase.getUniqueInteger is now implemented using itertools.count. Thanks
+  to Benjamin Peterson for the patch. (bug #490111)
+
+
+0.9.1
+~~~~~
+
+The new matcher API introduced in 0.9.0 had a small flaw where the matchee
+would be evaluated twice to get a description of the mismatch. This could lead
+to bugs if the act of matching caused side effects to occur in the matchee.
+Since having such side effects isn't desirable, we have changed the API now
+before it has become widespread.
+
+Changes
+-------
+
+* Matcher API changed to avoid evaluating matchee twice. Please consult
+  the API documentation.
+
+* TestCase.getUniqueString now uses the test id, not the test method name,
+  which works nicer with parameterised tests.
+
+Improvements
+------------
+
+* Python2.4 is now supported again.
+
+
+0.9.0
+~~~~~
+
+This release of testtools is perhaps the most interesting and exciting one
+it's ever had. We've continued in bringing together the best practices of unit
+testing from across a raft of different Python projects, but we've also
+extended our mission to incorporating unit testing concepts from other
+languages and from our own research, led by Robert Collins.
+
+We now support skipping and expected failures. We'll make sure that you
+up-call setUp and tearDown, avoiding unexpected testing weirdnesses. We're
+now compatible with Python 2.5, 2.6 and 2.7 unittest library.
+
+All in all, if you are serious about unit testing and want to get the best
+thinking from the whole Python community, you should get this release.
+
+Improvements
+------------
+
+* A new TestResult API has been added for attaching details to test outcomes.
+  This API is currently experimental, but is being prepared with the intent
+  of becoming an upstream Python API. For more details see pydoc
+  testtools.TestResult and the TestCase addDetail / getDetails methods.
+
+* assertThat has been added to TestCase. This new assertion supports
+  a hamcrest-inspired matching protocol. See pydoc testtools.Matcher for
+  details about writing matchers, and testtools.matchers for the included
+  matchers. See http://code.google.com/p/hamcrest/.
+
+* Compatible with Python 2.6 and Python 2.7
+
+* Failing to upcall in setUp or tearDown will now cause a test failure.
+  While the base methods do nothing, failing to upcall is usually a problem
+  in deeper hierarchies, and checking that the root method is called is a
+  simple way to catch this common bug.
+
+* New TestResult decorator ExtendedToOriginalDecorator which handles
+  downgrading extended API calls like addSkip to older result objects that
+  do not support them. This is used internally to make testtools simpler but
+  can also be used to simplify other code built on or for use with testtools.
+
+* New TextTestResult supporting the extended APIs that testtools provides.
+
+* Nose will no longer find 'runTest' tests in classes derived from
+   testtools.testcase.TestCase (bug #312257).
+
+* Supports the Python 2.7/3.1 addUnexpectedSuccess and addExpectedFailure
+  TestResult methods, with a support function 'knownFailure' to let tests
+  trigger these outcomes.
+
+* When using the skip feature with TestResult objects that do not support it
+  a test success will now be reported. Previously an error was reported but
+  production experience has shown that this is too disruptive for projects that
+  are using skips: they cannot get a clean run on down-level result objects.
+
+
+.. _testtools: http://pypi.python.org/pypi/testtools

@@ -8,11 +8,17 @@
     rst.initiate();
     rst.awaitReplication();
 
+    // filter out noop writes
     var getLatestOp = function() {
-        return primaryDB.getSiblingDB('local').oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        return primaryDB.getSiblingDB('local')
+            .oplog.rs.find({op: {$ne: 'n'}})
+            .sort({$natural: -1})
+            .limit(1)
+            .next();
     };
 
     var primaryDB = rst.getPrimary().getDB('test');
+    assert.writeOK(primaryDB.foo.insert({}));
     var op = getLatestOp();
 
     // Enable profiling on the primary
@@ -36,13 +42,7 @@
 
     // emptycapped the collection
     assert.commandWorked(primaryDB.runCommand({emptycapped: "system.profile"}));
-    assert.eq(op, getLatestOp(),
-              "oplog entry created when system.profile was emptied via emptycapped");
-    assert(primaryDB.system.profile.drop());
-
-    // convertToCapped
-    assert.commandWorked(primaryDB.createCollection("system.profile"));
-    assert.commandWorked(primaryDB.runCommand({convertToCapped: "system.profile", size: 1000}));
-    assert.eq(op, getLatestOp(), "oplog entry created when system.profile was convertedToCapped");
+    assert.eq(
+        op, getLatestOp(), "oplog entry created when system.profile was emptied via emptycapped");
     assert(primaryDB.system.profile.drop());
 })();

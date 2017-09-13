@@ -4,33 +4,59 @@ import textwrap
 
 Import("env debugBuild")
 Import("get_option")
+Import("endian")
 
 env = env.Clone()
+
 env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
+
+if endian == "big":
+    env.Append(CPPDEFINES=[('WORDS_BIGENDIAN', 1)])
 
 env.Append(CPPPATH=[
         "src/include",
     ])
 
-# Enable asserts, and optional rich logging in debug builds
+# Enable asserts in debug builds
 if debugBuild:
     env.Append(CPPDEFINES=[
         "HAVE_DIAGNOSTIC",
-        "HAVE_VERBOSE",
         ])
+
+# Enable optional rich logging
+env.Append(CPPDEFINES=["HAVE_VERBOSE"])
+
+conf = Configure(env)
+if conf.CheckFunc("fallocate"):
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_FALLOCATE"
+    ])
+if conf.CheckFunc("sync_file_range"):
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_SYNC_FILE_RANGE"
+    ])
+
+if conf.CheckCHeader('x86intrin.h'):
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_X86INTRIN_H"
+    ])
+env = conf.Finish();
 
 if env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_win"])
     env.Append(CFLAGS=[
         "/wd4090" # Ignore warning about mismatched const qualifiers
     ])
-    if get_option('allocator') == 'tcmalloc':
+    if env['MONGO_ALLOCATOR'] == 'tcmalloc':
         env.InjectThirdPartyIncludePaths(libraries=['gperftools'])
         env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
-elif env.TargetOSIs('osx'):
+elif env.TargetOSIs('darwin'):
     env.Append(CPPPATH=["build_darwin"])
 elif env.TargetOSIs('solaris'):
     env.Append(CPPPATH=["build_solaris"])
+    # For an explanation of __EXTENSIONS__,
+    # see http://docs.oracle.com/cd/E19253-01/816-5175/standards-5/index.html
+    env.Append(CPPDEFINES=["__EXTENSIONS__"])
 elif env.TargetOSIs('freebsd'):
     env.Append(CPPPATH=["build_freebsd"])
 elif env.TargetOSIs('openbsd'):
@@ -71,6 +97,7 @@ wiredtiger_includes = """
         #include <inttypes.h>
         #endif
         #include <stdarg.h>
+        #include <stdbool.h>
         #include <stdint.h>
         #include <stdio.h>
     """
@@ -94,17 +121,36 @@ env.Substfile(
     ],
     SUBST_DICT=replacements)
 
+env.Alias('generated-sources', "wiredtiger.h")
+
 #
 # WiredTiger library
 #
-filelistfile = "build_win/filelist.win" if env.TargetOSIs('windows') else 'dist/filelist'
+# Map WiredTiger build conditions: any conditions that appear in WiredTiger's
+# dist/filelist must appear here, and if the value is true, those files will be
+# included.
+#
+condition_map = {
+    'POSIX_HOST'   : not env.TargetOSIs('windows'),
+    'WINDOWS_HOST' : env.TargetOSIs('windows'),
 
-wtsources = []
+    'ARM64_HOST'   : env['TARGET_ARCH'] == 'aarch64',
+    'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
+    'X86_HOST'     : env['TARGET_ARCH'] == 'x86_64',
+    'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x',
+}
 
+def filtered_filelist(f):
+    for line in f:
+        file_cond = line.split()
+        if line.startswith("#") or len(file_cond) == 0:
+            continue
+        if len(file_cond) == 1 or condition_map.get(file_cond[1], False):
+            yield file_cond[0]
+
+filelistfile = 'dist/filelist'
 with open(File(filelistfile).srcnode().abspath) as filelist:
-    wtsources = [line.strip()
-                 for line in filelist
-                 if not line.startswith("#") and len(line.strip()) >= 1]
+    wtsources = list(filtered_filelist(filelist))
 
 if useZlib:
     env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_ZLIB'])
@@ -114,9 +160,23 @@ if useSnappy:
     env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_SNAPPY'])
     wtsources.append("ext/compressors/snappy/snappy_compress.c")
 
+# Use hardware by default on all platforms if available.
+# If not available at runtime, we fall back to software in some cases.
+#
+# On zSeries we may disable because SLES 11 kernel doe not support the instructions.
+if not (env['TARGET_ARCH'] == 's390x' and get_option("use-s390x-crc32") == "off"):
+    env.Append(CPPDEFINES=["HAVE_CRC32_HARDWARE"])
+
 wtlib = env.Library(
     target="wiredtiger",
-    source=wtsources)
+    source=wtsources,
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_snappy',
+        '$BUILD_DIR/third_party/shim_zlib',
+    ],
+    LIBDEPS_TAGS=[
+        'init-no-global-side-effects',
+    ],
+)
 
 env.Depends(wtlib, [filelistfile, version_file])
-

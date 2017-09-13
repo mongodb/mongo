@@ -46,7 +46,8 @@ void BSONObjBuilder::appendMinForType(StringData fieldName, int t) {
         case NumberInt:
         case NumberDouble:
         case NumberLong:
-            append(fieldName, -std::numeric_limits<double>::max());
+        case NumberDecimal:
+            append(fieldName, std::numeric_limits<double>::quiet_NaN());
             return;
         case Symbol:
         case String:
@@ -116,7 +117,8 @@ void BSONObjBuilder::appendMaxForType(StringData fieldName, int t) {
         case NumberInt:
         case NumberDouble:
         case NumberLong:
-            append(fieldName, std::numeric_limits<double>::max());
+        case NumberDecimal:
+            append(fieldName, std::numeric_limits<double>::infinity());
             return;
         case Symbol:
         case String:
@@ -178,51 +180,6 @@ void BSONObjBuilder::appendMaxForType(StringData fieldName, int t) {
     uassert(14853, "type not supported for appendMaxElementForType", false);
 }
 
-
-bool BSONObjBuilder::appendAsNumber(StringData fieldName, const string& data) {
-    if (data.size() == 0 || data == "-" || data == ".")
-        return false;
-
-    unsigned int pos = 0;
-    if (data[0] == '-')
-        pos++;
-
-    bool hasDec = false;
-
-    for (; pos < data.size(); pos++) {
-        if (isdigit(data[pos]))
-            continue;
-
-        if (data[pos] == '.') {
-            if (hasDec)
-                return false;
-            hasDec = true;
-            continue;
-        }
-
-        return false;
-    }
-
-    if (hasDec) {
-        double d = atof(data.c_str());
-        append(fieldName, d);
-        return true;
-    }
-
-    if (data.size() < 8) {
-        append(fieldName, atoi(data.c_str()));
-        return true;
-    }
-
-    try {
-        long long num = boost::lexical_cast<long long>(data);
-        append(fieldName, num);
-        return true;
-    } catch (boost::bad_lexical_cast&) {
-        return false;
-    }
-}
-
 BSONObjBuilder& BSONObjBuilder::appendDate(StringData fieldName, Date_t dt) {
     _b.appendNum((char)Date);
     _b.appendStr(fieldName);
@@ -231,7 +188,7 @@ BSONObjBuilder& BSONObjBuilder::appendDate(StringData fieldName, Date_t dt) {
 }
 
 /* add all the fields from the object specified to this object */
-BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
+BSONObjBuilder& BSONObjBuilder::appendElements(const BSONObj& x) {
     if (!x.isEmpty())
         _b.appendBuf(x.objdata() + 4,   // skip over leading length
                      x.objsize() - 5);  // ignore leading length and trailing \0
@@ -239,7 +196,7 @@ BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
 }
 
 /* add all the fields from the object specified to this object if they don't exist */
-BSONObjBuilder& BSONObjBuilder::appendElementsUnique(BSONObj x) {
+BSONObjBuilder& BSONObjBuilder::appendElementsUnique(const BSONObj& x) {
     std::set<std::string> have;
     {
         BSONObjIterator i = iterator();

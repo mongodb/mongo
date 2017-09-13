@@ -13,8 +13,8 @@
  *
  * Writes the results of each thread to the same collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/map_reduce_inline.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -25,7 +25,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        this.outDBName = uniqueDBName;
+        this.outDBName = db.getName() + uniqueDBName;
     };
 
     $config.states.mapReduce = function mapReduce(db, collName) {
@@ -35,13 +35,7 @@ var $config = extendWorkload($config, function($config, $super) {
                      "output collection '" + fullName + "' should exist");
 
         // Have all threads combine their results into the same collection
-        var options = {
-            finalize: this.finalizer,
-            out: {
-                merge: collName,
-                db: this.outDBName
-            }
-        };
+        var options = {finalize: this.finalizer, out: {merge: collName, db: this.outDBName}};
 
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);
         assertAlways.commandWorked(res);
@@ -50,15 +44,15 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        var outDB = db.getSiblingDB(uniqueDBName);
+        var outDB = db.getSiblingDB(db.getName() + uniqueDBName);
         assertAlways.commandWorked(outDB.createCollection(collName));
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        var outDB = db.getSiblingDB(uniqueDBName);
+        var outDB = db.getSiblingDB(db.getName() + uniqueDBName);
         var res = outDB.dropDatabase();
         assertAlways.commandWorked(res);
-        assertAlways.eq(uniqueDBName, res.dropped);
+        assertAlways.eq(db.getName() + uniqueDBName, res.dropped);
     };
 
     return $config;

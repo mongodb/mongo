@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
@@ -82,10 +83,10 @@ public:
     }
     void setName(const std::string& name);
 
-    const std::string& getPrimary() const {
+    const ShardId& getPrimary() const {
         return _primary.get();
     }
-    void setPrimary(const std::string& primary);
+    void setPrimary(const ShardId& primary);
 
     bool getSharded() const {
         return _sharded.get();
@@ -100,7 +101,7 @@ private:
 
     // Required primary shard (must be set even if the database is sharded, because there
     // might be collections, which are unsharded).
-    boost::optional<std::string> _primary;
+    boost::optional<ShardId> _primary;
 
     // Required whether sharding is enabled for this database. Even though this field is of
     // type optional, it is only used as an indicator that the value was explicitly set.

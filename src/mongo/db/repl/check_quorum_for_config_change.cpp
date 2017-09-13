@@ -34,18 +34,21 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
 
-QuorumChecker::QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex)
+using executor::RemoteCommandRequest;
+
+QuorumChecker::QuorumChecker(const ReplSetConfig* rsConfig, int myIndex)
     : _rsConfig(rsConfig),
       _myIndex(myIndex),
       _numResponses(1),  // We "responded" to ourself already.
@@ -99,6 +102,8 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
         requests.push_back(RemoteCommandRequest(_rsConfig->getMemberAt(i).getHostAndPort(),
                                                 "admin",
                                                 hbRequest,
+                                                BSON(rpc::kReplSetMetadataFieldName << 1),
+                                                nullptr,
                                                 _rsConfig->getHeartbeatTimeoutPeriodMillis()));
     }
 
@@ -106,7 +111,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
 }
 
 void QuorumChecker::processResponse(const RemoteCommandRequest& request,
-                                    const ResponseStatus& response) {
+                                    const executor::RemoteCommandResponse& response) {
     _tabulateHeartbeatResponse(request, response);
     if (hasReceivedSufficientResponses()) {
         _onQuorumCheckComplete();
@@ -172,16 +177,16 @@ void QuorumChecker::_onQuorumCheckComplete() {
 }
 
 void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& request,
-                                               const ResponseStatus& response) {
+                                               const executor::RemoteCommandResponse& response) {
     ++_numResponses;
     if (!response.isOK()) {
         warning() << "Failed to complete heartbeat request to " << request.target << "; "
-                  << response.getStatus();
-        _badResponses.push_back(std::make_pair(request.target, response.getStatus()));
+                  << response.status;
+        _badResponses.push_back(std::make_pair(request.target, response.status));
         return;
     }
 
-    BSONObj resBSON = response.getValue().data;
+    BSONObj resBSON = response.data;
     ReplSetHeartbeatResponse hbResp;
     Status hbStatus = hbResp.initialize(resBSON, 0);
 
@@ -209,6 +214,20 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
             _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
             warning() << message;
             return;
+        }
+    }
+
+    if (_rsConfig->hasReplicaSetId()) {
+        StatusWith<rpc::ReplSetMetadata> replMetadata =
+            rpc::ReplSetMetadata::readFromMetadata(response.metadata);
+        if (replMetadata.isOK() && replMetadata.getValue().getReplicaSetId().isSet() &&
+            _rsConfig->getReplicaSetId() != replMetadata.getValue().getReplicaSetId()) {
+            std::string message = str::stream()
+                << "Our replica set ID of " << _rsConfig->getReplicaSetId()
+                << " did not match that of " << request.target.toString() << ", which is "
+                << replMetadata.getValue().getReplicaSetId();
+            _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
+            warning() << message;
         }
     }
 
@@ -260,28 +279,28 @@ bool QuorumChecker::hasReceivedSufficientResponses() const {
     return true;
 }
 
-Status checkQuorumGeneral(ReplicationExecutor* executor,
-                          const ReplicaSetConfig& rsConfig,
+Status checkQuorumGeneral(executor::TaskExecutor* executor,
+                          const ReplSetConfig& rsConfig,
                           const int myIndex) {
-    QuorumChecker checker(&rsConfig, myIndex);
-    ScatterGatherRunner runner(&checker);
-    Status status = runner.run(executor);
+    auto checker = std::make_shared<QuorumChecker>(&rsConfig, myIndex);
+    ScatterGatherRunner runner(checker, executor);
+    Status status = runner.run();
     if (!status.isOK()) {
         return status;
     }
 
-    return checker.getFinalStatus();
+    return checker->getFinalStatus();
 }
 
-Status checkQuorumForInitiate(ReplicationExecutor* executor,
-                              const ReplicaSetConfig& rsConfig,
+Status checkQuorumForInitiate(executor::TaskExecutor* executor,
+                              const ReplSetConfig& rsConfig,
                               const int myIndex) {
     invariant(rsConfig.getConfigVersion() == 1);
     return checkQuorumGeneral(executor, rsConfig, myIndex);
 }
 
-Status checkQuorumForReconfig(ReplicationExecutor* executor,
-                              const ReplicaSetConfig& rsConfig,
+Status checkQuorumForReconfig(executor::TaskExecutor* executor,
+                              const ReplSetConfig& rsConfig,
                               const int myIndex) {
     invariant(rsConfig.getConfigVersion() > 1);
     return checkQuorumGeneral(executor, rsConfig, myIndex);

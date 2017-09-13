@@ -41,16 +41,20 @@ inline SafeNum& SafeNum::operator=(const SafeNum& rhs) {
     return *this;
 }
 
-inline SafeNum::SafeNum(int num) : _type(NumberInt) {
+inline SafeNum::SafeNum(int32_t num) : _type(NumberInt) {
     _value.int32Val = num;
 }
 
-inline SafeNum::SafeNum(long long int num) : _type(NumberLong) {
+inline SafeNum::SafeNum(int64_t num) : _type(NumberLong) {
     _value.int64Val = num;
 }
 
 inline SafeNum::SafeNum(double num) : _type(NumberDouble) {
     _value.doubleVal = num;
+}
+
+inline SafeNum::SafeNum(Decimal128 num) : _type(NumberDecimal) {
+    _value.decimalVal = num.getValue();
 }
 
 inline bool SafeNum::operator==(const SafeNum& rhs) const {
@@ -66,7 +70,7 @@ inline SafeNum SafeNum::operator+(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator+=(const SafeNum& rhs) {
-    return * this = addInternal(*this, rhs);
+    return *this = addInternal(*this, rhs);
 }
 
 inline SafeNum SafeNum::operator*(const SafeNum& rhs) const {
@@ -74,7 +78,7 @@ inline SafeNum SafeNum::operator*(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator*=(const SafeNum& rhs) {
-    return * this = mulInternal(*this, rhs);
+    return *this = mulInternal(*this, rhs);
 }
 
 inline SafeNum SafeNum::bitAnd(const SafeNum& rhs) const {
@@ -86,7 +90,7 @@ inline SafeNum SafeNum::operator&(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator&=(const SafeNum& rhs) {
-    return * this = bitAnd(rhs);
+    return *this = bitAnd(rhs);
 }
 
 inline SafeNum SafeNum::bitOr(const SafeNum& rhs) const {
@@ -98,7 +102,7 @@ inline SafeNum SafeNum::operator|(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator|=(const SafeNum& rhs) {
-    return * this = bitOr(rhs);
+    return *this = bitOr(rhs);
 }
 
 inline SafeNum SafeNum::bitXor(const SafeNum& rhs) const {
@@ -110,7 +114,7 @@ inline SafeNum SafeNum::operator^(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator^=(const SafeNum& rhs) {
-    return * this = bitXor(rhs);
+    return *this = bitXor(rhs);
 }
 
 inline bool SafeNum::isValid() const {

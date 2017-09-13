@@ -32,24 +32,27 @@
 
 #include "mongo/util/elapsed_tracker.h"
 
-#include "mongo/util/net/listen.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo {
 
-ElapsedTracker::ElapsedTracker(int32_t hitsBetweenMarks, int32_t msBetweenMarks)
-    : _hitsBetweenMarks(hitsBetweenMarks),
+ElapsedTracker::ElapsedTracker(ClockSource* cs,
+                               int32_t hitsBetweenMarks,
+                               Milliseconds msBetweenMarks)
+    : _clock(cs),
+      _hitsBetweenMarks(hitsBetweenMarks),
       _msBetweenMarks(msBetweenMarks),
       _pings(0),
-      _last(Listener::getElapsedTimeMillis()) {}
+      _last(cs->now()) {}
 
 bool ElapsedTracker::intervalHasElapsed() {
     if (++_pings >= _hitsBetweenMarks) {
         _pings = 0;
-        _last = Listener::getElapsedTimeMillis();
+        _last = _clock->now();
         return true;
     }
 
-    long long now = Listener::getElapsedTimeMillis();
+    const auto now = _clock->now();
     if (now - _last > _msBetweenMarks) {
         _pings = 0;
         _last = now;
@@ -61,7 +64,7 @@ bool ElapsedTracker::intervalHasElapsed() {
 
 void ElapsedTracker::resetLastTime() {
     _pings = 0;
-    _last = Listener::getElapsedTimeMillis();
+    _last = _clock->now();
 }
 
 }  // namespace mongo

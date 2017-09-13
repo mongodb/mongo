@@ -1,0 +1,148 @@
+From d900058a21f850f0804e603f18c6b890be16001f Mon Sep 17 00:00:00 2001
+From: Mark Benvenuto <mark.benvenuto@mongodb.com>
+Date: Tue, 19 Apr 2016 11:44:05 -0400
+Subject: [PATCH] SERVER-23358 SpiderMonkey 45.0.2 ESR MongoDB Build Fixes
+
+---
+ src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp          | 10 ++++++----
+ .../mozjs-45/extract/js/src/jit/BaselineCompiler.cpp           |  6 ++++++
+ src/third_party/mozjs-45/extract/js/src/jit/Ion.cpp            |  4 ++++
+ src/third_party/mozjs-45/extract/js/src/vm/Time.cpp            |  6 ++++--
+ src/third_party/mozjs-45/extract/mfbt/lz4.c                    |  2 +-
+ src/third_party/mozjs-45/include/mozilla/Types.h               |  5 ++++-
+ 6 files changed, 25 insertions(+), 8 deletions(-)
+
+diff --git a/src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp b/src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp
+index 4984d07..c97628e 100644
+--- a/src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp
++++ b/src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp
+@@ -17,7 +17,8 @@
+ #include "jswin.h"
+ #include <psapi.h>
+ 
+-#elif defined(SOLARIS)
++// MONGODB Modification: See SERVER-22927
++#elif 0 && defined(SOLARIS)
+ 
+ #include <sys/mman.h>
+ #include <unistd.h>
+@@ -346,7 +347,8 @@ DeallocateMappedContent(void* p, size_t length)
+     // TODO: Bug 988813 - Support memory mapped array buffer for Windows platform.
+ }
+ 
+-#elif defined(SOLARIS)
++// MONGODB Modification: See SERVER-22927
++#elif 0 && defined(SOLARIS)
+ 
+ #ifndef MAP_NOSYNC
+ # define MAP_NOSYNC 0
+@@ -438,7 +440,7 @@ static inline void*
+ MapMemoryAt(void* desired, size_t length, int prot = PROT_READ | PROT_WRITE,
+             int flags = MAP_PRIVATE | MAP_ANON, int fd = -1, off_t offset = 0)
+ {
+-#if defined(__ia64__) || (defined(__sparc64__) && defined(__NetBSD__))
++#if defined(__ia64__) || (defined(__sparc64__) && defined(__NetBSD__)) || defined(SOLARIS)
+     MOZ_ASSERT(0xffff800000000000ULL & (uintptr_t(desired) + length - 1) == 0);
+ #endif
+     void* region = mmap(desired, length, prot, flags, fd, offset);
+@@ -461,7 +463,7 @@ static inline void*
+ MapMemory(size_t length, int prot = PROT_READ | PROT_WRITE,
+           int flags = MAP_PRIVATE | MAP_ANON, int fd = -1, off_t offset = 0)
+ {
+-#if defined(__ia64__) || (defined(__sparc64__) && defined(__NetBSD__))
++#if defined(__ia64__) || (defined(__sparc64__) && defined(__NetBSD__)) || defined(SOLARIS)
+     /*
+      * The JS engine assumes that all allocated pointers have their high 17 bits clear,
+      * which ia64's mmap doesn't support directly. However, we can emulate it by passing
+diff --git a/src/third_party/mozjs-45/extract/js/src/jit/BaselineCompiler.cpp b/src/third_party/mozjs-45/extract/js/src/jit/BaselineCompiler.cpp
+index 6a0e929..73aaba7 100644
+--- a/src/third_party/mozjs-45/extract/js/src/jit/BaselineCompiler.cpp
++++ b/src/third_party/mozjs-45/extract/js/src/jit/BaselineCompiler.cpp
+@@ -199,8 +199,14 @@ BaselineCompiler::compile()
+                             epilogueOffset_.offset(),
+                             profilerEnterFrameToggleOffset_.offset(),
+                             profilerExitFrameToggleOffset_.offset(),
++// MONGODB MODIFICATION: Support debug spidermonkey builds with ENABLE_TRACE_LOGGING disabled
++#ifdef ENABLE_TRACE_LOGGING
+                             traceLoggerEnterToggleOffset_.offset(),
+                             traceLoggerExitToggleOffset_.offset(),
++#else
++                            -1,
++                            -1,
++#endif
+                             postDebugPrologueOffset_.offset(),
+                             icEntries_.length(),
+                             pcMappingIndexEntries.length(),
+diff --git a/src/third_party/mozjs-45/extract/js/src/jit/Ion.cpp b/src/third_party/mozjs-45/extract/js/src/jit/Ion.cpp
+index 6d78dd9..22cf54d 100644
+--- a/src/third_party/mozjs-45/extract/js/src/jit/Ion.cpp
++++ b/src/third_party/mozjs-45/extract/js/src/jit/Ion.cpp
+@@ -1263,8 +1263,12 @@ void
+ IonScript::Destroy(FreeOp* fop, IonScript* script)
+ {
+     script->unlinkFromRuntime(fop);
++#ifdef ENABLE_TRACE_LOGGING
++    // MONGODB HACK - The statement below needs operator= which is in
++    // tracelogging.cpp which we do not include in our builds.
+     // Frees the potential event we have set.
+     script->traceLoggerScriptEvent_ = TraceLoggerEvent();
++#endif
+     fop->free_(script);
+ }
+ 
+diff --git a/src/third_party/mozjs-45/extract/js/src/vm/Time.cpp b/src/third_party/mozjs-45/extract/js/src/vm/Time.cpp
+index 69e2cc4..f039449 100644
+--- a/src/third_party/mozjs-45/extract/js/src/vm/Time.cpp
++++ b/src/third_party/mozjs-45/extract/js/src/vm/Time.cpp
+@@ -27,7 +27,8 @@
+ #include <mmsystem.h> /* for timeBegin/EndPeriod */
+ #include <stdlib.h>   /* for _set_invalid_parameter_handler */
+ 
+-#include "prinit.h"
++// MONGODB MODIFICATION: Remove unneeded dependency on NSPR
++//#include "prinit.h"
+ 
+ #endif
+ 
+@@ -133,7 +134,8 @@ PRMJ_NowInit()
+     InitializeCriticalSectionAndSpinCount(&calibration.data_lock, DataLockSpinCount);
+ 
+     // Windows 8 has a new API function we can use.
+-    if (HMODULE h = GetModuleHandle("kernel32.dll")) {
++    // MONGODB MODIFICATION: Use ANSI version of WINAPI
++    if (HMODULE h = GetModuleHandleA("kernel32.dll")) {
+         pGetSystemTimePreciseAsFileTime =
+             (void (WINAPI*)(LPFILETIME))GetProcAddress(h, "GetSystemTimePreciseAsFileTime");
+     }
+diff --git a/src/third_party/mozjs-45/extract/mfbt/lz4.c b/src/third_party/mozjs-45/extract/mfbt/lz4.c
+index c416fe8..609d584 100644
+--- a/src/third_party/mozjs-45/extract/mfbt/lz4.c
++++ b/src/third_party/mozjs-45/extract/mfbt/lz4.c
+@@ -878,7 +878,7 @@ FORCE_INLINE int LZ4_decompress_generic(
+                  )
+ {
+     /* Local Variables */
+-    const BYTE* restrict ip = (const BYTE*) source;
++    const BYTE* ip = (const BYTE*) source;
+     const BYTE* ref;
+     const BYTE* const iend = ip + inputSize;
+ 
+diff --git a/src/third_party/mozjs-45/include/mozilla/Types.h b/src/third_party/mozjs-45/include/mozilla/Types.h
+index a5d9363..b9bbb9c 100644
+--- a/src/third_party/mozjs-45/include/mozilla/Types.h
++++ b/src/third_party/mozjs-45/include/mozilla/Types.h
+@@ -37,7 +37,10 @@
+  * These macros are designed for use by library interfaces -- not for normal
+  * methods or data used cross-file.
+  */
+-#if defined(WIN32)
++// MONGOD MODIFICATION - SERVER-20311
++// Disable all visibility hints since we are statically linking on Windows.
++// This prevents mongod.exe and other binaries from exporting these functions.
++#if 0 //defined(WIN32)
+ #  define MOZ_EXPORT   __declspec(dllexport)
+ #else /* Unix */
+ #  ifdef HAVE_VISIBILITY_ATTRIBUTE
+-- 
+2.5.4 (Apple Git-61)
+

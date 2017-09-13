@@ -1,15 +1,18 @@
+mydb = db.getSisterDB("repair_server12955");
+assert.commandWorked(mydb.dropDatabase());
 
-mydb = db.getSisterDB( "repair_server12955" );
-mydb.dropDatabase()
+assert.commandWorked(mydb.foo.ensureIndex({a: "text"}));
+assert.writeOK(mydb.foo.insert({a: "hello world"}));
 
-mydb.foo.ensureIndex({a:"text"})
-mydb.foo.insert({a:"hello world"})
+var res = mydb.stats();
+assert.commandWorked(res);
+before = res.dataFileVersion;
 
-before = mydb.stats().dataFileVersion;
+assert.commandWorked(mydb.repairDatabase());
 
-mydb.repairDatabase();
+res = mydb.stats();
+assert.commandWorked(res);
+after = res.dataFileVersion;
 
-after = mydb.stats().dataFileVersion;
-
-assert.eq( before, after );
-mydb.dropDatabase();
+assert.eq(before, after);
+assert.commandWorked(mydb.dropDatabase());

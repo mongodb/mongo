@@ -26,16 +26,19 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache.h"
@@ -47,6 +50,8 @@
 
 namespace QueryStageCachedPlan {
 
+static const NamespaceString nss("unittests.QueryStageCachedPlan");
+
 class QueryStageCachedPlanBase {
 public:
     QueryStageCachedPlanBase() {
@@ -57,7 +62,7 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
@@ -68,39 +73,38 @@ public:
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
     }
 
     void dropCollection() {
-        const NamespaceString nsString(ns());
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::DBLock dbLock(_txn.lockState(), nsString.db(), MODE_X);
-        Database* database = dbHolder().get(&_txn, nsString.db());
+        Lock::DBLock dbLock(&_opCtx, nss.db(), MODE_X);
+        Database* database = dbHolder().get(&_opCtx, nss.db());
         if (!database) {
             return;
         }
 
-        WriteUnitOfWork wuow(&_txn);
-        database->dropCollection(&_txn, ns());
+        WriteUnitOfWork wuow(&_opCtx);
+        database->dropCollection(&_opCtx, nss.ns()).transitional_ignore();
         wuow.commit();
     }
 
     void insertDocument(Collection* collection, BSONObj obj) {
-        WriteUnitOfWork wuow(&_txn);
+        WriteUnitOfWork wuow(&_opCtx);
 
         const bool enforceQuota = false;
-        StatusWith<RecordId> res = collection->insertDocument(&_txn, obj, enforceQuota);
-        ASSERT(res.isOK());
-
+        OpDebug* const nullOpDebug = nullptr;
+        ASSERT_OK(
+            collection->insertDocument(&_opCtx, InsertStatement(obj), nullOpDebug, enforceQuota));
         wuow.commit();
     }
 
-    static const char* ns() {
-        return "unittests.QueryStageCachedPlan";
+    OperationContext* opCtx() {
+        return &_opCtx;
     }
 
 protected:
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     WorkingSet _ws;
 };
 
@@ -111,14 +115,16 @@ protected:
 class QueryStageCachedPlanFailure : public QueryStageCachedPlanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
         // Query can be answered by either index on "a" or index on "b".
-        CanonicalQuery* rawCq;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns(), fromjson("{a: {$gte: 8}, b: 1}"), &rawCq));
-        const std::unique_ptr<CanonicalQuery> cq(rawCq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // We shouldn't have anything in the plan cache for this shape yet.
         PlanCache* cache = collection->infoCache()->getPlanCache();
@@ -128,19 +134,20 @@ public:
 
         // Get planner params.
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
+        fillOutPlannerParams(&_opCtx, collection, cq.get(), &plannerParams);
 
         // Queued data stage will return a failure during the cached plan trial period.
-        std::unique_ptr<QueuedDataStage> mockChild = stdx::make_unique<QueuedDataStage>(&_ws);
+        auto mockChild = stdx::make_unique<QueuedDataStage>(&_opCtx, &_ws);
         mockChild->pushBack(PlanStage::FAILURE);
 
         // High enough so that we shouldn't trigger a replan based on works.
         const size_t decisionWorks = 50;
         CachedPlanStage cachedPlanStage(
-            &_txn, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
+            &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
 
         // This should succeed after triggering a replan.
-        PlanYieldPolicy yieldPolicy(nullptr, PlanExecutor::YIELD_MANUAL);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
+                                    _opCtx.getServiceContext()->getFastClockSource());
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
         // Make sure that we get 2 legit results back.
@@ -175,14 +182,16 @@ public:
 class QueryStageCachedPlanHitMaxWorks : public QueryStageCachedPlanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
         // Query can be answered by either index on "a" or index on "b".
-        CanonicalQuery* rawCq;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns(), fromjson("{a: {$gte: 8}, b: 1}"), &rawCq));
-        const std::unique_ptr<CanonicalQuery> cq(rawCq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // We shouldn't have anything in the plan cache for this shape yet.
         PlanCache* cache = collection->infoCache()->getPlanCache();
@@ -192,23 +201,24 @@ public:
 
         // Get planner params.
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
+        fillOutPlannerParams(&_opCtx, collection, cq.get(), &plannerParams);
 
         // Set up queued data stage to take a long time before returning EOF. Should be long
         // enough to trigger a replan.
         const size_t decisionWorks = 10;
         const size_t mockWorks =
             1U + static_cast<size_t>(internalQueryCacheEvictionRatio * decisionWorks);
-        std::unique_ptr<QueuedDataStage> mockChild = stdx::make_unique<QueuedDataStage>(&_ws);
+        auto mockChild = stdx::make_unique<QueuedDataStage>(&_opCtx, &_ws);
         for (size_t i = 0; i < mockWorks; i++) {
             mockChild->pushBack(PlanStage::NEED_TIME);
         }
 
         CachedPlanStage cachedPlanStage(
-            &_txn, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
+            &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
 
         // This should succeed after triggering a replan.
-        PlanYieldPolicy yieldPolicy(nullptr, PlanExecutor::YIELD_MANUAL);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
+                                    _opCtx.getServiceContext()->getFastClockSource());
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
         // Make sure that we get 2 legit results back.

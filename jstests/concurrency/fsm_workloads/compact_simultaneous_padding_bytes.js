@@ -8,8 +8,9 @@
  * for all threads. Uses paddingBytes as a parameter for compact.
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/compact.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
+load('jstests/concurrency/fsm_workloads/compact.js');              // for $config
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
@@ -17,17 +18,18 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.compact = function compact(db, collName) {
-        var res = db.runCommand({
-            compact: this.threadCollName,
-            paddingBytes: 1024 * 5,
-            force: true
-        });
-        assertAlways.commandWorked(res);
+        var res =
+            db.runCommand({compact: this.threadCollName, paddingBytes: 1024 * 5, force: true});
+        if (!isEphemeral(db)) {
+            assertAlways.commandWorked(res);
+        } else {
+            assertAlways.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+        }
     };
 
     // no-op the query state because querying while compacting can result in closed cursors
     // as per SERVER-3964, as well as inaccurate counts, leaving nothing to assert.
-    $config.states.query = function query(db, collName) { };
+    $config.states.query = function query(db, collName) {};
 
     return $config;
 });

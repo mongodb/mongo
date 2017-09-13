@@ -35,7 +35,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
+#include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
 
@@ -44,20 +46,49 @@ namespace mongo {
 //
 // system warnings
 //
-void logCommonStartupWarnings() {
+void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     // each message adds a leading and a trailing newline
 
     bool warned = false;
     {
-        const char* foo = strchr(versionString, '.') + 1;
-        int bar = atoi(foo);
-        if ((2 * (bar / 2)) != bar) {
+        auto&& vii = VersionInfoInterface::instance();
+        if ((vii.minorVersion() % 2) != 0) {
             log() << startupWarningsLog;
-            log() << "** NOTE: This is a development version (" << versionString << ") of MongoDB."
+            log() << "** NOTE: This is a development version (" << vii.version() << ") of MongoDB."
                   << startupWarningsLog;
             log() << "**       Not recommended for production." << startupWarningsLog;
             warned = true;
         }
+    }
+
+    if (serverParams.authState == ServerGlobalParams::AuthState::kUndefined) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: Access control is not enabled for the database."
+              << startupWarningsLog;
+        log() << "**          Read and write access to data and configuration is "
+                 "unrestricted."
+              << startupWarningsLog;
+        warned = true;
+    }
+
+    const bool is32bit = sizeof(int*) == 4;
+    if (is32bit) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: This 32-bit MongoDB binary is deprecated" << startupWarningsLog;
+        warned = true;
+    }
+
+    /*
+    * We did not add the message to startupWarningsLog as the user can not
+    * specify a sslCAFile parameter from the shell
+    */
+    if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled &&
+        sslGlobalParams.sslCAFile.empty()) {
+        log() << "";
+        log() << "** WARNING: No SSL certificate validation can be performed since"
+                 " no CA file has been provided";
+
+        log() << "**          Please specify an sslCAFile parameter.";
     }
 
 #if defined(_WIN32) && !defined(_WIN64)
@@ -80,6 +111,23 @@ void logCommonStartupWarnings() {
         warned = true;
     }
 #endif
+
+    if (serverParams.bind_ip.empty()) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: This server is bound to localhost." << startupWarningsLog;
+        log() << "**          Remote systems will be unable to connect to this server. "
+              << startupWarningsLog;
+        log() << "**          Start the server with --bind_ip <address> to specify which IP "
+              << startupWarningsLog;
+        log() << "**          addresses it should serve responses from, or with --bind_ip_all to"
+              << startupWarningsLog;
+        log() << "**          bind to all interfaces. If this behavior is desired, start the"
+              << startupWarningsLog;
+        log() << "**          server with --bind_ip 127.0.0.1 to disable this warning."
+              << startupWarningsLog;
+        warned = true;
+    }
+
 
     if (warned) {
         log() << startupWarningsLog;

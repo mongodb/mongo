@@ -30,6 +30,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 
@@ -42,6 +43,8 @@ TEST(NamespaceStringTest, Normal) {
 
     ASSERT(!NamespaceString::normal("a.b.$c"));
     ASSERT(!NamespaceString::normal("a.b.$.c"));
+    ASSERT(!NamespaceString::normal("a.b$.c"));
+    ASSERT(!NamespaceString::normal("a$.b.c"));
 
     ASSERT(NamespaceString::normal("local.oplog.$main"));
     ASSERT(NamespaceString::normal("local.oplog.rs"));
@@ -65,15 +68,58 @@ TEST(NamespaceStringTest, Special) {
     ASSERT(!NamespaceString::special("a.systemfoo"));
 }
 
+TEST(NamespaceStringTest, Virtualized) {
+    ASSERT(!NamespaceString::virtualized("a"));
+    ASSERT(!NamespaceString::virtualized("a.b"));
+    ASSERT(!NamespaceString::virtualized("a.b.c"));
+
+    ASSERT(NamespaceString::virtualized("a.b.$c"));
+    ASSERT(NamespaceString::virtualized("a.b.$.c"));
+    ASSERT(NamespaceString::virtualized("a.b$.c"));
+    ASSERT(NamespaceString::virtualized("a$.b.c"));
+
+    ASSERT(!NamespaceString::virtualized("local.oplog.$main"));
+    ASSERT(!NamespaceString::virtualized("local.oplog.rs"));
+}
+
 TEST(NamespaceStringTest, DatabaseValidNames) {
+    ASSERT(NamespaceString::validDBName("foo", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(NamespaceString::validDBName("foo$bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo/bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo.bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo\\bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo\"bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("a\0b"_sd, NamespaceString::DollarInDbNameBehavior::Allow));
+#ifdef _WIN32
+    ASSERT(
+        !NamespaceString::validDBName("foo*bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo<bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo>bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo:bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo|bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo?bar", NamespaceString::DollarInDbNameBehavior::Allow));
+#endif
+
     ASSERT(NamespaceString::validDBName("foo"));
+    ASSERT(!NamespaceString::validDBName("foo$bar"));
     ASSERT(!NamespaceString::validDBName("foo/bar"));
     ASSERT(!NamespaceString::validDBName("foo bar"));
     ASSERT(!NamespaceString::validDBName("foo.bar"));
-    ASSERT(!NamespaceString::validDBName("foo.bar"));
     ASSERT(!NamespaceString::validDBName("foo\\bar"));
     ASSERT(!NamespaceString::validDBName("foo\"bar"));
-    ASSERT(!NamespaceString::validDBName(StringData("a\0b", StringData::LiteralTag())));
+    ASSERT(!NamespaceString::validDBName("a\0b"_sd));
 #ifdef _WIN32
     ASSERT(!NamespaceString::validDBName("foo*bar"));
     ASSERT(!NamespaceString::validDBName("foo<bar"));
@@ -83,44 +129,168 @@ TEST(NamespaceStringTest, DatabaseValidNames) {
     ASSERT(!NamespaceString::validDBName("foo?bar"));
 #endif
 
+    ASSERT(NamespaceString::validDBName(
+        "ThisIsADatabaseNameThatBrokeAllRecordsForValidLengthForDBName63"));
+    ASSERT(!NamespaceString::validDBName(
+        "WhileThisDatabaseNameExceedsTheMaximumLengthForDatabaseNamesof63"));
+
     ASSERT(NamespaceString::normal("asdads"));
     ASSERT(!NamespaceString::normal("asda$ds"));
     ASSERT(NamespaceString::normal("local.oplog.$main"));
 }
 
-TEST(NamespaceStringTest, ListCollectionsGetMore) {
-    ASSERT(NamespaceString("test.$cmd.listCollections").isListCollectionsGetMore());
+TEST(NamespaceStringTest, ListCollectionsCursorNS) {
+    ASSERT(NamespaceString("test.$cmd.listCollections").isListCollectionsCursorNS());
 
-    ASSERT(!NamespaceString("test.foo").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.foo.$cmd.listCollections").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.foo.").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listCollections.").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListCollectionsGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes.foo").isListCollectionsGetMore());
+    ASSERT(!NamespaceString("test.foo").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.foo.$cmd.listCollections").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.foo.").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listCollections.").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListCollectionsCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listIndexes.foo").isListCollectionsCursorNS());
 }
 
-TEST(NamespaceStringTest, ListIndexesGetMore) {
+TEST(NamespaceStringTest, ListIndexesCursorNS) {
     NamespaceString ns1("test.$cmd.listIndexes.f");
-    ASSERT(ns1.isListIndexesGetMore());
-    ASSERT("test.f" == ns1.getTargetNSForListIndexesGetMore().ns());
+    ASSERT(ns1.isListIndexesCursorNS());
+    ASSERT("test.f" == ns1.getTargetNSForListIndexes().ns());
 
     NamespaceString ns2("test.$cmd.listIndexes.foo");
-    ASSERT(ns2.isListIndexesGetMore());
-    ASSERT("test.foo" == ns2.getTargetNSForListIndexesGetMore().ns());
+    ASSERT(ns2.isListIndexesCursorNS());
+    ASSERT("test.foo" == ns2.getTargetNSForListIndexes().ns());
 
     NamespaceString ns3("test.$cmd.listIndexes.foo.bar");
-    ASSERT(ns3.isListIndexesGetMore());
-    ASSERT("test.foo.bar" == ns3.getTargetNSForListIndexesGetMore().ns());
+    ASSERT(ns3.isListIndexesCursorNS());
+    ASSERT("test.foo.bar" == ns3.getTargetNSForListIndexes().ns());
 
-    ASSERT(!NamespaceString("test.foo").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.foo.$cmd.listIndexes").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.foo.").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes.").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listCollections").isListIndexesGetMore());
-    ASSERT(!NamespaceString("test.$cmd.listCollections.foo").isListIndexesGetMore());
+    ASSERT(!NamespaceString("test.foo").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.foo.$cmd.listIndexes").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.foo.").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listIndexes.").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listCollections").isListIndexesCursorNS());
+    ASSERT(!NamespaceString("test.$cmd.listCollections.foo").isListIndexesCursorNS());
+}
+
+TEST(NamespaceStringTest, IsGloballyManagedNamespace) {
+    ASSERT_TRUE(NamespaceString{"test.$cmd.aggregate.foo"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listIndexes.foo"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.otherCommand.foo"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listCollections"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.otherCommand"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.aggregate"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listIndexes"}.isGloballyManagedNamespace());
+
+    ASSERT_FALSE(NamespaceString{"test.foo"}.isGloballyManagedNamespace());
+    ASSERT_FALSE(NamespaceString{"test.$cmd"}.isGloballyManagedNamespace());
+
+    ASSERT_FALSE(NamespaceString{"$cmd.aggregate.foo"}.isGloballyManagedNamespace());
+    ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isGloballyManagedNamespace());
+}
+
+TEST(NamespaceStringTest, GetTargetNSForGloballyManagedNamespace) {
+    ASSERT_EQ(
+        (NamespaceString{"test", "foo"}),
+        NamespaceString{"test.$cmd.aggregate.foo"}.getTargetNSForGloballyManagedNamespace().get());
+    ASSERT_EQ((NamespaceString{"test", "foo"}),
+              NamespaceString{"test.$cmd.listIndexes.foo"}
+                  .getTargetNSForGloballyManagedNamespace()
+                  .get());
+    ASSERT_EQ((NamespaceString{"test", "foo"}),
+              NamespaceString{"test.$cmd.otherCommand.foo"}
+                  .getTargetNSForGloballyManagedNamespace()
+                  .get());
+
+    ASSERT_FALSE(
+        NamespaceString{"test.$cmd.listCollections"}.getTargetNSForGloballyManagedNamespace());
+    ASSERT_FALSE(
+        NamespaceString{"test.$cmd.otherCommand"}.getTargetNSForGloballyManagedNamespace());
+}
+
+TEST(NamespaceStringTest, IsDropPendingNamespace) {
+    ASSERT_TRUE(NamespaceString{"test.system.drop.0i0t-1.foo"}.isDropPendingNamespace());
+    ASSERT_TRUE(NamespaceString{"test.system.drop.1234567i8t9.foo"}.isDropPendingNamespace());
+    ASSERT_TRUE(NamespaceString{"test.system.drop.1234.foo"}.isDropPendingNamespace());
+    ASSERT_TRUE(NamespaceString{"test.system.drop.foo"}.isDropPendingNamespace());
+
+    ASSERT_FALSE(NamespaceString{"test.system.drop"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"test.drop.1234.foo"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"test.drop.foo"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"test.foo"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"test.$cmd"}.isDropPendingNamespace());
+
+    ASSERT_FALSE(NamespaceString{"$cmd.aggregate.foo"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isDropPendingNamespace());
+}
+
+TEST(NamespaceStringTest, MakeDropPendingNamespace) {
+    ASSERT_EQUALS(NamespaceString{"test.system.drop.0i0t-1.foo"},
+                  NamespaceString{"test.foo"}.makeDropPendingNamespace(repl::OpTime()));
+    ASSERT_EQUALS(NamespaceString{"test.system.drop.1234567i8t9.foo"},
+                  NamespaceString{"test.foo"}.makeDropPendingNamespace(
+                      repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
+    // If the collection name is too long to fit in the generated drop pending namespace, it will be
+    // truncated.
+    std::string dbName("test");
+    std::string collName(std::size_t(NamespaceString::MaxNsCollectionLen) - dbName.size() - 1, 't');
+    NamespaceString nss(dbName, collName);
+    auto dropPendingNss =
+        nss.makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL));
+    ASSERT_EQUALS(std::size_t(NamespaceString::MaxNsCollectionLen), dropPendingNss.size());
+}
+
+TEST(NamespaceStringTest, GetDropPendingNamespaceOpTime) {
+    // Null optime is acceptable.
+    ASSERT_EQUALS(
+        repl::OpTime(),
+        unittest::assertGet(
+            NamespaceString{"test.system.drop.0i0t-1.foo"}.getDropPendingNamespaceOpTime()));
+
+    // Valid optime.
+    ASSERT_EQUALS(
+        repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL),
+        unittest::assertGet(
+            NamespaceString{"test.system.drop.1234567i8t9.foo"}.getDropPendingNamespaceOpTime()));
+
+    // Original collection name is optional.
+    ASSERT_EQUALS(
+        repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL),
+        unittest::assertGet(
+            NamespaceString{"test.system.drop.1234567i8t9"}.getDropPendingNamespaceOpTime()));
+
+    // No system.drop. prefix.
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  NamespaceString{"test.1234.foo"}.getDropPendingNamespaceOpTime());
+
+    // Missing 'i' separator.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  NamespaceString{"test.system.drop.1234t8.foo"}.getDropPendingNamespaceOpTime());
+
+    // Missing 't' separator.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  NamespaceString{"test.system.drop.1234i56.foo"}.getDropPendingNamespaceOpTime());
+
+    // Timestamp seconds is not a number.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        NamespaceString{"test.system.drop.wwwi56t123.foo"}.getDropPendingNamespaceOpTime());
+
+    // Timestamp increment is not a number.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        NamespaceString{"test.system.drop.1234iaaat123.foo"}.getDropPendingNamespaceOpTime());
+
+    // Timestamp increment must be an unsigned number.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        NamespaceString{"test.system.drop.1234i-100t123.foo"}.getDropPendingNamespaceOpTime());
+
+    // Term is not a number.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        NamespaceString{"test.system.drop.1234i111taaa.foo"}.getDropPendingNamespaceOpTime());
 }
 
 TEST(NamespaceStringTest, CollectionComponentValidNames) {
@@ -140,7 +310,7 @@ TEST(NamespaceStringTest, CollectionValidNames) {
     ASSERT(!NamespaceString::validCollectionName("$a"));
     ASSERT(!NamespaceString::validCollectionName("a$b"));
     ASSERT(!NamespaceString::validCollectionName(""));
-    ASSERT(!NamespaceString::validCollectionName(StringData("a\0b", StringData::LiteralTag())));
+    ASSERT(!NamespaceString::validCollectionName("a\0b"_sd));
 }
 
 TEST(NamespaceStringTest, DBHash) {
@@ -155,35 +325,6 @@ TEST(NamespaceStringTest, DBHash) {
     ASSERT_NOT_EQUALS(nsDBHash("foo"), nsDBHash("food"));
     ASSERT_NOT_EQUALS(nsDBHash("foo."), nsDBHash("food"));
     ASSERT_NOT_EQUALS(nsDBHash("foo.d"), nsDBHash("food"));
-}
-
-#define testEqualsBothWays(X, Y)       \
-    ASSERT_TRUE(nsDBEquals((X), (Y))); \
-    ASSERT_TRUE(nsDBEquals((Y), (X)));
-#define testNotEqualsBothWays(X, Y)     \
-    ASSERT_FALSE(nsDBEquals((X), (Y))); \
-    ASSERT_FALSE(nsDBEquals((Y), (X)));
-
-TEST(NamespaceStringTest, DBEquals) {
-    testEqualsBothWays("foo", "foo");
-    testEqualsBothWays("foo", "foo.a");
-    testEqualsBothWays("foo.a", "foo.a");
-    testEqualsBothWays("foo.a", "foo.b");
-
-    testEqualsBothWays("", "");
-    testEqualsBothWays("", ".");
-    testEqualsBothWays("", ".x");
-
-    testNotEqualsBothWays("foo", "bar");
-    testNotEqualsBothWays("foo", "food");
-    testNotEqualsBothWays("foo.", "food");
-
-    testNotEqualsBothWays("", "x");
-    testNotEqualsBothWays("", "x.");
-    testNotEqualsBothWays("", "x.y");
-    testNotEqualsBothWays(".", "x");
-    testNotEqualsBothWays(".", "x.");
-    testNotEqualsBothWays(".", "x.y");
 }
 
 TEST(NamespaceStringTest, nsToDatabase1) {
@@ -233,5 +374,22 @@ TEST(NamespaceStringTest, NamespaceStringParse4) {
     NamespaceString ns("abc.");
     ASSERT_EQUALS((string) "abc", ns.db());
     ASSERT_EQUALS((string) "", ns.coll());
+}
+
+TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
+    NamespaceString ns = NamespaceString::makeListCollectionsNSS("DB");
+    ASSERT_EQUALS("DB", ns.db());
+    ASSERT_EQUALS("$cmd.listCollections", ns.coll());
+    ASSERT(ns.isValid());
+    ASSERT(ns.isListCollectionsCursorNS());
+}
+
+TEST(NamespaceStringTest, makeListIndexesNSIsCorrect) {
+    NamespaceString ns = NamespaceString::makeListIndexesNSS("DB", "COLL");
+    ASSERT_EQUALS("DB", ns.db());
+    ASSERT_EQUALS("$cmd.listIndexes.COLL", ns.coll());
+    ASSERT(ns.isValid());
+    ASSERT(ns.isListIndexesCursorNS());
+    ASSERT_EQUALS(NamespaceString("DB.COLL"), ns.getTargetNSForListIndexes());
 }
 }

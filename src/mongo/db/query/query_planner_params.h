@@ -40,7 +40,7 @@ struct QueryPlannerParams {
     QueryPlannerParams()
         : options(DEFAULT),
           indexFiltersApplied(false),
-          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions) {}
+          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()) {}
 
     enum Options {
         // You probably want to set this.
@@ -58,9 +58,9 @@ struct QueryPlannerParams {
         // shouldn't be on this shard" stage before projection.
         //
         // In order to set this, you must check
-        // shardingState.needCollectionMetadata(current_namespace) in the same lock that you use
-        // to build the query executor. You must also wrap the PlanExecutor in a ClientCursor
-        // within the same lock. See the comment on ShardFilterStage for details.
+        // ShardingState::needCollectionMetadata(current_namespace) in the same lock that you use to
+        // build the query executor. You must also wrap the PlanExecutor in a ClientCursor within
+        // the same lock. See the comment on ShardFilterStage for details.
         INCLUDE_SHARD_FILTER = 1 << 2,
 
         // Set this if you don't want any plans with a blocking sort stage.  All sorts must be
@@ -74,9 +74,9 @@ struct QueryPlannerParams {
         // of the query in the query results.
         KEEP_MUTATIONS = 1 << 5,
 
-        // Nobody should set this above the getExecutor interface.  Internal flag set as a hint
-        // to the planner that the caller is actually the count command.
-        PRIVATE_IS_COUNT = 1 << 6,
+        // Indicate to the planner that the caller is requesting a count operation, possibly through
+        // a count command, or as part of an aggregation pipeline.
+        IS_COUNT = 1 << 6,
 
         // Set this if you want to handle batchSize properly with sort(). If limits on SORT
         // stages are always actually limits, then this should be left off. If they are
@@ -86,6 +86,18 @@ struct QueryPlannerParams {
         // Set this to prevent the planner from generating plans which answer a predicate
         // implicitly via exact index bounds for index intersection solutions.
         CANNOT_TRIM_IXISECT = 1 << 8,
+
+        // Set this if snapshot() should scan the _id index rather than performing a
+        // collection scan. The MMAPv1 storage engine sets this option since it cannot
+        // guarantee that a collection scan won't miss documents or return duplicates.
+        SNAPSHOT_USE_ID = 1 << 9,
+
+        // Set this if you don't want any plans with a non-covered projection stage. All projections
+        // must be provided/covered by an index.
+        NO_UNCOVERED_PROJECTIONS = 1 << 10,
+
+        // Set this to generate covered whole IXSCAN plans.
+        GENERATE_COVERED_IXSCANS = 1 << 11,
     };
 
     // See Options enum above.

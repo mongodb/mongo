@@ -44,7 +44,15 @@ public:
     /**
      * Actions taken based on heartbeat responses
      */
-    enum Action { NoAction, Reconfig, StartElection, StepDownSelf, StepDownRemotePrimary };
+    enum Action {
+        NoAction,
+        Reconfig,
+        StartElection,
+        StepDownSelf,
+        StepDownRemotePrimary,
+        PriorityTakeover,
+        CatchupTakeover
+    };
 
     /**
      * Makes a new action representing doing nothing.
@@ -60,6 +68,18 @@ public:
      * Makes a new action telling the current node to attempt to elect itself primary.
      */
     static HeartbeatResponseAction makeElectAction();
+
+    /**
+     * Makes a new action telling the current node to schedule an event to attempt to elect itself
+     * primary after the appropriate priority takeover delay.
+     */
+    static HeartbeatResponseAction makePriorityTakeoverAction();
+
+    /**
+     * Makes a new action telling the current node to schedule an event to attempt to elect itself
+     * primary after the appropriate catchup takeover delay.
+     */
+    static HeartbeatResponseAction makeCatchupTakeoverAction();
 
     /**
      * Makes a new action telling the current node to step down as primary.
@@ -88,6 +108,11 @@ public:
     void setNextHeartbeatStartDate(Date_t when);
 
     /**
+     * Sets whether or not the heartbeat response advanced the member's opTime.
+     */
+    void setAdvancedOpTime(bool advanced);
+
+    /**
      * Gets the action type of this action.
      */
     Action getAction() const {
@@ -110,10 +135,19 @@ public:
         return _primaryIndex;
     }
 
+    /*
+     * Returns true if the heartbeat response resulting in our conception of the
+     * member's optime moving forward, so we need to recalculate lastCommittedOpTime.
+     */
+    bool getAdvancedOpTime() const {
+        return _advancedOpTime;
+    }
+
 private:
     Action _action;
     int _primaryIndex;
     Date_t _nextHeartbeatStartDate;
+    bool _advancedOpTime = false;
 };
 
 }  // namespace repl

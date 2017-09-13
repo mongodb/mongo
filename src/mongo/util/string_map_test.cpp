@@ -33,35 +33,35 @@
 
 #include "mongo/platform/random.h"
 #include "mongo/platform/unordered_map.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/log.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
 namespace {
 using namespace mongo;
 
 TEST(StringMapTest, Hash1) {
-    StringMapDefaultHash h;
-    ASSERT_EQUALS(h(""), h(""));
-    ASSERT_EQUALS(h("a"), h("a"));
-    ASSERT_EQUALS(h("abc"), h("abc"));
+    auto hash = StringMapTraits::hash;
+    ASSERT_EQUALS(hash(""), hash(""));
+    ASSERT_EQUALS(hash("a"), hash("a"));
+    ASSERT_EQUALS(hash("abc"), hash("abc"));
 
-    ASSERT_NOT_EQUALS(h(""), h("a"));
-    ASSERT_NOT_EQUALS(h("a"), h("ab"));
+    ASSERT_NOT_EQUALS(hash(""), hash("a"));
+    ASSERT_NOT_EQUALS(hash("a"), hash("ab"));
 
-    ASSERT_NOT_EQUALS(h("foo28"), h("foo35"));
+    ASSERT_NOT_EQUALS(hash("foo28"), hash("foo35"));
 }
 
-#define equalsBothWays(a, b)  \
-    ASSERT_TRUE(e((a), (b))); \
-    ASSERT_TRUE(e((b), (a)));
+#define equalsBothWays(a, b)       \
+    ASSERT_TRUE(equals((a), (b))); \
+    ASSERT_TRUE(equals((b), (a)));
 
-#define notEqualsBothWays(a, b) \
-    ASSERT_FALSE(e((a), (b)));  \
-    ASSERT_FALSE(e((b), (a)));
+#define notEqualsBothWays(a, b)     \
+    ASSERT_FALSE(equals((a), (b))); \
+    ASSERT_FALSE(equals((b), (a)));
 
 TEST(StringMapTest, Equals1) {
-    StringMapDefaultEqual e;
+    auto equals = StringMapTraits::equals;
 
     equalsBothWays("", "");
     equalsBothWays("a", "a");
@@ -204,5 +204,15 @@ TEST(StringMapTest, Assign) {
 
     y = m;
     ASSERT_EQUALS(5, y["eliot"]);
+}
+
+TEST(StringMapTest, InitWithInitializerList) {
+    StringMap<int> smap{
+        {"q", 1}, {"coollog", 2}, {"mango", 3}, {"mango", 4},
+    };
+
+    ASSERT_EQ(1, smap["q"]);
+    ASSERT_EQ(2, smap["coollog"]);
+    ASSERT_EQ(3, smap["mango"]);
 }
 }

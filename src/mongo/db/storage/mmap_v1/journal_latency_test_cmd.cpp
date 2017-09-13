@@ -44,10 +44,10 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/logfile.h"
-#include "mongo/db/storage/paths.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
 #include "mongo/util/timer.h"
@@ -64,14 +64,14 @@ boost::filesystem::path getJournalDir();
 }
 
 // Testing-only, enabled via command line
-class JournalLatencyTestCmd : public Command {
+class JournalLatencyTestCmd : public BasicCommand {
 public:
-    JournalLatencyTestCmd() : Command("journalLatencyTest") {}
+    JournalLatencyTestCmd() : BasicCommand("journalLatencyTest") {}
 
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual bool adminOnly() const {
@@ -84,11 +84,9 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
-             int,
-             string& errmsg,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         boost::filesystem::path p = dur::getJournalDir();
         p /= "journalLatencyTest";

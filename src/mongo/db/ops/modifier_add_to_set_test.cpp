@@ -29,18 +29,21 @@
 
 #include "mongo/db/ops/modifier_add_to_set.h"
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using mongo::BSONObj;
+using mongo::CollatorInterfaceMock;
 using mongo::LogBuilder;
 using mongo::ModifierAddToSet;
 using mongo::ModifierInterface;
@@ -55,9 +58,10 @@ class Mod {
 public:
     Mod() : _mod() {}
 
-    explicit Mod(BSONObj modObj) : _modObj(modObj), _mod() {
-        ASSERT_OK(_mod.init(_modObj["$addToSet"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+    explicit Mod(BSONObj modObj,
+                 ModifierInterface::Options options = ModifierInterface::Options::normal())
+        : _modObj(modObj), _mod() {
+        ASSERT_OK(_mod.init(_modObj["$addToSet"].embeddedObject().firstElement(), options));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -80,28 +84,6 @@ private:
     BSONObj _modObj;
     ModifierAddToSet _mod;
 };
-
-TEST(Init, FailToInitWithInvalidValue) {
-    BSONObj modObj;
-    ModifierAddToSet mod;
-
-    modObj = fromjson("{ $addToSet : { a : { 'x.$.y' : 'bad' } } }");
-    ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-    modObj = fromjson("{ $addToSet : { a : { $each : [ { 'x.$.y' : 'bad' } ] } } }");
-    ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-
-    // An int is not valid after $each
-    modObj = fromjson("{ $addToSet : { a : { $each : 0 } } }");
-    ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-
-    // An object is not valid after $each
-    modObj = fromjson("{ $addToSet : { a : { $each : { a : 1 } } } }");
-    ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-}
 
 TEST(Init, ParsesSimple) {
     Mod(fromjson("{ $addToSet : { a : 1 } }"));
@@ -386,4 +368,73 @@ TEST(Regressions, SERVER_12848) {
     ASSERT_EQUALS(fromjson("{ $set : { 'a.1' : [ 1 ] } }"), logDoc);
 }
 
+TEST(Deduplication, DeduplicationRespectsCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    Document doc(fromjson("{ a : ['bar'] }"));
+    Mod mod(fromjson("{ $addToSet : { a : { $each : ['FOO', 'foo'] } } }"));
+    mod.mod().setCollator(&collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_OK(mod.apply());
+
+    ASSERT(doc.compareWithBSONObj(fromjson("{ a : ['bar', 'FOO'] }"), nullptr, false) == 0 ||
+           doc.compareWithBSONObj(fromjson("{ a: ['bar', 'foo'] }"), nullptr, false) == 0);
+}
+
+TEST(Deduplication, ExistingDuplicatesArePreservedWithRespectToCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    Document doc(fromjson("{ a : ['bar', 'BAR'] }"));
+    Mod mod(fromjson("{ $addToSet : { a : { $each : ['FOO', 'foo'] } } }"));
+    mod.mod().setCollator(&collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_OK(mod.apply());
+
+    ASSERT_EQUALS(doc, fromjson("{ a : ['bar', 'BAR', 'FOO'] }"));
+}
+
+TEST(Collation, AddToSetRespectsCollationFromModifierOptions) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Document doc(fromjson("{ a : ['not'] }"));
+    Mod mod(fromjson("{ $addToSet : { a : 'equal' } }"),
+            ModifierInterface::Options::normal(&collator));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_TRUE(execInfo.noOp);
+}
+
+TEST(Collation, AddToSetRespectsCollationFromSetCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Document doc(fromjson("{ a : ['not'] }"));
+    Mod mod(fromjson("{ $addToSet : { a : 'equal' } }"));
+    mod.mod().setCollator(&collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_TRUE(execInfo.noOp);
+}
+
+TEST(Collation, AddToSetWithEachRespectsCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    Document doc(fromjson("{ a : ['abc'] }"));
+    Mod mod(fromjson("{ $addToSet : { a : { $each : ['ABC', 'bdc'] } } }"));
+    mod.mod().setCollator(&collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_FALSE(execInfo.noOp);
+    ASSERT_OK(mod.apply());
+
+    ASSERT_EQUALS(doc, fromjson("{ a : ['abc', 'bdc'] }"));
+}
 }  // namespace

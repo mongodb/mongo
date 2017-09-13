@@ -31,9 +31,9 @@
 #include <list>
 #include <memory>
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
@@ -51,9 +51,9 @@ class PlanYieldPolicy;
  * Preconditions: Valid RecordId.
  *
  */
-class CachedPlanStage : public PlanStage {
+class CachedPlanStage final : public PlanStage {
 public:
-    CachedPlanStage(OperationContext* txn,
+    CachedPlanStage(OperationContext* opCtx,
                     Collection* collection,
                     WorkingSet* ws,
                     CanonicalQuery* cq,
@@ -61,25 +61,19 @@ public:
                     size_t decisionWorks,
                     PlanStage* root);
 
-    virtual bool isEOF();
+    bool isEOF() final;
 
-    virtual StageState work(WorkingSetID* out);
+    StageState doWork(WorkingSetID* out) final;
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_CACHED_PLAN;
     }
 
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
@@ -116,12 +110,11 @@ private:
     /**
      * May yield during the cached plan stage's trial period or replanning phases.
      *
-     * Returns a non-OK status if the plan was killed during a yield.
+     * Returns a non-OK status if query planning fails. In particular, this function returns
+     * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield, or
+     * ErrorCodes::ExceededTimeLimit if the operation exceeded its time limit.
      */
     Status tryYield(PlanYieldPolicy* yieldPolicy);
-
-    // Not owned.
-    OperationContext* _txn;
 
     // Not owned. Must be non-null.
     Collection* _collection;
@@ -142,8 +135,6 @@ private:
     // that solution is owned here.
     std::unique_ptr<QuerySolution> _replannedQs;
 
-    std::unique_ptr<PlanStage> _root;
-
     // Any results produced during trial period execution are kept here.
     std::list<WorkingSetID> _results;
 
@@ -154,7 +145,6 @@ private:
     std::unique_ptr<RecordFetcher> _fetcher;
 
     // Stats
-    CommonStats _commonStats;
     CachedPlanStats _specificStats;
 };
 

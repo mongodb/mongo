@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <deque>
 #include <set>
 #include <string>
@@ -42,9 +43,9 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -67,30 +68,32 @@ struct ReplicaSetMonitor::IsMasterReply {
     bool isMaster;
     bool secondary;
     bool hidden;
+    int configVersion{};
     OID electionId;                     // Set if this isMaster reply is from the primary
     HostAndPort primary;                // empty if not present
     std::set<HostAndPort> normalHosts;  // both "hosts" and "passives"
     BSONObj tags;
+    int minWireVersion{};
+    int maxWireVersion{};
 
     // remaining fields aren't in isMaster reply, but are known to caller.
     HostAndPort host;
     int64_t latencyMicros;  // ignored if negative
+    Date_t lastWriteDate{};
+    repl::OpTime opTime{};
 };
 
 struct ReplicaSetMonitor::SetState {
     MONGO_DISALLOW_COPYING(SetState);
 
 public:
-    // A single node in the replicaSet
+    /**
+     * Holds the state of a single node in the replicaSet
+     */
     struct Node {
-        explicit Node(const HostAndPort& host) : host(host), latencyMicros(unknownLatency) {
-            markFailed();
-        }
+        explicit Node(const HostAndPort& host);
 
-        void markFailed() {
-            isUp = false;
-            isMaster = false;
-        }
+        void markFailed(const Status& status);
 
         bool matches(const ReadPreference pref) const;
 
@@ -107,21 +110,29 @@ public:
          * not match: { "dc": "nyc", "rack": 2 }
          * not match: { "dc": "sf" }
          */
-        bool matches(const BSONObj& tag) const;
+        bool matches(const BSONObj&) const;
+
+        /**
+         *  Returns true if all of the tags in the tag set match node's tags
+         */
+        bool matches(const TagSet&) const;
 
         /**
          * Updates this Node based on information in reply. The reply must be from this host.
          */
         void update(const IsMasterReply& reply);
 
-        // Intentionally chosen to compare worse than all known latencies.
-        static const int64_t unknownLatency;  // = numeric_limits<int64_t>::max()
-
         HostAndPort host;
-        bool isUp;
-        bool isMaster;          // implies isUp
-        int64_t latencyMicros;  // unknownLatency if unknown
-        BSONObj tags;           // owned
+        bool isUp{false};
+        bool isMaster{false};
+        int64_t latencyMicros{};
+        BSONObj tags;  // owned
+        int minWireVersion{};
+        int maxWireVersion{};
+        Date_t lastWriteDate{};            // from isMasterReply
+        Date_t lastWriteDateUpdateTime{};  // set to the local system's time at the time of updating
+                                           // lastWriteDate
+        repl::OpTime opTime{};             // from isMasterReply
     };
 
     typedef std::vector<Node> Nodes;
@@ -130,6 +141,10 @@ public:
      * seedNodes must not be empty
      */
     SetState(StringData name, const std::set<HostAndPort>& seedNodes);
+
+    SetState(const MongoURI& uri);
+
+    bool isUsable() const;
 
     /**
      * Returns a host matching criteria or an empty host if no known host matches.
@@ -151,7 +166,17 @@ public:
 
     void updateNodeIfInNodes(const IsMasterReply& reply);
 
-    std::string getServerAddress() const;
+    /**
+     * Returns the connection string of the nodes that are known the be in the set because we've
+     * seen them in the isMaster reply of a PRIMARY.
+     */
+    std::string getConfirmedServerAddress() const;
+
+    /**
+     * Returns the connection string of the nodes that are believed to be in the set because we've
+     * seen them in the isMaster reply of non-PRIMARY nodes in our seed list.
+     */
+    std::string getUnconfirmedServerAddress() const;
 
     /**
      * Before unlocking, do DEV checkInvariants();
@@ -173,12 +198,14 @@ public:
     int consecutiveFailedScans;
     std::set<HostAndPort> seedNodes;  // updated whenever a master reports set membership changes
     OID maxElectionId;                // largest election id observed by this ReplicaSetMonitor
+    int configVersion{0};             // version number of the replica set config.
     HostAndPort lastSeenMaster;  // empty if we have never seen a master. can be same as current
     Nodes nodes;                 // maintained sorted and unique by host
     ScanStatePtr currentScan;    // NULL if no scan in progress
     int64_t latencyThresholdMicros;
     mutable PseudoRandom rand;  // only used for host selection to balance load
     mutable int roundRobin;     // used when useDeterministicHostSelection is true
+    MongoURI setUri;            // URI that may have constructed this
 };
 
 struct ReplicaSetMonitor::ScanState {

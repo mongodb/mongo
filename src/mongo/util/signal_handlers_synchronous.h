@@ -50,4 +50,10 @@ void setupSynchronousSignalHandlers();
  */
 void reportOutOfMemoryErrorAndExit();
 
+/**
+ * Clears the signal mask for the process. This is called from forkServer and to setup
+ * the unit tests. On Windows, this is a noop.
+ */
+void clearSignalMask();
+
 }  // namespace mongo

@@ -1,0 +1,133 @@
+/*! @m_page{{c,java},lsm,Log-Structured Merge Trees}
+
+@section lsm_background Background
+
+A common requirement is sustained throughput under a workload that consists
+of random inserts, where either the key range is chosen so that inserts are
+very unlikely to conflict (e.g., 128-bit hashes), or where inserts are
+expected to overwrite existing values.
+
+With traditional btree variants, inserts are very fast while the data set
+remains in cache, but once the tree overflows the cache, performance drops
+significantly.  There are two factors involved:
+
+ -# once the data fills the cache, new inserts have some probability of going
+to a page that is not in cache, requiring a read; and
+ -# the cache is full of dirty pages, so pages have to be written to free
+space in the cache before the read can be satisfied.
+
+@section lsm_description Description of LSM trees
+
+Log-Structured Merge Trees are described in this paper by Patrick O'Neil,
+Edward Cheng, Dieter Gawlick and Elizabeth O'Neil:
+http://www.cs.umb.edu/~poneil/lsmtree.pdf
+
+A logical tree is split into several physical pieces so that the
+most-recently-updated portion of data is in a tree that fits entirely in
+memory.  The size of the in-memory chunk can be configured with the
+\c "lsm=(chunk_size)" configuration key to WT_SESSION::create.
+
+Once the in-memory tree reaches a threshold size, a new in-memory tree is
+created and the old tree synced to disk. Once written to disk, trees are
+read-only, though they are merged in the background with other on-disk
+trees to reduce the cost of reads.
+
+With this structure, "blind writes" can be performed entirely on the
+in-memory tree.  Deletes are implemented by inserting a special "tombstone"
+record into the in-memory tree.
+
+@section lsm_api Interface to LSM trees
+
+An LSM tree can be created as follows, in much the same way as a
+WiredTiger btree file:
+
+@code
+@m_if{c}
+session->create(session, "table:bucket", "type=lsm,key_format=S,value_format=S");
+@m_else
+session.create("table:bucket", "type=lsm,key_format=S,value_format=S");
+@m_endif
+@endcode
+
+Once created, the LSM tree can be accessed using the same cursor interface
+as other data sources in WiredTiger:
+
+@code
+@m_if{c}
+WT_CURSOR *c;
+
+session->open_cursor(session, "table:bucket", NULL, NULL, &c);
+for(;;) {
+    c->set_key(c, "key");
+    c->set_value(c, "value");
+    c->insert(c);
+}
+@m_else
+Cursor c = session.open_cursor("table:bucket", null, null);
+for(;;) {
+    c.putKeyString("key");
+    c.putValueString("value");
+    c.insert();
+}
+@m_endif
+@endcode
+
+If an LSM cursor is configured with \c "overwrite=false" passed to
+WT_SESSION::open_cursor, the result will be a search through the levels of the
+LSM tree before every modification.
+
+@section lsm_merge Merging
+
+A background thread is opened for each active LSM tree.  This thread is
+responsible for both writing old chunks to stable storage, and for merging
+multiple chunks together so that reads can be satisfied from a small number
+of files.  There is currently no way to configure merges: they are performed
+automatically by the background thread.
+
+@section lsm_bloom Bloom filters
+
+WiredTiger creates a Bloom filter when merging.  This is an additional file
+that contains a configurable number of bits per key (default 8).  Keys are
+hashed a configurable number of times (default 4), and the corresponding
+bits set.  The Bloom filter is used to avoid reading from a chunk if the key
+cannot be present.
+
+With the defaults, the Bloom filter only requires one byte per key, so
+it usually fits in cache.  The Bloom parameters can be configured with
+\c "lsm=(bloom_bit_count)" and \c "lsm=(bloom_hash_count)" configuration
+keys to WT_SESSION::create.  The Bloom file can be configured with the
+\c "lsm=(bloom_config)" key.
+
+@section lsm_schema Creating tables using LSM trees
+
+Tables or indices can be stored using LSM trees.  Schema support is provided
+for LSM as an extension to the WT_SESSION::create method:
+
+@code
+@m_if{c}
+session->create(session, "table:T", "type=lsm");
+@m_else
+session.create("table:T", "type=lsm");
+@m_endif
+@endcode
+
+The default type for all schema objects will continue to be btree.
+
+@section lsm_caveats Caveats
+
+@subsection lsm_hazard Hazard configuration
+
+Reads from an LSM cursor may need to position a cursor in each active chunk.
+The number of chunks depends on the chunk size, and how many chunks have
+been merged.  There must be at least as many hazard pointers available as
+there are chunks in the tree for each cursor that is open on the LSM tree.
+The number of hazard pointers is configured with the \c "hazard_max"
+configuration key to ::wiredtiger_open.
+
+@subsection lsm_checkpoints Named checkpoints
+
+Named checkpoints are not supported on LSM trees, and cursors cannot be
+opened with a non-empty \c "checkpoint" configuration (that is, only the
+most recent standard checkpoint can be read).
+
+ */

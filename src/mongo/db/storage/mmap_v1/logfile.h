@@ -62,6 +62,12 @@ public:
     void truncate();  // Removes extra data after current position
 
 private:
+    // Originally disks had a sector size of 512 bytes, after Advanced Format disks were deployed in
+    // 2011, the default minimium size became 4096.
+    // The direct io size is based on the physical disk sector, not the VM page size.
+    const size_t minDirectIOSizeBytes = 4096;
+
+private:
 #if defined(_WIN32)
     typedef HANDLE fd_type;
 #else

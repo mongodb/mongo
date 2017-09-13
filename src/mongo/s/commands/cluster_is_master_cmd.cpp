@@ -28,52 +28,98 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/transport/message_compressor_manager.h"
+#include "mongo/util/map_util.h"
 
 namespace mongo {
 namespace {
 
-class CmdIsMaster : public Command {
+class CmdIsMaster : public BasicCommand {
 public:
-    CmdIsMaster() : Command("isMaster", false, "ismaster") {}
+    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    virtual bool slaveOk() const {
+    bool slaveOk() const override {
         return true;
     }
 
-    virtual void help(std::stringstream& help) const {
+    void help(std::stringstream& help) const override {
         help << "test if this is master half of a replica pair";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) override {
         // No auth required
     }
 
-    virtual bool run(OperationContext* txn,
-                     const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
+        bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
+        if (!seenIsMaster) {
+            clientMetadataIsMasterState.setSeenIsMaster();
+        }
+
+        BSONElement element = cmdObj[kMetadataDocumentName];
+        if (!element.eoo()) {
+            if (seenIsMaster) {
+                return Command::appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::ClientMetadataCannotBeMutated,
+                           "The client metadata document may only be sent in the first isMaster"));
+            }
+
+            auto swParseClientMetadata = ClientMetadata::parse(element);
+
+            if (!swParseClientMetadata.getStatus().isOK()) {
+                return Command::appendCommandStatus(result, swParseClientMetadata.getStatus());
+            }
+
+            invariant(swParseClientMetadata.getValue());
+
+            swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
+
+            clientMetadataIsMasterState.setClientMetadata(
+                opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
+        }
+
         result.appendBool("ismaster", true);
         result.append("msg", "isdbgrid");
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
-        result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
+        result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
+        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
 
         // Mongos tries to keep exactly the same version range of the server for which
         // it is compiled.
-        result.append("maxWireVersion", maxWireVersion);
-        result.append("minWireVersion", minWireVersion);
+        result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
+        result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
+
+        const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
+                                                  "automationServiceDescriptor",
+                                                  static_cast<ServerParameter*>(nullptr));
+        if (parameter)
+            parameter->append(opCtx, result, "automationServiceDescriptor");
+
+        MessageCompressorManager::forSession(opCtx->getClient()->session())
+            .serverNegotiate(cmdObj, &result);
 
         return true;
     }

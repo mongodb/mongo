@@ -1,0 +1,12 @@
+/*! @m_page{{c,java},in_memory,In-memory databases}
+
+The ::wiredtiger_open \c in_memory configuration changes WiredTiger to
+run in cache without writing to a backing disk. Data is limited to the
+configured cache size.
+
+If \c in_memory is configured, WT_CURSOR::insert and WT_CURSOR::update
+methods may return an additional error, ::WT_CACHE_FULL, indicating the
+insert or update operation requires more than the configured cache size
+to complete. If a transaction is in progress, it should be rolled back.
+
+ */

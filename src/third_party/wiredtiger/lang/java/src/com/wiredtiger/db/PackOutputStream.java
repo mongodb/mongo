@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -42,6 +42,7 @@ public class PackOutputStream {
     protected PackFormatInputStream format;
     protected ByteArrayOutputStream packed;
     protected byte[] intBuf;
+    protected boolean isRaw;
 
     /**
      * Constructor.
@@ -50,9 +51,21 @@ public class PackOutputStream {
      *               defines the layout of this packed value.
      */
     public PackOutputStream(String format) {
-        this.format = new PackFormatInputStream(format);
-        intBuf = new byte[MAX_INT_BYTES];
-        packed = new ByteArrayOutputStream(100);
+        this(format, false);
+    }
+
+    /**
+     * Constructor.
+     *
+     * \param format A String that contains the WiredTiger format that
+     *               defines the layout of this packed value.
+     * \param isRaw The stream is opened raw.
+     */
+    public PackOutputStream(String format, boolean isRaw) {
+        this.format = new PackFormatInputStream(format, isRaw);
+        this.intBuf = new byte[MAX_INT_BYTES];
+        this.packed = new ByteArrayOutputStream(100);
+        this.isRaw = isRaw;
     }
 
     /**
@@ -109,14 +122,33 @@ public class PackOutputStream {
      */
     public void addByteArray(byte[] value, int off, int len)
     throws WiredTigerPackingException {
-        format.checkType('U', true);
-        // If this is not the last item, store the size.
-        if (format.available() > 0) {
+        int padBytes = 0;
+
+        if (!isRaw) {
+            format.checkType('U', false);
+        }
+        boolean havesize = format.hasLength();
+        char type = format.getType();
+        if (havesize) {
+            int size = format.getLengthFromFormat(true);
+            if (len > size) {
+                len = size;
+            } else if (size > len) {
+                padBytes = size - len;
+            }
+        }
+        // We're done pulling information from the field now.
+        format.consume();
+
+        // If this is not the last item and the format does not have the
+        // size, or we're using the internal 'U' format, store the size.
+        if (!havesize && (format.available() > 0 || type == 'U')) {
             packLong(len, false);
         }
-
         packed.write(value, off, len);
-        /* TODO: padding. */
+        while(padBytes-- > 0) {
+            packed.write(0);
+        }
     }
 
     /**
@@ -178,17 +210,30 @@ public class PackOutputStream {
         // Strings have two possible encodings. A lower case 's' is not null
         // terminated, and has a length define in the format (default 1). An
         // upper case 'S' is variable length and has a null terminator.
-        if (fieldFormat == 's') {
-            stringLen = format.getLengthFromFormat(true);
-            valLen = value.length();
-            if (stringLen > valLen) {
-                padBytes = stringLen - valLen;
-                stringLen = valLen;
-            }
+
+        // Logic from python packing.py:
+        boolean havesize = format.hasLength();
+        int nullpos = value.indexOf('\0');
+        int size = 0;
+
+        if (fieldFormat == 'S' && nullpos >= 0) {
+            stringLen = nullpos;
         } else {
             stringLen = value.length();
-            padBytes = 1; // Null terminator
         }
+        if (havesize || fieldFormat == 's') {
+            size = format.getLengthFromFormat(true);
+            if (stringLen > size) {
+                stringLen = size;
+            }
+        }
+
+        if (fieldFormat == 'S' && !havesize) {
+            padBytes = 1;
+        } else if (size > stringLen) {
+            padBytes = size - stringLen;
+        }
+
         // We're done pulling information from the field now.
         format.consume();
 
@@ -249,6 +294,12 @@ public class PackOutputStream {
             intBuf[offset++] =
                 (byte)(PackUtil.POS_2BYTE_MARKER | PackUtil.GET_BITS(x, 13, 8));
             intBuf[offset++] = PackUtil.GET_BITS(x, 8, 0);
+        } else if (x == PackUtil.POS_2BYTE_MAX + 1) {
+            // This is a special case where we could store the value with
+            // just a single byte, but we append a zero byte so that the
+            // encoding doesn't get shorter for this one value.
+            intBuf[offset++] = (byte)(PackUtil.POS_MULTI_MARKER | 0x01);
+            intBuf[offset++] = 0;
         } else {
             x -= PackUtil.POS_2BYTE_MAX + 1;
             intBuf[offset] = PackUtil.POS_MULTI_MARKER;

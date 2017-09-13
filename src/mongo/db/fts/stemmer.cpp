@@ -29,7 +29,6 @@
 */
 
 #include <cstdlib>
-#include <string>
 
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/util/mongoutils/str.h"
@@ -37,8 +36,6 @@
 namespace mongo {
 
 namespace fts {
-
-using std::string;
 
 Stemmer::Stemmer(const FTSLanguage* language) {
     _stemmer = NULL;
@@ -53,9 +50,9 @@ Stemmer::~Stemmer() {
     }
 }
 
-string Stemmer::stem(StringData word) const {
+StringData Stemmer::stem(StringData word) const {
     if (!_stemmer)
-        return word.toString();
+        return word;
 
     const sb_symbol* sb_sym =
         sb_stemmer_stem(_stemmer, (const sb_symbol*)word.rawData(), word.size());
@@ -65,7 +62,7 @@ string Stemmer::stem(StringData word) const {
         invariant(false);
     }
 
-    return string((const char*)(sb_sym), sb_stemmer_length(_stemmer));
+    return StringData((const char*)(sb_sym), sb_stemmer_length(_stemmer));
 }
 }
 }

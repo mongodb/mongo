@@ -7,11 +7,11 @@ var coll = st.s0.getCollection("test.foo");
 // Pre-split collection: shard 0 takes {x: {$lt: 0}}, shard 1 takes {x: {$gte: 0}}.
 //
 assert.commandWorked(coll.getDB().adminCommand({enableSharding: coll.getDB().getName()}));
-coll.getDB().adminCommand({movePrimary: coll.getDB().getName(), to: "shard0000"});
+st.ensurePrimaryShard(coll.getDB().toString(), "shard0000");
 assert.commandWorked(coll.getDB().adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
 assert.commandWorked(coll.getDB().adminCommand({split: coll.getFullName(), middle: {x: 0}}));
-assert.commandWorked(coll.getDB().adminCommand({moveChunk: coll.getFullName(), find: {x: 0},
-                                                to: "shard0001"}));
+assert.commandWorked(
+    coll.getDB().adminCommand({moveChunk: coll.getFullName(), find: {x: 0}, to: "shard0001"}));
 
 //
 // Test that idhack queries with projections that remove the shard key return correct results.

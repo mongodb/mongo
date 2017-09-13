@@ -2,6 +2,24 @@
 
 Import("env")
 
+env = env.Clone()
+
+env.Library(
+    target='deferred_writer',
+    source=[
+        'deferred_writer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+    ],
+)
+
 env.Library(
     target='write_conflict_exception',
     source=[
@@ -13,6 +31,17 @@ env.Library(
 )
 
 env.Library(
+    target='global_lock_acquisition_tracker',
+    source=[
+        'global_lock_acquisition_tracker.cpp'
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/decorable',
+    ]
+)
+
+
+env.Library(
     target='lock_manager',
     source=[
         'd_concurrency.cpp',
@@ -21,9 +50,9 @@ env.Library(
         'lock_stats.cpp',
     ],
     LIBDEPS=[
+        'global_lock_acquisition_tracker',
         '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/base',
         # Temporary crutch since the ssl cleanup is hard coded in background.cpp
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/db/server_parameters',
@@ -43,6 +72,11 @@ env.CppUnitTest(
             'lock_stats_test.cpp',
     ],
     LIBDEPS=[
-        'lock_manager'
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/util/progress_meter',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        'global_lock_acquisition_tracker',
+        'lock_manager',
+        'write_conflict_exception',
     ]
 )

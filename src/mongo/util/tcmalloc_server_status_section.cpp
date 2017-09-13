@@ -27,15 +27,22 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#ifdef _WIN32
+#define NVALGRIND
+#endif
+
 #include "mongo/platform/basic.h"
 
 #include <gperftools/malloc_extension.h>
+#include <valgrind/valgrind.h>
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/util/concurrency/synchronization.h"
+#include "mongo/db/service_context.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
+#include "mongo/util/net/thread_idle_callback.h"
 
 namespace mongo {
 
@@ -45,28 +52,43 @@ namespace {
 // it is better to release memory when it is likely the thread will be blocked for
 // a long time.
 const int kManyClients = 40;
-size_t tcmallocPoolSize = 0;
 
-// Callback to allow TCMalloc to release freed memory to the central list at favorable times.
+stdx::mutex tcmallocCleanupLock;
+
+/**
+ *  Callback to allow TCMalloc to release freed memory to the central list at
+ *  favorable times. Ideally would do some milder cleanup or scavenge...
+ */
 void threadStateChange() {
-    int thread_count = Listener::globalTicketHolder.used();
-    if (thread_count <= kManyClients)
+    if (getGlobalServiceContext()->getTransportLayer()->sessionStats().numOpenSessions <=
+        kManyClients)
         return;
 
-#if MONGO_HAVE_GPERFTOOLS_SHRINK_CACHE_SIZE
-    MallocExtension::instance()->ShrinkCacheIfAboveSize(tcmallocPoolSize / thread_count);
-#else
-    MallocExtension::instance()->MarkThreadIdle();
-    MallocExtension::instance()->MarkThreadBusy();
+#if MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE
+    size_t threadCacheSizeBytes = MallocExtension::instance()->GetThreadCacheSize();
+
+    static const size_t kMaxThreadCacheSizeBytes = 0x10000;
+    if (threadCacheSizeBytes < kMaxThreadCacheSizeBytes) {
+        // This number was chosen a bit magically.
+        // At 1000 threads and the current (64mb) thread local cache size, we're "full".
+        // So we may want this number to scale with the number of current clients.
+        return;
+    }
+
+    LOG(1) << "thread over memory limit, cleaning up, current: " << (threadCacheSizeBytes / 1024)
+           << "k";
+
+    // We synchronize as the tcmalloc central list uses a spinlock, and we can cause a really
+    // terrible runaway if we're not careful.
+    stdx::lock_guard<stdx::mutex> lk(tcmallocCleanupLock);
 #endif
+    MallocExtension::instance()->MarkThreadTemporarilyIdle();
 }
 
 // Register threadStateChange callback
 MONGO_INITIALIZER(TCMallocThreadIdleListener)(InitializerContext*) {
-    registerThreadIdleCallback(&threadStateChange);
-    MallocExtension::instance()->GetNumericProperty("tcmalloc.max_total_thread_cache_bytes",
-                                                    &tcmallocPoolSize);
-    LOG(1) << "tcmallocPoolSize: " << tcmallocPoolSize << "\n";
+    if (!RUNNING_ON_VALGRIND)
+        registerThreadIdleCallback(&threadStateChange);
     return Status::OK();
 }
 
@@ -74,10 +96,20 @@ class TCMallocServerStatusSection : public ServerStatusSection {
 public:
     TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
     virtual bool includeByDefault() const {
-        return false;
+        return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const {
+        long long verbosity = 1;
+        if (configElement) {
+            // Relies on the fact that safeNumberLong turns non-numbers into 0.
+            long long configValue = configElement.safeNumberLong();
+            if (configValue) {
+                verbosity = configValue;
+            }
+        }
+
         BSONObjBuilder builder;
 
         // For a list of properties see the "Generic Tcmalloc Status" section of
@@ -91,6 +123,7 @@ public:
         }
         {
             BSONObjBuilder sub(builder.subobjStart("tcmalloc"));
+
             appendNumericPropertyIfAvailable(
                 sub, "pageheap_free_bytes", "tcmalloc.pageheap_free_bytes");
             appendNumericPropertyIfAvailable(
@@ -102,6 +135,18 @@ public:
                                              "tcmalloc.current_total_thread_cache_bytes");
             // Not including tcmalloc.slack_bytes since it is deprecated.
 
+            // Calculate total free bytes, *excluding the page heap*
+            size_t central;
+            size_t transfer;
+            size_t thread;
+            if (MallocExtension::instance()->GetNumericProperty("tcmalloc.central_cache_free_bytes",
+                                                                &central) &&
+                MallocExtension::instance()->GetNumericProperty(
+                    "tcmalloc.transfer_cache_free_bytes", &transfer) &&
+                MallocExtension::instance()->GetNumericProperty("tcmalloc.thread_cache_free_bytes",
+                                                                &thread)) {
+                sub.appendNumber("total_free_bytes", central + transfer + thread);
+            }
             appendNumericPropertyIfAvailable(
                 sub, "central_cache_free_bytes", "tcmalloc.central_cache_free_bytes");
             appendNumericPropertyIfAvailable(
@@ -110,11 +155,20 @@ public:
                 sub, "thread_cache_free_bytes", "tcmalloc.thread_cache_free_bytes");
             appendNumericPropertyIfAvailable(
                 sub, "aggressive_memory_decommit", "tcmalloc.aggressive_memory_decommit");
-        }
 
-        char buffer[4096];
-        MallocExtension::instance()->GetStats(buffer, sizeof(buffer));
-        builder.append("formattedString", buffer);
+#if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
+            if (verbosity >= 2) {
+                // Size class information
+                BSONArrayBuilder arr;
+                MallocExtension::instance()->SizeClasses(&arr, appendSizeClassInfo);
+                sub.append("size_classes", arr.arr());
+            }
+#endif
+
+            char buffer[4096];
+            MallocExtension::instance()->GetStats(buffer, sizeof buffer);
+            builder.append("formattedString", buffer);
+        }
 
         return builder.obj();
     }
@@ -127,6 +181,24 @@ private:
         if (MallocExtension::instance()->GetNumericProperty(property, &value))
             builder.appendNumber(bsonName, value);
     }
+
+#if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
+    static void appendSizeClassInfo(void* bsonarr_builder, const base::MallocSizeClass* stats) {
+        BSONArrayBuilder* builder = reinterpret_cast<BSONArrayBuilder*>(bsonarr_builder);
+        BSONObjBuilder doc;
+
+        doc.appendNumber("bytes_per_object", stats->bytes_per_obj);
+        doc.appendNumber("pages_per_span", stats->pages_per_span);
+        doc.appendNumber("num_spans", stats->num_spans);
+        doc.appendNumber("num_thread_objs", stats->num_thread_objs);
+        doc.appendNumber("num_central_objs", stats->num_central_objs);
+        doc.appendNumber("num_transfer_objs", stats->num_transfer_objs);
+        doc.appendNumber("free_bytes", stats->free_bytes);
+        doc.appendNumber("allocated_bytes", stats->alloc_bytes);
+
+        builder->append(doc.obj());
+    }
+#endif
 } tcmallocServerStatusSection;
 }
 }

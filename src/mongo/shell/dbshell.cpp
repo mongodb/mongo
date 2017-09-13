@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
@@ -49,21 +50,23 @@
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/util/exit_code.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
-#include "mongo/util/static_observer.h"
+#include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
@@ -82,13 +85,24 @@ using namespace mongo;
 string historyFile;
 bool gotInterrupted = false;
 bool inMultiLine = false;
-static volatile bool atPrompt = false;  // can eval before getting to prompt
+static AtomicBool atPrompt(false);  // can eval before getting to prompt
+
+namespace {
+const auto kDefaultMongoURL = "mongodb://127.0.0.1:27017"_sd;
+
+// We set the featureCompatibilityVersion to 3.6 in the mongo shell and rely on the server to reject
+// usages of new features if its featureCompatibilityVersion is lower.
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion36, ("EndStartupOptionSetup"))
+(InitializerContext* context) {
+    mongo::serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
+    return Status::OK();
+}
+}
 
 namespace mongo {
 
 Scope* shellMainScope;
-
-extern bool dbexitCalled;
 }
 
 void generateCompletions(const string& prefix, vector<string>& all) {
@@ -129,12 +143,18 @@ void shellHistoryInit() {
     ss << ".dbshell";
     historyFile = ss.str();
 
-    linenoiseHistoryLoad(historyFile.c_str());
+    Status res = linenoiseHistoryLoad(historyFile.c_str());
+    if (!res.isOK()) {
+        error() << "Error loading history file: " << res;
+    }
     linenoiseSetCompletionCallback(completionHook);
 }
 
 void shellHistoryDone() {
-    linenoiseHistorySave(historyFile.c_str());
+    Status res = linenoiseHistorySave(historyFile.c_str());
+    if (!res.isOK()) {
+        error() << "Error saving history file: " << res;
+    }
     linenoiseHistoryFree();
 }
 void shellHistoryAdd(const char* line) {
@@ -166,7 +186,7 @@ void killOps() {
     if (mongo::shell_utils::_nokillop)
         return;
 
-    if (atPrompt)
+    if (atPrompt.load())
         return;
 
     sleepmillis(10);  // give current op a chance to finish
@@ -175,36 +195,20 @@ void killOps() {
         !shellGlobalParams.autoKillOp);
 }
 
-// Stubs for signal_handlers.cpp
-namespace mongo {
-void logProcessDetailsForLogRotate() {}
-
-void exitCleanly(ExitCode code) {
-    {
-        stdx::lock_guard<stdx::mutex> lk(mongo::shell_utils::mongoProgramOutputMutex);
-        mongo::dbexitCalled = true;
-    }
-
-    ::killOps();
-    ::shellHistoryDone();
-    quickExit(0);
-}
-}
-
 void quitNicely(int sig) {
-    exitCleanly(EXIT_CLEAN);
+    shutdown(EXIT_CLEAN);
 }
 
 // the returned string is allocated with strdup() or malloc() and must be freed by calling free()
 char* shellReadline(const char* prompt, int handlesigint = 0) {
-    atPrompt = true;
+    atPrompt.store(true);
 
     char* ret = linenoise(prompt);
     if (!ret) {
         gotInterrupted = true;  // got ^C, break out of multiline
     }
 
-    atPrompt = false;
+    atPrompt.store(false);
     return ret;
 }
 
@@ -212,35 +216,62 @@ void setupSignals() {
     signal(SIGINT, quitNicely);
 }
 
-string fixHost(const std::string& url, const std::string& host, const std::string& port) {
+string getURIFromArgs(const std::string& url, const std::string& host, const std::string& port) {
     if (host.size() == 0 && port.size() == 0) {
-        if (url.find("/") == string::npos) {
-            // check for ips
-            if (url.find(".") != string::npos)
-                return url + "/test";
-
-            if (url.rfind(":") != string::npos && isdigit(url[url.rfind(":") + 1]))
-                return url + "/test";
-        }
-        return url;
+        return url.size() == 0 ? kDefaultMongoURL.toString() : url;
     }
 
+    // The name URL is misleading; really it's just a positional argument that wasn't a file. The
+    // check for "/" means "this 'URL' is probably a real URL and not the db name (e.g.)".
     if (url.find("/") != string::npos) {
-        cerr << "url can't have host or port if you specify them individually" << endl;
+        cerr << "if a full URI is provided, you cannot also specify host or port" << endl;
         quickExit(-1);
     }
 
-    string newurl((host.size() == 0) ? "127.0.0.1" : host);
-    if (port.size() > 0)
-        newurl += ":" + port;
-    else if (host.find(':') == string::npos) {
-        // need to add port with IPv6 addresses
-        newurl += ":27017";
+    bool hostEndsInSock = str::endsWith(host, ".sock");
+    const auto hostHasPort = (host.find(":") != std::string::npos);
+
+    // If host looks like a full URI (i.e. has a slash and isn't a unix socket) and the other fields
+    // are empty, then just return host.
+    std::string::size_type slashPos;
+    if (url.size() == 0 && port.size() == 0 &&
+        (!hostEndsInSock && ((slashPos = host.find("/")) != string::npos))) {
+        if (str::startsWith(host, "mongodb://")) {
+            return host;
+        }
+        // If there's a slash in the host field, then it's the replica set name, not a database name
+        stringstream ss;
+        ss << "mongodb://" << host.substr(slashPos + 1)
+           << "/?replicaSet=" << host.substr(0, slashPos);
+        return ss.str();
     }
 
-    newurl += "/" + url;
+    stringstream ss;
+    if (host.size() == 0) {
+        ss << "mongodb://127.0.0.1";
+    } else {
+        if (!str::startsWith(host, "mongodb://")) {
+            ss << "mongodb://";
+        }
+        ss << host;
+    }
 
-    return newurl;
+    if (!hostEndsInSock) {
+        if (port.size() > 0) {
+            if (hostHasPort) {
+                std::cerr << "Cannot specify a port in --host and also with --port" << std::endl;
+                quickExit(-1);
+            }
+            ss << ":" << port;
+        } else if (!hostHasPort || str::endsWith(host, "]")) {
+            // Default the port to 27017 if the host did not provide one (i.e. the host has no
+            // colons or ends in ']' like an IPv6 address).
+            ss << ":27017";
+        }
+    }
+
+    ss << "/" << url;
+    return ss.str();
 }
 
 static string OpSymbols = "~!%^&*-+=|:,<>/?.";
@@ -584,12 +615,18 @@ static void edit(const string& whatToEdit) {
 }
 
 int _main(int argc, char* argv[], char** envp) {
-    setupSignalHandlers(true);
+    registerShutdownTask([] {
+        // NOTE: This function may be called at any time. It must not
+        // depend on the prior execution of mongo initializers or the
+        // existence of threads.
+        ::killOps();
+        ::shellHistoryDone();
+    });
+
+    setupSignalHandlers();
     setupSignals();
 
     mongo::shell_utils::RecordMyLocation(argv[0]);
-
-    shellGlobalParams.url = "test";
 
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
@@ -603,8 +640,8 @@ int _main(int argc, char* argv[], char** envp) {
         }
     }
 
-    if (!mongo::serverGlobalParams.quiet)
-        cout << "MongoDB shell version: " << mongo::versionString << endl;
+    if (!mongo::serverGlobalParams.quiet.load())
+        cout << mongoShellVersion(VersionInfoInterface::instance()) << endl;
 
     mongo::StartupTest::runTests();
 
@@ -616,10 +653,11 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (!shellGlobalParams.nodb) {  // connect to db
         stringstream ss;
-        if (mongo::serverGlobalParams.quiet)
+        if (mongo::serverGlobalParams.quiet.load())
             ss << "__quiet = true;";
         ss << "db = connect( \""
-           << fixHost(shellGlobalParams.url, shellGlobalParams.dbhost, shellGlobalParams.port)
+           << getURIFromArgs(
+                  shellGlobalParams.url, shellGlobalParams.dbhost, shellGlobalParams.port)
            << "\")";
 
         mongo::shell_utils::_dbConnect = ss.str();
@@ -651,7 +689,8 @@ int _main(int argc, char* argv[], char** envp) {
                          << escape(shellGlobalParams.gssapiServiceName) << "\";" << endl;
     }
 
-    if (!shellGlobalParams.nodb && shellGlobalParams.username.size()) {
+    if (!shellGlobalParams.nodb && (!shellGlobalParams.username.empty() ||
+                                    shellGlobalParams.authenticationMechanism == "MONGODB-X509")) {
         authStringStream << "var username = \"" << escape(shellGlobalParams.username) << "\";"
                          << endl;
         if (shellGlobalParams.usingPassword) {
@@ -664,11 +703,14 @@ int _main(int argc, char* argv[], char** envp) {
             authStringStream << "var authDb = db.getSiblingDB(\""
                              << escape(shellGlobalParams.authenticationDatabase) << "\");" << endl;
         }
-        authStringStream << "authDb._authOrThrow({ " << saslCommandUserFieldName << ": username ";
+
+        authStringStream << "authDb._authOrThrow({ ";
+        if (!shellGlobalParams.username.empty()) {
+            authStringStream << saslCommandUserFieldName << ": username ";
+        }
         if (shellGlobalParams.usingPassword) {
             authStringStream << ", " << saslCommandPasswordFieldName << ": password ";
         }
-
         if (!shellGlobalParams.gssapiHostName.empty()) {
             authStringStream << ", " << saslCommandServiceHostnameFieldName << ": \""
                              << escape(shellGlobalParams.gssapiHostName) << '"' << endl;
@@ -680,8 +722,15 @@ int _main(int argc, char* argv[], char** envp) {
 
     mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
     mongo::ScriptEngine::setup();
-    mongo::globalScriptEngine->setScopeInitCallback(mongo::shell_utils::initScope);
-    unique_ptr<mongo::Scope> scope(mongo::globalScriptEngine->newScope());
+    mongo::getGlobalScriptEngine()->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
+    mongo::getGlobalScriptEngine()->setScopeInitCallback(mongo::shell_utils::initScope);
+    mongo::getGlobalScriptEngine()->enableJIT(!shellGlobalParams.nojit);
+    mongo::getGlobalScriptEngine()->enableJavaScriptProtection(
+        shellGlobalParams.javascriptProtection);
+
+    auto poolGuard = MakeGuard([] { ScriptEngine::dropScopeCache(); });
+
+    unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
     shellMainScope = scope.get();
 
     if (shellGlobalParams.runShell)
@@ -706,8 +755,9 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (!shellGlobalParams.script.empty()) {
         mongo::shell_utils::MongoProgramScope s;
-        if (!scope->exec(shellGlobalParams.script, "(shell eval)", true, true, false))
+        if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false))
             return -4;
+        scope->exec("shellPrintHelper( __lastres__ );", "(shell2 eval)", true, true, false);
     }
 
     for (size_t i = 0; i < shellGlobalParams.files.size(); ++i) {
@@ -720,11 +770,15 @@ int _main(int argc, char* argv[], char** envp) {
             cout << "failed to load: " << shellGlobalParams.files[i] << endl;
             return -3;
         }
+        if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
+            return -3;
+        }
     }
 
     if (shellGlobalParams.files.size() == 0 && shellGlobalParams.script.empty())
         shellGlobalParams.runShell = true;
 
+    bool lastLineSuccessful = true;
     if (shellGlobalParams.runShell) {
         mongo::shell_utils::MongoProgramScope s;
         // If they specify norc, assume it's not their first time
@@ -744,7 +798,8 @@ int _main(int argc, char* argv[], char** envp) {
                 hasMongoRC = true;
                 if (!scope->execFile(rcLocation, false, true)) {
                     cout << "The \".mongorc.js\" file located in your home folder could not be "
-                            "executed" << endl;
+                            "executed"
+                         << endl;
                     return -5;
                 }
             }
@@ -761,9 +816,16 @@ int _main(int argc, char* argv[], char** envp) {
             f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
         }
 
-        if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet && isatty(fileno(stdin))) {
+        if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet.load() &&
+            isatty(fileno(stdin))) {
             scope->exec(
-                "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings", false, true, false);
+                "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings)", false, true, false);
+
+            scope->exec("shellHelper( 'show', 'automationNotices' )",
+                        "(automationnotices)",
+                        false,
+                        true,
+                        false);
         }
 
         shellHistoryInit();
@@ -796,7 +858,7 @@ int _main(int argc, char* argv[], char** envp) {
             }
 
             if (!linePtr || (strlen(linePtr) == 4 && strstr(linePtr, "exit"))) {
-                if (!mongo::serverGlobalParams.quiet)
+                if (!mongo::serverGlobalParams.quiet.load())
                     cout << "bye" << endl;
                 if (line)
                     free(line);
@@ -847,39 +909,46 @@ int _main(int argc, char* argv[], char** envp) {
             bool wascmd = false;
             {
                 string cmd = linePtr;
-                if (cmd.find(" ") > 0)
-                    cmd = cmd.substr(0, cmd.find(" "));
+                string::size_type firstSpace;
+                if ((firstSpace = cmd.find(" ")) != string::npos)
+                    cmd = cmd.substr(0, firstSpace);
 
                 if (cmd.find("\"") == string::npos) {
                     try {
-                        scope->exec((string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
-                                    "(shellhelp1)",
-                                    false,
-                                    true,
-                                    true);
-                        if (scope->getBoolean("__iscmd__")) {
-                            scope->exec((string) "shellHelper( \"" + cmd + "\" , \"" +
-                                            code.substr(cmd.size()) + "\");",
-                                        "(shellhelp2)",
+                        lastLineSuccessful =
+                            scope->exec((string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
+                                        "(shellhelp1)",
                                         false,
                                         true,
-                                        false);
+                                        true);
+                        if (scope->getBoolean("__iscmd__")) {
+                            lastLineSuccessful =
+                                scope->exec((string) "shellHelper( \"" + cmd + "\" , \"" +
+                                                code.substr(cmd.size()) + "\");",
+                                            "(shellhelp2)",
+                                            false,
+                                            true,
+                                            false);
                             wascmd = true;
                         }
                     } catch (std::exception& e) {
                         cout << "error2:" << e.what() << endl;
                         wascmd = true;
+                        lastLineSuccessful = false;
                     }
                 }
             }
 
             if (!wascmd) {
                 try {
-                    if (scope->exec(code.c_str(), "(shell)", false, true, false))
+                    lastLineSuccessful = scope->exec(code.c_str(), "(shell)", false, true, false);
+                    if (lastLineSuccessful) {
                         scope->exec(
                             "shellPrintHelper( __lastres__ );", "(shell2)", true, true, false);
+                    }
                 } catch (std::exception& e) {
                     cout << "error:" << e.what() << endl;
+                    lastLineSuccessful = false;
                 }
             }
 
@@ -890,16 +959,11 @@ int _main(int argc, char* argv[], char** envp) {
         shellHistoryDone();
     }
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(mongo::shell_utils::mongoProgramOutputMutex);
-        mongo::dbexitCalled = true;
-    }
-    return 0;
+    return (lastLineSuccessful ? 0 : 1);
 }
 
 #ifdef _WIN32
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    static mongo::StaticObserver staticObserver;
     int returnCode;
     try {
         WindowsCommandLine wcl(argc, argvW, envpW);
@@ -912,7 +976,6 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
 }
 #else   // #ifdef _WIN32
 int main(int argc, char* argv[], char** envp) {
-    static mongo::StaticObserver staticObserver;
     int returnCode;
     try {
         returnCode = _main(argc, argv, envp);

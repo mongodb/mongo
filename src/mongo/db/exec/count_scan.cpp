@@ -28,33 +28,66 @@
 
 #include "mongo/db/exec/count_scan.h"
 
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
+namespace {
+/**
+ * This function replaces field names in *replace* with those from the object
+ * *fieldNames*, preserving field ordering.  Both objects must have the same
+ * number of fields.
+ *
+ * Example:
+ *
+ *     replaceBSONKeyNames({ 'a': 1, 'b' : 1 }, { '': 'foo', '', 'bar' }) =>
+ *
+ *         { 'a' : 'foo' }, { 'b' : 'bar' }
+ */
+BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames) {
+    invariant(replace.nFields() == fieldNames.nFields());
+
+    BSONObjBuilder bob;
+    BSONObjIterator iter = fieldNames.begin();
+
+    for (const BSONElement& el : replace) {
+        bob.appendAs(el, (*iter++).fieldNameStringData());
+    }
+
+    return bob.obj();
+}
+}
+
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* CountScan::kStageType = "COUNT_SCAN";
 
-CountScan::CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet)
-    : _txn(txn),
+CountScan::CountScan(OperationContext* opCtx, const CountScanParams& params, WorkingSet* workingSet)
+    : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
       _descriptor(params.descriptor),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-      _shouldDedup(params.descriptor->isMultikey(txn)),
-      _params(params),
-      _commonStats(kStageType) {
+      _shouldDedup(params.descriptor->isMultikey(opCtx)),
+      _params(params) {
     _specificStats.keyPattern = _params.descriptor->keyPattern();
+    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
+        invariant(collationElement.isABSONObj());
+        _specificStats.collation = collationElement.Obj().getOwned();
+    }
     _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
+    _specificStats.isMultiKey = _params.descriptor->isMultikey(opCtx);
+    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(opCtx);
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.indexVersion = _params.descriptor->version();
+    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
 
     // endKey must be after startKey in index order since we only do forward scans.
     dassert(_params.startKey.woCompare(_params.endKey,
@@ -63,13 +96,9 @@ CountScan::CountScan(OperationContext* txn, const CountScanParams& params, Worki
 }
 
 
-PlanStage::StageState CountScan::work(WorkingSetID* out) {
-    ++_commonStats.works;
+PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF)
         return PlanStage::IS_EOF;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     boost::optional<IndexKeyEntry> entry;
     const bool needInit = !_cursor;
@@ -79,14 +108,14 @@ PlanStage::StageState CountScan::work(WorkingSetID* out) {
 
         if (needInit) {
             // First call to work().  Perform cursor init.
-            _cursor = _iam->newCursor(_txn);
+            _cursor = _iam->newCursor(getOpCtx());
             _cursor->setEndPosition(_params.endKey, _params.endKeyInclusive);
 
             entry = _cursor->seek(_params.startKey, _params.startKeyInclusive, kWantLoc);
         } else {
             entry = _cursor->next(kWantLoc);
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         if (needInit) {
             // Release our cursor and try again next time.
             _cursor.reset();
@@ -105,12 +134,12 @@ PlanStage::StageState CountScan::work(WorkingSetID* out) {
 
     if (_shouldDedup && !_returned.insert(entry->loc).second) {
         // *loc was already in _returned.
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
 
-    *out = WorkingSet::INVALID_ID;
-    ++_commonStats.advanced;
+    WorkingSetID id = _workingSet->allocate();
+    _workingSet->transitionToRecordIdAndObj(id);
+    *out = id;
     return PlanStage::ADVANCED;
 }
 
@@ -118,29 +147,31 @@ bool CountScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void CountScan::saveState() {
-    _txn = NULL;
-    ++_commonStats.yields;
+void CountScan::doSaveState() {
     if (_cursor)
-        _cursor->savePositioned();
+        _cursor->save();
 }
 
-void CountScan::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-    ++_commonStats.unyields;
-
+void CountScan::doRestoreState() {
     if (_cursor)
-        _cursor->restore(opCtx);
+        _cursor->restore();
 
     // This can change during yielding.
     // TODO this isn't sufficient. See SERVER-17678.
-    _shouldDedup = _descriptor->isMultikey(_txn);
+    _shouldDedup = _descriptor->isMultikey(getOpCtx());
 }
 
-void CountScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
+void CountScan::doDetachFromOperationContext() {
+    if (_cursor)
+        _cursor->detachFromOperationContext();
+}
 
+void CountScan::doReattachToOperationContext() {
+    if (_cursor)
+        _cursor->reattachToOperationContext(getOpCtx());
+}
+
+void CountScan::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // The only state we're responsible for holding is what RecordIds to drop.  If a document
     // mutates the underlying index cursor will deal with it.
     if (INVALIDATION_MUTATION == type) {
@@ -155,23 +186,20 @@ void CountScan::invalidate(OperationContext* txn, const RecordId& dl, Invalidati
     }
 }
 
-vector<PlanStage*> CountScan::getChildren() const {
-    vector<PlanStage*> empty;
-    return empty;
-}
+unique_ptr<PlanStageStats> CountScan::getStats() {
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COUNT_SCAN);
 
-PlanStageStats* CountScan::getStats() {
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT_SCAN));
-
-    CountScanStats* countStats = new CountScanStats(_specificStats);
+    unique_ptr<CountScanStats> countStats = make_unique<CountScanStats>(_specificStats);
     countStats->keyPattern = _specificStats.keyPattern.getOwned();
-    ret->specific.reset(countStats);
 
-    return ret.release();
-}
+    countStats->startKey = replaceBSONFieldNames(_params.startKey, countStats->keyPattern);
+    countStats->startKeyInclusive = _params.startKeyInclusive;
+    countStats->endKey = replaceBSONFieldNames(_params.endKey, countStats->keyPattern);
+    countStats->endKeyInclusive = _params.endKeyInclusive;
 
-const CommonStats* CountScan::getCommonStats() const {
-    return &_commonStats;
+    ret->specific = std::move(countStats);
+
+    return ret;
 }
 
 const SpecificStats* CountScan::getSpecificStats() const {

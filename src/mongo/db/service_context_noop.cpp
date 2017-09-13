@@ -30,14 +30,14 @@
 
 #include "mongo/db/service_context_noop.h"
 
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 StorageEngine* ServiceContextNoop::getGlobalStorageEngine() {
-    return NULL;
+    return nullptr;
 }
 
 void ServiceContextNoop::initializeGlobalStorageEngine() {}
@@ -67,24 +67,8 @@ StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
     return new EmptySFI();
 }
 
-void ServiceContextNoop::setKillAllOperations() {}
-
-void ServiceContextNoop::unsetKillAllOperations() {}
-
-bool ServiceContextNoop::getKillAllOperations() {
-    return false;
-}
-
-bool ServiceContextNoop::killOperation(unsigned int opId) {
-    return false;
-}
-
-void ServiceContextNoop::killAllUserOperations(const OperationContext* txn) {}
-
-void ServiceContextNoop::registerKillOpListener(KillOpListenerInterface* listener) {}
-
-std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client) {
-    return stdx::make_unique<OperationContextNoop>(client, _nextOpId.fetchAndAdd(1));
+std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client, unsigned opId) {
+    return stdx::make_unique<OperationContextNoop>(client, opId);
 }
 
 void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {}
@@ -92,4 +76,5 @@ void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
 OpObserver* ServiceContextNoop::getOpObserver() {
     return nullptr;
 }
+
 }  // namespace mongo

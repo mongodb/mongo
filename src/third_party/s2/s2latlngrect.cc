@@ -171,7 +171,7 @@ S2Cap S2LatLngRect::GetCapBound() const {
   // rectangles that are larger than 180 degrees, we punt and always return a
   // bounding cap centered at one of the two poles.
   double lng_span = lng_.hi() - lng_.lo();
-  if (drem(lng_span, 2 * M_PI) >= 0) {
+  if (remainder(lng_span, 2 * M_PI) >= 0) {
     if (lng_span < 2 * M_PI) {
       S2Cap mid_cap = S2Cap::FromAxisAngle(GetCenter().ToPoint(),
                                            S1Angle::Radians(0));

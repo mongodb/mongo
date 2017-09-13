@@ -34,36 +34,22 @@
 
 namespace mongo {
 
-int getGtLtOp(const BSONElement& e);
-
-struct BSONElementCmpWithoutField {
-    bool operator()(const BSONElement& l, const BSONElement& r) const {
-        return l.woCompare(r, false) < 0;
-    }
-};
-
-class BSONObjCmp {
+class BSONElementCmpWithoutField {
 public:
-    BSONObjCmp(const BSONObj& order = BSONObj()) : _order(order) {}
-    bool operator()(const BSONObj& l, const BSONObj& r) const {
-        return l.woCompare(r, _order) < 0;
-    }
-    BSONObj order() const {
-        return _order;
+    /**
+     * If 'stringComparator' is null, the default binary comparator will be used for comparing
+     * string elements.  A custom string comparator may be provided, but it must outlive the
+     * constructed BSONElementCmpWithoutField.
+     */
+    BSONElementCmpWithoutField(const StringData::ComparatorInterface* stringComparator = nullptr)
+        : _stringComparator(stringComparator) {}
+
+    bool operator()(const BSONElement& l, const BSONElement& r) const {
+        return l.woCompare(r, false, _stringComparator) < 0;
     }
 
 private:
-    BSONObj _order;
-};
-
-typedef std::set<BSONObj, BSONObjCmp> BSONObjSet;
-
-enum FieldCompareResult {
-    LEFT_SUBFIELD = -2,
-    LEFT_BEFORE = -1,
-    SAME = 0,
-    RIGHT_BEFORE = 1,
-    RIGHT_SUBFIELD = 2
+    const StringData::ComparatorInterface* _stringComparator;
 };
 
 /** Use BSON macro to build a BSONObj from a stream
@@ -198,20 +184,6 @@ extern Labeler::Label NE;
 extern Labeler::Label NIN;
 extern Labeler::Label BSIZE;
 
-
-// $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT << 6));
-// becomes   : {$or: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
-inline BSONObj OR(const BSONObj& a, const BSONObj& b);
-inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c);
-inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d);
-inline BSONObj OR(
-    const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d, const BSONObj& e);
-inline BSONObj OR(const BSONObj& a,
-                  const BSONObj& b,
-                  const BSONObj& c,
-                  const BSONObj& d,
-                  const BSONObj& e,
-                  const BSONObj& f);
 // definitions in bsonobjbuilder.h b/c of incomplete types
 
 // Utility class to implement BSON( key << val ) as described above.
@@ -252,6 +224,11 @@ public:
     BSONObjBuilder& builder() {
         return *_builder;
     }
+
+    /**
+     * Restores this object to its empty state.
+     */
+    void reset();
 
 private:
     StringData _fieldName;

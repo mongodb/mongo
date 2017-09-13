@@ -64,6 +64,10 @@ OplogInterfaceMock::OplogInterfaceMock(std::initializer_list<Operation> operatio
 
 OplogInterfaceMock::OplogInterfaceMock(const Operations& operations) : _operations(operations) {}
 
+void OplogInterfaceMock::setOperations(const Operations& operations) {
+    _operations = operations;
+}
+
 std::string OplogInterfaceMock::toString() const {
     return "OplogInterfaceMock";
 }

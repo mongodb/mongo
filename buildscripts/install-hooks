@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Create a pre-push hook driver in this repo. The hook will run all
+# excutable scripts in ~/.githooks/<repo name>/pre-push
+
+# Find out the repo name and where the .git directory is for this repo
+origin="`git config remote.origin.url`"
+repo="`basename -s .git $origin`"
+tld="`git rev-parse --show-toplevel`"
+
+# Location for the hooks.
+# WARNING: if you change this you'll need to change the value of the
+# "hooksdir" variable in the heredoc below as well
+hooksdir="$HOME/.githooks/$repo/pre-push"
+
+usage() {
+    echo "Usage: `basename $0` [-f|-h]"
+    echo
+    echo "Install a pre-push hook in $tld/.git/hooks"
+    echo "  -f force overwriting existing hooks"
+    echo "  -h print this help"
+    echo
+    exit 0
+}
+
+# --- Command line options ---
+force=0
+while getopts fh opt_arg; do
+    case $opt_arg in
+        f) force=1 ;;
+        *) usage   ;;
+    esac
+done
+shift `expr $OPTIND - 1`
+# ----------------------------
+
+set -e
+
+# If there's already a pre-push hook installed bail out, we don't want to
+# overwrite it (unless -f is passed in the command line)
+pre_push_hook="$tld/.git/hooks/pre-push"
+
+if [ -e "$pre_push_hook" -a $force -eq 0 ]; then
+    echo "ERROR: found an existing pre-push hook: $pre_push_hook"
+    exit 1
+fi
+
+echo -n "Installing pre-push hook in $pre_push_hook: "
+
+cat > $pre_push_hook <<'EOF'
+#!/bin/bash
+
+# set GITHOOKS_QUIET to anything to anything to make this script quiet
+quiet=${GITHOOKS_QUIET:-""}
+
+origin="`git config remote.origin.url`"
+repo="`basename -s .git $origin`"
+
+hooksdir="$HOME/.githooks/$repo/pre-push"
+if [ ! -d "$hooksdir" ]; then
+    echo
+    echo "WARNING:"
+    echo "  hooks directory doesn't exist: $hooksdir"
+    echo "  pushing anyway"
+    echo
+    sleep 1
+    exit 0
+fi
+
+hooksrun=0
+allhooks="`/bin/ls -1 $hooksdir 2>/dev/null`"
+
+for hook in `echo $allhooks` ; do
+    if [ -x "$hooksdir/$hook" ]; then
+        [ -z "$quiet" ] && echo -e "\n=== running hook: $hooksdir/$hook"
+        $hooksdir/$hook "$@"
+        rc=$?
+        hooksrun=$((hooksrun + 1))
+        if [ $rc -ne 0 ]; then
+            echo
+            echo "ERROR: hook $hooksdir/$hook returned non-zero status: $rc"
+            echo
+            exit $rc
+        else
+            [ -z "$quiet" ] && echo "=== done."
+        fi
+    fi
+done
+
+if [ $hooksrun -eq 0 ]; then
+    echo
+    echo "WARNING:"
+    echo "  couldn't find any pre-push hooks to run in $hooksdir"
+    echo "  pushing anyway"
+    sleep 1
+fi
+
+echo
+exit 0
+EOF
+
+chmod +x $pre_push_hook
+
+echo "done."
+
+mkdir -p "$hooksdir"
+echo "Now add your favorite pre-push scripts to: $hooksdir"

@@ -36,38 +36,40 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Verify that an empty index takes up no space.
 TEST(SortedDataInterface, GetSpaceUsedBytesEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     // SERVER-15416 mmapv1 test harness does not use SimpleRecordStoreV1 as its record store
     //              and HeapRecordStoreBtree::dataSize does not have an actual implementation
     // {
-    //     const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+    //     const ServiceContext::UniqueOperationContext opCtx( harnessHelper->newOperationContext()
+    //     );
     //     ASSERT( sorted->getSpaceUsedBytes( opCtx.get() ) == 0 );
     // }
 }
 
 // Verify that a nonempty index takes up some space.
 TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
@@ -78,7 +80,7 @@ TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
@@ -86,7 +88,8 @@ TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
     //              and HeapRecordStoreBtree::dataSize does not have an actual implementation
     // long long spaceUsedBytes;
     // {
-    //     const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+    //     const ServiceContext::UniqueOperationContext opCtx( harnessHelper->newOperationContext()
+    //     );
     //     spaceUsedBytes = sorted->getSpaceUsedBytes( opCtx.get() );
     //     ASSERT( spaceUsedBytes > 0 );
     // }
@@ -94,10 +97,12 @@ TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
     // {
     //     // getSpaceUsedBytes() returns the same value when called multiple times
     //     // and there were not interleaved write operations.
-    //     const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+    //     const ServiceContext::UniqueOperationContext opCtx( harnessHelper->newOperationContext()
+    //     );
     //     ASSERT_EQUALS( spaceUsedBytes, sorted->getSpaceUsedBytes( opCtx.get() ) );
     //     ASSERT_EQUALS( spaceUsedBytes, sorted->getSpaceUsedBytes( opCtx.get() ) );
     // }
 }
 
+}  // namespace
 }  // namespace mongo

@@ -30,20 +30,20 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/util/net/sock.h"
 
 namespace mongo {
 namespace {
 
-class WhatsMyUriCmd : public Command {
+class WhatsMyUriCmd : public BasicCommand {
 public:
-    WhatsMyUriCmd() : Command("whatsmyuri") {}
+    WhatsMyUriCmd() : BasicCommand("whatsmyuri") {}
 
     virtual bool slaveOk() const {
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -57,11 +57,9 @@ public:
         // No auth required
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         result << "you" << cc().getRemote().toString();
         return true;

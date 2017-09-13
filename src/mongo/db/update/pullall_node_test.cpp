@@ -1,0 +1,297 @@
+/**
+ * Copyright (C) 2017 MongoDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or  modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * As a special exception, the copyright holders give permission to link the
+ * code of portions of this program with the OpenSSL library under certain
+ * conditions as described in each individual source file and distribute
+ * linked combinations including the program with the OpenSSL library. You
+ * must comply with the GNU Affero General Public License in all respects
+ * for all of the code used other than as permitted herein. If you modify
+ * file(s) with this exception, you may extend this exception to your
+ * version of the file(s), but you are not obligated to do so. If you do not
+ * wish to do so, delete this exception statement from your version. If you
+ * delete this exception statement from all source files in the program,
+ * then also delete it in the license file.
+ */
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/update/pullall_node.h"
+
+#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/update_node_test_fixture.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
+
+namespace mongo {
+namespace {
+
+using PullAllNodeTest = UpdateNodeTest;
+using mongo::mutablebson::Element;
+using mongo::mutablebson::countChildren;
+
+TEST(PullAllNodeTest, InitWithIntFails) {
+    auto update = fromjson("{$pullAll: {a: 1}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    auto status = node.init(update["$pullAll"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(PullAllNodeTest, InitWithStringFails) {
+    auto update = fromjson("{$pullAll: {a: 'test'}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    auto status = node.init(update["$pullAll"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(PullAllNodeTest, InitWithObjectFails) {
+    auto update = fromjson("{$pullAll: {a: {}}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    auto status = node.init(update["$pullAll"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(PullAllNodeTest, InitWithBoolFails) {
+    auto update = fromjson("{$pullAll: {a: true}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    auto status = node.init(update["$pullAll"]["a"], collator);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST_F(PullAllNodeTest, TargetNotFound) {
+    auto update = fromjson("{$pullAll : {b: [1]}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["b"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    setPathToCreate("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
+    auto update = fromjson("{$pullAll : {'a.2': [1]}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a.2"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 2]}"));
+    setPathToCreate("2");
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, ApplyToNonArrayFails) {
+    auto update = fromjson("{$pullAll : {'a.0': [1, 2]}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a.0"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 2]}"));
+    setPathTaken("a.0");
+    addIndexedPath("a");
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"][0])),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Cannot apply $pull to a non-array value");
+}
+
+TEST_F(PullAllNodeTest, ApplyWithSingleNumber) {
+    auto update = fromjson("{$pullAll : {a: [1]}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: ['a', {r: 1, b: 2}]}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: ['a', {r: 1, b: 2}]}}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
+    auto update = fromjson("{$pullAll : {a: [1]}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    setPathTaken("a");
+    setLogBuilderToNull();
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: ['a', {r: 1, b: 2}]}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+}
+
+TEST_F(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
+    auto update = fromjson("{$pullAll : {a: ['r']}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
+    auto update = fromjson("{$pullAll : {a: [1, 'a']}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: [{r: 1, b: 2}]}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: [{r: 1, b: 2}]}}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
+    auto update = fromjson("{$pullAll : {a: [1, 'a', {r: 1, b: 2}]}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: []}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
+    auto update = fromjson("{$pullAll : {a: [{r: 1, b: 2}, 1, 'a']}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: []}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
+    auto update = fromjson("{$pullAll : {a: [2, 3, 1, 'r', {r: 1, b: 2}, 'a']}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+
+    mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: []}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, ApplyWithCollator) {
+    auto update = fromjson("{$pullAll : {a: ['FOO', 'BAR']}}");
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], &collator));
+
+    mutablebson::Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
+    setPathTaken("a");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: ['baz']}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: ['baz']}}"), getLogDoc());
+}
+
+TEST_F(PullAllNodeTest, ApplyAfterSetCollator) {
+    auto update = fromjson("{$pullAll : {a: ['FOO', 'BAR']}}");
+    const CollatorInterface* collator = nullptr;
+    PullAllNode node;
+    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+
+    // First without a collator.
+    mutablebson::Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
+    setPathTaken("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_TRUE(result.noop);
+    ASSERT_EQUALS(fromjson("{a: ['foo', 'bar', 'baz']}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+
+    // Now with a collator.
+    CollatorInterfaceMock mockCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    node.setCollator(&mockCollator);
+    mutablebson::Document doc2(fromjson("{a: ['foo', 'bar', 'baz']}"));
+    resetApplyParams();
+    setPathTaken("a");
+    result = node.apply(getApplyParams(doc2.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: ['baz']}"), doc2);
+    ASSERT_FALSE(doc2.isInPlaceModeEnabled());
+}
+
+}  // namespace
+}  // namespace mongo

@@ -36,6 +36,7 @@
 
 namespace mongo {
 
+class CollatorInterface;
 class MatchExpression;
 
 class ModifierPull : public ModifierInterface {
@@ -57,6 +58,8 @@ public:
     /** Converts the effects of this $pull into one or more equivalent $unset operations. */
     virtual Status log(LogBuilder* logBuilder) const;
 
+    virtual void setCollator(const CollatorInterface* collator);
+
 private:
     bool isMatch(mutablebson::ConstElement element);
 
@@ -76,6 +79,10 @@ private:
     // If we are using the matcher, this is the match expression we built around _exprObj.
     std::unique_ptr<MatchExpression> _matchExpr;
     bool _matcherOnPrimitive;
+
+    // The collator which must be used for matching strings. Null if we should use a simple binary
+    // comparison.
+    const CollatorInterface* _collator = nullptr;
 
     struct PreparedState;
     std::unique_ptr<PreparedState> _preparedState;

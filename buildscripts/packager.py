@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # This program makes Debian and RPM repositories for MongoDB, by
 # downloading our tarballs of statically linked executables and
@@ -28,21 +28,17 @@
 
 import argparse
 import errno
-import getopt
-import httplib2
 from glob import glob
 import os
 import re
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
 import time
-import urlparse
 
 # The MongoDB names for the architectures we support.
-DEFAULT_ARCHES=["x86_64"]
+ARCH_CHOICES=["x86_64", "arm64"]
 
 # Made up names for the flavors of distribution we package for.
 DISTROS=["suse", "debian","redhat","ubuntu", "amazon"]
@@ -54,8 +50,14 @@ class Spec(object):
         self.gitspec = gitspec
         self.rel = rel
 
+    # Commit-triggerd version numbers can be in the form: 3.0.7-pre-, or 3.0.7-5-g3b67ac
+    # Patch builds version numbers are in the form: 3.5.5-64-g03945fa-patch-58debcdb3ff1223c9d00005b
+    #
     def is_nightly(self):
-        return bool(re.search("-$", self.version()))
+        return bool(re.search("-$", self.version())) or bool(re.search("\d-\d+-g[0-9a-f]+$", self.version()))
+
+    def is_patch(self):
+        return bool(re.search("\d-\d+-g[0-9a-f]+-patch-[0-9a-f]+$", self.version()))
 
     def is_rc(self):
         return bool(re.search("-rc\d+$", self.version()))
@@ -65,6 +67,12 @@ class Spec(object):
 
     def version(self):
         return self.ver
+
+    def patch_id(self):
+        if self.is_patch():
+            return re.sub(r'.*-([0-9a-f]+$)', r'\1', self.version())
+        else:
+            return "none"
 
     def metadata_gitspec(self):
         """Git revision to use for spec+control+init+manpage files.
@@ -83,35 +91,57 @@ class Spec(object):
         return "-org" if int(self.ver.split(".")[1])%2==0 else "-org-unstable"
 
     def prelease(self):
-      # "N" is either passed in on the command line, or "1"
+      # NOTE: This is only called for RPM packages, and only after
+      # pversion() below has been called. If you want to change this format
+      # and want DEB packages to match, make sure to update pversion()
+      # below
       #
-      # 1) Standard release - "N"
-      # 2) Nightly (snapshot) - "0.N.YYYYMMDDlatest"
-      # 3) RC's - "0.N.rcX"
+      # "N" is either passed in on the command line, or "1"
       if self.rel:
-        corenum = self.rel
+          corenum = self.rel
       else:
-        corenum = 1
-      # RC's
-      if re.search("-rc\d+$", self.version()):
-        return "0.%s.%s" % (corenum, re.sub('.*-','',self.version()))
-      # Nightlies
-      elif re.search("-$", self.version()):
-        return "0.%s.%s" % (corenum, time.strftime("%Y%m%d"))
+          corenum = 1
+
+      # Version suffix for RPM packages:
+      # 1) RC's - "0.N.rcX"
+      # 2) Nightly (snapshot) - "0.N.latest"
+      # 3) Patch builds - "0.N.patch.<patch_id>"
+      # 4) Standard release - "N"
+      if self.is_rc():
+          return "0.%s.%s" % (corenum, re.sub('.*-','',self.version()))
+      elif self.is_nightly():
+          return "0.%s.latest" % (corenum)
+      elif self.is_patch():
+          return "0.%s.patch.%s" % (corenum, self.patch_id())
       else:
-        return str(corenum)
+          return str(corenum)
 
     def pversion(self, distro):
         # Note: Debian packages have funny rules about dashes in
         # version numbers, and RPM simply forbids dashes.  pversion
         # will be the package's version number (but we need to know
         # our upstream version too).
+
+        # For RPM packages this just returns X.Y.X because of the
+        # aforementioned rules, and prelease (above) adds a suffix later,
+        # so detect this case early
+        if re.search("(suse|redhat|fedora|centos|amazon)", distro.name()):
+            return re.sub("-.*", "", self.version())
+
+        # For DEB packages, this code sets the full version. If you change
+        # this format and want RPM packages to match make sure you change
+        # prelease above as well
         if re.search("^(debian|ubuntu)", distro.name()):
-            return re.sub("-", "~", self.ver)
-        elif re.search("(suse|redhat|fedora|centos|amazon)", distro.name()):
-            return re.sub("-.*", "", self.ver)
-        else:
-            raise Exception("BUG: unsupported platform?")
+            if self.is_nightly():
+                ver = re.sub("-.*", "-latest", self.ver)
+            elif self.is_patch():
+                ver = re.sub("-.*", "", self.ver) + "-patch-" + self.patch_id()
+            else:
+                ver = self.ver
+
+            return re.sub("-", "~", ver)
+
+        raise Exception("BUG: unsupported platform?")
 
     def branch(self):
         """Return the major and minor portions of the specified version.
@@ -130,10 +160,30 @@ class Distro(object):
         return "mongodb"
 
     def archname(self, arch):
+        """Return the packaging system's architecture name.
+        Power and x86 have different names for apt/yum (ppc64le/ppc64el
+        and x86_64/amd64)
+        """
         if re.search("^(debian|ubuntu)", self.n):
-            return "i386" if arch.endswith("86") else "amd64"
+            if arch == "ppc64le":
+                return "ppc64el"
+            elif arch == "s390x":
+                return "s390x"
+            elif arch == "arm64":
+                return "arm64"
+            elif arch.endswith("86"):
+              return "i386"
+            else:
+              return "amd64"
         elif re.search("^(suse|centos|redhat|fedora|amazon)", self.n):
-            return "i686" if arch.endswith("86") else "x86_64"
+            if arch == "ppc64le":
+                return "ppc64le"
+            elif arch == "s390x":
+                return "s390x"
+            elif arch.endswith("86"):
+              return "i686"
+            else:
+              return "x86_64"
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -203,11 +253,15 @@ class Distro(object):
                 return "precise"
             elif build_os == 'ubuntu1404':
                 return "trusty"
+            elif build_os == 'ubuntu1604':
+                return "xenial"
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         elif self.n == 'debian':
             if build_os == 'debian71':
                 return 'wheezy'
+            elif build_os == 'debian81':
+                return 'jessie'
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         else:
@@ -221,21 +275,23 @@ class Distro(object):
         else:
             raise Exception("BUG: unsupported platform?")
 
-    def build_os(self):
-        """Return the build os label in the binary package to download ("rhel55", "rhel62" and "rhel70"
-        for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu, "debian71" for Debian), and "suse11"
-        for SUSE)"""
+    def build_os(self, arch):
+        """Return the build os label in the binary package to download (e.g. "rhel55" for redhat,
+        "ubuntu1204" for ubuntu, "debian71" for debian, "suse11" for suse, etc.)"""
+        # Community builds only support amd64
+        if arch not in ['x86_64', 'ppc64le', 's390x', 'arm64']:
+            raise Exception("BUG: unsupported architecture (%s)" % arch)
 
         if re.search("(suse)", self.n):
-            return [ "suse11" ]
+            return [ "suse11", "suse12" ]
         elif re.search("(redhat|fedora|centos)", self.n):
-            return [ "rhel70", "rhel62", "rhel55" ]
+            return [ "rhel70", "rhel71", "rhel72", "rhel62", "rhel55" ]
         elif self.n == 'amazon':
             return [ "amazon" ]
         elif self.n == 'ubuntu':
-            return [ "ubuntu1204", "ubuntu1404" ]
+            return [ "ubuntu1204", "ubuntu1404", "ubuntu1604", ]
         elif self.n == 'debian':
-            return [ "debian71" ]
+            return [ "debian71", "debian81" ]
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -248,56 +304,59 @@ class Distro(object):
         else:
           return re.sub(r'^rh(el\d).*$', r'\1', build_os)
 
-def main(argv):
+def get_args(distros, arch_choices):
 
-    # --distros must be "build_os" value, not actual distro name ("ubuntu1404" vs. "ubuntu")
-    #
-    distros=[Distro(distro) for distro in DISTROS]
-    DISTRO_CHOICES=[]
+    distro_choices=[]
     for distro in distros:
-      DISTRO_CHOICES.extend(distro.build_os())
+        for arch in arch_choices:
+          distro_choices.extend(distro.build_os(arch))
 
     parser = argparse.ArgumentParser(description='Build MongoDB Packages')
-    parser.add_argument("-s", "--server-version", help="Server version to build (e.g. 2.7.8-rc0)")
+    parser.add_argument("-s", "--server-version", help="Server version to build (e.g. 2.7.8-rc0)", required=True)
     parser.add_argument("-m", "--metadata-gitspec", help="Gitspec to use for package metadata files", required=False)
     parser.add_argument("-r", "--release-number", help="RPM release number base", type=int, required=False)
-    parser.add_argument("-d", "--distros", help="Distros to build for", choices=DISTRO_CHOICES, required=False, default=[], action='append')
-    parser.add_argument("-a", "--arches", help="Architecture to build", choices=DEFAULT_ARCHES, default=DEFAULT_ARCHES, required=False, action='append')
-    parser.add_argument("-t", "--tarball", help="Local tarball to package instead of downloading (only valid with one distro/arch combination)", required=False, type=lambda x: is_valid_file(parser, x))
+    parser.add_argument("-d", "--distros", help="Distros to build for", choices=distro_choices, required=False, default=[], action='append')
+    parser.add_argument("-p", "--prefix", help="Directory to build into", required=False)
+    parser.add_argument("-a", "--arches", help="Architecture to build", choices=arch_choices, default=[], required=False, action='append')
+    parser.add_argument("-t", "--tarball", help="Local tarball to package", required=True, type=lambda x: is_valid_file(parser, x))
+
     args = parser.parse_args()
 
     if len(args.distros) * len(args.arches) > 1 and args.tarball:
       parser.error("Can only specify local tarball with one distro/arch combination")
 
+    return args
+
+def main(argv):
+
+    distros=[Distro(distro) for distro in DISTROS]
+
+    args = get_args(distros, ARCH_CHOICES)
 
     spec = Spec(args.server_version, args.metadata_gitspec, args.release_number)
 
     oldcwd=os.getcwd()
     srcdir=oldcwd+"/../"
 
-    # We do all our work in a randomly-created directory. You can set
-    # TEMPDIR to influence where this program will do stuff.
-    prefix=tempfile.mkdtemp()
+    # Where to do all of our work. Use a randomly-created directory if one
+    # is not passed in.
+    prefix = args.prefix
+    if prefix is None:
+      prefix = tempfile.mkdtemp()
     print "Working in directory %s" % prefix
 
     os.chdir(prefix)
     try:
-      # Download the binaries.
-      urlfmt="http://downloads.mongodb.org/linux/mongodb-linux-%s-%s-%s.tgz"
-
       # Build a package for each distro/spec/arch tuple, and
       # accumulate the repository-layout directories.
       for (distro, arch) in crossproduct(distros, args.arches):
 
-          for build_os in distro.build_os():
+          for build_os in distro.build_os(arch):
             if build_os in args.distros or not args.distros:
 
-              if args.tarball:
-                filename = tarfile(build_os, arch, spec)
-                ensure_dir(filename)
-                shutil.copyfile(args.tarball,filename)
-              else:
-                httpget(urlfmt % (arch, build_os, spec.version()), ensure_dir(tarfile(build_os, arch, spec)))
+              filename = tarfile(build_os, arch, spec)
+              ensure_dir(filename)
+              shutil.copyfile(args.tarball, filename)
 
               repo = make_package(distro, build_os, arch, spec, srcdir)
               make_repo(repo, distro, build_os, spec)
@@ -349,30 +408,6 @@ def setupdir(distro, build_os, arch, spec):
     # or dst/x86_64/redhat/rhel55/mongodb-org-unstable/
     return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(), spec.suffix(), spec.pversion(distro))
 
-def httpget(url, filename):
-    """Download the contents of url to filename, return filename."""
-    print "Fetching %s to %s." % (url, filename)
-    conn = None
-    u=urlparse.urlparse(url)
-    assert(u.scheme=='http')
-    try:
-        h = httplib2.Http(cache = os.environ["HOME"] + "/.cache")
-        resp, content = h.request(url, "GET")
-        t=filename+'.TMP'
-        if resp.status==200:
-            f = open(t, 'w')
-            try:
-                f.write(content)
-            finally:
-                f.close()
-        else:
-            raise Exception("HTTP error %d" % resp.status)
-        os.rename(t, filename)
-    finally:
-        if conn:
-            conn.close()
-    return filename
-
 def unpack_binaries_into(build_os, arch, spec, where):
     """Unpack the tarfile for (build_os, arch, spec) into directory where."""
     rootdir=os.getcwd()
@@ -385,7 +420,7 @@ def unpack_binaries_into(build_os, arch, spec, where):
     try:
         sysassert(["tar", "xvzf", rootdir+"/"+tarfile(build_os, arch, spec)])
         release_dir = glob('mongodb-linux-*')[0]
-        for releasefile in "bin", "GNU-AGPL-3.0", "README", "THIRD-PARTY-NOTICES":
+        for releasefile in "bin", "GNU-AGPL-3.0", "README", "THIRD-PARTY-NOTICES", "MPL-2":
             print "moving file: %s/%s" % (release_dir, releasefile)
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
@@ -413,11 +448,10 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
-    # Remove the mongosniff binary due to libpcap dynamic
-    # linkage.  FIXME: this removal should go away
-    # eventually.
-    if os.path.exists(sdir + "bin/mongosniff"):
-      os.unlink(sdir + "bin/mongosniff")
+    # Remove the mongoreplay binary due to libpcap dynamic
+    # linkage.
+    if os.path.exists(sdir + "bin/mongoreplay"):
+      os.unlink(sdir + "bin/mongoreplay")
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 def make_repo(repodir, distro, build_os, spec):
@@ -436,11 +470,21 @@ def make_deb(distro, build_os, arch, spec, srcdir):
     suffix=spec.suffix()
     sdir=setupdir(distro, build_os, arch, spec)
     if re.search("debian", distro.name()):
-        os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.mongod.init" % (distro.pkgbase(), suffix))
         os.unlink(sdir+"debian/mongod.upstart")
+        if build_os == "debian71":
+            os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.mongod.init" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/mongod.service")
+        else:
+            os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/init.d")
     elif re.search("ubuntu", distro.name()):
-        os.link(sdir+"debian/mongod.upstart", sdir+"debian/%s%s-server.mongod.upstart" % (distro.pkgbase(), suffix))
         os.unlink(sdir+"debian/init.d")
+        if build_os in ("ubuntu1204", "ubuntu1404", "ubuntu1410"):
+            os.link(sdir+"debian/mongod.upstart", sdir+"debian/%s%s-server.mongod.upstart" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/mongod.service")
+        else:
+            os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/mongod.upstart")
     else:
         raise Exception("unknown debianoid flavor: not debian or ubuntu?")
     # Rewrite the control and rules files
@@ -463,7 +507,7 @@ def make_deb(distro, build_os, arch, spec, srcdir):
     oldcwd=os.getcwd()
     try:
         os.chdir(sdir)
-        sysassert(["dpkg-buildpackage", "-a"+distro_arch, "-k Richard Kreuter <richard@10gen.com>"])
+        sysassert(["dpkg-buildpackage", "-uc", "-us", "-a" + distro_arch])
     finally:
         os.chdir(oldcwd)
     r=distro.repodir(arch, build_os, spec)
@@ -482,17 +526,11 @@ def make_deb_repo(repo, distro, build_os, spec):
         dirs=set([os.path.dirname(deb)[2:] for deb in backtick(["find", ".", "-name", "*.deb"]).split()])
         for d in dirs:
             s=backtick(["dpkg-scanpackages", d, "/dev/null"])
-            f=open(d+"/Packages", "w")
-            try:
+            with open(d+"/Packages", "w") as f:
                 f.write(s)
-            finally:
-                f.close()
             b=backtick(["gzip", "-9c", d+"/Packages"])
-            f=open(d+"/Packages.gz", "wb")
-            try:
+            with open(d+"/Packages.gz", "wb") as f:
                 f.write(b)
-            finally:
-                f.close()
     finally:
         os.chdir(oldpwd)
     # Notes: the Release{,.gpg} files must live in a special place,
@@ -500,12 +538,12 @@ def make_deb_repo(repo, distro, build_os, spec):
     # done.
     s="""Origin: mongodb
 Label: mongodb
-Suite: mongodb
+Suite: %s
 Codename: %s/mongodb-org
-Architectures: amd64
+Architectures: amd64 arm64
 Components: %s
 Description: MongoDB packages
-""" % (distro.repo_os_version(build_os), distro.repo_component())
+""" % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
     if os.path.exists(repo+"../../Release"):
         os.unlink(repo+"../../Release")
     if os.path.exists(repo+"../../Release.gpg"):
@@ -514,22 +552,9 @@ Description: MongoDB packages
     os.chdir(repo+"../../")
     s2=backtick(["apt-ftparchive", "release", "."])
     try:
-        f=open("Release", 'w')
-        try:
+        with open("Release", 'w') as f:
             f.write(s)
             f.write(s2)
-        finally:
-            f.close()
-
-        arg=None
-        for line in backtick(["gpg", "--list-keys"]).split("\n"):
-            tokens=line.split()
-            if len(tokens)>0 and tokens[0] == "uid":
-                arg=tokens[-1]
-                break
-        # Note: for some reason, I think --no-tty might be needed
-        # here, but maybe not.
-        sysassert(["gpg", "-r", arg, "--no-secmem-warning", "-abs", "--output", "Release.gpg", "Release"])
     finally:
         os.chdir(oldpwd)
 
@@ -606,7 +631,6 @@ def write_debian_changelog(path, spec, srcdir):
         s=preamble+backtick(["sh", "-c", "git archive %s debian/changelog | tar xOf -" % spec.metadata_gitspec()])
     finally:
         os.chdir(oldcwd)
-    f=open(path, 'w')
     lines=s.split("\n")
     # If the first line starts with "mongodb", it's not a revision
     # preamble, and so frob the version number.
@@ -615,23 +639,39 @@ def write_debian_changelog(path, spec, srcdir):
     lines=[re.sub("^mongodb ", "mongodb%s " % (spec.suffix()), l) for l in lines]
     lines=[re.sub("^  --", " --", l) for l in lines]
     s="\n".join(lines)
-    try:
+    with open(path, 'w') as f:
         f.write(s)
-    finally:
-        f.close()
 
 def make_rpm(distro, build_os, arch, spec, srcdir):
     # Create the specfile.
     suffix=spec.suffix()
     sdir=setupdir(distro, build_os, arch, spec)
 
-    # Use special suse init script if we're building for SUSE
+    specfile = srcdir + "rpm/mongodb%s.spec" % suffix
+    init_spec = specfile.replace(".spec", "-init.spec")
+
+    # The Debian directory is here for the manpages so we we need to remove the service file
+    # from it so that RPM packages don't end up with the Debian file.
+    os.unlink(sdir + "debian/mongod.service")
+
+    # Swap out systemd files, different systemd spec files, and init scripts as needed based on
+    # underlying os version. Arranged so that new distros moving forward automatically use
+    # systemd. Note: the SUSE init packages use a different init script than then other RPM
+    # distros.
     #
-    if distro.name() == "suse":
+    if distro.name() == "suse" and distro.repo_os_version(build_os) in ("10", "11"):
         os.unlink(sdir+"rpm/init.d-mongod")
         os.link(sdir+"rpm/init.d-mongod.suse", sdir+"rpm/init.d-mongod")
 
-    specfile=srcdir+"rpm/mongodb%s.spec" % suffix
+        os.unlink(specfile)
+        os.link(init_spec, specfile)
+    elif distro.name() == "redhat" and distro.repo_os_version(build_os) in ("5", "6"):
+        os.unlink(specfile)
+        os.link(init_spec, specfile)
+    elif distro.name() == "amazon":
+        os.unlink(specfile)
+        os.link(init_spec, specfile)
+
     topdir=ensure_dir('%s/rpmbuild/%s/' % (os.getcwd(), build_os))
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
         ensure_dir("%s/%s/" % (topdir, subdir))
@@ -650,8 +690,11 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     # that "macrofiles" setting doesn't do anything for newer RPM
     # versions, where you have to use the --macros flag instead.  And
     # all of this is to let us do our work with some guarantee that
-    # we're not clobbering anything that doesn't belong to us.  Why is
-    # RPM so braindamaged?
+    # we're not clobbering anything that doesn't belong to us.
+    #
+    # On RHEL systems, --rcfile will generally be used and
+    # --macros will be used in Ubuntu.
+    #
     macrofiles=[l for l in backtick(["rpm", "--showrc"]).split("\n") if l.startswith("macrofiles")]
     flags=[]
     macropath=os.getcwd()+"/macros"
@@ -661,16 +704,24 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
         macrofiles=macrofiles[0]+":"+macropath
         rcfile=os.getcwd()+"/rpmrc"
         write_rpmrc_file(rcfile, macrofiles)
-        flags=["--rpmrc", rcfile]
+        flags=["--rcfile", rcfile]
     else:
         # This hard-coded hooey came from some box running RPM
         # 4.4.2.3.  It may not work over time, but RPM isn't sanely
         # configurable.
-        flags=["--macros", "/usr/lib/rpm/macros:/usr/lib/rpm/%s-linux/macros:/etc/rpm/macros.*:/etc/rpm/macros:/etc/rpm/%s-linux/macros:~/.rpmmacros:%s" % (distro_arch, distro_arch, macropath)]
+        flags=["--macros", "/usr/lib/rpm/macros:/usr/lib/rpm/%s-linux/macros:/usr/lib/rpm/suse/macros:/etc/rpm/macros.*:/etc/rpm/macros:/etc/rpm/%s-linux/macros:~/.rpmmacros:%s" % (distro_arch, distro_arch, macropath)]
     # Put the specfile and the tar'd up binaries and stuff in
-    # place. FIXME: see if shutil.copyfile can do this without too
-    # much hassle.
-    sysassert(["cp", "-v", specfile, topdir+"SPECS/"])
+    # place.
+    #
+    # The version of rpm and rpm tools in RHEL 5.5 can't interpolate the
+    # %{dynamic_version} macro, so do it manually
+    with open(specfile, "r") as spec_source:
+      with open(topdir+"SPECS/" + os.path.basename(specfile), "w") as spec_dest:
+        for line in spec_source:
+          line = line.replace('%{dynamic_version}', spec.pversion(distro))
+          line = line.replace('%{dynamic_release}', spec.prelease())
+          spec_dest.write(line)
+
     oldcwd=os.getcwd()
     os.chdir(sdir+"/../")
     try:
@@ -678,7 +729,8 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     finally:
         os.chdir(oldcwd)
     # Do the build.
-    flags.extend(["-D", "dynamic_version " + spec.pversion(distro), "-D", "dynamic_release " + spec.prelease()])
+
+    flags.extend(["-D", "dynamic_version " + spec.pversion(distro), "-D", "dynamic_release " + spec.prelease(), "-D", "_topdir " + topdir])
     sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/mongodb%s.spec" % (topdir, suffix)])
     r=distro.repodir(arch, build_os, spec)
     ensure_dir(r)
@@ -697,20 +749,14 @@ def make_rpm_repo(repo):
 
 
 def write_rpmrc_file(path, string):
-    f=open(path, 'w')
-    try:
+    with open(path, 'w') as f:
         f.write(string)
-    finally:
-        f.close()
 
 def write_rpm_macros_file(path, topdir, release_dist):
-    f=open(path, 'w')
-    try:
+    with open(path, 'w') as f:
         f.write("%%_topdir	%s\n" % topdir)
         f.write("%%dist	.%s\n" % release_dist)
         f.write("%_use_internal_dependency_generator 0\n")
-    finally:
-        f.close()
 
 def ensure_dir(filename):
     """Make sure that the directory that's the dirname part of
@@ -729,7 +775,7 @@ def ensure_dir(filename):
 def is_valid_file(parser, filename):
     """Check if file exists, and return the filename"""
     if not os.path.exists(filename):
-        parser.error("The file %s does not exist!" % arg)
+        parser.error("The file %s does not exist!" % filename)
     else:
         return filename
 

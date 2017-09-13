@@ -1,0 +1,102 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the GNU Affero General Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+# shardCollection IDL File
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+structs:
+    shardCollection:
+        description: "The public shardCollection command on mongos"
+        strict: false
+        fields:
+            shardCollection:
+                type: namespacestring
+                description: "The namespace of the collection to shard in the form <database>.<collection>."
+                optional: true
+            shardcollection:
+                type: namespacestring
+                description: "The deprecated version of this command's name"
+                optional: true
+            key:
+                type: object
+                description: "The index specification document to use as the shard key."
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint"
+                default: false
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially when sharding an empty collection with a hashed shard key."
+                default: 0
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+
+    ConfigsvrShardCollectionRequest:
+        description: "The request format of the internal shardCollection command on the config server"
+        strict: false
+        fields:
+            _configsvrShardCollection:
+                type: namespacestring
+                description: "The namespace of the collection to shard in the form <database>.<collection>."
+                optional: true
+            key:
+                type: object
+                description: "The index specification document to use as the shard key."
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint"
+                default: false
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially when sharding an empty collection with a hashed shard key."
+                default: 0
+            initialSplitPoints:
+                type: array<object>
+                description: "A specific set of points to create initial splits at, currently used only by mapReduce"
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+
+    ConfigsvrShardCollectionResponse:
+        description: "The response format of the internal shardCollection command on the config server"
+        strict: false
+        fields:
+            collectionsharded:
+                type: string
+                description: "The name of the collection that just got sharded."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection that just got sharded."
+                optional: true

@@ -31,61 +31,67 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/command_request_builder.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using namespace mongo;
 
-TEST(RequestBuilder, RoundTrip) {
+TEST(CommandRequestBuilder, RoundTrip) {
     auto databaseName = "barbaz";
     auto commandName = "foobar";
 
     BSONObjBuilder metadataBob{};
-    metadataBob.append("foo", "bar");
+    metadataBob.append("$replData", BSONObj());
     auto metadata = metadataBob.done();
 
     BSONObjBuilder commandArgsBob{};
-    commandArgsBob.append("bar", "baz");
+    commandArgsBob.append(commandName, "baz");
     auto commandArgs = commandArgsBob.done();
 
-    BSONObjBuilder inputDoc1Bob{};
-    inputDoc1Bob.append("z", "t");
-    auto inputDoc1 = inputDoc1Bob.done();
+    auto request = OpMsgRequest::fromDBAndBody(databaseName, commandArgs, metadata);
+    request.sequences.push_back({"sequence", {BSON("a" << 1), BSON("b" << 2)}});
+    auto msg = rpc::opCommandRequestFromOpMsgRequest(request);
 
-    BSONObjBuilder inputDoc2Bob{};
-    inputDoc2Bob.append("h", "j");
-    auto inputDoc2 = inputDoc2Bob.done();
+    auto bodyAndSequence = BSONObjBuilder(commandArgs)
+                               .append("sequence", BSON_ARRAY(BSON("a" << 1) << BSON("b" << 2)))
+                               .obj();
 
-    BSONObjBuilder inputDoc3Bob{};
-    inputDoc3Bob.append("g", "p");
-    auto inputDoc3 = inputDoc3Bob.done();
+    auto parsed = mongo::rpc::ParsedOpCommand::parse(msg);
 
-    BufBuilder inputDocs;
-    inputDoc1.appendSelfToBufBuilder(inputDocs);
-    inputDoc2.appendSelfToBufBuilder(inputDocs);
-    inputDoc3.appendSelfToBufBuilder(inputDocs);
+    ASSERT_EQUALS(parsed.database, databaseName);
+    ASSERT_EQUALS(StringData(parsed.body.firstElementFieldName()), commandName);
+    ASSERT_BSONOBJ_EQ(parsed.metadata, metadata);
+    ASSERT_BSONOBJ_EQ(parsed.body, bodyAndSequence);
+}
 
-    rpc::DocumentRange inputDocRange{inputDocs.buf(), inputDocs.buf() + inputDocs.len()};
+TEST(CommandRequestBuilder, DownconvertSecondaryReadPreferenceToSSM) {
+    auto readPref = BSON("mode"
+                         << "secondary");
+    auto msg = rpc::opCommandRequestFromOpMsgRequest(
+        OpMsgRequest::fromDBAndBody("admin", BSON("ping" << 1 << "$readPreference" << readPref)));
+    auto parsed = mongo::rpc::ParsedOpCommand::parse(msg);
 
-    rpc::CommandRequestBuilder r;
+    ASSERT(!parsed.body.hasField("$readPreference"));
+    ASSERT(!parsed.body.hasField("$ssm"));
+    ASSERT(!parsed.metadata.hasField("$readPreference"));
 
-    auto msg = r.setDatabase(databaseName)
-                   .setCommandName(commandName)
-                   .setMetadata(metadata)
-                   .setCommandArgs(commandArgs)
-                   .addInputDocs(inputDocRange)
-                   .done();
+    ASSERT_BSONOBJ_EQ(parsed.metadata["$ssm"]["$readPreference"].Obj(), readPref);
+    ASSERT(parsed.metadata["$ssm"]["$secondaryOk"].trueValue());
+}
 
-    rpc::CommandRequest parsed(msg.get());
+TEST(CommandRequestBuilder, DownconvertPrimaryReadPreferenceToSSM) {
+    auto readPref = BSON("mode"
+                         << "primary");
+    auto msg = rpc::opCommandRequestFromOpMsgRequest(
+        OpMsgRequest::fromDBAndBody("admin", BSON("ping" << 1 << "$readPreference" << readPref)));
+    auto parsed = mongo::rpc::ParsedOpCommand::parse(msg);
 
-    ASSERT_EQUALS(parsed.getDatabase(), databaseName);
-    ASSERT_EQUALS(parsed.getCommandName(), commandName);
-    ASSERT_EQUALS(parsed.getMetadata(), metadata);
-    ASSERT_EQUALS(parsed.getCommandArgs(), commandArgs);
-    // need ostream overloads for ASSERT_EQUALS
-    ASSERT_TRUE(parsed.getInputDocs() == inputDocRange);
+    ASSERT(!parsed.body.hasField("$readPreference"));
+    ASSERT(!parsed.body.hasField("$ssm"));
+    ASSERT(!parsed.metadata.hasField("$readPreference"));
+
+    ASSERT(!parsed.metadata["$ssm"]["$secondaryOk"].trueValue());
 }
 
 }  // namespace

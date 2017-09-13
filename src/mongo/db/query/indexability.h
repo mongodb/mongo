@@ -59,7 +59,7 @@ public:
      * Example: a: {$elemMatch: {$gte: 1, $lte: 1}}.
      */
     static bool arrayUsesIndexOnOwnField(const MatchExpression* me) {
-        if (!me->isArray()) {
+        if (me->getCategory() != MatchExpression::MatchCategory::kArrayMatching) {
             return false;
         }
 
@@ -111,7 +111,7 @@ public:
      * Example: a: {$elemMatch: {b:1, c:1}}.
      */
     static bool arrayUsesIndexOnChildren(const MatchExpression* me) {
-        return me->isArray() && MatchExpression::ELEM_MATCH_OBJECT == me->matchType();
+        return MatchExpression::ELEM_MATCH_OBJECT == me->matchType();
     }
 
     /**
@@ -129,6 +129,36 @@ public:
      */
     static bool isBoundsGenerating(const MatchExpression* me) {
         return isBoundsGeneratingNot(me) || nodeCanUseIndexOnOwnField(me);
+    }
+
+    /**
+     * Returns true if 'me' is of type EQ, GT, GTE, LT, or LTE.
+     */
+    static bool isEqualityOrInequality(const MatchExpression* me) {
+        return (me->matchType() == MatchExpression::EQ || me->matchType() == MatchExpression::GT ||
+                me->matchType() == MatchExpression::GTE || me->matchType() == MatchExpression::LT ||
+                me->matchType() == MatchExpression::LTE);
+    }
+
+    /**
+     * Returns true if 'elt' is a BSONType for which exact index bounds can be generated.
+     */
+    static bool isExactBoundsGenerating(BSONElement elt) {
+        switch (elt.type()) {
+            case BSONType::NumberLong:
+            case BSONType::NumberDouble:
+            case BSONType::NumberInt:
+            case BSONType::NumberDecimal:
+            case BSONType::String:
+            case BSONType::Bool:
+            case BSONType::Date:
+            case BSONType::bsonTimestamp:
+            case BSONType::jstOID:
+            case BSONType::BinData:
+                return true;
+            default:
+                return false;
+        }
     }
 
 private:

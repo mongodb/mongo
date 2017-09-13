@@ -30,31 +30,34 @@
  * This file tests db/query/plan_ranker.cpp and db/query/multi_plan_runner.cpp.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <iostream>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/dbtests/dbtests.h"
-
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 // How we access the external setParameter testing bool.
-extern bool internalQueryForceIntersectionPlans;
+extern AtomicBool internalQueryForceIntersectionPlans;
 
-extern bool internalQueryPlannerEnableHashIntersection;
+extern AtomicBool internalQueryPlannerEnableHashIntersection;
 
 }  // namespace mongo
 
@@ -63,48 +66,51 @@ namespace PlanRankingTests {
 using std::unique_ptr;
 using std::vector;
 
-static const char* ns = "unittests.PlanRankingTests";
+static const NamespaceString nss("unittests.PlanRankingTests");
 
 class PlanRankingTestBase {
 public:
     PlanRankingTestBase()
-        : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans),
-          _enableHashIntersection(internalQueryPlannerEnableHashIntersection),
-          _client(&_txn) {
+        : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans.load()),
+          _enableHashIntersection(internalQueryPlannerEnableHashIntersection.load()),
+          _client(&_opCtx) {
         // Run all tests with hash-based intersection enabled.
-        internalQueryPlannerEnableHashIntersection = true;
+        internalQueryPlannerEnableHashIntersection.store(true);
 
-        OldClientWriteContext ctx(&_txn, ns);
-        _client.dropCollection(ns);
+        // Ensure N is significantly larger then internalQueryPlanEvaluationWorks.
+        ASSERT_GTE(N, internalQueryPlanEvaluationWorks.load() + 1000);
+
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        _client.dropCollection(nss.ns());
     }
 
     virtual ~PlanRankingTestBase() {
         // Restore external setParameter testing bools.
-        internalQueryForceIntersectionPlans = _internalQueryForceIntersectionPlans;
-        internalQueryPlannerEnableHashIntersection = _enableHashIntersection;
+        internalQueryForceIntersectionPlans.store(_internalQueryForceIntersectionPlans);
+        internalQueryPlannerEnableHashIntersection.store(_enableHashIntersection);
     }
 
     void insert(const BSONObj& obj) {
-        OldClientWriteContext ctx(&_txn, ns);
-        _client.insert(ns, obj);
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        _client.insert(nss.ns(), obj);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns, obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
     }
 
     /**
      * Use the MultiPlanRunner to pick the best plan for the query 'cq'.  Goes through
      * normal planning to generate solutions and feeds them to the MPR.
      *
-     * Takes ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
+     * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        AutoGetCollectionForRead ctx(&_txn, ns);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
 
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_txn, collection, cq, &plannerParams);
+        fillOutPlannerParams(&_opCtx, collection, cq, &plannerParams);
         // Turn this off otherwise it pops up in some plans.
         plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
@@ -116,18 +122,19 @@ public:
         ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
         // Fill out the MPR.
-        _mps.reset(new MultiPlanStage(&_txn, collection, cq));
-        std::unique_ptr<WorkingSet> ws(new WorkingSet());
+        _mps.reset(new MultiPlanStage(&_opCtx, collection, cq));
+        unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the MPR.
         for (size_t i = 0; i < solutions.size(); ++i) {
             PlanStage* root;
-            ASSERT(StageBuilder::build(&_txn, collection, *solutions[i], ws.get(), &root));
+            ASSERT(StageBuilder::build(&_opCtx, collection, *cq, *solutions[i], ws.get(), &root));
             // Takes ownership of all (actually some) arguments.
             _mps->addPlan(solutions[i], root, ws.get());
         }
         // This is what sets a backup plan, should we test for it.
-        PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);
-        _mps->pickBestPlan(&yieldPolicy);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
+                                    _opCtx.getServiceContext()->getFastClockSource());
+        _mps->pickBestPlan(&yieldPolicy).transitional_ignore();
         ASSERT(_mps->bestPlanChosen());
 
         size_t bestPlanIdx = _mps->bestPlanIdx();
@@ -145,13 +152,18 @@ public:
         return _mps->hasBackupPlan();
     }
 
+    OperationContext* opCtx() {
+        return &_opCtx;
+    }
+
 protected:
     // A large number, which must be larger than the number of times
     // candidate plans are worked by the multi plan runner. Used for
     // determining the number of documents in the tests below.
-    static const int N;
+    const int N = 12000;
 
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
@@ -166,9 +178,6 @@ private:
 
     DBDirectClient _client;
 };
-
-// static
-const int PlanRankingTestBase::N = internalQueryPlanEvaluationWorks + 1000;
 
 /**
  * Test that the "prefer ixisect" parameter works.
@@ -185,36 +194,45 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
+        unique_ptr<CanonicalQuery> cq;
+
         // Run the query {a:4, b:1}.
-        CanonicalQuery* cq;
-        verify(CanonicalQuery::canonicalize(ns, BSON("a" << 100 << "b" << 1), &cq).isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        {
+            auto qr = stdx::make_unique<QueryRequest>(nss);
+            qr->setFilter(BSON("a" << 100 << "b" << 1));
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+            verify(statusWithCQ.isOK());
+            cq = std::move(statusWithCQ.getValue());
+            ASSERT(cq.get());
+        }
 
         // {a:100} is super selective so choose that.
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        internalQueryForceIntersectionPlans = true;
+        internalQueryForceIntersectionPlans.store(true);
 
         // And run the same query again.
-        ASSERT(CanonicalQuery::canonicalize(ns, BSON("a" << 100 << "b" << 1), &cq).isOK());
-        std::unique_ptr<CanonicalQuery> killCq2(cq);
+        {
+            auto qr = stdx::make_unique<QueryRequest>(nss);
+            qr->setFilter(BSON("a" << 100 << "b" << 1));
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+            verify(statusWithCQ.isOK());
+            cq = std::move(statusWithCQ.getValue());
+        }
 
         // With the "ranking picks ixisect always" option we pick an intersection plan that uses
         // both the {a:1} and {b:1} indices even though it performs poorly.
 
-        // Takes ownership of cq.
-        soln = pickBestPlan(cq);
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {node: {andSorted: {nodes: ["
-            "{ixscan: {filter: null, pattern: {a:1}}},"
-            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-            soln->root.get()));
+        soln = pickBestPlan(cq.get());
+        ASSERT(
+            QueryPlannerTestLib::solutionMatches("{fetch: {node: {andSorted: {nodes: ["
+                                                 "{ixscan: {filter: null, pattern: {a:1}}},"
+                                                 "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
+                                                 soln->root.get()));
     }
 };
 
@@ -234,23 +252,23 @@ public:
         addIndex(BSON("b" << 1));
 
         // Run the query {a:1, b:{$gt:1}.
-        CanonicalQuery* cq;
-        verify(CanonicalQuery::canonicalize(ns, BSON("a" << 1 << "b" << BSON("$gt" << 1)), &cq)
-                   .isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("a" << 1 << "b" << BSON("$gt" << 1)));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        verify(statusWithCQ.isOK());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        internalQueryForceIntersectionPlans = true;
+        internalQueryForceIntersectionPlans.store(true);
 
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {node: {andHash: {nodes: ["
-            "{ixscan: {filter: null, pattern: {a:1}}},"
-            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-            soln->root.get()));
+        QuerySolution* soln = pickBestPlan(cq.get());
+        ASSERT(
+            QueryPlannerTestLib::solutionMatches("{fetch: {node: {andHash: {nodes: ["
+                                                 "{ixscan: {filter: null, pattern: {a:1}}},"
+                                                 "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
+                                                 soln->root.get()));
 
         // Confirm that a backup plan is available.
         ASSERT(hasBackupPlan());
@@ -273,16 +291,16 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("a" << 1 << "b" << 1));
 
-        // Query for a==27 with projection that wants 'a' and 'b'.  BSONObj() is for sort.
-        CanonicalQuery* cq;
-        ASSERT(CanonicalQuery::canonicalize(
-                   ns, BSON("a" << 27), BSONObj(), BSON("_id" << 0 << "a" << 1 << "b" << 1), &cq)
-                   .isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        // Query for a==27 with projection that wants 'a' and 'b'.
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("a" << 27));
+        qr->setProj(BSON("_id" << 0 << "a" << 1 << "b" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
 
         // Prefer the fully covered plan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
@@ -309,14 +327,14 @@ public:
         addIndex(BSON("b" << 1));
 
         // There is no data that matches this query but we don't know that until EOF.
-        CanonicalQuery* cq;
-        BSONObj queryObj = BSON("a" << 1 << "b" << 1 << "c" << 99);
-        ASSERT(CanonicalQuery::canonicalize(ns, queryObj, &cq).isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("a" << 1 << "b" << 1 << "c" << 99));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
 
         // Anti-prefer the intersection plan.
         bool bestIsScanOverA = QueryPlannerTestLib::solutionMatches(
@@ -346,16 +364,16 @@ public:
 
         // There is no data that matches this query ({a:2}).  Both scans will hit EOF before
         // returning any data.
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("a" << 2));
+        qr->setProj(BSON("_id" << 0 << "a" << 1 << "b" << 1));
 
-        CanonicalQuery* cq;
-        ASSERT(CanonicalQuery::canonicalize(
-                   ns, BSON("a" << 2), BSONObj(), BSON("_id" << 0 << "a" << 1 << "b" << 1), &cq)
-                   .isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
         // Prefer the fully covered plan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}",
@@ -381,14 +399,15 @@ public:
         addIndex(BSON("b" << 1));
 
         // Run the query {a:N+1, b:1}.  (No such document.)
-        CanonicalQuery* cq;
-        verify(CanonicalQuery::canonicalize(ns, BSON("a" << N + 1 << "b" << 1), &cq).isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("a" << N + 1 << "b" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        verify(statusWithCQ.isOK());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
         // {a: 100} is super selective so choose that.
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
     }
@@ -416,15 +435,15 @@ public:
         addIndex(BSON("b" << 1));
 
         // Run the query {a:N+1, b:1}.  (No such document.)
-        CanonicalQuery* cq;
-        verify(CanonicalQuery::canonicalize(ns, BSON("a" << BSON("$gte" << N + 1) << "b" << 1), &cq)
-                   .isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        verify(statusWithCQ.isOK());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
         // {a: 100} is super selective so choose that.
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
     }
@@ -445,21 +464,20 @@ public:
 
         // Run a query with a sort.  The blocking sort won't produce any data during the
         // evaluation period.
-        CanonicalQuery* cq;
-        BSONObj queryObj = BSON("_id" << BSON("$gte" << 20 << "$lte" << 200));
-        BSONObj sortObj = BSON("c" << 1);
-        BSONObj projObj = BSONObj();
-        ASSERT(CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cq).isOK());
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("_id" << BSON("$gte" << 20 << "$lte" << 200)));
+        qr->setSort(BSON("c" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
 
         // The best must not be a collscan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{sort: {pattern: {c: 1}, limit: 0, node: {"
-            "fetch: {filter: null, node: "
-            "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}}",
+            "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node:"
+            "{fetch: {filter: null, node: "
+            "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}}}",
             soln->root.get()));
     }
 };
@@ -476,13 +494,14 @@ public:
         }
 
         // Look for A Space Odyssey.
-        CanonicalQuery* cq;
-        verify(CanonicalQuery::canonicalize(ns, BSON("foo" << 2001), &cq).isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("foo" << 2001));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        verify(statusWithCQ.isOK());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
-        // Takes ownership of cq.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
 
         // The best must be a collscan.
         ASSERT(QueryPlannerTestLib::solutionMatches("{cscan: {dir: 1, filter: {foo: 2001}}}",
@@ -508,23 +527,22 @@ public:
         addIndex(BSON("d" << 1 << "e" << 1));
 
         // Query: find({a: 1}).sort({d: 1})
-        CanonicalQuery* cq;
-        ASSERT(CanonicalQuery::canonicalize(ns,
-                                            BSON("a" << 1),
-                                            BSON("d" << 1),  // sort
-                                            BSONObj(),       // projection
-                                            &cq).isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("a" << 1));
+        qr->setSort(BSON("d" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
         // No results will be returned during the trial period,
         // so we expect to choose {d: 1, e: 1}, as it allows us
         // to avoid the sort stage.
-        QuerySolution* soln = pickBestPlan(cq);
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {filter: {a:1}, node: "
-            "{ixscan: {filter: null, pattern: {d:1,e:1}}}}}",
-            soln->root.get()));
+        QuerySolution* soln = pickBestPlan(cq.get());
+        ASSERT(
+            QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
+                                                 "{ixscan: {filter: null, pattern: {d:1,e:1}}}}}",
+                                                 soln->root.get()));
     }
 };
 
@@ -547,14 +565,15 @@ public:
         // Solutions using either 'a' or 'b' will take a long time to start producing
         // results. However, an index scan on 'b' will start producing results sooner
         // than an index scan on 'a'.
-        CanonicalQuery* cq;
-        ASSERT(CanonicalQuery::canonicalize(ns, fromjson("{a: 1, b: 1, c: {$gte: 5000}}"), &cq)
-                   .isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(fromjson("{a: 1, b: 1, c: {$gte: 5000}}"));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
         // Use index on 'b'.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {ixscan: {pattern: {b: 1}}}}}",
                                                     soln->root.get()));
     }
@@ -578,14 +597,15 @@ public:
         addIndex(BSON("b" << 1 << "c" << 1));
         addIndex(BSON("a" << 1));
 
-        CanonicalQuery* cq;
-        ASSERT(
-            CanonicalQuery::canonicalize(ns, fromjson("{a: 9, b: {$ne: 10}, c: 9}"), &cq).isOK());
-        ASSERT(NULL != cq);
-        std::unique_ptr<CanonicalQuery> killCq(cq);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(fromjson("{a: 9, b: {$ne: 10}, c: 9}"));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(NULL != cq.get());
 
         // Expect to use index {a: 1, b: 1}.
-        QuerySolution* soln = pickBestPlan(cq);
+        QuerySolution* soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}",
                                                     soln->root.get()));
     }

@@ -35,12 +35,16 @@
 #include <iostream>
 #include <map>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/log_manager.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/message_log_domain.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -53,6 +57,11 @@ using std::string;
 namespace unittest {
 
 namespace {
+
+bool stringContains(const std::string& haystack, const std::string& needle) {
+    return haystack.find(needle) != std::string::npos;
+}
+
 logger::MessageLogDomain* unittestOutput = logger::globalLogManager()->getNamedDomain("unittest");
 
 typedef std::map<std::string, std::shared_ptr<Suite>> SuiteMap;
@@ -68,8 +77,8 @@ logger::LogstreamBuilder log() {
     return LogstreamBuilder(unittestOutput, getThreadName(), logger::LogSeverity::Log());
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(UnitTestOutput,
-                                     ("GlobalLogManager", "default"))(InitializerContext*) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(UnitTestOutput, ("GlobalLogManager", "default"))
+(InitializerContext*) {
     unittestOutput->attachAppender(logger::MessageLogDomain::AppenderAutoPtr(
         new logger::ConsoleAppender<logger::MessageLogDomain::Event>(
             new logger::MessageEventDetailsEncoder)));
@@ -119,6 +128,33 @@ public:
 
 Result* Result::cur = 0;
 
+namespace {
+
+/**
+ * This unsafe scope guard allows exceptions in its destructor. Thus, if it goes out of scope when
+ * an exception is active and the guard function also throws an exception, the program will call
+ * std::terminate. This should only be used in unittests where termination on exception is okay.
+ */
+template <typename F>
+class UnsafeScopeGuard {
+public:
+    UnsafeScopeGuard(F fun) : _fun(fun) {}
+
+    ~UnsafeScopeGuard() noexcept(false) {
+        _fun();
+    }
+
+private:
+    F _fun;
+};
+
+template <typename F>
+inline UnsafeScopeGuard<F> MakeUnsafeScopeGuard(F fun) {
+    return UnsafeScopeGuard<F>(std::move(fun));
+}
+
+}  // namespace
+
 Test::Test() : _isCapturingLogMessages(false) {}
 
 Test::~Test() {
@@ -129,6 +165,7 @@ Test::~Test() {
 
 void Test::run() {
     setUp();
+    auto guard = MakeUnsafeScopeGuard([this] { tearDown(); });
 
     // An uncaught exception does not prevent the tear down from running. But
     // such an event still constitutes an error. To test this behavior we use a
@@ -137,14 +174,8 @@ void Test::run() {
     try {
         _doTest();
     } catch (FixtureExceptionForTesting&) {
-        tearDown();
         return;
-    } catch (TestAssertionFailureException&) {
-        tearDown();
-        throw;
     }
-
-    tearDown();
 }
 
 void Test::setUp() {}
@@ -160,11 +191,28 @@ public:
         if (!_encoder.encode(event, _os)) {
             return Status(ErrorCodes::LogWriteFailed, "Failed to append to LogTestAppender.");
         }
-        _lines->push_back(_os.str());
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (_enabled) {
+            _lines->push_back(_os.str());
+        }
         return Status::OK();
     }
 
+    void enable() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(!_enabled);
+        _enabled = true;
+    }
+
+    void disable() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(_enabled);
+        _enabled = false;
+    }
+
 private:
+    stdx::mutex _mutex;
+    bool _enabled = false;
     logger::MessageEventDetailsEncoder _encoder;
     std::vector<std::string>* _lines;
 };
@@ -173,15 +221,33 @@ private:
 void Test::startCapturingLogMessages() {
     invariant(!_isCapturingLogMessages);
     _capturedLogMessages.clear();
-    _captureAppenderHandle = logger::globalLogDomain()->attachAppender(
-        logger::MessageLogDomain::AppenderAutoPtr(new StringVectorAppender(&_capturedLogMessages)));
+    if (!_captureAppender) {
+        _captureAppender = stdx::make_unique<StringVectorAppender>(&_capturedLogMessages);
+    }
+    checked_cast<StringVectorAppender*>(_captureAppender.get())->enable();
+    _captureAppenderHandle = logger::globalLogDomain()->attachAppender(std::move(_captureAppender));
     _isCapturingLogMessages = true;
 }
 
 void Test::stopCapturingLogMessages() {
     invariant(_isCapturingLogMessages);
-    logger::globalLogDomain()->detachAppender(_captureAppenderHandle);
+    invariant(!_captureAppender);
+    _captureAppender = logger::globalLogDomain()->detachAppender(_captureAppenderHandle);
+    checked_cast<StringVectorAppender*>(_captureAppender.get())->disable();
     _isCapturingLogMessages = false;
+}
+void Test::printCapturedLogLines() const {
+    log() << "****************************** Captured Lines (start) *****************************";
+    std::for_each(getCapturedLogMessages().begin(),
+                  getCapturedLogMessages().end(),
+                  [](std::string line) { log() << line; });
+    log() << "****************************** Captured Lines (end) ******************************";
+}
+
+int64_t Test::countLogLinesContaining(const std::string& needle) {
+    return std::count_if(getCapturedLogMessages().begin(),
+                         getCapturedLogMessages().end(),
+                         stdx::bind(stringContains, stdx::placeholders::_1, needle));
 }
 
 Suite::Suite(const std::string& name) : _name(name) {
@@ -216,16 +282,18 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
 
         bool passes = false;
 
-        onCurrentTestNameChange(tc->getName());
-
-        log() << "\t going to run test: " << tc->getName() << std::endl;
-
         std::stringstream err;
         err << tc->getName() << "\t";
 
         try {
-            for (int x = 0; x < runsPerTest; x++)
+            for (int x = 0; x < runsPerTest; x++) {
+                std::stringstream runTimes;
+                if (runsPerTest > 1) {
+                    runTimes << "  (" << x + 1 << "/" << runsPerTest << ")";
+                }
+                log() << "\t going to run test: " << tc->getName() << runTimes.str();
                 tc->run();
+            }
             passes = true;
         } catch (const TestAssertionFailureException& ae) {
             err << ae.toString();
@@ -247,8 +315,6 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
         r->_rc = 17;
 
     r->_millis = timer.millis();
-
-    onCurrentTestNameChange("");
 
     log() << "\t DONE running tests" << std::endl;
 
@@ -391,7 +457,7 @@ TestAssertionFailure& TestAssertionFailure::operator=(const TestAssertionFailure
     return *this;
 }
 
-TestAssertionFailure::~TestAssertionFailure() BOOST_NOEXCEPT_IF(false) {
+TestAssertionFailure::~TestAssertionFailure() noexcept(false) {
     if (!_enabled) {
         invariant(_stream.str().empty());
         return;
@@ -399,6 +465,7 @@ TestAssertionFailure::~TestAssertionFailure() BOOST_NOEXCEPT_IF(false) {
     if (!_stream.str().empty()) {
         _exception.setMessage(_exception.getMessage() + " " + _stream.str());
     }
+    error() << "Throwing exception: " << _exception;
     throw _exception;
 }
 

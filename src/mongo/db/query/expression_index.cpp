@@ -29,13 +29,17 @@
 #include "mongo/db/query/expression_index.h"
 
 #include <iostream>
-
-#include "third_party/s2/s2regioncoverer.h"
+#include <unordered_set>
 
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/index/expression_params.h"
+#include "mongo/db/query/expression_index_knobs.h"
+#include "mongo/db/server_parameters.h"
+#include "third_party/s2/s2cellid.h"
+#include "third_party/s2/s2region.h"
+#include "third_party/s2/s2regioncoverer.h"
 
 namespace mongo {
 
@@ -64,10 +68,9 @@ static std::string toCoveringString(const GeoHashConverter& hashConverter,
     return result + "]";
 }
 
-void ExpressionMapping::cover2d(const R2Region& region,
-                                const BSONObj& indexInfoObj,
-                                int maxCoveringCells,
-                                OrderedIntervalList* oil) {
+std::vector<GeoHash> ExpressionMapping::get2dCovering(const R2Region& region,
+                                                      const BSONObj& indexInfoObj,
+                                                      int maxCoveringCells) {
     GeoHashConverter::Parameters hashParams;
     Status paramStatus = GeoHashConverter::parseParameters(indexInfoObj, &hashParams);
     verify(paramStatus.isOK());  // We validated the parameters when creating the index
@@ -78,52 +81,113 @@ void ExpressionMapping::cover2d(const R2Region& region,
     coverer.setMaxCells(maxCoveringCells);
 
     // TODO: Maybe slightly optimize by returning results in order
-    vector<GeoHash> unorderedCovering;
+    std::vector<GeoHash> unorderedCovering;
     coverer.getCovering(region, &unorderedCovering);
-    set<GeoHash> covering(unorderedCovering.begin(), unorderedCovering.end());
+    return unorderedCovering;
+}
 
+void ExpressionMapping::GeoHashsToIntervalsWithParents(
+    const std::vector<GeoHash>& unorderedCovering, OrderedIntervalList* oilOut) {
+    set<GeoHash> covering(unorderedCovering.begin(), unorderedCovering.end());
     for (set<GeoHash>::const_iterator it = covering.begin(); it != covering.end(); ++it) {
         const GeoHash& geoHash = *it;
         BSONObjBuilder builder;
         geoHash.appendHashMin(&builder, "");
         geoHash.appendHashMax(&builder, "");
 
-        oil->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(builder.obj(), true, true));
+        oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            builder.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
     }
 }
 
-// TODO: what should we really pass in for indexInfoObj?
-void ExpressionMapping::cover2dsphere(const S2Region& region,
-                                      const BSONObj& indexInfoObj,
-                                      OrderedIntervalList* oilOut) {
-    int coarsestIndexedLevel;
-    BSONElement ce = indexInfoObj["coarsestIndexedLevel"];
-    if (ce.isNumber()) {
-        coarsestIndexedLevel = ce.numberInt();
-    } else {
-        coarsestIndexedLevel = S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / kRadiusOfEarthInMeters);
-    }
+void ExpressionMapping::cover2d(const R2Region& region,
+                                const BSONObj& indexInfoObj,
+                                int maxCoveringCells,
+                                OrderedIntervalList* oilOut) {
+    std::vector<GeoHash> unorderedCovering = get2dCovering(region, indexInfoObj, maxCoveringCells);
+    GeoHashsToIntervalsWithParents(unorderedCovering, oilOut);
+}
 
-    // The min level of our covering is the level whose cells are the closest match to the
-    // *area* of the region (or the max indexed level, whichever is smaller) The max level
-    // is 4 sizes larger.
-    double edgeLen = sqrt(region.GetRectBound().Area());
+std::vector<S2CellId> ExpressionMapping::get2dsphereCovering(const S2Region& region) {
+    auto minLevel = internalQueryS2GeoCoarsestLevel.load();
+    auto maxLevel = internalQueryS2GeoFinestLevel.load();
+
+    uassert(28739, "Geo coarsest level must be in range [0,30]", 0 <= minLevel && minLevel <= 30);
+    uassert(28740, "Geo finest level must be in range [0,30]", 0 <= maxLevel && maxLevel <= 30);
+    uassert(28741, "Geo coarsest level must be less than or equal to finest", minLevel <= maxLevel);
+
     S2RegionCoverer coverer;
-    coverer.set_min_level(min(coarsestIndexedLevel, 2 + S2::kAvgEdge.GetClosestLevel(edgeLen)));
-    coverer.set_max_level(4 + coverer.min_level());
+    coverer.set_min_level(minLevel);
+    coverer.set_max_level(maxLevel);
+    coverer.set_max_cells(internalQueryS2GeoMaxCells.load());
 
     std::vector<S2CellId> cover;
     coverer.GetCovering(region, &cover);
+    return cover;
+}
 
-    // Look at the cells we cover and all cells that are within our covering and finer.
-    // Anything with our cover as a strict prefix is contained within the cover and should
-    // be intersection tested.
-    std::set<string> intervalSet;
-    std::set<string> exactSet;
-    for (size_t i = 0; i < cover.size(); ++i) {
-        S2CellId coveredCell = cover[i];
-        intervalSet.insert(coveredCell.toString());
+void ExpressionMapping::cover2dsphere(const S2Region& region,
+                                      const S2IndexingParams& indexingParams,
+                                      OrderedIntervalList* oilOut) {
+    std::vector<S2CellId> cover = get2dsphereCovering(region);
+    S2CellIdsToIntervalsWithParents(cover, indexingParams, oilOut);
+}
 
+namespace {
+bool compareIntervals(const Interval& a, const Interval& b) {
+    return a.precedes(b);
+}
+
+void S2CellIdsToIntervalsUnsorted(const std::vector<S2CellId>& intervalSet,
+                                  const S2IndexVersion indexVersion,
+                                  OrderedIntervalList* oilOut) {
+    for (const S2CellId& interval : intervalSet) {
+        BSONObjBuilder b;
+        if (indexVersion >= S2_INDEX_VERSION_3) {
+            long long start = static_cast<long long>(interval.range_min().id());
+            long long end = static_cast<long long>(interval.range_max().id());
+            b.append("start", start);
+            b.append("end", end);
+            invariant(start <= end);
+            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+                b.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
+        } else {
+            // for backwards compatibility, use strings
+            std::string start = interval.toString();
+            std::string end = start;
+            end[start.size() - 1]++;
+            b.append("start", start);
+            b.append("end", end);
+            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+                b.obj(), BoundInclusion::kIncludeStartKeyOnly));
+        }
+    }
+}
+}  // namespace
+
+void ExpressionMapping::S2CellIdsToIntervals(const std::vector<S2CellId>& intervalSet,
+                                             const S2IndexVersion indexVersion,
+                                             OrderedIntervalList* oilOut) {
+    // Order is not preserved in changing from numeric to string
+    // form of index key. Therefore, sorting is deferred to after
+    // intervals are made
+    S2CellIdsToIntervalsUnsorted(intervalSet, indexVersion, oilOut);
+    std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), compareIntervals);
+    // Make sure that our intervals don't overlap each other and are ordered correctly.
+    // This perhaps should only be done in debug mode.
+    if (!oilOut->isValidFor(1)) {
+        std::cout << "check your assumptions! OIL = " << oilOut->toString() << std::endl;
+        verify(0);
+    }
+}
+
+void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2CellId>& intervalSet,
+                                                        const S2IndexingParams& indexParams,
+                                                        OrderedIntervalList* oilOut) {
+    // There may be duplicates when going up parent cells if two cells share a parent
+    std::unordered_set<S2CellId> exactSet;  // NOLINT
+    for (const S2CellId& interval : intervalSet) {
+        S2CellId coveredCell = interval;
         // Look at the cells that cover us.  We want to look at every cell that contains the
         // covering we would index on if we were to insert the query geometry.  We generate
         // the would-index-with-this-covering and find all the cells strictly containing the
@@ -138,59 +202,28 @@ void ExpressionMapping::cover2dsphere(const S2Region& region,
         // created above, so we only want things where the value of the last digit is not
         // stored (and therefore could be 1).
 
-        while (coveredCell.level() > coarsestIndexedLevel) {
+        while (coveredCell.level() > indexParams.coarsestIndexedLevel) {
             // Add the parent cell of the currently covered cell since we aren't at the
             // coarsest level yet
             // NOTE: Be careful not to generate cells strictly less than the
             // coarsestIndexedLevel - this can result in S2 failures when level < 0.
 
             coveredCell = coveredCell.parent();
-            exactSet.insert(coveredCell.toString());
+            exactSet.insert(coveredCell);
         }
     }
 
-    // We turned the cell IDs into strings which define point intervals or prefixes of
-    // strings we want to look for.
-    std::set<std::string>::iterator exactIt = exactSet.begin();
-    std::set<std::string>::iterator intervalIt = intervalSet.begin();
-    while (exactSet.end() != exactIt && intervalSet.end() != intervalIt) {
-        const std::string& exact = *exactIt;
-        const std::string& ival = *intervalIt;
-        if (exact < ival) {
-            // add exact
-            oilOut->intervals.push_back(IndexBoundsBuilder::makePointInterval(exact));
-            exactIt++;
-        } else {
-            std::string end = ival;
-            end[end.size() - 1]++;
-            oilOut->intervals.push_back(
-                IndexBoundsBuilder::makeRangeInterval(ival, end, true, false));
-            intervalIt++;
-        }
+    for (const S2CellId& exact : exactSet) {
+        BSONObj exactBSON = S2CellIdToIndexKey(exact, indexParams.indexVersion);
+        oilOut->intervals.push_back(IndexBoundsBuilder::makePointInterval(exactBSON));
     }
 
-    if (exactSet.end() != exactIt) {
-        verify(intervalSet.end() == intervalIt);
-        do {
-            oilOut->intervals.push_back(IndexBoundsBuilder::makePointInterval(*exactIt));
-            exactIt++;
-        } while (exactSet.end() != exactIt);
-    } else if (intervalSet.end() != intervalIt) {
-        verify(exactSet.end() == exactIt);
-        do {
-            const std::string& ival = *intervalIt;
-            std::string end = ival;
-            end[end.size() - 1]++;
-            oilOut->intervals.push_back(
-                IndexBoundsBuilder::makeRangeInterval(ival, end, true, false));
-            intervalIt++;
-        } while (intervalSet.end() != intervalIt);
-    }
-
+    S2CellIdsToIntervalsUnsorted(intervalSet, indexParams.indexVersion, oilOut);
+    std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), compareIntervals);
     // Make sure that our intervals don't overlap each other and are ordered correctly.
     // This perhaps should only be done in debug mode.
     if (!oilOut->isValidFor(1)) {
-        cout << "check your assumptions! OIL = " << oilOut->toString() << std::endl;
+        std::cout << "check your assumptions! OIL = " << oilOut->toString() << std::endl;
         verify(0);
     }
 }

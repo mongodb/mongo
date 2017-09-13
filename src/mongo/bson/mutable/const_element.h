@@ -83,16 +83,22 @@ public:
     inline int32_t getValueInt() const;
     inline Timestamp getValueTimestamp() const;
     inline int64_t getValueLong() const;
+    inline Decimal128 getValueDecimal() const;
     inline bool isValueMinKey() const;
     inline bool isValueMaxKey() const;
     inline SafeNum getValueSafeNum() const;
 
-    inline int compareWithElement(const ConstElement& other, bool considerFieldName = true) const;
+    inline int compareWithElement(const ConstElement& other,
+                                  const StringData::ComparatorInterface* comparator,
+                                  bool considerFieldName = true) const;
 
     inline int compareWithBSONElement(const BSONElement& other,
+                                      const StringData::ComparatorInterface* comparator,
                                       bool considerFieldName = true) const;
 
-    inline int compareWithBSONObj(const BSONObj& other, bool considerFieldName = true) const;
+    inline int compareWithBSONObj(const BSONObj& other,
+                                  const StringData::ComparatorInterface* comparator,
+                                  bool considerFieldName = true) const;
 
     inline void writeTo(BSONObjBuilder* builder) const;
     inline void writeArrayTo(BSONArrayBuilder* builder) const;

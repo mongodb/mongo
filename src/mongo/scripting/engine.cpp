@@ -33,21 +33,22 @@
 
 #include "mongo/scripting/engine.h"
 
-#include <cctype>
 #include <boost/filesystem/operations.hpp>
+#include <cctype>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
 
-using std::endl;
 using std::set;
 using std::shared_ptr;
 using std::string;
@@ -55,9 +56,17 @@ using std::unique_ptr;
 
 AtomicInt64 Scope::_lastVersion(1);
 
+
 namespace {
+
+MONGO_FP_DECLARE(mr_killop_test_fp);
 // 2 GB is the largest support Javascript file size.
 const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
+
+const ServiceContext::Decoration<std::unique_ptr<ScriptEngine>> forService =
+    ServiceContext::declareDecoration<std::unique_ptr<ScriptEngine>>();
+static std::unique_ptr<ScriptEngine> globalScriptEngine;
+
 }  // namespace
 
 ScriptEngine::ScriptEngine() : _scopeInitCallback() {}
@@ -87,6 +96,9 @@ void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* s
         case NumberLong:
             builder.append(fieldName, getNumberLongLong(scopeName));
             break;
+        case NumberDecimal:
+            builder.append(fieldName, getNumberDecimal(scopeName));
+            break;
         case String:
             builder.append(fieldName, getString(scopeName));
             break;
@@ -98,9 +110,8 @@ void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* s
             builder.appendNull(fieldName);
             break;
         case Date:
-            builder.appendDate(
-                fieldName,
-                Date_t::fromMillisSinceEpoch(static_cast<long long>(getNumber(scopeName))));
+            builder.appendDate(fieldName,
+                               Date_t::fromMillisSinceEpoch(getNumberLongLong(scopeName)));
             break;
         case Code:
             builder.appendCode(fieldName, getString(scopeName));
@@ -123,7 +134,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
     boost::filesystem::path p(filename);
 #endif
     if (!exists(p)) {
-        error() << "file [" << filename << "] doesn't exist" << endl;
+        error() << "file [" << filename << "] doesn't exist";
         return false;
     }
 
@@ -142,7 +153,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
         }
 
         if (empty) {
-            error() << "directory [" << filename << "] doesn't have any *.js files" << endl;
+            error() << "directory [" << filename << "] doesn't have any *.js files";
             return false;
         }
 
@@ -157,7 +168,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
 
     fileofs fo = f.len();
     if (fo > kMaxJsFileLength) {
-        warning() << "attempted to execute javascript file larger than 2GB" << endl;
+        warning() << "attempted to execute javascript file larger than 2GB";
         return false;
     }
     unsigned len = static_cast<unsigned>(fo);
@@ -174,7 +185,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
     }
 
     StringData code(data.get() + offset, len - offset);
-    return exec(code, filename, printResult, reportError, timeoutMs);
+    return exec(code, filename, printResult, reportError, false, timeoutMs);
 }
 
 class Scope::StoredFuncModLogOpHandler : public RecoveryUnit::Change {
@@ -185,8 +196,8 @@ public:
     void rollback() {}
 };
 
-void Scope::storedFuncMod(OperationContext* txn) {
-    txn->recoveryUnit()->registerChange(new StoredFuncModLogOpHandler());
+void Scope::storedFuncMod(OperationContext* opCtx) {
+    opCtx->recoveryUnit()->registerChange(new StoredFuncModLogOpHandler());
 }
 
 void Scope::validateObjectIdString(const string& str) {
@@ -195,7 +206,7 @@ void Scope::validateObjectIdString(const string& str) {
         uassert(10430, "invalid object id: not hex", std::isxdigit(str.at(i)));
 }
 
-void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
+void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     if (_localDBName.size() == 0) {
         if (ignoreNotConnected)
             return;
@@ -209,27 +220,41 @@ void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
     _loadedVersion = lastVersion;
     string coll = _localDBName + ".system.js";
 
-    unique_ptr<DBClientBase> directDBClient(createDirectClient(txn));
+    auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
+
     unique_ptr<DBClientCursor> c =
         directDBClient->query(coll, Query(), 0, 0, NULL, QueryOption_SlaveOk, 0);
     massert(16669, "unable to get db client cursor from query", c.get());
 
     set<string> thisTime;
     while (c->more()) {
-        BSONObj o = c->nextSafe();
+        BSONObj o = c->nextSafe().getOwned();
         BSONElement n = o["_id"];
         BSONElement v = o["value"];
 
         uassert(10209, str::stream() << "name has to be a string: " << n, n.type() == String);
         uassert(10210, "value has to be set", v.type() != EOO);
 
+        if (MONGO_FAIL_POINT(mr_killop_test_fp)) {
+
+            /* This thread sleep makes the interrupts in the test come in at a time
+            *  where the js misses the interrupt and throw an exception instead of
+            *  being interrupted
+            */
+            stdx::this_thread::sleep_for(stdx::chrono::seconds(1));
+        }
+
         try {
-            setElement(n.valuestr(), v);
+            setElement(n.valuestr(), v, o);
             thisTime.insert(n.valuestr());
             _storedNames.insert(n.valuestr());
         } catch (const DBException& setElemEx) {
+            if (setElemEx.code() == ErrorCodes::Interrupted) {
+                throw;
+            }
+
             error() << "unable to load stored JavaScript function " << n.valuestr()
-                    << "(): " << setElemEx.what() << endl;
+                    << "(): " << redact(setElemEx);
         }
     }
 
@@ -260,28 +285,28 @@ ScriptingFunction Scope::createFunction(const char* code) {
     FunctionCacheMap::iterator i = _cachedFunctions.find(code);
     if (i != _cachedFunctions.end())
         return i->second;
-    // NB: we calculate the function number for v8 so the cache can be utilized to
-    //     lookup the source on an exception, but SpiderMonkey uses the value
-    //     returned by JS_CompileFunction.
-    ScriptingFunction defaultFunctionNumber = getFunctionCache().size() + 1;
-    ScriptingFunction& actualFunctionNumber = _cachedFunctions[code];
-    actualFunctionNumber = _createFunction(code, defaultFunctionNumber);
-    return actualFunctionNumber;
+
+    // Get a function number, so the cache can be utilized to lookup the source on an exception
+    ScriptingFunction functionNumber = _createFunction(code);
+    _cachedFunctions[code] = functionNumber;
+    return functionNumber;
 }
 
 namespace JSFiles {
 extern const JSFile collection;
+extern const JSFile crud_api;
 extern const JSFile db;
 extern const JSFile explain_query;
 extern const JSFile explainable;
 extern const JSFile mongo;
 extern const JSFile mr;
+extern const JSFile session;
 extern const JSFile query;
-extern const JSFile upgrade_check;
 extern const JSFile utils;
 extern const JSFile utils_sh;
 extern const JSFile utils_auth;
 extern const JSFile bulk_api;
+extern const JSFile error_codes;
 }
 
 void Scope::execCoreFiles() {
@@ -291,12 +316,14 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::db);
     execSetup(JSFiles::mongo);
     execSetup(JSFiles::mr);
+    execSetup(JSFiles::session);
     execSetup(JSFiles::query);
     execSetup(JSFiles::bulk_api);
+    execSetup(JSFiles::error_codes);
     execSetup(JSFiles::collection);
+    execSetup(JSFiles::crud_api);
     execSetup(JSFiles::explain_query);
     execSetup(JSFiles::explainable);
-    execSetup(JSFiles::upgrade_check);
 }
 
 namespace {
@@ -307,7 +334,7 @@ public:
 
         if (scope->hasOutOfMemoryException()) {
             // make some room
-            log() << "Clearing all idle JS contexts due to out of memory" << endl;
+            log() << "Clearing all idle JS contexts due to out of memory";
             _pools.clear();
             return;
         }
@@ -328,7 +355,7 @@ public:
         _pools.push_front(toStore);
     }
 
-    std::shared_ptr<Scope> tryAcquire(OperationContext* txn, const string& poolName) {
+    std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const string& poolName) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
@@ -337,12 +364,18 @@ public:
                 _pools.erase(it);
                 scope->incTimesUsed();
                 scope->reset();
-                scope->registerOperation(txn);
+                scope->registerOperation(opCtx);
                 return scope;
             }
         }
 
         return std::shared_ptr<Scope>();
+    }
+
+    void clear() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        _pools.clear();
     }
 
 private:
@@ -363,6 +396,10 @@ private:
 ScopeCache scopeCache;
 }  // anonymous namespace
 
+void ScriptEngine::dropScopeCache() {
+    scopeCache.clear();
+}
+
 class PooledScope : public Scope {
 public:
     PooledScope(const std::string& pool, const std::shared_ptr<Scope>& real)
@@ -376,8 +413,8 @@ public:
     void reset() {
         _real->reset();
     }
-    void registerOperation(OperationContext* txn) {
-        _real->registerOperation(txn);
+    void registerOperation(OperationContext* opCtx) {
+        _real->registerOperation(opCtx);
     }
     void unregisterOperation() {
         _real->unregisterOperation();
@@ -385,20 +422,26 @@ public:
     void init(const BSONObj* data) {
         _real->init(data);
     }
-    void localConnectForDbEval(OperationContext* txn, const char* dbName) {
+    void localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
         invariant(!"localConnectForDbEval should only be called from dbEval");
     }
     void setLocalDB(const string& dbName) {
         _real->setLocalDB(dbName);
     }
-    void loadStored(OperationContext* txn, bool ignoreNotConnected = false) {
-        _real->loadStored(txn, ignoreNotConnected);
+    void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false) {
+        _real->loadStored(opCtx, ignoreNotConnected);
     }
     void externalSetup() {
         _real->externalSetup();
     }
     void gc() {
         _real->gc();
+    }
+    void advanceGeneration() {
+        _real->advanceGeneration();
+    }
+    void requireOwnedObjects() override {
+        _real->requireOwnedObjects();
     }
     bool isKillPending() const {
         return _real->isKillPending();
@@ -418,6 +461,15 @@ public:
     double getNumber(const char* field) {
         return _real->getNumber(field);
     }
+    int getNumberInt(const char* field) {
+        return _real->getNumberInt(field);
+    }
+    long long getNumberLongLong(const char* field) {
+        return _real->getNumberLongLong(field);
+    }
+    Decimal128 getNumberDecimal(const char* field) {
+        return _real->getNumberDecimal(field);
+    }
     string getString(const char* field) {
         return _real->getString(field);
     }
@@ -433,8 +485,8 @@ public:
     void setString(const char* field, StringData val) {
         _real->setString(field, val);
     }
-    void setElement(const char* field, const BSONElement& val) {
-        _real->setElement(field, val);
+    void setElement(const char* field, const BSONElement& val, const BSONObj& parent) {
+        _real->setElement(field, val, parent);
     }
     void setObject(const char* field, const BSONObj& obj, bool readOnly = true) {
         _real->setObject(field, obj, readOnly);
@@ -480,12 +532,8 @@ public:
     }
 
 protected:
-    FunctionCacheMap& getFunctionCache() {
-        return _real->getFunctionCache();
-    }
-
-    ScriptingFunction _createFunction(const char* code, ScriptingFunction functionNumber = 0) {
-        return _real->_createFunction(code, functionNumber);
+    ScriptingFunction _createFunction(const char* code) {
+        return _real->_createFunction(code);
     }
 
 private:
@@ -494,25 +542,38 @@ private:
 };
 
 /** Get a scope from the pool of scopes matching the supplied pool name */
-unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* txn,
+unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
                                                const string& db,
                                                const string& scopeType) {
     const string fullPoolName = db + scopeType;
-    std::shared_ptr<Scope> s = scopeCache.tryAcquire(txn, fullPoolName);
+    std::shared_ptr<Scope> s = scopeCache.tryAcquire(opCtx, fullPoolName);
     if (!s) {
         s.reset(newScope());
-        s->registerOperation(txn);
+        s->registerOperation(opCtx);
     }
 
     unique_ptr<Scope> p;
     p.reset(new PooledScope(fullPoolName, s));
     p->setLocalDB(db);
-    p->loadStored(txn, true);
+    p->loadStored(opCtx, true);
     return p;
 }
 
-void (*ScriptEngine::_connectCallback)(DBClientWithCommands&) = 0;
-ScriptEngine* globalScriptEngine = 0;
+void (*ScriptEngine::_connectCallback)(DBClientBase&) = 0;
+
+ScriptEngine* getGlobalScriptEngine() {
+    if (hasGlobalServiceContext())
+        return forService(getGlobalServiceContext()).get();
+    else
+        return globalScriptEngine.get();
+}
+
+void setGlobalScriptEngine(ScriptEngine* impl) {
+    if (hasGlobalServiceContext())
+        forService(getGlobalServiceContext()).reset(impl);
+    else
+        globalScriptEngine.reset(impl);
+}
 
 bool hasJSReturn(const string& code) {
     size_t x = code.find("return");

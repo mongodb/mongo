@@ -27,9 +27,8 @@
 
 #pragma once
 
+#include <cstdint>
 #include <vector>
-
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 namespace mutablebson {

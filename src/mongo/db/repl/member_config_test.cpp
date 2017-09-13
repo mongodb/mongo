@@ -39,7 +39,7 @@ namespace repl {
 namespace {
 
 TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "localhost:12345"),
@@ -57,17 +57,18 @@ TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
 }
 
 TEST(MemberConfig, ParseFailsWithIllegalFieldName) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::BadValue,
                   mc.initialize(BSON("_id" << 0 << "host"
                                            << "localhost"
-                                           << "frim" << 1),
+                                           << "frim"
+                                           << 1),
                                 &tagConfig));
 }
 
 TEST(MemberConfig, ParseFailsWithMissingIdField) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   mc.initialize(BSON("host"
@@ -76,7 +77,7 @@ TEST(MemberConfig, ParseFailsWithMissingIdField) {
 }
 
 TEST(MemberConfig, ParseFailsWithBadIdField) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   mc.initialize(BSON("host"
@@ -95,14 +96,14 @@ TEST(MemberConfig, ParseFailsWithBadIdField) {
 }
 
 TEST(MemberConfig, ParseFailsWithMissingHostField) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, mc.initialize(BSON("_id" << 0), &tagConfig));
 }
 
 
 TEST(MemberConfig, ParseFailsWithBadHostField) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   mc.initialize(BSON("_id" << 0 << "host" << 0), &tagConfig));
@@ -117,31 +118,37 @@ TEST(MemberConfig, ParseFailsWithBadHostField) {
 }
 
 TEST(MemberConfig, ParseArbiterOnly) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "arbiterOnly" << 1.0),
+                                       << "arbiterOnly"
+                                       << 1.0),
                             &tagConfig));
     ASSERT_TRUE(mc.isArbiter());
+    ASSERT_EQUALS(0.0, mc.getPriority());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "arbiterOnly" << false),
+                                       << "arbiterOnly"
+                                       << false),
                             &tagConfig));
     ASSERT_TRUE(!mc.isArbiter());
+    ASSERT_EQUALS(1.0, mc.getPriority());
 }
 
 TEST(MemberConfig, ParseHidden) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "hidden" << 1.0),
+                                       << "hidden"
+                                       << 1.0),
                             &tagConfig));
     ASSERT_TRUE(mc.isHidden());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "hidden" << false),
+                                       << "hidden"
+                                       << false),
                             &tagConfig));
     ASSERT_TRUE(!mc.isHidden());
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
@@ -153,107 +160,124 @@ TEST(MemberConfig, ParseHidden) {
 }
 
 TEST(MemberConfig, ParseBuildIndexes) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "buildIndexes" << 1.0),
+                                       << "buildIndexes"
+                                       << 1.0),
                             &tagConfig));
     ASSERT_TRUE(mc.shouldBuildIndexes());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "buildIndexes" << false),
+                                       << "buildIndexes"
+                                       << false),
                             &tagConfig));
     ASSERT_TRUE(!mc.shouldBuildIndexes());
 }
 
 TEST(MemberConfig, ParseVotes) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 1.0),
+                                       << "votes"
+                                       << 1.0),
                             &tagConfig));
     ASSERT_TRUE(mc.isVoter());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0),
+                                       << "votes"
+                                       << 0
+                                       << "priority"
+                                       << 0),
                             &tagConfig));
     ASSERT_FALSE(mc.isVoter());
 
     // For backwards compatibility, truncate 1.X to 1, and 0.X to 0 (and -0.X to 0).
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 1.5),
+                                       << "votes"
+                                       << 1.5),
                             &tagConfig));
     ASSERT_TRUE(mc.isVoter());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0.5),
+                                       << "votes"
+                                       << 0.5),
                             &tagConfig));
     ASSERT_FALSE(mc.isVoter());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << -0.5),
+                                       << "votes"
+                                       << -0.5),
                             &tagConfig));
     ASSERT_FALSE(mc.isVoter());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 2),
+                                       << "votes"
+                                       << 2),
                             &tagConfig));
 
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   mc.initialize(BSON("_id" << 0 << "host"
                                            << "h"
-                                           << "votes" << Date_t::fromMillisSinceEpoch(2)),
+                                           << "votes"
+                                           << Date_t::fromMillisSinceEpoch(2)),
                                 &tagConfig));
 }
 
 TEST(MemberConfig, ParsePriority) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 1),
+                                       << "priority"
+                                       << 1),
                             &tagConfig));
     ASSERT_EQUALS(1.0, mc.getPriority());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 0),
+                                       << "priority"
+                                       << 0),
                             &tagConfig));
     ASSERT_EQUALS(0.0, mc.getPriority());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 100.8),
+                                       << "priority"
+                                       << 100.8),
                             &tagConfig));
     ASSERT_EQUALS(100.8, mc.getPriority());
 
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   mc.initialize(BSON("_id" << 0 << "host"
                                            << "h"
-                                           << "priority" << Date_t::fromMillisSinceEpoch(2)),
+                                           << "priority"
+                                           << Date_t::fromMillisSinceEpoch(2)),
                                 &tagConfig));
 }
 
 TEST(MemberConfig, ParseSlaveDelay) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "slaveDelay" << 100),
+                                       << "slaveDelay"
+                                       << 100),
                             &tagConfig));
     ASSERT_EQUALS(Seconds(100), mc.getSlaveDelay());
 }
 
 TEST(MemberConfig, ParseTags) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "tags" << BSON("k1"
-                                                         << "v1"
-                                                         << "k2"
-                                                         << "v2")),
+                                       << "tags"
+                                       << BSON("k1"
+                                               << "v1"
+                                               << "k2"
+                                               << "v2")),
                             &tagConfig));
     ASSERT_EQUALS(5U, mc.getNumTags());
     ASSERT_EQUALS(5, std::distance(mc.tagsBegin(), mc.tagsEnd()));
@@ -266,7 +290,7 @@ TEST(MemberConfig, ParseTags) {
 }
 
 TEST(MemberConfig, ValidateFailsWithIdOutOfRange) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << -1 << "host"
                                        << "localhost:12345"),
@@ -279,19 +303,23 @@ TEST(MemberConfig, ValidateFailsWithIdOutOfRange) {
 }
 
 TEST(MemberConfig, ValidateVotes) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 1.0),
+                                       << "votes"
+                                       << 1.0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_TRUE(mc.isVoter());
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0),
+                                       << "votes"
+                                       << 0
+                                       << "priority"
+                                       << 0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_FALSE(mc.isVoter());
@@ -299,21 +327,28 @@ TEST(MemberConfig, ValidateVotes) {
     // For backwards compatibility, truncate 1.X to 1, and 0.X to 0 (and -0.X to 0).
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 1.5),
+                                       << "votes"
+                                       << 1.5),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_TRUE(mc.isVoter());
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0.5),
+                                       << "votes"
+                                       << 0.5
+                                       << "priority"
+                                       << 0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_FALSE(mc.isVoter());
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << -0.5),
+                                       << "votes"
+                                       << -0.5
+                                       << "priority"
+                                       << 0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_FALSE(mc.isVoter());
@@ -321,131 +356,178 @@ TEST(MemberConfig, ValidateVotes) {
     // Invalid values
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 2),
+                                       << "votes"
+                                       << 2),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << -1),
+                                       << "votes"
+                                       << -1),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
 }
 
 TEST(MemberConfig, ValidatePriorityRanges) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 0),
+                                       << "priority"
+                                       << 0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 1000),
+                                       << "priority"
+                                       << 1000),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << -1),
+                                       << "priority"
+                                       << -1),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 1001),
+                                       << "priority"
+                                       << 1001),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
 }
 
 TEST(MemberConfig, ValidateSlaveDelays) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 0 << "slaveDelay" << 0),
+                                       << "priority"
+                                       << 0
+                                       << "slaveDelay"
+                                       << 0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 0 << "slaveDelay" << 3600 * 10),
+                                       << "priority"
+                                       << 0
+                                       << "slaveDelay"
+                                       << 3600 * 10),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 0 << "slaveDelay" << -1),
+                                       << "priority"
+                                       << 0
+                                       << "slaveDelay"
+                                       << -1),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 0 << "slaveDelay" << 3600 * 24 * 400),
+                                       << "priority"
+                                       << 0
+                                       << "slaveDelay"
+                                       << 3600 * 24 * 400),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
 }
 
 TEST(MemberConfig, ValidatePriorityAndSlaveDelayRelationship) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 1 << "slaveDelay" << 60),
+                                       << "priority"
+                                       << 1
+                                       << "slaveDelay"
+                                       << 60),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
 }
 
 TEST(MemberConfig, ValidatePriorityAndHiddenRelationship) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 1 << "hidden" << true),
+                                       << "priority"
+                                       << 1
+                                       << "hidden"
+                                       << true),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 1 << "hidden" << false),
+                                       << "priority"
+                                       << 1
+                                       << "hidden"
+                                       << false),
                             &tagConfig));
     ASSERT_OK(mc.validate());
 }
 
 TEST(MemberConfig, ValidatePriorityAndBuildIndexesRelationship) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 1 << "buildIndexes" << false),
+                                       << "priority"
+                                       << 1
+                                       << "buildIndexes"
+                                       << false),
                             &tagConfig));
 
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "priority" << 1 << "buildIndexes" << true),
+                                       << "priority"
+                                       << 1
+                                       << "buildIndexes"
+                                       << true),
                             &tagConfig));
     ASSERT_OK(mc.validate());
 }
 
 TEST(MemberConfig, ValidateArbiterVotesRelationship) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 1 << "arbiterOnly" << true),
+                                       << "votes"
+                                       << 1
+                                       << "arbiterOnly"
+                                       << true),
                             &tagConfig));
     ASSERT_OK(mc.validate());
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0 << "arbiterOnly" << false),
+                                       << "votes"
+                                       << 0
+                                       << "priority"
+                                       << 0
+                                       << "arbiterOnly"
+                                       << false),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 1 << "arbiterOnly" << false),
+                                       << "votes"
+                                       << 1
+                                       << "arbiterOnly"
+                                       << false),
                             &tagConfig));
     ASSERT_OK(mc.validate());
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0 << "arbiterOnly" << true),
+                                       << "votes"
+                                       << 0
+                                       << "arbiterOnly"
+                                       << true),
                             &tagConfig));
     ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
 }

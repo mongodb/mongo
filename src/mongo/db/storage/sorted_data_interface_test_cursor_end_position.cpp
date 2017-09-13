@@ -34,14 +34,15 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 // Tests setEndPosition with next().
 void testSetEndPosition_Next_Forward(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
         {
-         {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1}, {key5, loc1},
+            {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1}, {key5, loc1},
         });
 
     // Dup key on end point. Illegal for unique indexes.
@@ -75,12 +76,12 @@ TEST(SortedDataInterface, SetEndPosition_Next_Forward_Standard_Exclusive) {
 }
 
 void testSetEndPosition_Next_Reverse(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
         {
-         {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1}, {key5, loc1},
+            {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1}, {key5, loc1},
         });
 
     // Dup key on end point. Illegal for unique indexes.
@@ -115,14 +116,14 @@ TEST(SortedDataInterface, SetEndPosition_Next_Reverse_Standard_Exclusive) {
 
 // Tests setEndPosition with seek() and seekExact().
 void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
-                                                         {key1, loc1},
-                                                         // No key2
-                                                         {key3, loc1},
-                                                         {key4, loc1},
+                                                            {key1, loc1},
+                                                            // No key2
+                                                            {key3, loc1},
+                                                            {key4, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get());
@@ -144,7 +145,7 @@ void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
 
     cursor->saveUnpositioned();
     removeFromIndex(opCtx, sorted, {{key3, loc1}});
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->seek(key2, true), boost::none);
     ASSERT_EQ(cursor->seek(key3, true), boost::none);
@@ -163,14 +164,14 @@ TEST(SortedDataInterface, SetEndPosition_Seek_Forward_Standard_Exclusive) {
 }
 
 void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
-                                                         {key1, loc1},
-                                                         {key2, loc1},
-                                                         // No key3
-                                                         {key4, loc1},
+                                                            {key1, loc1},
+                                                            {key2, loc1},
+                                                            // No key3
+                                                            {key4, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
@@ -192,7 +193,7 @@ void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
 
     cursor->saveUnpositioned();
     removeFromIndex(opCtx, sorted, {{key2, loc1}});
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->seek(key3, true), boost::none);
     ASSERT_EQ(cursor->seek(key2, true), boost::none);
@@ -212,12 +213,12 @@ TEST(SortedDataInterface, SetEndPosition_Seek_Reverse_Standard_Exclusive) {
 
 // Test that restore never lands on the wrong side of the endPosition.
 void testSetEndPosition_Restore_Forward(bool unique) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
         {
-         {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1},
+            {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1},
         });
 
     auto cursor = sorted->newCursor(opCtx.get());
@@ -225,18 +226,18 @@ void testSetEndPosition_Restore_Forward(bool unique) {
 
     ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-    cursor->savePositioned();
-    cursor->restore(opCtx.get());
+    cursor->save();
+    cursor->restore();
 
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
 
-    cursor->savePositioned();
+    cursor->save();
     removeFromIndex(opCtx,
                     sorted,
                     {
-                     {key2, loc1}, {key3, loc1},
+                        {key2, loc1}, {key3, loc1},
                     });
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->next(), boost::none);
 }
@@ -248,12 +249,12 @@ TEST(SortedDataInterface, SetEndPosition_Restore_Forward_Standard) {
 }
 
 void testSetEndPosition_Restore_Reverse(bool unique) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
         {
-         {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1},
+            {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1},
         });
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
@@ -261,18 +262,18 @@ void testSetEndPosition_Restore_Reverse(bool unique) {
 
     ASSERT_EQ(cursor->seek(key4, true), IndexKeyEntry(key4, loc1));
 
-    cursor->savePositioned();
-    cursor->restore(opCtx.get());
+    cursor->save();
+    cursor->restore();
 
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
 
-    cursor->savePositioned();
+    cursor->save();
     removeFromIndex(opCtx,
                     sorted,
                     {
-                     {key2, loc1}, {key3, loc1},
+                        {key2, loc1}, {key3, loc1},
                     });
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->next(), boost::none);
 }
@@ -289,11 +290,11 @@ TEST(SortedDataInterface, SetEndPosition_Restore_Reverse_Standard) {
 // (since implementations are free not to use end cursors) but implementations that incorrectly
 // restore end cursors would tend to fail this test.
 void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
-                                                         {key1, loc1}, {key4, loc1},
+                                                            {key1, loc1}, {key4, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get());
@@ -306,10 +307,10 @@ void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
     insertToIndex(opCtx,
                   sorted,
                   {
-                   {key2, loc1},  // in range
-                   {key3, loc1},  // out of range
+                      {key2, loc1},  // in range
+                      {key3, loc1},  // out of range
                   });
-    cursor->restore(opCtx.get());
+    cursor->restore();
 
     ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
@@ -323,11 +324,11 @@ TEST(SortedDataInterface, SetEndPosition_RestoreEndCursor_Forward_Standard) {
 }
 
 void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
-                                                         {key1, loc1}, {key4, loc1},
+                                                            {key1, loc1}, {key4, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
@@ -339,10 +340,10 @@ void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
     insertToIndex(opCtx,
                   sorted,
                   {
-                   {key2, loc1},  // in range
-                   {key3, loc1},  // out of range
+                      {key2, loc1},  // in range
+                      {key3, loc1},  // out of range
                   });
-    cursor->restore(opCtx.get());  // must restore end cursor even with saveUnpositioned().
+    cursor->restore();  // must restore end cursor even with saveUnpositioned().
 
     ASSERT_EQ(cursor->seek(key4, true), IndexKeyEntry(key4, loc1));
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
@@ -358,12 +359,13 @@ TEST(SortedDataInterface, SetEndPosition_RestoreEndCursor_Reverse_Unique) {
 // setEndPosition with empty BSONObj is supposed to mean "no end position", regardless of
 // inclusive flag or direction.
 void testSetEndPosition_Empty_Forward(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(unique,
-                                                        {
-                                                         {key1, loc1}, {key2, loc1}, {key3, loc1},
-                                                        });
+    auto sorted =
+        harnessHelper->newSortedDataInterface(unique,
+                                              {
+                                                  {key1, loc1}, {key2, loc1}, {key3, loc1},
+                                              });
 
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(BSONObj(), inclusive);
@@ -387,12 +389,13 @@ TEST(SortedDataInterface, SetEndPosition_Empty_Forward_Standard_Exclusive) {
 }
 
 void testSetEndPosition_Empty_Reverse(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(unique,
-                                                        {
-                                                         {key1, loc1}, {key2, loc1}, {key3, loc1},
-                                                        });
+    auto sorted =
+        harnessHelper->newSortedDataInterface(unique,
+                                              {
+                                                  {key1, loc1}, {key2, loc1}, {key3, loc1},
+                                              });
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(BSONObj(), inclusive);
@@ -414,4 +417,5 @@ TEST(SortedDataInterface, SetEndPosition_Empty_Reverse_Standard_Inclusive) {
 TEST(SortedDataInterface, SetEndPosition_Empty_Reverse_Standard_Exclusive) {
     testSetEndPosition_Empty_Reverse(false, false);
 }
+}  // namespace
 }  // namespace mongo

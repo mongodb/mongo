@@ -9,7 +9,7 @@
 
 #define CREATE_SIZE 1
 
-extern symbol * create_s(void) {
+SNOWBALL_INLINE symbol * create_s(void) {
     symbol * p;
     void * mem = malloc(HEAD + (CREATE_SIZE + 1) * sizeof(symbol));
     if (mem == NULL) return NULL;
@@ -19,7 +19,7 @@ extern symbol * create_s(void) {
     return p;
 }
 
-extern void lose_s(symbol * p) {
+SNOWBALL_INLINE void lose_s(symbol * p) {
     if (p == NULL) return;
     free((char *) p - HEAD);
 }
@@ -32,7 +32,7 @@ extern void lose_s(symbol * p) {
    -- used to implement hop and next in the utf8 case.
 */
 
-extern int skip_utf8(const symbol * p, int c, int lb, int l, int n) {
+SNOWBALL_INLINE int skip_utf8(const symbol * p, int c, int lb, int l, int n) {
     int b;
     if (n >= 0) {
         for (; n > 0; n--) {
@@ -93,7 +93,7 @@ static int get_b_utf8(const symbol * p, int c, int lb, int * slot) {
     * slot = (p[c] & 0xF) << 12 | (b1 & 0x3F) << 6 | (b0 & 0x3F); return 3;
 }
 
-extern int in_grouping_U(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
+SNOWBALL_INLINE int in_grouping_U(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
     do {
 	int ch;
 	int w = get_utf8(z->p, z->c, z->l, & ch);
@@ -105,7 +105,7 @@ extern int in_grouping_U(struct SN_env * z, const unsigned char * s, int min, in
     return 0;
 }
 
-extern int in_grouping_b_U(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
+SNOWBALL_INLINE int in_grouping_b_U(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
     do {
 	int ch;
 	int w = get_b_utf8(z->p, z->c, z->lb, & ch);
@@ -117,7 +117,7 @@ extern int in_grouping_b_U(struct SN_env * z, const unsigned char * s, int min, 
     return 0;
 }
 
-extern int out_grouping_U(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
+SNOWBALL_INLINE int out_grouping_U(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
     do {
 	int ch;
 	int w = get_utf8(z->p, z->c, z->l, & ch);
@@ -129,7 +129,7 @@ extern int out_grouping_U(struct SN_env * z, const unsigned char * s, int min, i
     return 0;
 }
 
-extern int out_grouping_b_U(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
+SNOWBALL_INLINE int out_grouping_b_U(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
     do {
 	int ch;
 	int w = get_b_utf8(z->p, z->c, z->lb, & ch);
@@ -143,7 +143,7 @@ extern int out_grouping_b_U(struct SN_env * z, const unsigned char * s, int min,
 
 /* Code for character groupings: non-utf8 cases */
 
-extern int in_grouping(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
+SNOWBALL_INLINE int in_grouping(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
     do {
 	int ch;
 	if (z->c >= z->l) return -1;
@@ -155,7 +155,7 @@ extern int in_grouping(struct SN_env * z, const unsigned char * s, int min, int 
     return 0;
 }
 
-extern int in_grouping_b(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
+SNOWBALL_INLINE int in_grouping_b(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
     do {
 	int ch;
 	if (z->c <= z->lb) return -1;
@@ -167,7 +167,7 @@ extern int in_grouping_b(struct SN_env * z, const unsigned char * s, int min, in
     return 0;
 }
 
-extern int out_grouping(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
+SNOWBALL_INLINE int out_grouping(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
     do {
 	int ch;
 	if (z->c >= z->l) return -1;
@@ -179,7 +179,7 @@ extern int out_grouping(struct SN_env * z, const unsigned char * s, int min, int
     return 0;
 }
 
-extern int out_grouping_b(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
+SNOWBALL_INLINE int out_grouping_b(struct SN_env * z, const unsigned char * s, int min, int max, int repeat) {
     do {
 	int ch;
 	if (z->c <= z->lb) return -1;
@@ -191,25 +191,25 @@ extern int out_grouping_b(struct SN_env * z, const unsigned char * s, int min, i
     return 0;
 }
 
-extern int eq_s(struct SN_env * z, int s_size, const symbol * s) {
+SNOWBALL_INLINE int eq_s(struct SN_env * z, int s_size, const symbol * s) {
     if (z->l - z->c < s_size || memcmp(z->p + z->c, s, s_size * sizeof(symbol)) != 0) return 0;
     z->c += s_size; return 1;
 }
 
-extern int eq_s_b(struct SN_env * z, int s_size, const symbol * s) {
+SNOWBALL_INLINE int eq_s_b(struct SN_env * z, int s_size, const symbol * s) {
     if (z->c - z->lb < s_size || memcmp(z->p + z->c - s_size, s, s_size * sizeof(symbol)) != 0) return 0;
     z->c -= s_size; return 1;
 }
 
-extern int eq_v(struct SN_env * z, const symbol * p) {
+SNOWBALL_INLINE int eq_v(struct SN_env * z, const symbol * p) {
     return eq_s(z, SIZE(p), p);
 }
 
-extern int eq_v_b(struct SN_env * z, const symbol * p) {
+SNOWBALL_INLINE int eq_v_b(struct SN_env * z, const symbol * p) {
     return eq_s_b(z, SIZE(p), p);
 }
 
-extern int find_among(struct SN_env * z, const struct among * v, int v_size) {
+SNOWBALL_INLINE int find_among(struct SN_env * z, const struct among * v, int v_size) {
 
     int i = 0;
     int j = v_size;
@@ -269,7 +269,7 @@ extern int find_among(struct SN_env * z, const struct among * v, int v_size) {
 
 /* find_among_b is for backwards processing. Same comments apply */
 
-extern int find_among_b(struct SN_env * z, const struct among * v, int v_size) {
+SNOWBALL_INLINE int find_among_b(struct SN_env * z, const struct among * v, int v_size) {
 
     int i = 0;
     int j = v_size;
@@ -345,7 +345,7 @@ static symbol * increase_size(symbol * p, int n) {
    Returns 0 on success, -1 on error.
    Also, frees z->p (and sets it to NULL) on error.
 */
-extern int replace_s(struct SN_env * z, int c_bra, int c_ket, int s_size, const symbol * s, int * adjptr)
+SNOWBALL_INLINE int replace_s(struct SN_env * z, int c_bra, int c_ket, int s_size, const symbol * s, int * adjptr)
 {
     int adjustment;
     int len;
@@ -394,20 +394,20 @@ static int slice_check(struct SN_env * z) {
     return 0;
 }
 
-extern int slice_from_s(struct SN_env * z, int s_size, const symbol * s) {
+SNOWBALL_INLINE int slice_from_s(struct SN_env * z, int s_size, const symbol * s) {
     if (slice_check(z)) return -1;
     return replace_s(z, z->bra, z->ket, s_size, s, NULL);
 }
 
-extern int slice_from_v(struct SN_env * z, const symbol * p) {
+SNOWBALL_INLINE int slice_from_v(struct SN_env * z, const symbol * p) {
     return slice_from_s(z, SIZE(p), p);
 }
 
-extern int slice_del(struct SN_env * z) {
+SNOWBALL_INLINE int slice_del(struct SN_env * z) {
     return slice_from_s(z, 0, 0);
 }
 
-extern int insert_s(struct SN_env * z, int bra, int ket, int s_size, const symbol * s) {
+SNOWBALL_INLINE int insert_s(struct SN_env * z, int bra, int ket, int s_size, const symbol * s) {
     int adjustment;
     if (replace_s(z, bra, ket, s_size, s, &adjustment))
         return -1;
@@ -416,7 +416,7 @@ extern int insert_s(struct SN_env * z, int bra, int ket, int s_size, const symbo
     return 0;
 }
 
-extern int insert_v(struct SN_env * z, int bra, int ket, const symbol * p) {
+SNOWBALL_INLINE int insert_v(struct SN_env * z, int bra, int ket, const symbol * p) {
     int adjustment;
     if (replace_s(z, bra, ket, SIZE(p), p, &adjustment))
         return -1;
@@ -425,7 +425,7 @@ extern int insert_v(struct SN_env * z, int bra, int ket, const symbol * p) {
     return 0;
 }
 
-extern symbol * slice_to(struct SN_env * z, symbol * p) {
+SNOWBALL_INLINE symbol * slice_to(struct SN_env * z, symbol * p) {
     if (slice_check(z)) {
         lose_s(p);
         return NULL;
@@ -443,7 +443,7 @@ extern symbol * slice_to(struct SN_env * z, symbol * p) {
     return p;
 }
 
-extern symbol * assign_to(struct SN_env * z, symbol * p) {
+SNOWBALL_INLINE symbol * assign_to(struct SN_env * z, symbol * p) {
     int len = z->l;
     if (CAPACITY(p) < len) {
         p = increase_size(p, len);
@@ -456,7 +456,7 @@ extern symbol * assign_to(struct SN_env * z, symbol * p) {
 }
 
 #if 0
-extern void debug(struct SN_env * z, int number, int line_count) {
+static void debug(struct SN_env * z, int number, int line_count) {
     int i;
     int limit = SIZE(z->p);
     /*if (number >= 0) printf("%3d (line %4d): '", number, line_count);*/

@@ -5,23 +5,19 @@ load('jstests/concurrency/fsm_libs/runner.js');
 var dir = 'jstests/concurrency/fsm_workloads';
 
 var blacklist = [
-    // Disabled due to known bugs
-    'findAndModify_update_grow.js', // SERVER-17021 Perf. Regression for WT overflow items
-    'agg_sort_external.js', // SERVER-16700 Deadlock on WiredTiger LSM
-    'yield_sort.js', // SERVER-17011 Cursor can return objects out of order if updated during query
-
     // Disabled due to MongoDB restrictions and/or workload restrictions
 
-    // These workloads sometimes trigger 'Could not lock auth data update lock'
-    // errors because the AuthorizationManager currently waits for only five
-    // seconds to acquire the lock for authorization documents
-    'auth_create_role.js',
-    'auth_create_user.js',
-    'auth_drop_role.js',
-    'auth_drop_user.js', // SERVER-16739 OpenSSL libcrypto crash
-].map(function(file) { return dir + '/' + file; });
+    // These workloads implicitly assume that their tid ranges are [0, $config.threadCount). This
+    // isn't guaranteed to be true when they are run in parallel with other workloads.
+    'list_indexes.js',
+    'update_inc_capped.js',
 
-// SERVER-16196 re-enable executing workloads
-// runWorkloadsInParallel(ls(dir).filter(function(file) {
-//     return !Array.contains(blacklist, file);
-// }));
+    'agg_group_external.js',  // uses >100MB of data, which can overwhelm test hosts
+    'agg_sort_external.js',   // uses >100MB of data, which can overwhelm test hosts
+].map(function(file) {
+    return dir + '/' + file;
+});
+
+runWorkloadsInParallel(ls(dir).filter(function(file) {
+    return !Array.contains(blacklist, file);
+}));

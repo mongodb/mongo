@@ -26,11 +26,7 @@ var $config = (function() {
 
         function createAndDropUser(db, collName) {
             var username = uniqueUsername(this.prefix, this.tid, this.num++);
-            db.createUser({
-                user: username,
-                pwd: 'password',
-                roles: ['readWrite', 'dbAdmin']
-            });
+            db.createUser({user: username, pwd: 'password', roles: ['readWrite', 'dbAdmin']});
 
             var res = db.getUser(username);
             assertAlways(res !== null, "user '" + username + "' should exist");
@@ -38,28 +34,15 @@ var $config = (function() {
             assertAlways.eq(db.getName(), res.db);
 
             assertAlways(db.dropUser(username));
-            assertAlways.isnull(db.getUser(username),
-                                "user '" + username + "' should not exist");
+            assertAlways.isnull(db.getUser(username), "user '" + username + "' should not exist");
         }
 
-        return {
-            init: init,
-            createAndDropUser: createAndDropUser
-        };
+        return {init: init, createAndDropUser: createAndDropUser};
 
     })();
 
-    var transitions = {
-        init: { createAndDropUser: 1 },
-        createAndDropUser: { createAndDropUser: 1 }
-    };
+    var transitions = {init: {createAndDropUser: 1}, createAndDropUser: {createAndDropUser: 1}};
 
-    return {
-        threadCount: 10,
-        iterations: 20,
-        data: data,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 10, iterations: 20, data: data, states: states, transitions: transitions};
 
 })();

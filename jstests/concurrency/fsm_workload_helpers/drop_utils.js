@@ -8,11 +8,13 @@
 function dropCollections(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
 
-    db.getCollectionInfos().filter(function(collInfo) {
-        return pattern.test(collInfo.name);
-    }).forEach(function(collInfo) {
-        assertAlways(db[collInfo.name].drop());
-    });
+    db.getCollectionInfos()
+        .filter(function(collInfo) {
+            return pattern.test(collInfo.name);
+        })
+        .forEach(function(collInfo) {
+            assertAlways(db[collInfo.name].drop());
+        });
 }
 
 function dropDatabases(db, pattern) {

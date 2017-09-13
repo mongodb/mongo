@@ -26,31 +26,25 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/cluster_last_error_info.h"
 
-#include <utility>
-
-#include "mongo/db/client.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/stats/timer_stats.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
-const ClientBasic::Decoration<ClusterLastErrorInfo> ClusterLastErrorInfo::get =
-    ClientBasic::declareDecoration<ClusterLastErrorInfo>();
+const Client::Decoration<std::shared_ptr<ClusterLastErrorInfo>> ClusterLastErrorInfo::get =
+    Client::declareDecoration<std::shared_ptr<ClusterLastErrorInfo>>();
 
 void ClusterLastErrorInfo::addShardHost(const std::string& shardHost) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _cur->shardHostsWritten.insert(shardHost);
 }
 
 void ClusterLastErrorInfo::addHostOpTime(ConnectionString connStr, HostOpTime stat) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _cur->hostOpTimes[connStr] = stat;
 }
 
@@ -61,51 +55,16 @@ void ClusterLastErrorInfo::addHostOpTimes(const HostOpTimeMap& hostOpTimes) {
 }
 
 void ClusterLastErrorInfo::newRequest() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     std::swap(_cur, _prev);
     _cur->clear();
 }
 
 void ClusterLastErrorInfo::disableForCommand() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     RequestInfo* temp = _cur;
     _cur = _prev;
     _prev = temp;
-}
-
-static TimerStats gleWtimeStats;
-static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime", &gleWtimeStats);
-
-void saveGLEStats(const BSONObj& metadata, StringData hostString) {
-    if (!haveClient()) {
-        // TODO: how can this happen?
-        return;
-    }
-
-    auto swShardingMetadata = rpc::ShardingMetadata::readFromMetadata(metadata);
-    if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
-        return;
-    } else if (!swShardingMetadata.isOK()) {
-        warning() << "Got invalid sharding metadata " << swShardingMetadata.getStatus()
-                  << " metadata object was '" << metadata << "'";
-        return;
-    }
-
-    auto shardConn = ConnectionString::parse(hostString.toString());
-    // If we got the reply from this host, we expect that its 'hostString' must be valid.
-    if (!shardConn.isOK()) {
-        severe() << "got bad host string in saveGLEStats: " << hostString;
-    }
-    invariantOK(shardConn.getStatus());
-
-    auto shardingMetadata = std::move(swShardingMetadata.getValue());
-
-    auto& clientInfo = cc();
-    LOG(4) << "saveGLEStats lastOpTime:" << shardingMetadata.getLastOpTime()
-           << " electionId:" << shardingMetadata.getLastElectionId();
-
-    ClusterLastErrorInfo::get(clientInfo)
-        .addHostOpTime(
-            shardConn.getValue(),
-            HostOpTime(shardingMetadata.getLastOpTime(), shardingMetadata.getLastElectionId()));
 }
 
 }  // namespace mongo

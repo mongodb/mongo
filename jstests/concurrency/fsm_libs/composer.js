@@ -6,8 +6,8 @@ var composer = (function() {
         // TODO: what if a workload depends on iterations?
         var iterations = 100;
 
-        assert.eq(AssertLevel.ALWAYS, globalAssertLevel,
-                  'global assertion level is not set as ALWAYS');
+        assert.eq(
+            AssertLevel.ALWAYS, globalAssertLevel, 'global assertion level is not set as ALWAYS');
 
         var currentWorkload = getRandomElem(workloads, Random.rand());
         var currentState = configs[currentWorkload].startState;
@@ -18,8 +18,7 @@ var composer = (function() {
             var args = configs[workload];
             if (!first) {
                 assert.eq(myDB, args.db, 'expected all workloads to use same database');
-                assert.eq(collName, args.collName,
-                          'expected all workloads to use same collection');
+                assert.eq(collName, args.collName, 'expected all workloads to use same collection');
             }
             myDB = args.db;
             collName = args.collName;
@@ -38,8 +37,8 @@ var composer = (function() {
             // Transition to another valid state of the current workload,
             // with probability '1 - mixProb'
             if (Random.rand() >= mixProb) {
-                var nextState = fsm._getWeightedRandomChoice(args.transitions[currentState],
-                                                              Random.rand());
+                var nextState =
+                    fsm._getWeightedRandomChoice(args.transitions[currentState], Random.rand());
                 currentState = nextState;
                 continue;
             }
@@ -54,7 +53,7 @@ var composer = (function() {
                 var args = configs[workload];
                 Object.keys(args.states).forEach(function(state) {
                     if (state !== args.startState) {
-                        otherStates.push({ workload: workload, state: state });
+                        otherStates.push({workload: workload, state: state});
                     }
                 });
             });
@@ -70,8 +69,6 @@ var composer = (function() {
         return items[Math.floor(randVal * items.length)];
     }
 
-    return {
-        run: runCombinedFSM
-    };
+    return {run: runCombinedFSM};
 
 })();

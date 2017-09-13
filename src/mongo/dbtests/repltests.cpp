@@ -36,14 +36,18 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -66,28 +70,37 @@ BSONObj f(const char* s) {
 
 class Base {
 protected:
-    mutable OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     mutable DBDirectClient _client;
 
 public:
-    Base() : _client(&_txn) {
+    Base() : _client(&_opCtx) {
         ReplSettings replSettings;
-        replSettings.oplogSize = 10 * 1024 * 1024;
-        replSettings.master = true;
-        setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+        replSettings.setOplogSizeBytes(10 * 1024 * 1024);
+        replSettings.setMaster(true);
+        setGlobalReplicationCoordinator(
+            new repl::ReplicationCoordinatorMock(_opCtx.getServiceContext(), replSettings));
+
+        // Since the Client object persists across tests, even though the global
+        // ReplicationCoordinator does not, we need to clear the last op associated with the client
+        // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
+        repl::ReplClientInfo::forClient(_opCtx.getClient()).clearLastOp_forTest();
+
+        getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserverImpl>());
 
         setOplogCollectionName();
-        createOplog(&_txn);
+        createOplog(&_opCtx);
 
-        OldClientWriteContext ctx(&_txn, ns());
-        WriteUnitOfWork wuow(&_txn);
+        OldClientWriteContext ctx(&_opCtx, ns());
+        WriteUnitOfWork wuow(&_opCtx);
 
-        Collection* c = ctx.db()->getCollection(ns());
+        Collection* c = ctx.db()->getCollection(&_opCtx, ns());
         if (!c) {
-            c = ctx.db()->createCollection(&_txn, ns());
+            c = ctx.db()->createCollection(&_opCtx, ns());
         }
 
-        ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
+        ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
         wuow.commit();
     }
     ~Base() {
@@ -95,8 +108,9 @@ public:
             deleteAll(ns());
             deleteAll(cllNS());
             ReplSettings replSettings;
-            replSettings.oplogSize = 10 * 1024 * 1024;
-            setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+            replSettings.setOplogSizeBytes(10 * 1024 * 1024);
+            setGlobalReplicationCoordinator(
+                new repl::ReplicationCoordinatorMock(_opCtx.getServiceContext(), replSettings));
         } catch (...) {
             FAIL("Exception while cleaning up test");
         }
@@ -127,94 +141,70 @@ protected:
             ::mongo::log() << "expected: " << expected.toString() << ", got: " << got.toString()
                            << endl;
         }
-        ASSERT_EQUALS(expected, got);
+        ASSERT_BSONOBJ_EQ(expected, got);
     }
     BSONObj oneOp() const {
         return _client.findOne(cllNS(), BSONObj());
     }
     int count() const {
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::GlobalWrite lk(_txn.lockState());
-        OldClientContext ctx(&_txn, ns());
+        Lock::GlobalWrite lk(&_opCtx);
+        OldClientContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(ns());
+        Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
-            WriteUnitOfWork wunit(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wunit(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wunit.commit();
         }
 
         int count = 0;
-        auto cursor = coll->getCursor(&_txn);
+        auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             ++count;
         }
         return count;
     }
     int opCount() {
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::GlobalWrite lk(_txn.lockState());
-        OldClientContext ctx(&_txn, cllNS());
-
-        Database* db = ctx.db();
-        Collection* coll = db->getCollection(cllNS());
-        if (!coll) {
-            WriteUnitOfWork wunit(&_txn);
-            coll = db->createCollection(&_txn, cllNS());
-            wunit.commit();
-        }
-
-        int count = 0;
-        auto cursor = coll->getCursor(&_txn);
-        while (auto record = cursor->next()) {
-            ++count;
-        }
-        return count;
+        return DBDirectClient(&_opCtx).query(cllNS(), BSONObj())->itcount();
     }
     void applyAllOperations() {
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::GlobalWrite lk(_txn.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
         vector<BSONObj> ops;
         {
-            OldClientContext ctx(&_txn, cllNS());
-            Database* db = ctx.db();
-            Collection* coll = db->getCollection(cllNS());
-
-            auto cursor = coll->getCursor(&_txn);
-            while (auto record = cursor->next()) {
-                ops.push_back(record->data.releaseToBson().getOwned());
+            DBDirectClient db(&_opCtx);
+            auto cursor = db.query(cllNS(), BSONObj());
+            while (cursor->more()) {
+                ops.push_back(cursor->nextSafe());
             }
         }
         {
-            OldClientContext ctx(&_txn, ns());
+            OldClientContext ctx(&_opCtx, ns());
             BSONObjBuilder b;
             b.append("host", "localhost");
             b.appendTimestamp("syncedTo", 0);
-            ReplSource a(&_txn, b.obj());
+            ReplSource a(&_opCtx, b.obj());
             for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
                 if (0) {
                     mongo::unittest::log() << "op: " << *i << endl;
                 }
-                _txn.setReplicatedWrites(false);
-                a.applyOperation(&_txn, ctx.db(), *i);
-                _txn.setReplicatedWrites(true);
+                repl::UnreplicatedWritesBlock uwb(&_opCtx);
+                a.applyOperation(&_opCtx, ctx.db(), *i);
             }
         }
     }
     void printAll(const char* ns) {
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::GlobalWrite lk(_txn.lockState());
-        OldClientContext ctx(&_txn, ns);
+        Lock::GlobalWrite lk(&_opCtx);
+        OldClientContext ctx(&_opCtx, ns);
 
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(ns);
+        Collection* coll = db->getCollection(&_opCtx, ns);
         if (!coll) {
-            WriteUnitOfWork wunit(&_txn);
-            coll = db->createCollection(&_txn, ns);
+            WriteUnitOfWork wunit(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns);
             wunit.commit();
         }
 
-        auto cursor = coll->getCursor(&_txn);
+        auto cursor = coll->getCursor(&_opCtx);
         ::mongo::log() << "all for " << ns << endl;
         while (auto record = cursor->next()) {
             ::mongo::log() << record->data.releaseToBson() << endl;
@@ -222,46 +212,35 @@ protected:
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::GlobalWrite lk(_txn.lockState());
-        OldClientContext ctx(&_txn, ns);
-        WriteUnitOfWork wunit(&_txn);
-        Database* db = ctx.db();
-        Collection* coll = db->getCollection(ns);
-        if (!coll) {
-            coll = db->createCollection(&_txn, ns);
-        }
-
-        vector<RecordId> toDelete;
-        {
-            auto cursor = coll->getCursor(&_txn);
-            while (auto record = cursor->next()) {
-                toDelete.push_back(record->id);
+        ::mongo::writeConflictRetry(&_opCtx, "deleteAll", ns, [&] {
+            Lock::GlobalWrite lk(&_opCtx);
+            OldClientContext ctx(&_opCtx, ns);
+            WriteUnitOfWork wunit(&_opCtx);
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection(&_opCtx, ns);
+            if (!coll) {
+                coll = db->createCollection(&_opCtx, ns);
             }
-        }
 
-        for (vector<RecordId>::iterator i = toDelete.begin(); i != toDelete.end(); ++i) {
-            _txn.setReplicatedWrites(false);
-            coll->deleteDocument(&_txn, *i, true);
-            _txn.setReplicatedWrites(true);
-        }
-        wunit.commit();
+            ASSERT_OK(coll->truncate(&_opCtx));
+            wunit.commit();
+        });
     }
     void insert(const BSONObj& o) const {
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::GlobalWrite lk(_txn.lockState());
-        OldClientContext ctx(&_txn, ns());
-        WriteUnitOfWork wunit(&_txn);
+        Lock::GlobalWrite lk(&_opCtx);
+        OldClientContext ctx(&_opCtx, ns());
+        WriteUnitOfWork wunit(&_opCtx);
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(ns());
+        Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
-            coll = db->createCollection(&_txn, ns());
+            coll = db->createCollection(&_opCtx, ns());
         }
 
+        OpDebug* const nullOpDebug = nullptr;
         if (o.hasField("_id")) {
-            _txn.setReplicatedWrites(false);
-            coll->insertDocument(&_txn, o, true);
-            _txn.setReplicatedWrites(true);
+            repl::UnreplicatedWritesBlock uwb(&_opCtx);
+            coll->insertDocument(&_opCtx, InsertStatement(o), nullOpDebug, true)
+                .transitional_ignore();
             wunit.commit();
             return;
         }
@@ -271,9 +250,9 @@ protected:
         id.init();
         b.appendOID("_id", &id);
         b.appendElements(o);
-        _txn.setReplicatedWrites(false);
-        coll->insertDocument(&_txn, b.obj(), true);
-        _txn.setReplicatedWrites(true);
+        repl::UnreplicatedWritesBlock uwb(&_opCtx);
+        coll->insertDocument(&_opCtx, InsertStatement(b.obj()), nullOpDebug, true)
+            .transitional_ignore();
         wunit.commit();
     }
     static BSONObj wid(const char* json) {
@@ -918,35 +897,6 @@ public:
     }
 };
 
-class EmptyPushSparseIndex : public EmptyPush {
-public:
-    EmptyPushSparseIndex() {
-        _client.insert("unittests.system.indexes",
-                       BSON("ns" << ns() << "key" << BSON("a" << 1) << "name"
-                                 << "foo"
-                                 << "sparse" << true));
-    }
-    ~EmptyPushSparseIndex() {
-        _client.dropIndexes(ns());
-    }
-};
-
-class PushAll : public Base {
-public:
-    void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pushAll:{a:[5.0,6.0]}}"));
-    }
-    using ReplTests::Base::check;
-    void check() const {
-        ASSERT_EQUALS(1, count());
-        check(fromjson("{'_id':0,a:[4,5,6]}"), one(fromjson("{'_id':0}")));
-    }
-    void reset() const {
-        deleteAll(ns());
-        insert(fromjson("{'_id':0,a:[4]}"));
-    }
-};
-
 class PushWithDollarSigns : public Base {
     void doIt() const {
         _client.update(ns(), BSON("_id" << 0), BSON("$push" << BSON("a" << BSON("$foo" << 1))));
@@ -1013,38 +963,6 @@ class PushSliceToZero : public Base {
     void reset() const {
         deleteAll(ns());
         insert(BSON("_id" << 0));
-    }
-};
-
-class PushAllUpsert : public Base {
-public:
-    void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pushAll:{a:[5.0,6.0]}}"), true);
-    }
-    using ReplTests::Base::check;
-    void check() const {
-        ASSERT_EQUALS(1, count());
-        check(fromjson("{'_id':0,a:[4,5,6]}"), one(fromjson("{'_id':0}")));
-    }
-    void reset() const {
-        deleteAll(ns());
-        insert(fromjson("{'_id':0,a:[4]}"));
-    }
-};
-
-class EmptyPushAll : public Base {
-public:
-    void doIt() const {
-        _client.update(ns(), BSON("_id" << 0), fromjson("{$pushAll:{a:[5.0,6.0]}}"));
-    }
-    using ReplTests::Base::check;
-    void check() const {
-        ASSERT_EQUALS(1, count());
-        check(fromjson("{'_id':0,a:[5,6]}"), one(fromjson("{'_id':0}")));
-    }
-    void reset() const {
-        deleteAll(ns());
-        insert(fromjson("{'_id':0}"));
     }
 };
 
@@ -1258,7 +1176,7 @@ public:
     void reset() const {
         deleteAll(ns());
         // Add an index on 'a'.  This prevents the update from running 'in place'.
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1)));
         insert(fromjson("{'_id':0,z:1}"));
     }
 };
@@ -1401,7 +1319,7 @@ public:
     bool returnEmpty;
     SyncTest() : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc()), returnEmpty(false) {}
     virtual ~SyncTest() {}
-    virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
+    virtual BSONObj getMissingDoc(OperationContext* opCtx, const BSONObj& o) {
         if (returnEmpty) {
             BSONObj o;
             return o;
@@ -1413,26 +1331,27 @@ public:
     }
 };
 
-class ShouldRetry : public Base {
+class FetchAndInsertMissingDocument : public Base {
 public:
     void run() {
         bool threw = false;
         BSONObj o = BSON("ns" << ns() << "o" << BSON("foo"
-                                                     << "bar") << "o2" << BSON("_id"
-                                                                               << "in oplog"
-                                                                               << "foo"
-                                                                               << "bar"));
+                                                     << "bar")
+                              << "o2"
+                              << BSON("_id"
+                                      << "in oplog"
+                                      << "foo"
+                                      << "bar"));
 
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::GlobalWrite lk(_txn.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
 
         // this should fail because we can't connect
         try {
             SyncTail badSource(nullptr, SyncTail::MultiSyncApplyFunc());
             badSource.setHostname("localhost:123");
 
-            OldClientContext ctx(&_txn, ns());
-            badSource.getMissingDoc(&_txn, ctx.db(), o);
+            OldClientContext ctx(&_opCtx, ns());
+            badSource.getMissingDoc(&_opCtx, o);
         } catch (DBException&) {
             threw = true;
         }
@@ -1440,14 +1359,16 @@ public:
 
         // now this should succeed
         SyncTest t;
-        verify(t.shouldRetry(&_txn, o));
-        verify(!_client.findOne(ns(),
-                                BSON("_id"
-                                     << "on remote")).isEmpty());
+        verify(t.fetchAndInsertMissingDocument(&_opCtx, o));
+        verify(!_client
+                    .findOne(ns(),
+                             BSON("_id"
+                                  << "on remote"))
+                    .isEmpty());
 
         // force it not to find an obj
         t.returnEmpty = true;
-        verify(!t.shouldRetry(&_txn, o));
+        verify(!t.fetchAndInsertMissingDocument(&_opCtx, o));
     }
 };
 
@@ -1488,13 +1409,9 @@ public:
         add<Idempotence::PushUpsert>();
         add<Idempotence::MultiPush>();
         add<Idempotence::EmptyPush>();
-        add<Idempotence::EmptyPushSparseIndex>();
-        add<Idempotence::PushAll>();
         add<Idempotence::PushSlice>();
         add<Idempotence::PushSliceInitiallyInexistent>();
         add<Idempotence::PushSliceToZero>();
-        add<Idempotence::PushAllUpsert>();
-        add<Idempotence::EmptyPushAll>();
         add<Idempotence::Pull>();
         add<Idempotence::PullNothing>();
         add<Idempotence::PullAll>();
@@ -1514,7 +1431,7 @@ public:
         add<DeleteOpIsIdBased>();
         add<DatabaseIgnorerBasic>();
         add<DatabaseIgnorerUpdate>();
-        add<ShouldRetry>();
+        add<FetchAndInsertMissingDocument>();
     }
 };
 

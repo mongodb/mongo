@@ -1,0 +1,18 @@
+/*! @page tune_zone_reclaim Linux zone reclamation memory management
+
+The performance of WiredTiger applications can be sensitive to the zone
+reclamation algorithms used in Linux Non Uniform Memory Management (NUMA).
+Details of NUMA with specific reference to Linux can be found in the
+ACM Queue article
+<a href="http://queue.acm.org/detail.cfm?id=2513149">
+NUMA (Non-Uniform Memory Access): An Overview</a>, by Christoph Lameter.
+If a WiredTiger database cache is assigned a significant proportion of
+system memory, it will likely be beneficial to disable zone reclamation.
+Zone reclamation can be disabled by running the following command as the
+root user:
+
+@code
+echo 0 > /proc/sys/vm/zone_reclaim_mode
+@endcode
+
+ */

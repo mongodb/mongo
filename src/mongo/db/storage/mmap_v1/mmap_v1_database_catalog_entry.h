@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_index.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 
@@ -44,6 +45,7 @@ struct CollectionOptions;
 class IndexAccessMethod;
 class IndexCatalogEntry;
 class IndexDescriptor;
+class RecordId;
 class RecordStore;
 class RecordStoreV1Base;
 class RecoveryUnit;
@@ -51,13 +53,22 @@ class OperationContext;
 
 class MMAPV1DatabaseCatalogEntry : public DatabaseCatalogEntry {
 public:
-    MMAPV1DatabaseCatalogEntry(OperationContext* txn,
+    MMAPV1DatabaseCatalogEntry(OperationContext* opCtx,
                                StringData name,
                                StringData path,
                                bool directoryperdb,
-                               bool transient);
+                               bool transient,
+                               std::unique_ptr<ExtentManager> extentManager);
 
     virtual ~MMAPV1DatabaseCatalogEntry();
+
+    /**
+     * Must be called before destruction.
+     */
+    virtual void close(OperationContext* opCtx) {
+        _extentManager->close(opCtx);
+        _namespaceIndex.close(opCtx);
+    }
 
     // these two seem the same and yet different
     // TODO(ERH): consolidate into one ideally
@@ -79,18 +90,22 @@ public:
     virtual bool isOlderThan24(OperationContext* opCtx) const;
     virtual void markIndexSafe24AndUp(OperationContext* opCtx);
 
-    virtual bool currentFilesCompatible(OperationContext* opCtx) const;
+    // Records in the data file version bits that an index or collection may have an associated
+    // collation.
+    void markCollationFeatureAsInUse(OperationContext* opCtx);
+
+    virtual Status currentFilesCompatible(OperationContext* opCtx) const;
 
     virtual void appendExtraStats(OperationContext* opCtx, BSONObjBuilder* out, double scale) const;
 
-    Status createCollection(OperationContext* txn,
+    Status createCollection(OperationContext* opCtx,
                             StringData ns,
                             const CollectionOptions& options,
                             bool allocateDefaultSpace);
 
-    Status dropCollection(OperationContext* txn, StringData ns);
+    Status dropCollection(OperationContext* opCtx, StringData ns);
 
-    Status renameCollection(OperationContext* txn,
+    Status renameCollection(OperationContext* opCtx,
                             StringData fromNS,
                             StringData toNS,
                             bool stayTemp);
@@ -100,29 +115,34 @@ public:
     /**
      * will return NULL if ns does not exist
      */
-    CollectionCatalogEntry* getCollectionCatalogEntry(StringData ns) const;
+    NamespaceDetailsCollectionCatalogEntry* getCollectionCatalogEntry(StringData ns) const;
 
     RecordStore* getRecordStore(StringData ns) const;
 
-    IndexAccessMethod* getIndex(OperationContext* txn,
+    IndexAccessMethod* getIndex(OperationContext* opCtx,
                                 const CollectionCatalogEntry* collection,
                                 IndexCatalogEntry* index);
 
-    const MmapV1ExtentManager* getExtentManager() const {
-        return &_extentManager;
+    const ExtentManager* getExtentManager() const {
+        return _extentManager.get();
     }
-    MmapV1ExtentManager* getExtentManager() {
-        return &_extentManager;
+    ExtentManager* getExtentManager() {
+        return _extentManager.get();
     }
 
-    CollectionOptions getCollectionOptions(OperationContext* txn, StringData ns) const;
+    CollectionOptions getCollectionOptions(OperationContext* opCtx, StringData ns) const;
+
+    CollectionOptions getCollectionOptions(OperationContext* opCtx, RecordId nsRid) const;
 
     /**
      * Creates a CollectionCatalogEntry in the form of an index rather than a collection.
      * MMAPv1 puts both indexes and collections into CCEs. A namespace named 'name' must not
      * exist.
      */
-    void createNamespaceForIndex(OperationContext* txn, StringData name);
+    void createNamespaceForIndex(OperationContext* opCtx, StringData name);
+    static void invalidateSystemCollectionRecord(OperationContext* opCtx,
+                                                 NamespaceString systemCollectionNamespace,
+                                                 RecordId record);
 
 private:
     class EntryInsertion;
@@ -141,7 +161,7 @@ private:
     // RecoveryUnit to ensure correct handling of rollback.
 
     struct Entry {
-        std::unique_ptr<CollectionCatalogEntry> catalogEntry;
+        std::unique_ptr<NamespaceDetailsCollectionCatalogEntry> catalogEntry;
         std::unique_ptr<RecordStoreV1Base> recordStore;
     };
 
@@ -152,25 +172,25 @@ private:
     RecordStoreV1Base* _getNamespaceRecordStore() const;
     RecordStoreV1Base* _getRecordStore(StringData ns) const;
 
-    void _addNamespaceToNamespaceCollection(OperationContext* txn,
-                                            StringData ns,
-                                            const BSONObj* options);
+    RecordId _addNamespaceToNamespaceCollection(OperationContext* opCtx,
+                                                StringData ns,
+                                                const BSONObj* options);
 
-    void _removeNamespaceFromNamespaceCollection(OperationContext* txn, StringData ns);
+    void _removeNamespaceFromNamespaceCollection(OperationContext* opCtx, StringData ns);
 
-    Status _renameSingleNamespace(OperationContext* txn,
+    Status _renameSingleNamespace(OperationContext* opCtx,
                                   StringData fromNS,
                                   StringData toNS,
                                   bool stayTemp);
 
-    void _ensureSystemCollection(OperationContext* txn, StringData ns);
+    void _ensureSystemCollection(OperationContext* opCtx, StringData ns);
 
-    void _init(OperationContext* txn);
+    void _init(OperationContext* opCtx);
 
     /**
      * Populate the _collections cache.
      */
-    void _insertInCache(OperationContext* opCtx, StringData ns, Entry* entry);
+    void _insertInCache(OperationContext* opCtx, StringData ns, RecordId rid, Entry* entry);
 
     /**
      * Drop cached information for specified namespace. If a RecoveryUnit is specified,
@@ -182,7 +202,7 @@ private:
     const std::string _path;
 
     NamespaceIndex _namespaceIndex;
-    MmapV1ExtentManager _extentManager;
+    std::unique_ptr<ExtentManager> _extentManager;
     CollectionMap _collections;
 };
 }

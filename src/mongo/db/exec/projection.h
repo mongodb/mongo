@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+class CollatorInterface;
+
 struct ProjectionStageParams {
     enum ProjectionImplementation {
         // The default case.  Will handle every projection.
@@ -49,10 +51,7 @@ struct ProjectionStageParams {
         SIMPLE_DOC
     };
 
-    ProjectionStageParams(const MatchExpressionParser::WhereCallback& wc)
-        : projImpl(NO_FAST_PATH), fullExpression(NULL), whereCallback(&wc) {}
-
-    ProjectionImplementation projImpl;
+    ProjectionImplementation projImpl = NO_FAST_PATH;
 
     // The projection object.  We lack a ProjectionExpression or similar so we use a BSONObj.
     BSONObj projObj;
@@ -60,45 +59,39 @@ struct ProjectionStageParams {
     // If we have a positional or elemMatch projection we need a MatchExpression to pull out the
     // right data.
     // Not owned here, we do not take ownership.
-    const MatchExpression* fullExpression;
+    const MatchExpression* fullExpression = nullptr;
 
     // If (COVERED_ONE_INDEX == projObj) this is the key pattern we're extracting covered data
     // from.  Otherwise, this field is ignored.
     BSONObj coveredKeyObj;
 
-    // Used for creating context for the $where clause processing. Not owned.
-    const MatchExpressionParser::WhereCallback* whereCallback;
+    // The collator this operation should use to compare strings. If null, the collation is a simple
+    // binary compare.
+    const CollatorInterface* collator = nullptr;
 };
 
 /**
  * This stage computes a projection.
  */
-class ProjectionStage : public PlanStage {
+class ProjectionStage final : public PlanStage {
 public:
-    ProjectionStage(const ProjectionStageParams& params, WorkingSet* ws, PlanStage* child);
+    ProjectionStage(OperationContext* opCtx,
+                    const ProjectionStageParams& params,
+                    WorkingSet* ws,
+                    PlanStage* child);
 
-    virtual ~ProjectionStage();
+    bool isEOF() final;
+    StageState doWork(WorkingSetID* out) final;
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
-
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_PROJECTION;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const CommonStats* getCommonStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
-    virtual const SpecificStats* getSpecificStats() const;
-
-    typedef unordered_set<StringData, StringData::Hasher> FieldSet;
+    using FieldSet = StringMap<bool>;  // Value is unused.
 
     /**
      * Given the projection spec for a simple inclusion projection,
@@ -126,10 +119,8 @@ private:
 
     // _ws is not owned by us.
     WorkingSet* _ws;
-    std::unique_ptr<PlanStage> _child;
 
     // Stats
-    CommonStats _commonStats;
     ProjectionStats _specificStats;
 
     // Fast paths:
@@ -140,7 +131,7 @@ private:
 
     // Data used for both SIMPLE_DOC and COVERED_ONE_INDEX paths.
     // Has the field names present in the simple projection.
-    unordered_set<StringData, StringData::Hasher> _includedFields;
+    FieldSet _includedFields;
 
     //
     // Used for the COVERED_ONE_INDEX path.

@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplicationRollback
 
 #include "mongo/platform/basic.h"
 
@@ -39,7 +39,22 @@
 namespace mongo {
 namespace repl {
 
+// After the release of MongoDB 3.8, these fail point declarations can
+// be moved into the rs_rollback.cpp file, as we no longer need to maintain
+// functionality for rs_rollback_no_uuid.cpp. See SERVER-29766.
+
+// Failpoint which causes rollback to hang before finishing.
+MONGO_FP_DECLARE(rollbackHangBeforeFinish);
+
+// Failpoint which causes rollback to hang and then fail after minValid is written.
+MONGO_FP_DECLARE(rollbackHangThenFailAfterWritingMinValid);
+
+
 namespace {
+
+OpTime getOpTime(const OplogInterface::Iterator::Value& oplogValue) {
+    return fassertStatusOK(40298, OpTime::parseFromOplogEntry(oplogValue.first));
+}
 
 Timestamp getTimestamp(const BSONObj& operation) {
     return operation["ts"].timestamp();
@@ -82,9 +97,9 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
         long long diff = static_cast<long long>(getTimestamp(_localOplogValue).getSecs()) -
             getTimestamp(operation).getSecs();
         // diff could be positive, negative, or zero
-        log() << "rollback our last optime:   " << getTimestamp(_localOplogValue).toStringPretty();
-        log() << "rollback their last optime: " << getTimestamp(operation).toStringPretty();
-        log() << "rollback diff in end of log times: " << diff << " seconds";
+        log() << "our last optime:   " << getTimestamp(_localOplogValue).toStringPretty();
+        log() << "their last optime: " << getTimestamp(operation).toStringPretty();
+        log() << "diff in end of log times: " << diff << " seconds";
         if (diff > 1800) {
             severe() << "rollback too long a time period for a rollback.";
             return StatusWith<RollbackCommonPoint>(
@@ -116,7 +131,7 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
         _scanned++;
         if (getHash(_localOplogValue) == getHash(operation)) {
             return StatusWith<RollbackCommonPoint>(
-                std::make_pair(getTimestamp(_localOplogValue), _localOplogValue.second));
+                std::make_pair(getOpTime(_localOplogValue), _localOplogValue.second));
         }
         auto status = _rollbackOperation(_localOplogValue.first);
         if (!status.isOK()) {
@@ -139,14 +154,11 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
             "Need to process additional remote operations.");
     }
 
-    if (getTimestamp(_localOplogValue) < getTimestamp(operation)) {
-        _scanned++;
-        return StatusWith<RollbackCommonPoint>(ErrorCodes::NoSuchKey,
-                                               "Unable to determine common point. "
-                                               "Need to process additional remote operations.");
-    }
-
-    return RollbackCommonPoint(Timestamp(Seconds(1), 0), RecordId());
+    invariant(getTimestamp(_localOplogValue) < getTimestamp(operation));
+    _scanned++;
+    return StatusWith<RollbackCommonPoint>(ErrorCodes::NoSuchKey,
+                                           "Unable to determine common point. "
+                                           "Need to process additional remote operations.");
 }
 
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperations(

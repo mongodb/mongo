@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -43,6 +43,7 @@ public class PackInputStream {
     protected byte[] value;
     protected int valueOff;
     protected int valueLen;
+    protected boolean isRaw;
 
     /**
      * Constructor.
@@ -52,7 +53,7 @@ public class PackInputStream {
      * \param value The raw bytes that back the stream.
      */
     public PackInputStream(String format, byte[] value) {
-        this(format, value, 0, value.length);
+        this(format, value, false, 0, value.length);
     }
 
     /**
@@ -61,14 +62,29 @@ public class PackInputStream {
      * \param format A String that contains the WiredTiger format that
      *               defines the layout of this packed value.
      * \param value The raw bytes that back the stream.
+     * \param isRaw The stream is opened raw.
+     */
+    public PackInputStream(String format, byte[] value, boolean isRaw) {
+        this(format, value, isRaw, 0, value.length);
+    }
+
+    /**
+     * Constructor.
+     *
+     * \param format A String that contains the WiredTiger format that
+     *               defines the layout of this packed value.
+     * \param value The raw bytes that back the stream.
+     * \param isRaw The stream is opened raw.
      * \param off Offset into the value array at which the stream begins.
      * \param len Length of the value array that forms the stream.
      */
-    public PackInputStream(String format, byte[] value, int off, int len) {
-        this.format = new PackFormatInputStream(format);
+    public PackInputStream(
+        String format, byte[] value, boolean isRaw, int off, int len) {
+        this.format = new PackFormatInputStream(format, isRaw);
         this.value = value;
         this.valueOff = off;
         this.valueLen = len;
+        this.isRaw = isRaw;
     }
 
     /**
@@ -117,9 +133,10 @@ public class PackInputStream {
      */
     public void getByteArray(byte[] dest, int off, int len)
     throws WiredTigerPackingException {
-        format.checkType('U', false);
+        if (!isRaw) {
+            format.checkType('U', false);
+        }
         getByteArrayInternal(getByteArrayLength(), dest, off, len);
-
     }
 
     /**
@@ -128,6 +145,9 @@ public class PackInputStream {
      */
     public byte[] getByteArray()
     throws WiredTigerPackingException {
+        if (!isRaw) {
+            format.checkType('U', false);
+        }
         int itemLen = getByteArrayLength();
         byte[] unpacked = new byte[itemLen];
         getByteArrayInternal(itemLen, unpacked, 0, itemLen);
@@ -141,8 +161,20 @@ public class PackInputStream {
     private int getByteArrayLength()
     throws WiredTigerPackingException {
         int itemLen = 0;
-        /* The rest of the buffer is a byte array. */
-        if (format.available() == 1) {
+
+        if (isRaw) {
+            // The rest of the buffer is a byte array.
+            itemLen = valueLen - valueOff;
+        } else if (format.hasLength()) {
+            // If the format has a length, it's always used.
+            itemLen = format.getLengthFromFormat(true);
+        } else if (format.getType() == 'U') {
+            // The 'U' format is used internally, and may be exposed to us.
+            // It indicates that the size is always stored unless there
+            // is a size in the format.
+            itemLen = unpackInt(false);
+        } else if (format.available() == 1) {
+            // The rest of the buffer is a byte array.
             itemLen = valueLen - valueOff;
         } else {
             itemLen = unpackInt(false);
@@ -156,7 +188,6 @@ public class PackInputStream {
     private void getByteArrayInternal(
         int itemLen, byte[] dest, int off, int destLen)
     throws WiredTigerPackingException {
-        /* TODO: padding. */
         int copyLen = itemLen;
         if (itemLen > destLen) {
             copyLen = destLen;
@@ -171,11 +202,11 @@ public class PackInputStream {
      */
     public int getInt()
     throws WiredTigerPackingException {
-        boolean signed = false;
+        boolean signed = true;
         format.checkType('i', false);
         if (format.getType() == 'I' ||
                 format.getType() == 'L') {
-            signed = true;
+            signed = false;
         }
         format.consume();
         return unpackInt(signed);
@@ -186,10 +217,10 @@ public class PackInputStream {
      */
     public long getLong()
     throws WiredTigerPackingException {
-        boolean signed = false;
+        boolean signed = true;
         format.checkType('q', false);
         if (format.getType() == 'Q') {
-            signed = true;
+            signed = false;
         }
         format.consume();
         return unpackLong(signed);
@@ -210,10 +241,10 @@ public class PackInputStream {
      */
     public short getShort()
     throws WiredTigerPackingException {
-        boolean signed = false;
+        boolean signed = true;
         format.checkType('h', false);
         if (format.getType() == 'H') {
-            signed = true;
+            signed = false;
         }
         format.consume();
         return unpackShort(signed);

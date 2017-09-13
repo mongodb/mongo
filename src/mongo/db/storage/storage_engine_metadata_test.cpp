@@ -36,8 +36,8 @@
 #include <ostream>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/json.h"
+#include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -191,7 +191,7 @@ TEST(StorageEngineMetadataTest, Roundtrip) {
         StorageEngineMetadata metadata(tempDir.path());
         ASSERT_OK(metadata.read());
         ASSERT_EQUALS("storageEngine1", metadata.getStorageEngine());
-        ASSERT_EQUALS(options, metadata.getStorageEngineOptions());
+        ASSERT_BSONOBJ_EQ(options, metadata.getStorageEngineOptions());
 
         metadata.reset();
         ASSERT_TRUE(metadata.getStorageEngine().empty());
@@ -207,6 +207,10 @@ TEST(StorageEngineMetadataTest, ValidateStorageEngineOption) {
     metadata.setStorageEngineOptions(options);
 
     // Non-existent field.
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidOptions,
+        metadata.validateStorageEngineOption("w", true, boost::optional<bool>(false)).code());
+    ASSERT_OK(metadata.validateStorageEngineOption("w", false, boost::optional<bool>(false)));
     ASSERT_OK(metadata.validateStorageEngineOption("w", true));
     ASSERT_OK(metadata.validateStorageEngineOption("w", false));
 

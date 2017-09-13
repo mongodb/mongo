@@ -46,26 +46,6 @@ BatchedUpsertDetail::BatchedUpsertDetail() {
 
 BatchedUpsertDetail::~BatchedUpsertDetail() {}
 
-bool BatchedUpsertDetail::isValid(std::string* errMsg) const {
-    std::string dummy;
-    if (errMsg == NULL) {
-        errMsg = &dummy;
-    }
-
-    // All the mandatory fields must be present.
-    if (!_isIndexSet) {
-        *errMsg = stream() << "missing " << index.name() << " field";
-        return false;
-    }
-
-    if (!_isUpsertedIDSet) {
-        *errMsg = stream() << "missing " << upsertedID.name() << " field";
-        return false;
-    }
-
-    return true;
-}
-
 BSONObj BatchedUpsertDetail::toBSON() const {
     BSONObjBuilder builder;
 

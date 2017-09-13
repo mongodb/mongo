@@ -38,11 +38,12 @@
 namespace mongo {
 namespace {
 
-class CmdGetShardMap : public Command {
+class CmdGetShardMap : public BasicCommand {
 public:
-    CmdGetShardMap() : Command("getShardMap") {}
+    CmdGetShardMap() : BasicCommand("getShardMap") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -66,11 +67,9 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         // MongoD instances do not know that they are part of a sharded cluster until they
         // receive a setShardVersion command and that's when the catalog manager and the shard

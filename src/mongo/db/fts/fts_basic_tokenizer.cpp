@@ -30,7 +30,7 @@
 
 #include "mongo/db/fts/fts_basic_tokenizer.h"
 
-#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
@@ -68,21 +68,19 @@ bool BasicFTSTokenizer::moveNext() {
             continue;
         }
 
-        string word = token.data.toString();
-
-        word = tolowerString(token.data);
+        string word = tolowerString(token.data);
 
         // Stop words are case-sensitive so we need them to be lower cased to check
         // against the stop word list
-        if ((_options & FTSTokenizer::FilterStopWords) && _stopWords->isStopWord(word)) {
+        if ((_options & FTSTokenizer::kFilterStopWords) && _stopWords->isStopWord(word)) {
             continue;
         }
 
-        if (_options & FTSTokenizer::GenerateCaseSensitiveTokens) {
+        if (_options & FTSTokenizer::kGenerateCaseSensitiveTokens) {
             word = token.data.toString();
         }
 
-        _stem = _stemmer.stem(word);
+        _stem = _stemmer.stem(word).toString();
         return true;
     }
 }

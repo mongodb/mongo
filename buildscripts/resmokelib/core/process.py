@@ -11,21 +11,52 @@ import atexit
 import logging
 import os
 import os.path
-import subprocess
 import sys
 import threading
+
+# The subprocess32 module resolves the thread-safety issues of the subprocess module in Python 2.x
+# when the _posixsubprocess C extension module is also available. Additionally, the _posixsubprocess
+# C extension module avoids triggering invalid free() calls on Python's internal data structure for
+# thread-local storage by skipping the PyOS_AfterFork() call when the 'preexec_fn' parameter isn't
+# specified to subprocess.Popen(). See SERVER-22219 for more details.
+#
+# The subprocess32 module is untested on Windows and thus isn't recommended for use, even when it's
+# installed. See https://github.com/google/python-subprocess32/blob/3.2.7/README.md#usage.
+if os.name == "posix" and sys.version_info[0] == 2:
+    try:
+        import subprocess32 as subprocess
+    except ImportError:
+        import warnings
+        warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
+                       " available. When using the subprocess module, a child process may trigger"
+                       " an invalid free(). See SERVER-22219 for more details."),
+                      RuntimeWarning)
+        import subprocess
+else:
+    import subprocess
 
 from . import pipe
 from .. import utils
 
-# Prevent race conditions when starting multiple subprocesses on the same thread.
-# See https://bugs.python.org/issue2320 for more details.
+# Attempt to avoid race conditions (e.g. hangs caused by a file descriptor being left open) when
+# starting subprocesses concurrently from multiple threads by guarding calls to subprocess.Popen()
+# with a lock. See https://bugs.python.org/issue2320 and https://bugs.python.org/issue12739 as
+# reports of such hangs.
+#
+# This lock probably isn't necessary when both the subprocess32 module and its _posixsubprocess C
+# extension module are available because either
+#   (a) the pipe2() syscall is available on the platform we're using, so pipes are atomically
+#       created with the FD_CLOEXEC flag set on them, or
+#   (b) the pipe2() syscall isn't available, but the GIL isn't released during the
+#       _posixsubprocess.fork_exec() call or the _posixsubprocess.cloexec_pipe() call.
+# See https://bugs.python.org/issue7213 for more details.
 _POPEN_LOCK = threading.Lock()
 
 # Job objects are the only reliable way to ensure that processes are terminated on Windows.
 if sys.platform == "win32":
     import win32api
     import win32con
+    import win32event
     import win32job
     import win32process
     import winerror
@@ -68,8 +99,9 @@ class Process(object):
         and environment.
         """
 
-        # Ensure that executable files on Windows have a ".exe" extension.
-        if sys.platform == "win32" and os.path.splitext(args[0])[1] != ".exe":
+        # Ensure that executable files that don't already have an
+        # extension on Windows have a ".exe" extension.
+        if sys.platform == "win32" and not os.path.splitext(args[0])[1]:
             args[0] += ".exe"
 
         self.logger = logger
@@ -94,12 +126,25 @@ class Process(object):
         if sys.platform == "win32" and _JOB_OBJECT is not None:
             creation_flags |= win32process.CREATE_BREAKAWAY_FROM_JOB
 
+        # Use unbuffered I/O pipes to avoid adding delay between when the subprocess writes output
+        # and when the LoggerPipe thread reads it.
+        buffer_size = 0
+
+        # Close file descriptors in the child process before executing the program. This prevents
+        # file descriptors that were inherited due to multiple calls to fork() -- either within one
+        # thread, or concurrently from multiple threads -- from causing another subprocess to wait
+        # for the completion of the newly spawned child process. Closing other file descriptors
+        # isn't supported on Windows when stdout and stderr are redirected.
+        close_fds = (sys.platform != "win32")
+
         with _POPEN_LOCK:
             self._process = subprocess.Popen(self.args,
-                                             env=self.env,
-                                             creationflags=creation_flags,
+                                             bufsize=buffer_size,
                                              stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE)
+                                             stderr=subprocess.PIPE,
+                                             close_fds=close_fds,
+                                             env=self.env,
+                                             creationflags=creation_flags)
             self.pid = self._process.pid
 
         self._stdout_pipe = pipe.LoggerPipe(self.logger, logging.INFO, self._process.stdout)
@@ -119,12 +164,41 @@ class Process(object):
                 if return_code == win32con.STILL_ACTIVE:
                     raise
 
-    def stop(self):
-        """
-        Terminates the process.
-        """
-
+    def stop(self, kill=False):
+        """Terminate the process."""
         if sys.platform == "win32":
+
+            # Attempt to cleanly shutdown mongod.
+            if not kill and len(self.args) > 0 and self.args[0].find("mongod") != -1:
+                mongo_signal_handle = None
+                try:
+                    mongo_signal_handle = win32event.OpenEvent(
+                        win32event.EVENT_MODIFY_STATE, False, "Global\\Mongo_" +
+                        str(self._process.pid))
+
+                    if not mongo_signal_handle:
+                        # The process has already died.
+                        return
+                    win32event.SetEvent(mongo_signal_handle)
+                    # Wait 60 seconds for the program to exit.
+                    status = win32event.WaitForSingleObject(
+                        self._process._handle, 60 * 1000)
+                    if status == win32event.WAIT_OBJECT_0:
+                        return
+                except win32process.error as err:
+                    # ERROR_FILE_NOT_FOUND (winerror=2)
+                    # ERROR_ACCESS_DENIED (winerror=5)
+                    # ERROR_INVALID_HANDLE (winerror=6)
+                    # One of the above errors is received if the process has
+                    # already died.
+                    if err[0] not in (2, 5, 6):
+                        raise
+                finally:
+                    win32api.CloseHandle(mongo_signal_handle)
+
+                print "Failed to cleanly exit the program, calling TerminateProcess() on PID: " +\
+                    str(self._process.pid)
+
             # Adapted from implementation of Popen.terminate() in subprocess.py of Python 2.7
             # because earlier versions do not catch exceptions.
             try:
@@ -141,7 +215,10 @@ class Process(object):
                     raise
         else:
             try:
-                self._process.terminate()
+                if kill:
+                    self._process.kill()
+                else:
+                    self._process.terminate()
             except OSError as err:
                 # ESRCH (errno=3) is received when the process has already died.
                 if err.errno != 3:

@@ -39,32 +39,43 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/d_state.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+namespace {
+
+const char kTermField[] = "term";
+
+}  // namespace
 
 /**
  * A command for running .find() queries.
  */
-class FindCmd : public Command {
+class FindCmd : public BasicCommand {
     MONGO_DISALLOW_COPYING(FindCmd);
 
 public:
-    FindCmd() : Command("find") {}
+    FindCmd() : BasicCommand("find") {}
 
-    bool isWriteCommandForConfigServer() const override {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -84,8 +95,24 @@ public:
         return false;
     }
 
+    bool supportsNonLocalReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
+        return true;
+    }
+
     void help(std::stringstream& help) const override {
         help << "query for documents";
+    }
+
+    LogicalOp getLogicalOp() const override {
+        return LogicalOp::opQuery;
+    }
+
+    ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kRead;
+    }
+
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     /**
@@ -96,216 +123,229 @@ public:
         return false;
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
-
-        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+        const NamespaceString nss(parseNs(dbname, cmdObj));
+        auto hasTerm = cmdObj.hasField(kTermField);
+        return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
     }
 
-    Status explain(OperationContext* txn,
+    Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
-                   ExplainCommon::Verbosity verbosity,
+                   ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        const std::string fullns = parseNs(dbname, cmdObj);
-        const NamespaceString nss(fullns);
+        const NamespaceString nss(parseNs(dbname, cmdObj));
         if (!nss.isValid()) {
             return {ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid collection name: " << nss.ns()};
         }
 
-        // Parse the command BSON to a LiteParsedQuery.
+        // Parse the command BSON to a QueryRequest.
         const bool isExplain = true;
-        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
-        if (!lpqStatus.isOK()) {
-            return lpqStatus.getStatus();
+        auto qrStatus = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+        if (!qrStatus.isOK()) {
+            return qrStatus.getStatus();
         }
 
-        // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
-        std::unique_ptr<CanonicalQuery> cq;
-        {
-            CanonicalQuery* rawCq;
-            WhereCallbackReal whereCallback(txn, nss.db());
-            Status canonStatus =
-                CanonicalQuery::canonicalize(lpqStatus.getValue().release(), &rawCq, whereCallback);
-            if (!canonStatus.isOK()) {
-                return canonStatus;
+        // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
+
+        ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(opCtx,
+                                         std::move(qrStatus.getValue()),
+                                         expCtx,
+                                         extensionsCallback,
+                                         MatchExpressionParser::kAllowAllSpecialFeatures &
+                                             ~MatchExpressionParser::AllowedFeatures::kExpr);
+        if (!statusWithCQ.isOK()) {
+            return statusWithCQ.getStatus();
+        }
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+        // Acquire locks. If the namespace is a view, we release our locks and convert the query
+        // request into an aggregation command.
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
+        if (ctx.getView()) {
+            // Relinquish locks. The aggregation command will re-acquire them.
+            ctx.releaseLocksForView();
+
+            // Convert the find command into an aggregation using $match (and other stages, as
+            // necessary), if possible.
+            const auto& qr = cq->getQueryRequest();
+            auto viewAggregationCommand = qr.asAggregationCommand();
+            if (!viewAggregationCommand.isOK())
+                return viewAggregationCommand.getStatus();
+
+            // Create the agg request equivalent of the find operation, with the explain verbosity
+            // included.
+            auto aggRequest = AggregationRequest::parseFromBSON(
+                nss, viewAggregationCommand.getValue(), verbosity);
+            if (!aggRequest.isOK()) {
+                return aggRequest.getStatus();
             }
-            cq.reset(rawCq);
+
+            try {
+                return runAggregate(
+                    opCtx, nss, aggRequest.getValue(), viewAggregationCommand.getValue(), *out);
+            } catch (DBException& error) {
+                if (error.code() == ErrorCodes::InvalidPipelineOperator) {
+                    return {ErrorCodes::InvalidPipelineOperator,
+                            str::stream() << "Unsupported in view pipeline: " << error.what()};
+                }
+                return error.toStatus();
+            }
         }
 
-        AutoGetCollectionForRead ctx(txn, nss);
-        // The collection may be NULL. If so, getExecutor() should handle it by returning
-        // an execution tree with an EOFStage.
+        // The collection may be NULL. If so, getExecutor() should handle it by returning an
+        // execution tree with an EOFStage.
         Collection* collection = ctx.getCollection();
 
         // We have a parsed query. Time to get the execution plan for it.
-        std::unique_ptr<PlanExecutor> exec;
-        {
-            PlanExecutor* rawExec;
-            Status execStatus = getExecutorFind(
-                txn, collection, nss, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec);
-            if (!execStatus.isOK()) {
-                return execStatus;
-            }
-            exec.reset(rawExec);
+        auto statusWithPlanExecutor =
+            getExecutorFind(opCtx, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
+        if (!statusWithPlanExecutor.isOK()) {
+            return statusWithPlanExecutor.getStatus();
         }
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Got the execution tree. Explain it.
-        Explain::explainStages(exec.get(), verbosity, out);
+        Explain::explainStages(exec.get(), collection, verbosity, out);
         return Status::OK();
     }
 
     /**
      * Runs a query using the following steps:
-     *   1) Parsing.
-     *   2) Acquire locks.
-     *   3) Plan query, obtaining an executor that can run it.
-     *   4) Setup a cursor for the query, which may be used on subsequent getMores.
-     *   5) Generate the first batch.
-     *   6) Save state for getMore.
-     *   7) Generate response to send to the client.
-     *
-     * TODO: Rather than using the sharding version available in thread-local storage
-     * (i.e. call to shardingState.needCollectionMetadata() below), shard version
-     * information should be passed as part of the command parameter.
+     *   --Parsing.
+     *   --Acquire locks.
+     *   --Plan query, obtaining an executor that can run it.
+     *   --Generate the first batch.
+     *   --Save state for getMore, transferring ownership of the executor to a ClientCursor.
+     *   --Generate response to send to the client.
      */
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& cmdObj,
-             int options,
-             std::string& errmsg,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const std::string fullns = parseNs(dbname, cmdObj);
-        const NamespaceString nss(fullns);
-        if (!nss.isValid()) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::InvalidNamespace,
-                                        str::stream() << "Invalid collection name: " << nss.ns()});
-        }
-
         // Although it is a command, a find command gets counted as a query.
         globalOpCounters.gotQuery();
 
-        if (txn->getClient()->isInDirectClient()) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation, "Cannot run find command from eval()"));
-        }
-
-        // 1a) Parse the command BSON to a LiteParsedQuery.
+        // Parse the command BSON to a QueryRequest.
         const bool isExplain = false;
-        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
-        if (!lpqStatus.isOK()) {
-            return appendCommandStatus(result, lpqStatus.getStatus());
+        // Pass parseNs to makeFromFindCommand in case cmdObj does not have a UUID.
+        auto qrStatus = QueryRequest::makeFromFindCommand(
+            NamespaceString(parseNs(dbname, cmdObj)), cmdObj, isExplain);
+        if (!qrStatus.isOK()) {
+            return appendCommandStatus(result, qrStatus.getStatus());
         }
 
-        auto& lpq = lpqStatus.getValue();
+        auto& qr = qrStatus.getValue();
+
+        // Validate term before acquiring locks, if provided.
+        if (auto term = qr->getReplicationTerm()) {
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            Status status = replCoord->updateTerm(opCtx, *term);
+            // Note: updateTerm returns ok if term stayed the same.
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+        }
+
+        // Acquire locks. If the query is on a view, we release our locks and convert the query
+        // request into an aggregation command.
+        Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
+        const NamespaceString nss(parseNsOrUUID(opCtx, dbname, cmdObj));
+        qr->refreshNSS(opCtx);
 
         // Fill out curop information.
-        int ntoreturn = lpq->getBatchSize().value_or(0);
-        beginQueryOp(txn, nss, cmdObj, ntoreturn, lpq->getSkip());
+        //
+        // We pass negative values for 'ntoreturn' and 'ntoskip' to indicate that these values
+        // should be omitted from the log line. Limit and skip information is already present in the
+        // find command parameters, so these fields are redundant.
+        const int ntoreturn = -1;
+        const int ntoskip = -1;
+        beginQueryOp(opCtx, nss, cmdObj, ntoreturn, ntoskip);
 
-        // 1b) Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
-        std::unique_ptr<CanonicalQuery> cq;
-        {
-            CanonicalQuery* rawCq;
-            WhereCallbackReal whereCallback(txn, nss.db());
-            Status canonStatus = CanonicalQuery::canonicalize(lpq.release(), &rawCq, whereCallback);
-            if (!canonStatus.isOK()) {
-                return appendCommandStatus(result, canonStatus);
-            }
-            cq.reset(rawCq);
+        // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
+        ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        const boost::intrusive_ptr<ExpressionContext> expCtx;
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(opCtx,
+                                         std::move(qr),
+                                         expCtx,
+                                         extensionsCallback,
+                                         MatchExpressionParser::kAllowAllSpecialFeatures &
+                                             ~MatchExpressionParser::AllowedFeatures::kExpr);
+        if (!statusWithCQ.isOK()) {
+            return appendCommandStatus(result, statusWithCQ.getStatus());
         }
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        // 2) Acquire locks.
-        AutoGetCollectionForRead ctx(txn, nss);
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss, std::move(dbSLock));
         Collection* collection = ctx.getCollection();
+        if (ctx.getView()) {
+            // Relinquish locks. The aggregation command will re-acquire them.
+            ctx.releaseLocksForView();
 
-        const int dbProfilingLevel =
-            ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
+            // Convert the find command into an aggregation using $match (and other stages, as
+            // necessary), if possible.
+            const auto& qr = cq->getQueryRequest();
+            auto viewAggregationCommand = qr.asAggregationCommand();
+            if (!viewAggregationCommand.isOK())
+                return appendCommandStatus(result, viewAggregationCommand.getStatus());
 
-        // It is possible that the sharding version will change during yield while we are
-        // retrieving a plan executor. If this happens we will throw an error and mongos will
-        // retry.
-        const ChunkVersion shardingVersionAtStart = shardingState.getVersion(nss.ns());
-
-        // 3) Get the execution plan for the query.
-        std::unique_ptr<PlanExecutor> execHolder;
-        {
-            PlanExecutor* rawExec;
-            Status execStatus = getExecutorFind(
-                txn, collection, nss, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec);
-            if (!execStatus.isOK()) {
-                return appendCommandStatus(result, execStatus);
+            BSONObj aggResult = Command::runCommandDirectly(
+                opCtx,
+                OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregationCommand.getValue())));
+            auto status = getStatusFromCommandResult(aggResult);
+            if (status.code() == ErrorCodes::InvalidPipelineOperator) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::InvalidPipelineOperator,
+                     str::stream() << "Unsupported in view pipeline: " << status.reason()});
             }
-            execHolder.reset(rawExec);
+            result.resetToEmpty();
+            result.appendElements(aggResult);
+            return status.isOK();
         }
 
-        // TODO: Currently, chunk ranges are kept around until all ClientCursors created while
-        // the chunk belonged on this node are gone. Separating chunk lifetime management from
-        // ClientCursor should allow this check to go away.
-        if (!shardingState.getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
-            // Version changed while retrieving a PlanExecutor. Terminate the operation,
-            // signaling that mongos should retry.
-            throw SendStaleConfigException(nss.ns(),
-                                           "version changed during find command",
-                                           shardingVersionAtStart,
-                                           shardingState.getVersion(nss.ns()));
+        // Get the execution plan for the query.
+        auto statusWithPlanExecutor =
+            getExecutorFind(opCtx, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
+        if (!statusWithPlanExecutor.isOK()) {
+            return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+        }
+
+        auto exec = std::move(statusWithPlanExecutor.getValue());
+
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
         }
 
         if (!collection) {
             // No collection. Just fill out curop indicating that there were zero results and
             // there is no ClientCursor id, and then return.
-            const int numResults = 0;
+            const long long numResults = 0;
             const CursorId cursorId = 0;
-            endQueryOp(txn, execHolder.get(), dbProfilingLevel, numResults, cursorId);
+            endQueryOp(opCtx, collection, *exec, numResults, cursorId);
             appendCursorResponseObject(cursorId, nss.ns(), BSONArray(), &result);
             return true;
         }
 
-        const LiteParsedQuery& pq = execHolder->getCanonicalQuery()->getParsed();
+        const QueryRequest& originalQR = exec->getCanonicalQuery()->getQueryRequest();
 
-        // 4) If possible, register the execution plan inside a ClientCursor, and pin that
-        // cursor. In this case, ownership of the PlanExecutor is transferred to the
-        // ClientCursor, and 'exec' becomes null.
-        //
-        // First unregister the PlanExecutor so it can be re-registered with ClientCursor.
-        execHolder->deregisterExec();
-
-        // Create a ClientCursor containing this plan executor. We don't have to worry
-        // about leaking it as it's inserted into a global map by its ctor.
-        ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
-                                                execHolder.release(),
-                                                nss.ns(),
-                                                pq.getOptions(),
-                                                pq.getFilter());
-        CursorId cursorId = cursor->cursorid();
-        ClientCursorPin ccPin(collection->getCursorManager(), cursorId);
-
-        // On early return, get rid of the the cursor.
-        ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, ccPin);
-
-        invariant(!execHolder);
-        PlanExecutor* exec = cursor->getExecutor();
-
-        // 5) Stream query results, adding them to a BSONArray as we go.
-        BSONArrayBuilder firstBatch;
+        // Stream query results, adding them to a BSONArray as we go.
+        CursorResponseBuilder firstBatch(/*isInitialResponse*/ true, &result);
         BSONObj obj;
-        PlanExecutor::ExecState state;
-        int numResults = 0;
-        while (!enoughForFirstBatch(pq, numResults, firstBatch.len()) &&
+        PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
+        long long numResults = 0;
+        while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
                PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-            // If adding this object will cause us to exceed the BSON size limit, then we stash
-            // it for later.
-            if (firstBatch.len() + obj.objsize() > BSONObjMaxUserSize && numResults > 0) {
+            // If we can't fit this result inside the current batch, then we stash it for later.
+            if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
                 exec->enqueue(obj);
                 break;
             }
@@ -317,9 +357,9 @@ public:
 
         // Throw an assertion if query execution fails for any reason.
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+            firstBatch.abandon();
             error() << "Plan executor error during find command: " << PlanExecutor::statestr(state)
-                    << ", stats: " << Explain::statsToBSON(*stats);
+                    << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
             return appendCommandStatus(result,
                                        Status(ErrorCodes::OperationFailed,
@@ -328,36 +368,48 @@ public:
                                                   << WorkingSetCommon::toStatusString(obj)));
         }
 
-        // 6) Set up the cursor for getMore.
-        if (shouldSaveCursor(txn, collection, state, exec)) {
+        // Before saving the cursor, ensure that whatever plan we established happened with the
+        // expected collection version
+        auto css = CollectionShardingState::get(opCtx, nss);
+        css->checkShardVersionOrThrow(opCtx);
+
+        // Set up the cursor for getMore.
+        CursorId cursorId = 0;
+        if (shouldSaveCursor(opCtx, collection, state, exec.get())) {
+            // Create a ClientCursor containing this plan executor and register it with the cursor
+            // manager.
+            ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+                opCtx,
+                {std::move(exec),
+                 nss,
+                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                 opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                 cmdObj});
+            cursorId = pinnedCursor.getCursor()->cursorid();
+
+            invariant(!exec);
+            PlanExecutor* cursorExec = pinnedCursor.getCursor()->getExecutor();
+
             // State will be restored on getMore.
-            exec->saveState();
+            cursorExec->saveState();
+            cursorExec->detachFromOperationContext();
 
-            cursor->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
-            cursor->setPos(numResults);
-
-            // Don't stash the RU for tailable cursors at EOF, let them get a new RU on their
-            // next getMore.
-            if (!(pq.isTailable() && state == PlanExecutor::IS_EOF)) {
-                // We stash away the RecoveryUnit in the ClientCursor. It's used for
-                // subsequent getMore requests. The calling OpCtx gets a fresh RecoveryUnit.
-                txn->recoveryUnit()->abandonSnapshot();
-                cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-                StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
-                txn->setRecoveryUnit(engine->newRecoveryUnit(), OperationContext::kNotInUnitOfWork);
+            // We assume that cursors created through a DBDirectClient are always used from their
+            // original OperationContext, so we do not need to move time to and from the cursor.
+            if (!opCtx->getClient()->isInDirectClient()) {
+                pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(
+                    opCtx->getRemainingMaxTimeMicros());
             }
+            pinnedCursor.getCursor()->setPos(numResults);
+
+            // Fill out curop based on the results.
+            endQueryOp(opCtx, collection, *cursorExec, numResults, cursorId);
         } else {
-            cursorId = 0;
+            endQueryOp(opCtx, collection, *exec, numResults, cursorId);
         }
 
-        // Fill out curop based on the results.
-        endQueryOp(txn, exec, dbProfilingLevel, numResults, cursorId);
-
-        // 7) Generate the response object to send to the client.
-        appendCursorResponseObject(cursorId, nss.ns(), firstBatch.arr(), &result);
-        if (cursorId) {
-            cursorFreer.Dismiss();
-        }
+        // Generate the response object to send to the client.
+        firstBatch.done(cursorId, nss.ns());
         return true;
     }
 

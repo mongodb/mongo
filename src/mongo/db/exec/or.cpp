@@ -31,39 +31,30 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* OrStage::kStageType = "OR";
 
-OrStage::OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter)
-    : _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup), _commonStats(kStageType) {}
-
-OrStage::~OrStage() {
-    for (size_t i = 0; i < _children.size(); ++i) {
-        delete _children[i];
-    }
-}
+OrStage::OrStage(OperationContext* opCtx, WorkingSet* ws, bool dedup, const MatchExpression* filter)
+    : PlanStage(kStageType, opCtx), _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) {}
 
 void OrStage::addChild(PlanStage* child) {
-    _children.push_back(child);
+    _children.emplace_back(child);
 }
 
 bool OrStage::isEOF() {
     return _currentChild >= _children.size();
 }
 
-PlanStage::StageState OrStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -75,31 +66,28 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
         WorkingSetMember* member = _ws->get(id);
 
         // If we're deduping (and there's something to dedup by)
-        if (_dedup && member->hasLoc()) {
+        if (_dedup && member->hasRecordId()) {
             ++_specificStats.dupsTested;
 
             // ...and we've seen the RecordId before
-            if (_seen.end() != _seen.find(member->loc)) {
+            if (_seen.end() != _seen.find(member->recordId)) {
                 // ...drop it.
                 ++_specificStats.dupsDropped;
                 _ws->free(id);
-                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             } else {
                 // Otherwise, note that we've seen it.
-                _seen.insert(member->loc);
+                _seen.insert(member->recordId);
             }
         }
 
         if (Filter::passes(member, _filter)) {
             // Match!  return it.
             *out = id;
-            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         } else {
             // Does not match, try again.
             _ws->free(id);
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     } else if (PlanStage::IS_EOF == childStatus) {
@@ -110,7 +98,6 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
         if (isEOF()) {
             return PlanStage::IS_EOF;
         } else {
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     } else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
@@ -125,10 +112,7 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
             *out = WorkingSetCommon::allocateStatusMember(_ws, status);
         }
         return childStatus;
-    } else if (PlanStage::NEED_TIME == childStatus) {
-        ++_commonStats.needTime;
     } else if (PlanStage::NEED_YIELD == childStatus) {
-        ++_commonStats.needYield;
         *out = id;
     }
 
@@ -136,29 +120,10 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
     return childStatus;
 }
 
-void OrStage::saveState() {
-    ++_commonStats.yields;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->saveState();
-    }
-}
-
-void OrStage::restoreState(OperationContext* opCtx) {
-    ++_commonStats.unyields;
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->restoreState(opCtx);
-    }
-}
-
-void OrStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-
+void OrStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
+    // TODO remove this since calling isEOF is illegal inside of doInvalidate().
     if (isEOF()) {
         return;
-    }
-
-    for (size_t i = 0; i < _children.size(); ++i) {
-        _children[i]->invalidate(txn, dl, type);
     }
 
     // If we see DL again it is not the same record as it once was so we still want to
@@ -166,37 +131,29 @@ void OrStage::invalidate(OperationContext* txn, const RecordId& dl, Invalidation
     if (_dedup && INVALIDATION_DELETION == type) {
         unordered_set<RecordId, RecordId::Hasher>::iterator it = _seen.find(dl);
         if (_seen.end() != it) {
-            ++_specificStats.locsForgotten;
+            ++_specificStats.recordIdsForgotten;
             _seen.erase(dl);
         }
     }
 }
 
-vector<PlanStage*> OrStage::getChildren() const {
-    return _children;
-}
-
-PlanStageStats* OrStage::getStats() {
+unique_ptr<PlanStageStats> OrStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     // Add a BSON representation of the filter to the stats tree, if there is one.
     if (NULL != _filter) {
         BSONObjBuilder bob;
-        _filter->toBSON(&bob);
+        _filter->serialize(&bob);
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_OR));
-    ret->specific.reset(new OrStats(_specificStats));
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_OR);
+    ret->specific = make_unique<OrStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats());
+        ret->children.emplace_back(_children[i]->getStats());
     }
 
-    return ret.release();
-}
-
-const CommonStats* OrStage::getCommonStats() const {
-    return &_commonStats;
+    return ret;
 }
 
 const SpecificStats* OrStage::getSpecificStats() const {

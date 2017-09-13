@@ -37,7 +37,6 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace {
 
 class ValidateAdaptorSpy : public ValidateAdaptor {
 public:
@@ -47,7 +46,7 @@ public:
 
     ~ValidateAdaptorSpy() {}
 
-    Status validate(const RecordData& recordData, size_t* dataSize) {
+    Status validate(const RecordId& recordId, const RecordData& recordData, size_t* dataSize) {
         std::string s(recordData.data());
         ASSERT(1 == _remain.erase(s));
 
@@ -66,9 +65,10 @@ private:
 class ValidateTest : public mongo::unittest::Test {
 public:
     ValidateTest()
-        : _harnessHelper(newHarnessHelper()), _rs(_harnessHelper->newNonCappedRecordStore()) {}
+        : _harnessHelper(newRecordStoreHarnessHelper()),
+          _rs(_harnessHelper->newNonCappedRecordStore()) {}
 
-    OperationContext* newOperationContext() {
+    ServiceContext::UniqueOperationContext newOperationContext() {
         return _harnessHelper->newOperationContext();
     }
 
@@ -82,13 +82,13 @@ public:
 
     void setUp() {
         {
-            std::unique_ptr<OperationContext> opCtx(newOperationContext());
+            ServiceContext::UniqueOperationContext opCtx(newOperationContext());
             ASSERT_EQUALS(0, _rs->numRecords(opCtx.get()));
         }
 
         int nToInsert = 10;
         for (int i = 0; i < nToInsert; i++) {
-            std::unique_ptr<OperationContext> opCtx(newOperationContext());
+            ServiceContext::UniqueOperationContext opCtx(newOperationContext());
             {
                 std::stringstream ss;
                 ss << "record " << i;
@@ -96,24 +96,23 @@ public:
                 ASSERT(_remain.insert(data).second);
 
                 WriteUnitOfWork uow(opCtx.get());
-                StatusWith<RecordId> res =
-                    _rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                StatusWith<RecordId> res = _rs->insertRecord(
+                    opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
                 ASSERT_OK(res.getStatus());
                 uow.commit();
             }
         }
 
         {
-            std::unique_ptr<OperationContext> opCtx(newOperationContext());
+            ServiceContext::UniqueOperationContext opCtx(newOperationContext());
             ASSERT_EQUALS(nToInsert, _rs->numRecords(opCtx.get()));
         }
     }
 
 private:
-    std::unique_ptr<HarnessHelper> _harnessHelper;
+    std::unique_ptr<RecordStoreHarnessHelper> _harnessHelper;
     std::unique_ptr<RecordStore> _rs;
     std::set<std::string> _remain;
 };
 
-}  // namespace
 }  // namespace mongo

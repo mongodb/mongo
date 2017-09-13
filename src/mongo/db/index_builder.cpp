@@ -40,7 +40,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -67,9 +66,10 @@ void _setBgIndexStarting() {
 }
 }  // namespace
 
-IndexBuilder::IndexBuilder(const BSONObj& index)
+IndexBuilder::IndexBuilder(const BSONObj& index, bool relaxConstraints)
     : BackgroundJob(true /* self-delete */),
       _index(index.getOwned()),
+      _relaxConstraints(relaxConstraints),
       _name(str::stream() << "repl index builder " << _indexBuildCount.addAndFetch(1)) {}
 
 IndexBuilder::~IndexBuilder() {}
@@ -82,32 +82,32 @@ void IndexBuilder::run() {
     Client::initThread(name().c_str());
     LOG(2) << "IndexBuilder building index " << _index;
 
-    OperationContextImpl txn;
-    txn.lockState()->setIsBatchWriter(true);
+    const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+    OperationContext& opCtx = *opCtxPtr;
+    opCtx.lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-    AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
+    AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
 
     {
-        stdx::lock_guard<Client> lk(*txn.getClient());
-        CurOp::get(txn)->setOp_inlock(dbInsert);
+        stdx::lock_guard<Client> lk(*opCtx.getClient());
+        CurOp::get(opCtx)->setNetworkOp_inlock(dbInsert);
     }
     NamespaceString ns(_index["ns"].String());
 
-    ScopedTransaction transaction(&txn, MODE_IX);
-    Lock::DBLock dlk(txn.lockState(), ns.db(), MODE_X);
-    OldClientContext ctx(&txn, ns.getSystemIndexesCollection());
+    Lock::DBLock dlk(&opCtx, ns.db(), MODE_X);
+    OldClientContext ctx(&opCtx, ns.getSystemIndexesCollection());
 
-    Database* db = dbHolder().get(&txn, ns.db().toString());
+    Database* db = dbHolder().get(&opCtx, ns.db().toString());
 
-    Status status = _build(&txn, db, true, &dlk);
+    Status status = _build(&opCtx, db, true, &dlk);
     if (!status.isOK()) {
-        error() << "IndexBuilder could not build index: " << status.toString();
+        error() << "IndexBuilder could not build index: " << redact(status);
         fassert(28555, ErrorCodes::isInterruption(status.code()));
     }
 }
 
-Status IndexBuilder::buildInForeground(OperationContext* txn, Database* db) const {
-    return _build(txn, db, false, NULL);
+Status IndexBuilder::buildInForeground(OperationContext* opCtx, Database* db) const {
+    return _build(opCtx, db, false, NULL);
 }
 
 void IndexBuilder::waitForBgIndexStarting() {
@@ -119,41 +119,28 @@ void IndexBuilder::waitForBgIndexStarting() {
     _bgIndexStarting = false;
 }
 
-Status IndexBuilder::_build(OperationContext* txn,
+Status IndexBuilder::_build(OperationContext* opCtx,
                             Database* db,
                             bool allowBackgroundBuilding,
                             Lock::DBLock* dbLock) const {
     const NamespaceString ns(_index["ns"].String());
 
-    Collection* c = db->getCollection(ns.ns());
-    if (!c) {
-        while (true) {
-            try {
-                WriteUnitOfWork wunit(txn);
-                c = db->getOrCreateCollection(txn, ns.ns());
-                verify(c);
-                wunit.commit();
-                break;
-            } catch (const WriteConflictException& wce) {
-                LOG(2) << "WriteConflictException while creating collection in IndexBuilder"
-                       << ", retrying.";
-                txn->recoveryUnit()->abandonSnapshot();
-                continue;
-            }
-        }
-    }
+    Collection* c = db->getCollection(opCtx, ns);
+
+    // Collections should not be implicitly created by the index builder.
+    fassert(40409, c);
 
     {
-        stdx::lock_guard<Client> lk(*txn->getClient());
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
         // Show which index we're building in the curop display.
-        CurOp::get(txn)->setQuery_inlock(_index);
+        CurOp::get(opCtx)->setOpDescription_inlock(_index);
     }
 
     bool haveSetBgIndexStarting = false;
     while (true) {
         Status status = Status::OK();
         try {
-            MultiIndexBlock indexer(txn, c);
+            MultiIndexBlock indexer(opCtx, c);
             indexer.allowInterruption();
 
             if (allowBackgroundBuilding)
@@ -161,8 +148,10 @@ Status IndexBuilder::_build(OperationContext* txn,
 
 
             try {
-                status = indexer.init(_index);
-                if (status.code() == ErrorCodes::IndexAlreadyExists) {
+                status = indexer.init(_index).getStatus();
+                if (status == ErrorCodes::IndexAlreadyExists ||
+                    (status == ErrorCodes::IndexOptionsConflict && _relaxConstraints)) {
+                    LOG(1) << "Ignoring indexing error: " << redact(status);
                     if (allowBackgroundBuilding) {
                         // Must set this in case anyone is waiting for this build.
                         _setBgIndexStarting();
@@ -180,7 +169,7 @@ Status IndexBuilder::_build(OperationContext* txn,
                         dbLock->relockWithMode(MODE_IX);
                     }
 
-                    Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                    Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IX);
                     status = indexer.insertAllDocumentsInCollection();
                 }
 
@@ -188,9 +177,12 @@ Status IndexBuilder::_build(OperationContext* txn,
                     if (allowBackgroundBuilding) {
                         dbLock->relockWithMode(MODE_X);
                     }
-                    WriteUnitOfWork wunit(txn);
+                    WriteUnitOfWork wunit(opCtx);
                     indexer.commit();
                     wunit.commit();
+                }
+                if (!status.isOK()) {
+                    error() << "bad status from index build: " << redact(status);
                 }
             } catch (const DBException& e) {
                 status = e.toStatus();
@@ -198,13 +190,14 @@ Status IndexBuilder::_build(OperationContext* txn,
 
             if (allowBackgroundBuilding) {
                 dbLock->relockWithMode(MODE_X);
-                Database* reloadDb = dbHolder().get(txn, ns.db());
+                Database* reloadDb = dbHolder().get(opCtx, ns.db());
                 fassert(28553, reloadDb);
-                fassert(28554, reloadDb->getCollection(ns.ns()));
+                fassert(28554, reloadDb->getCollection(opCtx, ns));
             }
 
             if (status.code() == ErrorCodes::InterruptedAtShutdown) {
                 // leave it as-if kill -9 happened. This will be handled on restart.
+                invariant(allowBackgroundBuilding);  // Foreground builds aren't interrupted.
                 indexer.abortWithoutCleanup();
             }
         } catch (const WriteConflictException& wce) {
@@ -216,7 +209,7 @@ Status IndexBuilder::_build(OperationContext* txn,
 
 
         LOG(2) << "WriteConflictException while creating index in IndexBuilder, retrying.";
-        txn->recoveryUnit()->abandonSnapshot();
+        opCtx->recoveryUnit()->abandonSnapshot();
     }
 }
 }

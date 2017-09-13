@@ -36,26 +36,31 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_runner.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/find_and_modify_request.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
-#include "mongo/s/type_lockpings.h"
-#include "mongo/s/type_locks.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
+#include "mongo/s/catalog/type_lockpings.h"
+#include "mongo/s/catalog/type_locks.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 using std::string;
+using std::vector;
 
 namespace {
 
-const char kCmdResponseWriteConcernField[] = "writeConcernError";
 const char kFindAndModifyResponseResultDocField[] = "value";
 const char kLocalTimeField[] = "localTime";
+
 const ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly, TagSet());
 
 /**
@@ -64,32 +69,18 @@ const ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly, TagSet());
  * the findAndModify command did not modify any document.
  * This also checks for errors in the response object.
  */
-StatusWith<BSONObj> extractFindAndModifyNewObj(const BSONObj& responseObj) {
-    auto cmdStatus = getStatusFromCommandResult(responseObj);
-
-    if (!cmdStatus.isOK()) {
-        return cmdStatus;
+StatusWith<BSONObj> extractFindAndModifyNewObj(StatusWith<Shard::CommandResponse> response) {
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+    if (!response.getValue().commandStatus.isOK()) {
+        return response.getValue().commandStatus;
+    }
+    if (!response.getValue().writeConcernStatus.isOK()) {
+        return response.getValue().writeConcernStatus;
     }
 
-    BSONElement wcErrorElem;
-    auto wcErrStatus =
-        bsonExtractTypedField(responseObj, kCmdResponseWriteConcernField, Object, &wcErrorElem);
-
-    if (wcErrStatus.isOK()) {
-        BSONObj wcErrObj(wcErrorElem.Obj());
-        WCErrorDetail wcError;
-
-        string wcErrorParseMsg;
-        if (!wcError.parseBSON(wcErrObj, &wcErrorParseMsg)) {
-            return Status(ErrorCodes::UnsupportedFormat, wcErrorParseMsg);
-        }
-
-        return {ErrorCodes::WriteConcernFailed, wcError.getErrMessage()};
-    }
-
-    if (wcErrStatus != ErrorCodes::NoSuchKey) {
-        return wcErrStatus;
-    }
+    auto responseObj = std::move(response.getValue().response);
 
     if (const auto& newDocElem = responseObj[kFindAndModifyResponseResultDocField]) {
         if (newDocElem.isNull()) {
@@ -101,35 +92,64 @@ StatusWith<BSONObj> extractFindAndModifyNewObj(const BSONObj& responseObj) {
             return {ErrorCodes::UnsupportedFormat,
                     str::stream() << "expected an object from the findAndModify response '"
                                   << kFindAndModifyResponseResultDocField
-                                  << "'field, got: " << newDocElem};
+                                  << "'field, got: "
+                                  << newDocElem};
         }
 
-        return newDocElem.Obj();
+        return newDocElem.Obj().getOwned();
     }
 
-    return {ErrorCodes::LockStateChangeFailed,
+    return {ErrorCodes::UnsupportedFormat,
             str::stream() << "no '" << kFindAndModifyResponseResultDocField
                           << "' in findAndModify response"};
 }
 
 /**
- * Extract the electionId from a command response.
- *
- * TODO: this needs to support OP_COMMAND metadata.
+ * Extract the electionId from a serverStatus command response.
  */
 StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
-    BSONElement gleStatsElem;
-    auto gleStatus = bsonExtractTypedField(responseObj, "$gleStats", Object, &gleStatsElem);
+    BSONElement replElem;
+    auto replElemStatus = bsonExtractTypedField(responseObj, "repl", Object, &replElem);
 
-    if (!gleStatus.isOK()) {
-        return {ErrorCodes::UnsupportedFormat, gleStatus.reason()};
+    if (!replElemStatus.isOK()) {
+        return {ErrorCodes::UnsupportedFormat, replElemStatus.reason()};
     }
 
+    const auto replSubObj = replElem.Obj();
     OID electionId;
-
-    auto electionIdStatus = bsonExtractOIDField(gleStatsElem.Obj(), "electionId", &electionId);
+    auto electionIdStatus = bsonExtractOIDField(replSubObj, "electionId", &electionId);
 
     if (!electionIdStatus.isOK()) {
+        // Secondaries don't have electionId.
+        if (electionIdStatus.code() == ErrorCodes::NoSuchKey) {
+            // Verify that the from replSubObj that this is indeed not a primary.
+            bool isPrimary = false;
+            auto isPrimaryStatus = bsonExtractBooleanField(replSubObj, "ismaster", &isPrimary);
+
+            if (!isPrimaryStatus.isOK()) {
+                return {ErrorCodes::UnsupportedFormat, isPrimaryStatus.reason()};
+            }
+
+            if (isPrimary) {
+                string hostContacted;
+                auto hostContactedStatus = bsonExtractStringField(replSubObj, "me", &hostContacted);
+
+                if (!hostContactedStatus.isOK()) {
+                    return {
+                        ErrorCodes::UnsupportedFormat,
+                        str::stream()
+                            << "failed to extract 'me' field from repl subsection of serverStatus: "
+                            << hostContactedStatus.reason()};
+                }
+
+                return {ErrorCodes::UnsupportedFormat,
+                        str::stream() << "expected primary to have electionId but not present on "
+                                      << hostContacted};
+            }
+
+            return {ErrorCodes::NotMaster, "only primary can have electionId"};
+        }
+
         return {ErrorCodes::UnsupportedFormat, electionIdStatus.reason()};
     }
 
@@ -138,73 +158,75 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
 
 }  // unnamed namespace
 
-DistLockCatalogImpl::DistLockCatalogImpl(RemoteCommandTargeter* targeter,
-                                         RemoteCommandRunner* executor,
-                                         Milliseconds writeConcernTimeout)
-    : _cmdRunner(executor),
-      _targeter(targeter),
-      _writeConcern(WriteConcernOptions(WriteConcernOptions::kMajority,
-                                        WriteConcernOptions::JOURNAL,
-                                        writeConcernTimeout.count())),
-      _lockPingNS(LockpingsType::ConfigNS),
-      _locksNS(LocksType::ConfigNS) {}
+DistLockCatalogImpl::DistLockCatalogImpl()
+    : _lockPingNS(LockpingsType::ConfigNS), _locksNS(LocksType::ConfigNS) {}
 
 DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
-StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
-    invariant(false);  // TODO
+StatusWith<LockpingsType> DistLockCatalogImpl::getPing(OperationContext* opCtx,
+                                                       StringData processID) {
+    auto findResult = _findOnConfig(
+        opCtx, kReadPref, _lockPingNS, BSON(LockpingsType::process() << processID), BSONObj(), 1);
+
+    if (!findResult.isOK()) {
+        return findResult.getStatus();
+    }
+
+    const auto& findResultSet = findResult.getValue();
+
+    if (findResultSet.empty()) {
+        return {ErrorCodes::NoMatchingDocument,
+                str::stream() << "ping entry for " << processID << " not found"};
+    }
+
+    BSONObj doc = findResultSet.front();
+    auto pingDocResult = LockpingsType::fromBSON(doc);
+    if (!pingDocResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse document: " << doc << " : "
+                              << pingDocResult.getStatus().toString()};
+    }
+
+    return pingDocResult.getValue();
 }
 
-Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
-    auto targetStatus = _targeter->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
+Status DistLockCatalogImpl::ping(OperationContext* opCtx, StringData processID, Date_t ping) {
     auto request =
         FindAndModifyRequest::makeUpdate(_lockPingNS,
-                                         BSON(LockpingsType::process(processID.toString())),
+                                         BSON(LockpingsType::process() << processID),
                                          BSON("$set" << BSON(LockpingsType::ping(ping))));
     request.setUpsert(true);
-    request.setWriteConcern(_writeConcern);
+    request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        _locksNS.db().toString(),
+        request.toBSON(),
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kNotIdempotent);
 
-    if (!resultStatus.isOK()) {
-        return resultStatus.getStatus();
-    }
-
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
-
-    auto cmdStatus = getStatusFromCommandResult(responseObj);
-
-    if (!cmdStatus.isOK()) {
-        return cmdStatus;
-    }
-
-    auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
+    auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     return findAndModifyStatus.getStatus();
 }
 
-StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
+StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* opCtx,
+                                                    StringData lockID,
                                                     const OID& lockSessionID,
                                                     StringData who,
                                                     StringData processId,
                                                     Date_t time,
-                                                    StringData why) {
-    auto targetStatus = _targeter->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
-    BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
-                                << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
-                                << LocksType::process() << processId << LocksType::when(time)
-                                << LocksType::why() << why));
+                                                    StringData why,
+                                                    const WriteConcernOptions& writeConcern) {
+    BSONObj newLockDetails(BSON(
+        LocksType::lockID(lockSessionID) << LocksType::state(LocksType::LOCKED) << LocksType::who()
+                                         << who
+                                         << LocksType::process()
+                                         << processId
+                                         << LocksType::when(time)
+                                         << LocksType::why()
+                                         << why));
 
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS,
@@ -212,127 +234,122 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
         BSON("$set" << newLockDetails));
     request.setUpsert(true);
     request.setShouldReturnNew(true);
-    request.setWriteConcern(_writeConcern);
+    request.setWriteConcern(writeConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        _locksNS.db().toString(),
+        request.toBSON(),
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kNoRetry);  // Dist lock manager is handling own retries
 
-    if (!resultStatus.isOK()) {
-        return resultStatus.getStatus();
-    }
-
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
-
-    auto cmdStatus = getStatusFromCommandResult(responseObj);
-
-    if (!cmdStatus.isOK()) {
-        return cmdStatus;
-    }
-
-    auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
+    auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     if (!findAndModifyStatus.isOK()) {
+        if (findAndModifyStatus == ErrorCodes::DuplicateKey) {
+            // Another thread won the upsert race. Also see SERVER-14322.
+            return {ErrorCodes::LockStateChangeFailed,
+                    str::stream() << "duplicateKey error during upsert of lock: " << lockID};
+        }
+
         return findAndModifyStatus.getStatus();
     }
 
-    BSONObj newDoc(findAndModifyStatus.getValue());
-
-    if (newDoc.isEmpty()) {
-        return LocksType();
+    BSONObj doc = findAndModifyStatus.getValue();
+    auto locksTypeResult = LocksType::fromBSON(doc);
+    if (!locksTypeResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse: " << doc << " : "
+                              << locksTypeResult.getStatus().toString()};
     }
 
-    LocksType lockDoc;
-    string errMsg;
-    if (!lockDoc.parseBSON(newDoc, &errMsg)) {
-        return {ErrorCodes::FailedToParse, errMsg};
-    }
-
-    return lockDoc;
+    return locksTypeResult.getValue();
 }
 
-StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
+StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* opCtx,
+                                                        StringData lockID,
                                                         const OID& lockSessionID,
                                                         const OID& currentHolderTS,
                                                         StringData who,
                                                         StringData processId,
                                                         Date_t time,
                                                         StringData why) {
-    auto targetStatus = _targeter->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
     BSONArrayBuilder orQueryBuilder;
     orQueryBuilder.append(
         BSON(LocksType::name() << lockID << LocksType::state(LocksType::UNLOCKED)));
     orQueryBuilder.append(BSON(LocksType::name() << lockID << LocksType::lockID(currentHolderTS)));
 
-    BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
-                                << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
-                                << LocksType::process() << processId << LocksType::when(time)
-                                << LocksType::why() << why));
+    BSONObj newLockDetails(BSON(
+        LocksType::lockID(lockSessionID) << LocksType::state(LocksType::LOCKED) << LocksType::who()
+                                         << who
+                                         << LocksType::process()
+                                         << processId
+                                         << LocksType::when(time)
+                                         << LocksType::why()
+                                         << why));
 
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS, BSON("$or" << orQueryBuilder.arr()), BSON("$set" << newLockDetails));
     request.setShouldReturnNew(true);
-    request.setWriteConcern(_writeConcern);
+    request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        _locksNS.db().toString(),
+        request.toBSON(),
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kNotIdempotent);
 
-    if (!resultStatus.isOK()) {
-        return resultStatus.getStatus();
-    }
-
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
-
-    auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
+    auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     if (!findAndModifyStatus.isOK()) {
         return findAndModifyStatus.getStatus();
     }
 
-    BSONObj newDoc(findAndModifyStatus.getValue());
-
-    if (newDoc.isEmpty()) {
-        return LocksType();
+    BSONObj doc = findAndModifyStatus.getValue();
+    auto locksTypeResult = LocksType::fromBSON(doc);
+    if (!locksTypeResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse: " << doc << " : "
+                              << locksTypeResult.getStatus().toString()};
     }
 
-    LocksType lockDoc;
-    string errMsg;
-    if (!lockDoc.parseBSON(newDoc, &errMsg)) {
-        return {ErrorCodes::FailedToParse, errMsg};
-    }
-
-    return lockDoc;
+    return locksTypeResult.getValue();
 }
 
-Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
-    auto targetStatus = _targeter->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-
-    auto request = FindAndModifyRequest::makeUpdate(
+Status DistLockCatalogImpl::unlock(OperationContext* opCtx, const OID& lockSessionID) {
+    FindAndModifyRequest request = FindAndModifyRequest::makeUpdate(
         _locksNS,
         BSON(LocksType::lockID(lockSessionID)),
         BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
-    request.setWriteConcern(_writeConcern);
+    request.setWriteConcern(kMajorityWriteConcern);
+    return _unlock(opCtx, request);
+}
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+Status DistLockCatalogImpl::unlock(OperationContext* opCtx,
+                                   const OID& lockSessionID,
+                                   StringData name) {
+    FindAndModifyRequest request = FindAndModifyRequest::makeUpdate(
+        _locksNS,
+        BSON(LocksType::lockID(lockSessionID) << LocksType::name(name.toString())),
+        BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
+    request.setWriteConcern(kMajorityWriteConcern);
+    return _unlock(opCtx, request);
+}
 
-    if (!resultStatus.isOK()) {
-        return resultStatus.getStatus();
-    }
+Status DistLockCatalogImpl::_unlock(OperationContext* opCtx, const FindAndModifyRequest& request) {
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        _locksNS.db().toString(),
+        request.toBSON(),
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kIdempotent);
 
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
-
-    auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj).getStatus();
-
+    auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     if (findAndModifyStatus == ErrorCodes::LockStateChangeFailed) {
         // Did not modify any document, which implies that the lock already has a
         // a different owner. This is ok since it means that the objective of
@@ -340,31 +357,76 @@ Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
         return Status::OK();
     }
 
-    return findAndModifyStatus;
+    return findAndModifyStatus.getStatus();
 }
 
-StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
-    auto targetStatus = _targeter->findHost(kReadPref);
+Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx, const std::string& processID) {
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(_locksNS);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON(LocksType::process(processID)));
+            entry.setU(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
+            entry.setUpsert(false);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+    request.setWriteConcern(kLocalWriteConcern.toBSON());
 
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
+    BSONObj cmdObj = request.toBSON();
+
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto response = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        _locksNS.db().toString(),
+        cmdObj,
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kIdempotent);
+
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+    if (!response.getValue().commandStatus.isOK()) {
+        return response.getValue().commandStatus;
+    }
+    if (!response.getValue().writeConcernStatus.isOK()) {
+        return response.getValue().writeConcernStatus;
     }
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), "admin", BSON("serverStatus" << 1)));
+    BatchedCommandResponse batchResponse;
+    std::string errmsg;
+    if (!batchResponse.parseBSON(response.getValue().response, &errmsg)) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream()
+                          << "Failed to parse config server response to batch request for "
+                             "unlocking existing distributed locks"
+                          << causedBy(errmsg));
+    }
+    return batchResponse.toStatus();
+}
+
+StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(
+    OperationContext* opCtx) {
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        kReadPref,
+        "admin",
+        BSON("serverStatus" << 1),
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kIdempotent);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
-
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
-
-    auto cmdStatus = getStatusFromCommandResult(responseObj);
-
-    if (!cmdStatus.isOK()) {
-        return cmdStatus;
+    if (!resultStatus.getValue().commandStatus.isOK()) {
+        return resultStatus.getValue().commandStatus;
     }
+
+    BSONObj responseObj(std::move(resultStatus.getValue().response));
 
     BSONElement localTimeElem;
     auto localTimeStatus =
@@ -377,43 +439,98 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
     auto electionIdStatus = extractElectionId(responseObj);
 
     if (!electionIdStatus.isOK()) {
-        return {ErrorCodes::UnsupportedFormat, electionIdStatus.getStatus().reason()};
+        return electionIdStatus.getStatus();
     }
 
     return DistLockCatalog::ServerInfo(localTimeElem.date(), electionIdStatus.getValue());
 }
 
-StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID) {
-    invariant(false);  // TODO
-}
+StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* opCtx,
+                                                       const OID& lockSessionID) {
+    auto findResult = _findOnConfig(
+        opCtx, kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), BSONObj(), 1);
 
-StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
-    invariant(false);  // TODO
-}
-
-Status DistLockCatalogImpl::stopPing(StringData processId) {
-    auto targetStatus = _targeter->findHost(kReadPref);
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
+    if (!findResult.isOK()) {
+        return findResult.getStatus();
     }
 
+    const auto& findResultSet = findResult.getValue();
+
+    if (findResultSet.empty()) {
+        return {ErrorCodes::LockNotFound,
+                str::stream() << "lock with ts " << lockSessionID << " not found"};
+    }
+
+    BSONObj doc = findResultSet.front();
+    auto locksTypeResult = LocksType::fromBSON(doc);
+    if (!locksTypeResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse: " << doc << " : "
+                              << locksTypeResult.getStatus().toString()};
+    }
+
+    return locksTypeResult.getValue();
+}
+
+StatusWith<LocksType> DistLockCatalogImpl::getLockByName(OperationContext* opCtx, StringData name) {
+    auto findResult =
+        _findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::name() << name), BSONObj(), 1);
+
+    if (!findResult.isOK()) {
+        return findResult.getStatus();
+    }
+
+    const auto& findResultSet = findResult.getValue();
+
+    if (findResultSet.empty()) {
+        return {ErrorCodes::LockNotFound,
+                str::stream() << "lock with name " << name << " not found"};
+    }
+
+    BSONObj doc = findResultSet.front();
+    auto locksTypeResult = LocksType::fromBSON(doc);
+    if (!locksTypeResult.isOK()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "failed to parse: " << doc << " : "
+                              << locksTypeResult.getStatus().toString()};
+    }
+
+    return locksTypeResult.getValue();
+}
+
+Status DistLockCatalogImpl::stopPing(OperationContext* opCtx, StringData processId) {
     auto request =
         FindAndModifyRequest::makeRemove(_lockPingNS, BSON(LockpingsType::process() << processId));
-    request.setWriteConcern(_writeConcern);
+    request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _cmdRunner->runCommand(
-        RemoteCommandRequest(targetStatus.getValue(), _locksNS.db().toString(), request.toBSON()));
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        _locksNS.db().toString(),
+        request.toBSON(),
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kNotIdempotent);
 
-    if (!resultStatus.isOK()) {
-        return resultStatus.getStatus();
+    auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
+    return findAndModifyStatus.getStatus();
+}
+
+StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& sort,
+    boost::optional<long long> limit) {
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto result = shardRegistry->getConfigShard()->exhaustiveFindOnConfig(
+        opCtx, readPref, repl::ReadConcernLevel::kMajorityReadConcern, nss, query, sort, limit);
+    if (!result.isOK()) {
+        return result.getStatus();
     }
 
-    const RemoteCommandResponse& response = resultStatus.getValue();
-    BSONObj responseObj(response.data);
-
-    auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
-    return findAndModifyStatus.getStatus();
+    return result.getValue().docs;
 }
 
 }  // namespace mongo

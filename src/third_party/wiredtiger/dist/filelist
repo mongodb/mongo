@@ -30,7 +30,9 @@ src/btree/bt_io.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
+src/btree/bt_random.c
 src/btree/bt_read.c
+src/btree/bt_rebalance.c
 src/btree/bt_ret.c
 src/btree/bt_slvg.c
 src/btree/bt_split.c
@@ -45,6 +47,14 @@ src/btree/col_srch.c
 src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
+src/cache/cache_las.c
+src/checksum/arm64/crc32-arm64.c	ARM64_HOST
+src/checksum/power8/crc32.sx		POWERPC_HOST
+src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
+src/checksum/software/checksum.c
+src/checksum/x86/crc32-x86.c		X86_HOST
+src/checksum/zseries/crc32-s390x.c	ZSERIES_HOST
+src/checksum/zseries/crc32le-vx.sx	ZSERIES_HOST
 src/config/config.c
 src/config/config_api.c
 src/config/config_check.c
@@ -62,6 +72,7 @@ src/conn/conn_dhandle.c
 src/conn/conn_handle.c
 src/conn/conn_log.c
 src/conn/conn_open.c
+src/conn/conn_reconfig.c
 src/conn/conn_stat.c
 src/conn/conn_sweep.c
 src/cursor/cur_backup.c
@@ -71,6 +82,7 @@ src/cursor/cur_ds.c
 src/cursor/cur_dump.c
 src/cursor/cur_file.c
 src/cursor/cur_index.c
+src/cursor/cur_join.c
 src/cursor/cur_json.c
 src/cursor/cur_log.c
 src/cursor/cur_metadata.c
@@ -80,9 +92,11 @@ src/cursor/cur_table.c
 src/evict/evict_file.c
 src/evict/evict_lru.c
 src/evict/evict_page.c
+src/evict/evict_stat.c
 src/log/log.c
 src/log/log_auto.c
 src/log/log_slot.c
+src/log/log_sys.c
 src/lsm/lsm_cursor.c
 src/lsm/lsm_cursor_bulk.c
 src/lsm/lsm_manager.c
@@ -98,41 +112,57 @@ src/meta/meta_ext.c
 src/meta/meta_table.c
 src/meta/meta_track.c
 src/meta/meta_turtle.c
-src/os_posix/os_abort.c
-src/os_posix/os_alloc.c
-src/os_posix/os_dir.c
-src/os_posix/os_dlopen.c
-src/os_posix/os_errno.c
-src/os_posix/os_exist.c
-src/os_posix/os_fallocate.c
-src/os_posix/os_filesize.c
-src/os_posix/os_flock.c
-src/os_posix/os_fsync.c
-src/os_posix/os_ftruncate.c
-src/os_posix/os_getenv.c
-src/os_posix/os_getline.c
-src/os_posix/os_getopt.c
-src/os_posix/os_map.c
-src/os_posix/os_mtx_cond.c
-src/os_posix/os_mtx_rw.c
-src/os_posix/os_once.c
-src/os_posix/os_open.c
-src/os_posix/os_path.c
-src/os_posix/os_priv.c
-src/os_posix/os_remove.c
-src/os_posix/os_rename.c
-src/os_posix/os_rw.c
-src/os_posix/os_sleep.c
-src/os_posix/os_stdio.c
-src/os_posix/os_strtouq.c
-src/os_posix/os_thread.c
-src/os_posix/os_time.c
-src/os_posix/os_yield.c
+src/os_common/filename.c
+src/os_common/os_abort.c
+src/os_common/os_alloc.c
+src/os_common/os_errno.c
+src/os_common/os_fhandle.c
+src/os_common/os_fs_inmemory.c
+src/os_common/os_fstream.c
+src/os_common/os_fstream_stdio.c
+src/os_common/os_getopt.c
+src/os_common/os_strtouq.c
+src/os_posix/os_dir.c			POSIX_HOST
+src/os_posix/os_dlopen.c		POSIX_HOST
+src/os_posix/os_fallocate.c		POSIX_HOST
+src/os_posix/os_fs.c			POSIX_HOST
+src/os_posix/os_getenv.c		POSIX_HOST
+src/os_posix/os_map.c			POSIX_HOST
+src/os_posix/os_mtx_cond.c		POSIX_HOST
+src/os_posix/os_once.c			POSIX_HOST
+src/os_posix/os_pagesize.c		POSIX_HOST
+src/os_posix/os_path.c			POSIX_HOST
+src/os_posix/os_priv.c			POSIX_HOST
+src/os_posix/os_setvbuf.c		POSIX_HOST
+src/os_posix/os_sleep.c			POSIX_HOST
+src/os_posix/os_snprintf.c		POSIX_HOST
+src/os_posix/os_thread.c		POSIX_HOST
+src/os_posix/os_time.c			POSIX_HOST
+src/os_posix/os_yield.c			POSIX_HOST
+src/os_win/os_dir.c			WINDOWS_HOST
+src/os_win/os_dlopen.c			WINDOWS_HOST
+src/os_win/os_fs.c			WINDOWS_HOST
+src/os_win/os_getenv.c			WINDOWS_HOST
+src/os_win/os_map.c			WINDOWS_HOST
+src/os_win/os_mtx_cond.c		WINDOWS_HOST
+src/os_win/os_once.c			WINDOWS_HOST
+src/os_win/os_pagesize.c		WINDOWS_HOST
+src/os_win/os_path.c			WINDOWS_HOST
+src/os_win/os_priv.c			WINDOWS_HOST
+src/os_win/os_setvbuf.c			WINDOWS_HOST
+src/os_win/os_sleep.c			WINDOWS_HOST
+src/os_win/os_snprintf.c		WINDOWS_HOST
+src/os_win/os_thread.c			WINDOWS_HOST
+src/os_win/os_time.c			WINDOWS_HOST
+src/os_win/os_utf8.c			WINDOWS_HOST
+src/os_win/os_winerr.c			WINDOWS_HOST
+src/os_win/os_yield.c			WINDOWS_HOST
 src/packing/pack_api.c
 src/packing/pack_impl.c
 src/packing/pack_stream.c
 src/reconcile/rec_track.c
 src/reconcile/rec_write.c
+src/schema/schema_alter.c
 src/schema/schema_create.c
 src/schema/schema_drop.c
 src/schema/schema_list.c
@@ -148,23 +178,29 @@ src/session/session_api.c
 src/session/session_compact.c
 src/session/session_dhandle.c
 src/session/session_salvage.c
-src/support/cksum.c
+src/support/cond_auto.c
 src/support/crypto.c
 src/support/err.c
-src/support/filename.c
+src/support/generation.c
 src/support/global.c
 src/support/hash_city.c
 src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
 src/support/huffman.c
+src/support/modify.c
+src/support/mtx_rw.c
 src/support/pow.c
 src/support/rand.c
 src/support/scratch.c
 src/support/stat.c
+src/support/thread_group.c
+src/support/time.c
 src/txn/txn.c
 src/txn/txn_ckpt.c
 src/txn/txn_ext.c
 src/txn/txn_log.c
 src/txn/txn_nsnap.c
 src/txn/txn_recover.c
+src/txn/txn_rollback_to_stable.c
+src/txn/txn_timestamp.c

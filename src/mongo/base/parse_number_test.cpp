@@ -29,13 +29,13 @@
 #include "mongo/platform/basic.h"
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
-#include "mongo/platform/cstdint.h"
-#include "mongo/util/mongoutils/str.h"  // for str::stream()!
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/mongoutils/str.h"  // for str::stream()!
 
 #define ASSERT_PARSES(TYPE, INPUT_STRING, EXPECTED_VALUE)    \
     do {                                                     \
@@ -249,9 +249,7 @@ TEST(Double, TestParsingGarbage) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1e6 ", &d));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>(" 1e6", &d));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("0xabcab.defPa", &d));
-    ASSERT_EQUALS(
-        ErrorCodes::FailedToParse,
-        parseNumberFromString<double>(StringData("1.0\0garbage", StringData::LiteralTag()), &d));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1.0\0garbage"_sd, &d));
 }
 
 TEST(Double, TestParsingOverflow) {
@@ -292,9 +290,9 @@ TEST(Double, TestParsingNormal) {
     // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
     // See SERVER-14131.
 
-    ASSERT_PARSES(double, "0xff", 0xff);
-    ASSERT_PARSES(double, "-0xff", -0xff);
-    ASSERT_PARSES(double, "0xabcab.defdefP-10", 0xabcab.defdefP-10);
+    ASSERT_PARSES(double, "0xff", 255);
+    ASSERT_PARSES(double, "-0xff", -255);
+    ASSERT_PARSES(double, "0xabcab.defdefP-10", 687.16784283419838);
 #endif
 }
 

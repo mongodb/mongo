@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because renameCollection command not supported
+// on sharded collections.
+// @tags: [assumes_unsharded_collection]
+
 // Test that collections with text indexes can be renamed.  SERVER-14027.
 
 var coll1 = db.fts_index2;
@@ -11,6 +15,6 @@ assert.commandWorked(coll1.ensureIndex({"$**": "text"}));
 assert.eq(1, coll1.count({$text: {$search: "content"}}));
 
 // Rename within same database.
-assert.commandWorked(coll1.getDB().adminCommand({renameCollection: coll1.getFullName(),
-                                                 to: coll2.getFullName() }));
+assert.commandWorked(
+    coll1.getDB().adminCommand({renameCollection: coll1.getFullName(), to: coll2.getFullName()}));
 assert.eq(1, coll2.count({$text: {$search: "content"}}));

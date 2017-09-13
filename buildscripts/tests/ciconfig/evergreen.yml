@@ -1,0 +1,156 @@
+functions:
+  "fetch source" :
+    - command: git.get_project
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          echo "this is a 2nd command in the function!"
+          ls
+  "debug":
+    command: shell.exec
+    params:
+      script: |
+        echo "i am a debug function."
+  "run a task that fails" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        echo "this is a function with only a single command to run!"
+        ./run.py results fail
+
+  "run a task that passes" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        ./run.py results pass
+
+  "run a function with an arg":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        echo "I was called with ${foobar}"
+
+pre:
+  command: shell.exec
+  params:
+    script: |
+      rm -rf src || true
+      echo "pre-task run. JUST ONE COMMAND"
+
+post:
+  - command: shell.exec
+    params:
+      script: |
+        echo "post-task run."
+        true
+  - command: attach.results
+    params:
+      file_location: src/results.json
+
+test_lifecycle_excluded_tasks:
+- burn_in_tests
+- no_lifecycle*
+
+tasks:
+- name: compile
+  depends_on: []
+  commands:
+    - func: "fetch source"
+    - func: "run a task that passes"
+    - func: "run a function with an arg"
+      vars:
+        foobar: "TESTING: ONE"
+    - func: "run a function with an arg"
+      vars:
+        foobar: "TESTING: TWO"
+
+- name: passing_test
+  depends_on:
+  - name: compile
+  commands:
+    - func: "fetch source"
+    - func: "run a task that passes"
+
+- name: failing_test
+  depends_on:
+  - name: compile
+  commands:
+    - func: "fetch source"
+    - func: "run a task that fails"
+
+- name: timeout_test
+  depends_on:
+  - name: compile
+  commands:
+    - func: "fetch source"
+    - command: shell.exec
+      timeout_secs: 20
+      params:
+        working_dir: src
+        script: |
+           echo "this is going to timeout"
+           ./run.py timeout
+
+- name: no_lifecycle_task
+  depends_on:
+  - name: compile
+  commands:
+    - func: "fetch source"
+    - func: "do something incompatible with test lifecycle"
+- name: resmoke_task
+  depends_on:
+  - name: compile
+  commands:
+    - func: "setup"
+    - func: "run tests"
+      vars:
+        resmoke_args: "--suites=somesuite --storageEngine=mmapv1"
+
+
+modules:
+- name: render-module
+  repo: git@github.com:evergreen-ci/render.git
+  prefix: modules
+  branch: master
+
+buildvariants:
+- name: osx-108
+  display_name: OSX
+  modules: ~
+  run_on:
+  - localtestdistro
+  expansions:
+    num_jobs_available: 549
+  tasks:
+  - name: compile
+  - name: passing_test
+  - name: failing_test
+  - name: timeout_test
+- name: ubuntu
+  display_name: Ubuntu
+  batchtime: 1440
+  modules: ["render-module"]
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    test_flags: "--param=value --ubuntu"
+  tasks:
+  - name: compile
+  - name: passing_test
+  - name: failing_test
+  - name: timeout_test
+  - name: resmoke_task
+    distros:
+      - pdp-11
+- name: debian
+  display_name: Debian
+  run_on:
+  - debian-stretch
+  tasks:
+  - name: resmoke_task

@@ -31,24 +31,29 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/path.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
-Matcher::Matcher(const BSONObj& pattern, const MatchExpressionParser::WhereCallback& whereCallback)
+Matcher::Matcher(const BSONObj& pattern,
+                 const CollatorInterface* collator,
+                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                 const ExtensionsCallback& extensionsCallback,
+                 const MatchExpressionParser::AllowedFeatureSet allowedFeatures)
     : _pattern(pattern) {
-    StatusWithMatchExpression result = MatchExpressionParser::parse(pattern, whereCallback);
+    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
+        pattern, collator, expCtx, extensionsCallback, allowedFeatures);
     uassert(16810,
-            mongoutils::str::stream() << "bad query: " << result.getStatus().toString(),
-            result.isOK());
+            mongoutils::str::stream() << "bad query: " << statusWithMatcher.getStatus().toString(),
+            statusWithMatcher.isOK());
 
-    _expression.reset(result.getValue());
+    _expression = std::move(statusWithMatcher.getValue());
 }
 
 bool Matcher::matches(const BSONObj& doc, MatchDetails* details) const {

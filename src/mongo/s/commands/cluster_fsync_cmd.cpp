@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -36,9 +38,9 @@
 namespace mongo {
 namespace {
 
-class FsyncCommand : public Command {
+class FsyncCommand : public ErrmsgCommandDeprecated {
 public:
-    FsyncCommand() : Command("fsync", false, "fsync") {}
+    FsyncCommand() : ErrmsgCommandDeprecated("fsync", "fsync") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -48,7 +50,8 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -64,12 +67,11 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
-                     const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    virtual bool errmsgRun(OperationContext* opCtx,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           std::string& errmsg,
+                           BSONObjBuilder& result) {
         if (cmdObj["lock"].trueValue()) {
             errmsg = "can't do lock through mongos";
             return false;
@@ -84,13 +86,22 @@ public:
         grid.shardRegistry()->getAllShardIds(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            const auto s = grid.shardRegistry()->getShard(shardId);
-            if (!s) {
+            auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
+            if (!shardStatus.isOK()) {
                 continue;
             }
+            const auto s = shardStatus.getValue();
 
-            BSONObj x = s->runCommand("admin", "fsync");
-            sub.append(s->getId(), x);
+            auto response = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                BSON("fsync" << 1),
+                Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(response.commandStatus);
+            BSONObj x = std::move(response.response);
+
+            sub.append(s->getId().toString(), x);
 
             if (!x["ok"].trueValue()) {
                 ok = false;
@@ -105,7 +116,7 @@ public:
         return ok;
     }
 
-} fsyncCmd;
+} clusterFsyncCmd;
 
 }  // namespace
 }  // namespace mongo

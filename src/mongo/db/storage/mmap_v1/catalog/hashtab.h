@@ -28,9 +28,10 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -60,25 +61,25 @@ public:
         return 0;
     }
 
-    void kill(OperationContext* txn, const Namespace& k) {
+    void kill(OperationContext* opCtx, const Namespace& k) {
         bool found;
         int i = _find(k, found);
         if (i >= 0 && found) {
             Node* n = &_nodes(i);
-            n = txn->recoveryUnit()->writing(n);
+            n = opCtx->recoveryUnit()->writing(n);
             n->key.kill();
             n->setUnused();
         }
     }
 
     /** returns false if too full */
-    bool put(OperationContext* txn, const Namespace& k, const NamespaceDetails& value) {
+    bool put(OperationContext* opCtx, const Namespace& k, const NamespaceDetails& value) {
         bool found;
         int i = _find(k, found);
         if (i < 0)
             return false;
 
-        Node* n = txn->recoveryUnit()->writing(&_nodes(i));
+        Node* n = opCtx->recoveryUnit()->writing(&_nodes(i));
         if (!found) {
             n->key = k;
             n->hash = k.hash();
@@ -116,7 +117,7 @@ private:
     };
 #pragma pack()
 
-    BOOST_STATIC_ASSERT(sizeof(Node) == 628);
+    MONGO_STATIC_ASSERT(sizeof(Node) == 628);
 
 
     int _find(const Namespace& k, bool& found) const;

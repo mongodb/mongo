@@ -1,0 +1,46 @@
+/*! @m_page{{c,java},threads,Multithreading}
+
+All WT_CONNECTION methods are thread safe, and WT_CONNECTION handles can
+be shared between threads.  Applications typically open a single
+connection to each database, per process.  Multi-threaded programs
+must wait for all other threads to exit before closing the WT_CONNECTION
+handle because that will implicitly close all other handles.
+Alternatively, a thread can set an event handler using
+WT_CONNECTION::open_session to be notified when a WT_CONNECTION close is
+in progress.
+
+WT_SESSION and WT_CURSOR methods are not thread safe and WT_SESSION and
+WT_CURSOR handles cannot be accessed concurrently by multiple threads.
+Applications typically open one WT_SESSION handle for each thread
+accessing a database, and then one or more WT_CURSOR handles within the
+session.
+
+WT_SESSION and WT_CURSOR methods may be accessed by different threads
+serially (for example, a pool of threads managed by the application with
+a set of shared session or cursor handles).  There is no thread-local
+state in WiredTiger, and no built-in synchronization of session or
+cursor handles, either, so if multiple threads access a session or
+cursor handle, access must be serialized by the application.
+
+WT_ASYNC_OP methods are not thread-safe, and must be accessed by only a
+single thread at a time.  WT_ASYNC_OP methods may be accessed by
+different threads serially (and that is expected to happen when the
+asynchronous callback function runs).
+
+@section threads_example Code samples
+
+The code below is taken from the complete example program
+@ex_ref{ex_thread.c}.
+
+This is an example of a thread entry point.  A new session is opened for
+the thread and used for all operations within that thread.
+
+@snippet ex_thread.c thread scan
+
+Here is the main function that starts the threads.  It opens a single
+connection, shared between the threads, and closes the connection after
+waiting for all of the threads to exit.
+
+@snippet ex_thread.c thread main
+
+ */

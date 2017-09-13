@@ -2,6 +2,8 @@
 
 Import('env')
 
+env = env.Clone()
+
 env.Library(
     target='mutable_bson',
     source=[
@@ -10,7 +12,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/safe_num',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -20,6 +22,8 @@ env.Library(
         'mutable_bson_test_utils.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/unittest/unittest',
         'mutable_bson',
     ],
 )
@@ -41,6 +45,7 @@ env.CppUnitTest(
         'mutable_bson_algo_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         'mutable_bson',
         'mutable_bson_test_utils',
     ],

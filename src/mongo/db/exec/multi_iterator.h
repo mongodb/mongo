@@ -45,58 +45,50 @@ namespace mongo {
  * special commands that work with RecordCursors. For example, it is used by the
  * parallelCollectionScan and repairCursor commands
  */
-class MultiIteratorStage : public PlanStage {
+class MultiIteratorStage final : public PlanStage {
 public:
-    MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection);
-
-    ~MultiIteratorStage() {}
+    MultiIteratorStage(OperationContext* opCtx, WorkingSet* ws, Collection* collection);
 
     void addIterator(std::unique_ptr<RecordCursor> it);
 
-    virtual PlanStage::StageState work(WorkingSetID* out);
+    PlanStage::StageState doWork(WorkingSetID* out) final;
 
-    virtual bool isEOF();
+    bool isEOF() final;
 
     void kill();
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doSaveState() final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext() final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     // Returns empty PlanStageStats object
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
     // Not used.
-    virtual CommonStats* getCommonStats() const {
+    SpecificStats* getSpecificStats() const final {
         return NULL;
     }
 
     // Not used.
-    virtual SpecificStats* getSpecificStats() const {
-        return NULL;
-    }
-
-    // Not used.
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    // Not used.
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_MULTI_ITERATOR;
     }
 
     static const char* kStageType;
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     Collection* _collection;
     std::vector<std::unique_ptr<RecordCursor>> _iterators;
 
     // Not owned by us.
     WorkingSet* _ws;
 
-    // We allocate a working set member with this id on construction of the stage. It gets
-    // used for all fetch requests, changing the RecordId as appropriate.
+    // We allocate a working set member with this id on construction of the stage. It gets used for
+    // all fetch requests. This should only be used for passing up the Fetcher for a NEED_YIELD, and
+    // should remain in the INVALID state.
     const WorkingSetID _wsidForFetch;
 };
 

@@ -1,10 +1,21 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
+
+/*
+ * __wt_cache_aggressive --
+ *      Indicate if the cache is operating in aggressive mode.
+ */
+static inline bool
+__wt_cache_aggressive(WT_SESSION_IMPL *session)
+{
+	return (S2C(session)->cache->evict_aggressive_score >=
+	    WT_EVICT_SCORE_CUTOFF);
+}
 
 /*
  * __wt_cache_read_gen --
@@ -28,34 +39,70 @@ __wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
 
 /*
  * __wt_cache_read_gen_bump --
- *      Get the read generation to keep a page in memory.
+ *      Update the page's read generation.
  */
-static inline uint64_t
-__wt_cache_read_gen_bump(WT_SESSION_IMPL *session)
+static inline void
+__wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	/* Ignore pages set for forcible eviction. */
+	if (page->read_gen == WT_READGEN_OLDEST)
+		return;
+
+	/* Ignore pages already in the future. */
+	if (page->read_gen > __wt_cache_read_gen(session))
+		return;
+
 	/*
-	 * We return read-generations from the future (where "the future" is
-	 * measured by increments of the global read generation).  The reason
-	 * is because when acquiring a new hazard pointer for a page, we can
-	 * check its read generation, and if the read generation isn't less
-	 * than the current global generation, we don't bother updating the
-	 * page.  In other words, the goal is to avoid some number of updates
-	 * immediately after each update we have to make.
+	 * We set read-generations in the future (where "the future" is measured
+	 * by increments of the global read generation).  The reason is because
+	 * when acquiring a new hazard pointer for a page, we can check its read
+	 * generation, and if the read generation isn't less than the current
+	 * global generation, we don't bother updating the page.  In other
+	 * words, the goal is to avoid some number of updates immediately after
+	 * each update we have to make.
 	 */
-	return (__wt_cache_read_gen(session) + WT_READGEN_STEP);
+	page->read_gen = __wt_cache_read_gen(session) + WT_READGEN_STEP;
 }
 
 /*
  * __wt_cache_read_gen_new --
  *      Get the read generation for a new page in memory.
  */
-static inline uint64_t
-__wt_cache_read_gen_new(WT_SESSION_IMPL *session)
+static inline void
+__wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
-	return (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2;
+	page->read_gen =
+	    (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2;
+}
+
+/*
+ * __wt_cache_stuck --
+ *      Indicate if the cache is stuck (i.e., not making progress).
+ */
+static inline bool
+__wt_cache_stuck(WT_SESSION_IMPL *session)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	return (cache->evict_aggressive_score == WT_EVICT_SCORE_MAX &&
+	    F_ISSET(cache,
+		WT_CACHE_EVICT_CLEAN_HARD | WT_CACHE_EVICT_DIRTY_HARD));
+}
+
+/*
+ * __wt_page_evict_soon --
+ *      Set a page to be evicted as soon as possible.
+ */
+static inline void
+__wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_UNUSED(session);
+
+	ref->page->read_gen = WT_READGEN_OLDEST;
 }
 
 /*
@@ -69,21 +116,26 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_bytes_plus_overhead --
+ *	Apply the cache overhead to a size in bytes.
+ */
+static inline uint64_t
+__wt_cache_bytes_plus_overhead(WT_CACHE *cache, uint64_t sz)
+{
+	if (cache->overhead_pct != 0)
+		sz += (sz * (uint64_t)cache->overhead_pct) / 100;
+
+	return (sz);
+}
+
+/*
  * __wt_cache_bytes_inuse --
  *	Return the number of bytes in use.
  */
 static inline uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache)
 {
-	uint64_t bytes_inuse;
-
-	/* Adjust the cache size to take allocation overhead into account. */
-	bytes_inuse = cache->bytes_inmem;
-	if (cache->overhead_pct != 0)
-		bytes_inuse +=
-		    (bytes_inuse * (uint64_t)cache->overhead_pct) / 100;
-
-	return (bytes_inuse);
+	return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_inmem));
 }
 
 /*
@@ -93,150 +145,55 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 static inline uint64_t
 __wt_cache_dirty_inuse(WT_CACHE *cache)
 {
-	uint64_t dirty_inuse;
-
-	dirty_inuse = cache->bytes_dirty;
-	if (cache->overhead_pct != 0)
-		dirty_inuse +=
-		    (dirty_inuse * (uint64_t)cache->overhead_pct) / 100;
-
-	return (dirty_inuse);
+	return (__wt_cache_bytes_plus_overhead(cache,
+	    cache->bytes_dirty_intl + cache->bytes_dirty_leaf));
 }
 
 /*
- * __wt_cache_status --
- *	Return if the cache usage exceeds the eviction or dirty targets.
+ * __wt_cache_dirty_leaf_inuse --
+ *	Return the number of dirty bytes in use by leaf pages.
  */
-static inline void
-__wt_cache_status(WT_SESSION_IMPL *session, int *evictp, int *dirtyp)
+static inline uint64_t
+__wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_CACHE *cache;
-	uint64_t bytes_inuse, bytes_max, dirty_inuse;
-
-	conn = S2C(session);
-	cache = conn->cache;
-
-	/*
-	 * There's an assumption "evict" overrides "dirty", that is, if eviction
-	 * is required, we no longer care where we are with respect to the dirty
-	 * target.
-	 *
-	 * Avoid division by zero if the cache size has not yet been set in a
-	 * shared cache.
-	 */
-	bytes_max = conn->cache_size + 1;
-	if (evictp != NULL) {
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100) {
-			*evictp = 1;
-			return;
-		}
-		*evictp = 0;
-	}
-	if (dirtyp != NULL) {
-		dirty_inuse = __wt_cache_dirty_inuse(cache);
-		if (dirty_inuse >
-		    (cache->eviction_dirty_target * bytes_max) / 100) {
-			*dirtyp = 1;
-			return;
-		}
-		*dirtyp = 0;
-	}
+	return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_dirty_leaf));
 }
 
 /*
- * __wt_eviction_check --
- *	Wake the eviction server if necessary.
+ * __wt_cache_bytes_image --
+ *	Return the number of page image bytes in use.
  */
-static inline int
-__wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
+static inline uint64_t
+__wt_cache_bytes_image(WT_CACHE *cache)
 {
-	WT_CACHE *cache;
-	WT_CONNECTION_IMPL *conn;
-	uint64_t bytes_inuse, bytes_max, dirty_inuse;
-
-	conn = S2C(session);
-	cache = conn->cache;
-
-	/*
-	 * If we're over the maximum cache, shut out reads (which include page
-	 * allocations) until we evict to back under the maximum cache.
-	 * Eviction will keep pushing out pages so we don't run on the edge all
-	 * the time.
-	 *
-	 * Avoid division by zero if the cache size has not yet been set in a
-	 * shared cache.
-	 */
-	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = conn->cache_size + 1;
-
-	/* Return the cache full percentage. */
-	*fullp = (int)((100 * bytes_inuse) / bytes_max);
-	if (!wake)
-		return (0);
-
-	/*
-	 * Wake eviction if we're over the trigger cache size or there are too
-	 * many dirty pages.
-	 */
-	if (bytes_inuse <= (cache->eviction_trigger * bytes_max) / 100) {
-		dirty_inuse = __wt_cache_dirty_inuse(cache);
-		if (dirty_inuse <=
-		    (cache->eviction_dirty_trigger * bytes_max) / 100)
-			return (0);
-	}
-	return (__wt_evict_server_wake(session));
+	return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_image));
 }
 
 /*
- * __wt_cache_full_check --
- *	Wait for there to be space in the cache before a read or update.
+ * __wt_cache_bytes_other --
+ *	Return the number of bytes in use not for page images.
  */
-static inline int
-__wt_cache_full_check(WT_SESSION_IMPL *session)
+static inline uint64_t
+__wt_cache_bytes_other(WT_CACHE *cache)
 {
-	WT_BTREE *btree;
-	int full;
+	uint64_t bytes_image, bytes_inmem;
+
+	bytes_image = cache->bytes_image;
+	bytes_inmem = cache->bytes_inmem;
 
 	/*
-	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
-	 * that case, or when holding the schema or handle list locks (which
-	 * block eviction), we don't want to highjack the thread for eviction.
+	 * The reads above could race with changes to the values, so protect
+	 * against underflow.
 	 */
-	if (F_ISSET(session, WT_SESSION_NO_CACHE_CHECK |
-	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA))
-		return (0);
-
-	/*
-	 * Threads operating on trees that cannot be evicted are ignored,
-	 * mostly because they're not contributing to the problem.
-	 */
-	if ((btree = S2BT_SAFE(session)) != NULL &&
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		return (0);
-
-	/*
-	 * Only wake the eviction server the first time through here (if the
-	 * cache is too full).
-	 *
-	 * If the cache is less than 95% full, no work to be done.  If we are
-	 * at the API boundary and the cache is more than 95% full, try to
-	 * evict at least one page before we start an operation.  This helps
-	 * with some eviction-dominated workloads.
-	 */
-	WT_RET(__wt_eviction_check(session, &full, 1));
-	if (full < 95)
-		return (0);
-
-	return (__wt_cache_wait(session, full));
+	return ((bytes_image > bytes_inmem) ? 0 :
+	    __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_image));
 }
 
 /*
  * __wt_session_can_wait --
  *	Return if a session available for a potentially slow operation.
  */
-static inline int
+static inline bool
 __wt_session_can_wait(WT_SESSION_IMPL *session)
 {
 	/*
@@ -245,16 +202,198 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 	 * the system cache.
 	 */
 	if (!F_ISSET(session, WT_SESSION_CAN_WAIT))
+		return (false);
+
+	/*
+	 * LSM sets the no-eviction flag when holding the LSM tree lock, in that
+	 * case, or when holding the schema lock, we don't want to highjack the
+	 * thread for eviction.
+	 */
+	return (!F_ISSET(
+	    session, WT_SESSION_NO_EVICTION | WT_SESSION_LOCKED_SCHEMA));
+}
+
+/*
+ * __wt_eviction_clean_needed --
+ *	Return if an application thread should do eviction due to the total
+ *	volume of data in cache.
+ */
+static inline bool
+__wt_eviction_clean_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
+{
+	WT_CACHE *cache;
+	uint64_t bytes_inuse, bytes_max;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * Avoid division by zero if the cache size has not yet been set in a
+	 * shared cache.
+	 */
+	bytes_max = S2C(session)->cache_size + 1;
+	bytes_inuse = __wt_cache_bytes_inuse(cache);
+
+	if (pct_fullp != NULL)
+		*pct_fullp = (u_int)((100 * bytes_inuse) / bytes_max);
+
+	return (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100);
+}
+
+/*
+ * __wt_eviction_dirty_needed --
+ *	Return if an application thread should do eviction due to the total
+ *	volume of dirty data in cache.
+ */
+static inline bool
+__wt_eviction_dirty_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
+{
+	WT_CACHE *cache;
+	double dirty_trigger;
+	uint64_t dirty_inuse, bytes_max;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * Avoid division by zero if the cache size has not yet been set in a
+	 * shared cache.
+	 */
+	bytes_max = S2C(session)->cache_size + 1;
+	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
+
+	if (pct_fullp != NULL)
+		*pct_fullp = (u_int)((100 * dirty_inuse) / bytes_max);
+
+	if ((dirty_trigger = cache->eviction_scrub_limit) < 1.0)
+		dirty_trigger = (double)cache->eviction_dirty_trigger;
+
+	return (dirty_inuse > (uint64_t)(dirty_trigger * bytes_max) / 100);
+}
+
+/*
+ * __wt_eviction_needed --
+ *	Return if an application thread should do eviction, and the cache full
+ *      percentage as a side-effect.
+ */
+static inline bool
+__wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, u_int *pct_fullp)
+{
+	WT_CACHE *cache;
+	u_int pct_dirty, pct_full;
+	bool clean_needed, dirty_needed;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * If the connection is closing we do not need eviction from an
+	 * application thread.  The eviction subsystem is already closed.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_CLOSING))
+		return (false);
+
+	clean_needed = __wt_eviction_clean_needed(session, &pct_full);
+	dirty_needed = __wt_eviction_dirty_needed(session, &pct_dirty);
+
+	/*
+	 * Calculate the cache full percentage; anything over the trigger means
+	 * we involve the application thread.
+	 */
+	if (pct_fullp != NULL)
+		*pct_fullp = (u_int)WT_MAX(0, 100 - WT_MIN(
+		    (int)cache->eviction_trigger - (int)pct_full,
+		    (int)cache->eviction_dirty_trigger - (int)pct_dirty));
+
+	/*
+	 * Only check the dirty trigger when the session is not busy.
+	 *
+	 * In other words, once we are pinning resources, try to finish the
+	 * operation as quickly as possible without exceeding the cache size.
+	 * The next transaction in this session will not be able to start until
+	 * the cache is under the limit.
+	 */
+	return (clean_needed || (!busy && dirty_needed));
+}
+
+/*
+ * __wt_cache_full --
+ *	Return if the cache is at (or over) capacity.
+ */
+static inline bool
+__wt_cache_full(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CACHE *cache;
+
+	conn = S2C(session);
+	cache = conn->cache;
+
+	return (__wt_cache_bytes_inuse(cache) >= conn->cache_size);
+}
+
+/*
+ * __wt_cache_eviction_check --
+ *	Evict pages if the cache crosses its boundaries.
+ */
+static inline int
+__wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
+{
+	WT_BTREE *btree;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
+	u_int pct_full;
+
+	if (didworkp != NULL)
+		*didworkp = false;
+
+	/*
+	 * If the current transaction is keeping the oldest ID pinned, it is in
+	 * the middle of an operation.	This may prevent the oldest ID from
+	 * moving forward, leading to deadlock, so only evict what we can.
+	 * Otherwise, we are at a transaction boundary and we can work harder
+	 * to make sure there is free space in the cache.
+	 */
+	txn_global = &S2C(session)->txn_global;
+	txn_state = WT_SESSION_TXN_STATE(session);
+	busy = busy || txn_state->id != WT_TXN_NONE ||
+	    session->nhazard > 0 ||
+	    (txn_state->pinned_id != WT_TXN_NONE &&
+	    txn_global->current != txn_global->oldest_id);
+
+	/*
+	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
+	 * that case, or when holding the handle list, schema or table locks
+	 * (which can block checkpoints and eviction), don't block the thread
+	 * for eviction.
+	 */
+	if (F_ISSET(session, WT_SESSION_NO_EVICTION |
+	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA |
+	    WT_SESSION_LOCKED_TABLE))
+		return (0);
+
+	/* In memory configurations don't block when the cache is full. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 		return (0);
 
 	/*
-	 * LSM sets the no-cache-check flag when holding the LSM tree lock,
-	 * in that case, or when holding the schema lock, we don't want to
-	 * highjack the thread for eviction.
+	 * Threads operating on cache-resident trees are ignored because
+	 * they're not contributing to the problem.  We also don't block while
+	 * reading metadata because we're likely to be holding some other
+	 * resources that could block checkpoints or eviction.
 	 */
-	if (F_ISSET(session,
-	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_LOCKED_SCHEMA))
+	btree = S2BT_SAFE(session);
+	if (btree != NULL && (F_ISSET(btree, WT_BTREE_IN_MEMORY) ||
+	    WT_IS_METADATA(session->dhandle)))
 		return (0);
 
-	return (1);
+	/* Check if eviction is needed. */
+	if (!__wt_eviction_needed(session, busy, &pct_full))
+		return (0);
+
+	/*
+	 * Some callers (those waiting for slow operations), will sleep if there
+	 * was no cache work to do. After this point, let them skip the sleep.
+	 */
+	if (didworkp != NULL)
+		*didworkp = true;
+
+	return (__wt_cache_eviction_worker(session, busy, pct_full));
 }

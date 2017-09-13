@@ -28,15 +28,19 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/invalidation_type.h"
 
 namespace mongo {
 
+class ClockSource;
 class Collection;
-class RecordId;
 class OperationContext;
+class RecordId;
 
 /**
  * A PlanStage ("stage") is the basic building block of a "Query Execution Plan."  A stage is
@@ -101,7 +105,12 @@ class OperationContext;
  */
 class PlanStage {
 public:
+    PlanStage(const char* typeName, OperationContext* opCtx)
+        : _commonStats(typeName), _opCtx(opCtx) {}
+
     virtual ~PlanStage() {}
+
+    using Children = std::vector<std::unique_ptr<PlanStage>>;
 
     /**
      * All possible return values of work(...)
@@ -177,7 +186,7 @@ public:
      * Stage returns StageState::ADVANCED if *out is set to the next unit of output.  Otherwise,
      * returns another value of StageState to indicate the stage's status.
      */
-    virtual StageState work(WorkingSetID* out) = 0;
+    StageState work(WorkingSetID* out);
 
     /**
      * Returns true if no more work can be done on the query / out of results.
@@ -199,24 +208,43 @@ public:
     //
 
     /**
-     * Notifies the stage that all locks are about to be released.  The stage must save any
-     * state required to resume where it was before saveState was called.
+     * Notifies the stage that the underlying data source may change.
      *
-     * Stages must be able to handle multiple calls to saveState() in a row without a call to
-     * restoreState() in between.
+     * It is illegal to call work() or isEOF() when a stage is in the "saved" state.
+     *
+     * Propagates to all children, then calls doSaveState().
      */
-    virtual void saveState() = 0;
+    void saveState();
 
     /**
-     * Notifies the stage that any required locks have been reacquired.  The stage must restore
-     * any saved state and be ready to handle calls to work().
+     * Notifies the stage that underlying data is stable again and prepares for calls to work().
      *
-     * Can only be called after saveState.
+     * Can only be called while the stage in is the "saved" state.
      *
-     * If the stage needs an OperationContext during its execution, it may keep a handle to the
-     * provided OperationContext (which is valid until the next call to saveState()).
+     * Propagates to all children, then calls doRestoreState().
      */
-    virtual void restoreState(OperationContext* opCtx) = 0;
+    void restoreState();
+
+    /**
+     * Detaches from the OperationContext and releases any storage-engine state.
+     *
+     * It is only legal to call this when in a "saved" state. While in the "detached" state, it is
+     * only legal to call reattachToOperationContext or the destructor. It is not legal to call
+     * detachFromOperationContext() while already in the detached state.
+     *
+     * Propagates to all children, then calls doDetachFromOperationContext().
+     */
+    void detachFromOperationContext();
+
+    /**
+     * Reattaches to the OperationContext and reacquires any storage-engine state.
+     *
+     * It is only legal to call this in the "detached" state. On return, the cursor is left in a
+     * "saved" state, so callers must still call restoreState to use this object.
+     *
+     * Propagates to all children, then calls doReattachToOperationContext().
+     */
+    void reattachToOperationContext(OperationContext* opCtx);
 
     /**
      * Notifies a stage that a RecordId is going to be deleted (or in-place updated) so that the
@@ -228,14 +256,51 @@ public:
      * The provided OperationContext should be used if any work needs to be performed during the
      * invalidate (as the state of the stage must be saved before any calls to invalidate, the
      * stage's own OperationContext is inactive during the invalidate and should not be used).
+     *
+     * Propagates to all children, then calls doInvalidate().
      */
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) = 0;
+    void invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
+
+    /*
+     * Releases any resources held by this stage. It is an error to use a PlanStage in any way after
+     * calling dispose(). Does not throw exceptions.
+     *
+     * Propagates to all children, then calls doDispose().
+     */
+    void dispose(OperationContext* opCtx) {
+        try {
+            // We may or may not be attached during disposal. We can't call
+            // reattachToOperationContext()
+            // directly, since that will assert that '_opCtx' is not set.
+            _opCtx = opCtx;
+            invariant(!_opCtx || opCtx == opCtx);
+
+            for (auto&& child : _children) {
+                child->dispose(opCtx);
+            }
+            doDispose();
+        } catch (...) {
+            std::terminate();
+        }
+    }
 
     /**
      * Retrieve a list of this stage's children. This stage keeps ownership of
      * its children.
      */
-    virtual std::vector<PlanStage*> getChildren() const = 0;
+    const Children& getChildren() const {
+        return _children;
+    }
+
+    /**
+     * Returns the only child.
+     *
+     * Convenience method for PlanStages that have exactly one child.
+     */
+    const std::unique_ptr<PlanStage>& child() const {
+        dassert(_children.size() == 1);
+        return _children.front();
+    }
 
     /**
      * What type of stage is this?
@@ -252,10 +317,8 @@ public:
      *
      * Creates plan stats tree which has the same topology as the original execution tree,
      * but has a separate lifetime.
-     *
-     * Caller owns returned pointer.
      */
-    virtual PlanStageStats* getStats() = 0;
+    virtual std::unique_ptr<PlanStageStats> getStats() = 0;
 
     /**
      * Get the CommonStats for this stage. The pointer is *not* owned by the caller.
@@ -264,7 +327,9 @@ public:
      * It must not exist past the stage. If you need the stats to outlive the stage,
      * use the getStats(...) method above.
      */
-    virtual const CommonStats* getCommonStats() const = 0;
+    const CommonStats* getCommonStats() const {
+        return &_commonStats;
+    }
 
     /**
      * Get stats specific to this stage. Some stages may not have specific stats, in which
@@ -275,6 +340,63 @@ public:
      * use the getStats(...) method above.
      */
     virtual const SpecificStats* getSpecificStats() const = 0;
+
+protected:
+    /**
+     * Performs one unit of work.  See comment at work() above.
+     */
+    virtual StageState doWork(WorkingSetID* out) = 0;
+
+    /**
+     * Saves any stage-specific state required to resume where it was if the underlying data
+     * changes.
+     *
+     * Stages must be able to handle multiple calls to doSaveState() in a row without a call to
+     * doRestoreState() in between.
+     */
+    virtual void doSaveState() {}
+
+    /**
+     * Restores any stage-specific saved state and prepares to handle calls to work().
+     */
+    virtual void doRestoreState() {}
+
+    /**
+     * Does stage-specific detaching.
+     *
+     * Implementations of this method cannot use the pointer returned from getOpCtx().
+     */
+    virtual void doDetachFromOperationContext() {}
+
+    /**
+     * Does stage-specific attaching.
+     *
+     * If an OperationContext* is needed, use getOpCtx(), which will return a valid
+     * OperationContext* (the one to which the stage is reattaching).
+     */
+    virtual void doReattachToOperationContext() {}
+
+    /**
+     * Does stage-specific destruction. Must not throw exceptions.
+     */
+    virtual void doDispose() {}
+
+    /**
+     * Does the stage-specific invalidation work.
+     */
+    virtual void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {}
+
+    ClockSource* getClock() const;
+
+    OperationContext* getOpCtx() const {
+        return _opCtx;
+    }
+
+    Children _children;
+    CommonStats _commonStats;
+
+private:
+    OperationContext* _opCtx;
 };
 
 }  // namespace mongo

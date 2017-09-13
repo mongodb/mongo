@@ -38,9 +38,7 @@ namespace mongo {
 // TODO: Does this need to have move support?
 /**
  * A replacement for the Record class. This class represents data in a record store.
- * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
- * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
- * it must point to the same array as _data.
+ * The _ownedData attribute is used to manage memory ownership.
  */
 class RecordData {
 public:
@@ -69,7 +67,7 @@ public:
         return std::move(_ownedData);
     }
 
-    BSONObj toBson() const {
+    BSONObj toBson() const& {
         return isOwned() ? BSONObj(_ownedData) : BSONObj(_data);
     }
 
@@ -77,8 +75,9 @@ public:
         return isOwned() ? BSONObj(releaseBuffer()) : BSONObj(_data);
     }
 
-    // TODO uncomment once we require compilers that support overloading for rvalue this.
-    // BSONObj toBson() && { return releaseToBson(); }
+    BSONObj toBson() && {
+        return releaseToBson();
+    }
 
     RecordData getOwned() const {
         if (isOwned())

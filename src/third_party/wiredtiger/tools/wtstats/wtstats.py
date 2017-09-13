@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2017 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -115,6 +115,9 @@ def parse_wtstats_file(file, result):
     # Parse file
     for line in open(file, 'rU'):
         month, day, time, v, title = line.strip('\n').split(" ", 4)
+        # The colon in the URI confuses parsing, strip it out.
+        if "cache_walk" in title:
+            title = title.replace("file:", "", 1)
         result[title].append((month + " " + day + " " + time, v))
 
 
@@ -137,6 +140,8 @@ def parse_wtperf_file(file, result):
         for i, v in enumerate(values):
             if v == 'N': 
                 v = 0
+            if v == 'Y': 
+                v = 1
             # convert us to ms
             if '(ms)' in headings[i]:
                 v = float(v) / 1000.0

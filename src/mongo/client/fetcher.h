@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <iosfwd>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -35,15 +37,20 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+namespace {
+using executor::RemoteCommandRequest;
+}
+
 class Fetcher {
     MONGO_DISALLOW_COPYING(Fetcher);
 
@@ -58,15 +65,14 @@ public:
      * If cursor ID is zero, there are no additional batches.
      */
     struct QueryResponse {
-        QueryResponse() = default;
-        QueryResponse(CursorId theCursorId, const NamespaceString& theNss, Documents theDocuments);
         CursorId cursorId = 0;
         NamespaceString nss;
         Documents documents;
-        // TODO: fill in with replication metadata.
         struct OtherFields {
             BSONObj metadata;
         } otherFields;
+        Milliseconds elapsedMillis = Milliseconds(0);
+        bool first = false;
     };
 
     using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
@@ -113,19 +119,51 @@ public:
      *
      * The callback function 'work' is not allowed to call into the Fetcher instance. This
      * behavior is undefined and may result in a deadlock.
+     *
+     * An optional retry policy may be provided for the first remote command request so that
+     * the remote command scheduler will re-send the command in case of transient network errors.
      */
     Fetcher(executor::TaskExecutor* executor,
             const HostAndPort& source,
             const std::string& dbname,
             const BSONObj& cmdObj,
-            const CallbackFn& work);
+            const CallbackFn& work,
+            const BSONObj& metadata = ReadPreferenceSetting::secondaryPreferredMetadata(),
+            Milliseconds timeout = RemoteCommandRequest::kNoTimeout,
+            std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy =
+                RemoteCommandRetryScheduler::makeNoRetryPolicy());
 
     virtual ~Fetcher();
+
+    /**
+     * Returns host where remote commands will be sent to.
+     */
+    HostAndPort getSource() const;
+
+    /**
+     * Returns command object sent in first remote command.
+     */
+    BSONObj getCommandObject() const;
+
+    /**
+     * Returns metadata object sent in remote commands.
+     */
+    BSONObj getMetadataObject() const;
+
+    /**
+     * Returns timeout for remote commands to complete.
+     */
+    Milliseconds getTimeout() const;
 
     /**
      * Returns diagnostic information.
      */
     std::string getDiagnosticString() const;
+
+    /**
+     * Returns an informational string.
+     */
+    std::string toString() const;
 
     /**
      * Returns true if a remote command has been scheduled (but not completed)
@@ -142,19 +180,35 @@ public:
      * Cancels remote command request.
      * Returns immediately if fetcher is not active.
      */
-    void cancel();
+    void shutdown();
 
     /**
      * Waits for remote command requests to complete.
      * Returns immediately if fetcher is not active.
      */
-    void wait();
+    void join();
+
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    // This enum class is made public for testing.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+
+    /**
+     * Returns current fetcher state.
+     * For testing only.
+     */
+    State getState_forTest() const;
 
 private:
+    bool _isActive_inlock() const;
+
     /**
-     * Schedules remote command to be run by the executor
+     * Schedules getMore command to be run by the executor
      */
-    Status _schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName);
+    Status _scheduleGetMore(const BSONObj& cmdObj);
 
     /**
      * Callback for remote command.
@@ -167,12 +221,26 @@ private:
      */
     void _finishCallback();
 
+    /**
+     * Sends a kill cursor for the specified id and collection (namespace)
+     *
+     * Note: Errors are ignored and no retry is done
+     */
+    void _sendKillCursors(const CursorId id, const NamespaceString& nss);
+
+    /**
+     * Returns whether the fetcher is in shutdown.
+     */
+    bool _isShuttingDown() const;
+    bool _isShuttingDown_inlock() const;
+
     // Not owned by us.
     executor::TaskExecutor* _executor;
 
     HostAndPort _source;
     std::string _dbname;
     BSONObj _cmdObj;
+    BSONObj _metadata;
     CallbackFn _work;
 
     // Protects member data of this Fetcher.
@@ -180,10 +248,27 @@ private:
 
     mutable stdx::condition_variable _condition;
 
-    // _active is true when Fetcher is scheduled to be run by the executor.
-    bool _active;
-    // Callback handle to the scheduled remote command.
-    executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
+    // Current fetcher state. See comments for State enum class for details.
+    State _state = State::kPreStart;
+
+    // _first is true for first query response and false for subsequent responses.
+    // Using boolean instead of a counter to avoid issues with wrap around.
+    bool _first = true;
+
+    // Callback handle to the scheduled getMore command.
+    executor::TaskExecutor::CallbackHandle _getMoreCallbackHandle;
+
+    // Socket timeout
+    Milliseconds _timeout;
+
+    // First remote command scheduler.
+    RemoteCommandRetryScheduler _firstRemoteCommandScheduler;
 };
+
+/**
+ * Insertion operator for Fetcher::State. Formats fetcher state for output stream.
+ * For testing only.
+ */
+std::ostream& operator<<(std::ostream& os, const Fetcher::State& state);
 
 }  // namespace mongo

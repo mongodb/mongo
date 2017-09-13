@@ -10,17 +10,17 @@ function step(msg) {
 
 step();
 
-var replTest = new ReplSetTest( {name: name, nodes: 2} );
+var replTest = new ReplSetTest({name: name, nodes: 2});
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var total = 1000;
 
 {
     step("store data");
     var foo = master.getDB("foo");
     for (i = 0; i < total; i++) {
-        foo.bar.insert({ x: i, y: "abc" });
+        foo.bar.insert({x: i, y: "abc"});
     }
 }
 
@@ -33,8 +33,11 @@ step("mongodump from replset");
 
 var data = MongoRunner.dataDir + "/dumprestore10-dump1/";
 
-runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--out", data );
-
+var exitCode = MongoRunner.runMongoTool("mongodump", {
+    host: "127.0.0.1:" + master.port,
+    out: data,
+});
+assert.eq(0, exitCode, "mongodump failed to dump data from the replica set");
 
 {
     step("remove data after dumping");
@@ -48,7 +51,13 @@ runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--out",
 
 step("try mongorestore with write concern");
 
-runMongoProgram( "mongorestore", "--writeConcern", "2", "--host", "127.0.0.1:"+replTest.ports[0], "--dir", data );
+exitCode = MongoRunner.runMongoTool("mongorestore", {
+    writeConcern: "2",
+    host: "127.0.0.1:" + master.port,
+    dir: data,
+});
+assert.eq(
+    0, exitCode, "mongorestore failed to restore the data to a replica set while using w=2 writes");
 
 var x = 0;
 

@@ -2,7 +2,6 @@
 #	List of extension source files for WiredTiger library.
 
 ext/collators/reverse/reverse_collator.c
-ext/compressors/bzip2/bzip2_compress.c
 ext/compressors/nop/nop_compress.c
 ext/compressors/snappy/snappy_compress.c
 ext/compressors/zlib/zlib_compress.c

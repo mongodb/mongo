@@ -57,42 +57,37 @@ struct CountScanParams {
 };
 
 /**
- * Used by the count command.  Scans an index from a start key to an end key.  Does not create
- * any WorkingSetMember(s) for any of the data, instead returning ADVANCED to indicate to the
- * caller that another result should be counted.
+ * Used by the count command. Scans an index from a start key to an end key. Creates a
+ * WorkingSetMember for each matching index key in RID_AND_OBJ state. It has a null record id and an
+ * empty object with a null snapshot id rather than real data. Returning real data is unnecessary
+ * since all we need is the count.
  *
- * Only created through the getExecutorCount path, as count is the only operation that doesn't
+ * Only created through the getExecutorCount() path, as count is the only operation that doesn't
  * care about its data.
  */
-class CountScan : public PlanStage {
+class CountScan final : public PlanStage {
 public:
-    CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet);
-    virtual ~CountScan() {}
+    CountScan(OperationContext* opCtx, const CountScanParams& params, WorkingSet* workingSet);
 
-    virtual StageState work(WorkingSetID* out);
-    virtual bool isEOF();
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    StageState doWork(WorkingSetID* out) final;
+    bool isEOF() final;
+    void doSaveState() final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext() final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_COUNT_SCAN;
     }
 
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
 private:
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
-
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
 
@@ -108,7 +103,6 @@ private:
 
     CountScanParams _params;
 
-    CommonStats _commonStats;
     CountScanStats _specificStats;
 };
 

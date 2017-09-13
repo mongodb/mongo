@@ -1,0 +1,160 @@
+/**
+ *    Copyright (C) 2017 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
+ */
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/client.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
+#include "mongo/db/repl/replication_coordinator_external_state_impl.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery.h"
+#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/unittest.h"
+
+namespace mongo {
+namespace {
+
+ServiceContext::UniqueOperationContext makeOpCtx() {
+    return cc().makeOperationContext();
+}
+
+class ReplicaSetTest : public mongo::unittest::Test {
+protected:
+    void setUp() {
+        auto opCtx = makeOpCtx();
+        _storageInterface = stdx::make_unique<repl::StorageInterfaceMock>();
+        _dropPendingCollectionReaper =
+            stdx::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get());
+        auto consistencyMarkers =
+            stdx::make_unique<repl::ReplicationConsistencyMarkersImpl>(_storageInterface.get());
+        auto recovery = stdx::make_unique<repl::ReplicationRecoveryImpl>(_storageInterface.get(),
+                                                                         consistencyMarkers.get());
+        _replicationProcess = stdx::make_unique<repl::ReplicationProcess>(
+            _storageInterface.get(), std::move(consistencyMarkers), std::move(recovery));
+        _replCoordExternalState = stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
+            opCtx->getServiceContext(),
+            _dropPendingCollectionReaper.get(),
+            _storageInterface.get(),
+            _replicationProcess.get());
+    }
+
+    void tearDown() {
+        auto opCtx = makeOpCtx();
+        DBDirectClient client(opCtx.get());
+        client.dropCollection("local.replset.election");
+
+        _replCoordExternalState.reset();
+        _dropPendingCollectionReaper.reset();
+        _storageInterface.reset();
+        _replicationProcess.reset();
+    }
+
+    repl::ReplicationCoordinatorExternalStateImpl* getReplCoordExternalState() {
+        return _replCoordExternalState.get();
+    }
+
+    repl::StorageInterface& getStorageInterface() {
+        return *_storageInterface;
+    }
+
+private:
+    std::unique_ptr<repl::ReplicationCoordinatorExternalStateImpl> _replCoordExternalState;
+    std::unique_ptr<repl::StorageInterface> _storageInterface;
+    std::unique_ptr<repl::DropPendingCollectionReaper> _dropPendingCollectionReaper;
+    std::unique_ptr<repl::ReplicationProcess> _replicationProcess;
+};
+
+TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
+    auto opCtx = makeOpCtx();
+    auto replCoordExternalState = getReplCoordExternalState();
+
+    replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
+        .transitional_ignore();
+
+    auto lastVote = replCoordExternalState->loadLocalLastVoteDocument(opCtx.get());
+    ASSERT_OK(lastVote.getStatus());
+    ASSERT_EQ(lastVote.getValue().getTerm(), 2);
+    ASSERT_EQ(lastVote.getValue().getCandidateIndex(), 1);
+
+    replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{3, 1})
+        .transitional_ignore();
+
+    lastVote = replCoordExternalState->loadLocalLastVoteDocument(opCtx.get());
+    ASSERT_OK(lastVote.getStatus());
+    ASSERT_EQ(lastVote.getValue().getTerm(), 3);
+    ASSERT_EQ(lastVote.getValue().getCandidateIndex(), 1);
+}
+
+TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
+    auto opCtx = makeOpCtx();
+    auto replCoordExternalState = getReplCoordExternalState();
+
+    replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
+        .transitional_ignore();
+
+    auto lastVote = replCoordExternalState->loadLocalLastVoteDocument(opCtx.get());
+    ASSERT_OK(lastVote.getStatus());
+    ASSERT_EQ(lastVote.getValue().getTerm(), 2);
+    ASSERT_EQ(lastVote.getValue().getCandidateIndex(), 1);
+
+    replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{1, 1})
+        .transitional_ignore();
+
+    lastVote = replCoordExternalState->loadLocalLastVoteDocument(opCtx.get());
+    ASSERT_OK(lastVote.getStatus());
+    ASSERT_EQ(lastVote.getValue().getTerm(), 2);
+    ASSERT_EQ(lastVote.getValue().getCandidateIndex(), 1);
+}
+
+TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithEqualTerm) {
+    auto opCtx = makeOpCtx();
+    auto replCoordExternalState = getReplCoordExternalState();
+
+    replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
+        .transitional_ignore();
+
+    auto lastVote = replCoordExternalState->loadLocalLastVoteDocument(opCtx.get());
+    ASSERT_OK(lastVote.getStatus());
+    ASSERT_EQ(lastVote.getValue().getTerm(), 2);
+    ASSERT_EQ(lastVote.getValue().getCandidateIndex(), 1);
+
+    replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 2})
+        .transitional_ignore();
+
+    lastVote = replCoordExternalState->loadLocalLastVoteDocument(opCtx.get());
+    ASSERT_OK(lastVote.getStatus());
+    ASSERT_EQ(lastVote.getValue().getTerm(), 2);
+    ASSERT_EQ(lastVote.getValue().getCandidateIndex(), 1);
+}
+
+}  // namespace
+}  // namespace mongo

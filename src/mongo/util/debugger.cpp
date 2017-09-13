@@ -31,29 +31,46 @@
 
 #include "mongo/util/debugger.h"
 
-#include "mongo/db/server_options.h"
-#include "mongo/util/debug_util.h"
+#include <cstdlib>
+#include <mutex>
+
+#if defined(USE_GDBSERVER)
+#include <cstdio>
+#include <unistd.h>
+#endif
 
 #ifndef _WIN32
 #include <signal.h>
 #endif
 
+#include "mongo/util/debug_util.h"
+
+#ifndef _WIN32
+namespace {
+std::once_flag breakpointOnceFlag;
+}  // namespace
+#endif
+
 namespace mongo {
 void breakpoint() {
 #ifdef _WIN32
-    DEV DebugBreak();
+    if (IsDebuggerPresent()) {
+        DebugBreak();
+    };
 #endif
 #ifndef _WIN32
     // code to raise a breakpoint in GDB
-    ONCE {
+    std::call_once(breakpointOnceFlag, []() {
         // prevent SIGTRAP from crashing the program if default action is specified and we are not
         // in gdb
         struct sigaction current;
-        sigaction(SIGTRAP, NULL, &current);
+        if (sigaction(SIGTRAP, nullptr, &current) != 0) {
+            std::abort();
+        }
         if (current.sa_handler == SIG_DFL) {
             signal(SIGTRAP, SIG_IGN);
         }
-    }
+    });
 
     raise(SIGTRAP);
 #endif
@@ -72,26 +89,24 @@ void launchGDB(int) {
     // Don't come back here
     signal(SIGTRAP, SIG_IGN);
 
-    const int newPort = serverGlobalParams.port + 2000;
-
     char pidToDebug[16];
     int pidRet = snprintf(pidToDebug, sizeof(pidToDebug), "%d", getpid());
-    invariant(pidRet >= 0 && size_t(pidRet) < sizeof(pidToDebug));
-
-    char hostPort[32];
-    int hostRet = snprintf(hostPort, sizeof(hostPort), "localhost:%d", newPort);
-    invariant(hostRet >= 0 && size_t(hostRet) < sizeof(hostPort));
+    if (!(pidRet >= 0 && size_t(pidRet) < sizeof(pidToDebug)))
+        std::abort();
 
     char msg[128];
-    int msgRet =
-        snprintf(msg, sizeof(msg), "\n\n\t**** Launching gdbserver on %s ****\n\n", hostPort);
-    invariant(msgRet >= 0 && size_t(msgRet) < sizeof(msg));
-    invariant(write(STDERR_FILENO, msg, msgRet) == msgRet);
+    int msgRet = snprintf(
+        msg, sizeof(msg), "\n\n\t**** Launching gdbserver (use lsof to find port) ****\n\n");
+    if (!(msgRet >= 0 && size_t(msgRet) < sizeof(msg)))
+        std::abort();
+
+    if (!(write(STDERR_FILENO, msg, msgRet) == msgRet))
+        std::abort();
 
     if (fork() == 0) {
         // child
-        execlp("gdbserver", "gdbserver", "--attach", hostPort, pidToDebug, NULL);
-        perror(NULL);
+        execlp("gdbserver", "gdbserver", "--attach", ":0", pidToDebug, nullptr);
+        perror(nullptr);
         _exit(1);
     } else {
         // parent
@@ -101,7 +116,8 @@ void launchGDB(int) {
 }
 
 void setupSIGTRAPforGDB() {
-    verify(signal(SIGTRAP, launchGDB) != SIG_ERR);
+    if (!(signal(SIGTRAP, launchGDB) != SIG_ERR))
+        std::abort();
 }
 #else
 void setupSIGTRAPforGDB() {}

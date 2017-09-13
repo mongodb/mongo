@@ -30,16 +30,27 @@
 
 #include <vector>
 
-#include "mongo/s/commands/run_on_all_shards_cmd.h"
+#include "mongo/db/commands.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
 
 using std::vector;
 
-class DBStatsCmd : public RunOnAllShardsCommand {
+class DBStatsCmd : public ErrmsgCommandDeprecated {
 public:
-    DBStatsCmd() : RunOnAllShardsCommand("dbStats", "dbstats") {}
+    DBStatsCmd() : ErrmsgCommandDeprecated("dbStats", "dbstats") {}
+
+    bool slaveOk() const override {
+        return true;
+    }
+    bool adminOnly() const override {
+        return false;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -48,7 +59,31 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    virtual void aggregateResults(const vector<ShardAndReply>& results, BSONObjBuilder& output) {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbName,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& output) override {
+        auto shardResponses =
+            uassertStatusOK(scatterGather(opCtx,
+                                          dbName,
+                                          boost::none,
+                                          filterCommandRequestForPassthrough(cmdObj),
+                                          ReadPreferenceSetting::get(opCtx),
+                                          ShardTargetingPolicy::BroadcastToAllShards));
+        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
+            return false;
+        }
+        aggregateResults(shardResponses, output);
+        return true;
+    }
+
+    void aggregateResults(const vector<AsyncRequestsSender::Response>& responses,
+                          BSONObjBuilder& output) {
         long long objects = 0;
         long long unscaledDataSize = 0;
         long long dataSize = 0;
@@ -61,8 +96,9 @@ public:
         long long freeListNum = 0;
         long long freeListSize = 0;
 
-        for (const ShardAndReply& shardAndReply : results) {
-            const BSONObj& b = std::get<1>(shardAndReply);
+        for (const auto& response : responses) {
+            invariant(response.swResponse.getStatus().isOK());
+            const BSONObj& b = response.swResponse.getValue().data;
 
             objects += b["objects"].numberLong();
             unscaledDataSize += b["avgObjSize"].numberLong() * b["objects"].numberLong();
@@ -79,8 +115,7 @@ public:
             }
         }
 
-        // TODO: need to find a good way to get this
-        // result.appendNumber( "collections" , ncollections );
+        // TODO SERVER-26110: Add aggregated 'collections' and 'views' metrics.
         output.appendNumber("objects", objects);
 
         // avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use

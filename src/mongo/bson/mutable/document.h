@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <cstdint>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
@@ -34,7 +35,6 @@
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/safe_num.h"
 
 namespace mongo {
@@ -277,10 +277,14 @@ public:
     //
 
     /** Compare this Document to 'other' with the semantics of BSONObj::woCompare. */
-    inline int compareWith(const Document& other, bool considerFieldName = true) const;
+    inline int compareWith(const Document& other,
+                           const StringData::ComparatorInterface* comparator,
+                           bool considerFieldName = true) const;
 
     /** Compare this Document to 'other' with the semantics of BSONObj::woCompare. */
-    inline int compareWithBSONObj(const BSONObj& other, bool considerFieldName = true) const;
+    inline int compareWithBSONObj(const BSONObj& other,
+                                  const StringData::ComparatorInterface* comparator,
+                                  bool considerFieldName = true) const;
 
 
     //
@@ -376,6 +380,9 @@ public:
 
     /** Create a new long integer Element with the given value and field name. */
     Element makeElementLong(StringData fieldName, int64_t value);
+
+    /** Create a new dec128 Element with the given value and field name. */
+    Element makeElementDecimal(StringData fieldName, Decimal128 value);
 
     /** Create a new min key Element with the given field name. */
     Element makeElementMinKey(StringData fieldName);

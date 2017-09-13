@@ -32,6 +32,7 @@
 #include "mongo/bson/oid.h"
 
 #include <boost/functional/hash.hpp>
+#include <limits>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -136,6 +137,14 @@ void OID::init() {
     setTimestamp(time(0));
     setInstanceUnique(_instanceUnique);
     setIncrement(Increment::next());
+}
+
+void OID::initFromTermNumber(int64_t term) {
+    // Each set* method handles endianness.
+    // Set max timestamp because the drivers compare ElectionId's to determine valid new primaries,
+    // and we want ElectionId's with terms to supercede ones without terms.
+    setTimestamp(std::numeric_limits<Timestamp>::max());
+    _view().write<BigEndian<int64_t>>(term, kInstanceUniqueOffset);
 }
 
 void OID::init(const std::string& s) {

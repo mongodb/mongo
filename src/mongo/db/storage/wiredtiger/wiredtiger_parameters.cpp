@@ -46,7 +46,7 @@ WiredTigerEngineRuntimeConfigParameter::WiredTigerEngineRuntimeConfigParameter(
       _engine(engine) {}
 
 
-void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* txn,
+void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder& b,
                                                     const std::string& name) {
     b << name << "";
@@ -55,12 +55,14 @@ void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* txn,
 Status WiredTigerEngineRuntimeConfigParameter::set(const BSONElement& newValueElement) {
     try {
         return setFromString(newValueElement.String());
-    } catch (MsgAssertionException msg) {
+    } catch (const AssertionException& msg) {
         return Status(
             ErrorCodes::BadValue,
             mongoutils::str::stream()
                 << "Invalid value for wiredTigerEngineRuntimeConfig via setParameter command: "
-                << newValueElement);
+                << newValueElement
+                << ", exception: "
+                << msg.what());
     }
 }
 
@@ -70,7 +72,8 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
         return Status(ErrorCodes::BadValue,
                       (str::stream()
                        << "WiredTiger configuration strings cannot have embedded null characters. "
-                          "Embedded null found at position " << pos));
+                          "Embedded null found at position "
+                       << pos));
     }
 
     log() << "Reconfiguring WiredTiger storage engine with config string: \"" << str << "\"";
@@ -79,7 +82,9 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
     if (ret != 0) {
         string result =
             (mongoutils::str::stream() << "WiredTiger reconfiguration failed with error code ("
-                                       << ret << "): " << wiredtiger_strerror(ret));
+                                       << ret
+                                       << "): "
+                                       << wiredtiger_strerror(ret));
         error() << result;
 
         return Status(ErrorCodes::BadValue, result);

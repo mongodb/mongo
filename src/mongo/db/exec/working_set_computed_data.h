@@ -41,7 +41,7 @@ public:
         return _score;
     }
 
-    virtual TextScoreComputedData* clone() const {
+    TextScoreComputedData* clone() const final {
         return new TextScoreComputedData(_score);
     }
 
@@ -58,7 +58,7 @@ public:
         return _dist;
     }
 
-    virtual GeoDistanceComputedData* clone() const {
+    GeoDistanceComputedData* clone() const final {
         return new GeoDistanceComputedData(_dist);
     }
 
@@ -75,7 +75,7 @@ public:
         return _key;
     }
 
-    virtual IndexKeyComputedData* clone() const {
+    IndexKeyComputedData* clone() const final {
         return new IndexKeyComputedData(_key);
     }
 
@@ -92,12 +92,29 @@ public:
         return _point;
     }
 
-    virtual GeoNearPointComputedData* clone() const {
+    GeoNearPointComputedData* clone() const final {
         return new GeoNearPointComputedData(_point);
     }
 
 private:
     BSONObj _point;
+};
+
+class SortKeyComputedData : public WorkingSetComputedData {
+public:
+    SortKeyComputedData(BSONObj sortKey)
+        : WorkingSetComputedData(WSM_SORT_KEY), _sortKey(sortKey.getOwned()) {}
+
+    BSONObj getSortKey() const {
+        return _sortKey;
+    }
+
+    SortKeyComputedData* clone() const final {
+        return new SortKeyComputedData(_sortKey);
+    }
+
+private:
+    BSONObj _sortKey;
 };
 
 }  // namespace mongo

@@ -31,10 +31,11 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/index_names.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -47,12 +48,14 @@ TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInte
 }
 
 /** Finds the key objects to put in an index */
-void TwoDAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
+void TwoDAccessMethod::doGetKeys(const BSONObj& obj,
+                                 BSONObjSet* keys,
+                                 MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::get2DKeys(obj, _params, keys, NULL);
 }
 
 /** Finds all locations in a geo-indexed object */
-void TwoDAccessMethod::getKeys(const BSONObj& obj, vector<BSONObj>& locs) const {
+void TwoDAccessMethod::getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const {
     ExpressionKeysPrivate::get2DKeys(obj, _params, NULL, &locs);
 }
 

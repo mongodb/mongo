@@ -6,19 +6,19 @@ var coll = db.getCollection("twodspherevalid");
 
 // Valid index
 coll.drop();
-assert.commandWorked(coll.ensureIndex({geo : "2dsphere", other : 1}));
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere", other: 1}));
 
 // Valid index
 coll.drop();
-assert.commandWorked(coll.ensureIndex({geo : "2dsphere", other : 1, geo2 : "2dsphere"}));
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere", other: 1, geo2: "2dsphere"}));
 
 // Invalid index, using hash with 2dsphere
 coll.drop();
-assert.commandFailed(coll.ensureIndex({geo : "2dsphere", other : "hash"}));
+assert.commandFailed(coll.ensureIndex({geo: "2dsphere", other: "hash"}));
 
 // Invalid index, using 2d with 2dsphere
 coll.drop();
-assert.commandFailed(coll.ensureIndex({geo : "2dsphere", other : "2d"}));
+assert.commandFailed(coll.ensureIndex({geo: "2dsphere", other: "2d"}));
 
 jsTest.log("Success!");
 

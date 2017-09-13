@@ -1,0 +1,39 @@
+/*! @page tune_statistics Performance monitoring with statistics
+
+WiredTiger optionally maintains a variety of statistics, when the
+\c statistics configuration string is specified to ::wiredtiger_open;
+see @ref statistics for general information about statistics, and
+@ref data_statistics for information about accessing the statistics.
+
+The resulting statistics can be displayed using the \c wtstats visualization
+tool.  For more information, see @ref wtstats.
+
+<b>
+Note that maintaining run-time statistics involves updating
+shared-memory data structures and may decrease application performance.
+</b>
+
+The statistics gathered by WiredTiger can be combined to derive information
+about the system's behavior.  For example, a cursor can be opened on the
+statistics for a table:
+
+@snippet ex_stat.c statistics calculate open table stats
+
+Then this code calculates the "fragmentation" of a table, defined
+here as the percentage of the table that is not part of the current
+checkpoint:
+
+@snippet ex_stat.c statistics calculate table fragmentation
+
+The following example calculates the "write amplification", defined here as
+the ratio of bytes written to the filesystem versus the total bytes
+inserted, updated and removed by the application.
+
+@snippet ex_stat.c statistics calculate write amplification
+
+Both examples use this helper function to retrieve statistics values from a
+cursor:
+
+@snippet ex_stat.c statistics calculation helper function
+
+ */

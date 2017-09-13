@@ -41,17 +41,23 @@ class SimpleRecordStoreV1;
  *
  * If start is not DiskLoc(), the iteration begins at that DiskLoc.
  */
-class SimpleRecordStoreV1Iterator final : public RecordCursor {
+class SimpleRecordStoreV1Iterator final : public SeekableRecordCursor {
 public:
-    SimpleRecordStoreV1Iterator(OperationContext* txn,
+    SimpleRecordStoreV1Iterator(OperationContext* opCtx,
                                 const SimpleRecordStoreV1* records,
                                 bool forward);
 
     boost::optional<Record> next() final;
     boost::optional<Record> seekExact(const RecordId& id) final;
-    void savePositioned() final;
-    bool restore(OperationContext* txn) final;
-    void invalidate(const RecordId& dl) final;
+    void save() final;
+    bool restore() final;
+    void detachFromOperationContext() final {
+        _opCtx = nullptr;
+    }
+    void reattachToOperationContext(OperationContext* opCtx) final {
+        _opCtx = opCtx;
+    }
+    void invalidate(OperationContext* opCtx, const RecordId& dl) final;
     std::unique_ptr<RecordFetcher> fetcherForNext() const final;
     std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const final;
 
@@ -62,7 +68,7 @@ private:
     }
 
     // for getNext, not owned
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // The result returned on the next call to getNext().
     DiskLoc _curr;

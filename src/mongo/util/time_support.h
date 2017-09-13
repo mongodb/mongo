@@ -37,50 +37,16 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/stdx/chrono.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
 template <typename Allocator>
 class StringBuilderImpl;
 
-using Microseconds = stdx::chrono::microseconds;
-using Milliseconds = stdx::chrono::milliseconds;
-using Seconds = stdx::chrono::seconds;
-using Minutes = stdx::chrono::minutes;
-using stdx::chrono::duration_cast;
-
 void time_t_to_Struct(time_t t, struct tm* buf, bool local = false);
 std::string time_t_to_String_short(time_t t);
-
-//
-// Operators for putting durations to streams.
-//
-
-std::ostream& operator<<(std::ostream& os, Microseconds us);
-std::ostream& operator<<(std::ostream& os, Milliseconds ms);
-std::ostream& operator<<(std::ostream& os, Seconds s);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Microseconds us);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Milliseconds ms);
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Seconds s);
-
-/**
- * Convenience method for reading the count of a duration with specified units.
- *
- * Use when logging or comparing to integers, to ensure that you're using
- * the units you intend.
- *
- * E.g., log() << durationCount<Seconds>(some duration) << " seconds";
- */
-template <typename DOut, typename DIn>
-long long durationCount(DIn d) {
-    return duration_cast<DOut>(d).count();
-}
 
 /**
  * Representation of a point in time, with millisecond resolution and capable
@@ -92,10 +58,10 @@ class Date_t {
 public:
     /**
      * The largest representable Date_t.
-     *
-     * TODO(schwerin): Make constexpr when supported by all compilers.
      */
-    static Date_t max();
+    static constexpr Date_t max() {
+        return fromMillisSinceEpoch(std::numeric_limits<long long>::max());
+    }
 
     /**
      * Reads the system clock and returns a Date_t representing the present time.
@@ -105,7 +71,7 @@ public:
     /**
      * Returns a Date_t from an integer number of milliseconds since the epoch.
      */
-    static Date_t fromMillisSinceEpoch(long long m) {
+    static constexpr Date_t fromMillisSinceEpoch(long long m) {
         return Date_t(m);
     }
 
@@ -120,7 +86,7 @@ public:
     /**
      * Constructs a Date_t representing the epoch.
      */
-    Date_t() = default;
+    constexpr Date_t() = default;
 
     /**
      * Constructs a Date_t from a system clock time point.
@@ -177,6 +143,8 @@ public:
 
     /*
      * Returns a system clock time_point representing the same point in time as this Date_t.
+     * Warning: careful when using with Date_t::max() as it can have a value that is bigger than
+     * time_point can store.
      */
     stdx::chrono::system_clock::time_point toSystemTimePoint() const;
 
@@ -191,6 +159,8 @@ public:
     /**
      * Implicit conversion operator to system clock time point.  Enables use of Date_t with
      * condition_variable::wait_until.
+     * Warning: careful when using with Date_t::max() as it can have a value that is bigger than
+     * time_point can store.
      */
     operator stdx::chrono::system_clock::time_point() const {
         return toSystemTimePoint();
@@ -204,7 +174,7 @@ public:
 
     template <typename Duration>
     Date_t& operator-=(Duration d) {
-        return * this += (-d);
+        return *this += (-d);
     }
 
     template <typename Duration>
@@ -249,8 +219,13 @@ public:
         return !(*this < other);
     }
 
+    friend std::ostream& operator<<(std::ostream& out, const Date_t& date) {
+        out << date.toString();
+        return out;
+    }
+
 private:
-    explicit Date_t(long long m) : millis(m) {}
+    constexpr explicit Date_t(long long m) : millis(m) {}
 
     long long millis = 0;
 };
@@ -258,6 +233,11 @@ private:
 // uses ISO 8601 dates without trailing Z
 // colonsOk should be false when creating filenames
 std::string terseCurrentTime(bool colonsOk = true);
+
+/**
+ * Produces a short UTC date + time approriate for file names with Z appended.
+ */
+std::string terseUTCCurrentTime();
 
 /**
  * Formats "date" according to the ISO 8601 extended form standard, including date,
@@ -315,7 +295,11 @@ bool toPointInTime(const std::string& str, boost::posix_time::ptime* timeOfDay);
 void sleepsecs(int s);
 void sleepmillis(long long ms);
 void sleepmicros(long long micros);
-void sleepFor(const Milliseconds& time);
+
+template <typename DurationType>
+void sleepFor(DurationType time) {
+    sleepmicros(durationCount<Microseconds>(time));
+}
 
 class Backoff {
 public:

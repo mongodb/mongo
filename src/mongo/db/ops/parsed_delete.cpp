@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/delete.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
@@ -46,8 +47,8 @@
 
 namespace mongo {
 
-ParsedDelete::ParsedDelete(OperationContext* txn, const DeleteRequest* request)
-    : _txn(txn), _request(request) {}
+ParsedDelete::ParsedDelete(OperationContext* opCtx, const DeleteRequest* request)
+    : _opCtx(opCtx), _request(request) {}
 
 Status ParsedDelete::parseRequest() {
     dassert(!_canonicalQuery.get());
@@ -69,8 +70,15 @@ Status ParsedDelete::parseRequest() {
 Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
-    CanonicalQuery* cqRaw;
-    const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
+    const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNamespaceString());
+
+    // The projection needs to be applied after the delete operation, so we do not specify a
+    // projection during canonicalization.
+    auto qr = stdx::make_unique<QueryRequest>(_request->getNamespaceString());
+    qr->setFilter(_request->getQuery());
+    qr->setSort(_request->getSort());
+    qr->setCollation(_request->getCollation());
+    qr->setExplain(_request->isExplain());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
@@ -78,54 +86,52 @@ Status ParsedDelete::parseQueryToCQ() {
     // deleted out from under it, but a limit could inhibit that and give an EOF when the delete
     // has not actually deleted a document. This behavior is fine for findAndModify, but should
     // not apply to deletes in general.
-    long long limit = (!_request->isMulti() && !_request->getSort().isEmpty()) ? -1 : 0;
-
-    // The projection needs to be applied after the delete operation, so we specify an empty
-    // BSONObj as the projection during canonicalization.
-    const BSONObj emptyObj;
-    Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
-                                                 _request->getQuery(),
-                                                 _request->getSort(),
-                                                 emptyObj,  // projection
-                                                 0,         // skip
-                                                 limit,
-                                                 emptyObj,  // hint
-                                                 emptyObj,  // min
-                                                 emptyObj,  // max
-                                                 false,     // snapshot
-                                                 _request->isExplain(),
-                                                 &cqRaw,
-                                                 whereCallback);
-
-    if (status.isOK()) {
-        _canonicalQuery.reset(cqRaw);
+    if (!_request->isMulti() && !_request->getSort().isEmpty()) {
+        qr->setLimit(1);
     }
 
-    return status;
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(_opCtx,
+                                     std::move(qr),
+                                     expCtx,
+                                     extensionsCallback,
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
+
+    if (statusWithCQ.isOK()) {
+        _canonicalQuery = std::move(statusWithCQ.getValue());
+    }
+
+    return statusWithCQ.getStatus();
 }
 
 const DeleteRequest* ParsedDelete::getRequest() const {
     return _request;
 }
 
-bool ParsedDelete::canYield() const {
-    return !_request->isGod() && PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
-        !isIsolated();
+PlanExecutor::YieldPolicy ParsedDelete::yieldPolicy() const {
+    if (_request->isGod()) {
+        return PlanExecutor::NO_YIELD;
+    }
+    if (_request->getYieldPolicy() == PlanExecutor::YIELD_AUTO && isIsolated()) {
+        return PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;  // Don't yield locks.
+    }
+    return _request->getYieldPolicy();
 }
 
 bool ParsedDelete::isIsolated() const {
-    return _canonicalQuery.get()
-        ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
-        : LiteParsedQuery::isQueryIsolated(_request->getQuery());
+    return _canonicalQuery.get() ? _canonicalQuery->isIsolated()
+                                 : QueryRequest::isQueryIsolated(_request->getQuery());
 }
 
 bool ParsedDelete::hasParsedQuery() const {
     return _canonicalQuery.get() != NULL;
 }
 
-CanonicalQuery* ParsedDelete::releaseParsedQuery() {
+std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
     invariant(_canonicalQuery.get() != NULL);
-    return _canonicalQuery.release();
+    return std::move(_canonicalQuery);
 }
 
 }  // namespace mongo

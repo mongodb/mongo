@@ -91,9 +91,9 @@ std::string hexdump(const char* data, unsigned len) {
     verify(len < 1000000);
     const unsigned char* p = (const unsigned char*)data;
     std::stringstream ss;
-    ss << std::hex << std::setw(2) << std::setfill('0');
+    ss << std::hex << std::setfill('0');
     for (unsigned i = 0; i < len; i++) {
-        ss << static_cast<unsigned>(p[i]) << ' ';
+        ss << std::setw(2) << static_cast<unsigned>(p[i]) << ' ';
     }
     std::string s = ss.str();
     return s;

@@ -15,7 +15,8 @@
         return found;
     }
 
-    var shardTest = new ShardingTest('listShardsTest', 1, 0, 1, { useHostname: true });
+    var shardTest = new ShardingTest(
+        {name: 'listShardsTest', shards: 1, mongos: 1, other: {useHostname: true}});
 
     var mongos = shardTest.s0;
     var res = mongos.adminCommand('listShards');
@@ -25,7 +26,7 @@
 
     // add standalone mongod
     var standaloneShard = MongoRunner.runMongod({useHostName: true});
-    res = shardTest.admin.runCommand({ addShard: standaloneShard.host, name: 'standalone' });
+    res = shardTest.admin.runCommand({addShard: standaloneShard.host, name: 'standalone'});
     assert.commandWorked(res, 'addShard command failed');
     res = mongos.adminCommand('listShards');
     assert.commandWorked(res, 'listShards command failed');
@@ -35,10 +36,10 @@
            'listShards command didn\'t return standalone shard: ' + tojson(shardsArray));
 
     // add replica set named 'repl'
-    var rs1 = new ReplSetTest({ name: 'repl', nodes: 1, useHostName: true});
+    var rs1 = new ReplSetTest({name: 'repl', nodes: 1, useHostName: true});
     rs1.startSet();
     rs1.initiate();
-    res = shardTest.admin.runCommand({ addShard: rs1.getURL()});
+    res = shardTest.admin.runCommand({addShard: rs1.getURL()});
     assert.commandWorked(res, 'addShard command failed');
     res = mongos.adminCommand('listShards');
     assert.commandWorked(res, 'listShards command failed');
@@ -49,7 +50,7 @@
 
     // remove 'repl' shard
     assert.soon(function() {
-        var res = shardTest.admin.runCommand({ removeShard: 'repl' });
+        var res = shardTest.admin.runCommand({removeShard: 'repl'});
         assert.commandWorked(res, 'removeShard command failed');
         return res.state === 'completed';
     }, 'failed to remove the replica set shard');

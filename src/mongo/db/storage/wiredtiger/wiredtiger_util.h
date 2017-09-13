@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -131,12 +132,18 @@ public:
     /**
      * Validates formatVersion in application metadata for 'uri'.
      * Version must be numeric and be in the range [minimumVersion, maximumVersion].
-     * URI is used in error messages only.
+     * URI is used in error messages only. Returns actual version.
      */
-    static Status checkApplicationMetadataFormatVersion(OperationContext* opCtx,
-                                                        StringData uri,
-                                                        int64_t minimumVersion,
-                                                        int64_t maximumVersion);
+    static StatusWith<int64_t> checkApplicationMetadataFormatVersion(OperationContext* opCtx,
+                                                                     StringData uri,
+                                                                     int64_t minimumVersion,
+                                                                     int64_t maximumVersion);
+
+    /**
+     * Validates the 'configString' specified as a collection or index creation option.
+     */
+    static Status checkTableCreationOptions(const BSONElement& configElem);
+
     /**
      * Reads individual statistics using URI.
      * List of statistics keys WT_STAT_* can be found in wiredtiger.h.
@@ -169,6 +176,13 @@ public:
 
     static int64_t getIdentSize(WT_SESSION* s, const std::string& uri);
 
+
+    /**
+     * Return amount of memory to use for the WiredTiger cache based on either the startup
+     * option chosen or the amount of available memory on the host.
+     */
+    static size_t getCacheSizeMB(double requestedCacheSizeGB);
+
     /**
      * Returns a WT_EVENT_HANDER with MongoDB's default handlers.
      * The default handlers just log so it is recommended that you consider calling them even if
@@ -179,15 +193,37 @@ public:
      */
     static WT_EVENT_HANDLER defaultEventHandlers();
 
+    class ErrorAccumulator : public WT_EVENT_HANDLER {
+    public:
+        ErrorAccumulator(std::vector<std::string>* errors);
+
+    private:
+        static int onError(WT_EVENT_HANDLER* handler,
+                           WT_SESSION* session,
+                           int error,
+                           const char* message);
+
+        using ErrorHandler = int (*)(WT_EVENT_HANDLER*, WT_SESSION*, int, const char*);
+
+        std::vector<std::string>* const _errors;
+        const ErrorHandler _defaultErrorHandler;
+    };
+
     /**
      * Calls WT_SESSION::validate() on a side-session to ensure that your current transaction
      * isn't left in an invalid state.
      *
      * If errors is non-NULL, all error messages will be appended to the array.
      */
-    static int verifyTable(OperationContext* txn,
+    static int verifyTable(OperationContext* opCtx,
                            const std::string& uri,
                            std::vector<std::string>* errors = NULL);
+
+    static bool useTableLogging(NamespaceString ns, bool replEnabled);
+
+    static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
+
+    static Status setTableLogging(WT_SESSION* session, const std::string& uri, bool on);
 
 private:
     /**

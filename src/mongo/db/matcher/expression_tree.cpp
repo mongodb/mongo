@@ -30,9 +30,10 @@
 
 #include "mongo/db/matcher/expression_tree.h"
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 
 namespace mongo {
 
@@ -56,7 +57,7 @@ void ListOfMatchExpression::_debugList(StringBuilder& debug, int level) const {
 void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out) const {
     for (unsigned i = 0; i < _expressions.size(); i++) {
         BSONObjBuilder childBob(out->subobjStart());
-        _expressions[i]->toBSON(&childBob);
+        _expressions[i]->serialize(&childBob);
     }
     out->doneFast();
 }
@@ -91,9 +92,9 @@ bool AndMatchExpression::matches(const MatchableDocument* doc, MatchDetails* det
     return true;
 }
 
-bool AndMatchExpression::matchesSingleElement(const BSONElement& e) const {
+bool AndMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
-        if (!getChild(i)->matchesSingleElement(e)) {
+        if (!getChild(i)->matchesSingleElement(e, details)) {
             return false;
         }
     }
@@ -107,9 +108,16 @@ void AndMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugList(debug, level);
 }
 
-void AndMatchExpression::toBSON(BSONObjBuilder* out) const {
+void AndMatchExpression::serialize(BSONObjBuilder* out) const {
+    if (!numChildren()) {
+        // It is possible for an AndMatchExpression to have no children, resulting in the serialized
+        // expression {$and: []}, which is not a valid query object.
+        return;
+    }
+
     BSONArrayBuilder arrBob(out->subarrayStart("$and"));
     _listToBSON(&arrBob);
+    arrBob.doneFast();
 }
 
 // -----
@@ -123,9 +131,9 @@ bool OrMatchExpression::matches(const MatchableDocument* doc, MatchDetails* deta
     return false;
 }
 
-bool OrMatchExpression::matchesSingleElement(const BSONElement& e) const {
+bool OrMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matchesSingleElement(e)) {
+        if (getChild(i)->matchesSingleElement(e, details)) {
             return true;
         }
     }
@@ -139,7 +147,11 @@ void OrMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugList(debug, level);
 }
 
-void OrMatchExpression::toBSON(BSONObjBuilder* out) const {
+void OrMatchExpression::serialize(BSONObjBuilder* out) const {
+    if (!numChildren()) {
+        out->append(AlwaysFalseMatchExpression::kName, 1);
+        return;
+    }
     BSONArrayBuilder arrBob(out->subarrayStart("$or"));
     _listToBSON(&arrBob);
 }
@@ -155,9 +167,9 @@ bool NorMatchExpression::matches(const MatchableDocument* doc, MatchDetails* det
     return true;
 }
 
-bool NorMatchExpression::matchesSingleElement(const BSONElement& e) const {
+bool NorMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matchesSingleElement(e)) {
+        if (getChild(i)->matchesSingleElement(e, details)) {
             return false;
         }
     }
@@ -170,7 +182,7 @@ void NorMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugList(debug, level);
 }
 
-void NorMatchExpression::toBSON(BSONObjBuilder* out) const {
+void NorMatchExpression::serialize(BSONObjBuilder* out) const {
     BSONArrayBuilder arrBob(out->subarrayStart("$nor"));
     _listToBSON(&arrBob);
 }
@@ -183,10 +195,17 @@ void NotMatchExpression::debugString(StringBuilder& debug, int level) const {
     _exp->debugString(debug, level + 1);
 }
 
-void NotMatchExpression::toBSON(BSONObjBuilder* out) const {
-    BSONObjBuilder childBob(out->subobjStart("$not"));
-    _exp->toBSON(&childBob);
-    childBob.doneFast();
+void NotMatchExpression::serialize(BSONObjBuilder* out) const {
+    BSONObjBuilder childBob;
+    _exp->serialize(&childBob);
+
+    BSONObj tempObj = childBob.obj();
+
+    // We don't know what the inner object is, and thus whether serializing to $not will result in a
+    // parseable MatchExpression. As a fix, we change it to $nor, which is always parseable.
+    BSONArrayBuilder tBob(out->subarrayStart("$nor"));
+    tBob.append(tempObj);
+    tBob.doneFast();
 }
 
 bool NotMatchExpression::equivalent(const MatchExpression* other) const {

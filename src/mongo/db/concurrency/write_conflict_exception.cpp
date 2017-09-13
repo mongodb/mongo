@@ -37,11 +37,11 @@
 
 namespace mongo {
 
-bool WriteConflictException::trace = false;
+AtomicBool WriteConflictException::trace(false);
 
 WriteConflictException::WriteConflictException()
-    : DBException("WriteConflict", ErrorCodes::WriteConflict) {
-    if (trace) {
+    : DBException(ErrorCodes::WriteConflict, "WriteConflict") {
+    if (trace.load()) {
         printStackTrace();
     }
 }
@@ -64,10 +64,9 @@ void WriteConflictException::logAndBackoff(int attempt, StringData operation, St
 
 namespace {
 // for WriteConflictException
-ExportedServerParameter<bool> TraceWCExceptionsSetting(ServerParameterSet::getGlobal(),
-                                                       "traceWriteConflictExceptions",
-                                                       &WriteConflictException::trace,
-                                                       true,   // allowedToChangeAtStartup
-                                                       true);  // allowedToChangeAtRuntime
+ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> TraceWCExceptionsSetting(
+    ServerParameterSet::getGlobal(),
+    "traceWriteConflictExceptions",
+    &WriteConflictException::trace);
 }
 }

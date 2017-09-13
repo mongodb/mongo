@@ -31,15 +31,16 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/rpc/protocol.h"
 
 namespace mongo {
 class BSONObj;
+class BSONObjBuilder;
 class Message;
 
 namespace rpc {
-class DocumentRange;
 
 /**
  * Constructs an RPC Reply.
@@ -48,30 +49,27 @@ class ReplyBuilderInterface {
     MONGO_DISALLOW_COPYING(ReplyBuilderInterface);
 
 public:
-    /**
-     * Reply builders must have their fields set in order as they are immediately written into
-     * the underlying message buffer. This enum represents the next field that can be written
-     * into the builder. Note that when the builder is in state 'kInputDocs', multiple input
-     * docs can be added. After the builder's done() method is called it is in state 'kDone',
-     * and no further methods can be called.
-     */
-    enum class State { kMetadata, kCommandReply, kOutputDocs, kDone };
-
     virtual ~ReplyBuilderInterface() = default;
-
-    virtual ReplyBuilderInterface& setMetadata(BSONObj metadata) = 0;
 
     /**
      * Sets the raw command reply. This should probably not be used in favor of the
      * variants that accept a Status or StatusWith.
      */
-    virtual ReplyBuilderInterface& setRawCommandReply(BSONObj reply) = 0;
+    virtual ReplyBuilderInterface& setRawCommandReply(const BSONObj& reply) = 0;
+
+    /**
+     * Returns a BSONObjBuilder for building a command reply in place.
+     */
+    virtual BSONObjBuilder getInPlaceReplyBuilder(std::size_t reserveBytes) = 0;
+
+    virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
 
     /**
      * Sets the reply for this command. If an engaged StatusWith<BSONObj> is passed, the command
      * reply will be set to the contained BSONObj, augmented with the element {ok, 1.0} if it
      * does not already have an "ok" field. If a disengaged StatusWith<BSONObj> is passed, the
      * command reply will be set to {ok: 0.0, code: <code of status>,
+     *                               codeName: <name of status code>,
      *                               errmsg: <reason of status>}
      */
     ReplyBuilderInterface& setCommandReply(StatusWith<BSONObj> commandReply);
@@ -79,33 +77,14 @@ public:
     /**
      * Sets the reply for this command. The status parameter must be non-OK. The reply for
      * this command will be set to an object containing all the fields in extraErrorInfo,
-     * augmented with {ok: 0.0} , {code: <code of status>}, and {errmsg: <reason of status>}.
+     * augmented with {ok: 0.0} , {code: <code of status>}, {codeName: <name of status code>},
+     * and {errmsg: <reason of status>}.
      * If any of the fields "ok", "code", or "errmsg" already exist in extraErrorInfo, they
      * will be left as-is in the command reply. This use of this form is intended for
      * interfacing with legacy code that adds additional data to a failed command reply and
      * its use is discouraged in new code.
      */
-    ReplyBuilderInterface& setCommandReply(Status nonOKStatus, BSONObj extraErrorInfo);
-
-    /**
-     * Add a range of output documents to the reply. This method can be called multiple times
-     * before calling done().
-     */
-    virtual ReplyBuilderInterface& addOutputDocs(DocumentRange outputDocs) = 0;
-
-    /**
-     * Add a single output document to the reply. This method can be called multiple times
-     * before calling done().
-     */
-    virtual ReplyBuilderInterface& addOutputDoc(BSONObj outputDoc) = 0;
-
-    /**
-     * Gets the state of the builder. As the builder will simply crash the process if it is ever
-     * put in an invalid state, it isn't neccessary to call this method for correctness. Rather
-     * it may be helpful to explicitly assert that the builder is in a certain state to make
-     * code that manipulates the builder more readable.
-     */
-    virtual State getState() const = 0;
+    virtual ReplyBuilderInterface& setCommandReply(Status nonOKStatus, BSONObj extraErrorInfo);
 
     /**
      * Gets the protocol used to serialize this reply. This should be used for validity checks
@@ -120,16 +99,10 @@ public:
     virtual void reset() = 0;
 
     /**
-     * Returns available space in bytes, should be used to verify that the message have enough
-     * space for ouput documents.
-     */
-    virtual std::size_t availableSpaceForOutputDocs() const = 0;
-
-    /**
      * Writes data then transfers ownership of the message to the caller. The behavior of
      * calling any methods on the builder is subsequently undefined.
      */
-    virtual std::unique_ptr<Message> done() = 0;
+    virtual Message done() = 0;
 
 protected:
     ReplyBuilderInterface() = default;

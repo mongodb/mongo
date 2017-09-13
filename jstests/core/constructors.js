@@ -2,8 +2,8 @@
 
 // Takes a list of constructors and returns a new list with an extra entry for each constructor with
 // "new" prepended
-function addConstructorsWithNew (constructorList) {
-    function prependNew (constructor) {
+function addConstructorsWithNew(constructorList) {
+    function prependNew(constructor) {
         return "new " + constructor;
     }
 
@@ -12,152 +12,152 @@ function addConstructorsWithNew (constructorList) {
     // We use slice(0) here to make a copy of our lists
     var validWithNew = valid.concat(valid.slice(0).map(prependNew));
     var invalidWithNew = invalid.concat(invalid.slice(0).map(prependNew));
-    return { "valid" : validWithNew, "invalid" : invalidWithNew };
+    return {"valid": validWithNew, "invalid": invalidWithNew};
 }
 
-function clientEvalConstructorTest (constructorList) {
+function clientEvalConstructorTest(constructorList) {
     constructorList = addConstructorsWithNew(constructorList);
-    constructorList.valid.forEach(function (constructor) {
+    constructorList.valid.forEach(function(constructor) {
         try {
             eval(constructor);
-        }
-        catch (e) {
-            throw ("valid constructor: " + constructor + " failed in eval context: " + e);
+        } catch (e) {
+            throw("valid constructor: " + constructor + " failed in eval context: " + e);
         }
     });
-    constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { eval(constructor) },
-                      [], "invalid constructor did not throw error in eval context: " + constructor);
+    constructorList.invalid.forEach(function(constructor) {
+        assert.throws(function() {
+            eval(constructor);
+        }, [], "invalid constructor did not throw error in eval context: " + constructor);
     });
 }
 
-function dbEvalConstructorTest (constructorList) {
+function dbEvalConstructorTest(constructorList) {
+    assert.writeOK(db.evalConstructors.insert({}), "db must exist for eval to succeed");
+    assert(db.evalConstructors.drop());
     constructorList = addConstructorsWithNew(constructorList);
-    constructorList.valid.forEach(function (constructor) {
+    constructorList.valid.forEach(function(constructor) {
         try {
             db.eval(constructor);
-        }
-        catch (e) {
-            throw ("valid constructor: " + constructor + " failed in db.eval context: " + e);
+        } catch (e) {
+            throw("valid constructor: " + constructor + " failed in db.eval context: " + e);
         }
     });
-    constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { db.eval(constructor) },
-                      [], "invalid constructor did not throw error in db.eval context: " + constructor);
+    constructorList.invalid.forEach(function(constructor) {
+        assert.throws(function() {
+            db.eval(constructor);
+        }, [], "invalid constructor did not throw error in db.eval context: " + constructor);
     });
 }
 
-function mapReduceConstructorTest (constructorList) {
+function mapReduceConstructorTest(constructorList) {
     constructorList = addConstructorsWithNew(constructorList);
     t = db.mr_constructors;
     t.drop();
 
-    t.save( { "partner" : 1, "visits" : 9 } )
-    t.save( { "partner" : 2, "visits" : 9 } )
-    t.save( { "partner" : 1, "visits" : 11 } )
-    t.save( { "partner" : 1, "visits" : 30 } )
-    t.save( { "partner" : 2, "visits" : 41 } )
-    t.save( { "partner" : 2, "visits" : 41 } )
+    t.save({"partner": 1, "visits": 9});
+    t.save({"partner": 2, "visits": 9});
+    t.save({"partner": 1, "visits": 11});
+    t.save({"partner": 1, "visits": 30});
+    t.save({"partner": 2, "visits": 41});
+    t.save({"partner": 2, "visits": 41});
 
-    constructorList.valid.forEach(function (constructor) {
+    constructorList.valid.forEach(function(constructor) {
         try {
             m = eval("dummy = function(){ emit( \"test\" , " + constructor + " ) }");
 
             r = eval("dummy = function( k , v ){ return { test : " + constructor + " } }");
 
-            res = t.mapReduce( m , r , { out : "mr_constructors_out" , scope : { xx : 1 } } );
-        }
-        catch (e) {
-            throw ("valid constructor: " + constructor + " failed in mapReduce context: " + e);
+            res = t.mapReduce(m, r, {out: "mr_constructors_out", scope: {xx: 1}});
+        } catch (e) {
+            throw("valid constructor: " + constructor + " failed in mapReduce context: " + e);
         }
     });
-    constructorList.invalid.forEach(function (constructor) {
+    constructorList.invalid.forEach(function(constructor) {
         m = eval("dummy = function(){ emit( \"test\" , " + constructor + " ) }");
 
         r = eval("dummy = function( k , v ){ return { test : " + constructor + " } }");
 
-        assert.throws(function () { res = t.mapReduce( m , r ,
-                                    { out : "mr_constructors_out" , scope : { xx : 1 } } ) },
-                      [], "invalid constructor did not throw error in mapReduce context: " + constructor);
+        assert.throws(function() {
+            res = t.mapReduce(m, r, {out: "mr_constructors_out", scope: {xx: 1}});
+        }, [], "invalid constructor did not throw error in mapReduce context: " + constructor);
     });
 
     db.mr_constructors_out.drop();
     t.drop();
 }
 
-function whereConstructorTest (constructorList) {
+function whereConstructorTest(constructorList) {
     constructorList = addConstructorsWithNew(constructorList);
     t = db.where_constructors;
     t.drop();
-    assert.writeOK( t.insert({ x : 1 }));
+    assert.writeOK(t.insert({x: 1}));
 
-    constructorList.valid.forEach(function (constructor) {
+    constructorList.valid.forEach(function(constructor) {
         try {
-            t.findOne({ $where : constructor });
-        }
-        catch (e) {
-            throw ("valid constructor: " + constructor + " failed in $where query: " + e);
+            t.findOne({$where: constructor});
+        } catch (e) {
+            throw("valid constructor: " + constructor + " failed in $where query: " + e);
         }
     });
-    constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { t.findOne({ $where : constructor }) },
-                      [], "invalid constructor did not throw error in $where query: " + constructor);
+    constructorList.invalid.forEach(function(constructor) {
+        assert.throws(function() {
+            t.findOne({$where: constructor});
+        }, [], "invalid constructor did not throw error in $where query: " + constructor);
     });
 }
 
 var dbrefConstructors = {
-    "valid" : [
-            "DBRef(\"namespace\", 0)",
-            "DBRef(\"namespace\", \"test\")",
-            "DBRef(\"namespace\", \"test\", \"database\")",
-            "DBRef(\"namespace\", ObjectId())",
-            "DBRef(\"namespace\", ObjectId(\"000000000000000000000000\"))",
-            "DBRef(\"namespace\", ObjectId(\"000000000000000000000000\"), \"database\")",
-        ],
-    "invalid" : [
-            "DBRef()",
-            "DBRef(true, ObjectId())",
-            "DBRef(true, ObjectId(), true)",
-            "DBRef(\"namespace\")",
-            "DBRef(\"namespace\", ObjectId(), true)",
-            "DBRef(\"namespace\", ObjectId(), 123)",
-        ]
-}
+    "valid": [
+        "DBRef(\"namespace\", 0)",
+        "DBRef(\"namespace\", \"test\")",
+        "DBRef(\"namespace\", \"test\", \"database\")",
+        "DBRef(\"namespace\", ObjectId())",
+        "DBRef(\"namespace\", ObjectId(\"000000000000000000000000\"))",
+        "DBRef(\"namespace\", ObjectId(\"000000000000000000000000\"), \"database\")",
+    ],
+    "invalid": [
+        "DBRef()",
+        "DBRef(true, ObjectId())",
+        "DBRef(true, ObjectId(), true)",
+        "DBRef(\"namespace\")",
+        "DBRef(\"namespace\", ObjectId(), true)",
+        "DBRef(\"namespace\", ObjectId(), 123)",
+    ]
+};
 
 var dbpointerConstructors = {
-    "valid" : [
-            "DBPointer(\"namespace\", ObjectId())",
-            "DBPointer(\"namespace\", ObjectId(\"000000000000000000000000\"))",
-        ],
-    "invalid" : [
-            "DBPointer()",
-            "DBPointer(true, ObjectId())",
-            "DBPointer(\"namespace\", 0)",
-            "DBPointer(\"namespace\", \"test\")",
-            "DBPointer(\"namespace\")",
-            "DBPointer(\"namespace\", ObjectId(), true)",
-        ]
-}
-
+    "valid": [
+        "DBPointer(\"namespace\", ObjectId())",
+        "DBPointer(\"namespace\", ObjectId(\"000000000000000000000000\"))",
+    ],
+    "invalid": [
+        "DBPointer()",
+        "DBPointer(true, ObjectId())",
+        "DBPointer(\"namespace\", 0)",
+        "DBPointer(\"namespace\", \"test\")",
+        "DBPointer(\"namespace\")",
+        "DBPointer(\"namespace\", ObjectId(), true)",
+    ]
+};
 
 var objectidConstructors = {
-    "valid" : [
+    "valid": [
         'ObjectId()',
         'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFF")',
-        ],
-    "invalid" : [
+    ],
+    "invalid": [
         'ObjectId(5)',
         'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFQ")',
-        ]
-}
+    ]
+};
 
 var timestampConstructors = {
-    "valid" : [
+    "valid": [
         'Timestamp()',
         'Timestamp(0,0)',
         'Timestamp(1.0,1.0)',
-        ],
-    "invalid" : [
+    ],
+    "invalid": [
         'Timestamp(0)',
         'Timestamp(0,0,0)',
         'Timestamp("test","test")',
@@ -166,109 +166,113 @@ var timestampConstructors = {
         'Timestamp(true,true)',
         'Timestamp(true,0)',
         'Timestamp(0,true)',
-        ]
-}
+        'Timestamp(Math.pow(2,32),Math.pow(2,32))',
+        'Timestamp(0,Math.pow(2,32))',
+        'Timestamp(Math.pow(2,32),0)',
+        'Timestamp(-1,-1)',
+        'Timestamp(-1,0)',
+        'Timestamp(0,-1)'
+    ]
+};
 
 var bindataConstructors = {
-    "valid" : [
+    "valid": [
         'BinData(0,"test")',
-        ],
-    "invalid" : [
+    ],
+    "invalid": [
         'BinData(0,"test", "test")',
         'BinData()',
         'BinData(-1, "")',
         'BinData(256, "")',
         'BinData("string","aaaa")',
-        // SERVER-10152
-        //'BinData(0, true)',
-        //'BinData(0, null)',
-        //'BinData(0, undefined)',
-        //'BinData(0, {})',
-        //'BinData(0, [])',
-        //'BinData(0, function () {})',
-        ]
-}
+        'BinData(0, true)',
+        'BinData(0, null)',
+        'BinData(0, undefined)',
+        'BinData(0, {})',
+        'BinData(0, [])',
+        'BinData(0, function () {})',
+    ]
+};
 
 var uuidConstructors = {
-    "valid" : [
-        'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
-        ],
-    "invalid" : [
-        'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
+    "valid": [
+        'UUID("0123456789abcdef0123456789ABCDEF")',
+        'UUID("0a1A2b3B-4c5C-6d7D-8e9E-AfBFC0D1E3F4")',
+        'UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")',
         'UUID()',
+        UUID().toString(),
+    ],
+    "invalid": [
+        'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
+        'UUID("aaaaaaaa-aaaa-aaaa-aaaaaaaa-aaaaaaaa")',
+        'UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaa-aaaaaaa")',
         'UUID("aa")',
         'UUID("invalidhex")',
-        // SERVER-9686
-        //'UUID("invalidhexbutstilltherequiredlen")',
+        'UUID("invalidhexbutstilltherequiredlen")',
         'UUID(true)',
         'UUID(null)',
         'UUID(undefined)',
         'UUID({})',
         'UUID([])',
         'UUID(function () {})',
-        ]
-}
+    ]
+};
 
 var md5Constructors = {
-    "valid" : [
+    "valid": [
         'MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
-        ],
-    "invalid" : [
+    ],
+    "invalid": [
         'MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
         'MD5()',
         'MD5("aa")',
         'MD5("invalidhex")',
-        // SERVER-9686
-        //'MD5("invalidhexbutstilltherequiredlen")',
+        'MD5("invalidhexbutstilltherequiredlen")',
         'MD5(true)',
         'MD5(null)',
         'MD5(undefined)',
         'MD5({})',
         'MD5([])',
         'MD5(function () {})',
-        ]
-}
+    ]
+};
 
 var hexdataConstructors = {
-    "valid" : [
+    "valid": [
         'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
-        // Numbers as the payload are converted to strings, so HexData(0, 100) == HexData(0, "100")
-        'HexData(0, 100)',
         'HexData(0, "")',
-        'HexData(0, "aaa")',
-        'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
-        'HexData(0, "000000000000000000000005")', // SERVER-9605
-        ],
-    "invalid" : [
+        'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        'HexData(0, "000000000000000000000005")',  // SERVER-9605
+    ],
+    "invalid": [
         'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
         'HexData()',
         'HexData(0)',
+        'HexData(0, 100)',
         'HexData(-1, "")',
         'HexData(256, "")',
+        'HexData(0, "aaa")',
         'HexData("string","aaaa")',
-        // SERVER-10152
-        //'HexData(0, true)',
-        //'HexData(0, null)',
-        //'HexData(0, undefined)',
-        //'HexData(0, {})',
-        //'HexData(0, [])',
-        //'HexData(0, function () {})',
-        // SERVER-9686
-        //'HexData(0, "invalidhex")',
-        ]
-}
+        'HexData(0, true)',
+        'HexData(0, null)',
+        'HexData(0, undefined)',
+        'HexData(0, {})',
+        'HexData(0, [])',
+        'HexData(0, function () {})',
+        'HexData(0, "invalidhex")',
+    ]
+};
 
 var dateConstructors = {
-    "valid" : [
+    "valid": [
         'Date()',
         'Date(0)',
         'Date(0,0)',
         'Date(0,0,0)',
         'Date("foo")',
-        ],
-    "invalid" : [
-        ]
-}
+    ],
+    "invalid": []
+};
 
 clientEvalConstructorTest(dbrefConstructors);
 clientEvalConstructorTest(dbpointerConstructors);
@@ -290,28 +294,22 @@ dbEvalConstructorTest(md5Constructors);
 dbEvalConstructorTest(hexdataConstructors);
 dbEvalConstructorTest(dateConstructors);
 
-// SERVER-8963
-if (db.runCommand({buildinfo:1}).javascriptEngine == "V8") {
-    mapReduceConstructorTest(dbrefConstructors);
-    mapReduceConstructorTest(dbpointerConstructors);
-    mapReduceConstructorTest(objectidConstructors);
-    mapReduceConstructorTest(timestampConstructors);
-    mapReduceConstructorTest(bindataConstructors);
-    mapReduceConstructorTest(uuidConstructors);
-    mapReduceConstructorTest(md5Constructors);
-    mapReduceConstructorTest(hexdataConstructors);
-}
+mapReduceConstructorTest(dbrefConstructors);
+mapReduceConstructorTest(dbpointerConstructors);
+mapReduceConstructorTest(objectidConstructors);
+mapReduceConstructorTest(timestampConstructors);
+mapReduceConstructorTest(bindataConstructors);
+mapReduceConstructorTest(uuidConstructors);
+mapReduceConstructorTest(md5Constructors);
+mapReduceConstructorTest(hexdataConstructors);
 mapReduceConstructorTest(dateConstructors);
 
-// SERVER-8963
-if (db.runCommand({buildinfo:1}).javascriptEngine == "V8") {
-    whereConstructorTest(dbrefConstructors);
-    whereConstructorTest(dbpointerConstructors);
-    whereConstructorTest(objectidConstructors);
-    whereConstructorTest(timestampConstructors);
-    whereConstructorTest(bindataConstructors);
-    whereConstructorTest(uuidConstructors);
-    whereConstructorTest(md5Constructors);
-    whereConstructorTest(hexdataConstructors);
-}
+whereConstructorTest(dbrefConstructors);
+whereConstructorTest(dbpointerConstructors);
+whereConstructorTest(objectidConstructors);
+whereConstructorTest(timestampConstructors);
+whereConstructorTest(bindataConstructors);
+whereConstructorTest(uuidConstructors);
+whereConstructorTest(md5Constructors);
+whereConstructorTest(hexdataConstructors);
 whereConstructorTest(dateConstructors);

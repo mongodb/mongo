@@ -30,30 +30,41 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/storage/test_harness_helper.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 class RecordStore;
 class RecoveryUnit;
 
-class HarnessHelper {
+class RecordStoreHarnessHelper : public HarnessHelper {
 public:
-    HarnessHelper() : _serviceContext(), _client(_serviceContext.makeClient("hh")) {}
-    virtual ~HarnessHelper() {}
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() = 0;
 
-    virtual RecordStore* newNonCappedRecordStore() = 0;
-    virtual RecoveryUnit* newRecoveryUnit() = 0;
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) = 0;
 
-    virtual OperationContext* newOperationContext() {
-        return new OperationContextNoop(_client.get(), 1, newRecoveryUnit());
-    }
+    static const int64_t kDefaultCapedSizeBytes = 16 * 1024 * 1024;
+    virtual std::unique_ptr<RecordStore> newCappedRecordStore(
+        int64_t cappedSizeBytes = kDefaultCapedSizeBytes, int64_t cappedMaxDocs = -1) = 0;
 
-private:
-    ServiceContextNoop _serviceContext;
-    ServiceContext::UniqueClient _client;
+    virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
+                                                              int64_t cappedSizeBytes,
+                                                              int64_t cappedMaxDocs) = 0;
+
+    /**
+     * Currently this requires that it is possible to have two independent open write operations
+     * at the same time one the same thread (with separate Clients, OperationContexts, and
+     * RecoveryUnits).
+     */
+    virtual bool supportsDocLocking() = 0;
 };
 
-HarnessHelper* newHarnessHelper();
+inline std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper() {
+    return dynamic_ptr_cast<RecordStoreHarnessHelper>(newHarnessHelper());
 }
+}  // namespace mongo

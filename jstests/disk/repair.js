@@ -1,47 +1,65 @@
 // check --repairpath and --repair
 
+// `--repairpath` is mmap only.
+// @tags: [requires_mmapv1]
+
 var baseName = "jstests_disk_repair";
+var dbpath = MongoRunner.dataPath + baseName + "/";
+var repairpath = dbpath + "repairDir/";
 
-port = allocatePorts( 1 )[ 0 ];
-dbpath = MongoRunner.dataPath + baseName + "/";
-repairpath = dbpath + "repairDir/"
+resetDbpath(dbpath);
+resetDbpath(repairpath);
 
-resetDbpath( dbpath );
-resetDbpath( repairpath );
-
-m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-db = m.getDB( baseName );
-db[ baseName ].save( {} );
-assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles:true} ) );
+var m = MongoRunner.runMongod({
+    dbpath: dbpath,
+    repairpath: repairpath,
+    noCleanData: true,
+});
+db = m.getDB(baseName);
+db[baseName].save({});
+assert.commandWorked(db.runCommand({repairDatabase: 1, backupOriginalFiles: true}));
 function check() {
-    files = listFiles( dbpath );
-    for( f in files ) {
-        assert( ! new RegExp( "^" + dbpath + "backup_" ).test( files[ f ].name ), "backup dir in dbpath" );
+    files = listFiles(dbpath);
+    for (f in files) {
+        assert(!new RegExp("^" + dbpath + "backup_").test(files[f].name), "backup dir in dbpath");
     }
 
-    assert.eq.automsg( "1", "db[ baseName ].count()" );
+    assert.eq.automsg("1", "db[ baseName ].count()");
 }
 check();
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod(m);
 
-resetDbpath( repairpath );
-m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-db = m.getDB( baseName );
-assert.commandWorked( db.runCommand( {repairDatabase:1} ) );
+resetDbpath(repairpath);
+m = MongoRunner.runMongod({
+    port: m.port,
+    dbpath: dbpath,
+    noCleanData: true,
+});
+db = m.getDB(baseName);
+assert.commandWorked(db.runCommand({repairDatabase: 1}));
 check();
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod(m);
 
-resetDbpath( repairpath );
-rc = runMongoProgram( "mongod", "--repair", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-assert.eq.automsg( "0", "rc" );
-m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-db = m.getDB( baseName );
+resetDbpath(repairpath);
+rc = runMongoProgram(
+    "mongod", "--repair", "--port", m.port, "--dbpath", dbpath, "--repairpath", repairpath);
+assert.eq.automsg("0", "rc");
+m = MongoRunner.runMongod({
+    port: m.port,
+    dbpath: dbpath,
+    noCleanData: true,
+});
+db = m.getDB(baseName);
 check();
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod(m);
 
-resetDbpath( repairpath );
-rc = runMongoProgram( "mongod", "--repair", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-assert.eq.automsg( "0", "rc" );
-m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-db = m.getDB( baseName );
+resetDbpath(repairpath);
+rc = runMongoProgram("mongod", "--repair", "--port", m.port, "--dbpath", dbpath);
+assert.eq.automsg("0", "rc");
+m = MongoRunner.runMongod({
+    port: m.port,
+    dbpath: dbpath,
+    noCleanData: true,
+});
+db = m.getDB(baseName);
 check();

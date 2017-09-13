@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -14,6 +14,7 @@
  */
 const char *
 __wt_page_type_string(u_int type)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	switch (type) {
 	case WT_PAGE_INVALID:
@@ -101,7 +102,7 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *buf)
 		return (buf->data);
 	}
 
-	(void)__wt_ref_info(session, ref, &addr, &addr_size, NULL);
+	__wt_ref_info(ref, &addr, &addr_size, NULL);
 	return (__wt_addr_string(session, addr, addr_size, buf));
 }
 
@@ -115,13 +116,15 @@ __wt_addr_string(WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_size, WT_ITEM *buf)
 {
 	WT_BM *bm;
+	WT_BTREE *btree;
 
-	bm = S2BT(session)->bm;
+	btree = S2BT_SAFE(session);
 
 	if (addr == NULL) {
 		buf->data = "[NoAddr]";
 		buf->size = strlen("[NoAddr]");
-	} else if (bm->addr_string(bm, session, buf, addr, addr_size) != 0) {
+	} else if (btree == NULL || (bm = btree->bm) == NULL ||
+	    bm->addr_string(bm, session, buf, addr, addr_size) != 0) {
 		buf->data = "[Error]";
 		buf->size = strlen("[Error]");
 	}

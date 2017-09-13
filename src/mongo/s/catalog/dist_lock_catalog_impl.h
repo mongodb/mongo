@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <vector>
+
 #include "mongo/bson/oid.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -37,53 +40,63 @@
 
 namespace mongo {
 
-class RemoteCommandRunner;
-class RemoteCommandTargeter;
+class FindAndModifyRequest;
+struct ReadPreferenceSetting;
 
 class DistLockCatalogImpl final : public DistLockCatalog {
 public:
-    DistLockCatalogImpl(RemoteCommandTargeter* targeter,
-                        RemoteCommandRunner* executor,
-                        Milliseconds writeConcernTimeout);
+    DistLockCatalogImpl();
+    ~DistLockCatalogImpl();
 
-    virtual ~DistLockCatalogImpl();
+    StatusWith<LockpingsType> getPing(OperationContext* opCtx, StringData processID) override;
 
-    virtual StatusWith<LockpingsType> getPing(StringData processID) override;
+    Status ping(OperationContext* opCtx, StringData processID, Date_t ping) override;
 
-    virtual Status ping(StringData processID, Date_t ping) override;
+    StatusWith<LocksType> grabLock(OperationContext* opCtx,
+                                   StringData lockID,
+                                   const OID& lockSessionID,
+                                   StringData who,
+                                   StringData processId,
+                                   Date_t time,
+                                   StringData why,
+                                   const WriteConcernOptions& writeConcern) override;
 
-    virtual StatusWith<LocksType> grabLock(StringData lockID,
-                                           const OID& lockSessionID,
-                                           StringData who,
-                                           StringData processId,
-                                           Date_t time,
-                                           StringData why) override;
+    StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
+                                       StringData lockID,
+                                       const OID& lockSessionID,
+                                       const OID& currentHolderTS,
+                                       StringData who,
+                                       StringData processId,
+                                       Date_t time,
+                                       StringData why) override;
 
-    virtual StatusWith<LocksType> overtakeLock(StringData lockID,
-                                               const OID& lockSessionID,
-                                               const OID& currentHolderTS,
-                                               StringData who,
-                                               StringData processId,
-                                               Date_t time,
-                                               StringData why) override;
+    Status unlock(OperationContext* opCtx, const OID& lockSessionID) override;
 
-    virtual Status unlock(const OID& lockSessionID) override;
+    Status unlock(OperationContext* opCtx, const OID& lockSessionID, StringData name) override;
 
-    virtual StatusWith<ServerInfo> getServerInfo() override;
+    Status unlockAll(OperationContext* opCtx, const std::string& processID) override;
 
-    virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) override;
+    StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) override;
 
-    virtual StatusWith<LocksType> getLockByName(StringData name) override;
+    StatusWith<LocksType> getLockByTS(OperationContext* opCtx, const OID& lockSessionID) override;
 
-    virtual Status stopPing(StringData processId) override;
+    StatusWith<LocksType> getLockByName(OperationContext* opCtx, StringData name) override;
+
+    Status stopPing(OperationContext* opCtx, StringData processId) override;
 
 private:
-    RemoteCommandRunner* _cmdRunner;
-    RemoteCommandTargeter* _targeter;
+    Status _unlock(OperationContext* opCtx, const FindAndModifyRequest& request);
+
+    StatusWith<std::vector<BSONObj>> _findOnConfig(OperationContext* opCtx,
+                                                   const ReadPreferenceSetting& readPref,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& query,
+                                                   const BSONObj& sort,
+                                                   boost::optional<long long> limit);
 
     // These are not static to avoid initialization order fiasco.
-    const WriteConcernOptions _writeConcern;
     const NamespaceString _lockPingNS;
     const NamespaceString _locksNS;
 };
-}
+
+}  // namespace mongo

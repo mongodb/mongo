@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -21,14 +21,14 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	session = conn->default_session;
 
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++) {
-		SLIST_INIT(&conn->dhhash[i]);	/* Data handle hash lists */
-		SLIST_INIT(&conn->fhhash[i]);	/* File handle hash lists */
+		TAILQ_INIT(&conn->dhhash[i]);	/* Data handle hash lists */
+		TAILQ_INIT(&conn->fhhash[i]);	/* File handle hash lists */
 	}
 
-	SLIST_INIT(&conn->dhlh);		/* Data handle list */
+	TAILQ_INIT(&conn->dhqh);		/* Data handle list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->dsrcqh);		/* Data source list */
-	SLIST_INIT(&conn->fhlh);		/* File list */
+	TAILQ_INIT(&conn->fhqh);		/* File list */
 	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
 	TAILQ_INIT(&conn->encryptqh);		/* Encryptor list */
@@ -41,26 +41,30 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	TAILQ_INIT(&conn->lsm_manager.appqh);
 	TAILQ_INIT(&conn->lsm_manager.managerqh);
 
+	/* Random numbers. */
+	__wt_random_init(&session->rnd);
+
 	/* Configuration. */
 	WT_RET(__wt_conn_config_init(session));
 
 	/* Statistics. */
-	__wt_stat_init_connection_stats(&conn->stats);
+	WT_RET(__wt_stat_connection_init(session, conn));
 
-	/* Locks. */
+	/* Spinlocks. */
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
-	WT_RET(__wt_spin_init(session, &conn->checkpoint_lock, "checkpoint"));
-	WT_RET(__wt_spin_init(session, &conn->dhandle_lock, "data handle"));
+	WT_SPIN_INIT_TRACKED(session, &conn->checkpoint_lock, checkpoint);
 	WT_RET(__wt_spin_init(session, &conn->encryptor_lock, "encryptor"));
 	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
-	WT_RET(__wt_spin_init(session, &conn->hot_backup_lock, "hot backup"));
+	WT_RET(__wt_spin_init(session, &conn->las_lock, "lookaside table"));
+	WT_SPIN_INIT_TRACKED(session, &conn->metadata_lock, metadata);
 	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
-	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
-	WT_RET(__wt_spin_init(session, &conn->table_lock, "table creation"));
-	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS(conn), &conn->page_lock));
-	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
-		WT_RET(
-		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));
+	WT_SPIN_INIT_TRACKED(session, &conn->schema_lock, schema);
+	WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
+
+	/* Read-write locks */
+	WT_RWLOCK_INIT_TRACKED(session, &conn->dhandle_lock, dhandle);
+	WT_RET(__wt_rwlock_init(session, &conn->hot_backup_lock));
+	WT_RWLOCK_INIT_TRACKED(session, &conn->table_lock, table);
 
 	/* Setup the spin locks for the LSM manager queues. */
 	WT_RET(__wt_spin_init(session,
@@ -70,17 +74,10 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(
 	    session, &conn->lsm_manager.switch_lock, "LSM switch queue lock"));
 	WT_RET(__wt_cond_alloc(
-	    session, "LSM worker cond", 0, &conn->lsm_manager.work_cond));
+	    session, "LSM worker cond", &conn->lsm_manager.work_cond));
 
-	/*
-	 * Generation numbers.
-	 *
-	 * Start split generations at one.  Threads publish this generation
-	 * number before examining tree structures, and zero when they leave.
-	 * We need to distinguish between threads that are in a tree before the
-	 * first split has happened, and threads that are not in a tree.
-	 */
-	conn->split_gen = 1;
+	/* Initialize the generation manager. */
+	__wt_gen_init(session);
 
 	/*
 	 * Block manager.
@@ -90,8 +87,8 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	 */
 	WT_RET(__wt_spin_init(session, &conn->block_lock, "block manager"));
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
-		SLIST_INIT(&conn->blockhash[i]);/* Block handle hash lists */
-	SLIST_INIT(&conn->blocklh);		/* Block manager list */
+		TAILQ_INIT(&conn->blockhash[i]);/* Block handle hash lists */
+	TAILQ_INIT(&conn->blockqh);		/* Block manager list */
 
 	return (0);
 }
@@ -100,25 +97,16 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
  * __wt_connection_destroy --
  *	Destroy the connection's underlying WT_CONNECTION_IMPL structure.
  */
-int
+void
 __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	u_int i;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)
-		return (0);
+		return;
 
 	session = conn->default_session;
-
-	/*
-	 * Close remaining open files (before discarding the mutex, the
-	 * underlying file-close code uses the mutex to guard lists of
-	 * open files.
-	 */
-	WT_TRET(__wt_close(session, &conn->lock_fh));
 
 	/* Remove from the list of connections. */
 	__wt_spin_lock(session, &__wt_process.spinlock);
@@ -133,23 +121,23 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->api_lock);
 	__wt_spin_destroy(session, &conn->block_lock);
 	__wt_spin_destroy(session, &conn->checkpoint_lock);
-	__wt_spin_destroy(session, &conn->dhandle_lock);
+	__wt_rwlock_destroy(session, &conn->dhandle_lock);
 	__wt_spin_destroy(session, &conn->encryptor_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
-	__wt_spin_destroy(session, &conn->hot_backup_lock);
+	__wt_rwlock_destroy(session, &conn->hot_backup_lock);
+	__wt_spin_destroy(session, &conn->las_lock);
+	__wt_spin_destroy(session, &conn->metadata_lock);
 	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
-	__wt_spin_destroy(session, &conn->table_lock);
-	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
-		__wt_spin_destroy(session, &conn->page_lock[i]);
-	__wt_free(session, conn->page_lock);
+	__wt_rwlock_destroy(session, &conn->table_lock);
+	__wt_spin_destroy(session, &conn->turtle_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->cfg);
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->error_prefix);
 	__wt_free(session, conn->sessions);
+	__wt_stat_connection_discard(session, conn);
 
 	__wt_free(NULL, conn);
-	return (ret);
 }

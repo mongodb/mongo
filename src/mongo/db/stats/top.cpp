@@ -36,7 +36,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 
@@ -73,71 +72,81 @@ Top& Top::get(ServiceContext* service) {
     return getTop(service);
 }
 
-void Top::record(StringData ns, int op, int lockType, long long micros, bool command) {
+void Top::record(OperationContext* opCtx,
+                 StringData ns,
+                 LogicalOp logicalOp,
+                 LockType lockType,
+                 long long micros,
+                 bool command,
+                 Command::ReadWriteType readWriteType) {
     if (ns[0] == '?')
         return;
 
-    // cout << "record: " << ns << "\t" << op << "\t" << command << endl;
+    auto hashedNs = UsageMap::HashedKey(ns);
     stdx::lock_guard<SimpleMutex> lk(_lock);
 
-    if ((command || op == dbQuery) && ns == _lastDropped) {
+    if ((command || logicalOp == LogicalOp::opQuery) && ns == _lastDropped) {
         _lastDropped = "";
         return;
     }
 
-    CollectionData& coll = _usage[ns];
-    _record(coll, op, lockType, micros, command);
+    CollectionData& coll = _usage[hashedNs];
+    _record(opCtx, coll, logicalOp, lockType, micros, readWriteType);
 }
 
-void Top::_record(CollectionData& c, int op, int lockType, long long micros, bool command) {
+void Top::_record(OperationContext* opCtx,
+                  CollectionData& c,
+                  LogicalOp logicalOp,
+                  LockType lockType,
+                  long long micros,
+                  Command::ReadWriteType readWriteType) {
+
+    _incrementHistogram(opCtx, micros, &c.opLatencyHistogram, readWriteType);
+
     c.total.inc(micros);
 
-    if (lockType > 0)
+    if (lockType == LockType::WriteLocked)
         c.writeLock.inc(micros);
-    else if (lockType < 0)
+    else if (lockType == LockType::ReadLocked)
         c.readLock.inc(micros);
 
-    switch (op) {
-        case 0:
+    switch (logicalOp) {
+        case LogicalOp::opInvalid:
             // use 0 for unknown, non-specific
             break;
-        case dbUpdate:
+        case LogicalOp::opUpdate:
             c.update.inc(micros);
             break;
-        case dbInsert:
+        case LogicalOp::opInsert:
             c.insert.inc(micros);
             break;
-        case dbQuery:
-            if (command)
-                c.commands.inc(micros);
-            else
-                c.queries.inc(micros);
+        case LogicalOp::opQuery:
+            c.queries.inc(micros);
             break;
-        case dbGetMore:
+        case LogicalOp::opGetMore:
             c.getmore.inc(micros);
             break;
-        case dbDelete:
+        case LogicalOp::opDelete:
             c.remove.inc(micros);
             break;
-        case dbKillCursors:
+        case LogicalOp::opKillCursors:
             break;
-        case opReply:
-        case dbMsg:
-        case dbCommandReply:
-            log() << "unexpected op in Top::record: " << op << endl;
-            break;
-        case dbCommand:
+        case LogicalOp::opCommand:
             c.commands.inc(micros);
             break;
         default:
-            log() << "unknown op in Top::record: " << op << endl;
+            MONGO_UNREACHABLE;
     }
 }
 
-void Top::collectionDropped(StringData ns) {
+void Top::collectionDropped(StringData ns, bool databaseDropped) {
     stdx::lock_guard<SimpleMutex> lk(_lock);
     _usage.erase(ns);
-    _lastDropped = ns.toString();
+    if (!databaseDropped) {
+        // If a collection drop occurred, there will be a subsequent call to record for this
+        // collection namespace which must be ignored. This does not apply to a database drop.
+        _lastDropped = ns.toString();
+    }
 }
 
 void Top::cloneMap(Top::UsageMap& out) const {
@@ -187,4 +196,36 @@ void Top::_appendStatsEntry(BSONObjBuilder& b, const char* statsName, const Usag
     bb.appendNumber("count", map.count);
     bb.done();
 }
+
+void Top::appendLatencyStats(StringData ns, bool includeHistograms, BSONObjBuilder* builder) {
+    auto hashedNs = UsageMap::HashedKey(ns);
+    stdx::lock_guard<SimpleMutex> lk(_lock);
+    BSONObjBuilder latencyStatsBuilder;
+    _usage[hashedNs].opLatencyHistogram.append(includeHistograms, &latencyStatsBuilder);
+    builder->append("ns", ns);
+    builder->append("latencyStats", latencyStatsBuilder.obj());
 }
+
+void Top::incrementGlobalLatencyStats(OperationContext* opCtx,
+                                      uint64_t latency,
+                                      Command::ReadWriteType readWriteType) {
+    stdx::lock_guard<SimpleMutex> guard(_lock);
+    _incrementHistogram(opCtx, latency, &_globalHistogramStats, readWriteType);
+}
+
+void Top::appendGlobalLatencyStats(bool includeHistograms, BSONObjBuilder* builder) {
+    stdx::lock_guard<SimpleMutex> guard(_lock);
+    _globalHistogramStats.append(includeHistograms, builder);
+}
+
+void Top::_incrementHistogram(OperationContext* opCtx,
+                              long long latency,
+                              OperationLatencyHistogram* histogram,
+                              Command::ReadWriteType readWriteType) {
+    // Only update histogram if operation came from a user.
+    Client* client = opCtx->getClient();
+    if (client->isFromUserConnection() && !client->isInDirectClient()) {
+        histogram->increment(latency, readWriteType);
+    }
+}
+}  // namespace mongo

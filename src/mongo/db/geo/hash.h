@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 
@@ -136,6 +136,10 @@ public:
     // closest (in particular, level == kMaxBits is not allowed).
     void appendVertexNeighbors(unsigned level, std::vector<GeoHash>* output) const;
 
+    // public but only for the purpose of testing
+    void unhash_fast(unsigned* x, unsigned* y) const;
+    void unhash_slow(unsigned* x, unsigned* y) const;
+
 private:
     // Create a hash from the provided string.  Used by the std::string and char* cons.
     void initFromString(const char* s);
@@ -145,9 +149,6 @@ private:
     void clearUnusedBits();
     // XXX: what does this do
     void _move(unsigned offset, int d);
-    // XXX: this is nasty and has no example
-    void unhash_fast(unsigned* x, unsigned* y) const;
-    void unhash_slow(unsigned* x, unsigned* y) const;
 
     long long _hash;
     // Bits per field.  Our hash is 64 bits, and we have an X and a Y field,

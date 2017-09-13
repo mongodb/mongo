@@ -28,16 +28,44 @@
 
 #include "mongo/db/exec/projection_exec.h"
 
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/query_request.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using std::max;
 using std::string;
+
+namespace mmb = mongo::mutablebson;
+
+namespace {
+
+/**
+ * Adds sort key metadata inside 'member' to 'builder' with field name 'fieldName'.
+ *
+ * Returns a non-OK status if sort key metadata is missing from 'member'.
+ */
+Status addSortKeyMetaProj(StringData fieldName,
+                          const WorkingSetMember& member,
+                          BSONObjBuilder* builder) {
+    if (!member.hasComputed(WSM_SORT_KEY)) {
+        return Status(ErrorCodes::InternalError,
+                      "sortKey meta-projection requested but no data available");
+    }
+
+    const SortKeyComputedData* sortKeyData =
+        static_cast<const SortKeyComputedData*>(member.getComputed(WSM_SORT_KEY));
+    builder->append(fieldName, sortKeyData->getSortKey());
+    return Status::OK();
+}
+
+}  // namespace
 
 ProjectionExec::ProjectionExec()
     : _include(true),
@@ -46,15 +74,12 @@ ProjectionExec::ProjectionExec()
       _skip(0),
       _limit(-1),
       _arrayOpType(ARRAY_OP_NORMAL),
-      _hasNonSimple(false),
-      _hasDottedField(false),
       _queryExpression(NULL),
       _hasReturnKey(false) {}
 
-
 ProjectionExec::ProjectionExec(const BSONObj& spec,
                                const MatchExpression* queryExpression,
-                               const MatchExpressionParser::WhereCallback& whereCallback)
+                               const CollatorInterface* collator)
     : _include(true),
       _special(false),
       _source(spec),
@@ -62,23 +87,16 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
       _skip(0),
       _limit(-1),
       _arrayOpType(ARRAY_OP_NORMAL),
-      _hasNonSimple(false),
-      _hasDottedField(false),
       _queryExpression(queryExpression),
-      _hasReturnKey(false) {
-    // Are we including or excluding fields?
-    // -1 when we haven't initialized it.
-    // 1 when we're including
-    // 0 when we're excluding.
-    int include_exclude = -1;
+      _hasReturnKey(false),
+      _collator(collator) {
+    // Whether we're including or excluding fields.
+    enum class IncludeExclude { kUninitialized, kInclude, kExclude };
+    IncludeExclude includeExclude = IncludeExclude::kUninitialized;
 
     BSONObjIterator it(_source);
     while (it.more()) {
         BSONElement e = it.next();
-
-        if (!e.isNumber() && !e.isBoolean()) {
-            _hasNonSimple = true;
-        }
 
         if (Object == e.type()) {
             BSONObj obj = e.embeddedObject();
@@ -113,27 +131,29 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                 BSONObj elemMatchObj = e.wrap();
                 verify(elemMatchObj.isOwned());
                 _elemMatchObjs.push_back(elemMatchObj);
-                StatusWithMatchExpression swme =
-                    MatchExpressionParser::parse(elemMatchObj, whereCallback);
-                verify(swme.isOK());
+                StatusWithMatchExpression statusWithMatcher =
+                    MatchExpressionParser::parse(elemMatchObj, _collator);
+                verify(statusWithMatcher.isOK());
                 // And store it in _matchers.
-                _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] = swme.getValue();
+                _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] =
+                    statusWithMatcher.getValue().release();
 
                 add(e.fieldName(), true);
             } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
                 verify(String == e2.type());
-                if (e2.valuestr() == LiteParsedQuery::metaTextScore) {
+                if (e2.valuestr() == QueryRequest::metaTextScore) {
                     _meta[e.fieldName()] = META_TEXT_SCORE;
-                } else if (e2.valuestr() == LiteParsedQuery::metaRecordId) {
+                } else if (e2.valuestr() == QueryRequest::metaSortKey) {
+                    _sortKeyMetaFields.push_back(e.fieldName());
+                    _meta[_sortKeyMetaFields.back()] = META_SORT_KEY;
+                } else if (e2.valuestr() == QueryRequest::metaRecordId) {
                     _meta[e.fieldName()] = META_RECORDID;
-                } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
+                } else if (e2.valuestr() == QueryRequest::metaGeoNearPoint) {
                     _meta[e.fieldName()] = META_GEONEAR_POINT;
-                } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearDistance) {
+                } else if (e2.valuestr() == QueryRequest::metaGeoNearDistance) {
                     _meta[e.fieldName()] = META_GEONEAR_DIST;
-                } else if (e2.valuestr() == LiteParsedQuery::metaIndexKey) {
+                } else if (e2.valuestr() == QueryRequest::metaIndexKey) {
                     _hasReturnKey = true;
-                    // The index key clobbers everything so just stop parsing here.
-                    return;
                 } else {
                     // This shouldn't happen, should be caught by parsing.
                     verify(0);
@@ -146,16 +166,10 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
         } else {
             add(e.fieldName(), e.trueValue());
 
-            // Projections of dotted fields aren't covered.
-            if (mongoutils::str::contains(e.fieldName(), '.')) {
-                _hasDottedField = true;
-            }
-
-            // Validate input.
-            if (include_exclude == -1) {
-                // If we haven't specified an include/exclude, initialize include_exclude.
-                // We expect further include/excludes to match it.
-                include_exclude = e.trueValue();
+            // If we haven't specified an include/exclude, initialize includeExclude.
+            if (includeExclude == IncludeExclude::kUninitialized) {
+                includeExclude =
+                    e.trueValue() ? IncludeExclude::kInclude : IncludeExclude::kExclude;
                 _include = !e.trueValue();
             }
         }
@@ -223,18 +237,27 @@ void ProjectionExec::add(const string& field, int skip, int limit) {
 
 Status ProjectionExec::transform(WorkingSetMember* member) const {
     if (_hasReturnKey) {
-        BSONObj keyObj;
+        BSONObjBuilder builder;
 
         if (member->hasComputed(WSM_INDEX_KEY)) {
             const IndexKeyComputedData* key =
                 static_cast<const IndexKeyComputedData*>(member->getComputed(WSM_INDEX_KEY));
-            keyObj = key->getKey();
+            builder.appendElements(key->getKey());
         }
 
-        member->state = WorkingSetMember::OWNED_OBJ;
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), keyObj);
+        // Must be possible to do both returnKey meta-projection and sortKey meta-projection so that
+        // mongos can support returnKey.
+        for (auto fieldName : _sortKeyMetaFields) {
+            auto sortKeyMetaStatus = addSortKeyMetaProj(fieldName, *member, &builder);
+            if (!sortKeyMetaStatus.isOK()) {
+                return sortKeyMetaStatus;
+            }
+        }
+
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), builder.obj());
         member->keyData.clear();
-        member->loc = RecordId();
+        member->recordId = RecordId();
+        member->transitionToOwnedObj();
         return Status::OK();
     }
 
@@ -254,7 +277,7 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             return projStatus;
         }
     } else {
-        verify(!requiresDocument());
+        invariant(!_include);
         // Go field by field.
         if (_includeID) {
             BSONElement elt;
@@ -264,19 +287,38 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             }
         }
 
-        BSONObjIterator it(_source);
-        while (it.more()) {
-            BSONElement specElt = it.next();
+        mmb::Document projectedDoc;
+
+        for (auto&& specElt : _source) {
             if (mongoutils::str::equals("_id", specElt.fieldName())) {
                 continue;
             }
 
+            // $meta sortKey is the only meta-projection which is allowed to operate on index keys
+            // rather than the full document.
+            auto metaIt = _meta.find(specElt.fieldName());
+            if (metaIt != _meta.end()) {
+                invariant(metaIt->second == META_SORT_KEY);
+                continue;
+            }
+
+            // $meta sortKey is also the only element with an Object value in the projection spec
+            // that can operate on index keys rather than the full document.
+            invariant(BSONType::Object != specElt.type());
+
             BSONElement keyElt;
             // We can project a field that doesn't exist.  We just ignore it.
             if (member->getFieldDotted(specElt.fieldName(), &keyElt) && !keyElt.eoo()) {
-                bob.appendAs(keyElt, specElt.fieldName());
+                FieldRef projectedFieldPath{specElt.fieldNameStringData()};
+                auto setElementStatus =
+                    pathsupport::setElementAtPath(projectedFieldPath, keyElt, &projectedDoc);
+                if (!setElementStatus.isOK()) {
+                    return setElementStatus;
+                }
             }
         }
+
+        bob.appendElements(projectedDoc.getObject());
     }
 
     for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {
@@ -312,35 +354,22 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             } else {
                 bob.append(it->first, 0.0);
             }
+        } else if (META_SORT_KEY == it->second) {
+            auto sortKeyMetaStatus = addSortKeyMetaProj(it->first, *member, &bob);
+            if (!sortKeyMetaStatus.isOK()) {
+                return sortKeyMetaStatus;
+            }
         } else if (META_RECORDID == it->second) {
-            bob.append(it->first, static_cast<long long>(member->loc.repr()));
+            bob.append(it->first, static_cast<long long>(member->recordId.repr()));
         }
     }
 
     BSONObj newObj = bob.obj();
-    member->state = WorkingSetMember::OWNED_OBJ;
     member->obj = Snapshotted<BSONObj>(SnapshotId(), newObj);
     member->keyData.clear();
-    member->loc = RecordId();
+    member->recordId = RecordId();
+    member->transitionToOwnedObj();
 
-    return Status::OK();
-}
-
-Status ProjectionExec::transform(const BSONObj& in, BSONObj* out) const {
-    // If it's a positional projection we need a MatchDetails.
-    MatchDetails matchDetails;
-    if (transformRequiresDetails()) {
-        matchDetails.requestElemMatchKey();
-        verify(NULL != _queryExpression);
-        verify(_queryExpression->matchesBSON(in, &matchDetails));
-    }
-
-    BSONObjBuilder bob;
-    Status s = transform(in, &bob, &matchDetails);
-    if (!s.isOK()) {
-        return s;
-    }
-    *out = bob.obj();
     return Status::OK();
 }
 
@@ -445,7 +474,7 @@ void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool
                 BSONObjBuilder subBob;
                 BSONObjIterator jt(elt.embeddedObject());
                 while (jt.more()) {
-                    append(&subBob, jt.next());
+                    append(&subBob, jt.next()).transitional_ignore();
                 }
                 bob->append(bob->numStr(index++), subBob.obj());
                 break;
@@ -488,7 +517,7 @@ Status ProjectionExec::append(BSONObjBuilder* bob,
         BSONObjBuilder subBob;
         BSONObjIterator it(elt.embeddedObject());
         while (it.more()) {
-            subfm.append(&subBob, it.next(), details, arrayOpType);
+            subfm.append(&subBob, it.next(), details, arrayOpType).transitional_ignore();
         }
         bob->append(elt.fieldName(), subBob.obj());
     } else {

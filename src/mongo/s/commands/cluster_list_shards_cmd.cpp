@@ -32,16 +32,16 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
 
-class ListShardsCmd : public Command {
+class ListShardsCmd : public BasicCommand {
 public:
-    ListShardsCmd() : Command("listShards", false, "listshards") {}
+    ListShardsCmd() : BasicCommand("listShards", "listshards") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -51,7 +51,8 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -67,17 +68,17 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        std::vector<ShardType> shards;
-        Status status = grid.catalogManager()->getAllShards(&shards);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+        auto shardsStatus =
+            grid.catalogClient()->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+        if (!shardsStatus.isOK()) {
+            return appendCommandStatus(result, shardsStatus.getStatus());
         }
+        std::vector<ShardType> shards = std::move(shardsStatus.getValue().value);
+
         std::vector<BSONObj> shardsObj;
         for (std::vector<ShardType>::const_iterator it = shards.begin(); it != shards.end(); it++) {
             shardsObj.push_back(it->toBSON());

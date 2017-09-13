@@ -33,6 +33,7 @@
 namespace mongo {
 
 class AuthorizationManager;
+class OperationContext;
 
 /**
  * Background job that runs only in mongos and periodically checks in with the config servers
@@ -42,7 +43,10 @@ class AuthorizationManager;
  */
 class UserCacheInvalidator : public BackgroundJob {
 public:
-    explicit UserCacheInvalidator(AuthorizationManager* authzManager);
+    UserCacheInvalidator(AuthorizationManager* authzManager);
+    ~UserCacheInvalidator();
+
+    void initialize(OperationContext* opCtx);
 
 protected:
     virtual std::string name() const;

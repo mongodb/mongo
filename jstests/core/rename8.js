@@ -1,6 +1,7 @@
 // SERVER-12591: prevent renaming to arbitrary system collections.
 
-var testdb = db.getSiblingDB("rename8"); // to avoid breaking other tests when we touch system.users
+var testdb =
+    db.getSiblingDB("rename8");  // to avoid breaking other tests when we touch system.users
 var coll = testdb.rename8;
 var systemNamespaces = testdb.system.namespaces;
 var systemFoo = testdb.system.foo;
@@ -17,7 +18,7 @@ assert.commandFailed(systemFoo.renameCollection(coll.getName()));
 
 // same with system.namespaces, even though it does exist
 assert.commandFailed(coll.renameCollection(systemNamespaces.getName()));
-assert.commandFailed(coll.renameCollection(systemNamespaces.getName(), /*dropTarget*/true));
+assert.commandFailed(coll.renameCollection(systemNamespaces.getName(), /*dropTarget*/ true));
 assert.commandFailed(systemNamespaces.renameCollection(coll.getName()));
 
 // system.users is whitelisted so these should work

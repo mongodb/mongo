@@ -28,50 +28,56 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/rpc/command_reply_builder.h"
+
 #include <utility>
 
-#include "mongo/rpc/command_reply_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {
 
-CommandReplyBuilder::CommandReplyBuilder() : _message{stdx::make_unique<Message>()} {}
+CommandReplyBuilder::CommandReplyBuilder() : CommandReplyBuilder(Message{}) {}
 
-CommandReplyBuilder::CommandReplyBuilder(std::unique_ptr<Message> message)
-    : _message{std::move(message)} {}
-
-CommandReplyBuilder& CommandReplyBuilder::setMetadata(BSONObj metadata) {
-    invariant(_state == State::kMetadata);
-    metadata.appendSelfToBufBuilder(_builder);
-    _state = State::kCommandReply;
-    return *this;
+CommandReplyBuilder::CommandReplyBuilder(Message&& message) : _message{std::move(message)} {
+    _builder.skip(mongo::MsgData::MsgDataHeaderSize);
 }
 
-CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(BSONObj commandReply) {
+CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(const BSONObj& commandReply) {
     invariant(_state == State::kCommandReply);
     commandReply.appendSelfToBufBuilder(_builder);
+    _state = State::kMetadata;
+    return *this;
+}
+
+BSONObjBuilder CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
+    invariant(_state == State::kCommandReply);
+    // Eagerly allocate reserveBytes bytes.
+    _builder.reserveBytes(reserveBytes);
+    // Claim our reservation immediately so we can actually write data to it.
+    _builder.claimReservedBytes(reserveBytes);
+    _state = State::kMetadata;
+    return BSONObjBuilder(_builder);
+}
+
+CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
+    invariant(_state == State::kMetadata);
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up- and down-conversion here so that the rest of the code only
+    // has to deal with the current format.
+    BSONObjBuilder bob(_builder);
+    for (auto elem : metadata) {
+        if (elem.fieldNameStringData() == "$configServerState") {
+            bob.appendAs(elem, "configsvr");
+        } else {
+            bob.append(elem);
+        }
+    }
     _state = State::kOutputDocs;
     return *this;
-}
-
-CommandReplyBuilder& CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
-    invariant(_state == State::kOutputDocs);
-    auto rangeData = outputDocs.data();
-    _builder.appendBuf(rangeData.data(), rangeData.length());
-    // leave state as is as we can add as many outputDocs as we want.
-    return *this;
-}
-
-CommandReplyBuilder& CommandReplyBuilder::addOutputDoc(BSONObj outputDoc) {
-    invariant(_state == State::kOutputDocs);
-    outputDoc.appendSelfToBufBuilder(_builder);
-    return *this;
-}
-
-ReplyBuilderInterface::State CommandReplyBuilder::getState() const {
-    return _state;
 }
 
 Protocol CommandReplyBuilder::getProtocol() const {
@@ -79,33 +85,25 @@ Protocol CommandReplyBuilder::getProtocol() const {
 }
 
 void CommandReplyBuilder::reset() {
-    // If we are in State::kMetadata, we are already in the 'start' state, so by
+    // If we are in State::kCommandReply, we are already in the 'start' state, so by
     // immediately returning, we save a heap allocation.
-    if (_state == State::kMetadata) {
+    if (_state == State::kCommandReply) {
         return;
     }
     _builder.reset();
-    _message = stdx::make_unique<Message>();
-    _state = State::kMetadata;
+    _builder.skip(mongo::MsgData::MsgDataHeaderSize);
+    _message.reset();
+    _state = State::kCommandReply;
 }
 
-std::unique_ptr<Message> CommandReplyBuilder::done() {
+Message CommandReplyBuilder::done() {
     invariant(_state == State::kOutputDocs);
-    // TODO: we can elide a large copy here by transferring the internal buffer of
-    // the BufBuilder to the Message.
-    _message->setData(dbCommandReply, _builder.buf(), _builder.len());
+    MsgData::View msg = _builder.buf();
+    msg.setLen(_builder.len());
+    msg.setOperation(dbCommandReply);
+    _message.setData(_builder.release());
     _state = State::kDone;
     return std::move(_message);
-}
-
-std::size_t CommandReplyBuilder::availableSpaceForOutputDocs() const {
-    invariant(State::kDone != _state);
-    int intLen = _builder.len();
-    invariant(0 <= intLen);
-    std::size_t len = static_cast<std::size_t>(intLen);
-    std::size_t msgHeaderSz = static_cast<std::size_t>(MsgData::MsgDataHeaderSize);
-    invariant(len + msgHeaderSz <= mongo::MaxMessageSizeBytes);
-    return mongo::MaxMessageSizeBytes - len - msgHeaderSz;
 }
 
 }  // rpc

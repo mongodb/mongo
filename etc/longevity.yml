@@ -1,0 +1,402 @@
+stepback: false
+command_type: system
+
+pre:
+
+post:
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          set -v
+          source ./dsienv.sh
+          $DSI_PATH/bin/make_artifact.sh
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports.tgz
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}.${ext|tgz}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: test-log
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports/graphs/timeseries-p1.html
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${task_name}-${build_id}.html
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: timeseries-p1.html
+    - command: attach.results
+      params:
+        file_location: work/report.json
+    - command: shell.exec
+      # destroy the cluster
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          # call terraform destroy twice to avoid AWS timeout
+          yes yes | ./terraform destroy --var-file=cluster.json
+          yes yes | ./terraform destroy --var-file=cluster.json
+          # clean all file to be safe
+          rm -rf *
+          echo "Cluster DESTROYED."
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          # removes files from the (local) scons cache when it's over a
+          # threshold, to the $prune_ratio percentage. Ideally override
+          # these default values in the distro config in evergreen.
+
+          if [ -d "${scons_cache_path}" ]; then
+              ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+          fi
+
+functions:
+  "prepare environment":
+    - command: shell.exec
+      params:
+        script: |
+          rm -rf ./*
+          mkdir src
+          mkdir work
+    - command: manifest.load
+    - command: git.get_project
+      params:
+        directory: src
+        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+          dsi: ${dsi_rev}
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          cat > bootstrap.yml <<EOF
+          cluster_type: ${cluster}
+          platform: ${platform}
+          setup: ${setup}
+          storageEngine: ${storageEngine}
+          test: ${test}.longevity
+          production: true
+          EOF
+
+          cat > runtime.yml <<EOF
+          # evergreen default expansions
+          is_patch: ${is_patch}
+          task_id: ${task_id}
+          task_name: ${task_name}
+          execution: ${execution}
+          build_id: ${build_id}
+          build_variant: ${build_variant}
+          version_id: ${version_id}
+          workdir: ${workdir}
+          revision: ${revision}
+          project: ${project}
+          branch_name: ${branch_name}
+
+          # sys-perf expansions
+          # Shouldn't be needed: testList: ${testList}
+          ext: ${ext}
+          script_flags : ${script_flags}
+          dsi_rev: ${dsi_rev}
+          compare_task: ${compare_task}
+          workloads_rev: ${workloads_rev}
+
+          # compositions of expansions
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          EOF
+    - command: shell.exec
+      params:
+        silent: true
+        working_dir: work
+        script: |
+          # AWS ssh secret key
+          echo "${ec2_pem}" > aws_ssh_key.pem
+          chmod 400 aws_ssh_key.pem
+
+          cat > runtime_secret.yml <<EOF
+          # Note that inside system_perf.yml we have ${aws_key} & ${aws_secret}, which are used for
+          # Evergreen resources. The below are used for dsi resources, and are NOT the same!
+          aws_access_key: "${terraform_key}"
+          aws_secret_key: "${terraform_secret}"
+          perf_jira_user: "${perf_jira_user}"
+          perf_jira_pw: "${perf_jira_pw}"
+          EOF
+          chmod 400 runtime_secret.yml
+    - command: shell.exec
+      params:
+        working_dir: work
+        # setup execution environment
+        # configure environment
+        script: |
+          set -e
+          virtualenv ./venv
+          source ./venv/bin/activate
+          pip install -r ../src/dsi/dsi/requirements.txt
+          python ../src/dsi/dsi/bin/bootstrap.py
+    - command: shell.exec
+      params:
+        script: |
+          set -v
+          set -e
+          source work/dsienv.sh
+          $DSI_PATH/bin/setup-dsi-env.sh
+          ls -a work
+
+  "infrastructure provisioning":
+    - command: shell.exec
+      # call infrastructure-provisioning.py. This will either create a cluster, or update tags on existing instances.
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -v
+          source ./dsienv.sh
+          source ./venv/bin/activate
+          $DSI_PATH/bin/infrastructure_provisioning.py
+
+  "configure mongodb cluster":
+    - command: shell.exec
+      # bring up the mongod
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          source ./dsienv.sh
+          source ./venv/bin/activate
+          $DSI_PATH/bin/mongodb_setup.py && echo "${setup} MongoDB Cluster STARTED."
+
+  "run test":
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -v
+          source ./dsienv.sh
+          source ./venv/bin/activate
+          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
+          $DSI_PATH/bin/run_test.py ${storageEngine} ${test} ${cluster}
+          echo "Complete test for ${test} with setup ${setup}!"
+    - command: "json.send"
+      params:
+          name: "perf"
+          file: "work/perf.json"
+
+  "destroy cluster":
+    - command: shell.exec
+      # destroy the cluster
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          source ./dsienv.sh
+          # Longevity runs so rarely, we simply teardown the cluster when done.
+          # Note that nowadays infrastructure_teardown.py is actually copying the terraform.tfstate into /data/infrastructure_provisioning
+          # but as of this writing the rhel70-perf-longevity distro didn't actually use the teardown hook.
+          source ./dsienv.sh
+          source ./venv/bin/activate
+          $DSI_PATH/bin/infrastructure_teardown.py
+          echo "Cluster DESTROYED."
+          echo
+          echo "All perf results"
+          cd ..
+          cat perf.json | egrep "name|ops_per_sec"
+
+  "make test log artifact":
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          set -v
+          source ./dsienv.sh
+          $DSI_PATH/bin/make_artifact.sh
+
+  "analyze":
+    - command: json.get_history
+      params:
+        task: ${task_name}
+        file: "work/history.json"
+        name: "perf"
+    - command: json.get_history
+      params:
+        tags: true
+        task: ${task_name}
+        file: "work/tags.json"
+        name: "perf"
+    - command: shell.exec
+      # post_run_check.py and longevity_override.json for DSI tests are part of dsi repo
+      type : test
+      params:
+        working_dir: work
+        script: |
+          set -o errexit
+          set -o verbose
+          TAG="3.2.1-Baseline"
+          PROJECT="mongo-longevity"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/master/longevity_override.json"
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
+
+tasks:
+- name: compile
+  commands:
+    - command: manifest.load
+    - command: git.get_project
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # We get the raw version string (r1.2.3-45-gabcdef) from git
+          MONGO_VERSION=$(git describe)
+          # If this is a patch build, we add the patch version id to the version string so we know
+          # this build was a patch, and which evergreen task it came from
+          if [ "${is_patch|}" = "true" ]; then
+            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          fi
+
+          # This script converts the generated version string into a sanitized version string for
+          # use by scons and uploading artifacts as well as information about for the scons cache.
+          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+    # Then we load the generated version data into the agent so we can use it in task definitions
+    - command: expansions.update
+      params:
+        file: src/compile_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo mongod mongos
+
+          # strip binaries here
+          strip mongo
+          strip mongos
+          strip mongod
+          mkdir -p mongodb/bin
+          mv mongo mongodb/bin
+          mv mongod mongodb/bin
+          mv mongos mongodb/bin
+          tar cvf mongodb.tar mongodb
+          gzip mongodb.tar
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb.tar.gz
+        remote_file: ${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongodb.tar.gz
+
+- name: shard_cluster_test
+  depends_on:
+    - name: compile
+  exec_timeout_secs: 216000
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "ycsb"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "ycsb"
+    - func: "make test log artifact"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+    - func: "destroy cluster"
+
+- name: shard_cluster_MMAPv1_test
+  depends_on:
+    - name: compile
+  exec_timeout_secs: 216000
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "ycsb"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "ycsb"
+    - func: "make test log artifact"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+    - func: "destroy cluster"
+
+
+#######################################
+#               Modules               #
+#######################################
+# if a module is added and to be added to the manifest
+# be sure to add the module to git.get_project revisions parameter
+modules:
+- name: dsi
+  repo: git@github.com:10gen/dsi.git
+  prefix: dsi
+  branch: master
+
+
+buildvariants:
+- name: linux-wt-shard
+  display_name: Linux WT Shard
+  batchtime: 40320 # 4 weeks
+  modules: &modules
+    - dsi
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    setup: shard-longevity
+    cluster: longevity
+    numShard: 3
+    storageEngine: wiredTiger
+    use_scons_cache: true
+    project: &project longevity
+  run_on:
+    - "rhel70-perf-longevity"
+  tasks:
+    - name: compile
+      distros:
+      - rhel70
+    - name: shard_cluster_test
+
+- name: linux-mmapv1-shard
+  display_name: Linux MMAPv1 Shard
+  batchtime: 40320 # 4 week
+  modules: *modules
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    setup: shard-longevity
+    cluster: longevity
+    numShard: 3
+    storageEngine: mmapv1
+    use_scons_cache: true
+    project: *project
+  run_on:
+    - "rhel70-perf-longevity"
+  tasks:
+    - name: compile
+      distros:
+      - rhel70
+    - name: shard_cluster_MMAPv1_test

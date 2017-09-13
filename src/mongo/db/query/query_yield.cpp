@@ -25,33 +25,37 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/query_yield.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-// static
-void QueryYield::yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher) {
-    // Things have to happen here in a specific order:
-    //   1) Tell the RecordFetcher to do any setup which needs to happen inside locks
-    //   2) Release lock mgr locks
-    //   3) Go to sleep
-    //   4) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
-    //   5) Reacquire lock mgr locks
+namespace {
+MONGO_FP_DECLARE(setYieldAllLocksHang);
+MONGO_FP_DECLARE(setYieldAllLocksWait);
+}  // namespace
 
-    Locker* locker = txn->lockState();
+// static
+void QueryYield::yieldAllLocks(OperationContext* opCtx,
+                               stdx::function<void()> whileYieldingFn,
+                               const NamespaceString& planExecNS) {
+    // Things have to happen here in a specific order:
+    //   * Release lock mgr locks
+    //   * Go to sleep
+    //   * Call the whileYieldingFn
+    //   * Reacquire lock mgr locks
+
+    Locker* locker = opCtx->lockState();
 
     Locker::LockSnapshot snapshot;
-
-    if (fetcher) {
-        fetcher->setup();
-    }
 
     // Nothing was unlocked, just return, yielding is pointless.
     if (!locker->saveLockStateAndUnlock(&snapshot)) {
@@ -60,13 +64,23 @@ void QueryYield::yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher) {
 
     // Top-level locks are freed, release any potential low-level (storage engine-specific
     // locks). If we are yielding, we are at a safe place to do so.
-    txn->recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->abandonSnapshot();
 
     // Track the number of yields in CurOp.
-    CurOp::get(txn)->yielded();
+    CurOp::get(opCtx)->yielded();
 
-    if (fetcher) {
-        fetcher->fetch();
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(setYieldAllLocksHang);
+
+    MONGO_FAIL_POINT_BLOCK(setYieldAllLocksWait, customWait) {
+        const BSONObj& data = customWait.getData();
+        BSONElement customWaitNS = data["namespace"];
+        if (!customWaitNS || planExecNS == customWaitNS.str()) {
+            sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
+        }
+    }
+
+    if (whileYieldingFn) {
+        whileYieldingFn();
     }
 
     locker->restoreLockState(snapshot);

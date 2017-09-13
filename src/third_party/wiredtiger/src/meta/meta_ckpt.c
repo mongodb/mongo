@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -139,7 +139,7 @@ __ckpt_named(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM k, v;
 
 	WT_RET(__wt_config_getones(session, config, "checkpoint", &v));
-	WT_RET(__wt_config_subinit(session, &ckptconf, &v));
+	__wt_config_subinit(session, &ckptconf, &v);
 
 	/*
 	 * Take the first match: there should never be more than a single
@@ -164,7 +164,7 @@ __ckpt_last(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt)
 	int64_t found;
 
 	WT_RET(__wt_config_getones(session, config, "checkpoint", &v));
-	WT_RET(__wt_config_subinit(session, &ckptconf, &v));
+	__wt_config_subinit(session, &ckptconf, &v);
 	for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
 		/* Ignore checkpoints before the ones we've already seen. */
 		WT_RET(__wt_config_subgets(session, &v, "order", &a));
@@ -196,7 +196,7 @@ __ckpt_last_name(
 	*namep = NULL;
 
 	WT_ERR(__wt_config_getones(session, config, "checkpoint", &v));
-	WT_ERR(__wt_config_subinit(session, &ckptconf, &v));
+	__wt_config_subinit(session, &ckptconf, &v);
 	for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
 		/*
 		 * We only care about unnamed checkpoints; applications may not
@@ -212,8 +212,7 @@ __ckpt_last_name(
 		if (found && a.val < found)
 			continue;
 
-		if (*namep != NULL)
-			__wt_free(session, *namep);
+		__wt_free(session, *namep);
 		WT_ERR(__wt_strndup(session, k.str, k.len, namep));
 		found = a.val;
 	}
@@ -221,7 +220,7 @@ __ckpt_last_name(
 		ret = WT_NOTFOUND;
 
 	if (0) {
-err:		__wt_free(session, namep);
+err:		__wt_free(session, *namep);
 	}
 	return (ret);
 }
@@ -268,8 +267,8 @@ __wt_meta_ckptlist_get(
 
 	/* Load any existing checkpoints into the array. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	if (__wt_config_getones(session, config, "checkpoint", &v) == 0 &&
-	    __wt_config_subinit(session, &ckptconf, &v) == 0)
+	if (__wt_config_getones(session, config, "checkpoint", &v) == 0) {
+		__wt_config_subinit(session, &ckptconf, &v);
 		for (; __wt_config_next(&ckptconf, &k, &v) == 0; ++slot) {
 			WT_ERR(__wt_realloc_def(
 			    session, &allocated, slot + 1, &ckptbase));
@@ -277,6 +276,7 @@ __wt_meta_ckptlist_get(
 
 			WT_ERR(__ckpt_load(session, &k, &v, ckpt));
 		}
+	}
 
 	/*
 	 * Allocate an extra slot for a new value, plus a slot to mark the end.
@@ -297,7 +297,7 @@ __wt_meta_ckptlist_get(
 	*ckptbasep = ckptbase;
 
 	if (0) {
-err:		__wt_meta_ckptlist_free(session, ckptbase);
+err:		__wt_meta_ckptlist_free(session, &ckptbase);
 	}
 	__wt_free(session, config);
 	__wt_scr_free(session, &buf);
@@ -424,12 +424,12 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 			 * guaranteed, a time_t has to be an arithmetic type,
 			 * but not an integral type.
 			 */
-			WT_ERR(__wt_seconds(session, &secs));
+			__wt_seconds(session, &secs);
 			ckpt->sec = (uintmax_t)secs;
 		}
 		if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s.%" PRId64 "=(addr=\"%.*s\",order=%" PRIu64
+			    "%s%s.%" PRId64 "=(addr=\"%.*s\",order=%" PRId64
 			    ",time=%" PRIuMAX ",size=%" PRIu64
 			    ",write_gen=%" PRIu64 ")",
 			    sep, ckpt->name, ckpt->order,
@@ -438,7 +438,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 			    ckpt->write_gen));
 		else
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%.*s\",order=%" PRIu64
+			    "%s%s=(addr=\"%.*s\",order=%" PRId64
 			    ",time=%" PRIuMAX ",size=%" PRIu64
 			    ",write_gen=%" PRIu64 ")",
 			    sep, ckpt->name,
@@ -451,7 +451,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 	if (ckptlsn != NULL)
 		WT_ERR(__wt_buf_catfmt(session, buf,
 		    ",checkpoint_lsn=(%" PRIu32 ",%" PRIuMAX ")",
-		    ckptlsn->file, (uintmax_t)ckptlsn->offset));
+		    ckptlsn->l.file, (uintmax_t)ckptlsn->l.offset));
 	WT_ERR(__ckpt_set(session, fname, buf->mem));
 
 err:	__wt_scr_free(session, &buf);
@@ -463,16 +463,16 @@ err:	__wt_scr_free(session, &buf);
  *	Discard the checkpoint array.
  */
 void
-__wt_meta_ckptlist_free(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
+__wt_meta_ckptlist_free(WT_SESSION_IMPL *session, WT_CKPT **ckptbasep)
 {
-	WT_CKPT *ckpt;
+	WT_CKPT *ckpt, *ckptbase;
 
-	if (ckptbase == NULL)
+	if ((ckptbase = *ckptbasep) == NULL)
 		return;
 
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		__wt_meta_checkpoint_free(session, ckpt);
-	__wt_free(session, ckptbase);
+	__wt_free(session, *ckptbasep);
 }
 
 /*

@@ -29,11 +29,11 @@
 #include "mongo/db/ops/modifier_rename.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/ops/field_checker.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/update/field_checker.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -74,6 +74,11 @@ Status ModifierRename::init(const BSONElement& modExpr, const Options& opts, boo
                       str::stream() << "The 'to' field for $rename must be a string: " << modExpr);
     }
 
+    if (modExpr.valueStringData().find('\0') != std::string::npos) {
+        return Status(ErrorCodes::BadValue,
+                      "The 'to' field for $rename cannot contain an embedded null byte");
+    }
+
     // Extract the field names from the mod expression
 
     _fromFieldRef.parse(modExpr.fieldName());
@@ -90,15 +95,16 @@ Status ModifierRename::init(const BSONElement& modExpr, const Options& opts, boo
     // Old restriction is that if the fields are the same then it is not allowed.
     if (_fromFieldRef == _toFieldRef)
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "The source and target field for $rename must differ: " << modExpr);
+                      str::stream() << "The source and target field for $rename must differ: "
+                                    << modExpr);
 
     // TODO: Remove this restriction by allowing moving deeping from the 'from' path
     // Old restriction is that if the to/from is on the same path it fails
     if (_fromFieldRef.isPrefixOf(_toFieldRef) || _toFieldRef.isPrefixOf(_fromFieldRef)) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "The source and target field for $rename must "
-                                       "not be on the same path: " << modExpr);
+                                       "not be on the same path: "
+                                    << modExpr);
     }
     // TODO: We can remove this restriction as long as there is only one,
     //       or it is the same array -- should think on this a bit.
@@ -156,9 +162,11 @@ Status ModifierRename::prepare(mutablebson::Element root,
             if (curr.getType() == Array)
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "The source field cannot be an array element, '"
-                                            << _fromFieldRef.dottedField() << "' in doc with "
+                                            << _fromFieldRef.dottedField()
+                                            << "' in doc with "
                                             << findElementNamed(root.leftChild(), "_id").toString()
-                                            << " has an array field called '" << curr.getFieldName()
+                                            << " has an array field called '"
+                                            << curr.getFieldName()
                                             << "'");
             curr = curr.parent();
         }
@@ -186,9 +194,11 @@ Status ModifierRename::prepare(mutablebson::Element root,
             if (curr.getType() == Array)
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "The destination field cannot be an array element, '"
-                                            << _fromFieldRef.dottedField() << "' in doc with "
+                                            << _fromFieldRef.dottedField()
+                                            << "' in doc with "
                                             << findElementNamed(root.leftChild(), "_id").toString()
-                                            << " has an array field called '" << curr.getFieldName()
+                                            << " has an array field called '"
+                                            << curr.getFieldName()
                                             << "'");
             curr = curr.parent();
         }
@@ -221,10 +231,8 @@ Status ModifierRename::apply() const {
         (_preparedState->toIdxFound == (_toFieldRef.numParts() - 1));
 
     if (destExists) {
-        removeStatus = _preparedState->toElemFound.remove();
-        if (!removeStatus.isOK()) {
-            return removeStatus;
-        }
+        // Set destination element to the value of the source element.
+        return _preparedState->toElemFound.setValueElement(_preparedState->fromElemFound);
     }
 
     // Creates the final element that's going to be the in 'doc'.
@@ -247,7 +255,8 @@ Status ModifierRename::apply() const {
     return pathsupport::createPathAt(_toFieldRef,
                                      tempElem == doc.end() ? 0 : tempIdx + 1,
                                      tempElem == doc.end() ? doc.root() : tempElem,
-                                     elemToSet);
+                                     elemToSet)
+        .getStatus();
 }
 
 Status ModifierRename::log(LogBuilder* logBuilder) const {

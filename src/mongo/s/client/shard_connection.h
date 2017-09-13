@@ -31,16 +31,25 @@
 #include <string>
 
 #include "mongo/client/connpool.h"
-#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
 class ChunkManager;
-typedef std::shared_ptr<ChunkManager> ChunkManagerPtr;
-
 
 class ShardConnection : public AScopedConnection {
 public:
+    /**
+     * Instantiates a new sharded connection, which will be associated with the specified chunk
+     * manager for versioning purposes.
+     *
+     * @param connectionString Connection string for the host to use.
+     * @param ns Namespace to associate the version with.
+     * @param manager The chunk manager, which should be used for obtaining shard version
+     *  information to be set on the connection. This value can be nullptr, if the connection will
+     *  not be versioned and not associated with a namespace, in which case only the
+     *  setShardVersion command will be invoked to initialize the remote shard. Otherwise, the
+     *  chunk manager will be used to obtain the shard version to set on the connection.
+     */
     ShardConnection(const ConnectionString& connectionString,
                     const std::string& ns,
                     std::shared_ptr<ChunkManager> manager = nullptr);
@@ -94,8 +103,6 @@ public:
         return _setVersion;
     }
 
-    static void sync();
-
     void donotCheckVersion() {
         _setVersion = false;
         _finishedInit = true;
@@ -106,7 +113,7 @@ public:
     }
 
     /** checks all of my thread local connections for the version of this ns */
-    static void checkMyConnectionVersions(const std::string& ns);
+    static void checkMyConnectionVersions(OperationContext* opCtx, const std::string& ns);
 
     /**
      * Returns all the current sharded connections to the pool.
@@ -126,34 +133,17 @@ public:
     static void forgetNS(const std::string& ns);
 
 private:
-    void _init();
     void _finishInit();
 
     const ConnectionString _cs;
     const std::string _ns;
-
-    std::shared_ptr<ChunkManager> _manager;
+    const std::shared_ptr<ChunkManager> _manager;
 
     bool _finishedInit;
 
     DBClientBase* _conn;
     bool _setVersion;
 };
-
-
-/**
- * Sends the setShardVersion command on the specified connection.
- */
-bool setShardVersion(DBClientBase& conn,
-                     const std::string& ns,
-                     const std::string& configServerPrimary,
-                     ChunkVersion version,
-                     ChunkManager* manager,
-                     bool authoritative,
-                     BSONObj& result);
-
-
-typedef std::shared_ptr<ShardConnection> ShardConnectionPtr;
 
 extern DBConnectionPool shardConnectionPool;
 

@@ -34,9 +34,12 @@
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -57,6 +60,18 @@ protected:
 
     void addIndex(BSONObj keyPattern, BSONObj infoObj);
 
+    void addIndex(BSONObj keyPattern, MatchExpression* filterExpr);
+
+    void addIndex(BSONObj keyPattern, const MultikeyPaths& multikeyPaths);
+
+    void addIndex(BSONObj keyPattern, const CollatorInterface* collator);
+
+    void addIndex(BSONObj keyPattern,
+                  MatchExpression* filterExpr,
+                  const CollatorInterface* collator);
+
+    void addIndex(BSONObj keyPattern, const CollatorInterface* collator, StringData indexName);
+
     //
     // Execute planner.
     //
@@ -65,15 +80,15 @@ protected:
 
     void runQuerySortProj(const BSONObj& query, const BSONObj& sort, const BSONObj& proj);
 
-    void runQuerySkipLimit(const BSONObj& query, long long skip, long long limit);
+    void runQuerySkipNToReturn(const BSONObj& query, long long skip, long long ntoreturn);
 
     void runQueryHint(const BSONObj& query, const BSONObj& hint);
 
-    void runQuerySortProjSkipLimit(const BSONObj& query,
-                                   const BSONObj& sort,
-                                   const BSONObj& proj,
-                                   long long skip,
-                                   long long limit);
+    void runQuerySortProjSkipNToReturn(const BSONObj& query,
+                                       const BSONObj& sort,
+                                       const BSONObj& proj,
+                                       long long skip,
+                                       long long ntoreturn);
 
     void runQuerySortHint(const BSONObj& query, const BSONObj& sort, const BSONObj& hint);
 
@@ -82,12 +97,12 @@ protected:
                             const BSONObj& minObj,
                             const BSONObj& maxObj);
 
-    void runQuerySortProjSkipLimitHint(const BSONObj& query,
-                                       const BSONObj& sort,
-                                       const BSONObj& proj,
-                                       long long skip,
-                                       long long limit,
-                                       const BSONObj& hint);
+    void runQuerySortProjSkipNToReturnHint(const BSONObj& query,
+                                           const BSONObj& sort,
+                                           const BSONObj& proj,
+                                           long long skip,
+                                           long long ntoreturn,
+                                           const BSONObj& hint);
 
     void runQuerySnapshot(const BSONObj& query);
 
@@ -95,7 +110,7 @@ protected:
                       const BSONObj& sort,
                       const BSONObj& proj,
                       long long skip,
-                      long long limit,
+                      long long ntoreturn,
                       const BSONObj& hint,
                       const BSONObj& minObj,
                       const BSONObj& maxObj,
@@ -109,11 +124,11 @@ protected:
 
     void runInvalidQuerySortProj(const BSONObj& query, const BSONObj& sort, const BSONObj& proj);
 
-    void runInvalidQuerySortProjSkipLimit(const BSONObj& query,
-                                          const BSONObj& sort,
-                                          const BSONObj& proj,
-                                          long long skip,
-                                          long long limit);
+    void runInvalidQuerySortProjSkipNToReturn(const BSONObj& query,
+                                              const BSONObj& sort,
+                                              const BSONObj& proj,
+                                              long long skip,
+                                              long long ntoreturn);
 
     void runInvalidQueryHint(const BSONObj& query, const BSONObj& hint);
 
@@ -122,18 +137,18 @@ protected:
                                    const BSONObj& minObj,
                                    const BSONObj& maxObj);
 
-    void runInvalidQuerySortProjSkipLimitHint(const BSONObj& query,
-                                              const BSONObj& sort,
-                                              const BSONObj& proj,
-                                              long long skip,
-                                              long long limit,
-                                              const BSONObj& hint);
+    void runInvalidQuerySortProjSkipNToReturnHint(const BSONObj& query,
+                                                  const BSONObj& sort,
+                                                  const BSONObj& proj,
+                                                  long long skip,
+                                                  long long ntoreturn,
+                                                  const BSONObj& hint);
 
     void runInvalidQueryFull(const BSONObj& query,
                              const BSONObj& sort,
                              const BSONObj& proj,
                              long long skip,
-                             long long limit,
+                             long long ntoreturn,
                              const BSONObj& hint,
                              const BSONObj& minObj,
                              const BSONObj& maxObj,
@@ -144,6 +159,8 @@ protected:
      * version goes through find command parsing, and will be planned like a find command.
      */
     void runQueryAsCommand(const BSONObj& cmdObj);
+
+    void runInvalidQueryAsCommand(const BSONObj& cmdObj);
 
     //
     // Introspect solutions.
@@ -178,16 +195,24 @@ protected:
      */
     void assertHasOneSolutionOf(const std::vector<std::string>& solnStrs) const;
 
+    /**
+     * Helper function to parse a MatchExpression.
+     */
+    static std::unique_ptr<MatchExpression> parseMatchExpression(
+        const BSONObj& obj, const CollatorInterface* collator = nullptr);
+
     //
     // Data members.
     //
 
-    static const char* ns;
+    static const NamespaceString nss;
 
+    QueryTestServiceContext serviceContext;
+    ServiceContext::UniqueOperationContext opCtx;
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;
     QueryPlannerParams params;
-    OwnedPointerVector<QuerySolution> solns;
+    std::vector<std::unique_ptr<QuerySolution>> solns;
 };
 
 }  // namespace mongo

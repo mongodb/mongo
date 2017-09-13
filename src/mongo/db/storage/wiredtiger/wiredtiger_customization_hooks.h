@@ -32,13 +32,11 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/db/jsobj.h"
-
 namespace mongo {
 class StringData;
 class ServiceContext;
 
+// Interface and default implementation for WiredTiger customization hooks
 class WiredTigerCustomizationHooks {
 public:
     static void set(ServiceContext* service,
@@ -46,27 +44,18 @@ public:
 
     static WiredTigerCustomizationHooks* get(ServiceContext* service);
 
-    virtual ~WiredTigerCustomizationHooks() = default;
+    virtual ~WiredTigerCustomizationHooks();
 
     /**
-     *  Appends additional configuration sub object(s) to the BSONObjbuilder builder.
+     * Returns true if the customization hooks are enabled.
      */
-    virtual void appendUID(BSONObjBuilder* builder) = 0;
+    virtual bool enabled() const;
 
     /**
-     *  Gets the WiredTiger encryption configuration string for the
-     *  provided table name
+     *  Gets an additional configuration string for the provided table name on a
+     *  `WT_SESSION::create` call.
      */
-    virtual std::string getOpenConfig(StringData tableName) = 0;
+    virtual std::string getTableCreateConfig(StringData tableName);
 };
 
-// Empty default implementation of the abstract class WiredTigerCustomizationHooks
-class EmptyWiredTigerCustomizationHooks : public WiredTigerCustomizationHooks {
-public:
-    ~EmptyWiredTigerCustomizationHooks() override;
-
-    void appendUID(BSONObjBuilder* builder) override;
-
-    std::string getOpenConfig(StringData tableName) override;
-};
 }  // namespace mongo

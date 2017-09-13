@@ -40,6 +40,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -109,10 +110,11 @@ Status StorageEngineLockFile::open() {
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "Unable to check existence of data directory " << _dbpath
-                                    << ": " << ex.what());
+                                    << ": "
+                                    << ex.what());
     }
 
-    HANDLE lockFileHandle = CreateFileA(_filespec.c_str(),
+    HANDLE lockFileHandle = CreateFileW(toNativeString(_filespec.c_str()).c_str(),
                                         GENERIC_READ | GENERIC_WRITE,
                                         0 /* do not allow anyone else access */,
                                         NULL,
@@ -122,10 +124,21 @@ Status StorageEngineLockFile::open() {
 
     if (lockFileHandle == INVALID_HANDLE_VALUE) {
         int errorcode = GetLastError();
+        if (errorcode == ERROR_ACCESS_DENIED) {
+            return Status(ErrorCodes::IllegalOperation,
+                          str::stream()
+                              << "Attempted to create a lock file on a read-only directory: "
+                              << _dbpath);
+        }
         return Status(ErrorCodes::DBPathInUse,
-                      str::stream() << "Unable to create/open lock file: " << _filespec << ' '
+                      str::stream() << "Unable to create/open the lock file: " << _filespec << " ("
                                     << errnoWithDescription(errorcode)
-                                    << ". Is a mongod instance already running?");
+                                    << ")."
+                                    << " Ensure the user executing mongod is the owner of the lock "
+                                       "file and has the appropriate permissions. Also make sure "
+                                       "that another mongod instance is not already running on the "
+                                    << _dbpath
+                                    << " directory");
     }
     _lockFileHandle->_handle = lockFileHandle;
     return Status::OK();
@@ -164,12 +177,16 @@ Status StorageEngineLockFile::writePid() {
         int errorcode = GetLastError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id " << pid.toString()
-                                    << " to file: " << _filespec << ' '
+                                    << " to file: "
+                                    << _filespec
+                                    << ' '
                                     << errnoWithDescription(errorcode));
     } else if (bytesWritten == 0) {
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id " << pid.toString()
-                                    << " to file: " << _filespec << " no data written.");
+                                    << " to file: "
+                                    << _filespec
+                                    << " no data written.");
     }
 
     ::FlushFileBuffers(_lockFileHandle->_handle);
@@ -184,7 +201,7 @@ void StorageEngineLockFile::clearPidAndUnlock() {
     log() << "shutdown: removing fs lock...";
     // This ought to be an unlink(), but Eliot says the last
     // time that was attempted, there was a race condition
-    // with acquirePathLock().
+    // with StorageEngineLockFile::open().
     Status status = _truncateFile(_lockFileHandle->_handle);
     if (!status.isOK()) {
         log() << "couldn't remove fs lock " << status.toString();

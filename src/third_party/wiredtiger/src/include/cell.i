@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -182,10 +182,10 @@ __wt_cell_pack_addr(WT_CELL *cell, u_int cell_type, uint64_t recno, size_t size)
 
 	p = cell->__chunk + 1;
 
-	if (recno == 0)
-		cell->__chunk[0] = cell_type;		/* Type */
+	if (recno == WT_RECNO_OOB)
+		cell->__chunk[0] = (uint8_t)cell_type;	/* Type */
 	else {
-		cell->__chunk[0] = cell_type | WT_CELL_64V;
+		cell->__chunk[0] = (uint8_t)(cell_type | WT_CELL_64V);
 		(void)__wt_vpack_uint(&p, 0, recno);	/* Record number */
 	}
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
@@ -207,8 +207,8 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, size_t size)
 	 */
 	if (rle < 2 && size <= WT_CELL_SHORT_MAX) {
 		byte = (uint8_t)size;			/* Type + length */
-		cell->__chunk[0] =
-		    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_VALUE_SHORT;
+		cell->__chunk[0] = (uint8_t)
+		    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_VALUE_SHORT);
 		return (1);
 	}
 
@@ -230,11 +230,12 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, size_t size)
  */
 static inline int
 __wt_cell_pack_data_match(
-    WT_CELL *page_cell, WT_CELL *val_cell, const uint8_t *val_data, int *matchp)
+    WT_CELL *page_cell, WT_CELL *val_cell, const uint8_t *val_data,
+    bool *matchp)
 {
 	const uint8_t *a, *b;
 	uint64_t av, bv;
-	int rle;
+	bool rle;
 
 	*matchp = 0;				/* Default to no-match */
 
@@ -252,7 +253,7 @@ __wt_cell_pack_data_match(
 		av = a[0] >> WT_CELL_SHORT_SHIFT;
 		++a;
 	} else if (WT_CELL_TYPE(a[0]) == WT_CELL_VALUE) {
-		rle = a[0] & WT_CELL_64V ? 1 : 0;	/* Skip any RLE */
+		rle = (a[0] & WT_CELL_64V) != 0;	/* Skip any RLE */
 		++a;
 		if (rle)
 			WT_RET(__wt_vunpack_uint(&a, 0, &av));
@@ -264,7 +265,7 @@ __wt_cell_pack_data_match(
 		bv = b[0] >> WT_CELL_SHORT_SHIFT;
 		++b;
 	} else if (WT_CELL_TYPE(b[0]) == WT_CELL_VALUE) {
-		rle = b[0] & WT_CELL_64V ? 1 : 0;	/* Skip any RLE */
+		rle = (b[0] & WT_CELL_64V) != 0;	/* Skip any RLE */
 		++b;
 		if (rle)
 			WT_RET(__wt_vunpack_uint(&b, 0, &bv));
@@ -273,7 +274,7 @@ __wt_cell_pack_data_match(
 		return (0);
 
 	if (av == bv)
-		*matchp = memcmp(a, val_data, av) == 0 ? 1 : 0;
+		*matchp = memcmp(a, val_data, av) == 0;
 	return (0);
 }
 
@@ -330,8 +331,8 @@ __wt_cell_pack_int_key(WT_CELL *cell, size_t size)
 	/* Short keys have 6 bits of data length in the descriptor byte. */
 	if (size <= WT_CELL_SHORT_MAX) {
 		byte = (uint8_t)size;
-		cell->__chunk[0] =
-		    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT;
+		cell->__chunk[0] = (uint8_t)
+		    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT);
 		return (1);
 	}
 
@@ -357,17 +358,15 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size_t size)
 	if (size <= WT_CELL_SHORT_MAX) {
 		if (prefix == 0) {
 			byte = (uint8_t)size;		/* Type + length */
-			cell->__chunk[0] =
-			    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT;
+			cell->__chunk[0] = (uint8_t)
+			    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT);
 			return (1);
-		} else {
-			byte = (uint8_t)size;		/* Type + length */
-			cell->__chunk[0] =
-			    (byte << WT_CELL_SHORT_SHIFT) |
-			    WT_CELL_KEY_SHORT_PFX;
-			cell->__chunk[1] = prefix;	/* Prefix */
-			return (2);
 		}
+		byte = (uint8_t)size;		/* Type + length */
+		cell->__chunk[0] = (uint8_t)
+		    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT_PFX);
+		cell->__chunk[1] = prefix;	/* Prefix */
+		return (2);
 	}
 
 	if (prefix == 0) {
@@ -432,7 +431,7 @@ __wt_cell_total_len(WT_CELL_UNPACK *unpack)
 	 * it represents the length of the current cell (normally used for the
 	 * loop that walks through cells on the page), but occasionally we want
 	 * to copy a cell directly from the page, and what we need is the cell's
-	 * total length.   The problem is dictionary-copy cells, because in that
+	 * total length. The problem is dictionary-copy cells, because in that
 	 * case, the __len field is the length of the current cell, not the cell
 	 * for which we're returning data.  To use the __len field, you must be
 	 * sure you're not looking at a copy cell.
@@ -547,7 +546,8 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
  *	Unpack a WT_CELL into a structure during verification.
  */
 static inline int
-__wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
+__wt_cell_unpack_safe(
+    WT_CELL *cell, WT_CELL_UNPACK *unpack, const void *start, const void *end)
 {
 	struct {
 		uint32_t len;
@@ -560,14 +560,15 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	copy.v = 0;			/* -Werror=maybe-uninitialized */
 
 	/*
-	 * The verification code specifies an end argument, a pointer to 1 past
-	 * the end-of-page.  In that case, make sure we don't go past the end
-	 * of the page when reading.  If an error occurs, we simply return the
-	 * error code, the verification code takes care of complaining (and, in
-	 * the case of salvage, it won't complain at all, it's OK to fail).
+	 * The verification code specifies start/end arguments, pointers to the
+	 * start of the page and to 1 past the end-of-page. In which case, make
+	 * sure all reads are inside the page image. If an error occurs, return
+	 * an error code but don't output messages, our caller handles that.
 	 */
-#define	WT_CELL_LEN_CHK(p, len) do {					\
-	if (end != NULL && (((uint8_t *)p) + (len)) > end)		\
+#define	WT_CELL_LEN_CHK(t, len) do {					\
+	if (start != NULL &&						\
+	    ((uint8_t *)(t) < (uint8_t *)start ||			\
+	    (((uint8_t *)(t)) + (len)) > (uint8_t *)end))		\
 		return (WT_ERROR);					\
 } while (0)
 
@@ -582,8 +583,8 @@ restart:
 	WT_CELL_LEN_CHK(cell, 0);
 	unpack->cell = cell;
 	unpack->v = 0;
-	unpack->raw = __wt_cell_type_raw(cell);
-	unpack->type = __wt_cell_type(cell);
+	unpack->raw = (uint8_t)__wt_cell_type_raw(cell);
+	unpack->type = (uint8_t)__wt_cell_type(cell);
 	unpack->ovfl = 0;
 
 	/*
@@ -630,7 +631,7 @@ restart:
 	 */
 	if (cell->__chunk[0] & WT_CELL_64V)		/* skip value */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &unpack->v));
 
 	/*
 	 * Handle special actions for a few different cell types and set the
@@ -647,7 +648,7 @@ restart:
 		 * earlier cell.
 		 */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &v));
 		copy.len = WT_PTRDIFF32(p, cell);
 		copy.v = unpack->v;
 		cell = (WT_CELL *)((uint8_t *)cell - v);
@@ -675,7 +676,7 @@ restart:
 		 * data.
 		 */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &v));
 
 		if (unpack->raw == WT_CELL_KEY ||
 		    unpack->raw == WT_CELL_KEY_PFX ||
@@ -716,7 +717,7 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 static inline void
 __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
-	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
+	(void)__wt_cell_unpack_safe(cell, unpack, NULL, NULL);
 }
 
 /*
@@ -729,6 +730,7 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	void *huffman;
+	bool decoded;
 
 	btree = S2BT(session);
 
@@ -748,14 +750,16 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 		huffman = btree->huffman_value;
 		break;
 	case WT_CELL_KEY_OVFL:
-		WT_RET(__wt_ovfl_read(session, page, unpack, store));
-		if (page_type == WT_PAGE_ROW_INT)
+		WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));
+		if (page_type == WT_PAGE_ROW_INT || decoded)
 			return (0);
 
 		huffman = btree->huffman_key;
 		break;
 	case WT_CELL_VALUE_OVFL:
-		WT_RET(__wt_ovfl_read(session, page, unpack, store));
+		WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));
+		if (decoded)
+			return (0);
 		huffman = btree->huffman_value;
 		break;
 	WT_ILLEGAL_VALUE(session);

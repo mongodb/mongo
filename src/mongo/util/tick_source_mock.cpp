@@ -28,6 +28,8 @@
 
 #include "mongo/util/tick_source_mock.h"
 
+#include <utility>
+
 namespace mongo {
 
 namespace {
@@ -42,7 +44,7 @@ TickSource::Tick TickSourceMock::getTicksPerSecond() {
     return kTicksPerSecond;
 }
 
-void TickSourceMock::advance(const stdx::chrono::milliseconds& ms) {
+void TickSourceMock::advance(const Milliseconds& ms) {
     _currentTicks += ms.count();
 }
 

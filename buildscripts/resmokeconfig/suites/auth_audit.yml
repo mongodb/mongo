@@ -1,0 +1,18 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/auth/*.js
+  exclude_files:
+  # Skip until SERVER-25618 is resolved.
+  - jstests/auth/repl.js
+
+# Auth tests start their own mongod's.
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+      global_vars:
+        TestData:
+          auditDestination: 'console'

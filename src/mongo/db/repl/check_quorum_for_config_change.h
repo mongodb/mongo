@@ -29,13 +29,13 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 namespace repl {
 
-class ReplicaSetConfig;
+class ReplSetConfig;
 
 /**
  * Quorum checking state machine.
@@ -57,12 +57,12 @@ public:
      *
      * "rsConfig" must stay in scope until QuorumChecker's destructor completes.
      */
-    QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex);
+    QuorumChecker(const ReplSetConfig* rsConfig, int myIndex);
     virtual ~QuorumChecker();
 
-    virtual std::vector<RemoteCommandRequest> getRequests() const;
-    virtual void processResponse(const RemoteCommandRequest& request,
-                                 const ResponseStatus& response);
+    virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
+    virtual void processResponse(const executor::RemoteCommandRequest& request,
+                                 const executor::RemoteCommandResponse& response);
 
     virtual bool hasReceivedSufficientResponses() const;
 
@@ -82,11 +82,11 @@ private:
     /**
      * Updates the QuorumChecker state based on the data from a single heartbeat response.
      */
-    void _tabulateHeartbeatResponse(const RemoteCommandRequest& request,
-                                    const ResponseStatus& response);
+    void _tabulateHeartbeatResponse(const executor::RemoteCommandRequest& request,
+                                    const executor::RemoteCommandResponse& response);
 
     // Pointer to the replica set configuration for which we're checking quorum.
-    const ReplicaSetConfig* const _rsConfig;
+    const ReplSetConfig* const _rsConfig;
 
     // Index of the local node's member configuration in _rsConfig.
     const int _myIndex;
@@ -126,8 +126,8 @@ private:
  * - No nodes are already joined to a replica set.
  * - No node reports a replica set name other than the one in "rsConfig".
  */
-Status checkQuorumForInitiate(ReplicationExecutor* executor,
-                              const ReplicaSetConfig& rsConfig,
+Status checkQuorumForInitiate(executor::TaskExecutor* executor,
+                              const ReplSetConfig& rsConfig,
                               const int myIndex);
 
 /**
@@ -144,8 +144,8 @@ Status checkQuorumForInitiate(ReplicationExecutor* executor,
  * - No responding node reports a replica set name other than the one in "rsConfig".
  * - All responding nodes report a config version less than the one in "rsConfig".
  */
-Status checkQuorumForReconfig(ReplicationExecutor* executor,
-                              const ReplicaSetConfig& rsConfig,
+Status checkQuorumForReconfig(executor::TaskExecutor* executor,
+                              const ReplSetConfig& rsConfig,
                               const int myIndex);
 
 }  // namespace repl

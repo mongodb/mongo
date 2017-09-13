@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include "mongo/stdx/chrono.h"
 #include "mongo/util/tick_source.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -46,7 +46,7 @@ public:
     /**
      * Advance the ticks by the given amount of milliseconds.
      */
-    void advance(const stdx::chrono::milliseconds& ms);
+    void advance(const Milliseconds& ms);
 
     /**
      * Resets the tick count to the give value.

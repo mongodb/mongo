@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/working_set.h"
 
 namespace mongo {
@@ -33,15 +34,20 @@ namespace mongo {
 class AndCommon {
 public:
     /**
-     * If src has any data dest doesn't, add that data to dest.
+     * If 'src' has any data that the member in 'workingSet' keyed by 'destId' doesn't, add that
+     * data to 'destId's WSM.
      */
-    static void mergeFrom(WorkingSetMember* dest, const WorkingSetMember& src) {
+    static void mergeFrom(WorkingSet* workingSet,
+                          WorkingSetID destId,
+                          const WorkingSetMember& src) {
+        WorkingSetMember* dest = workingSet->get(destId);
+
         // Both 'src' and 'dest' must have a RecordId (and they must be the same RecordId), as
         // we should have just matched them according to this RecordId while doing an
         // intersection.
-        verify(dest->hasLoc());
-        verify(src.hasLoc());
-        verify(dest->loc == src.loc);
+        verify(dest->hasRecordId());
+        verify(src.hasRecordId());
+        verify(dest->recordId == src.recordId);
 
         // Merge computed data.
         typedef WorkingSetComputedDataType WSCD;
@@ -58,16 +64,16 @@ public:
         }
 
         if (src.hasObj()) {
+            invariant(src.getState() == WorkingSetMember::RID_AND_OBJ);
+
             // 'src' has the full document but 'dest' doesn't so we need to copy it over.
             dest->obj = src.obj;
+            dest->makeObjOwnedIfNeeded();
 
             // We have an object so we don't need key data.
             dest->keyData.clear();
 
-            // 'dest' should have the same state as 'src'. If 'src' has an unowned obj, then
-            // 'dest' also should have an unowned obj; if 'src' has an owned obj, then dest
-            // should also have an owned obj.
-            dest->state = src.state;
+            workingSet->transitionToRecordIdAndObj(destId);
 
             // Now 'dest' has the full object. No more work to do.
             return;
@@ -80,7 +86,8 @@ public:
         for (size_t i = 0; i < src.keyData.size(); ++i) {
             bool found = false;
             for (size_t j = 0; j < dest->keyData.size(); ++j) {
-                if (dest->keyData[j].indexKeyPattern == src.keyData[i].indexKeyPattern) {
+                if (SimpleBSONObjComparator::kInstance.evaluate(dest->keyData[j].indexKeyPattern ==
+                                                                src.keyData[i].indexKeyPattern)) {
                     found = true;
                     break;
                 }

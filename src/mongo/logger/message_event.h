@@ -27,10 +27,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -48,11 +49,7 @@ public:
                           LogSeverity severity,
                           StringData contextName,
                           StringData message)
-        : _date(date),
-          _severity(severity),
-          _component(LogComponent::kDefault),
-          _contextName(contextName),
-          _message(message) {}
+        : MessageEventEphemeral(date, severity, LogComponent::kDefault, contextName, message) {}
 
     MessageEventEphemeral(Date_t date,
                           LogSeverity severity,
@@ -64,6 +61,11 @@ public:
           _component(component),
           _contextName(contextName),
           _message(message) {}
+
+    MessageEventEphemeral& setIsTruncatable(bool value) {
+        _isTruncatable = value;
+        return *this;
+    }
 
     Date_t getDate() const {
         return _date;
@@ -80,6 +82,9 @@ public:
     StringData getMessage() const {
         return _message;
     }
+    bool isTruncatable() const {
+        return _isTruncatable;
+    }
 
 private:
     Date_t _date;
@@ -87,6 +92,7 @@ private:
     LogComponent _component;
     StringData _contextName;
     StringData _message;
+    bool _isTruncatable = true;
 };
 
 }  // namespace logger

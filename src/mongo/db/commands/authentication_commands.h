@@ -36,30 +36,28 @@
 
 namespace mongo {
 
-class CmdAuthenticate : public Command {
+class CmdAuthenticate : public BasicCommand {
 public:
     static void disableAuthMechanism(std::string authMechanism);
 
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(std::stringstream& ss) const {
         ss << "internal";
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
     virtual void redactForLogging(mutablebson::Document* cmdObj);
 
-    CmdAuthenticate() : Command("authenticate") {}
-    bool run(OperationContext* txn,
+    CmdAuthenticate() : BasicCommand("authenticate") {}
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& cmdObj,
-             int options,
-             std::string& errmsg,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result);
 
 private:
@@ -75,13 +73,12 @@ private:
      * mechanism, and ProtocolError, indicating an error in the use of the authentication
      * protocol.
      */
-    Status _authenticate(OperationContext* txn,
+    Status _authenticate(OperationContext* opCtx,
                          const std::string& mechanism,
                          const UserName& user,
                          const BSONObj& cmdObj);
-    Status _authenticateCR(OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
-    Status _authenticateX509(OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
-    bool _clusterIdMatch(const std::string& subjectName, const std::string& srvSubjectName);
+    Status _authenticateCR(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj);
+    Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj);
 };
 
 extern CmdAuthenticate cmdAuthenticate;

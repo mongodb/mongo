@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -13,15 +13,10 @@
  *	Allocate and initialize a condition variable.
  */
 int
-__wt_cond_alloc(WT_SESSION_IMPL *session,
-    const char *name, int is_signalled, WT_CONDVAR **condp)
+__wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
 
-	/*
-	 * !!!
-	 * This function MUST handle a NULL session handle.
-	 */
 	WT_RET(__wt_calloc_one(session, &cond));
 
 	InitializeCriticalSection(&cond->mtx);
@@ -30,45 +25,59 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	InitializeConditionVariable(&cond->cond);
 
 	cond->name = name;
-	cond->waiters = is_signalled ? -1 : 0;
+	cond->waiters = 0;
 
 	*condp = cond;
 	return (0);
 }
 
 /*
- * __wt_cond_wait --
- *	Wait on a mutex, optionally timing out.
+ * __wt_cond_wait_signal --
+ *	Wait on a mutex, optionally timing out.  If we get it before the time
+ * out period expires, let the caller know.
  */
-int
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
+void
+__wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond,
+    uint64_t usecs, bool (*run_func)(WT_SESSION_IMPL *), bool *signalled)
 {
-	DWORD milliseconds;
-	WT_DECL_RET;
+	BOOL sleepret;
+	DWORD milliseconds, windows_error;
+	bool locked;
 	uint64_t milliseconds64;
-	int locked;
 
-	locked = 0;
+	locked = false;
 
 	/* Fast path if already signalled. */
-	if (WT_ATOMIC_ADD4(cond->waiters, 1) == 0)
-		return (0);
+	*signalled = true;
+	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
+		return;
 
-	/*
-	 * !!!
-	 * This function MUST handle a NULL session handle.
-	 */
-	if (session != NULL) {
-		WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-			"wait %s cond (%p)", cond->name, cond));
-		WT_STAT_FAST_CONN_INCR(session, cond_wait);
-	}
+	__wt_verbose(session, WT_VERB_MUTEX, "wait %s", cond->name);
+	WT_STAT_CONN_INCR(session, cond_wait);
 
 	EnterCriticalSection(&cond->mtx);
-	locked = 1;
+	locked = true;
+
+	/*
+	 * It's possible to race with threads waking us up. That's not a problem
+	 * if there are multiple wakeups because the next wakeup will get us, or
+	 * if we're only pausing for a short period. It's a problem if there's
+	 * only a single wakeup, our waker is likely waiting for us to exit.
+	 * After acquiring the mutex (so we're guaranteed to be awakened by any
+	 * future wakeup call), optionally check if we're OK to keep running.
+	 * This won't ensure our caller won't just loop and call us again, but
+	 * at least it's not our fault.
+	 *
+	 * Assert we're not waiting longer than a second if not checking the
+	 * run status.
+	 */
+	WT_ASSERT(session, run_func != NULL || usecs <= WT_MILLION);
+
+	if (run_func != NULL && !run_func(session))
+		goto skipping;
 
 	if (usecs > 0) {
-		milliseconds64 = usecs / 1000;
+		milliseconds64 = usecs / WT_THOUSAND;
 
 		/*
 		 * Check for 32-bit unsigned integer overflow
@@ -85,81 +94,85 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 		if (milliseconds == 0)
 			milliseconds = 1;
 
-		ret = SleepConditionVariableCS(
+		sleepret = SleepConditionVariableCS(
 		    &cond->cond, &cond->mtx, milliseconds);
 	} else
-		ret = SleepConditionVariableCS(
+		sleepret = SleepConditionVariableCS(
 		    &cond->cond, &cond->mtx, INFINITE);
 
-	if (ret == 0) {
-		if (GetLastError() == ERROR_TIMEOUT) {
-			ret = 1;
+	/*
+	 * SleepConditionVariableCS returns non-zero on success, 0 on timeout
+	 * or failure.
+	 */
+	if (sleepret == 0) {
+		windows_error = __wt_getlasterror();
+		if (windows_error == ERROR_TIMEOUT) {
+skipping:		*signalled = false;
+			sleepret = 1;
 		}
 	}
 
-	(void)WT_ATOMIC_SUB4(cond->waiters, 1);
+	(void)__wt_atomic_subi32(&cond->waiters, 1);
 
 	if (locked)
 		LeaveCriticalSection(&cond->mtx);
-	if (ret != 0)
-		return (0);
-	WT_RET_MSG(session, ret, "SleepConditionVariableCS");
+
+	if (sleepret != 0)
+		return;
+
+	__wt_errx(session, "SleepConditionVariableCS: %s: %s",
+	    cond->name, __wt_formatmessage(session, windows_error));
+	WT_PANIC_MSG(session, __wt_map_windows_error(windows_error),
+	    "SleepConditionVariableCS: %s", cond->name);
 }
 
 /*
  * __wt_cond_signal --
  *	Signal a waiting thread.
  */
-int
+void
 __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	WT_DECL_RET;
-	int locked;
 
-	locked = 0;
+	__wt_verbose(session, WT_VERB_MUTEX, "signal %s", cond->name);
 
 	/*
-	 * !!!
-	 * This function MUST handle a NULL session handle.
+	 * Our callers often set flags to cause a thread to exit. Add a barrier
+	 * to ensure exit flags are seen by the sleeping threads, otherwise we
+	 * can wake up a thread, it immediately goes back to sleep, and we'll
+	 * hang. Use a full barrier (we may not write before waiting on thread
+	 * join).
 	 */
-	if (session != NULL)
-		WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-			"signal %s cond (%p)", cond->name, cond));
+	WT_FULL_BARRIER();
 
-	/* Fast path if already signalled. */
-	if (cond->waiters == -1)
-		return (0);
+	/*
+	 * Fast path if we are in (or can enter), a state where the next waiter
+	 * will return immediately as already signaled.
+	 */
+	if (cond->waiters == -1 ||
+	    (cond->waiters == 0 && __wt_atomic_casi32(&cond->waiters, 0, -1)))
+		return;
 
-	if (cond->waiters > 0 || !WT_ATOMIC_CAS4(cond->waiters, 0, -1)) {
-		EnterCriticalSection(&cond->mtx);
-		locked = 1;
-		WakeAllConditionVariable(&cond->cond);
-	}
-
-	if (locked)
-		LeaveCriticalSection(&cond->mtx);
-	if (ret == 0)
-		return (0);
-	WT_RET_MSG(session, ret, "WakeAllConditionVariable");
+	EnterCriticalSection(&cond->mtx);
+	WakeAllConditionVariable(&cond->cond);
+	LeaveCriticalSection(&cond->mtx);
 }
 
 /*
  * __wt_cond_destroy --
  *	Destroy a condition variable.
  */
-int
+void
 __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
-	WT_DECL_RET;
 
 	cond = *condp;
 	if (cond == NULL)
-		return (0);
+		return;
 
 	/* Do nothing to delete Condition Variable */
 	DeleteCriticalSection(&cond->mtx);
 	__wt_free(session, *condp);
-
-	return (ret);
 }

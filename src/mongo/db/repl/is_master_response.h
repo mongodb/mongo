@@ -32,6 +32,8 @@
 #include <vector>
 
 #include "mongo/bson/oid.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/optime_with.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -143,6 +145,34 @@ public:
         return _electionId;
     }
 
+    OpTime getLastWriteOpTime() const {
+        if (!_lastWrite) {
+            return OpTime();
+        }
+        return _lastWrite->opTime;
+    }
+
+    time_t getLastWriteDate() const {
+        if (!_lastWrite) {
+            return 0;
+        }
+        return _lastWrite->value;
+    }
+
+    OpTime getLastMajorityWriteOpTime() const {
+        if (!_lastMajorityWrite) {
+            return OpTime();
+        }
+        return _lastMajorityWrite->opTime;
+    }
+
+    time_t getLastMajorityWriteDate() const {
+        if (!_lastMajorityWrite) {
+            return 0;
+        }
+        return _lastMajorityWrite->value;
+    }
+
     /**
      * If false, calls to toBSON/addToBSON will ignore all other fields and add a specific
      * message to indicate that we have no replica set config.
@@ -194,6 +224,11 @@ public:
 
     void setElectionId(const OID& electionId);
 
+    void setLastWrite(const OpTime& lastWriteOpTime, const time_t lastWriteDate);
+
+    void setLastMajorityWrite(const OpTime& lastMajorityWriteOpTime,
+                              const time_t lastMajorityWriteDate);
+
     /**
      * Marks _configSet as false, which will cause future calls to toBSON/addToBSON to ignore
      * all other member variables and output a hardcoded response indicating that we have no
@@ -240,6 +275,8 @@ private:
     HostAndPort _me;
     bool _meSet;
     OID _electionId;
+    boost::optional<OpTimeWith<time_t>> _lastWrite;
+    boost::optional<OpTimeWith<time_t>> _lastMajorityWrite;
 
     // If _configSet is false this means we don't have a valid repl set config, so toBSON
     // will return a set of hardcoded values that indicate this.

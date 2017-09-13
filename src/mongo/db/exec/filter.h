@@ -42,7 +42,6 @@ namespace mongo {
 class WorkingSetMatchableDocument : public MatchableDocument {
 public:
     WorkingSetMatchableDocument(WorkingSetMember* wsm) : _wsm(wsm) {}
-    virtual ~WorkingSetMatchableDocument() {}
 
     // This is only called by a $where query.  The query system must be smart enough to realize
     // that it should do a fetch beforehand.
@@ -51,7 +50,7 @@ public:
         return _wsm->obj.value();
     }
 
-    virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+    ElementIterator* allocateIterator(const ElementPath* path) const final {
         // BSONElementIterator does some interesting things with arrays that I don't think
         // SimpleArrayElementIterator does.
         if (_wsm->hasObj()) {
@@ -89,7 +88,7 @@ public:
         return new SingleElementElementIterator(BSONElement());
     }
 
-    virtual void releaseIterator(ElementIterator* iterator) const {
+    void releaseIterator(ElementIterator* iterator) const final {
         delete iterator;
     }
 
@@ -106,7 +105,7 @@ public:
         return _key;
     }
 
-    virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+    ElementIterator* allocateIterator(const ElementPath* path) const final {
         BSONObjIterator keyPatternIt(_keyPattern);
         BSONObjIterator keyDataIt(_key);
 
@@ -132,7 +131,7 @@ public:
         return new SingleElementElementIterator(BSONElement());
     }
 
-    virtual void releaseIterator(ElementIterator* iterator) const {
+    void releaseIterator(ElementIterator* iterator) const final {
         delete iterator;
     }
 

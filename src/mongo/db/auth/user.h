@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
@@ -86,6 +87,11 @@ public:
     const UserName& getName() const;
 
     /**
+     * Returns a digest of the user's identity
+     */
+    const SHA256Block& getDigest() const;
+
+    /**
      * Returns an iterator over the names of the user's direct roles
      */
     RoleNameIterator getRoles() const;
@@ -129,11 +135,6 @@ public:
      * only caller of this.
      */
     uint32_t getRefCount() const;
-
-    /**
-     * Clones this user into a new, valid User object with refcount of 0.
-     */
-    User* clone() const;
 
     // Mutators below.  Mutation functions should *only* be called by the AuthorizationManager
 
@@ -179,6 +180,19 @@ public:
     void addPrivileges(const PrivilegeVector& privileges);
 
     /**
+     * Replaces any existing authentication restrictions with "restrictions".
+     */
+    void setRestrictions(RestrictionDocuments restrictions) &;
+
+    /**
+     * Gets any set authentication restrictions.
+     */
+    const RestrictionDocuments& getRestrictions() const& noexcept {
+        return _restrictions;
+    }
+    void getRestrictions() && = delete;
+
+    /**
      * Marks this instance of the User object as invalid, most likely because information about
      * the user has been updated and needs to be reloaded from the AuthorizationManager.
      *
@@ -206,6 +220,9 @@ public:
 private:
     UserName _name;
 
+    // Digest of the full username
+    SHA256Block _digest;
+
     // Maps resource name to privilege on that resource
     ResourcePrivilegeMap _privileges;
 
@@ -217,6 +234,9 @@ private:
 
     // Credential information.
     CredentialData _credentials;
+
+    // Restrictions which must be met by a Client in order to authenticate as this user.
+    RestrictionDocuments _restrictions;
 
     // _refCount and _isInvalidated are modified exclusively by the AuthorizationManager
     // _isInvalidated can be read by any consumer of User, but _refCount can only be

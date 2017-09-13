@@ -40,9 +40,9 @@ namespace mongo {
 
 using std::endl;
 
-RecordStoreV1RepairCursor::RecordStoreV1RepairCursor(OperationContext* txn,
+RecordStoreV1RepairCursor::RecordStoreV1RepairCursor(OperationContext* opCtx,
                                                      const RecordStoreV1Base* recordStore)
-    : _txn(txn), _recordStore(recordStore), _stage(FORWARD_SCAN) {
+    : _opCtx(opCtx), _recordStore(recordStore), _stage(FORWARD_SCAN) {
     // Position the iterator at the first record
     //
     advance();
@@ -53,11 +53,7 @@ boost::optional<Record> RecordStoreV1RepairCursor::next() {
         return {};
     auto out = _currRecord.toRecordId();
     advance();
-    return {{out, _recordStore->dataFor(_txn, out)}};
-}
-
-boost::optional<Record> RecordStoreV1RepairCursor::seekExact(const RecordId& id) {
-    invariant(!"seekExact not supported");
+    return {{out, _recordStore->dataFor(_opCtx, out)}};
 }
 
 void RecordStoreV1RepairCursor::advance() {
@@ -80,10 +76,10 @@ void RecordStoreV1RepairCursor::advance() {
         } else {
             switch (_stage) {
                 case FORWARD_SCAN:
-                    _currRecord = _recordStore->getNextRecordInExtent(_txn, _currRecord);
+                    _currRecord = _recordStore->getNextRecordInExtent(_opCtx, _currRecord);
                     break;
                 case BACKWARD_SCAN:
-                    _currRecord = _recordStore->getPrevRecordInExtent(_txn, _currRecord);
+                    _currRecord = _recordStore->getPrevRecordInExtent(_opCtx, _currRecord);
                     break;
                 default:
                     invariant(!"This should never be reached.");
@@ -120,10 +116,10 @@ bool RecordStoreV1RepairCursor::_advanceToNextValidExtent() {
         if (_currExtent.isNull()) {
             switch (_stage) {
                 case FORWARD_SCAN:
-                    _currExtent = _recordStore->details()->firstExtent(_txn);
+                    _currExtent = _recordStore->details()->firstExtent(_opCtx);
                     break;
                 case BACKWARD_SCAN:
-                    _currExtent = _recordStore->details()->lastExtent(_txn);
+                    _currExtent = _recordStore->details()->lastExtent(_opCtx);
                     break;
                 default:
                     invariant(DONE == _stage);
@@ -185,7 +181,7 @@ bool RecordStoreV1RepairCursor::_advanceToNextValidExtent() {
     return true;
 }
 
-void RecordStoreV1RepairCursor::invalidate(const RecordId& id) {
+void RecordStoreV1RepairCursor::invalidate(OperationContext* opCtx, const RecordId& id) {
     // If we see this record again it probably means it was reinserted rather than an infinite
     // loop. If we do loop, we should quickly hit another seen record that hasn't been
     // invalidated.
@@ -195,6 +191,8 @@ void RecordStoreV1RepairCursor::invalidate(const RecordId& id) {
     if (_currRecord == dl) {
         // The DiskLoc being invalidated is also the one pointed at by this iterator. We
         // advance the iterator so it's not pointing at invalid data.
+        // We don't worry about undoing invalidations on rollback here, as we shouldn't have
+        // concurrent writes that can rollback to a database we're trying to recover.
         advance();
 
         if (_currRecord == dl) {

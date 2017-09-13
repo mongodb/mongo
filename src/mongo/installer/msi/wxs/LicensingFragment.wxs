@@ -26,6 +26,10 @@
         <File Id="f_Readme" Name="README" Source="$(var.LicenseSource)\README"
               DiskId ="1" />
       </Component>
+      <Component Id="c_MPL2" Guid="326EAE1B-6AF2-45D2-90FC-8660C50C7271">
+        <File Id="f_MPL2" Name="MPL-2" Source="$(var.LicenseSource)\MPL-2"
+              DiskId ="1" />
+      </Component>
           <Component Id="c_InstallKey" Guid="31635E6D-CCE1-43AD-8AB3-4F5607D75755">
             <RegistryKey Root="HKLM"
                 Key="Software\MongoDB\Server\$(var.MongoDBMajorVersion)">
@@ -39,6 +43,7 @@
       <ComponentRef Id="c_Thirdparty"/>
       <ComponentRef Id="c_License"/>
       <ComponentRef Id="c_InstallKey"/>
+      <ComponentRef Id="c_MPL2"/>
     </ComponentGroup>
 
     <?if $(var.Edition) = Enterprise ?>

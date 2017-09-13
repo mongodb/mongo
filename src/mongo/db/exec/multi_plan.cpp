@@ -38,53 +38,48 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/storage/record_fetcher.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
 using std::list;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 // static
 const char* MultiPlanStage::kStageType = "MULTI_PLAN";
 
-MultiPlanStage::MultiPlanStage(OperationContext* txn,
+MultiPlanStage::MultiPlanStage(OperationContext* opCtx,
                                const Collection* collection,
                                CanonicalQuery* cq,
-                               bool shouldCache)
-    : _txn(txn),
+                               CachingMode cachingMode)
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
-      _shouldCache(shouldCache),
+      _cachingMode(cachingMode),
       _query(cq),
       _bestPlanIdx(kNoSuchPlan),
       _backupPlanIdx(kNoSuchPlan),
       _failure(false),
       _failureCount(0),
-      _statusMemberId(WorkingSet::INVALID_ID),
-      _commonStats(kStageType) {
+      _statusMemberId(WorkingSet::INVALID_ID) {
     invariant(_collection);
-}
-
-MultiPlanStage::~MultiPlanStage() {
-    for (size_t ix = 0; ix < _candidates.size(); ++ix) {
-        delete _candidates[ix].solution;
-        delete _candidates[ix].root;
-    }
 }
 
 void MultiPlanStage::addPlan(QuerySolution* solution, PlanStage* root, WorkingSet* ws) {
     _candidates.push_back(CandidatePlan(solution, root, ws));
+    _children.emplace_back(root);
 }
 
 bool MultiPlanStage::isEOF() {
@@ -103,10 +98,7 @@ bool MultiPlanStage::isEOF() {
     return bestPlan.results.empty() && bestPlan.root->isEOF();
 }
 
-PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
     if (_failure) {
         *out = _statusMemberId;
         return PlanStage::FAILURE;
@@ -118,7 +110,6 @@ PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
     if (!bestPlan.results.empty()) {
         *out = bestPlan.results.front();
         bestPlan.results.pop_front();
-        _commonStats.advanced++;
         return PlanStage::ADVANCED;
     }
 
@@ -127,7 +118,7 @@ PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
     StageState state = bestPlan.root->work(out);
 
     if (PlanStage::FAILURE == state && hasBackupPlan()) {
-        LOG(5) << "Best plan errored out switching to backup\n";
+        LOG(5) << "Best plan errored out switching to backup";
         // Uncache the bad solution if we fall back
         // on the backup solution.
         //
@@ -136,7 +127,7 @@ PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
         // if the best solution fails. Alternatively we could try to
         // defer cache insertion to be after the first produced result.
 
-        _collection->infoCache()->getPlanCache()->remove(*_query);
+        _collection->infoCache()->getPlanCache()->remove(*_query).transitional_ignore();
 
         _bestPlanIdx = _backupPlanIdx;
         _backupPlanIdx = kNoSuchPlan;
@@ -145,17 +136,8 @@ PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
     }
 
     if (hasBackupPlan() && PlanStage::ADVANCED == state) {
-        LOG(5) << "Best plan had a blocking stage, became unblocked\n";
+        LOG(5) << "Best plan had a blocking stage, became unblocked";
         _backupPlanIdx = kNoSuchPlan;
-    }
-
-    // Increment stats.
-    if (PlanStage::ADVANCED == state) {
-        _commonStats.advanced++;
-    } else if (PlanStage::NEED_TIME == state) {
-        _commonStats.needTime++;
-    } else if (PlanStage::NEED_YIELD == state) {
-        _commonStats.needYield++;
     }
 
     return state;
@@ -168,14 +150,13 @@ Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     //   3) we need to yield and retry due to a WriteConflictException.
     // In all cases, the actual yielding happens here.
     if (yieldPolicy->shouldYield()) {
-        bool alive = yieldPolicy->yield(_fetcher.get());
+        auto yieldStatus = yieldPolicy->yield(_fetcher.get());
 
-        if (!alive) {
+        if (!yieldStatus.isOK()) {
             _failure = true;
-            Status failStat(ErrorCodes::OperationFailed,
-                            "PlanExecutor killed during plan selection");
-            _statusMemberId = WorkingSetCommon::allocateStatusMember(_candidates[0].ws, failStat);
-            return failStat;
+            _statusMemberId =
+                WorkingSetCommon::allocateStatusMember(_candidates[0].ws, yieldStatus);
+            return yieldStatus;
         }
     }
 
@@ -187,17 +168,17 @@ Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 }
 
 // static
-size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* txn, const Collection* collection) {
+size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* opCtx, const Collection* collection) {
     // Run each plan some number of times. This number is at least as great as
     // 'internalQueryPlanEvaluationWorks', but may be larger for big collections.
-    size_t numWorks = internalQueryPlanEvaluationWorks;
+    size_t numWorks = internalQueryPlanEvaluationWorks.load();
     if (NULL != collection) {
         // For large collections, the number of works is set to be this
         // fraction of the collection size.
         double fraction = internalQueryPlanEvaluationCollFraction;
 
-        numWorks = std::max(static_cast<size_t>(internalQueryPlanEvaluationWorks),
-                            static_cast<size_t>(fraction * collection->numRecords(txn)));
+        numWorks = std::max(static_cast<size_t>(internalQueryPlanEvaluationWorks.load()),
+                            static_cast<size_t>(fraction * collection->numRecords(opCtx)));
     }
 
     return numWorks;
@@ -207,11 +188,12 @@ size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* txn, const Collecti
 size_t MultiPlanStage::getTrialPeriodNumToReturn(const CanonicalQuery& query) {
     // Determine the number of results which we will produce during the plan
     // ranking phase before stopping.
-    size_t numResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults);
-    if (query.getParsed().getLimit()) {
-        numResults = std::min(static_cast<size_t>(*query.getParsed().getLimit()), numResults);
-    } else if (!query.getParsed().isFromFindCommand() && query.getParsed().getBatchSize()) {
-        numResults = std::min(static_cast<size_t>(*query.getParsed().getBatchSize()), numResults);
+    size_t numResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults.load());
+    if (query.getQueryRequest().getNToReturn()) {
+        numResults =
+            std::min(static_cast<size_t>(*query.getQueryRequest().getNToReturn()), numResults);
+    } else if (query.getQueryRequest().getLimit()) {
+        numResults = std::min(static_cast<size_t>(*query.getQueryRequest().getLimit()), numResults);
     }
 
     return numResults;
@@ -221,9 +203,9 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
     // execution work that happens here, so this is needed for the time accounting to
     // make sense.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
+    ScopedTimer timer(getClock(), &_commonStats.executionTimeMillis);
 
-    size_t numWorks = getTrialPeriodWorks(_txn, _collection);
+    size_t numWorks = getTrialPeriodWorks(getOpCtx(), _collection);
     size_t numResults = getTrialPeriodNumToReturn(*_query);
 
     // Work the plans, stopping when a plan hits EOF or returns some
@@ -253,26 +235,68 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     CandidatePlan& bestCandidate = _candidates[_bestPlanIdx];
     std::list<WorkingSetID>& alreadyProduced = bestCandidate.results;
-    QuerySolution* bestSolution = bestCandidate.solution;
+    const auto& bestSolution = bestCandidate.solution;
 
-    LOG(5) << "Winning solution:\n" << bestSolution->toString() << endl;
-    LOG(2) << "Winning plan: " << Explain::getPlanSummary(bestCandidate.root);
+    LOG(5) << "Winning solution:\n" << redact(bestSolution->toString());
+    LOG(2) << "Winning plan: " << redact(Explain::getPlanSummary(bestCandidate.root));
 
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
-        LOG(5) << "Winner has blocking stage, looking for backup plan...\n";
+        LOG(5) << "Winner has blocking stage, looking for backup plan...";
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
             if (!_candidates[ix].solution->hasBlockingStage) {
-                LOG(5) << "Candidate " << ix << " is backup child\n";
+                LOG(5) << "Candidate " << ix << " is backup child";
                 _backupPlanIdx = ix;
                 break;
             }
         }
     }
 
+    // Even if the query is of a cacheable shape, the caller might have indicated that we shouldn't
+    // write to the plan cache.
+    //
+    // TODO: We can remove this if we introduce replanning logic to the SubplanStage.
+    bool canCache = (_cachingMode == CachingMode::AlwaysCache);
+    if (_cachingMode == CachingMode::SometimesCache) {
+        // In "sometimes cache" mode, we cache unless we hit one of the special cases below.
+        canCache = true;
+
+        if (ranking->tieForBest) {
+            // The winning plan tied with the runner-up and we're using "sometimes cache" mode. We
+            // will not write a plan cache entry.
+            canCache = false;
+
+            // These arrays having two or more entries is implied by 'tieForBest'.
+            invariant(ranking->scores.size() > 1U);
+            invariant(ranking->candidateOrder.size() > 1U);
+
+            size_t winnerIdx = ranking->candidateOrder[0];
+            size_t runnerUpIdx = ranking->candidateOrder[1];
+
+            LOG(1) << "Winning plan tied with runner-up. Not caching."
+                   << " ns: " << _collection->ns() << " " << redact(_query->toStringShort())
+                   << " winner score: " << ranking->scores[0] << " winner summary: "
+                   << redact(Explain::getPlanSummary(_candidates[winnerIdx].root))
+                   << " runner-up score: " << ranking->scores[1] << " runner-up summary: "
+                   << redact(Explain::getPlanSummary(_candidates[runnerUpIdx].root));
+        }
+
+        if (alreadyProduced.empty()) {
+            // We're using the "sometimes cache" mode, and the winning plan produced no results
+            // during the plan ranking trial period. We will not write a plan cache entry.
+            canCache = false;
+
+            size_t winnerIdx = ranking->candidateOrder[0];
+            LOG(1) << "Winning plan had zero results. Not caching."
+                   << " ns: " << _collection->ns() << " " << redact(_query->toStringShort())
+                   << " winner score: " << ranking->scores[0] << " winner summary: "
+                   << redact(Explain::getPlanSummary(_candidates[winnerIdx].root));
+        }
+    }
+
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
-    if (PlanCache::shouldCacheQuery(*_query) && _shouldCache) {
+    if (PlanCache::shouldCacheQuery(*_query) && canCache) {
         // Create list of candidate solutions for the cache with
         // the best solution at the front.
         std::vector<QuerySolution*> solutions;
@@ -281,7 +305,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         for (size_t orderingIndex = 0; orderingIndex < candidateOrder.size(); ++orderingIndex) {
             // index into candidates/ranking
             size_t ix = candidateOrder[orderingIndex];
-            solutions.push_back(_candidates[ix].solution);
+            solutions.push_back(_candidates[ix].solution.get());
         }
 
         // Check solution cache data. Do not add to cache if
@@ -291,36 +315,21 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             if (NULL == solutions[ix]->cacheData.get()) {
                 LOG(5) << "Not caching query because this solution has no cache data: "
-                       << solutions[ix]->toString();
+                       << redact(solutions[ix]->toString());
                 validSolutions = false;
                 break;
             }
         }
 
         if (validSolutions) {
-            _collection->infoCache()->getPlanCache()->add(*_query, solutions, ranking.release());
+            _collection->infoCache()
+                ->getPlanCache()
+                ->add(*_query, solutions, ranking.release())
+                .transitional_ignore();
         }
     }
 
     return Status::OK();
-}
-
-vector<PlanStageStats*> MultiPlanStage::generateCandidateStats() {
-    OwnedPointerVector<PlanStageStats> candidateStats;
-
-    for (size_t ix = 0; ix < _candidates.size(); ix++) {
-        if (ix == (size_t)_bestPlanIdx) {
-            continue;
-        }
-        if (ix == (size_t)_backupPlanIdx) {
-            continue;
-        }
-
-        PlanStageStats* stats = _candidates[ix].root->getStats();
-        candidateStats.push_back(stats);
-    }
-
-    return candidateStats.release();
 }
 
 bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolicy) {
@@ -342,6 +351,10 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
 
         if (PlanStage::ADVANCED == state) {
             // Save result for later.
+            WorkingSetMember* member = candidate.ws->get(id);
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we choose to
+            // return the results from the 'candidate' plan.
+            member->makeObjOwnedIfNeeded();
             candidate.results.push_back(id);
 
             // Once a plan returns enough results, stop working.
@@ -354,7 +367,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             doneWorking = true;
         } else if (PlanStage::NEED_YIELD == state) {
             if (id == WorkingSet::INVALID_ID) {
-                if (!yieldPolicy->allowedToYield())
+                if (!yieldPolicy->canAutoYield())
                     throw WriteConflictException();
             } else {
                 WorkingSetMember* member = candidate.ws->get(id);
@@ -363,7 +376,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
                 _fetcher.reset(member->releaseFetcher());
             }
 
-            if (yieldPolicy->allowedToYield()) {
+            if (yieldPolicy->canAutoYield()) {
                 yieldPolicy->forceYield();
             }
 
@@ -392,64 +405,41 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
     return !doneWorking;
 }
 
-void MultiPlanStage::saveState() {
-    _txn = NULL;
-    for (size_t i = 0; i < _candidates.size(); ++i) {
-        _candidates[i].root->saveState();
-    }
-}
-
-void MultiPlanStage::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-
-    for (size_t i = 0; i < _candidates.size(); ++i) {
-        _candidates[i].root->restoreState(opCtx);
-    }
-}
-
 namespace {
 
-void invalidateHelper(OperationContext* txn,
+void invalidateHelper(OperationContext* opCtx,
                       WorkingSet* ws,  // may flag for review
-                      const RecordId& dl,
+                      const RecordId& recordId,
                       list<WorkingSetID>* idsToInvalidate,
                       const Collection* collection) {
-    for (list<WorkingSetID>::iterator it = idsToInvalidate->begin();
-         it != idsToInvalidate->end();) {
+    for (auto it = idsToInvalidate->begin(); it != idsToInvalidate->end(); ++it) {
         WorkingSetMember* member = ws->get(*it);
-        if (member->hasLoc() && member->loc == dl) {
-            list<WorkingSetID>::iterator next = it;
-            next++;
-            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, collection);
-            ws->flagForReview(*it);
-            idsToInvalidate->erase(it);
-            it = next;
-        } else {
-            it++;
+        if (member->hasRecordId() && member->recordId == recordId) {
+            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, collection);
         }
     }
 }
-}
 
-void MultiPlanStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+}  // namespace
+
+void MultiPlanStage::doInvalidate(OperationContext* opCtx,
+                                  const RecordId& recordId,
+                                  InvalidationType type) {
     if (_failure) {
         return;
     }
 
     if (bestPlanChosen()) {
         CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
-        bestPlan.root->invalidate(txn, dl, type);
-        invalidateHelper(txn, bestPlan.ws, dl, &bestPlan.results, _collection);
+        invalidateHelper(opCtx, bestPlan.ws, recordId, &bestPlan.results, _collection);
         if (hasBackupPlan()) {
             CandidatePlan& backupPlan = _candidates[_backupPlanIdx];
-            backupPlan.root->invalidate(txn, dl, type);
-            invalidateHelper(txn, backupPlan.ws, dl, &backupPlan.results, _collection);
+            invalidateHelper(opCtx, backupPlan.ws, recordId, &backupPlan.results, _collection);
         }
     } else {
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
-            _candidates[ix].root->invalidate(txn, dl, type);
-            invalidateHelper(txn, _candidates[ix].ws, dl, &_candidates[ix].results, _collection);
+            invalidateHelper(
+                opCtx, _candidates[ix].ws, recordId, &_candidates[ix].results, _collection);
         }
     }
 }
@@ -470,39 +460,17 @@ QuerySolution* MultiPlanStage::bestSolution() {
     if (_bestPlanIdx == kNoSuchPlan)
         return NULL;
 
-    return _candidates[_bestPlanIdx].solution;
+    return _candidates[_bestPlanIdx].solution.get();
 }
 
-vector<PlanStage*> MultiPlanStage::getChildren() const {
-    vector<PlanStage*> children;
-
-    if (bestPlanChosen()) {
-        children.push_back(_candidates[_bestPlanIdx].root);
-    } else {
-        for (size_t i = 0; i < _candidates.size(); i++) {
-            children.push_back(_candidates[i].root);
-        }
-    }
-
-    return children;
-}
-
-PlanStageStats* MultiPlanStage::getStats() {
-    if (bestPlanChosen()) {
-        return _candidates[_bestPlanIdx].root->getStats();
-    }
-    if (hasBackupPlan()) {
-        return _candidates[_backupPlanIdx].root->getStats();
-    }
+unique_ptr<PlanStageStats> MultiPlanStage::getStats() {
     _commonStats.isEOF = isEOF();
-
-    unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_MULTI_PLAN));
-
-    return ret.release();
-}
-
-const CommonStats* MultiPlanStage::getCommonStats() const {
-    return &_commonStats;
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
+    ret->specific = make_unique<MultiPlanStats>(_specificStats);
+    for (auto&& child : _children) {
+        ret->children.emplace_back(child->getStats());
+    }
+    return ret;
 }
 
 const SpecificStats* MultiPlanStage::getSpecificStats() const {

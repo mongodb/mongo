@@ -8,16 +8,16 @@ limit cpu unlimited unlimited
 limit as unlimited unlimited
 limit nofile 64000 64000
 limit rss unlimited unlimited
-limit nproc 32000 32000
+limit nproc 64000 64000
 
 kill timeout 300 # wait 300s between SIGTERM and SIGKILL.
 
 pre-start script
   DAEMONUSER=${DAEMONUSER:-mongodb}
-  if [ ! -d /var/lib/mongod ]; then
+  if [ ! -d /var/lib/mongodb ]; then
     mkdir -p /var/lib/mongodb && chown mongodb:mongodb /var/lib/mongodb
   fi
-  if [ ! -d /var/log/mongod ]; then
+  if [ ! -d /var/log/mongodb ]; then
     mkdir -p /var/log/mongodb && chown mongodb:mongodb /var/log/mongodb
   fi
   touch /var/run/mongodb.pid
@@ -32,6 +32,7 @@ script
   CONF=/etc/mongod.conf
   DAEMON=/usr/bin/mongod
   DAEMONUSER=${DAEMONUSER:-mongodb}
+  DAEMONGROUP=${DAEMONGROUP:-mongodb}
 
   if [ -f /etc/default/mongod ]; then . /etc/default/mongod; fi
 
@@ -50,7 +51,7 @@ script
   if [ "x$ENABLE_MONGOD" = "xyes" ]
   then
     exec start-stop-daemon --start \
-        --chuid $DAEMONUSER \
+        --chuid $DAEMONUSER:$DAEMONGROUP \
         --pidfile /var/run/mongodb.pid \
         --make-pidfile \
         --exec $NUMACTL $DAEMON $DAEMON_OPTS

@@ -35,11 +35,11 @@ class NamespaceString;
 class OperationContext;
 
 /**
- * Drops the index from collection "ns" that matches the "idxDescriptor" and populates
+ * Drops the index from collection "nss" that matches the "idxDescriptor" and populates
  * "result" with some statistics about the dropped index.
  */
-Status dropIndexes(OperationContext* txn,
-                   const NamespaceString& ns,
+Status dropIndexes(OperationContext* opCtx,
+                   const NamespaceString& nss,
                    const BSONObj& idxDescriptor,
                    BSONObjBuilder* result);
 

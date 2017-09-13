@@ -35,6 +35,7 @@
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/net/message.h"
 
@@ -52,9 +53,24 @@ CommandReply::CommandReply(const Message* message) : _message(message) {
     const char* messageEnd = begin + length;
     ConstDataRangeCursor cur(begin, messageEnd);
 
-    _metadata = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
-    _commandReply = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
-    _outputDocs = DocumentRange(cur.data(), messageEnd);
+    _commandReply = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
+    _commandReply.shareOwnershipWith(message->sharedBuffer());
+
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up- and down-conversion here so that the rest of the code only
+    // has to deal with the current format.
+    auto rawMetadata = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
+    BSONObjBuilder metadataBuilder;
+    for (auto elem : rawMetadata) {
+        if (elem.fieldNameStringData() == "configsvr") {
+            metadataBuilder.appendAs(elem, "$configServerState");
+        } else {
+            metadataBuilder.append(elem);
+        }
+    }
+    _metadata = metadataBuilder.obj();
+
+    uassert(40420, "OP_COMMAND reply contains trailing bytes following metadata", cur.empty());
 }
 
 const BSONObj& CommandReply::getMetadata() const {
@@ -65,17 +81,14 @@ const BSONObj& CommandReply::getCommandReply() const {
     return _commandReply;
 }
 
-DocumentRange CommandReply::getOutputDocs() const {
-    return _outputDocs;
-}
-
 Protocol CommandReply::getProtocol() const {
     return rpc::Protocol::kOpCommandV1;
 }
 
 bool operator==(const CommandReply& lhs, const CommandReply& rhs) {
-    return std::tie(lhs._metadata, lhs._commandReply, lhs._outputDocs) ==
-        std::tie(rhs._metadata, rhs._commandReply, rhs._outputDocs);
+    SimpleBSONObjComparator bsonComparator;
+    return bsonComparator.evaluate(lhs._metadata == rhs._metadata) &&
+        bsonComparator.evaluate(lhs._commandReply == rhs._commandReply);
 }
 
 bool operator!=(const CommandReply& lhs, const CommandReply& rhs) {

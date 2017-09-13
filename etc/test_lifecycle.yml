@@ -1,0 +1,4 @@
+# This file is used to tag JS tests that run under resmoke.py.
+# The content of this file lives in the https://github.com/mongodb/mongo-test-metadata repository.
+# It is fetched automatically as part of the compile task.
+selector: {}

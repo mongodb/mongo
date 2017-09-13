@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -9,30 +9,14 @@
 #include "wt_internal.h"
 
 /*
- * __wt_seconds --
- *	Return the seconds since the Epoch.
+ * __wt_epoch_raw --
+ *	Return the time since the Epoch as reported by the system.
  */
-int
-__wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
+void
+__wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp)
 {
-	struct timespec t;
-
-	WT_RET(__wt_epoch(session, &t));
-
-	*timep = t.tv_sec;
-
-	return (0);
-}
-
-/*
- * __wt_epoch --
- *	Return the time since the Epoch.
- */
-int
-__wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
-{
-	uint64_t ns100;
 	FILETIME time;
+	uint64_t ns100;
 
 	WT_UNUSED(session);
 
@@ -42,8 +26,6 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 	    - 116444736000000000LL;
 	tsp->tv_sec = ns100 / 10000000;
 	tsp->tv_nsec = (long)((ns100 % 10000000) * 100);
-
-	return (0);
 }
 
 /*

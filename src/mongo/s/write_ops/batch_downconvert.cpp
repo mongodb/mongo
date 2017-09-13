@@ -26,23 +26,17 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/write_ops/batch_downconvert.h"
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/client/multi_command_dispatch.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
-using std::endl;
 using std::string;
-using std::vector;
 
 Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
     // DRAGONS
@@ -63,7 +57,7 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
 
     if (err == "norepl" || err == "noreplset") {
         // Know this is legacy gle and the repl not enforced - write concern error in 2.4
-        errors->wcError.reset(new WCErrorDetail);
+        errors->wcError.reset(new WriteConcernErrorDetail);
         errors->wcError->setErrCode(ErrorCodes::WriteConcernFailed);
         if (!errMsg.empty()) {
             errors->wcError->setErrMessage(errMsg);
@@ -74,7 +68,7 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
         }
     } else if (timeout) {
         // Know there was no write error
-        errors->wcError.reset(new WCErrorDetail);
+        errors->wcError.reset(new WriteConcernErrorDetail);
         errors->wcError->setErrCode(ErrorCodes::WriteConcernFailed);
         if (!errMsg.empty()) {
             errors->wcError->setErrMessage(errMsg);
@@ -90,18 +84,17 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
                // 2.6 Error codes
                ||
                code == ErrorCodes::NotMaster || code == ErrorCodes::UnknownReplWriteConcern ||
-               code == ErrorCodes::WriteConcernFailed) {
+               code == ErrorCodes::WriteConcernFailed || code == ErrorCodes::PrimarySteppedDown) {
         // Write concern errors that get returned as regular errors (result may not be ok: 1.0)
-        errors->wcError.reset(new WCErrorDetail);
-        errors->wcError->setErrCode(code);
+        errors->wcError.reset(new WriteConcernErrorDetail());
+        errors->wcError->setErrCode(ErrorCodes::fromInt(code));
         errors->wcError->setErrMessage(errMsg);
     } else if (!isOK) {
         //
         // !!! SOME GLE ERROR OCCURRED, UNKNOWN WRITE RESULT !!!
         //
 
-        return Status(DBException::convertExceptionCode(code ? code : ErrorCodes::UnknownError),
-                      errMsg);
+        return Status(ErrorCodes::fromInt(code ? code : ErrorCodes::UnknownError), errMsg);
     } else if (!err.empty()) {
         // Write error
         errors->writeError.reset(new WriteErrorDetail);
@@ -120,7 +113,7 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
         errors->writeError->setErrMessage(err);
     } else if (!jNote.empty()) {
         // Know this is legacy gle and the journaling not enforced - write concern error in 2.4
-        errors->wcError.reset(new WCErrorDetail);
+        errors->wcError.reset(new WriteConcernErrorDetail);
         errors->wcError->setErrCode(ErrorCodes::WriteConcernFailed);
         errors->wcError->setErrMessage(jNote);
     }
@@ -184,110 +177,4 @@ BSONObj stripNonWCInfo(const BSONObj& gleResponse) {
     return builder.obj();
 }
 
-// Adds a wOpTime and a wElectionId field to a set of gle options
-static BSONObj buildGLECmdWithOpTime(const BSONObj& gleOptions,
-                                     const Timestamp& opTime,
-                                     const OID& electionId) {
-    BSONObjBuilder builder;
-    BSONObjIterator it(gleOptions);
-
-    for (int i = 0; it.more(); ++i) {
-        BSONElement el = it.next();
-
-        // Make sure first element is getLastError : 1
-        if (i == 0) {
-            StringData elName(el.fieldName());
-            if (!elName.equalCaseInsensitive("getLastError")) {
-                builder.append("getLastError", 1);
-            }
-        }
-
-        builder.append(el);
-    }
-    builder.append("wOpTime", opTime);
-    builder.appendOID("wElectionId", const_cast<OID*>(&electionId));
-    return builder.obj();
-}
-
-Status enforceLegacyWriteConcern(MultiCommandDispatch* dispatcher,
-                                 StringData dbName,
-                                 const BSONObj& options,
-                                 const HostOpTimeMap& hostOpTimes,
-                                 vector<LegacyWCResponse>* legacyWCResponses) {
-    if (hostOpTimes.empty()) {
-        return Status::OK();
-    }
-
-    for (HostOpTimeMap::const_iterator it = hostOpTimes.begin(); it != hostOpTimes.end(); ++it) {
-        const ConnectionString& shardEndpoint = it->first;
-        const HostOpTime hot = it->second;
-        const Timestamp& opTime = hot.opTime;
-        const OID& electionId = hot.electionId;
-
-        LOG(3) << "enforcing write concern " << options << " on " << shardEndpoint.toString()
-               << " at opTime " << opTime.toStringPretty() << " with electionID " << electionId;
-
-        BSONObj gleCmd = buildGLECmdWithOpTime(options, opTime, electionId);
-
-        RawBSONSerializable gleCmdSerial(gleCmd);
-        dispatcher->addCommand(shardEndpoint, dbName, gleCmdSerial);
-    }
-
-    dispatcher->sendAll();
-
-    vector<Status> failedStatuses;
-
-    while (dispatcher->numPending() > 0) {
-        ConnectionString shardEndpoint;
-        RawBSONSerializable gleResponseSerial;
-
-        Status dispatchStatus = dispatcher->recvAny(&shardEndpoint, &gleResponseSerial);
-        if (!dispatchStatus.isOK()) {
-            // We need to get all responses before returning
-            failedStatuses.push_back(dispatchStatus);
-            continue;
-        }
-
-        BSONObj gleResponse = stripNonWCInfo(gleResponseSerial.toBSON());
-
-        // Use the downconversion tools to determine if this GLE response is ok, a
-        // write concern error, or an unknown error we should immediately abort for.
-        GLEErrors errors;
-        Status extractStatus = extractGLEErrors(gleResponse, &errors);
-        if (!extractStatus.isOK()) {
-            failedStatuses.push_back(extractStatus);
-            continue;
-        }
-
-        LegacyWCResponse wcResponse;
-        wcResponse.shardHost = shardEndpoint.toString();
-        wcResponse.gleResponse = gleResponse;
-        if (errors.wcError.get()) {
-            wcResponse.errToReport = errors.wcError->getErrMessage();
-        }
-
-        legacyWCResponses->push_back(wcResponse);
-    }
-
-    if (failedStatuses.empty()) {
-        return Status::OK();
-    }
-
-    StringBuilder builder;
-    builder << "could not enforce write concern";
-
-    for (vector<Status>::const_iterator it = failedStatuses.begin(); it != failedStatuses.end();
-         ++it) {
-        const Status& failedStatus = *it;
-        if (it == failedStatuses.begin()) {
-            builder << causedBy(failedStatus.toString());
-        } else {
-            builder << ":: and ::" << failedStatus.toString();
-        }
-    }
-
-    return Status(failedStatuses.size() == 1u ? failedStatuses.front().code()
-                                              : ErrorCodes::MultipleErrorsOccurred,
-                  builder.str());
-}
-}
+}  // namespace mongo

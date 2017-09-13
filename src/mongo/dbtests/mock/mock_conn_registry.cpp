@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 
 #include "mongo/base/init.h"
@@ -91,7 +93,7 @@ mongo::DBClientBase* MockConnRegistry::MockConnHook::connect(const ConnectionStr
     const string hostName(connString.toString());
     MockDBClientConnection* conn = _registry->connect(hostName);
 
-    if (!conn->connect(hostName.c_str(), errmsg)) {
+    if (!conn->connect(hostName.c_str(), StringData(), errmsg)) {
         // Assumption: connect never throws, so no leak.
         delete conn;
 

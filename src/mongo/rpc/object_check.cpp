@@ -25,25 +25,40 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/rpc/object_check.h"
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/server_options.h"
-
+#include "mongo/bson/bson_depth.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
+namespace {
+class MaxBSONDepthParameter
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupOnly> {
+public:
+    MaxBSONDepthParameter()
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(), "maxBSONDepth", &BSONDepth::maxAllowableDepth) {}
 
-Status Validator<BSONObj>::validateLoad(const char* ptr, size_t length) {
-    return serverGlobalParams.objcheck ? validateBSON(ptr, length) : Status::OK();
-}
+    virtual Status validate(const std::int32_t& potentialNewValue) {
+        if (potentialNewValue < BSONDepth::kBSONDepthParameterFloor ||
+            potentialNewValue > BSONDepth::kBSONDepthParameterCeiling) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "maxBSONDepth must be between "
+                                        << BSONDepth::kBSONDepthParameterFloor
+                                        << " and "
+                                        << BSONDepth::kBSONDepthParameterCeiling
+                                        << ", inclusive");
+        }
+        return Status::OK();
+    }
+} maxBSONDepthParameter;
+}  // namespace
 
 Status Validator<BSONObj>::validateStore(const BSONObj& toStore) {
     return Status::OK();
 }
-
 }  // namespace mongo

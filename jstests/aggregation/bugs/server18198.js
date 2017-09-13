@@ -11,32 +11,45 @@
         var commandsRan = [];
         // hook in our patched mongo
         var mockMongo = {
-            getSlaveOk: function() { return true; },
-            runCommand: function(db, cmd, opts) {
-              commandsRan.push({db: db, cmd: cmd, opts: opts});
-              return {ok: 1.0};
+            getSlaveOk: function() {
+                return true;
             },
-            getReadPref: function() { return {mode: "secondaryPreferred"}; },
-            getReadPrefMode: function() { return "secondaryPreferred"; }
+            runCommand: function(db, cmd, opts) {
+                commandsRan.push({db: db, cmd: cmd, opts: opts});
+                return {ok: 1.0};
+            },
+            getReadPref: function() {
+                return {mode: "secondaryPreferred"};
+            },
+            getReadPrefMode: function() {
+                return "secondaryPreferred";
+            },
+            getMinWireVersion: function() {
+                return mongo.getMinWireVersion();
+            },
+            getMaxWireVersion: function() {
+                return mongo.getMaxWireVersion();
+            },
         };
 
         db._mongo = mockMongo;
+        db._session = new _DummyDriverSession(mockMongo);
 
         // this query should not get a read pref
-        t.aggregate([{$sort: {"x" : 1}}, {$out: "foo"}]);
+        t.aggregate([{$sort: {"x": 1}}, {$out: "foo"}]);
         assert.eq(commandsRan.length, 1);
         // check that it doesn't have a read preference
         assert(!commandsRan[0].cmd.hasOwnProperty("$readPreference"));
 
         commandsRan = [];
 
-        t.aggregate([{$sort: {"x" : 1}}]);
+        t.aggregate([{$sort: {"x": 1}}]);
         // check another command was run
         assert.eq(commandsRan.length, 1);
         // check that it has a read preference
         assert(commandsRan[0].cmd.hasOwnProperty("$readPreference"));
-    }
-    finally {
+    } finally {
         db._mongo = mongo;
+        db._session = new _DummyDriverSession(mongo);
     }
 })();

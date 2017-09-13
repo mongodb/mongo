@@ -1,0 +1,40 @@
+# -*- mode: python -*-
+
+Import([
+    "env",
+    ])
+
+env = env.Clone()
+
+def removeIfPresent(lst, item):
+    try:
+        lst.remove(item)
+    except ValueError:
+        pass
+
+for to_remove in ['-Werror', '-Wall', '-W']:
+    removeIfPresent(env['CCFLAGS'], to_remove)
+
+env.Prepend(CPPPATH=[
+    'src/headers',
+])
+
+env.Library(
+    target="tomcrypt",
+    source= [
+        "src/hashes/helper/hash_memory.c",
+        "src/hashes/sha1.c",
+        "src/hashes/sha2/sha256.c",
+        "src/mac/hmac/hmac_done.c",
+        "src/mac/hmac/hmac_init.c",
+        "src/mac/hmac/hmac_memory.c",
+        "src/mac/hmac/hmac_process.c",
+        "src/misc/compare_testvector.c",
+        "src/misc/crypt/crypt_argchk.c",
+        "src/misc/crypt/crypt_find_hash.c",
+        "src/misc/crypt/crypt_hash_descriptor.c",
+        "src/misc/crypt/crypt_hash_is_valid.c",
+        "src/misc/crypt/crypt_register_hash.c",
+        "src/misc/zeromem.c",
+    ],
+)

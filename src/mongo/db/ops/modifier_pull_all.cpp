@@ -31,9 +31,10 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/ops/field_checker.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/update/field_checker.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -69,11 +70,14 @@ struct ModifierPullAll::PreparedState {
 namespace {
 
 struct mutableElementEqualsBSONElement : std::unary_function<BSONElement, bool> {
-    mutableElementEqualsBSONElement(const mutablebson::Element& elem) : _what(elem) {}
+    mutableElementEqualsBSONElement(const mutablebson::Element& elem,
+                                    const CollatorInterface* collator)
+        : _what(elem), _collator(collator) {}
     bool operator()(const BSONElement& elem) const {
-        return _what.compareWithBSONElement(elem, false) == 0;
+        return _what.compareWithBSONElement(elem, _collator, false) == 0;
     }
     const mutablebson::Element& _what;
+    const CollatorInterface* _collator = nullptr;
 };
 }  // namespace
 
@@ -105,7 +109,8 @@ Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts, bo
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     //
@@ -120,6 +125,7 @@ Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts, bo
 
     // store the stuff to remove later
     _elementsToFind = modExpr.Array();
+    setCollator(opts.collator);
 
     return Status::OK();
 }
@@ -155,9 +161,9 @@ Status ModifierPullAll::prepare(mutablebson::Element root,
             // array.
             if (_preparedState->pathFoundElement.getType() != Array) {
                 mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
-                return Status(ErrorCodes::BadValue,
-                              str::stream()
-                                  << "Can only apply $pullAll to an array. " << idElem.toString()
+                return Status(
+                    ErrorCodes::BadValue,
+                    str::stream() << "Can only apply $pullAll to an array. " << idElem.toString()
                                   << " has the field "
                                   << _preparedState->pathFoundElement.getFieldName()
                                   << " of non-array type "
@@ -172,7 +178,7 @@ Status ModifierPullAll::prepare(mutablebson::Element root,
                 while (elem.ok()) {
                     if (std::find_if(_elementsToFind.begin(),
                                      _elementsToFind.end(),
-                                     mutableElementEqualsBSONElement(elem)) !=
+                                     mutableElementEqualsBSONElement(elem, _collator)) !=
                         _elementsToFind.end()) {
                         _preparedState->elementsToRemove.push_back(elem);
                     }
@@ -206,7 +212,7 @@ Status ModifierPullAll::apply() const {
     vector<mutablebson::Element>::const_iterator curr = _preparedState->elementsToRemove.begin();
     const vector<mutablebson::Element>::const_iterator end = _preparedState->elementsToRemove.end();
     for (; curr != end; ++curr) {
-        const_cast<mutablebson::Element&>(*curr).remove();
+        const_cast<mutablebson::Element&>(*curr).remove().transitional_ignore();
     }
     return Status::OK();
 }
@@ -227,7 +233,9 @@ Status ModifierPullAll::log(LogBuilder* logBuilder) const {
     if (!logElement.ok()) {
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Could not append entry to $pullAll oplog entry: "
-                                    << "set '" << _fieldRef.dottedField() << "' -> "
+                                    << "set '"
+                                    << _fieldRef.dottedField()
+                                    << "' -> "
                                     << _preparedState->pathFoundElement.toString());
     }
     return logBuilder->addToSets(logElement);

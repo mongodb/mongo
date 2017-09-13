@@ -28,15 +28,17 @@
 
 #pragma once
 
-
 #include "mongo/db/exec/near.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/r2_region_coverer.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/index_bounds.h"
+#include "third_party/s2/s2cellunion.h"
 
 namespace mongo {
 
@@ -61,35 +63,27 @@ struct GeoNearParams {
 /**
  * Implementation of GeoNear on top of a 2D index
  */
-class GeoNear2DStage : public NearStage {
+class GeoNear2DStage final : public NearStage {
 public:
     GeoNear2DStage(const GeoNearParams& nearParams,
-                   OperationContext* txn,
+                   OperationContext* opCtx,
                    WorkingSet* workingSet,
                    Collection* collection,
                    IndexDescriptor* twoDIndex);
 
-    virtual ~GeoNear2DStage();
-
 protected:
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
-                                                      WorkingSet* workingSet,
-                                                      Collection* collection);
+    StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
+                                              WorkingSet* workingSet,
+                                              Collection* collection) final;
 
-    virtual StatusWith<double> computeDistance(WorkingSetMember* member);
+    StatusWith<double> computeDistance(WorkingSetMember* member) final;
 
-    virtual PlanStage::StageState initialize(OperationContext* txn,
-                                             WorkingSet* workingSet,
-                                             Collection* collection,
-                                             WorkingSetID* out);
+    PlanStage::StageState initialize(OperationContext* opCtx,
+                                     WorkingSet* workingSet,
+                                     Collection* collection,
+                                     WorkingSetID* out) final;
 
 private:
-    virtual void finishSaveState();
-
-    virtual void finishRestoreState(OperationContext* txn);
-
-    virtual void finishInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
     const GeoNearParams _nearParams;
 
     // The 2D index we're searching over
@@ -105,6 +99,9 @@ private:
     // Amount to increment the next bounds by
     double _boundsIncrement;
 
+    // Keeps track of the region that has already been scanned
+    R2CellUnion _scannedCells;
+
     class DensityEstimator;
     std::unique_ptr<DensityEstimator> _densityEstimator;
 };
@@ -112,40 +109,36 @@ private:
 /**
  * Implementation of GeoNear on top of a 2DSphere (S2) index
  */
-class GeoNear2DSphereStage : public NearStage {
+class GeoNear2DSphereStage final : public NearStage {
 public:
     GeoNear2DSphereStage(const GeoNearParams& nearParams,
-                         OperationContext* txn,
+                         OperationContext* opCtx,
                          WorkingSet* workingSet,
                          Collection* collection,
                          IndexDescriptor* s2Index);
 
-    virtual ~GeoNear2DSphereStage();
+    ~GeoNear2DSphereStage();
 
 protected:
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
-                                                      WorkingSet* workingSet,
-                                                      Collection* collection);
+    StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
+                                              WorkingSet* workingSet,
+                                              Collection* collection) final;
 
-    virtual StatusWith<double> computeDistance(WorkingSetMember* member);
+    StatusWith<double> computeDistance(WorkingSetMember* member) final;
 
-    virtual PlanStage::StageState initialize(OperationContext* txn,
-                                             WorkingSet* workingSet,
-                                             Collection* collection,
-                                             WorkingSetID* out);
+    PlanStage::StageState initialize(OperationContext* opCtx,
+                                     WorkingSet* workingSet,
+                                     Collection* collection,
+                                     WorkingSetID* out) final;
 
 private:
-    virtual void finishSaveState();
-
-    virtual void finishRestoreState(OperationContext* txn);
-
-    virtual void finishInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
     const GeoNearParams _nearParams;
 
     // The 2D index we're searching over
     // Not owned here
     IndexDescriptor* const _s2Index;
+
+    S2IndexingParams _indexParams;
 
     // The total search annulus
     const R2Annulus _fullBounds;
@@ -155,6 +148,9 @@ private:
 
     // Amount to increment the next bounds by
     double _boundsIncrement;
+
+    // Keeps track of the region that has already been scanned
+    S2CellUnion _scannedCells;
 
     class DensityEstimator;
     std::unique_ptr<DensityEstimator> _densityEstimator;

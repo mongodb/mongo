@@ -7,11 +7,11 @@ from __future__ import absolute_import
 import os.path
 
 import pymongo
+import pymongo.errors
 
 from . import interface
 from . import standalone
 from ... import config
-from ... import logging
 from ... import utils
 
 
@@ -46,31 +46,49 @@ class MasterSlaveFixture(interface.ReplFixture):
         dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
         dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
         self._dbpath_prefix = os.path.join(dbpath_prefix,
-                                           "job%d" % (self.job_num),
+                                           "job{}".format(self.job_num),
                                            config.FIXTURE_SUBDIR)
 
         self.master = None
         self.slave = None
 
     def setup(self):
-        self.master = self._new_mongod_master()
+        if self.master is None:
+            self.master = self._new_mongod_master()
         self.master.setup()
-        self.port = self.master.port
 
-        self.slave = self._new_mongod_slave()
+        if self.slave is None:
+            self.slave = self._new_mongod_slave()
         self.slave.setup()
 
     def await_ready(self):
         self.master.await_ready()
         self.slave.await_ready()
 
-    def teardown(self):
+        # Do a replicated write to ensure that the slave has finished with its initial sync before
+        # starting to run any tests.
+        client = self.master.mongo_client()
+
+        # Keep retrying this until it times out waiting for replication.
+        def insert_fn(remaining_secs):
+            remaining_millis = int(round(remaining_secs * 1000))
+            write_concern = pymongo.WriteConcern(w=2, wtimeout=remaining_millis)
+            coll = client.resmoke.get_collection("await_ready", write_concern=write_concern)
+            coll.insert_one({"awaiting": "ready"})
+
+        try:
+            self.retry_until_wtimeout(insert_fn)
+        except pymongo.errors.WTimeoutError:
+            self.logger.info("Replication of write operation timed out.")
+            raise
+
+    def _do_teardown(self):
         running_at_start = self.is_running()
         success = True  # Still a success if nothing is running.
 
         if not running_at_start:
-            self.logger.info("Master-slave deployment was expected to be running in teardown(),"
-                             " but wasn't.")
+            self.logger.info(
+                "Master-slave deployment was expected to be running in _do_teardown(), but wasn't.")
 
         if self.slave is not None:
             if running_at_start:
@@ -102,51 +120,6 @@ class MasterSlaveFixture(interface.ReplFixture):
     def get_secondaries(self):
         return [self.slave]
 
-    def await_repl(self):
-        """
-        Inserts a document into each database on the master and waits
-        for all write operations to be acknowledged by the master-slave
-        deployment.
-        """
-
-        client = utils.new_mongo_client(self.port)
-
-        # We verify that each database has replicated to the slave because in the case of an initial
-        # sync, the slave may acknowledge writes to one database before it has finished syncing
-        # others.
-        db_names = client.database_names()
-        self.logger.info("Awaiting replication of inserts to each of the following databases on"
-                         " master on port %d: %s",
-                         self.port,
-                         db_names)
-
-        for db_name in db_names:
-            if db_name == "local":
-                continue  # The local database is expected to differ, ignore.
-
-            self.logger.info("Awaiting replication of insert to database %s (w=2, wtimeout=%d min)"
-                             " to master on port %d",
-                             db_name,
-                             interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS,
-                             self.port)
-
-            # Keep retrying this until it times out waiting for replication.
-            def insert_fn(remaining_secs):
-                remaining_millis = int(round(remaining_secs * 1000))
-                client[db_name].resmoke_await_repl.insert({"awaiting": "repl"},
-                                                          w=2,
-                                                          wtimeout=remaining_millis)
-
-            try:
-                self.retry_until_wtimeout(insert_fn)
-            except pymongo.errors.WTimeoutError:
-                self.logger.info("Replication of write operation timed out.")
-                raise
-
-            self.logger.info("Replication of write operation completed for database %s.", db_name)
-
-        self.logger.info("Finished awaiting replication.")
-
     def _new_mongod(self, mongod_logger, mongod_options):
         """
         Returns a standalone.MongoDFixture with the specified logger and
@@ -164,8 +137,7 @@ class MasterSlaveFixture(interface.ReplFixture):
         master of a master-slave deployment.
         """
 
-        logger_name = "%s:master" % (self.logger.name)
-        mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        mongod_logger = self.logger.new_fixture_node_logger("master")
 
         mongod_options = self.mongod_options.copy()
         mongod_options.update(self.master_options)
@@ -179,12 +151,17 @@ class MasterSlaveFixture(interface.ReplFixture):
         slave of a master-slave deployment.
         """
 
-        logger_name = "%s:slave" % (self.logger.name)
-        mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        mongod_logger = self.logger.new_fixture_node_logger("slave")
 
         mongod_options = self.mongod_options.copy()
         mongod_options.update(self.slave_options)
         mongod_options["slave"] = ""
-        mongod_options["source"] = "localhost:%d" % (self.port)
+        mongod_options["source"] = self.master.get_internal_connection_string()
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "slave")
         return self._new_mongod(mongod_logger, mongod_options)
+
+    def get_internal_connection_string(self):
+        return self.master.get_internal_connection_string()
+
+    def get_driver_connection_url(self):
+        return self.master.get_driver_connection_url()

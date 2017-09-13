@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -38,8 +38,8 @@
 #define	POS_2BYTE_MARKER (uint8_t)0xc0
 #define	POS_MULTI_MARKER (uint8_t)0xe0
 
-#define	NEG_1BYTE_MIN ((-1) << 6)
-#define	NEG_2BYTE_MIN (((-1) << 13) + NEG_1BYTE_MIN)
+#define	NEG_1BYTE_MIN (-(1 << 6))
+#define	NEG_2BYTE_MIN (-(1 << 13) + NEG_1BYTE_MIN)
 #define	POS_1BYTE_MAX ((1 << 6) - 1)
 #define	POS_2BYTE_MAX ((1 << 13) + POS_1BYTE_MAX)
 
@@ -47,27 +47,33 @@
 #define	GET_BITS(x, start, end)                                         \
 	(((uint64_t)(x) & ((1U << (start)) - 1U)) >> (end))
 
-#define	WT_SIZE_CHECK(l, maxl)						\
+/*
+ * Size checks: return ENOMEM if not enough room when writing, EINVAL if the
+ * length is wrong when reading (presumably the value is corrupted).
+ */
+#define	WT_SIZE_CHECK_PACK(l, maxl)					\
 	WT_RET_TEST((maxl) != 0 && (size_t)(l) > (maxl), ENOMEM)
+#define	WT_SIZE_CHECK_UNPACK(l, maxl)					\
+	WT_RET_TEST((maxl) != 0 && (size_t)(l) > (maxl), EINVAL)
 
 /* Count the leading zero bytes. */
 #if defined(__GNUC__)
 #define	WT_LEADING_ZEROS(x, i)						\
-	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
+	((i) = ((x) == 0) ? (int)sizeof(x) : __builtin_clzll(x) >> 3)
 #elif defined(_MSC_VER)
 #define	WT_LEADING_ZEROS(x, i)	do {					\
-	if (x == 0) i = (int)sizeof(x);				\
+	if ((x) == 0) (i) = (int)sizeof(x);				\
 	else  { 							\
 		unsigned long __index;					\
 		_BitScanReverse64(&__index, x);				\
 		__index = 63 ^ __index;					\
-		i = (int)(__index >> 3); }				\
+		(i) = (int)(__index >> 3); }				\
 	} while (0)
 #else
 #define	WT_LEADING_ZEROS(x, i) do {					\
 	uint64_t __x = (x);						\
 	uint64_t __m = (uint64_t)0xff << 56;				\
-	for (i = 0; !(__x & __m) && i != 8; i++)			\
+	for ((i) = 0; !(__x & __m) && (i) != 8; (i)++)			\
 		__m >>= 8;						\
 } while (0)
 #endif
@@ -83,8 +89,8 @@ __wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
 	int len, lz, shift;
 
 	WT_LEADING_ZEROS(x, lz);
-	len = (int)sizeof (x) - lz;
-	WT_SIZE_CHECK(len + 1, maxlen);
+	len = (int)sizeof(x) - lz;
+	WT_SIZE_CHECK_PACK(len + 1, maxlen);
 	p = *pp;
 
 	/* There are four bits we can use in the first byte. */
@@ -108,8 +114,8 @@ __wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
 	int len, lz, shift;
 
 	WT_LEADING_ZEROS(~x, lz);
-	len = (int)sizeof (x) - lz;
-	WT_SIZE_CHECK(len + 1, maxlen);
+	len = (int)sizeof(x) - lz;
+	WT_SIZE_CHECK_PACK(len + 1, maxlen);
 	p = *pp;
 
 	/*
@@ -141,7 +147,7 @@ __wt_vunpack_posint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 	/* There are four length bits in the first byte. */
 	p = *pp;
 	len = (*p++ & 0xf);
-	WT_SIZE_CHECK(len + 1, maxlen);
+	WT_SIZE_CHECK_UNPACK(len + 1, maxlen);
 
 	for (x = 0; len != 0; --len)
 		x = (x << 8) | *p++;
@@ -164,8 +170,8 @@ __wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 
 	/* There are four length bits in the first byte. */
 	p = *pp;
-	len = (int)sizeof (x) - (*p++ & 0xf);
-	WT_SIZE_CHECK(len + 1, maxlen);
+	len = (int)sizeof(x) - (*p++ & 0xf);
+	WT_SIZE_CHECK_UNPACK(len + 1, maxlen);
 
 	for (x = UINT64_MAX; len != 0; --len)
 		x = (x << 8) | *p++;
@@ -184,12 +190,12 @@ __wt_vpack_uint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
 	uint8_t *p;
 
-	WT_SIZE_CHECK(1, maxlen);
+	WT_SIZE_CHECK_PACK(1, maxlen);
 	p = *pp;
 	if (x <= POS_1BYTE_MAX)
 		*p++ = POS_1BYTE_MARKER | GET_BITS(x, 6, 0);
 	else if (x <= POS_2BYTE_MAX) {
-		WT_SIZE_CHECK(2, maxlen);
+		WT_SIZE_CHECK_PACK(2, maxlen);
 		x -= POS_1BYTE_MAX + 1;
 		*p++ = POS_2BYTE_MARKER | GET_BITS(x, 13, 8);
 		*p++ = GET_BITS(x, 8, 0);
@@ -220,13 +226,14 @@ __wt_vpack_int(uint8_t **pp, size_t maxlen, int64_t x)
 {
 	uint8_t *p;
 
-	WT_SIZE_CHECK(1, maxlen);
+	WT_SIZE_CHECK_PACK(1, maxlen);
 	p = *pp;
 	if (x < NEG_2BYTE_MIN) {
 		*p = NEG_MULTI_MARKER;
 		return (__wt_vpack_negint(pp, maxlen, (uint64_t)x));
-	} else if (x < NEG_1BYTE_MIN) {
-		WT_SIZE_CHECK(2, maxlen);
+	}
+	if (x < NEG_1BYTE_MIN) {
+		WT_SIZE_CHECK_PACK(2, maxlen);
 		x -= NEG_2BYTE_MIN;
 		*p++ = NEG_2BYTE_MARKER | GET_BITS(x, 13, 8);
 		*p++ = GET_BITS(x, 8, 0);
@@ -250,7 +257,7 @@ __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
 {
 	const uint8_t *p;
 
-	WT_SIZE_CHECK(1, maxlen);
+	WT_SIZE_CHECK_UNPACK(1, maxlen);
 	p = *pp;
 	switch (*p & 0xf0) {
 	case POS_1BYTE_MARKER:
@@ -262,7 +269,7 @@ __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
 		break;
 	case POS_2BYTE_MARKER:
 	case POS_2BYTE_MARKER | 0x10:
-		WT_SIZE_CHECK(2, maxlen);
+		WT_SIZE_CHECK_UNPACK(2, maxlen);
 		*xp = GET_BITS(*p++, 5, 0) << 8;
 		*xp |= *p++;
 		*xp += POS_1BYTE_MAX + 1;
@@ -288,7 +295,7 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 {
 	const uint8_t *p;
 
-	WT_SIZE_CHECK(1, maxlen);
+	WT_SIZE_CHECK_UNPACK(1, maxlen);
 	p = *pp;
 	switch (*p & 0xf0) {
 	case NEG_MULTI_MARKER:
@@ -296,11 +303,10 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 		return (0);
 	case NEG_2BYTE_MARKER:
 	case NEG_2BYTE_MARKER | 0x10:
-		WT_SIZE_CHECK(2, maxlen);
+		WT_SIZE_CHECK_UNPACK(2, maxlen);
 		*xp = (int64_t)(GET_BITS(*p++, 5, 0) << 8);
 		*xp |= *p++;
 		*xp += NEG_2BYTE_MIN;
-		p += 2;
 		break;
 	case NEG_1BYTE_MARKER:
 	case NEG_1BYTE_MARKER | 0x10:
@@ -353,12 +359,10 @@ __wt_vsize_uint(uint64_t x)
 {
 	if (x <= POS_1BYTE_MAX)
 		return (1);
-	else if (x <= POS_2BYTE_MAX + 1) {
+	if (x <= POS_2BYTE_MAX + 1)
 		return (2);
-	} else {
-		x -= POS_2BYTE_MAX + 1;
-		return (__wt_vsize_posint(x));
-	}
+	x -= POS_2BYTE_MAX + 1;
+	return (__wt_vsize_posint(x));
 }
 
 /*
@@ -368,13 +372,12 @@ __wt_vsize_uint(uint64_t x)
 static inline size_t
 __wt_vsize_int(int64_t x)
 {
-	if (x < NEG_2BYTE_MIN) {
+	if (x < NEG_2BYTE_MIN)
 		return (__wt_vsize_negint((uint64_t)x));
-	} else if (x < NEG_1BYTE_MIN) {
+	if (x < NEG_1BYTE_MIN)
 		return (2);
-	} else if (x < 0) {
+	if (x < 0)
 		return (1);
-	} else
-		/* For non-negative values, use the unsigned code above. */
-		return (__wt_vsize_uint((uint64_t)x));
+	/* For non-negative values, use the unsigned code above. */
+	return (__wt_vsize_uint((uint64_t)x));
 }

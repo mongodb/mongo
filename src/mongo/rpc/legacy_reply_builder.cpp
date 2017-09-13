@@ -28,55 +28,72 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/rpc/legacy_reply_builder.h"
+
+#include <iterator>
+
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace rpc {
 
-LegacyReplyBuilder::LegacyReplyBuilder() : LegacyReplyBuilder(stdx::make_unique<Message>()) {}
+LegacyReplyBuilder::LegacyReplyBuilder() : LegacyReplyBuilder(Message()) {}
 
-LegacyReplyBuilder::LegacyReplyBuilder(std::unique_ptr<Message> message)
-    : _message{std::move(message)} {
+LegacyReplyBuilder::LegacyReplyBuilder(Message&& message) : _message{std::move(message)} {
     _builder.skip(sizeof(QueryResult::Value));
 }
 
 LegacyReplyBuilder::~LegacyReplyBuilder() {}
 
-LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(BSONObj metadata) {
-    invariant(_state == State::kMetadata);
-    _metadata = std::move(metadata);
-    _state = State::kCommandReply;
+LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
+                                                        BSONObj extraErrorInfo) {
+    invariant(_state == State::kCommandReply);
+    if (nonOKStatus == ErrorCodes::SendStaleConfig) {
+        _staleConfigError = true;
+        // Need to use the special $err format for SendStaleConfig errors to be backwards
+        // compatible.
+        BSONObjBuilder err;
+        // $err must be the first field in object.
+        err.append("$err", nonOKStatus.reason());
+        err.append("code", nonOKStatus.code());
+        err.appendElements(extraErrorInfo);
+        setRawCommandReply(err.done());
+    } else {
+        // All other errors proceed through the normal path, which also handles state transitions.
+        ReplyBuilderInterface::setCommandReply(std::move(nonOKStatus), std::move(extraErrorInfo));
+    }
     return *this;
 }
 
-LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(BSONObj commandReply) {
+LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(const BSONObj& commandReply) {
     invariant(_state == State::kCommandReply);
-    BSONObj downconvertedCommandReply = uassertStatusOK(
-        rpc::downconvertReplyMetadata(std::move(commandReply), std::move(_metadata)));
-    downconvertedCommandReply.appendSelfToBufBuilder(_builder);
+    commandReply.appendSelfToBufBuilder(_builder);
+    _state = State::kMetadata;
+    return *this;
+}
+
+BSONObjBuilder LegacyReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
+    invariant(_state == State::kCommandReply);
+    // Eagerly allocate reserveBytes bytes.
+    _builder.reserveBytes(reserveBytes);
+    // Claim our reservation immediately so we can actually write data to it.
+    _builder.claimReservedBytes(reserveBytes);
+    _state = State::kMetadata;
+    return BSONObjBuilder(_builder);
+}
+
+LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(const BSONObj& metadata) {
+    invariant(_state == State::kMetadata);
+    BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag(), _builder, sizeof(QueryResult::Value))
+        .appendElements(metadata);
     _state = State::kOutputDocs;
     return *this;
-}
-
-LegacyReplyBuilder& LegacyReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
-    invariant(_state == State::kOutputDocs);
-    // no op
-    return *this;
-}
-
-LegacyReplyBuilder& LegacyReplyBuilder::addOutputDoc(BSONObj outputDoc) {
-    invariant(_state == State::kOutputDocs);
-    // no op
-    return *this;
-}
-
-ReplyBuilderInterface::State LegacyReplyBuilder::getState() const {
-    return _state;
 }
 
 Protocol LegacyReplyBuilder::getProtocol() const {
@@ -86,39 +103,39 @@ Protocol LegacyReplyBuilder::getProtocol() const {
 void LegacyReplyBuilder::reset() {
     // If we are in State::kMetadata, we are already in the 'start' state, so by
     // immediately returning, we save a heap allocation.
-    if (_state == State::kMetadata) {
+    if (_state == State::kCommandReply) {
         return;
     }
     _builder.reset();
-    _metadata = BSONObj();
-    _message = stdx::make_unique<Message>();
-    _state = State::kMetadata;
+    _builder.skip(sizeof(QueryResult::Value));
+    _message.reset();
+    _state = State::kCommandReply;
+    _staleConfigError = false;
 }
 
 
-std::unique_ptr<Message> LegacyReplyBuilder::done() {
+Message LegacyReplyBuilder::done() {
     invariant(_state == State::kOutputDocs);
-    std::unique_ptr<Message> message = stdx::make_unique<Message>();
 
     QueryResult::View qr = _builder.buf();
-    qr.setResultFlagsToOk();
+
+    if (_staleConfigError) {
+        // For compatibility with legacy mongos, we need to set this result flag on SendStaleConfig
+        qr.setResultFlags(ResultFlag_ErrSet | ResultFlag_ShardConfigStale);
+    } else {
+        qr.setResultFlagsToOk();
+    }
+
     qr.msgdata().setLen(_builder.len());
     qr.msgdata().setOperation(opReply);
     qr.setCursorId(0);
     qr.setStartingFrom(0);
     qr.setNReturned(1);
-    _builder.decouple();
 
-    message->setData(qr.view2ptr(), true);
+    _message.setData(_builder.release());
 
     _state = State::kDone;
-    return std::move(message);
-}
-
-std::size_t LegacyReplyBuilder::availableSpaceForOutputDocs() const {
-    invariant(State::kDone != _state);
-    // LegacyReplyBuilder currently does not support addOutputDoc(s)
-    return 0u;
+    return std::move(_message);
 }
 
 }  // namespace rpc

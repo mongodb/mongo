@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -37,8 +37,8 @@ __bloom_init(WT_SESSION_IMPL *session,
 		len += strlen(config);
 	WT_ERR(__wt_calloc_def(session, len, &bloom->config));
 	/* Add the standard config at the end, so it overrides user settings. */
-	(void)snprintf(bloom->config, len,
-	    "%s,%s", config == NULL ? "" : config, WT_BLOOM_TABLE_CONFIG);
+	WT_ERR(__wt_snprintf(bloom->config, len,
+	    "%s,%s", config == NULL ? "" : config, WT_BLOOM_TABLE_CONFIG));
 
 	bloom->session = session;
 
@@ -65,7 +65,9 @@ __bloom_setup(
     WT_BLOOM *bloom, uint64_t n, uint64_t m, uint32_t factor, uint32_t k)
 {
 	if (k < 2)
-		return (EINVAL);
+		WT_RET_MSG(bloom->session, EINVAL,
+		    "bloom filter hash values to be set/tested must be "
+		    "greater than 2");
 
 	bloom->k = k;
 	bloom->factor = factor;
@@ -93,6 +95,7 @@ int
 __wt_bloom_create(
     WT_SESSION_IMPL *session, const char *uri, const char *config,
     uint64_t count, uint32_t factor, uint32_t k, WT_BLOOM **bloomp)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_BLOOM *bloom;
 	WT_DECL_RET;
@@ -105,7 +108,7 @@ __wt_bloom_create(
 	*bloomp = bloom;
 	return (0);
 
-err:	(void)__wt_bloom_close(bloom);
+err:	WT_TRET(__wt_bloom_close(bloom));
 	return (ret);
 }
 
@@ -130,8 +133,12 @@ __bloom_open_cursor(WT_BLOOM *bloom, WT_CURSOR *owner)
 	c = NULL;
 	WT_RET(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
 
-	/* XXX Layering violation: bump the cache priority for Bloom filters. */
-	((WT_CURSOR_BTREE *)c)->btree->evict_priority = WT_EVICT_INT_SKEW;
+	/*
+	 * Bump the cache priority for Bloom filters: this makes eviction favor
+	 * pages from other trees over Bloom filters.
+	 */
+#define	WT_EVICT_BLOOM_SKEW	1000
+	__wt_evict_priority_set(session, WT_EVICT_BLOOM_SKEW);
 
 	bloom->c = c;
 	return (0);
@@ -146,6 +153,7 @@ int
 __wt_bloom_open(WT_SESSION_IMPL *session,
     const char *uri, uint32_t factor, uint32_t k,
     WT_CURSOR *owner, WT_BLOOM **bloomp)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
@@ -166,7 +174,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	*bloomp = bloom;
 	return (0);
 
-err:	(void)__wt_bloom_close(bloom);
+err:	WT_TRET(__wt_bloom_close(bloom));
 	return (ret);
 }
 
@@ -174,18 +182,17 @@ err:	(void)__wt_bloom_close(bloom);
  * __wt_bloom_insert --
  *	Adds the given key to the Bloom filter.
  */
-int
+void
 __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	uint64_t h1, h2;
 	uint32_t i;
 
 	h1 = __wt_hash_fnv64(key->data, key->size);
 	h2 = __wt_hash_city64(key->data, key->size);
-	for (i = 0; i < bloom->k; i++, h1 += h2) {
+	for (i = 0; i < bloom->k; i++, h1 += h2)
 		__bit_set(bloom->bitstring, h1 % bloom->m);
-	}
-	return (0);
 }
 
 /*
@@ -195,6 +202,7 @@ __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
  */
 int
 __wt_bloom_finalize(WT_BLOOM *bloom)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_CURSOR *c;
 	WT_DECL_RET;
@@ -238,15 +246,13 @@ err:	WT_TRET(c->close(c));
  * __wt_bloom_hash --
  *	Calculate the hash values for a given key.
  */
-int
+void
 __wt_bloom_hash(WT_BLOOM *bloom, WT_ITEM *key, WT_BLOOM_HASH *bhash)
 {
 	WT_UNUSED(bloom);
 
 	bhash->h1 = __wt_hash_fnv64(key->data, key->size);
 	bhash->h2 = __wt_hash_city64(key->data, key->size);
-
-	return (0);
 }
 
 /*
@@ -295,7 +301,7 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 err:	/* Don't return WT_NOTFOUND from a failed search. */
 	if (ret == WT_NOTFOUND)
 		ret = WT_ERROR;
-	__wt_err(bloom->session, ret, "Failed lookup in bloom filter.");
+	__wt_err(bloom->session, ret, "Failed lookup in bloom filter");
 	return (ret);
 }
 
@@ -306,11 +312,58 @@ err:	/* Don't return WT_NOTFOUND from a failed search. */
  */
 int
 __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_BLOOM_HASH bhash;
 
-	WT_RET(__wt_bloom_hash(bloom, key, &bhash));
+	__wt_bloom_hash(bloom, key, &bhash);
 	return (__wt_bloom_hash_get(bloom, &bhash));
+}
+
+/*
+ * __wt_bloom_inmem_get --
+ *	Tests whether the given key is in the Bloom filter.
+ *	This can be used in place of __wt_bloom_get
+ *	for Bloom filters that are memory only.
+ */
+int
+__wt_bloom_inmem_get(WT_BLOOM *bloom, WT_ITEM *key)
+{
+	uint64_t h1, h2;
+	uint32_t i;
+
+	h1 = __wt_hash_fnv64(key->data, key->size);
+	h2 = __wt_hash_city64(key->data, key->size);
+	for (i = 0; i < bloom->k; i++, h1 += h2) {
+		if (!__bit_test(bloom->bitstring, h1 % bloom->m))
+			return (WT_NOTFOUND);
+	}
+	return (0);
+}
+
+/*
+ * __wt_bloom_intersection --
+ *	Modify the Bloom filter to contain the intersection of this
+ *	filter with another.
+ */
+int
+__wt_bloom_intersection(WT_BLOOM *bloom, WT_BLOOM *other)
+{
+	uint64_t i, nbytes;
+
+	if (bloom->k != other->k || bloom->factor != other->factor ||
+	    bloom->m != other->m || bloom->n != other->n)
+		WT_RET_MSG(bloom->session, EINVAL,
+		    "bloom filter intersection configuration mismatch: ("
+		    "%" PRIu32 "/%" PRIu32 ", %" PRIu32 "/%" PRIu32 ", "
+		    "%" PRIu64 "/%" PRIu64 ", %" PRIu64 "/%" PRIu64 ")",
+		    bloom->k, other->k, bloom->factor, other->factor,
+		    bloom->m, other->m, bloom->n, other->n);
+
+	nbytes = __bitstr_size(bloom->m);
+	for (i = 0; i < nbytes; i++)
+		bloom->bitstring[i] &= other->bitstring[i];
+	return (0);
 }
 
 /*
@@ -319,6 +372,7 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
  */
 int
 __wt_bloom_close(WT_BLOOM *bloom)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -341,6 +395,7 @@ __wt_bloom_close(WT_BLOOM *bloom)
  */
 int
 __wt_bloom_drop(WT_BLOOM *bloom, const char *config)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_DECL_RET;
 	WT_SESSION *wt_session;

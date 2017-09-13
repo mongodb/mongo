@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -100,7 +100,7 @@ __wt_log2_int(uint32_t n)
  * __wt_ispo2 --
  *	Return if a number is a power-of-two.
  */
-int
+bool
 __wt_ispo2(uint32_t v)
 {
 	/*

@@ -29,14 +29,16 @@
 #include "mongo/db/index/external_key_generator.h"
 
 #include <cmath>
+#include <string>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/s2_common.h"
-#include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_common.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -45,32 +47,42 @@ namespace {
 void getKeysForUpgradeChecking(const BSONObj& infoObj, const BSONObj& doc, BSONObjSet* keys) {
     BSONObj keyPattern = infoObj.getObjectField("key");
 
-    string type = IndexNames::findPluginName(keyPattern);
+    std::string type = IndexNames::findPluginName(keyPattern);
 
     if (IndexNames::GEO_2D == type) {
         TwoDIndexingParams params;
         ExpressionParams::parseTwoDParams(infoObj, &params);
         ExpressionKeysPrivate::get2DKeys(doc, params, keys, NULL);
     } else if (IndexNames::GEO_HAYSTACK == type) {
-        string geoField;
-        vector<string> otherFields;
+        std::string geoField;
+        std::vector<std::string> otherFields;
         double bucketSize;
         ExpressionParams::parseHaystackParams(infoObj, &geoField, &otherFields, &bucketSize);
         ExpressionKeysPrivate::getHaystackKeys(doc, geoField, otherFields, bucketSize, keys);
     } else if (IndexNames::GEO_2DSPHERE == type) {
         S2IndexingParams params;
-        ExpressionParams::parse2dsphereParams(infoObj, &params);
-        ExpressionKeysPrivate::getS2Keys(doc, keyPattern, params, keys);
+        // TODO SERVER-22251: If the index has a collator, it should be passed here, or the keys
+        // generated will be wrong.
+        CollatorInterface* collator = nullptr;
+        ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+
+        // There's no need to compute the prefixes of the indexed fields that cause the index to be
+        // multikey when checking if any index key is too large.
+        MultikeyPaths* multikeyPaths = nullptr;
+        ExpressionKeysPrivate::getS2Keys(doc, keyPattern, params, keys, multikeyPaths);
     } else if (IndexNames::TEXT == type) {
         fts::FTSSpec spec(infoObj);
         ExpressionKeysPrivate::getFTSKeys(doc, spec, keys);
     } else if (IndexNames::HASHED == type) {
         HashSeed seed;
         int version;
-        string field;
+        std::string field;
         ExpressionParams::parseHashParams(infoObj, &seed, &version, &field);
+        // TODO SERVER-22251: If the index has a collator, it should be passed here, or the keys
+        // generated will be wrong.
+        CollatorInterface* collator = nullptr;
         ExpressionKeysPrivate::getHashKeys(
-            doc, field, seed, version, infoObj["sparse"].trueValue(), keys);
+            doc, field, seed, version, infoObj["sparse"].trueValue(), collator, keys);
     } else {
         invariant(IndexNames::BTREE == type);
 
@@ -84,9 +96,13 @@ void getKeysForUpgradeChecking(const BSONObj& infoObj, const BSONObj& doc, BSONO
         }
 
         // XXX: do we care about version
-        BtreeKeyGeneratorV1 keyGen(fieldNames, fixed, infoObj["sparse"].trueValue());
+        // TODO: change nullptr to a collator, if a collation spec is given.
+        BtreeKeyGeneratorV1 keyGen(fieldNames, fixed, infoObj["sparse"].trueValue(), nullptr);
 
-        keyGen.getKeys(doc, keys);
+        // There's no need to compute the prefixes of the indexed fields that cause the index to be
+        // multikey when checking if any index key is too large.
+        MultikeyPaths* multikeyPaths = nullptr;
+        keyGen.getKeys(doc, keys, multikeyPaths);
     }
 }
 
@@ -179,7 +195,7 @@ int keyV1Size(const BSONObj& obj) {
 }  // namespace
 
 bool isAnyIndexKeyTooLarge(const BSONObj& index, const BSONObj& doc) {
-    BSONObjSet keys;
+    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     getKeysForUpgradeChecking(index, doc, &keys);
 
     int largestKeySize = 0;

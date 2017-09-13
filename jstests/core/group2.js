@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of unsupported group operator on sharded
+// collection.
+// @tags: [assumes_unsharded_collection]
+
 t = db.group2;
 t.drop();
 
@@ -5,12 +9,13 @@ t.save({a: 2});
 t.save({b: 5});
 t.save({a: 1});
 
-cmd = { key: {a: 1},
-        initial: {count: 0},
-        reduce: function(obj, prev) {
-            prev.count++;
-        }
-      };
+cmd = {
+    key: {a: 1},
+    initial: {count: 0},
+    reduce: function(obj, prev) {
+        prev.count++;
+    }
+};
 
 result = t.group(cmd);
 
@@ -23,16 +28,18 @@ assert.eq(1, result[0].count, "F");
 assert.eq(1, result[1].count, "G");
 assert.eq(1, result[2].count, "H");
 
+var keyFn = function(x) {
+    return {a: 'a' in x ? x.a : null};
+};
 
-delete cmd.key
-cmd["$keyf"] = function(x){ return { a : x.a }; };
-result2 = t.group( cmd );
+delete cmd.key;
+cmd["$keyf"] = keyFn;
+result2 = t.group(cmd);
 
-assert.eq( result , result2, "check result2" );
+assert.eq(result, result2, "check result2");
 
+delete cmd.$keyf;
+cmd["keyf"] = keyFn;
+result3 = t.group(cmd);
 
-delete cmd.$keyf
-cmd["keyf"] = function(x){ return { a : x.a }; };
-result3 = t.group( cmd );
-
-assert.eq( result , result3, "check result3" );
+assert.eq(result, result3, "check result3");

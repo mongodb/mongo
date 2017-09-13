@@ -1,0 +1,31 @@
+Testscenarios is licensed under two licenses, the Apache License, Version 2.0
+or the 3-clause BSD License. You may use this project under either of these
+licenses - choose the one that works best for you.
+
+We require contributions to be licensed under both licenses. The primary
+difference between them is that the Apache license takes care of potential
+issues with Patents and other intellectual property concerns that some users
+or contributors may find important.
+
+Generally every source file in Testscenarios needs a license grant under both
+these licenses.  As the code is shipped as a single unit, a brief form is used:
+----
+Copyright (c) [yyyy][,yyyy]* [name or 'Testscenarios Contributors']
+
+Licensed under either the Apache License, Version 2.0 or the BSD 3-clause
+license at the users choice. A copy of both licenses are available in the
+project source as Apache-2.0 and BSD. You may not use this file except in
+compliance with one of these two licences.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under these licenses is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+license you chose for the specific language governing permissions and
+limitations under that license.
+----
+
+Code that has been incorporated into Testscenarios from other projects will
+naturally be under its own license, and will retain that license.
+
+A known list of such code is maintained here:
+* No entries.

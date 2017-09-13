@@ -1,0 +1,19 @@
+# A stress configuration, to create long running checkpoints and see how
+# they interfere with schema level operations (table create, drop).
+# Setup a cache size large enough that checkpoints can take a long time.
+conn_config="cache_size=8GB,log=(enabled=false),checkpoint=(wait=30)"
+table_config="leaf_page_max=4k,internal_page_max=16k,type=file"
+icount=10000000
+table_count_idle=100
+# Turn on create/drop of idle tables, and error if a single operation takes
+# more than 5 seconds.
+idle_table_cycle=5
+populate_threads=5
+checkpoint_threads=0
+report_interval=5
+# 100 million
+random_range=100000000
+run_time=1000
+# Setup a workload that dirties a lot of the cache
+threads=((count=2,reads=1),(count=2,inserts=1),(count=2,updates=1))
+value_sz=500

@@ -32,6 +32,7 @@
 
 #include "mongo/db/exec/index_scan.h"
 
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -57,11 +59,11 @@ namespace mongo {
 // static
 const char* IndexScan::kStageType = "IXSCAN";
 
-IndexScan::IndexScan(OperationContext* txn,
+IndexScan::IndexScan(OperationContext* opCtx,
                      const IndexScanParams& params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : _txn(txn),
+    : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
       _keyPattern(params.descriptor->keyPattern().getOwned()),
@@ -70,17 +72,22 @@ IndexScan::IndexScan(OperationContext* txn,
       _shouldDedup(true),
       _forward(params.direction == 1),
       _params(params),
-      _commonStats(kStageType),
-      _endKeyInclusive(false) {
+      _startKeyInclusive(IndexBounds::isStartIncludedInBound(params.bounds.boundInclusion)),
+      _endKeyInclusive(IndexBounds::isEndIncludedInBound(params.bounds.boundInclusion)) {
     // We can't always access the descriptor in the call to getStats() so we pull
     // any info we need for stats reporting out here.
     _specificStats.keyPattern = _keyPattern;
+    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
+        invariant(collationElement.isABSONObj());
+        _specificStats.collation = collationElement.Obj().getOwned();
+    }
     _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.isMultiKey = _params.descriptor->isMultikey(_txn);
+    _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
+    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(getOpCtx());
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.indexVersion = _params.descriptor->version();
+    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
@@ -88,28 +95,29 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         _shouldDedup = false;
     } else {
         // TODO it is incorrect to rely on this not changing. SERVER-17678
-        _shouldDedup = _params.descriptor->isMultikey(_txn);
+        _shouldDedup = _params.descriptor->isMultikey(getOpCtx());
     }
 
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
-    _indexCursor = _iam->newCursor(_txn, _forward);
+    _indexCursor = _iam->newCursor(getOpCtx(), _forward);
+
+    // We always seek once to establish the cursor position.
+    ++_specificStats.seeks;
 
     if (_params.bounds.isSimpleRange) {
         // Start at one key, end at another.
+        _startKey = _params.bounds.startKey;
         _endKey = _params.bounds.endKey;
-        _endKeyInclusive = _params.bounds.endKeyInclusive;
         _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
-        return _indexCursor->seek(_params.bounds.startKey, /*inclusive*/ true);
+        return _indexCursor->seek(_startKey, _startKeyInclusive);
     } else {
         // For single intervals, we can use an optimized scan which checks against the position
         // of an end cursor.  For all other index scans, we fall back on using
         // IndexBoundsChecker to determine when we've finished the scan.
-        BSONObj startKey;
-        bool startKeyInclusive;
         if (IndexBoundsBuilder::isSingleInterval(
-                _params.bounds, &startKey, &startKeyInclusive, &_endKey, &_endKeyInclusive)) {
+                _params.bounds, &_startKey, &_startKeyInclusive, &_endKey, &_endKeyInclusive)) {
             _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
-            return _indexCursor->seek(startKey, startKeyInclusive);
+            return _indexCursor->seek(_startKey, _startKeyInclusive);
         } else {
             _checker.reset(new IndexBoundsChecker(&_params.bounds, _keyPattern, _params.direction));
 
@@ -121,12 +129,7 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     }
 }
 
-PlanStage::StageState IndexScan::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     // Get the next kv pair from the index, if any.
     boost::optional<IndexKeyEntry> kv;
     try {
@@ -138,18 +141,28 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
                 kv = _indexCursor->next();
                 break;
             case NEED_SEEK:
+                ++_specificStats.seeks;
                 kv = _indexCursor->seek(_seekPoint);
                 break;
             case HIT_END:
                 return PlanStage::IS_EOF;
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         *out = WorkingSet::INVALID_ID;
         return PlanStage::NEED_YIELD;
     }
 
     if (kv) {
         // In debug mode, check that the cursor isn't lying to us.
+        if (kDebugBuild && !_startKey.isEmpty()) {
+            int cmp = kv->key.woCompare(_startKey,
+                                        Ordering::make(_params.descriptor->keyPattern()),
+                                        /*compareFieldNames*/ false);
+            if (cmp == 0)
+                dassert(_startKeyInclusive);
+            dassert(_forward ? cmp >= 0 : cmp <= 0);
+        }
+
         if (kDebugBuild && !_endKey.isEmpty()) {
             int cmp = kv->key.woCompare(_endKey,
                                         Ordering::make(_params.descriptor->keyPattern()),
@@ -176,7 +189,6 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
 
             case IndexBoundsChecker::MUST_ADVANCE:
                 _scanState = NEED_SEEK;
-                _commonStats.needTime++;
                 return PlanStage::NEED_TIME;
         }
     }
@@ -195,14 +207,12 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
         if (!_returned.insert(kv->loc).second) {
             // We've seen this RecordId before. Skip it this time.
             ++_specificStats.dupsDropped;
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     }
 
     if (_filter) {
         if (!Filter::passes(kv->key, _keyPattern, _filter)) {
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     }
@@ -213,9 +223,9 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
     // We found something to return, so fill out the WSM.
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
-    member->loc = kv->loc;
+    member->recordId = kv->loc;
     member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, _iam));
-    member->state = WorkingSetMember::LOC_AND_IDX;
+    _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_params.addKeyMetadata) {
         BSONObjBuilder bob;
@@ -224,7 +234,6 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
     }
 
     *out = id;
-    ++_commonStats.advanced;
     return PlanStage::ADVANCED;
 }
 
@@ -232,14 +241,7 @@ bool IndexScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void IndexScan::saveState() {
-    if (!_txn) {
-        // We were already saved. Nothing to do.
-        return;
-    }
-
-    _txn = NULL;
-    ++_commonStats.yields;
+void IndexScan::doSaveState() {
     if (!_indexCursor)
         return;
 
@@ -248,21 +250,25 @@ void IndexScan::saveState() {
         return;
     }
 
-    _indexCursor->savePositioned();
+    _indexCursor->save();
 }
 
-void IndexScan::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-    ++_commonStats.unyields;
-
+void IndexScan::doRestoreState() {
     if (_indexCursor)
-        _indexCursor->restore(opCtx);
+        _indexCursor->restore();
 }
 
-void IndexScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
+void IndexScan::doDetachFromOperationContext() {
+    if (_indexCursor)
+        _indexCursor->detachFromOperationContext();
+}
 
+void IndexScan::doReattachToOperationContext() {
+    if (_indexCursor)
+        _indexCursor->reattachToOperationContext(getOpCtx());
+}
+
+void IndexScan::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // The only state we're responsible for holding is what RecordIds to drop.  If a document
     // mutates the underlying index cursor will deal with it.
     if (INVALIDATION_MUTATION == type) {
@@ -278,18 +284,14 @@ void IndexScan::invalidate(OperationContext* txn, const RecordId& dl, Invalidati
     }
 }
 
-std::vector<PlanStage*> IndexScan::getChildren() const {
-    return {};
-}
-
-PlanStageStats* IndexScan::getStats() {
+std::unique_ptr<PlanStageStats> IndexScan::getStats() {
     // WARNING: this could be called even if the collection was dropped.  Do not access any
     // catalog information here.
 
     // Add a BSON representation of the filter to the stats tree, if there is one.
     if (NULL != _filter) {
         BSONObjBuilder bob;
-        _filter->toBSON(&bob);
+        _filter->serialize(&bob);
         _commonStats.filter = bob.obj();
     }
 
@@ -302,13 +304,10 @@ PlanStageStats* IndexScan::getStats() {
         _specificStats.direction = _params.direction;
     }
 
-    std::unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IXSCAN));
-    ret->specific.reset(new IndexScanStats(_specificStats));
-    return ret.release();
-}
-
-const CommonStats* IndexScan::getCommonStats() const {
-    return &_commonStats;
+    std::unique_ptr<PlanStageStats> ret =
+        stdx::make_unique<PlanStageStats>(_commonStats, STAGE_IXSCAN);
+    ret->specific = stdx::make_unique<IndexScanStats>(_specificStats);
+    return ret;
 }
 
 const SpecificStats* IndexScan::getSpecificStats() const {

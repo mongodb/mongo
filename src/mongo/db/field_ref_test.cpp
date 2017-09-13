@@ -319,4 +319,475 @@ TEST(DottedSubstring, Nested) {
     ASSERT_EQUALS("", path.dottedSubstring(1, path.numParts() - 5));
 }
 
+// The "short" append tests operate entirely in "reserve" space.
+TEST(AppendShort, Simple) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.appendPart("c");
+    ASSERT_EQUALS(3u, path.numParts());
+    ASSERT_EQUALS("a.b.c", path.dottedField());
+}
+
+TEST(AppendShort, AppendAndReplace1) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.appendPart("c");
+    path.setPart(1, "0");
+    ASSERT_EQUALS(3u, path.numParts());
+    ASSERT_EQUALS("a.0.c", path.dottedField());
+}
+
+TEST(AppendShort, AppendAndReplace2) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.appendPart("c");
+    path.setPart(2, "0");
+    ASSERT_EQUALS(3u, path.numParts());
+    ASSERT_EQUALS("a.b.0", path.dottedField());
+}
+
+TEST(AppendShort, ReplaceAndAppend) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.setPart(1, "0");
+    path.appendPart("c");
+    ASSERT_EQUALS(3u, path.numParts());
+    ASSERT_EQUALS("0", path.getPart(1));
+    ASSERT_EQUALS("a.0.c", path.dottedField());
+}
+
+TEST(AppendShort, AppendAndGetPart) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.appendPart("c");
+    path.setPart(1, "0");
+    ASSERT_EQUALS("a", path.getPart(0));
+    ASSERT_EQUALS("0", path.getPart(1));
+    ASSERT_EQUALS("c", path.getPart(2));
+}
+
+TEST(AppendShort, AppendEmptyPart) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.appendPart("");
+    ASSERT_EQUALS(3u, path.numParts());
+    ASSERT_EQUALS("", path.getPart(2));
+    ASSERT_EQUALS("a.b.", path.dottedField());
+}
+
+TEST(AppendShort, SetEmptyPartThenAppend) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.setPart(1, "");
+    path.appendPart("c");
+    ASSERT_EQUALS(3u, path.numParts());
+    ASSERT_EQUALS("a..c", path.dottedField());
+    ASSERT_EQUALS("", path.getPart(1));
+}
+
+// The "medium" append tests feature an append operation that spills out of reserve space (i.e.,
+// we append to a path that has _size == kReserveAhead).
+TEST(AppendMedium, Simple) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.appendPart("e");
+    ASSERT_EQUALS(5u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d.e", path.dottedField());
+}
+
+TEST(AppendMedium, AppendAndReplace1) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.appendPart("e");
+    path.setPart(1, "0");
+    ASSERT_EQUALS(5u, path.numParts());
+    ASSERT_EQUALS("a.0.c.d.e", path.dottedField());
+}
+
+TEST(AppendMedium, AppendAndReplace2) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.appendPart("e");
+    path.setPart(4, "0");
+    ASSERT_EQUALS(5u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d.0", path.dottedField());
+}
+
+TEST(AppendMedium, ReplaceAndAppend) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.setPart(1, "0");
+    path.appendPart("e");
+    ASSERT_EQUALS(5u, path.numParts());
+    ASSERT_EQUALS("0", path.getPart(1));
+    ASSERT_EQUALS("a.0.c.d.e", path.dottedField());
+}
+
+TEST(AppendMedium, AppendAndGetPart) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.appendPart("e");
+    path.setPart(1, "0");
+    ASSERT_EQUALS("a", path.getPart(0));
+    ASSERT_EQUALS("0", path.getPart(1));
+    ASSERT_EQUALS("c", path.getPart(2));
+    ASSERT_EQUALS("d", path.getPart(3));
+    ASSERT_EQUALS("e", path.getPart(4));
+}
+
+TEST(AppendMedium, AppendEmptyPart) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.appendPart("");
+    ASSERT_EQUALS(5u, path.numParts());
+    ASSERT_EQUALS("", path.getPart(4));
+    ASSERT_EQUALS("a.b.c.d.", path.dottedField());
+}
+
+TEST(AppendMedium, SetEmptyPartThenAppend) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.setPart(1, "");
+    path.appendPart("e");
+    ASSERT_EQUALS(5u, path.numParts());
+    ASSERT_EQUALS("a..c.d.e", path.dottedField());
+    ASSERT_EQUALS("", path.getPart(1));
+}
+
+// The "long" append tests have paths that are bigger than the reserve space throughout their life
+// cycle.
+TEST(AppendLong, Simple) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.appendPart("g");
+    path.appendPart("h");
+    path.appendPart("i");
+    ASSERT_EQUALS(9u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d.e.f.g.h.i", path.dottedField());
+}
+
+TEST(AppendLong, AppendAndReplace1) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.appendPart("g");
+    path.appendPart("h");
+    path.appendPart("i");
+    path.setPart(1, "0");
+    path.setPart(5, "1");
+    ASSERT_EQUALS(9u, path.numParts());
+    ASSERT_EQUALS("a.0.c.d.e.1.g.h.i", path.dottedField());
+}
+
+TEST(AppendLong, AppendAndReplace2) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.appendPart("g");
+    path.appendPart("h");
+    path.appendPart("i");
+    path.setPart(7, "0");
+    ASSERT_EQUALS(9u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d.e.f.g.0.i", path.dottedField());
+}
+
+TEST(AppendLong, ReplaceAndAppend) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.setPart(1, "0");
+    path.setPart(5, "1");
+    path.appendPart("g");
+    path.appendPart("h");
+    path.appendPart("i");
+    ASSERT_EQUALS(9u, path.numParts());
+    ASSERT_EQUALS("0", path.getPart(1));
+    ASSERT_EQUALS("1", path.getPart(5));
+    ASSERT_EQUALS("a.0.c.d.e.1.g.h.i", path.dottedField());
+}
+
+TEST(AppendLong, AppendAndGetPart) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.appendPart("g");
+    path.appendPart("h");
+    path.appendPart("i");
+    path.setPart(1, "0");
+    path.setPart(5, "1");
+    path.setPart(7, "2");
+    ASSERT_EQUALS("a", path.getPart(0));
+    ASSERT_EQUALS("0", path.getPart(1));
+    ASSERT_EQUALS("c", path.getPart(2));
+    ASSERT_EQUALS("d", path.getPart(3));
+    ASSERT_EQUALS("e", path.getPart(4));
+    ASSERT_EQUALS("1", path.getPart(5));
+    ASSERT_EQUALS("g", path.getPart(6));
+    ASSERT_EQUALS("2", path.getPart(7));
+    ASSERT_EQUALS("i", path.getPart(8));
+}
+
+TEST(AppendLong, AppendEmptyPart) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.appendPart("");
+    ASSERT_EQUALS(7u, path.numParts());
+    ASSERT_EQUALS("", path.getPart(6));
+    ASSERT_EQUALS("a.b.c.d.e.f.", path.dottedField());
+}
+
+TEST(AppendLong, SetEmptyPartThenAppend) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.setPart(1, "");
+    path.setPart(4, "");
+    path.appendPart("g");
+    ASSERT_EQUALS(7u, path.numParts());
+    ASSERT_EQUALS("a..c.d..f.g", path.dottedField());
+    ASSERT_EQUALS("", path.getPart(1));
+    ASSERT_EQUALS("", path.getPart(4));
+}
+
+// The "short" removeLastPart tests operate entirely in "reserve" space.
+TEST(RemoveLastPartShort, Simple) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.removeLastPart();
+    ASSERT_EQUALS(1u, path.numParts());
+    ASSERT_EQUALS("a", path.dottedField());
+}
+
+TEST(RemoveLastPartShort, RemoveUntilEmpty) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.removeLastPart();
+    path.removeLastPart();
+    ASSERT_EQUALS(0u, path.numParts());
+    ASSERT_EQUALS("", path.dottedField());
+}
+
+TEST(RemoveLastPartShort, AppendThenRemove) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.appendPart("c");
+    path.removeLastPart();
+    ASSERT_EQUALS(2u, path.numParts());
+    ASSERT_EQUALS("a.b", path.dottedField());
+}
+
+TEST(RemoveLastPartShort, RemoveThenAppend) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.removeLastPart();
+    path.appendPart("b");
+    ASSERT_EQUALS(2u, path.numParts());
+    ASSERT_EQUALS("a.b", path.dottedField());
+}
+
+TEST(RemoveLastPartShort, RemoveThenSetPart) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.removeLastPart();
+    path.setPart(0, "0");
+    ASSERT_EQUALS(1u, path.numParts());
+    ASSERT_EQUALS("0", path.dottedField());
+}
+
+TEST(RemoveLastPartShort, SetPartThenRemove) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.setPart(0, "0");
+    path.setPart(1, "1");
+    path.removeLastPart();
+    ASSERT_EQUALS(1u, path.numParts());
+    ASSERT_EQUALS("0", path.dottedField());
+}
+
+TEST(RemoveLastPartShort, AppendThenSetPartThenRemove) {
+    FieldRef path("a.b");
+    ASSERT_EQUALS(2u, path.numParts());
+
+    path.appendPart("c");
+    path.setPart(2, "0");
+    path.removeLastPart();
+    ASSERT_EQUALS(2u, path.numParts());
+    ASSERT_EQUALS("a.b", path.dottedField());
+}
+
+// The "medium" removeLastPart tests feature paths that change in size during the test so that they
+// transition between fitting and not fitting in "reserve" space.
+TEST(RemoveLastPartMedium, Simple) {
+    FieldRef path("a.b.c.d.e");
+    ASSERT_EQUALS(5u, path.numParts());
+
+    path.removeLastPart();
+    ASSERT_EQUALS(4u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d", path.dottedField());
+}
+
+TEST(RemoveLastPartMedium, RemoveUntilEmpty) {
+    FieldRef path("a.b.c.d.e");
+    ASSERT_EQUALS(5u, path.numParts());
+
+    while (path.numParts() > 0) {
+        path.removeLastPart();
+    }
+    ASSERT_EQUALS(0u, path.numParts());
+    ASSERT_EQUALS("", path.dottedField());
+}
+
+TEST(RemoveLastPartMedium, AppendThenRemove) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.appendPart("e");
+    path.removeLastPart();
+    ASSERT_EQUALS(4u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d", path.dottedField());
+}
+
+TEST(RemoveLastPartMedium, RemoveThenAppend) {
+    FieldRef path("a.b.c.d.e");
+    ASSERT_EQUALS(5u, path.numParts());
+
+    path.removeLastPart();
+    path.appendPart("e");
+    ASSERT_EQUALS(5u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d.e", path.dottedField());
+}
+
+TEST(RemoveLastPartMedium, RemoveThenSetPart) {
+    FieldRef path("a.b.c.d.e");
+    ASSERT_EQUALS(5u, path.numParts());
+
+    path.removeLastPart();
+    path.setPart(0, "0");
+    ASSERT_EQUALS(4u, path.numParts());
+    ASSERT_EQUALS("0.b.c.d", path.dottedField());
+}
+
+TEST(RemoveLastPartMedium, SetPartThenRemove) {
+    FieldRef path("a.b.c.d.e");
+    ASSERT_EQUALS(5u, path.numParts());
+
+    path.setPart(0, "0");
+    path.setPart(4, "1");
+    path.removeLastPart();
+    ASSERT_EQUALS(4u, path.numParts());
+    ASSERT_EQUALS("0.b.c.d", path.dottedField());
+}
+
+TEST(RemoveLastPartMedium, AppendThenSetPartThenRemove) {
+    FieldRef path("a.b.c.d");
+    ASSERT_EQUALS(4u, path.numParts());
+
+    path.appendPart("c");
+    path.setPart(2, "0");
+    path.setPart(4, "1");
+    path.removeLastPart();
+    ASSERT_EQUALS(4u, path.numParts());
+    ASSERT_EQUALS("a.b.0.d", path.dottedField());
+}
+
+// The "long" removeLastPart tests have paths that are bigger than the reserve space throughout
+// their life cycle (with the exception of RemoveUntilempty).
+TEST(RemoveLastPartLong, Simple) {
+    FieldRef path("a.b.c.d.e.f.g");
+    ASSERT_EQUALS(7u, path.numParts());
+
+    path.removeLastPart();
+    ASSERT_EQUALS(6u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d.e.f", path.dottedField());
+}
+
+TEST(RemoveLastPartLong, RemoveUntilEmpty) {
+    FieldRef path("a.b.c.d.e.f.g");
+    ASSERT_EQUALS(7u, path.numParts());
+
+    while (path.numParts() > 0) {
+        path.removeLastPart();
+    }
+    ASSERT_EQUALS(0u, path.numParts());
+    ASSERT_EQUALS("", path.dottedField());
+}
+
+TEST(RemoveLastPartLong, AppendThenRemove) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.appendPart("g");
+    path.removeLastPart();
+    ASSERT_EQUALS(6u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d.e.f", path.dottedField());
+}
+
+TEST(RemoveLastPartLong, RemoveThenAppend) {
+    FieldRef path("a.b.c.d.e.f.g");
+    ASSERT_EQUALS(7u, path.numParts());
+
+    path.removeLastPart();
+    path.appendPart("g");
+    ASSERT_EQUALS(7u, path.numParts());
+    ASSERT_EQUALS("a.b.c.d.e.f.g", path.dottedField());
+}
+
+TEST(RemoveLastPartLong, RemoveThenSetPart) {
+    FieldRef path("a.b.c.d.e.f.g");
+    ASSERT_EQUALS(7u, path.numParts());
+
+    path.removeLastPart();
+    path.setPart(0, "0");
+    path.setPart(4, "1");
+    ASSERT_EQUALS(6u, path.numParts());
+    ASSERT_EQUALS("0.b.c.d.1.f", path.dottedField());
+}
+
+TEST(RemoveLastPartLong, SetPartThenRemove) {
+    FieldRef path("a.b.c.d.e.f.g");
+    ASSERT_EQUALS(7u, path.numParts());
+
+    path.setPart(0, "0");
+    path.setPart(4, "1");
+    path.setPart(6, "2");
+    path.removeLastPart();
+    ASSERT_EQUALS(6u, path.numParts());
+    ASSERT_EQUALS("0.b.c.d.1.f", path.dottedField());
+}
+
+TEST(RemoveLastPartLong, AppendThenSetPartThenRemove) {
+    FieldRef path("a.b.c.d.e.f");
+    ASSERT_EQUALS(6u, path.numParts());
+
+    path.appendPart("g");
+    path.setPart(2, "0");
+    path.setPart(4, "1");
+    path.setPart(6, "2");
+    path.removeLastPart();
+    ASSERT_EQUALS(6u, path.numParts());
+    ASSERT_EQUALS("a.b.0.d.1.f", path.dottedField());
+}
+
 }  // namespace

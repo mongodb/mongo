@@ -31,7 +31,15 @@
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
-// Use this for blocking during an fsync-and-lock
+
+/**
+ * Allows holders to block on an active fsyncLock.
+ */
 extern SimpleMutex filesLockedFsync;
+
+/**
+ * Returns true if mongod is currently fsyncLocked.
+ */
 bool lockedForWriting();
+
 }  // namespace mongo

@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -83,6 +84,18 @@ Status bsonExtractBooleanField(const BSONObj& object, StringData fieldName, bool
  * undefined.
  */
 Status bsonExtractIntegerField(const BSONObj& object, StringData fieldName, long long* out);
+
+/**
+ * Finds an element named "fieldName" in "object" that represents a double-precision floating point
+ * value.
+ *
+ * Returns Status::OK() and sets *out to the element's double floating point value representation on
+ * success. Returns ErrorCodes::NoSuchKey if there are no matches for "fieldName". Returns
+ * ErrorCodes::TypeMismatch if the value of the matching element is not of a numeric type. Returns
+ * ErrorCodes::BadValue if the value does not have an exact floating point number representation.
+ * For return values other than Status::OK(), the resulting value of "*out" is undefined.
+ */
+Status bsonExtractDoubleField(const BSONObj& object, StringData fieldName, double* out);
 
 /**
  * Finds a string-typed element named "fieldName" in "object" and stores its value in "out".
@@ -145,6 +158,21 @@ Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
                                           long long* out);
 
 /**
+ * Finds a double-precision floating point element named "fieldName" in "object".
+ *
+ * If a field named "fieldName" is present, and is a double, stores the value of the field into
+ * "*out". If no field named fieldName is present, sets "*out" to "defaultValue". In these cases,
+ * returns Status::OK().
+ *
+ * If "fieldName" is present more than once, behavior is undefined. If the found field is not a
+ * double, returns ErrorCodes::TypeMismatch.
+ */
+Status bsonExtractDoubleFieldWithDefault(const BSONObj& object,
+                                         StringData fieldName,
+                                         double defaultValue,
+                                         double* out);
+
+/**
  * Finds a std::string element named "fieldName" in "object".
  *
  * If a field named "fieldName" is present, and is a string, stores the value of the field into
@@ -171,5 +199,29 @@ Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
                                       StringData fieldName,
                                       const OID& defaultValue,
                                       OID* out);
+
+/**
+ * Finds an element named "fieldName" in "object" that represents an integral value for which
+ * 'pred' is true.
+ *
+ * If a field named "fieldName" is present and is a value of numeric type with an exact 64-bit
+ * integer representation, returns that representation in *out and returns Status::OK().
+ * If there is no field named "fieldName", stores defaultValue into *out and returns Status::OK().
+ * If the field is found, but has non-numeric type, returns ErrorCodes::TypeMismatch.
+ * If the value has numeric type, but cannot be represented as a 64-bit integer, returns BadValue.
+ * If the parsed value (or default) fails the predicate, returns ErrorCodes::BadValue.
+ */
+Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
+                                            StringData fieldName,
+                                            long long defaultValue,
+                                            stdx::function<bool(long long)> pred,
+                                            const std::string& predDescription,
+                                            long long* out);
+
+Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
+                                            StringData fieldName,
+                                            long long defaultValue,
+                                            stdx::function<bool(long long)> pred,
+                                            long long* out);
 
 }  // namespace mongo

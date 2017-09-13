@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+// CHECK_LOG_REDACTION
+
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
@@ -38,12 +40,101 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/json.h"
-#include "mongo/util/fail_point_service.h"
+#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
 using std::string;
+
+namespace {
+
+// Lists the $-prefixed query options that can be passed alongside a wrapped query predicate for
+// OP_QUERY find. The $orderby field is omitted because "orderby" (no dollar sign) is also allowed,
+// and this requires special handling.
+const std::vector<const char*> kDollarQueryModifiers = {
+    "$hint",
+    "$comment",
+    "$maxScan",
+    "$max",
+    "$min",
+    "$returnKey",
+    "$showDiskLoc",
+    "$snapshot",
+    "$maxTimeMS",
+};
+
+}  // namespace
+
+BSONObj upconvertQueryEntry(const BSONObj& query,
+                            const NamespaceString& nss,
+                            int ntoreturn,
+                            int ntoskip) {
+    BSONObjBuilder bob;
+
+    bob.append("find", nss.coll());
+
+    // Whether or not the query predicate is wrapped inside a "query" or "$query" field so that
+    // other options can be passed alongside the predicate.
+    bool predicateIsWrapped = false;
+
+    // Extract the query predicate.
+    BSONObj filter;
+    if (auto elem = query["query"]) {
+        predicateIsWrapped = true;
+        bob.appendAs(elem, "filter");
+    } else if (auto elem = query["$query"]) {
+        predicateIsWrapped = true;
+        bob.appendAs(elem, "filter");
+    } else if (!query.isEmpty()) {
+        bob.append("filter", query);
+    }
+
+    if (ntoskip) {
+        bob.append("skip", ntoskip);
+    }
+    if (ntoreturn) {
+        bob.append("ntoreturn", ntoreturn);
+    }
+
+    // The remainder of the query options are only available if the predicate is passed in wrapped
+    // form. If the predicate is not wrapped, we're done.
+    if (!predicateIsWrapped) {
+        return bob.obj();
+    }
+
+    // Extract the sort.
+    if (auto elem = query["orderby"]) {
+        bob.appendAs(elem, "sort");
+    } else if (auto elem = query["$orderby"]) {
+        bob.appendAs(elem, "sort");
+    }
+
+    // Add $-prefixed OP_QUERY modifiers, like $hint.
+    for (auto modifier : kDollarQueryModifiers) {
+        if (auto elem = query[modifier]) {
+            // Use "+ 1" to omit the leading dollar sign.
+            bob.appendAs(elem, modifier + 1);
+        }
+    }
+
+    return bob.obj();
+}
+
+BSONObj upconvertGetMoreEntry(const NamespaceString& nss, CursorId cursorId, int ntoreturn) {
+    return GetMoreRequest(nss,
+                          cursorId,
+                          ntoreturn,
+                          boost::none,  // awaitDataTimeout
+                          boost::none,  // term
+                          boost::none   // lastKnownCommittedOpTime
+                          )
+        .toBSON();
+}
 
 /**
  * This type decorates a Client object with a stack of active CurOp objects.
@@ -125,23 +216,6 @@ private:
 const OperationContext::Decoration<CurOp::CurOpStack> CurOp::_curopStack =
     OperationContext::declareDecoration<CurOp::CurOpStack>();
 
-// Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
-// valid non-zero max time to fail immediately.  Any getmore operation on a cursor already
-// created with a valid non-zero max time will also fail immediately.
-//
-// This fail point cannot be used with the maxTimeNeverTimeOut fail point.
-MONGO_FP_DECLARE(maxTimeAlwaysTimeOut);
-
-// Enabling the maxTimeNeverTimeOut fail point will cause the server to never time out any
-// query, command, or getmore operation, regardless of whether a max time is set.
-//
-// This fail point cannot be used with the maxTimeAlwaysTimeOut fail point.
-MONGO_FP_DECLARE(maxTimeNeverTimeOut);
-
-
-BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
-
-
 CurOp* CurOp::get(const OperationContext* opCtx) {
     return get(*opCtx);
 }
@@ -158,22 +232,6 @@ CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
     } else {
         _stack->push_nolock(this);
     }
-    _start = 0;
-    _isCommand = false;
-    _dbprofile = 0;
-    _end = 0;
-    _maxTimeMicros = 0;
-    _maxTimeTracker.reset();
-    _message = "";
-    _progressMeter.finished();
-    _numYields = 0;
-    _expectedLatencyMs = 0;
-    _op = 0;
-    _command = NULL;
-}
-
-void CurOp::setOp_inlock(int op) {
-    _op = op;
 }
 
 ProgressMeter& CurOp::setMessage_inlock(const char* msg,
@@ -182,7 +240,7 @@ ProgressMeter& CurOp::setMessage_inlock(const char* msg,
                                         int secondsBetween) {
     if (progressMeterTotal) {
         if (_progressMeter.isActive()) {
-            error() << "old _message: " << _message << " new message:" << msg;
+            error() << "old _message: " << redact(_message) << " new message:" << redact(msg);
             verify(!_progressMeter.isActive());
         }
         _progressMeter.reset(progressMeterTotal, secondsBetween);
@@ -205,48 +263,121 @@ void CurOp::setNS_inlock(StringData ns) {
 void CurOp::ensureStarted() {
     if (_start == 0) {
         _start = curTimeMicros64();
-
-        // If ensureStarted() is invoked after setMaxTimeMicros(), then time limit tracking will
-        // start here.  This is because time limit tracking can only commence after the
-        // operation is assigned a start time.
-        if (_maxTimeMicros > 0) {
-            _maxTimeTracker.setTimeLimit(_start, _maxTimeMicros);
-        }
     }
 }
 
-void CurOp::enter_inlock(const char* ns, int dbProfileLevel) {
+void CurOp::enter_inlock(const char* ns, boost::optional<int> dbProfileLevel) {
     ensureStarted();
     _ns = ns;
-    raiseDbProfileLevel(dbProfileLevel);
+    if (dbProfileLevel) {
+        raiseDbProfileLevel(*dbProfileLevel);
+    }
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
     _dbprofile = std::max(dbProfileLevel, _dbprofile);
 }
 
-void CurOp::reportState(BSONObjBuilder* builder) {
-    if (_start) {
-        builder->append("secs_running", elapsedSeconds());
-        builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()));
+Command::ReadWriteType CurOp::getReadWriteType() const {
+    if (_command) {
+        return _command->getReadWriteType();
     }
+    switch (_logicalOp) {
+        case LogicalOp::opGetMore:
+        case LogicalOp::opQuery:
+            return Command::ReadWriteType::kRead;
+        case LogicalOp::opUpdate:
+        case LogicalOp::opInsert:
+        case LogicalOp::opDelete:
+            return Command::ReadWriteType::kWrite;
+        default:
+            return Command::ReadWriteType::kCommand;
+    }
+}
 
-    builder->append("op", opToString(_op));
+namespace {
 
-    // Fill out "ns" from our namespace member (and if it's not available, fall back to the
-    // OpDebug namespace member). We prefer our ns when set because it changes to match each
-    // accessed namespace, while _debug.ns is set once at the start of the operation. However,
-    // sometimes _ns is not yet set.
-    builder->append("ns", !_ns.empty() ? _ns : _debug.ns);
-
-    if (_op == dbInsert) {
-        _query.append(*builder, "insert");
+/**
+ * Appends {<name>: obj} to the provided builder.  If obj is greater than maxSize, appends a string
+ * summary of obj as { <name>: { $truncated: "obj" } }. If a comment parameter is present, add it to
+ * the truncation object.
+ */
+void appendAsObjOrString(StringData name,
+                         const BSONObj& obj,
+                         const boost::optional<size_t> maxSize,
+                         BSONObjBuilder* builder) {
+    if (!maxSize || static_cast<size_t>(obj.objsize()) <= *maxSize) {
+        builder->append(name, obj);
     } else {
-        _query.append(*builder, "query");
+        // Generate an abbreviated serialization for the object, by passing false as the
+        // "full" argument to obj.toString().
+        std::string objToString = obj.toString();
+        if (objToString.size() > *maxSize) {
+            // objToString is still too long, so we append to the builder a truncated form
+            // of objToString concatenated with "...".  Instead of creating a new string
+            // temporary, mutate objToString to do this (we know that we can mutate
+            // characters in objToString up to and including objToString[maxSize]).
+            objToString[*maxSize - 3] = '.';
+            objToString[*maxSize - 2] = '.';
+            objToString[*maxSize - 1] = '.';
+        }
+
+        StringData truncation = StringData(objToString).substr(0, *maxSize);
+
+        // Append the truncated representation of the object to the builder. If a comment parameter
+        // is present, write it to the object alongside the truncated op. This object will appear as
+        // {$truncated: "{find: \"collection\", filter: {x: 1, ...", comment: "comment text" }
+        BSONObjBuilder truncatedBuilder(builder->subobjStart(name));
+        truncatedBuilder.append("$truncated", truncation);
+
+        if (auto comment = obj["comment"]) {
+            truncatedBuilder.append(comment);
+        }
+
+        truncatedBuilder.doneFast();
+    }
+}
+}  // namespace
+
+void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
+    if (_start) {
+        builder->append("secs_running", durationCount<Seconds>(elapsedTimeTotal()));
+        builder->append("microsecs_running", durationCount<Microseconds>(elapsedTimeTotal()));
     }
 
-    if (!debug().planSummary.empty()) {
-        builder->append("planSummary", debug().planSummary.toString());
+    builder->append("op", logicalOpToString(_logicalOp));
+    builder->append("ns", _ns);
+
+    // When the currentOp command is run, it returns a single response object containing all current
+    // operations; this request will fail if the response exceeds the 16MB document limit. By
+    // contrast, the $currentOp aggregation stage does not have this restriction. If 'truncateOps'
+    // is true, limit the size of each op to 1000 bytes. Otherwise, do not truncate.
+    const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
+
+    if (!_command && _networkOp == dbQuery) {
+        // This is a legacy OP_QUERY. We upconvert the "query" field of the currentOp output to look
+        // similar to a find command.
+        //
+        // CurOp doesn't have access to the ntoreturn or ntoskip values. By setting them to zero, we
+        // will omit mention of them in the currentOp output.
+        const int ntoreturn = 0;
+        const int ntoskip = 0;
+
+        appendAsObjOrString(
+            "command",
+            upconvertQueryEntry(_opDescription, NamespaceString(_ns), ntoreturn, ntoskip),
+            maxQuerySize,
+            builder);
+    } else {
+        appendAsObjOrString("command", _opDescription, maxQuerySize, builder);
+    }
+
+    if (!_originatingCommand.isEmpty()) {
+        appendAsObjOrString("originatingCommand", _originatingCommand, maxQuerySize, builder);
+    }
+
+    if (!_planSummary.empty()) {
+        builder->append("planSummary", _planSummary);
     }
 
     if (!_message.empty()) {
@@ -266,151 +397,18 @@ void CurOp::reportState(BSONObjBuilder* builder) {
     builder->append("numYields", _numYields);
 }
 
-void CurOp::setMaxTimeMicros(uint64_t maxTimeMicros) {
-    _maxTimeMicros = maxTimeMicros;
-
-    if (_maxTimeMicros == 0) {
-        // 0 is "allow to run indefinitely".
-        return;
+namespace {
+StringData getProtoString(int op) {
+    if (op == dbMsg) {
+        return "op_msg";
+    } else if (op == dbQuery) {
+        return "op_query";
+    } else if (op == dbCommand) {
+        return "op_command";
     }
-
-    // If the operation has a start time, then enable the tracker.
-    //
-    // If the operation has no start time yet, then ensureStarted() will take responsibility for
-    // enabling the tracker.
-    if (isStarted()) {
-        _maxTimeTracker.setTimeLimit(startTime(), _maxTimeMicros);
-    }
+    MONGO_UNREACHABLE;
 }
-
-bool CurOp::isMaxTimeSet() const {
-    return _maxTimeMicros != 0;
-}
-
-bool CurOp::maxTimeHasExpired() {
-    if (MONGO_FAIL_POINT(maxTimeNeverTimeOut)) {
-        return false;
-    }
-    if (_maxTimeMicros > 0 && MONGO_FAIL_POINT(maxTimeAlwaysTimeOut)) {
-        return true;
-    }
-    return _maxTimeTracker.checkTimeLimit();
-}
-
-uint64_t CurOp::getRemainingMaxTimeMicros() const {
-    return _maxTimeTracker.getRemainingMicros();
-}
-
-CurOp::MaxTimeTracker::MaxTimeTracker() {
-    reset();
-}
-
-void CurOp::MaxTimeTracker::reset() {
-    _enabled = false;
-    _targetEpochMicros = 0;
-    _approxTargetServerMillis = 0;
-}
-
-void CurOp::MaxTimeTracker::setTimeLimit(uint64_t startEpochMicros, uint64_t durationMicros) {
-    dassert(durationMicros != 0);
-
-    _enabled = true;
-
-    _targetEpochMicros = startEpochMicros + durationMicros;
-
-    uint64_t now = curTimeMicros64();
-    // If our accurate time source thinks time is not up yet, calculate the next target for
-    // our approximate time source.
-    if (_targetEpochMicros > now) {
-        _approxTargetServerMillis = Listener::getElapsedTimeMillis() +
-            static_cast<int64_t>((_targetEpochMicros - now) / 1000);
-    }
-    // Otherwise, set our approximate time source target such that it thinks time is already
-    // up.
-    else {
-        _approxTargetServerMillis = Listener::getElapsedTimeMillis();
-    }
-}
-
-bool CurOp::MaxTimeTracker::checkTimeLimit() {
-    if (!_enabled) {
-        return false;
-    }
-
-    // Does our approximate time source think time is not up yet?  If so, return early.
-    if (_approxTargetServerMillis > Listener::getElapsedTimeMillis()) {
-        return false;
-    }
-
-    uint64_t now = curTimeMicros64();
-    // Does our accurate time source think time is not up yet?  If so, readjust the target for
-    // our approximate time source and return early.
-    if (_targetEpochMicros > now) {
-        _approxTargetServerMillis = Listener::getElapsedTimeMillis() +
-            static_cast<int64_t>((_targetEpochMicros - now) / 1000);
-        return false;
-    }
-
-    // Otherwise, time is up.
-    return true;
-}
-
-uint64_t CurOp::MaxTimeTracker::getRemainingMicros() const {
-    if (!_enabled) {
-        // 0 is "allow to run indefinitely".
-        return 0;
-    }
-
-    // Does our accurate time source think time is up?  If so, claim there is 1 microsecond
-    // left for this operation.
-    uint64_t now = curTimeMicros64();
-    if (_targetEpochMicros <= now) {
-        return 1;
-    }
-
-    // Otherwise, calculate remaining time.
-    return _targetEpochMicros - now;
-}
-
-void OpDebug::reset() {
-    extra.reset();
-
-    op = 0;
-    iscommand = false;
-    ns = "";
-    query = BSONObj();
-    updateobj = BSONObj();
-
-    cursorid = -1;
-    ntoreturn = -1;
-    ntoskip = -1;
-    exhaust = false;
-
-    nscanned = -1;
-    nscannedObjects = -1;
-    idhack = false;
-    scanAndOrder = false;
-    nMatched = -1;
-    nModified = -1;
-    ninserted = -1;
-    ndeleted = -1;
-    nmoved = -1;
-    fastmod = false;
-    fastmodinsert = false;
-    upsert = false;
-    cursorExhausted = false;
-    keyUpdates = 0;  // unsigned, so -1 not possible
-    writeConflicts = 0;
-    planSummary = "";
-    execStats.reset();
-
-    exceptionInfo.reset();
-
-    executionTime = 0;
-    nreturned = -1;
-    responseLength = -1;
-}
-
+}  // namespace
 
 #define OPDEBUG_TOSTRING_HELP(x) \
     if (x >= 0)                  \
@@ -418,40 +416,61 @@ void OpDebug::reset() {
 #define OPDEBUG_TOSTRING_HELP_BOOL(x) \
     if (x)                            \
     s << " " #x ":" << (x)
-string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const {
+
+string OpDebug::report(Client* client,
+                       const CurOp& curop,
+                       const SingleThreadedLockStats& lockStats) const {
     StringBuilder s;
     if (iscommand)
         s << "command ";
     else
-        s << opToString(op) << ' ';
-    s << ns;
+        s << networkOpToString(networkOp) << ' ';
+
+    s << curop.getNS();
+
+    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
+    if (clientMetadata) {
+        auto appName = clientMetadata.get().getApplicationName();
+        if (!appName.empty()) {
+            s << " appName: \"" << escape(appName) << '\"';
+        }
+    }
+
+    BSONObj query;
+
+    // If necessary, upconvert legacy find operations so that their log lines resemble their find
+    // command counterpart.
+    if (!iscommand && networkOp == dbQuery) {
+        query = upconvertQueryEntry(
+            curop.opDescription(), NamespaceString(curop.getNS()), ntoreturn, ntoskip);
+    } else {
+        query = curop.opDescription();
+    }
 
     if (!query.isEmpty()) {
+        s << " command: ";
         if (iscommand) {
-            s << " command: ";
-
             Command* curCommand = curop.getCommand();
             if (curCommand) {
                 mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
                 curCommand->redactForLogging(&cmdToLog);
-                s << curCommand->name << " ";
-                s << cmdToLog.toString();
-            } else {  // Should not happen but we need to handle curCommand == NULL gracefully
-                s << query.toString();
+                s << curCommand->getName() << " ";
+                s << redact(cmdToLog.getObject());
+            } else {  // Should not happen but we need to handle curCommand == NULL gracefully.
+                s << redact(query);
             }
         } else {
-            s << " query: ";
-            s << query.toString();
+            s << redact(query);
         }
     }
 
-    if (!planSummary.empty()) {
-        s << " planSummary: " << planSummary.toString();
+    auto originatingCommand = curop.originatingCommand();
+    if (!originatingCommand.isEmpty()) {
+        s << " originatingCommand: " << redact(originatingCommand);
     }
 
-    if (!updateobj.isEmpty()) {
-        s << " update: ";
-        updateobj.toString(s);
+    if (!curop.getPlanSummary().empty()) {
+        s << " planSummary: " << redact(curop.getPlanSummary().toString());
     }
 
     OPDEBUG_TOSTRING_HELP(cursorid);
@@ -459,29 +478,38 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     OPDEBUG_TOSTRING_HELP(ntoskip);
     OPDEBUG_TOSTRING_HELP_BOOL(exhaust);
 
-    OPDEBUG_TOSTRING_HELP(nscanned);
-    OPDEBUG_TOSTRING_HELP(nscannedObjects);
-    OPDEBUG_TOSTRING_HELP_BOOL(idhack);
-    OPDEBUG_TOSTRING_HELP_BOOL(scanAndOrder);
-    OPDEBUG_TOSTRING_HELP(nmoved);
+    OPDEBUG_TOSTRING_HELP(keysExamined);
+    OPDEBUG_TOSTRING_HELP(docsExamined);
+    OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
+    OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
+    OPDEBUG_TOSTRING_HELP_BOOL(replanned);
     OPDEBUG_TOSTRING_HELP(nMatched);
     OPDEBUG_TOSTRING_HELP(nModified);
     OPDEBUG_TOSTRING_HELP(ninserted);
     OPDEBUG_TOSTRING_HELP(ndeleted);
-    OPDEBUG_TOSTRING_HELP_BOOL(fastmod);
     OPDEBUG_TOSTRING_HELP_BOOL(fastmodinsert);
     OPDEBUG_TOSTRING_HELP_BOOL(upsert);
     OPDEBUG_TOSTRING_HELP_BOOL(cursorExhausted);
-    OPDEBUG_TOSTRING_HELP(keyUpdates);
-    OPDEBUG_TOSTRING_HELP(writeConflicts);
 
-    if (extra.len())
-        s << " " << extra.str();
+    if (nmoved > 0) {
+        s << " nmoved:" << nmoved;
+    }
 
-    if (!exceptionInfo.empty()) {
-        s << " exception: " << exceptionInfo.msg;
-        if (exceptionInfo.code)
-            s << " code:" << exceptionInfo.code;
+    if (keysInserted > 0) {
+        s << " keysInserted:" << keysInserted;
+    }
+
+    if (keysDeleted > 0) {
+        s << " keysDeleted:" << keysDeleted;
+    }
+
+    if (writeConflicts > 0) {
+        s << " writeConflicts:" << writeConflicts;
+    }
+
+    if (!exceptionInfo.isOK()) {
+        s << " exception: " << redact(exceptionInfo.reason());
+        s << " code:" << exceptionInfo.code();
     }
 
     s << " numYields:" << curop.numYields();
@@ -497,43 +525,14 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
         s << " locks:" << locks.obj().toString();
     }
 
-    s << " " << executionTime << "ms";
+    if (iscommand) {
+        s << " protocol:" << getProtoString(networkOp);
+    }
+
+    s << " " << (executionTimeMicros / 1000) << "ms";
 
     return s.str();
 }
-
-namespace {
-/**
- * Appends {name: obj} to the provided builder.  If obj is greater than maxSize, appends a
- * string summary of obj instead of the object itself.
- */
-void appendAsObjOrString(StringData name,
-                         const BSONObj& obj,
-                         size_t maxSize,
-                         BSONObjBuilder* builder) {
-    if (static_cast<size_t>(obj.objsize()) <= maxSize) {
-        builder->append(name, obj);
-    } else {
-        // Generate an abbreviated serialization for the object, by passing false as the
-        // "full" argument to obj.toString().
-        const bool isArray = false;
-        const bool full = false;
-        std::string objToString = obj.toString(isArray, full);
-        if (objToString.size() <= maxSize) {
-            builder->append(name, objToString);
-        } else {
-            // objToString is still too long, so we append to the builder a truncated form
-            // of objToString concatenated with "...".  Instead of creating a new string
-            // temporary, mutate objToString to do this (we know that we can mutate
-            // characters in objToString up to and including objToString[maxSize]).
-            objToString[maxSize - 3] = '.';
-            objToString[maxSize - 2] = '.';
-            objToString[maxSize - 1] = '.';
-            builder->append(name, StringData(objToString).substr(0, maxSize));
-        }
-    }
-}
-}  // namespace
 
 #define OPDEBUG_APPEND_NUMBER(x) \
     if (x != -1)                 \
@@ -541,47 +540,63 @@ void appendAsObjOrString(StringData name,
 #define OPDEBUG_APPEND_BOOL(x) \
     if (x)                     \
     b.appendBool(#x, (x))
+
 void OpDebug::append(const CurOp& curop,
                      const SingleThreadedLockStats& lockStats,
                      BSONObjBuilder& b) const {
     const size_t maxElementSize = 50 * 1024;
 
-    b.append("op", iscommand ? "command" : opToString(op));
-    b.append("ns", ns);
+    b.append("op", logicalOpToString(logicalOp));
 
-    if (!query.isEmpty()) {
-        appendAsObjOrString(iscommand ? "command" : "query", query, maxElementSize, &b);
-    } else if (!iscommand && curop.haveQuery()) {
-        appendAsObjOrString("query", curop.query(), maxElementSize, &b);
+    NamespaceString nss = NamespaceString(curop.getNS());
+    b.append("ns", nss.ns());
+
+    if (!iscommand && networkOp == dbQuery) {
+        appendAsObjOrString("command",
+                            upconvertQueryEntry(curop.opDescription(), nss, ntoreturn, ntoskip),
+                            maxElementSize,
+                            &b);
+    } else if (curop.haveOpDescription()) {
+        appendAsObjOrString("command", curop.opDescription(), maxElementSize, &b);
     }
 
-    if (!updateobj.isEmpty()) {
-        appendAsObjOrString("updateobj", updateobj, maxElementSize, &b);
+    auto originatingCommand = curop.originatingCommand();
+    if (!originatingCommand.isEmpty()) {
+        appendAsObjOrString("originatingCommand", originatingCommand, maxElementSize, &b);
     }
-
-    const bool moved = (nmoved >= 1);
 
     OPDEBUG_APPEND_NUMBER(cursorid);
-    OPDEBUG_APPEND_NUMBER(ntoreturn);
-    OPDEBUG_APPEND_NUMBER(ntoskip);
     OPDEBUG_APPEND_BOOL(exhaust);
 
-    OPDEBUG_APPEND_NUMBER(nscanned);
-    OPDEBUG_APPEND_NUMBER(nscannedObjects);
-    OPDEBUG_APPEND_BOOL(idhack);
-    OPDEBUG_APPEND_BOOL(scanAndOrder);
-    OPDEBUG_APPEND_BOOL(moved);
-    OPDEBUG_APPEND_NUMBER(nmoved);
+    OPDEBUG_APPEND_NUMBER(keysExamined);
+    OPDEBUG_APPEND_NUMBER(docsExamined);
+    OPDEBUG_APPEND_BOOL(hasSortStage);
+    OPDEBUG_APPEND_BOOL(fromMultiPlanner);
+    OPDEBUG_APPEND_BOOL(replanned);
     OPDEBUG_APPEND_NUMBER(nMatched);
     OPDEBUG_APPEND_NUMBER(nModified);
     OPDEBUG_APPEND_NUMBER(ninserted);
     OPDEBUG_APPEND_NUMBER(ndeleted);
-    OPDEBUG_APPEND_BOOL(fastmod);
     OPDEBUG_APPEND_BOOL(fastmodinsert);
     OPDEBUG_APPEND_BOOL(upsert);
     OPDEBUG_APPEND_BOOL(cursorExhausted);
-    OPDEBUG_APPEND_NUMBER(keyUpdates);
-    OPDEBUG_APPEND_NUMBER(writeConflicts);
+
+    if (nmoved > 0) {
+        b.appendNumber("nmoved", nmoved);
+    }
+
+    if (keysInserted > 0) {
+        b.appendNumber("keysInserted", keysInserted);
+    }
+
+    if (keysDeleted > 0) {
+        b.appendNumber("keysDeleted", keysDeleted);
+    }
+
+    if (writeConflicts > 0) {
+        b.appendNumber("writeConflicts", writeConflicts);
+    }
+
     b.appendNumber("numYield", curop.numYields());
 
     {
@@ -589,15 +604,33 @@ void OpDebug::append(const CurOp& curop,
         lockStats.report(&locks);
     }
 
-    if (!exceptionInfo.empty()) {
-        exceptionInfo.append(b, "exception", "exceptionCode");
+    if (!exceptionInfo.isOK()) {
+        b.append("exception", exceptionInfo.reason());
+        b.append("exceptionCode", exceptionInfo.code());
     }
 
     OPDEBUG_APPEND_NUMBER(nreturned);
     OPDEBUG_APPEND_NUMBER(responseLength);
-    b.append("millis", executionTime);
+    if (iscommand) {
+        b.append("protocol", getProtoString(networkOp));
+    }
+    b.appendIntOrLL("millis", executionTimeMicros / 1000);
 
-    execStats.append(b, "execStats");
+    if (!curop.getPlanSummary().empty()) {
+        b.append("planSummary", curop.getPlanSummary());
+    }
+
+    if (!execStats.isEmpty()) {
+        b.append("execStats", execStats);
+    }
+}
+
+void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
+    keysExamined = planSummaryStats.totalKeysExamined;
+    docsExamined = planSummaryStats.totalDocsExamined;
+    hasSortStage = planSummaryStats.hasSortStage;
+    fromMultiPlanner = planSummaryStats.fromMultiPlanner;
+    replanned = planSummaryStats.replanned;
 }
 
 }  // namespace mongo

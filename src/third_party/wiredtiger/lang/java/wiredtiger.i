@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -47,6 +47,7 @@
 %}
 
 %{
+#include "wiredtiger.h"
 #include "src/include/wt_internal.h"
 
 /*
@@ -80,6 +81,7 @@ typedef struct {
 	JavaVM *javavm;		/* Used in async threads to craft a jnienv */
 	JNIEnv *jnienv;		/* jni env that created the Session/Cursor */
 	WT_SESSION_IMPL *session; /* session used for alloc/free */
+	bool cursor_raw;	/* is the cursor opened raw? */
 	jobject jobj;		/* the java Session/Cursor/AsyncOp object */
 	jobject jcallback;	/* callback object for async ops */
 	jfieldID cptr_fid;	/* cached Cursor.swigCPtr field id in session */
@@ -107,6 +109,23 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 		(*jenv)->ThrowNew(jenv, excep, wiredtiger_strerror(err));
 }
 
+struct __wt_java_modify_impl;
+struct __wt_java_modify_list;
+typedef struct __wt_java_modify_impl WT_MODIFY_IMPL;
+typedef struct __wt_java_modify_list WT_MODIFY_LIST;
+static void modify_impl_release(WT_MODIFY_IMPL *impl);
+static void modify_list_release(WT_MODIFY_LIST *impl);
+
+/*
+ * An extension to the WT_MODIFY struct, so we can associate some Java-specific
+ * information with it.
+ */
+typedef struct __wt_java_modify_impl {
+	WT_MODIFY modify;
+	JNIEnv *jnienv;
+	jobject ref;
+} WT_MODIFY_IMPL;
+
 %}
 
 /* No finalizers */
@@ -126,7 +145,7 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 
 %typemap(javain) uint64_t "$javainput"
 %typemap(javaout) uint64_t {
-	return $jnicall;
+	return ($jnicall);
 }
 
 /* Return byte[] from cursor.get_value */
@@ -136,7 +155,7 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 
 %typemap(javain) WT_ITEM, WT_ITEM * "$javainput"
 %typemap(javaout) WT_ITEM, WT_ITEM * {
-	return $jnicall;
+	return ($jnicall);
 }
 
 %typemap(in) WT_ITEM * (WT_ITEM item) %{
@@ -158,13 +177,39 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 	}
 %}
 
+/*
+ * In some cases, for an internal interface, we need something like a WT_ITEM,
+ * but we need to hold onto the memory past the method call, and release it
+ * later.  A WT_ITEM_HOLD serves the purpose, it retains the java object
+ * for the byte array that we make into a global reference.
+ */
+%typemap(jni) WT_ITEM_HOLD, WT_ITEM_HOLD * "jbyteArray"
+%typemap(jtype) WT_ITEM_HOLD, WT_ITEM_HOLD * "byte[]"
+%typemap(jstype) WT_ITEM_HOLD, WT_ITEM_HOLD * "byte[]"
+
+%typemap(javain) WT_ITEM_HOLD, WT_ITEM_HOLD * "$javainput"
+%typemap(javaout) WT_ITEM_HOLD, WT_ITEM_HOLD * {
+	return ($jnicall);
+}
+%typemap(in) WT_ITEM_HOLD * (WT_ITEM_HOLD item) %{
+	$1 = &item;
+	$1->data = (*jenv)->GetByteArrayElements(jenv, $input, 0);
+	$1->size = (size_t)(*jenv)->GetArrayLength(jenv, $input);
+	$1->jnienv = jenv;
+	$1->ref = (*jenv)->NewGlobalRef(jenv, $input);
+%}
+
+%typemap(argout) WT_ITEM_HOLD * %{
+	/* Explicitly don't release the byte array elements here. */
+%}
+
 /* Don't require empty config strings. */
 %typemap(default) const char *config %{ $1 = NULL; %}
 
 %typemap(out) int %{
 	if ($1 != 0 && $1 != WT_NOTFOUND) {
 		throwWiredTigerException(jenv, $1);
-		return $null;
+		return ($null);
 	}
 	$result = $1;
 %}
@@ -173,10 +218,13 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 	if (!val) {
 		SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException,
 		#name " is null");
-		return $null;
+		return ($null);
 	}
 %enddef
 
+/*
+ * 'Declare' a WiredTiger class. This sets up boilerplate typemaps.
+ */
 %define WT_CLASS(type, class, name)
 /*
  * Extra 'self' elimination.
@@ -210,18 +258,32 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
   */"
 %enddef
 
-%define WT_CLASS_WITH_CLOSE_HANDLER(type, class, name, closeHandler, priv)
+/*
+ * Declare a WT_CLASS so that close methods call a specified closeHandler,
+ * after the WT core close function has completed. Arguments to the
+ * closeHandler are saved in advance since, as macro args, they may refer to
+ * values that are freed/zeroed by the close.
+ */
+%define WT_CLASS_WITH_CLOSE_HANDLER(type, class, name, closeHandler,
+    sess, priv)
 WT_CLASS(type, class, name)
 
-%typemap(in, numinputs=0) class ## _CLOSED *name (JAVA_CALLBACK *jcb) {
+/*
+ * This typemap recognizes a close function via a special declaration on its
+ * first argument. See WT_HANDLE_CLOSED in wiredtiger.h .  Like
+ * WT_CURSOR_NULLABLE, the WT_{CURSOR,SESSION,CONNECTION}_CLOSED typedefs
+ * are only visible to the SWIG parser.
+ */
+%typemap(in, numinputs=0) class ## _CLOSED *name (
+    WT_SESSION *savesess, JAVA_CALLBACK *jcb) {
 	$1 = *(type **)&jarg1;
 	NULL_CHECK($1, $1_name)
+	savesess = sess;
 	jcb = (JAVA_CALLBACK *)(priv);
 }
 
 %typemap(freearg, numinputs=0) class ## _CLOSED *name {
-	closeHandler(jcb2);
-	priv = NULL;
+	closeHandler(jenv, savesess2, jcb2);
 }
 
 %enddef
@@ -239,11 +301,11 @@ WT_CLASS(type, class, name)
 %}
 
 WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_connection, WT_CONNECTION, connection,
-    closeHandler, ((WT_CONNECTION_IMPL *)$1)->lang_private)
+    closeHandler, NULL, ((WT_CONNECTION_IMPL *)$1)->lang_private)
 WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_session, WT_SESSION, session,
-    closeHandler, ((WT_SESSION_IMPL *)$1)->lang_private)
+    closeHandler, $1, ((WT_SESSION_IMPL *)$1)->lang_private)
 WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_cursor, WT_CURSOR, cursor,
-    cursorCloseHandler, ((WT_CURSOR *)$1)->lang_private)
+    cursorCloseHandler, $1->session, ((WT_CURSOR *)$1)->lang_private)
 WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 
 %define COPYDOC(SIGNATURE_CLASS, CLASS, METHOD)
@@ -281,6 +343,7 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 %ignore __wt_cursor::set_value;
 %ignore __wt_cursor::insert;
 %ignore __wt_cursor::remove;
+%ignore __wt_cursor::reset;
 %ignore __wt_cursor::search;
 %ignore __wt_cursor::search_near;
 %ignore __wt_cursor::update;
@@ -290,6 +353,10 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 %rename (prev_wrap) __wt_cursor::prev;
 %javamethodmodifiers __wt_cursor::key_format "protected";
 %javamethodmodifiers __wt_cursor::value_format "protected";
+%ignore __wt_modify::data;
+%ignore __wt_modify::position;
+%ignore __wt_modify::size;
+%ignore __wt_cursor::modify;
 
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %rename (compare_wrap) __wt_cursor::compare;
@@ -299,6 +366,15 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 %rename (getKeyFormat) __wt_async_op::getKey_format;
 %rename (getValueFormat) __wt_async_op::getValue_format;
 %rename (getType) __wt_async_op::get_type;
+
+/*
+ * Special cases: override the out typemap, return checking is done in the
+ * wrapper.
+ */
+%typemap(out) int __wt_cursor::compare_wrap,
+              int __wt_cursor::equals_wrap %{
+	$result = $1;
+%}
 
 /* SWIG magic to turn Java byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
@@ -312,21 +388,35 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %wrapper %{
 /* Zero out SWIG's pointer to the C object,
  * equivalent to 'jobj.swigCPtr = 0;' in java.
+ * We expect that either env in non-null (if called
+ * via an explicit session/cursor close() call), or
+ * that session is non-null (if called implicitly
+ * as part of connection/session close).
  */
 static int
-javaClose(JNIEnv *env, JAVA_CALLBACK *jcb, jfieldID *pfid)
+javaClose(JNIEnv *env, WT_SESSION *session, JAVA_CALLBACK *jcb, jfieldID *pfid)
 {
 	jclass cls;
 	jfieldID fid;
+	WT_CONNECTION_IMPL *conn;
 
+	/* If we were not called via an implicit close call,
+	 * we won't have a JNIEnv yet.  Get one from the connection,
+	 * since the thread that started the session may have
+	 * terminated.
+	 */
+	if (env == NULL) {
+		conn = (WT_CONNECTION_IMPL *)session->connection;
+		env = ((JAVA_CALLBACK *)conn->lang_private)->jnienv;
+	}
 	if (pfid == NULL || *pfid == NULL) {
 		cls = (*env)->GetObjectClass(env, jcb->jobj);
 		fid = (*env)->GetFieldID(env, cls, "swigCPtr", "J");
 		if (pfid != NULL)
 			*pfid = fid;
-	} else {
+	} else
 		fid = *pfid;
-	}
+
 	(*env)->SetLongField(env, jcb->jobj, fid, 0L);
 	(*env)->DeleteGlobalRef(env, jcb->jobj);
 	__wt_free(jcb->session, jcb);
@@ -335,20 +425,22 @@ javaClose(JNIEnv *env, JAVA_CALLBACK *jcb, jfieldID *pfid)
 
 /* Connection and Session close handler. */
 static int
-closeHandler(JAVA_CALLBACK *jcb)
+closeHandler(JNIEnv *env, WT_SESSION *session, JAVA_CALLBACK *jcb)
 {
-	return (javaClose(jcb->jnienv, jcb, NULL));
+	return (javaClose(env, session, jcb, NULL));
 }
 
 /* Cursor specific close handler. */
 static int
-cursorCloseHandler(JAVA_CALLBACK *jcb)
+cursorCloseHandler(JNIEnv *env, WT_SESSION *wt_session, JAVA_CALLBACK *jcb)
 {
 	int ret;
 	JAVA_CALLBACK *sess_jcb;
+	WT_SESSION_IMPL *session;
 
-	sess_jcb = (JAVA_CALLBACK *)jcb->session->lang_private;
-	ret = javaClose(jcb->jnienv, jcb,
+	session = (WT_SESSION_IMPL *)wt_session;
+	sess_jcb = (JAVA_CALLBACK *)session->lang_private;
+	ret = javaClose(env, wt_session, jcb,
 	    sess_jcb ? &sess_jcb->cptr_fid : NULL);
 
 	return (ret);
@@ -360,14 +452,20 @@ javaCloseHandler(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 	WT_CURSOR *cursor)
 {
 	int ret;
+	JAVA_CALLBACK *jcb;
 
 	WT_UNUSED(handler);
 
-	if (cursor != NULL)
-		ret = cursorCloseHandler((JAVA_CALLBACK *)cursor->lang_private);
-	else
-		ret = closeHandler((JAVA_CALLBACK *)
-		    ((WT_SESSION_IMPL *)session)->lang_private);
+	ret = 0;
+	if (cursor != NULL) {
+		if ((jcb = (JAVA_CALLBACK *)cursor->lang_private) != NULL) {
+			ret = cursorCloseHandler(NULL, session, jcb);
+			cursor->lang_private = NULL;
+		}
+	} else if ((jcb = ((WT_SESSION_IMPL *)session)->lang_private) != NULL) {
+		ret = closeHandler(NULL, session, jcb);
+		((WT_SESSION_IMPL *)session)->lang_private = NULL;
+	}
 	return (ret);
 }
 
@@ -474,7 +572,7 @@ err:		__wt_err(session, ret, "Java async callback error");
 	}
 
 	/* Invalidate the AsyncOp, further use throws NullPointerException. */
-	ret = javaClose(jenv, jcb, &conn_jcb->asynccptr_fid);
+	ret = javaClose(jenv, NULL, jcb, &conn_jcb->asynccptr_fid);
 
 	(*jenv)->DeleteGlobalRef(jenv, jcallback);
 
@@ -488,7 +586,6 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %}
 
 %extend __wt_async_op {
-
 	%javamethodmodifiers get_key_wrap "protected";
 	WT_ITEM get_key_wrap(JNIEnv *jenv) {
 		WT_ITEM k;
@@ -496,7 +593,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		k.data = NULL;
 		if ((ret = $self->get_key($self, &k)) != 0)
 			throwWiredTigerException(jenv, ret);
-		return k;
+		return (k);
 	}
 
 	%javamethodmodifiers get_value_wrap "protected";
@@ -506,37 +603,44 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		v.data = NULL;
 		if ((ret = $self->get_value($self, &v)) != 0)
 			throwWiredTigerException(jenv, ret);
-		return v;
+		return (v);
 	}
 
 	%javamethodmodifiers insert_wrap "protected";
 	int insert_wrap(WT_ITEM *k, WT_ITEM *v) {
 		$self->set_key($self, k);
 		$self->set_value($self, v);
-		return $self->insert($self);
+		return ($self->insert($self));
 	}
 
 	%javamethodmodifiers remove_wrap "protected";
 	int remove_wrap(WT_ITEM *k) {
 		$self->set_key($self, k);
-		return $self->remove($self);
+		return ($self->remove($self));
 	}
 
 	%javamethodmodifiers search_wrap "protected";
 	int search_wrap(WT_ITEM *k) {
 		$self->set_key($self, k);
-		return $self->search($self);
+		return ($self->search($self));
 	}
 
 	%javamethodmodifiers update_wrap "protected";
 	int update_wrap(WT_ITEM *k, WT_ITEM *v) {
 		$self->set_key($self, k);
 		$self->set_value($self, v);
-		return $self->update($self);
+		return ($self->update($self));
 	}
 
-	%javamethodmodifiers java_init "protected";
-	int java_init(jobject jasyncop) {
+	%javamethodmodifiers _java_raw "protected";
+	bool _java_raw(JNIEnv *jenv) {
+		(void)jenv;
+		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->c.lang_private;
+		return (jcb->cursor_raw);
+	}
+
+	%javamethodmodifiers _java_init "protected";
+	int _java_init(jobject jasyncop) {
 		JAVA_CALLBACK *jcb =
 		    (JAVA_CALLBACK *)$self->c.lang_private;
 		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jasyncop);
@@ -549,6 +653,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %typemap(javabody) struct __wt_async_op %{
  private long swigCPtr;
  protected boolean swigCMemOwn;
+ protected boolean javaRaw;
  protected String keyFormat;
  protected String valueFormat;
  protected PackOutputStream keyPacker;
@@ -561,13 +666,14 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
    swigCPtr = cPtr;
    keyFormat = getKey_format();
    valueFormat = getValue_format();
-   keyPacker = new PackOutputStream(keyFormat);
-   valuePacker = new PackOutputStream(valueFormat);
-   wiredtigerJNI.AsyncOp_java_init(swigCPtr, this, this);
+   javaRaw = _java_raw();
+   keyPacker = new PackOutputStream(keyFormat, javaRaw);
+   valuePacker = new PackOutputStream(valueFormat, javaRaw);
+   wiredtigerJNI.AsyncOp__java_init(swigCPtr, this, this);
  }
 
  protected static long getCPtr($javaclassname obj) {
-   return (obj == null) ? 0 : obj.swigCPtr;
+	 return ((obj == null) ? 0 : obj.swigCPtr);
  }
 %}
 
@@ -1049,7 +1155,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	throws WiredTigerPackingException {
 		if (keyUnpacker == null)
 			keyUnpacker =
-			    new PackInputStream(keyFormat, get_key_wrap());
+			    new PackInputStream(keyFormat, get_key_wrap(),
+			    javaRaw);
 		return keyUnpacker;
 	}
 
@@ -1062,7 +1169,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	throws WiredTigerPackingException {
 		if (valueUnpacker == null)
 			valueUnpacker =
-			    new PackInputStream(valueFormat, get_value_wrap());
+			    new PackInputStream(valueFormat, get_value_wrap(),
+			    javaRaw);
 		return valueUnpacker;
 	}
 
@@ -1077,7 +1185,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		k.data = NULL;
 		if ((ret = $self->get_key($self, &k)) != 0)
 			throwWiredTigerException(jenv, ret);
-		return k;
+		return (k);
 	}
 
 	%javamethodmodifiers get_value_wrap "protected";
@@ -1087,26 +1195,31 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		v.data = NULL;
 		if ((ret = $self->get_value($self, &v)) != 0)
 			throwWiredTigerException(jenv, ret);
-		return v;
+		return (v);
 	}
 
 	%javamethodmodifiers insert_wrap "protected";
 	int insert_wrap(WT_ITEM *k, WT_ITEM *v) {
 		$self->set_key($self, k);
 		$self->set_value($self, v);
-		return $self->insert($self);
+		return ($self->insert($self));
 	}
 
 	%javamethodmodifiers remove_wrap "protected";
 	int remove_wrap(WT_ITEM *k) {
 		$self->set_key($self, k);
-		return $self->remove($self);
+		return ($self->remove($self));
+	}
+
+	%javamethodmodifiers reset_wrap "protected";
+	int reset_wrap() {
+		return $self->reset($self);
 	}
 
 	%javamethodmodifiers search_wrap "protected";
 	int search_wrap(WT_ITEM *k) {
 		$self->set_key($self, k);
-		return $self->search($self);
+		return ($self->search($self));
 	}
 
 	%javamethodmodifiers search_near_wrap "protected";
@@ -1126,29 +1239,79 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	int update_wrap(WT_ITEM *k, WT_ITEM *v) {
 		$self->set_key($self, k);
 		$self->set_value($self, v);
-		return $self->update($self);
+		return ($self->update($self));
 	}
 
+	%javamethodmodifiers compare_wrap "protected";
 	int compare_wrap(JNIEnv *jenv, WT_CURSOR *other) {
 		int cmp, ret = $self->compare($self, other, &cmp);
 		if (ret != 0)
 			throwWiredTigerException(jenv, ret);
-		return cmp;
+		return (cmp);
 	}
 
+	%javamethodmodifiers equals_wrap "protected";
 	int equals_wrap(JNIEnv *jenv, WT_CURSOR *other) {
 		int cmp, ret = $self->equals($self, other, &cmp);
 		if (ret != 0)
 			throwWiredTigerException(jenv, ret);
-		return cmp;
+		return (cmp);
 	}
 
-	%javamethodmodifiers java_init "protected";
-	int java_init(jobject jcursor) {
+	%javamethodmodifiers _java_raw "protected";
+	bool _java_raw(JNIEnv *jenv) {
+		(void)jenv;
+		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
+		return (jcb->cursor_raw);
+	}
+
+	%javamethodmodifiers _java_init "protected";
+	int _java_init(jobject jcursor) {
 		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
 		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jcursor);
 		JCALL1(DeleteLocalRef, jcb->jnienv, jcursor);
 		return (0);
+	}
+
+	int modify_wrap(WT_MODIFY_LIST *list, WT_ITEM *k) {
+		int ret;
+
+		$self->set_key($self, k);
+		ret = $self->modify(self, list->mod_array, list->count);
+		modify_list_release(list);
+		return (ret);
+	}
+
+	/*
+	 * Called internally after a new call.  The artificial constructor for
+	 * WT_MODIFY_LIST has no opportunity to throw an exception on a memory
+	 * allocation failure, so the the null check must be made within a
+	 * method on WT_CURSOR.
+	 */
+	bool _new_check_modify_list(WT_MODIFY_LIST *list) {
+		JAVA_CALLBACK *jcb;
+		if (list == NULL) {
+			jcb = (JAVA_CALLBACK *)$self->lang_private;
+			throwWiredTigerException(jcb->jnienv, ENOMEM);
+			return (false);
+		}
+		return (true);
+	}
+
+	/*
+	 * Called internally after a new call.  The artificial constructor for
+	 * WT_MODIFY has no opportunity to throw an exception on a memory
+	 * allocation failure, so the the null check must be made within a
+	 * method on WT_CURSOR.
+	 */
+	bool _new_check_modify(WT_MODIFY *mod) {
+		JAVA_CALLBACK *jcb;
+		if (mod == NULL) {
+			jcb = (JAVA_CALLBACK *)$self->lang_private;
+			throwWiredTigerException(jcb->jnienv, ENOMEM);
+			return (false);
+		}
+		return (true);
 	}
 }
 
@@ -1168,9 +1331,9 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
    swigCPtr = cPtr;
    keyFormat = getKey_format();
    valueFormat = getValue_format();
-   keyPacker = new PackOutputStream(keyFormat);
-   valuePacker = new PackOutputStream(valueFormat);
-   wiredtigerJNI.Cursor_java_init(swigCPtr, this, this);
+   keyPacker = new PackOutputStream(keyFormat, _java_raw());
+   valuePacker = new PackOutputStream(valueFormat, _java_raw());
+   wiredtigerJNI.Cursor__java_init(swigCPtr, this, this);
  }
 
  protected static long getCPtr($javaclassname obj) {
@@ -1650,10 +1813,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = next_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
 		return ret;
 	}
 
@@ -1667,10 +1828,23 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = prev_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
+		return ret;
+	}
+
+	/**
+	 * Reset a cursor.
+	 *
+	 * \return The status of the operation.
+	 */
+	public int reset()
+	throws WiredTigerException {
+		int ret = reset_wrap();
+		keyPacker.reset();
+		valuePacker.reset();
+		keyUnpacker = null;
+		valueUnpacker = null;
 		return ret;
 	}
 
@@ -1684,10 +1858,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = search_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
 		return ret;
 	}
 
@@ -1701,12 +1873,185 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		SearchStatus ret = search_near_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret != SearchStatus.NOTFOUND) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret != SearchStatus.NOTFOUND) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret != SearchStatus.NOTFOUND);
+		valueUnpacker = initValueUnpacker(ret != SearchStatus.NOTFOUND);
 		return ret;
 	}
+
+	/**
+	 * Initialize a key unpacker after an operation that changes
+	 * the cursor position.
+	 *
+	 * \param success Whether the associated operation succeeded.
+	 * \return The key unpacker.
+	 */
+	private PackInputStream initKeyUnpacker(boolean success)
+	throws WiredTigerException {
+		if (!success || keyFormat.equals(""))
+			return null;
+		else
+			return new PackInputStream(keyFormat,
+			    get_key_wrap(), _java_raw());
+	}
+
+	/**
+	 * Initialize a value unpacker after an operation that changes
+	 * the cursor position.
+	 *
+	 * \param success Whether the associated operation succeeded.
+	 * \return The value unpacker.
+	 */
+	private PackInputStream initValueUnpacker(boolean success)
+	throws WiredTigerException {
+		if (!success || valueFormat.equals(""))
+			return null;
+		else
+			return new PackInputStream(valueFormat,
+			    get_value_wrap(), _java_raw());
+	}
+
+	/**
+	 * Modify an existing record.
+	 *
+	 * The cursor must already be positioned, and the key's value will be
+	 * updated.
+	 *
+	 * \param mods an array of modifications.
+	 * \return 0 on success, errno on error.
+	 */
+	public int modify(Modify mods[])
+	throws WiredTigerException {
+		byte[] key = keyPacker.getValue();
+		keyPacker.reset();
+
+		WT_MODIFY_LIST l = new WT_MODIFY_LIST(mods.length);
+		if (!_new_check_modify_list(l))
+			return (0);   // exception is already thrown
+		int pos = 0;
+
+		for (Modify m : mods) {
+			if (!_new_check_modify(m))
+				return (0);   // exception is already thrown
+			l.set(pos, m);
+			pos++;
+		}
+		return modify_wrap(l, key);
+	}
+%}
+
+/*
+ * Support for WT_CURSOR.modify.
+ */
+
+%inline %{
+typedef struct __wt_java_item_hold {
+#ifndef SWIG
+	void *data;
+	size_t size;
+	JNIEnv *jnienv;
+	jobject ref;
+#endif
+} WT_ITEM_HOLD;
+
+/*
+ * An internal Java class encapsulates a list of Modify objects (stored as a
+ * WT_MODIFY array in C).
+ */
+typedef struct __wt_java_modify_list {
+#ifndef SWIG
+	WT_MODIFY *mod_array;
+	jobject *ref_array;
+	JNIEnv *jnienv;
+	int count;
+#endif
+} WT_MODIFY_LIST;
+%}
+%extend __wt_java_modify_list {
+	__wt_java_modify_list(int count) {
+		WT_MODIFY_LIST *self;
+		if (__wt_calloc_def(NULL, 1, &self) != 0)
+			return (NULL);
+		if (__wt_calloc_def(NULL, (size_t)count,
+		    &self->mod_array) != 0) {
+			__wt_free(NULL, self);
+			return (NULL);
+		}
+		if (__wt_calloc_def(NULL, (size_t)count,
+		    &self->ref_array) != 0) {
+			__wt_free(NULL, self->mod_array);
+			__wt_free(NULL, self);
+			return (NULL);
+		}
+		self->count = count;
+		return (self);
+	}
+	~__wt_java_modify_list() {
+		modify_list_release(self);
+		__wt_free(NULL, self);
+	}
+	void set(int i, WT_MODIFY *m) {
+		WT_MODIFY_IMPL *impl = (WT_MODIFY_IMPL *)m;
+		self->mod_array[i] = *m;
+		self->ref_array[i] = impl->ref;
+		impl->ref = (jobject)0;
+		self->jnienv = impl->jnienv;
+	}
+};
+
+%extend __wt_modify {
+	__wt_modify() {
+		WT_MODIFY_IMPL *self;
+		if (__wt_calloc_def(NULL, 1, &self) != 0)
+			return (NULL);
+		self->modify.data.data = NULL;
+		self->modify.data.size = 0;
+		self->modify.offset = 0;
+		self->modify.size = 0;
+		return (&self->modify);
+	}
+	__wt_modify(WT_ITEM_HOLD *itemdata,
+	    size_t offset, size_t size) {
+		WT_MODIFY_IMPL *self;
+		if (__wt_calloc_def(NULL, 1, &self) != 0)
+			return (NULL);
+		self->modify.data.data = itemdata->data;
+		self->modify.data.size = itemdata->size;
+		self->modify.offset = offset;
+		self->modify.size = size;
+		self->ref = itemdata->ref;
+		self->jnienv = itemdata->jnienv;
+		return (&self->modify);
+	}
+	~__wt_modify() {
+		modify_impl_release((WT_MODIFY_IMPL *)self);
+		__wt_free(NULL, self);
+	}
+};
+
+%{
+static void modify_list_release(WT_MODIFY_LIST *list) {
+	for (int i = 0; i < list->count; i++)
+		if (list->ref_array[i] != (jobject)0) {
+			(*list->jnienv)->ReleaseByteArrayElements(
+			    list->jnienv, list->ref_array[i],
+			    (jbyte *)list->mod_array[i].data.data, 0);
+			(*list->jnienv)->DeleteGlobalRef(
+			    list->jnienv, list->ref_array[i]);
+		}
+	__wt_free(NULL, list->ref_array);
+	__wt_free(NULL, list->mod_array);
+	list->count = 0;
+}
+
+static void modify_impl_release(WT_MODIFY_IMPL *impl) {
+	if (impl->ref != (jobject)0) {
+		(*impl->jnienv)->ReleaseByteArrayElements(
+		    impl->jnienv, impl->ref,
+		    (jbyte *)impl->modify.data.data, 0);
+		(*impl->jnienv)->DeleteGlobalRef(impl->jnienv, impl->ref);
+		impl->ref = (jobject)0;
+	}
+}
 %}
 
 /* Put a WiredTigerException on all wrapped methods. We'd like this
@@ -1715,20 +2060,22 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
  */
 %javaexception("com.wiredtiger.db.WiredTigerException") { $action; }
 %javaexception("") wiredtiger_strerror { $action; }
+%javaexception("") __wt_async_op::_java_raw { $action; }
 %javaexception("") __wt_async_op::connection { $action; }
 %javaexception("") __wt_async_op::get_type { $action; }
 %javaexception("") __wt_async_op::get_id { $action; }
 %javaexception("") __wt_async_op::key_format { $action; }
 %javaexception("") __wt_async_op::value_format { $action; }
+%javaexception("") __wt_connection::_java_init { $action; }
 %javaexception("") __wt_connection::get_home { $action; }
 %javaexception("") __wt_connection::is_new { $action; }
-%javaexception("") __wt_connection::java_init { $action; }
+%javaexception("") __wt_cursor::_java_raw { $action; }
 %javaexception("") __wt_cursor::key_format { $action; }
 %javaexception("") __wt_cursor::session { $action; }
 %javaexception("") __wt_cursor::uri { $action; }
 %javaexception("") __wt_cursor::value_format { $action; }
+%javaexception("") __wt_session::_java_init { $action; }
 %javaexception("") __wt_session::connection { $action; }
-%javaexception("") __wt_session::java_init { $action; }
 
 /* Remove / rename parts of the C API that we don't want in Java. */
 %immutable __wt_cursor::session;
@@ -1748,6 +2095,9 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %ignore __wt_event_handler;
 %ignore __wt_extractor;
 %ignore __wt_connection::add_extractor;
+%ignore __wt_file_system;
+%ignore __wt_file_handle;
+%ignore __wt_connection::set_file_system;
 %ignore __wt_item;
 %ignore __wt_lsn;
 %ignore __wt_session::msg_printf;
@@ -1784,6 +2134,7 @@ REQUIRE_WRAP(WT_ASYNC_OP::get_id, __wt_async_op::get_id,getId)
 
 %rename(AsyncOp) __wt_async_op;
 %rename(Cursor) __wt_cursor;
+%rename(Modify) __wt_modify;
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
 
@@ -1806,8 +2157,8 @@ REQUIRE_WRAP(WT_ASYNC_OP::get_id, __wt_async_op::get_id,getId)
 %}
 
 %extend ctypename {
-	%javamethodmodifiers java_init "protected";
-	int java_init(jobject jsess) {
+	%javamethodmodifiers _java_init "protected";
+	int _java_init(jobject jsess) {
 		implclass *session = (implclass *)$self;
 		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)session->lang_private;
 		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jsess);
@@ -1817,8 +2168,8 @@ REQUIRE_WRAP(WT_ASYNC_OP::get_id, __wt_async_op::get_id,getId)
 }
 %enddef
 
-TRACKED_CLASS(Session, __wt_session, wiredtigerJNI.Session_java_init, WT_SESSION_IMPL)
-TRACKED_CLASS(Connection, __wt_connection, wiredtigerJNI.Connection_java_init, WT_CONNECTION_IMPL)
+TRACKED_CLASS(Session, __wt_session, wiredtigerJNI.Session__java_init, WT_SESSION_IMPL)
+TRACKED_CLASS(Connection, __wt_connection, wiredtigerJNI.Connection__java_init, WT_CONNECTION_IMPL)
 /* Note: Cursor incorporates the elements of TRACKED_CLASS into its
  * custom constructor and %extend clause.
  */
@@ -1845,7 +2196,7 @@ WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *
 
 err:	if (ret != 0)
 		throwWiredTigerException(jenv, ret);
-	return conn;
+	return (conn);
 }
 }
 
@@ -1868,14 +2219,14 @@ err:	if (ret != 0)
 		jcb->jnienv = jenv;
 		jcb->session = connimpl->default_session;
 		(*jenv)->GetJavaVM(jenv, &jcb->javavm);
-		jcb->jcallback = JCALL1(NewGlobalRef, jcb->jnienv, callbackObject);
-		JCALL1(DeleteLocalRef, jcb->jnienv, callbackObject);
+		jcb->jcallback = JCALL1(NewGlobalRef, jenv, callbackObject);
+		JCALL1(DeleteLocalRef, jenv, callbackObject);
 		asyncop->c.lang_private = jcb;
 		asyncop->c.flags |= WT_CURSTD_RAW;
 
 err:		if (ret != 0)
 			throwWiredTigerException(jenv, ret);
-		return asyncop;
+		return (asyncop);
 	}
 }
 
@@ -1899,7 +2250,7 @@ err:		if (ret != 0)
 
 err:		if (ret != 0)
 			throwWiredTigerException(jenv, ret);
-		return session;
+		return (session);
 	}
 }
 
@@ -1912,12 +2263,14 @@ err:		if (ret != 0)
 		if ((ret = $self->open_cursor($self, uri, to_dup, config, &cursor)) != 0)
 			goto err;
 
-		if ((cursor->flags & WT_CURSTD_DUMP_JSON) == 0)
-			cursor->flags |= WT_CURSTD_RAW;
-
 		if ((ret = __wt_calloc_def((WT_SESSION_IMPL *)cursor->session,
 			    1, &jcb)) != 0)
 			goto err;
+
+		if ((cursor->flags & WT_CURSTD_RAW) != 0)
+			jcb->cursor_raw = true;
+		if ((cursor->flags & WT_CURSTD_DUMP_JSON) == 0)
+			cursor->flags |= WT_CURSTD_RAW;
 
 		jcb->jnienv = jenv;
 		jcb->session = (WT_SESSION_IMPL *)cursor->session;
@@ -1925,14 +2278,14 @@ err:		if (ret != 0)
 
 err:		if (ret != 0)
 			throwWiredTigerException(jenv, ret);
-		return cursor;
+		return (cursor);
 	}
 }
 
 %extend __wt_async_op {
 	long get_id_wrap(JNIEnv *jenv) {
 		WT_UNUSED(jenv);
-		return (self->get_id(self));
+		return ((long)self->get_id(self));
 	}
 }
 
@@ -1943,6 +2296,6 @@ err:		if (ret != 0)
 		ret = self->transaction_pinned_range(self, &range);
 		if (ret != 0)
 			throwWiredTigerException(jenv, ret);
-		return range;
+		return ((long)range);
 	}
 }

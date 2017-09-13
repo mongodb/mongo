@@ -31,28 +31,40 @@
 
 #pragma once
 
-#include <set>
+#include <list>
+#include <memory>
 #include <string>
 
 #include <wiredtiger.h>
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 
+class ClockSource;
+class JournalListener;
+class WiredTigerRecordStore;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 
-class WiredTigerKVEngine : public KVEngine {
+class WiredTigerKVEngine final : public KVEngine {
 public:
-    WiredTigerKVEngine(const std::string& path,
-                       const std::string& extraOpenOptions = "",
-                       bool durable = true,
-                       bool repair = false);
+    WiredTigerKVEngine(const std::string& canonicalName,
+                       const std::string& path,
+                       ClockSource* cs,
+                       const std::string& extraOpenOptions,
+                       size_t cacheSizeGB,
+                       bool durable,
+                       bool ephemeral,
+                       bool repair,
+                       bool readOnly);
+
     virtual ~WiredTigerKVEngine();
 
     void setRecordStoreExtraOptions(const std::string& options);
@@ -66,25 +78,59 @@ public:
         return _durable;
     }
 
+    virtual bool isEphemeral() const {
+        return _ephemeral;
+    }
+
     virtual RecoveryUnit* newRecoveryUnit();
 
     virtual Status createRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options);
+                                     const CollectionOptions& options) {
+        return createGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
+    }
 
-    virtual RecordStore* getRecordStore(OperationContext* opCtx,
-                                        StringData ns,
-                                        StringData ident,
-                                        const CollectionOptions& options);
+    virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
+                                                        StringData ns,
+                                                        StringData ident,
+                                                        const CollectionOptions& options) {
+        return getGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
+    }
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
-                                             const IndexDescriptor* desc);
+                                             const IndexDescriptor* desc) {
+        return createGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
+    }
 
     virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
                                                         StringData ident,
-                                                        const IndexDescriptor* desc);
+                                                        const IndexDescriptor* desc) {
+        return getGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
+    }
+
+    virtual Status createGroupedRecordStore(OperationContext* opCtx,
+                                            StringData ns,
+                                            StringData ident,
+                                            const CollectionOptions& options,
+                                            KVPrefix prefix);
+
+    virtual std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
+                                                               StringData ns,
+                                                               StringData ident,
+                                                               const CollectionOptions& options,
+                                                               KVPrefix prefix);
+
+    virtual Status createGroupedSortedDataInterface(OperationContext* opCtx,
+                                                    StringData ident,
+                                                    const IndexDescriptor* desc,
+                                                    KVPrefix prefix);
+
+    virtual SortedDataInterface* getGroupedSortedDataInterface(OperationContext* opCtx,
+                                                               StringData ident,
+                                                               const IndexDescriptor* desc,
+                                                               KVPrefix prefix);
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident);
 
@@ -94,7 +140,11 @@ public:
                               StringData ident,
                               const RecordStore* originalRecordStore) const;
 
-    virtual int flushAllFiles(bool sync);
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync);
+
+    virtual Status beginBackup(OperationContext* opCtx);
+
+    virtual void endBackup(OperationContext* opCtx);
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
 
@@ -106,6 +156,18 @@ public:
 
     virtual void cleanShutdown();
 
+    SnapshotManager* getSnapshotManager() const final {
+        return &_sessionCache->snapshotManager();
+    }
+
+    void setJournalListener(JournalListener* jl) final;
+
+    virtual void setStableTimestamp(SnapshotName stableTimestamp) override;
+
+    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
+
+    virtual bool supportsRecoverToStableTimestamp() const override;
+
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
     // held by this class
@@ -114,10 +176,43 @@ public:
     WT_CONNECTION* getConnection() {
         return _conn;
     }
-    void dropAllQueued();
+    void dropSomeQueuedIdents();
+    std::list<WiredTigerCachedCursor> filterCursorsWithQueuedDrops(
+        std::list<WiredTigerCachedCursor>* cache);
     bool haveDropsQueued() const;
 
     void syncSizeInfo(bool sync) const;
+
+    /*
+     * Initializes and reference counts an oplog manager, to control oplog entry visibility for
+     * reads.
+     * The oplogManager object is held by this class but is constructed and deleted as per
+     * the Oplog record store (the record store corresponding to the oplog collection).  If
+     * multiple oplog record stores are created, the first oplog record store to be constructed will
+     * construct the Manager, and the last oplog record store to be deleted will destruct the
+     * Manager.
+     */
+    void initializeOplogManager(OperationContext* opCtx,
+                                const std::string& uri,
+                                WiredTigerRecordStore* oplogRecordStore);
+    void deleteOplogManager();
+
+    WiredTigerOplogManager* getOplogManager() const {
+        return _oplogManager.get();
+    }
+
+    /*
+     * This function is called when replication has completed a batch.  In this function, we
+     * refresh our oplog visiblity read-at-timestamp value.
+     */
+    void replicationBatchIsComplete() const override;
+
+    /**
+     * Sets the implementation for `initRsOplogBackgroundThread` (allowing tests to skip the
+     * background job, for example). Intended to be called from a MONGO_INITIALIZER and therefroe in
+     * a single threaded context.
+     */
+    static void setInitRsOplogBackgroundThreadCallback(stdx::function<bool(StringData)> cb);
 
     /**
      * Initializes a background job to remove excess documents in the oplog collections.
@@ -127,7 +222,12 @@ public:
      */
     static bool initRsOplogBackgroundThread(StringData ns);
 
+    static void appendGlobalStats(BSONObjBuilder& b);
+
 private:
+    class WiredTigerJournalFlusher;
+    class WiredTigerCheckpointThread;
+
     Status _salvageIfNeeded(const char* uri);
     void _checkIdentPath(StringData ident);
 
@@ -136,20 +236,43 @@ private:
     std::string _uri(StringData ident) const;
     bool _drop(StringData ident);
 
+    void _setOldestTimestamp(SnapshotName oldestTimestamp);
+
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+
+    // Mutex to protect use of _oplogManager and _oplogManagerCount by this instance of KV
+    // engine.
+    // Uses of _oplogManager by the oplog record stores themselves are safe without locking, since
+    // those record stores manage the oplogManager lifetime.
+    mutable stdx::mutex _oplogManagerMutex;
+    std::unique_ptr<WiredTigerOplogManager> _oplogManager;
+    std::size_t _oplogManagerCount = 0;
+
+    std::string _canonicalName;
     std::string _path;
-    bool _durable;
-
-    std::string _rsOptions;
-    std::string _indexOptions;
-
-    std::set<std::string> _identToDrop;
-    mutable stdx::mutex _identToDropMutex;
+    std::string _wtOpenConfig;
 
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
     std::string _sizeStorerUri;
     mutable ElapsedTracker _sizeStorerSyncTracker;
+
+    bool _durable;
+    bool _ephemeral;
+    bool _readOnly;
+    std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
+    std::unique_ptr<WiredTigerCheckpointThread> _checkpointThread;
+
+    std::string _rsOptions;
+    std::string _indexOptions;
+
+    mutable stdx::mutex _dropAllQueuesMutex;
+    mutable stdx::mutex _identToDropMutex;
+    std::list<std::string> _identToDrop;
+
+    mutable Date_t _previousCheckedDropsQueued;
+
+    std::unique_ptr<WiredTigerSession> _backupSession;
 };
 }

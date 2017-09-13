@@ -29,20 +29,309 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
-
-class OperationContext;
-
 namespace repl {
 
-class StorageInterfaceMock : public StorageInterface {
-public:
-    explicit StorageInterfaceMock();
-    virtual ~StorageInterfaceMock();
+struct CollectionMockStats {
+    bool initCalled = false;
+    int insertCount = 0;
+    bool commitCalled = false;
+};
 
-    OperationContext* createOperationContext() override;
+class CollectionBulkLoaderMock : public CollectionBulkLoader {
+    MONGO_DISALLOW_COPYING(CollectionBulkLoaderMock);
+
+public:
+    CollectionBulkLoaderMock(CollectionMockStats* collStats) : stats(collStats){};
+    virtual ~CollectionBulkLoaderMock() = default;
+    virtual Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
+
+    virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
+                                   const std::vector<BSONObj>::const_iterator end) override;
+    virtual Status commit() override;
+
+    std::string toString() const override {
+        return toBSON().toString();
+    };
+    BSONObj toBSON() const override {
+        return BSONObj();
+    };
+
+    CollectionMockStats* stats;
+
+    // Override functions.
+    stdx::function<Status(const std::vector<BSONObj>::const_iterator begin,
+                          const std::vector<BSONObj>::const_iterator end)>
+        insertDocsFn = [](const std::vector<BSONObj>::const_iterator,
+                          const std::vector<BSONObj>::const_iterator) { return Status::OK(); };
+    stdx::function<Status()> abortFn = []() { return Status::OK(); };
+    stdx::function<Status()> commitFn = []() { return Status::OK(); };
+};
+
+class StorageInterfaceMock : public StorageInterface {
+    MONGO_DISALLOW_COPYING(StorageInterfaceMock);
+
+public:
+    // Used for testing.
+
+    using CreateCollectionForBulkFn =
+        stdx::function<StatusWith<std::unique_ptr<CollectionBulkLoader>>(
+            const NamespaceString& nss,
+            const CollectionOptions& options,
+            const BSONObj idIndexSpec,
+            const std::vector<BSONObj>& secondaryIndexSpecs)>;
+    using InsertDocumentFn = stdx::function<Status(
+        OperationContext* opCtx, const NamespaceString& nss, const TimestampedBSONObj& doc)>;
+    using InsertDocumentsFn = stdx::function<Status(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const std::vector<InsertStatement>& docs)>;
+    using DropUserDatabasesFn = stdx::function<Status(OperationContext* opCtx)>;
+    using CreateOplogFn =
+        stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
+    using CreateCollectionFn = stdx::function<Status(
+        OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options)>;
+    using TruncateCollectionFn =
+        stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
+    using DropCollectionFn =
+        stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
+    using FindDocumentsFn =
+        stdx::function<StatusWith<std::vector<BSONObj>>(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        boost::optional<StringData> indexName,
+                                                        ScanDirection scanDirection,
+                                                        const BSONObj& startKey,
+                                                        BoundInclusion boundInclusion,
+                                                        std::size_t limit)>;
+    using DeleteDocumentsFn =
+        stdx::function<StatusWith<std::vector<BSONObj>>(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        boost::optional<StringData> indexName,
+                                                        ScanDirection scanDirection,
+                                                        const BSONObj& startKey,
+                                                        BoundInclusion boundInclusion,
+                                                        std::size_t limit)>;
+    using IsAdminDbValidFn = stdx::function<Status(OperationContext* opCtx)>;
+
+    StorageInterfaceMock() = default;
+
+    StatusWith<int> getRollbackID(OperationContext* opCtx) override;
+    Status initializeRollbackID(OperationContext* opCtx) override;
+    Status incrementRollbackID(OperationContext* opCtx) override;
+
+    StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
+        const NamespaceString& nss,
+        const CollectionOptions& options,
+        const BSONObj idIndexSpec,
+        const std::vector<BSONObj>& secondaryIndexSpecs) override {
+        return createCollectionForBulkFn(nss, options, idIndexSpec, secondaryIndexSpecs);
+    };
+
+    Status insertDocument(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const TimestampedBSONObj& doc) override {
+        return insertDocumentFn(opCtx, nss, doc);
+    };
+
+    Status insertDocuments(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const std::vector<InsertStatement>& docs) override {
+        return insertDocumentsFn(opCtx, nss, docs);
+    }
+
+    Status dropReplicatedDatabases(OperationContext* opCtx) override {
+        return dropUserDBsFn(opCtx);
+    };
+
+    Status createOplog(OperationContext* opCtx, const NamespaceString& nss) override {
+        return createOplogFn(opCtx, nss);
+    };
+
+    StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx,
+                                       const NamespaceString& nss) override {
+        return 1024 * 1024 * 1024;
+    }
+
+    Status createCollection(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const CollectionOptions& options) override {
+        return createCollFn(opCtx, nss, options);
+    }
+
+    Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) override {
+        return dropCollFn(opCtx, nss);
+    };
+
+    Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) override {
+        return truncateCollFn(opCtx, nss);
+    }
+
+    Status renameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromNS,
+                            const NamespaceString& toNS,
+                            bool stayTemp) override {
+
+        return Status{ErrorCodes::IllegalOperation, "renameCollection not implemented."};
+    }
+
+    StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   boost::optional<StringData> indexName,
+                                                   ScanDirection scanDirection,
+                                                   const BSONObj& startKey,
+                                                   BoundInclusion boundInclusion,
+                                                   std::size_t limit) override {
+        return findDocumentsFn(
+            opCtx, nss, indexName, scanDirection, startKey, boundInclusion, limit);
+    }
+
+    StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     boost::optional<StringData> indexName,
+                                                     ScanDirection scanDirection,
+                                                     const BSONObj& startKey,
+                                                     BoundInclusion boundInclusion,
+                                                     std::size_t limit) override {
+        return deleteDocumentsFn(
+            opCtx, nss, indexName, scanDirection, startKey, boundInclusion, limit);
+    }
+
+    StatusWith<BSONObj> findSingleton(OperationContext* opCtx,
+                                      const NamespaceString& nss) override {
+        return Status{ErrorCodes::IllegalOperation, "findSingleton not implemented."};
+    }
+
+    Status putSingleton(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "putSingleton not implemented."};
+    }
+
+    StatusWith<BSONObj> findById(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const BSONElement& idKey) override {
+        return Status{ErrorCodes::IllegalOperation, "findById not implemented."};
+    }
+
+    StatusWith<BSONObj> deleteById(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const BSONElement& idKey) override {
+        return Status{ErrorCodes::IllegalOperation, "deleteById not implemented."};
+    }
+
+    Status upsertById(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const BSONElement& idKey,
+                      const BSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "upsertById not implemented."};
+    }
+
+    Status deleteByFilter(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& filter) override {
+        return Status{ErrorCodes::IllegalOperation, "deleteByFilter not implemented."};
+    }
+
+    StatusWith<StorageInterface::CollectionSize> getCollectionSize(
+        OperationContext* opCtx, const NamespaceString& nss) override {
+        return 0;
+    }
+
+    StatusWith<StorageInterface::CollectionCount> getCollectionCount(
+        OperationContext* opCtx, const NamespaceString& nss) override {
+        return 0;
+    }
+
+    void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
+
+    void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
+
+    SnapshotName getStableTimestamp() const;
+
+    SnapshotName getInitialDataTimestamp() const;
+
+    Status recoverToStableTimestamp(ServiceContext* serviceCtx) override {
+        return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
+    }
+
+    Status isAdminDbValid(OperationContext* opCtx) override {
+        return isAdminDbValidFn(opCtx);
+    };
+
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) override {
+        return;
+    }
+
+    // Testing functions.
+    CreateCollectionForBulkFn createCollectionForBulkFn =
+        [](const NamespaceString& nss,
+           const CollectionOptions& options,
+           const BSONObj idIndexSpec,
+           const std::vector<BSONObj>&
+               secondaryIndexSpecs) -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+        return Status{ErrorCodes::IllegalOperation, "CreateCollectionForBulkFn not implemented."};
+    };
+    InsertDocumentFn insertDocumentFn =
+        [](OperationContext* opCtx, const NamespaceString& nss, const TimestampedBSONObj& doc) {
+            return Status{ErrorCodes::IllegalOperation, "InsertDocumentFn not implemented."};
+        };
+    InsertDocumentsFn insertDocumentsFn = [](OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const std::vector<InsertStatement>& docs) {
+        return Status{ErrorCodes::IllegalOperation, "InsertDocumentsFn not implemented."};
+    };
+    DropUserDatabasesFn dropUserDBsFn = [](OperationContext* opCtx) {
+        return Status{ErrorCodes::IllegalOperation, "DropUserDatabasesFn not implemented."};
+    };
+    CreateOplogFn createOplogFn = [](OperationContext* opCtx, const NamespaceString& nss) {
+        return Status{ErrorCodes::IllegalOperation, "CreateOplogFn not implemented."};
+    };
+    CreateCollectionFn createCollFn =
+        [](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
+            return Status{ErrorCodes::IllegalOperation, "CreateCollectionFn not implemented."};
+        };
+    TruncateCollectionFn truncateCollFn = [](OperationContext* opCtx, const NamespaceString& nss) {
+        return Status{ErrorCodes::IllegalOperation, "TruncateCollectionFn not implemented."};
+    };
+    DropCollectionFn dropCollFn = [](OperationContext* opCtx, const NamespaceString& nss) {
+        return Status{ErrorCodes::IllegalOperation, "DropCollectionFn not implemented."};
+    };
+    FindDocumentsFn findDocumentsFn = [](OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         boost::optional<StringData> indexName,
+                                         ScanDirection scanDirection,
+                                         const BSONObj& startKey,
+                                         BoundInclusion boundInclusion,
+                                         std::size_t limit) {
+        return Status{ErrorCodes::IllegalOperation, "FindOneFn not implemented."};
+    };
+    DeleteDocumentsFn deleteDocumentsFn = [](OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             boost::optional<StringData> indexName,
+                                             ScanDirection scanDirection,
+                                             const BSONObj& startKey,
+                                             BoundInclusion boundInclusion,
+                                             std::size_t limit) {
+        return Status{ErrorCodes::IllegalOperation, "DeleteOneFn not implemented."};
+    };
+    IsAdminDbValidFn isAdminDbValidFn = [](OperationContext*) {
+        return Status{ErrorCodes::IllegalOperation, "IsAdminDbValidFn not implemented."};
+    };
+
+private:
+    mutable stdx::mutex _mutex;
+    int _rbid;
+    bool _rbidInitialized = false;
+    SnapshotName _stableTimestamp = SnapshotName::min();
+    SnapshotName _initialDataTimestamp = SnapshotName::min();
 };
 
 }  // namespace repl

@@ -31,10 +31,12 @@
 
 #ifdef _WIN32
 #include "mongo/platform/windows_basic.h"
+#else
+#include <pthread.h>
 #endif
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/static_observer.h"
 
 namespace mongo {
 
@@ -55,9 +57,7 @@ public:
     }
 
     ~SimpleMutex() {
-        if (!StaticObserver::_destroyingStatics) {
-            DeleteCriticalSection(&_cs);
-        }
+        DeleteCriticalSection(&_cs);
     }
 
     void lock() {
@@ -82,9 +82,7 @@ public:
     }
 
     ~SimpleMutex() {
-        if (!StaticObserver::_destroyingStatics) {
-            verify(pthread_mutex_destroy(&_lock) == 0);
-        }
+        verify(pthread_mutex_destroy(&_lock) == 0);
     }
 
     void lock() {

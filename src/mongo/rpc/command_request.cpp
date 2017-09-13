@@ -37,8 +37,8 @@
 #include "mongo/base/data_type_string_data.h"
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -49,17 +49,16 @@ namespace rpc {
 
 namespace {
 // None of these include null byte
-const std::size_t kMaxDatabaseLength = 63;
-const std::size_t kMinDatabaseLength = 1;
-
 const std::size_t kMinCommandNameLength = 1;
 const std::size_t kMaxCommandNameLength = 128;
 
 }  // namespace
 
-CommandRequest::CommandRequest(const Message* message) : _message(message) {
-    char* begin = _message->singleData().data();
-    std::size_t length = _message->singleData().dataLen();
+ParsedOpCommand ParsedOpCommand::parse(const Message& message) {
+    ParsedOpCommand out;
+
+    char* begin = message.singleData().data();
+    std::size_t length = message.singleData().dataLen();
 
     // checked in message_port.cpp
     invariant(length <= MaxMessageSizeBytes);
@@ -68,64 +67,73 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
 
     ConstDataRangeCursor cur(begin, messageEnd);
 
-    _database = uassertStatusOK(cur.readAndAdvance<Terminated<'\0', StringData>>());
+    Terminated<'\0', StringData> str;
+    uassertStatusOK(cur.readAndAdvance<>(&str));
+    out.database = str.value.toString();
 
-    uassert(28636,
-            str::stream() << "Database parsed in OP_COMMAND message must be between"
-                          << kMinDatabaseLength << " and " << kMaxDatabaseLength
-                          << " bytes. Got: " << _database,
-            (_database.size() >= kMinDatabaseLength) && (_database.size() <= kMaxDatabaseLength));
-
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid database name: '" << _database << "'",
-            NamespaceString::validDBName(_database));
-
-    _commandName = uassertStatusOK(cur.readAndAdvance<Terminated<'\0', StringData>>());
+    uassertStatusOK(cur.readAndAdvance<>(&str));
+    const auto commandName = std::move(str.value);
 
     uassert(28637,
-            str::stream() << "Command name parsed in OP_COMMAND message must be between"
-                          << kMinCommandNameLength << " and " << kMaxCommandNameLength
-                          << " bytes. Got: " << _database,
-            (_commandName.size() >= kMinCommandNameLength) &&
-                (_commandName.size() <= kMaxCommandNameLength));
+            str::stream() << "Command name parsed in OP_COMMAND message must be between "
+                          << kMinCommandNameLength
+                          << " and "
+                          << kMaxCommandNameLength
+                          << " bytes. Got: "
+                          << out.database,
+            (commandName.size() >= kMinCommandNameLength) &&
+                (commandName.size() <= kMaxCommandNameLength));
 
-    _metadata = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
-    _commandArgs = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
-    _inputDocs = DocumentRange{cur.data(), messageEnd};
+    Validated<BSONObj> obj;
+    uassertStatusOK(cur.readAndAdvance<>(&obj));
+    out.body = std::move(obj.val);
+    uassert(39950,
+            str::stream() << "Command name parsed in OP_COMMAND message '" << commandName
+                          << "' doesn't match command name from object '"
+                          << out.body.firstElementFieldName()
+                          << '\'',
+            out.body.firstElementFieldName() == commandName);
+
+    uassertStatusOK(cur.readAndAdvance<>(&obj));
+    out.metadata = std::move(obj.val);
+
+    uassert(40419, "OP_COMMAND request contains trailing bytes following metadata", cur.empty());
+
+    return out;
 }
 
-StringData CommandRequest::getDatabase() const {
-    return _database;
-}
+OpMsgRequest opMsgRequestFromCommandRequest(const Message& message) {
+    auto parsed = ParsedOpCommand::parse(message);
 
-StringData CommandRequest::getCommandName() const {
-    return _commandName;
-}
+    BSONObjBuilder bodyBuilder(std::move(parsed.body));
 
-const BSONObj& CommandRequest::getMetadata() const {
-    return _metadata;
-}
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up-conversion here so that the rest of the code only has to
+    // deal with the current format.
+    for (auto elem : parsed.metadata) {
+        if (elem.fieldNameStringData() == "configsvr") {
+            bodyBuilder.appendAs(elem, "$configServerState");
+        } else if (elem.fieldNameStringData() == "$ssm") {
+            auto ssmObj = elem.Obj();
+            if (auto readPrefElem = ssmObj["$readPreference"]) {
+                // Promote the read preference to the top level.
+                bodyBuilder.append(readPrefElem);
+            } else if (ssmObj["$secondaryOk"].trueValue()) {
+                // Convert secondaryOk to equivalent read preference if none was explicitly
+                // provided.
+                ReadPreferenceSetting(ReadPreference::SecondaryPreferred)
+                    .toContainingBSON(&bodyBuilder);
+            }
+        } else {
+            bodyBuilder.append(elem);
+        }
+    }
 
-const BSONObj& CommandRequest::getCommandArgs() const {
-    return _commandArgs;
-}
+    bodyBuilder.append("$db", parsed.database);
 
-DocumentRange CommandRequest::getInputDocs() const {
-    return _inputDocs;
-}
-
-bool operator==(const CommandRequest& lhs, const CommandRequest& rhs) {
-    return std::tie(
-               lhs._database, lhs._commandName, lhs._metadata, lhs._commandArgs, lhs._inputDocs) ==
-        std::tie(rhs._database, rhs._commandName, rhs._metadata, rhs._commandArgs, rhs._inputDocs);
-}
-
-bool operator!=(const CommandRequest& lhs, const CommandRequest& rhs) {
-    return !(lhs == rhs);
-}
-
-Protocol CommandRequest::getProtocol() const {
-    return rpc::Protocol::kOpCommandV1;
+    OpMsgRequest request;
+    request.body = bodyBuilder.obj();
+    return request;
 }
 
 }  // namespace rpc

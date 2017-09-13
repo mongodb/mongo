@@ -43,13 +43,13 @@ class MockDBClientCursor : public mongo::DBClientCursor {
 public:
     MockDBClientCursor(mongo::DBClientBase* client, const mongo::BSONArray& mockCollection);
 
-    bool more();
+    bool more() override;
 
     /**
      * Note: has the same contract as DBClientCursor - returned BSONObj will
      * become invalid when this cursor is destroyed.
      */
-    mongo::BSONObj next();
+    mongo::BSONObj next() override;
 
 private:
     std::unique_ptr<mongo::DBClientMockCursor> _cursor;

@@ -7,8 +7,8 @@
  * appear in both a collection scan and an index scan. The indexed value is a
  * legacy coordinate pair, indexed with a 2d index.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
+load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -19,7 +19,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        assertAlways.lt(this.tid, 1 << 16); // assume tid is a 16 bit nonnegative int
+        assertAlways.lt(this.tid, 1 << 16);  // assume tid is a 16 bit nonnegative int
         // split the tid into the odd bits and the even bits
         // for example:
         //  tid:  57 = 00111001

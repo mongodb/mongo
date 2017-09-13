@@ -34,11 +34,16 @@
 
 namespace mongo {
 
+class BSONObj;
+
 /**
  * Timestamp: A combination of a count of seconds since the POSIX epoch plus an ordinal value.
  */
 class Timestamp {
 public:
+    // Timestamp to signal that the storage engine should take unstable checkpoints.
+    static const Timestamp kAllowUnstableCheckpointsSentinel;
+
     // Maximum Timestamp value.
     static Timestamp max();
 
@@ -58,9 +63,7 @@ public:
 
     Timestamp(Seconds s, unsigned increment) : Timestamp(s.count(), increment) {}
 
-    Timestamp(unsigned a, unsigned b) : i(b), secs(a) {
-        dassert(secs <= static_cast<unsigned>(std::numeric_limits<int>::max()));
-    }
+    Timestamp(unsigned a, unsigned b) : i(b), secs(a) {}
 
     Timestamp() = default;
 
@@ -114,6 +117,7 @@ public:
     // Append the BSON representation of this Timestamp to the given BufBuilder with the given
     // name. This lives here because Timestamp manages its own serialization format.
     void append(BufBuilder& builder, const StringData& fieldName) const;
+    BSONObj toBSON() const;
 
 private:
     std::tuple<unsigned, unsigned> tie() const {

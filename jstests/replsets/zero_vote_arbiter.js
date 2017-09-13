@@ -17,12 +17,7 @@ var InvalidReplicaSetConfig = 93;
     var arbiterConn = replTest.add();
     var admin = replTest.getPrimary().getDB("admin");
     var conf = admin.runCommand({replSetGetConfig: 1}).config;
-    conf.members.push({
-        _id: 3,
-        host: arbiterConn.host,
-        arbiterOnly: true,
-        votes: 0
-    });
+    conf.members.push({_id: 3, host: arbiterConn.host, arbiterOnly: true, votes: 0});
     conf.version++;
 
     jsTestLog('Add arbiter with zero votes:');
@@ -60,7 +55,6 @@ var InvalidReplicaSetConfig = 93;
     replTest.stopSet();
 })();
 
-
 /*
  * replSetInitiate with a 0-vote arbiter.
  */
@@ -96,12 +90,7 @@ var InvalidReplicaSetConfig = 93;
     var arbiterConn = replTest.add();
     var admin = replTest.getPrimary().getDB("admin");
     var conf = admin.runCommand({replSetGetConfig: 1}).config;
-    conf.members.push({
-        _id: 7,
-        host: arbiterConn.host,
-        arbiterOnly: true,
-        votes: 0
-    });
+    conf.members.push({_id: 7, host: arbiterConn.host, arbiterOnly: true, votes: 0});
     conf.version++;
 
     jsTestLog('Add arbiter with zero votes:');

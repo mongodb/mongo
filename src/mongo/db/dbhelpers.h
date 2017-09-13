@@ -29,14 +29,17 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <memory>
 
 #include "mongo/db/db.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/data_protector.h"
 
 namespace mongo {
 
 class Collection;
 class Cursor;
+class DataProtector;
 class OperationContext;
 struct KeyRange;
 struct WriteConcernOptions;
@@ -50,22 +53,6 @@ struct WriteConcernOptions;
 struct Helpers {
     class RemoveSaver;
 
-    /* ensure the specified index exists.
-
-       @param keyPattern key pattern, e.g., { ts : 1 }
-       @param name index name, e.g., "name_1"
-
-       This method can be a little (not much) cpu-slow, so you may wish to use
-         OCCASIONALLY ensureIndex(...);
-
-       Note: does nothing if collection does not yet exist.
-    */
-    static void ensureIndex(OperationContext* txn,
-                            Collection* collection,
-                            BSONObj keyPattern,
-                            bool unique,
-                            const char* name);
-
     /* fetch a single object from collection ns that matches query.
        set your db SavedContext first.
 
@@ -77,13 +64,13 @@ struct Helpers {
 
        @return true if object found
     */
-    static bool findOne(OperationContext* txn,
+    static bool findOne(OperationContext* opCtx,
                         Collection* collection,
                         const BSONObj& query,
                         BSONObj& result,
                         bool requireIndex = false);
 
-    static RecordId findOne(OperationContext* txn,
+    static RecordId findOne(OperationContext* opCtx,
                             Collection* collection,
                             const BSONObj& query,
                             bool requireIndex);
@@ -92,9 +79,9 @@ struct Helpers {
      * @param foundIndex if passed in will be set to 1 if ns and index found
      * @return true if object found
      */
-    static bool findById(OperationContext* txn,
+    static bool findById(OperationContext* opCtx,
                          Database* db,
-                         const char* ns,
+                         StringData ns,
                          BSONObj query,
                          BSONObj& result,
                          bool* nsFound = 0,
@@ -103,7 +90,7 @@ struct Helpers {
     /* TODO: should this move into Collection?
      * uasserts if no _id index.
      * @return null loc if not found */
-    static RecordId findById(OperationContext* txn, Collection* collection, const BSONObj& query);
+    static RecordId findById(OperationContext* opCtx, Collection* collection, const BSONObj& query);
 
     /**
      * Get the first object generated from a forward natural-order scan on "ns".  Callers do not
@@ -114,25 +101,25 @@ struct Helpers {
      *
      * Returns false if there is no such object.
      */
-    static bool getSingleton(OperationContext* txn, const char* ns, BSONObj& result);
+    static bool getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result);
 
     /**
      * Same as getSingleton, but with a reverse natural-order scan on "ns".
      */
-    static bool getLast(OperationContext* txn, const char* ns, BSONObj& result);
+    static bool getLast(OperationContext* opCtx, const char* ns, BSONObj& result);
 
     /**
      * Performs an upsert of "obj" into the collection "ns", with an empty update predicate.
      * Callers must have "ns" locked.
      */
-    static void putSingleton(OperationContext* txn, const char* ns, BSONObj obj);
+    static void putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj);
 
     /**
      * you have to lock
      * you do not have to have Context set
      * o has to have an _id field or will assert
      */
-    static void upsert(OperationContext* txn,
+    static void upsert(OperationContext* opCtx,
                        const std::string& ns,
                        const BSONObj& o,
                        bool fromMigrate = false);
@@ -152,61 +139,11 @@ struct Helpers {
     static BSONObj inferKeyPattern(const BSONObj& o);
 
     /**
-     * Takes a namespace range, specified by a min and max and qualified by an index pattern,
-     * and removes all the documents in that range found by iterating
-     * over the given index. Caller is responsible for insuring that min/max are
-     * compatible with the given keyPattern (e.g min={a:100} is compatible with
-     * keyPattern={a:1,b:1} since it can be extended to {a:100,b:minKey}, but
-     * min={b:100} is not compatible).
-     *
-     * Caller must hold a write lock on 'ns'
-     *
-     * Returns -1 when no usable index exists
-     *
-     * Does oplog the individual document deletions.
-     * // TODO: Refactor this mechanism, it is growing too large
-     */
-    static long long removeRange(OperationContext* txn,
-                                 const KeyRange& range,
-                                 bool maxInclusive,
-                                 const WriteConcernOptions& secondaryThrottle,
-                                 RemoveSaver* callback = NULL,
-                                 bool fromMigrate = false,
-                                 bool onlyRemoveOrphanedDocs = false);
-
-
-    // TODO: This will supersede Chunk::MaxObjectsPerChunk
-    static const long long kMaxDocsPerChunk;
-
-    /**
-     * Get sorted disklocs that belong to a range of a namespace defined over an index
-     * key pattern (KeyRange).
-     *
-     * @param chunk range of a namespace over an index key pattern.
-     * @param maxChunkSizeBytes max number of bytes that we will retrieve locs for, if the
-     * range is estimated larger (from avg doc stats) we will stop recording locs.
-     * @param locs set to record locs in
-     * @param estChunkSizeBytes chunk size estimated from doc count and avg doc size
-     * @param chunkTooBig whether the chunk was estimated larger than our maxChunkSizeBytes
-     * @param errmsg filled with textual description of error if this call return false
-     *
-     * @return NamespaceNotFound if the namespace doesn't exist
-     * @return IndexNotFound if the index pattern doesn't match any indexes
-     * @return InvalidLength if the estimated size exceeds maxChunkSizeBytes
-     */
-    static Status getLocsInRange(OperationContext* txn,
-                                 const KeyRange& range,
-                                 long long maxChunkSizeBytes,
-                                 std::set<RecordId>* locs,
-                                 long long* numDocs,
-                                 long long* estChunkSizeBytes);
-
-    /**
      * Remove all documents from a collection.
      * You do not need to set the database before calling.
      * Does not oplog the operation.
      */
-    static void emptyCollection(OperationContext* txn, const char* ns);
+    static void emptyCollection(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * for saving deleted bson objects to a flat file
@@ -218,12 +155,18 @@ struct Helpers {
         RemoveSaver(const std::string& type, const std::string& ns, const std::string& why);
         ~RemoveSaver();
 
-        void goingToDelete(const BSONObj& o);
+        /**
+         * Writes document to file. File is created lazily before writing the first document.
+         * Returns error status if the file could not be created or if there were errors writing
+         * to the file.
+         */
+        Status goingToDelete(const BSONObj& o);
 
     private:
         boost::filesystem::path _root;
         boost::filesystem::path _file;
-        std::ofstream* _out;
+        std::unique_ptr<DataProtector> _protector;
+        std::unique_ptr<std::ostream> _out;
     };
 };
 

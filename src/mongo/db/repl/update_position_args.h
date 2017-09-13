@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -40,15 +40,25 @@ class Status;
 namespace repl {
 
 /**
- * Arguments to the handshake command.
+ * Arguments to the update position command.
  */
 class UpdatePositionArgs {
 public:
-    struct UpdateInfo {
-        UpdateInfo(const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberId);
+    static const char kCommandFieldName[];
+    static const char kUpdateArrayFieldName[];
+    static const char kAppliedOpTimeFieldName[];
+    static const char kDurableOpTimeFieldName[];
+    static const char kMemberIdFieldName[];
+    static const char kConfigVersionFieldName[];
 
-        OID rid;
-        OpTime ts;
+    struct UpdateInfo {
+        UpdateInfo(const OpTime& applied,
+                   const OpTime& durable,
+                   long long aCfgver,
+                   long long aMemberId);
+
+        OpTime appliedOpTime;
+        OpTime durableOpTime;
         long long cfgver;
         long long memberId;
     };

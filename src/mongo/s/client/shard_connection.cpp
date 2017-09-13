@@ -36,12 +36,14 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/version_manager.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/s/version_manager.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -87,13 +89,13 @@ private:
 /**
  * Command to allow access to the sharded conn pool information in mongos.
  */
-class ShardedPoolStats : public Command {
+class ShardedPoolStats : public BasicCommand {
 public:
-    ShardedPoolStats() : Command("shardConnPoolStats") {}
+    ShardedPoolStats() : BasicCommand("shardConnPoolStats") {}
     virtual void help(stringstream& help) const {
         help << "stats about the shard connection pool";
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual bool slaveOk() const {
@@ -109,16 +111,16 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     mongo::BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
+                     const mongo::BSONObj& cmdObj,
                      mongo::BSONObjBuilder& result) {
-        // Base pool info
-        shardConnectionPool.appendInfo(result);
+        // Connection information
+        executor::ConnectionPoolStats stats{};
+        shardConnectionPool.appendConnectionStats(&stats);
+        stats.appendToBSON(result);
 
-        // Thread connection info
+        // Thread connection information
         activeClientConnections.appendInfo(result);
 
         return true;
@@ -177,7 +179,7 @@ public:
             if (ss->avail) {
                 // If we're shutting down, don't want to initiate release mechanism as it is
                 // slow, and isn't needed since all connections will be closed anyway.
-                if (inShutdown()) {
+                if (globalInShutdownDeprecated()) {
                     if (versionManager.isVersionableCB(ss->avail)) {
                         versionManager.resetShardVersionCB(ss->avail);
                     }
@@ -237,7 +239,7 @@ public:
             warning() << "Detected additional sharded connection in the "
                       << "thread local pool for " << addr;
 
-            if (DBException::traceExceptions) {
+            if (DBException::traceExceptions.load()) {
                 // There shouldn't be more than one connection checked out to the same
                 // host on the same thread.
                 printStackTrace();
@@ -269,16 +271,7 @@ public:
         s->avail = conn;
     }
 
-    void sync() {
-        for (HostMap::iterator i = _hosts.begin(); i != _hosts.end(); ++i) {
-            string addr = i->first;
-            Status* ss = i->second;
-            if (ss->avail)
-                ss->avail->getLastError();
-        }
-    }
-
-    void checkVersions(const string& ns) {
+    void checkVersions(OperationContext* opCtx, const string& ns) {
         vector<ShardId> all;
         grid.shardRegistry()->getAllShardIds(&all);
 
@@ -288,10 +281,12 @@ public:
         // Now only check top-level shard connections
         for (const ShardId& shardId : all) {
             try {
-                const auto shard = grid.shardRegistry()->getShard(shardId);
-                if (!shard) {
+                auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
+                if (!shardStatus.isOK()) {
+                    invariant(shardStatus == ErrorCodes::ShardNotFound);
                     continue;
                 }
+                const auto shard = shardStatus.getValue();
 
                 string sconnString = shard->getConnString().toString();
                 Status* s = _getStatus(sconnString);
@@ -301,7 +296,7 @@ public:
                     s->created++;  // After, so failed creation doesn't get counted
                 }
 
-                versionManager.checkShardVersionCB(s->avail, ns, false, 1);
+                versionManager.checkShardVersionCB(opCtx, s->avail, ns, false, 1);
             } catch (const DBException& ex) {
                 warning() << "problem while initially checking shard versions on"
                           << " " << shardId << causedBy(ex);
@@ -369,18 +364,17 @@ public:
 
     // -----
 
-    static thread_specific_ptr<ClientConnections> _perThread;
+    static thread_local std::unique_ptr<ClientConnections> _perThread;
 
     static ClientConnections* threadInstance() {
-        ClientConnections* cc = _perThread.get();
-        if (!cc) {
-            cc = new ClientConnections();
-            _perThread.reset(cc);
+        if (!_perThread) {
+            _perThread = stdx::make_unique<ClientConnections>();
         }
-        return cc;
+        return _perThread.get();
     }
 };
 
+thread_local std::unique_ptr<ClientConnections> ClientConnections::_perThread;
 
 void ActiveClientConnections::appendInfo(BSONObjBuilder& b) {
     BSONArrayBuilder arr(64 * 1024);  // There may be quite a few threads
@@ -399,22 +393,29 @@ void ActiveClientConnections::appendInfo(BSONObjBuilder& b) {
     b.appendArray("threads", arr.obj());
 }
 
-thread_specific_ptr<ClientConnections> ClientConnections::_perThread;
-
 }  // namespace
 
 // The global connection pool
 DBConnectionPool shardConnectionPool;
 
-// Different between mongos and mongod
-void usingAShardConnection(const string& addr);
-
-
 ShardConnection::ShardConnection(const ConnectionString& connectionString,
                                  const string& ns,
                                  std::shared_ptr<ChunkManager> manager)
-    : _cs(connectionString), _ns(ns), _manager(manager) {
-    _init();
+    : _cs(connectionString), _ns(ns), _manager(manager), _finishedInit(false) {
+    invariant(_cs.isValid());
+
+    // Make sure we specified a manager for the correct namespace
+    if (_ns.size() && _manager) {
+        invariant(_manager->getns() == _ns);
+    }
+
+    auto csString = _cs.toString();
+    _conn = ClientConnections::threadInstance()->get(csString, _ns);
+    if (isMongos()) {
+        // In mongos, we record this connection as having been used for useful work to provide
+        // useful information in getLastError.
+        ClusterLastErrorInfo::get(cc())->addShardHost(csString);
+    }
 }
 
 ShardConnection::~ShardConnection() {
@@ -437,23 +438,16 @@ ShardConnection::~ShardConnection() {
     }
 }
 
-void ShardConnection::_init() {
-    invariant(_cs.isValid());
-    _conn = ClientConnections::threadInstance()->get(_cs.toString(), _ns);
-    _finishedInit = false;
-    usingAShardConnection(_cs.toString());
-}
-
 void ShardConnection::_finishInit() {
     if (_finishedInit)
         return;
     _finishedInit = true;
 
     if (versionManager.isVersionableCB(_conn)) {
-        // Make sure we specified a manager for the correct namespace
-        if (_ns.size() && _manager)
-            verify(_manager->getns() == _ns);
-        _setVersion = versionManager.checkShardVersionCB(this, false, 1);
+        auto& client = cc();
+        auto opCtx = client.getOperationContext();
+        invariant(opCtx);
+        _setVersion = versionManager.checkShardVersionCB(opCtx, this, false, 1);
     } else {
         // Make sure we didn't specify a manager for a non-versionable connection (i.e. config)
         verify(!_manager);
@@ -487,12 +481,8 @@ void ShardConnection::kill() {
     }
 }
 
-void ShardConnection::sync() {
-    ClientConnections::threadInstance()->sync();
-}
-
-void ShardConnection::checkMyConnectionVersions(const string& ns) {
-    ClientConnections::threadInstance()->checkVersions(ns);
+void ShardConnection::checkMyConnectionVersions(OperationContext* opCtx, const string& ns) {
+    ClientConnections::threadInstance()->checkVersions(opCtx, ns);
 }
 
 void ShardConnection::releaseMyConnections() {
@@ -508,42 +498,4 @@ void ShardConnection::forgetNS(const string& ns) {
     ClientConnections::threadInstance()->forgetNS(ns);
 }
 
-
-bool setShardVersion(DBClientBase& conn,
-                     const string& ns,
-                     const string& configServerPrimary,
-                     ChunkVersion version,
-                     ChunkManager* manager,
-                     bool authoritative,
-                     BSONObj& result) {
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("setShardVersion", ns);
-    cmdBuilder.append("configdb", configServerPrimary);
-
-    ShardId shardId;
-    {
-        const auto shard = grid.shardRegistry()->getShard(conn.getServerAddress());
-        shardId = shard->getId();
-        cmdBuilder.append("shard", shardId);
-        cmdBuilder.append("shardHost", shard->getConnString().toString());
-    }
-
-    if (ns.size() > 0) {
-        version.addToBSON(cmdBuilder);
-    } else {
-        cmdBuilder.append("init", true);
-    }
-
-    if (authoritative) {
-        cmdBuilder.appendBool("authoritative", 1);
-    }
-
-    BSONObj cmd = cmdBuilder.obj();
-
-    LOG(1) << "    setShardVersion  " << shardId << " " << conn.getServerAddress() << "  " << ns
-           << "  " << cmd
-           << (manager ? string(str::stream() << " " << manager->getSequenceNumber()) : "");
-
-    return conn.runCommand("admin", cmd, result, 0);
-}
-}
+}  // namespace mongo

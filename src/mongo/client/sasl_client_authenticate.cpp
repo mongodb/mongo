@@ -38,8 +38,10 @@ namespace mongo {
 
 using namespace mongoutils;
 
-Status (*saslClientAuthenticate)(DBClientWithCommands* client,
-                                 const BSONObj& saslParameters) = NULL;
+void (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
+                               const HostAndPort& hostname,
+                               const BSONObj& saslParameters,
+                               auth::AuthCompletionHandler handler) = nullptr;
 
 const char* const saslStartCommandName = "saslStart";
 const char* const saslContinueCommandName = "saslContinue";
@@ -77,7 +79,7 @@ Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType*
     } else if (payloadElement.type() == String) {
         try {
             *payload = base64::decode(payloadElement.str());
-        } catch (UserException& e) {
+        } catch (AssertionException& e) {
             return Status(ErrorCodes::FailedToParse, e.what());
         }
     } else {

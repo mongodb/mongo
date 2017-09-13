@@ -34,13 +34,13 @@
 #include <set>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/init.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -61,7 +61,7 @@ class WiredTigerRecordStoreThread : public BackgroundJob {
 public:
     WiredTigerRecordStoreThread(const NamespaceString& ns)
         : BackgroundJob(true /* deleteSelf */), _ns(ns) {
-        _name = std::string("WiredTigerRecordStoreThread for ") + _ns.toString();
+        _name = std::string("WT RecordStoreThread: ") + _ns.toString();
     }
 
     virtual std::string name() const {
@@ -69,68 +69,57 @@ public:
     }
 
     /**
-     * @return Number of documents deleted.
+     * Returns true iff there was an oplog to delete from.
      */
-    int64_t _deleteExcessDocuments() {
+    bool _deleteExcessDocuments() {
         if (!getGlobalServiceContext()->getGlobalStorageEngine()) {
-            LOG(1) << "no global storage engine yet";
-            return 0;
+            LOG(2) << "no global storage engine yet";
+            return false;
         }
 
-        OperationContextImpl txn;
-        checked_cast<WiredTigerRecoveryUnit*>(txn.recoveryUnit())->markNoTicketRequired();
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
 
         try {
-            ScopedTransaction transaction(&txn, MODE_IX);
-
-            AutoGetDb autoDb(&txn, _ns.db(), MODE_IX);
+            AutoGetDb autoDb(&opCtx, _ns.db(), MODE_IX);
             Database* db = autoDb.getDb();
             if (!db) {
                 LOG(2) << "no local database yet";
-                return 0;
+                return false;
             }
 
-            Lock::CollectionLock collectionLock(txn.lockState(), _ns.ns(), MODE_IX);
-            Collection* collection = db->getCollection(_ns);
+            Lock::CollectionLock collectionLock(opCtx.lockState(), _ns.ns(), MODE_IX);
+            Collection* collection = db->getCollection(&opCtx, _ns);
             if (!collection) {
                 LOG(2) << "no collection " << _ns;
-                return 0;
+                return false;
             }
 
-            OldClientContext ctx(&txn, _ns, false);
+            OldClientContext ctx(&opCtx, _ns.ns(), false);
             WiredTigerRecordStore* rs =
                 checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
-            WriteUnitOfWork wuow(&txn);
-            stdx::lock_guard<stdx::timed_mutex> lock(rs->cappedDeleterMutex());
-            int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
-            wuow.commit();
-            return removed;
+
+            if (!rs->yieldAndAwaitOplogDeletionRequest(&opCtx)) {
+                return false;  // Oplog went away.
+            }
+            rs->reclaimOplog(&opCtx);
         } catch (const std::exception& e) {
             severe() << "error in WiredTigerRecordStoreThread: " << e.what();
             fassertFailedNoTrace(!"error in WiredTigerRecordStoreThread");
         } catch (...) {
             fassertFailedNoTrace(!"unknown error in WiredTigerRecordStoreThread");
         }
+        return true;
     }
 
     virtual void run() {
         Client::initThread(_name.c_str());
 
-        while (!inShutdown()) {
-            int64_t removed = _deleteExcessDocuments();
-            LOG(2) << "WiredTigerRecordStoreThread deleted " << removed;
-            if (removed == 0) {
-                // If we removed 0 documents, sleep a bit in case we're on a laptop
-                // or something to be nice.
-                sleepmillis(1000);
-            } else if (removed < 1000) {
-                // 1000 is the batch size, so we didn't even do a full batch,
-                // which is the most efficient.
-                sleepmillis(10);
+        while (!globalInShutdownDeprecated()) {
+            if (!_deleteExcessDocuments()) {
+                sleepmillis(1000);  // Back off in case there were problems deleting.
             }
         }
-
-        log() << "shutting down";
     }
 
 private:
@@ -138,10 +127,7 @@ private:
     std::string _name;
 };
 
-}  // namespace
-
-// static
-bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
+bool initRsOplogBackgroundThread(StringData ns) {
     if (!NamespaceString::oplog(ns)) {
         return false;
     }
@@ -165,4 +151,10 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
     return true;
 }
 
+MONGO_INITIALIZER(SetInitRsOplogBackgroundThreadCallback)(InitializerContext* context) {
+    WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(initRsOplogBackgroundThread);
+    return Status::OK();
+}
+
+}  // namespace
 }  // namespace mongo

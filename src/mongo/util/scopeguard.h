@@ -15,6 +15,8 @@
 #ifndef LOKI_SCOPEGUARD_H_
 #define LOKI_SCOPEGUARD_H_
 
+#include <exception>
+
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
@@ -98,6 +100,7 @@ protected:
             try {
                 j.Execute();
             } catch (...) {
+                std::terminate();
             }
     }
 

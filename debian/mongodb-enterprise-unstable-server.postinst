@@ -20,20 +20,24 @@ set -e
 
 case "$1" in
     configure)
-	# create a mongodb group and user
+        # create a mongodb group and user
         if ! getent passwd mongodb >/dev/null 2>&1; then
-		adduser --system --no-create-home mongodb
-		addgroup --system mongodb
-		adduser mongodb mongodb
+            adduser --system --no-create-home mongodb
+            addgroup --system mongodb
+            adduser mongodb mongodb
         fi
 
-	# create db -- note: this should agree with dbpath in mongod.conf
-	mkdir -p /var/lib/mongodb
-	chown -R mongodb:mongodb /var/lib/mongodb
+        # create db -- note: this should agree with dbpath in mongod.conf
+        if [ ! -d /var/lib/mongodb ]; then
+            mkdir -p /var/lib/mongodb
+            chown mongodb:mongodb /var/lib/mongodb
+        fi
 
-	# create logdir -- note: this should agree with logpath in mongod.conf
-	mkdir -p /var/log/mongodb
-	chown -R mongodb:mongodb /var/log/mongodb
+        # create logdir -- note: this should agree with logpath in mongod.conf
+        if [ ! -d /var/log/mongodb ]; then
+            mkdir -p /var/log/mongodb
+            chown mongodb:mongodb /var/log/mongodb
+        fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

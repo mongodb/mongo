@@ -37,6 +37,7 @@ namespace mongo {
 namespace fts {
 
 using std::string;
+using unittest::assertGet;
 
 TEST(FTSElementIterator, Test1) {
     BSONObj obj = fromjson(
@@ -47,7 +48,7 @@ TEST(FTSElementIterator, Test1) {
 
     BSONObj indexSpec = fromjson("{ key : { a : \"text\" }, weights : { b : 10, d : 5 } }");
 
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     Weights::const_iterator itt = spec.weights().begin();
     ASSERT(itt != spec.weights().end());
     ASSERT_EQUALS("a", itt->first);
@@ -92,7 +93,7 @@ TEST(FTSElementIterator, Test2) {
 
     BSONObj indexSpec = fromjson("{ key : { \"a.b.c\" : \"text\", d : \"text\" } }");
 
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
 
     FTSElementIterator it(spec, obj);
 
@@ -137,7 +138,7 @@ TEST(FTSElementIterator, Test3) {
     BSONObj indexSpec =
         fromjson("{ key : { a : \"text\", \"a.b.c\" : \"text\" }, weights : { \"a.b.c\" : 5 } }");
 
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     Weights::const_iterator itt = spec.weights().begin();
     ASSERT(itt != spec.weights().end());
     ASSERT_EQUALS("a", itt->first);
@@ -183,7 +184,7 @@ TEST(FTSElementIterator, Test4) {
 
     BSONObj indexSpec = fromjson("{ key : { \"a.b.c\" : \"text\" }, weights : { \"a.b.c\" : 5 } }");
 
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     FTSElementIterator it(spec, obj);
 
     ASSERT(it.more());
@@ -223,7 +224,7 @@ TEST(FTSElementIterator, Test5) {
     BSONObj indexSpec =
         fromjson("{ key : { a : \"text\" }, weights : { b : 20, c : 10, \"d.e.f\" : 5 } }");
 
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     FTSElementIterator it(spec, obj);
 
     ASSERT(it.more());
@@ -269,7 +270,7 @@ TEST(FTSElementIterator, Test6) {
     BSONObj indexSpec =
         fromjson("{ key : { a : \"text\" }, weights : { b : 20, c : 10, \"d.e.f\" : 5 } }");
 
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     FTSElementIterator it(spec, obj);
 
     ASSERT(it.more());
@@ -296,5 +297,104 @@ TEST(FTSElementIterator, Test6) {
     ASSERT_EQUALS("danish", val._language->str());
     ASSERT_EQUALS(5, val._weight);
 }
+
+// Multi-language : Test Version 2 Language Override
+TEST(FTSElementIterator, LanguageOverrideV2) {
+    BSONObj obj = fromjson(
+        "{ a :"
+        "  { b :"
+        "    [ { c : \"walked\", language : \"english\" },"
+        "      { c : \"camminato\", language : \"italian\" },"
+        "      { c : \"ging\", language : \"german\" } ]"
+        "   },"
+        "  d : \"Feliz Año Nuevo!\","
+        "  language : \"spanish\""
+        " }");
+
+    BSONObj indexSpec =
+        fromjson("{ key : { \"a.b.c\" : \"text\", d : \"text\" }, textIndexVersion: 2.0 }");
+
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
+
+    FTSElementIterator it(spec, obj);
+
+    ASSERT(it.more());
+    FTSIteratorValue val = it.next();
+    ASSERT_EQUALS("walked", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("camminato", string(val._text));
+    ASSERT_EQUALS("italian", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("ging", string(val._text));
+    ASSERT_EQUALS("german", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("Feliz Año Nuevo!", string(val._text));
+    ASSERT_EQUALS("spanish", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
 }
+
+// Multi-language : Test Version 3 Language Override
+TEST(FTSElementIterator, LanguageOverrideV3) {
+    BSONObj obj = fromjson(
+        "{ a :"
+        "  { b :"
+        "    [ { c : \"walked\", language : \"english\" },"
+        "      { c : \"camminato\", language : \"italian\" },"
+        "      { c : \"ging\", language : \"german\" } ]"
+        "   },"
+        "  d : \"Feliz Año Nuevo!\","
+        "  language : \"spanish\""
+        " }");
+
+    BSONObj indexSpec =
+        fromjson("{ key : { \"a.b.c\" : \"text\", d : \"text\" }, textIndexVersion: 3.0 }");
+
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
+
+    FTSElementIterator it(spec, obj);
+
+    ASSERT(it.more());
+    FTSIteratorValue val = it.next();
+    ASSERT_EQUALS("walked", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("camminato", string(val._text));
+    ASSERT_EQUALS("italian", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("ging", string(val._text));
+    ASSERT_EQUALS("german", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("Feliz Año Nuevo!", string(val._text));
+    ASSERT_EQUALS("spanish", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
 }
+
+}  // namespace fts
+}  // namespace mongo

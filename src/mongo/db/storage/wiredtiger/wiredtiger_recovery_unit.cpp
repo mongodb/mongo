@@ -30,79 +30,46 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
-
 namespace {
-struct WaitUntilDurableData {
-    WaitUntilDurableData() : numWaitingForSync(0), lastSyncTime(0) {}
+// SnapshotIds need to be globally unique, as they are used in a WorkingSetMember to
+// determine if documents changed, but a different recovery unit may be used across a getMore,
+// so there is a chance the snapshot ID will be reused.
+AtomicUInt64 nextSnapshotId{1};
 
-    void syncHappend() {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
-        lastSyncTime++;
-        condvar.notify_all();
-    }
-
-    // return true if happened
-    bool waitUntilDurable() {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
-        long long start = lastSyncTime;
-        numWaitingForSync.fetchAndAdd(1);
-        condvar.timed_wait(lk, boost::posix_time::milliseconds(50));
-        numWaitingForSync.fetchAndAdd(-1);
-        return lastSyncTime > start;
-    }
-
-    AtomicUInt32 numWaitingForSync;
-
-    stdx::mutex mutex;  // this just protects lastSyncTime
-    stdx::condition_variable condvar;
-    long long lastSyncTime;
-} waitUntilDurableData;
-}
+logger::LogSeverity kSlowTransactionSeverity = logger::LogSeverity::Debug(1);
+}  // namespace
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
     : _sessionCache(sc),
-      _session(NULL),
       _inUnitOfWork(false),
       _active(false),
-      _myTransactionCount(1),
-      _everStartedWrite(false),
-      _currentlySquirreled(false),
-      _syncing(false),
-      _noTicketNeeded(false) {}
+      _mySnapshotId(nextSnapshotId.fetchAndAdd(1)) {}
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork);
     _abort();
-    if (_session) {
-        _sessionCache->releaseSession(_session);
-        _session = NULL;
-    }
 }
 
-void WiredTigerRecoveryUnit::reportState(BSONObjBuilder* b) const {
-    b->append("wt_inUnitOfWork", _inUnitOfWork);
-    b->append("wt_active", _active);
-    b->append("wt_everStartedWrite", _everStartedWrite);
-    b->append("wt_hasTicket", _ticket.hasTicket());
-    b->appendNumber("wt_myTransactionCount", static_cast<long long>(_myTransactionCount));
-    if (_active)
-        b->append("wt_millisSinceCommit", _timer.millis());
+void WiredTigerRecoveryUnit::prepareForCreateSnapshot(OperationContext* opCtx) {
+    invariant(!_active);  // Can't already be in a WT transaction.
+    invariant(!_inUnitOfWork);
+    invariant(!_readFromMajorityCommittedSnapshot);
+
+    // Starts the WT transaction that will be the basis for creating a named snapshot.
+    getSession(opCtx);
+    _areWriteUnitOfWorksBanned = true;
 }
 
 void WiredTigerRecoveryUnit::_commit() {
@@ -131,8 +98,8 @@ void WiredTigerRecoveryUnit::_abort() {
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
              ++it) {
-            Change* change = *it;
-            LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
+            Change* change = it->get();
+            LOG(2) << "CUSTOM ROLLBACK " << redact(demangleName(typeid(*change)));
             change->rollback();
         }
         _changes.clear();
@@ -144,11 +111,9 @@ void WiredTigerRecoveryUnit::_abort() {
 }
 
 void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
+    invariant(!_areWriteUnitOfWorksBanned);
     invariant(!_inUnitOfWork);
-    invariant(!_currentlySquirreled);
     _inUnitOfWork = true;
-    _everStartedWrite = true;
-    _getTicket(opCtx);
 }
 
 void WiredTigerRecoveryUnit::commitUnitOfWork() {
@@ -163,32 +128,24 @@ void WiredTigerRecoveryUnit::abortUnitOfWork() {
     _abort();
 }
 
-void WiredTigerRecoveryUnit::goingToWaitUntilDurable() {
-    if (_active) {
-        // too late, can't change config
-        return;
+void WiredTigerRecoveryUnit::_ensureSession() {
+    if (!_session) {
+        _session = _sessionCache->getSession();
     }
-    // yay, we've configured ourselves for sync
-    _syncing = true;
 }
 
 bool WiredTigerRecoveryUnit::waitUntilDurable() {
-    if (_syncing && _everStartedWrite) {
-        // we did a sync, so we're good
-        return true;
-    }
-    waitUntilDurableData.waitUntilDurable();
+    invariant(!_inUnitOfWork);
+    // _session may be nullptr. We cannot _ensureSession() here as that needs shutdown protection.
+    const bool forceCheckpoint = false;
+    const bool stableCheckpoint = false;
+    _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
     return true;
 }
 
 void WiredTigerRecoveryUnit::registerChange(Change* change) {
     invariant(_inUnitOfWork);
-    _changes.push_back(change);
-}
-
-WiredTigerRecoveryUnit* WiredTigerRecoveryUnit::get(OperationContext* txn) {
-    invariant(txn);
-    return checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
+    _changes.push_back(std::unique_ptr<Change>{change});
 }
 
 void WiredTigerRecoveryUnit::assertInActiveTxn() const {
@@ -196,14 +153,15 @@ void WiredTigerRecoveryUnit::assertInActiveTxn() const {
 }
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSession(OperationContext* opCtx) {
-    if (!_session) {
-        _session = _sessionCache->getSession();
-    }
-
     if (!_active) {
-        _txnOpen(opCtx);
+        _txnOpen();
     }
-    return _session;
+    return _session.get();
+}
+
+WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn(OperationContext* opCtx) {
+    _ensureSession();
+    return _session.get();
 }
 
 void WiredTigerRecoveryUnit::abandonSnapshot() {
@@ -212,182 +170,133 @@ void WiredTigerRecoveryUnit::abandonSnapshot() {
         // Can't be in a WriteUnitOfWork, so safe to rollback
         _txnClose(false);
     }
+    _areWriteUnitOfWorksBanned = false;
 }
 
-void WiredTigerRecoveryUnit::setOplogReadTill(const RecordId& loc) {
-    _oplogReadTill = loc;
-}
-
-namespace {
-
-
-class TicketServerParameter : public ServerParameter {
-    MONGO_DISALLOW_COPYING(TicketServerParameter);
-
-public:
-    TicketServerParameter(TicketHolder* holder, const std::string& name)
-        : ServerParameter(ServerParameterSet::getGlobal(), name, true, true), _holder(holder) {}
-
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-        b.append(name, _holder->outof());
-    }
-
-    virtual Status set(const BSONElement& newValueElement) {
-        if (!newValueElement.isNumber())
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a number");
-        return _set(newValueElement.numberInt());
-    }
-
-    virtual Status setFromString(const std::string& str) {
-        int num = 0;
-        Status status = parseNumberFromString(str, &num);
-        if (!status.isOK())
-            return status;
-        return _set(num);
-    }
-
-    Status _set(int newNum) {
-        if (newNum <= 0) {
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be > 0");
-        }
-
-        return _holder->resize(newNum);
-    }
-
-private:
-    TicketHolder* _holder;
-};
-
-TicketHolder openWriteTransaction(128);
-TicketServerParameter openWriteTransactionParam(&openWriteTransaction,
-                                                "wiredTigerConcurrentWriteTransactions");
-
-TicketHolder openReadTransaction(128);
-TicketServerParameter openReadTransactionParam(&openReadTransaction,
-                                               "wiredTigerConcurrentReadTransactions");
-}
-
-void WiredTigerRecoveryUnit::appendGlobalStats(BSONObjBuilder& b) {
-    BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
-    {
-        BSONObjBuilder bbb(bb.subobjStart("write"));
-        bbb.append("out", openWriteTransaction.used());
-        bbb.append("available", openWriteTransaction.available());
-        bbb.append("totalTickets", openWriteTransaction.outof());
-        bbb.done();
-    }
-    {
-        BSONObjBuilder bbb(bb.subobjStart("read"));
-        bbb.append("out", openReadTransaction.used());
-        bbb.append("available", openReadTransaction.available());
-        bbb.append("totalTickets", openReadTransaction.outof());
-        bbb.done();
-    }
-    bb.done();
+void* WiredTigerRecoveryUnit::writingPtr(void* data, size_t len) {
+    // This API should not be used for anything other than the MMAP V1 storage engine
+    MONGO_UNREACHABLE;
 }
 
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_active);
     WT_SESSION* s = _session->getSession();
+    if (_timer) {
+        const int transactionTime = _timer->millis();
+        if (transactionTime >= serverGlobalParams.slowMS) {
+            LOG(kSlowTransactionSeverity) << "Slow WT transaction. Lifetime of SnapshotId "
+                                          << _mySnapshotId << " was " << transactionTime << "ms";
+        }
+    }
+
     if (commit) {
         invariantWTOK(s->commit_transaction(s, NULL));
-        LOG(2) << "WT commit_transaction";
-        if (_syncing)
-            waitUntilDurableData.syncHappend();
+        LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
         invariantWTOK(s->rollback_transaction(s, NULL));
-        LOG(2) << "WT rollback_transaction";
+        LOG(3) << "WT rollback_transaction for snapshot id " << _mySnapshotId;
     }
     _active = false;
-    _myTransactionCount++;
-    _ticket.reset(NULL);
+    _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
+    _isOplogReader = false;
 }
 
 SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
     // TODO: use actual wiredtiger txn id
-    return SnapshotId(_myTransactionCount);
+    return SnapshotId(_mySnapshotId);
 }
 
-void WiredTigerRecoveryUnit::markNoTicketRequired() {
-    invariant(!_ticket.hasTicket());
-    _noTicketNeeded = true;
-}
-
-void WiredTigerRecoveryUnit::_getTicket(OperationContext* opCtx) {
-    // already have a ticket
-    if (_ticket.hasTicket())
-        return;
-
-    if (_noTicketNeeded)
-        return;
-
-    bool writeLocked;
-
-    // If we have a strong lock, waiting for a ticket can cause a deadlock.
-    if (opCtx != NULL && opCtx->lockState() != NULL) {
-        if (opCtx->lockState()->hasStrongLocks())
-            return;
-        writeLocked = opCtx->lockState()->isWriteLocked();
-    } else {
-        writeLocked = _everStartedWrite;
+Status WiredTigerRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
+    auto snapshotName = _sessionCache->snapshotManager().getMinSnapshotForNextCommittedRead();
+    if (!snapshotName) {
+        return {ErrorCodes::ReadConcernMajorityNotAvailableYet,
+                "Read concern majority reads are currently not possible."};
     }
 
-    TicketHolder* holder = writeLocked ? &openWriteTransaction : &openReadTransaction;
-
-    holder->waitForTicket();
-    _ticket.reset(holder);
+    _majorityCommittedSnapshot = *snapshotName;
+    _readFromMajorityCommittedSnapshot = true;
+    return Status::OK();
 }
 
-void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
-    invariant(!_active);
-    _getTicket(opCtx);
+boost::optional<SnapshotName> WiredTigerRecoveryUnit::getMajorityCommittedSnapshot() const {
+    if (!_readFromMajorityCommittedSnapshot)
+        return {};
+    return _majorityCommittedSnapshot;
+}
 
-    WT_SESSION* s = _session->getSession();
-    _syncing = _syncing || waitUntilDurableData.numWaitingForSync.load() > 0;
-    invariantWTOK(s->begin_transaction(s, _syncing ? "sync=true" : NULL));
-    LOG(2) << "WT begin_transaction";
-    _timer.reset();
+void WiredTigerRecoveryUnit::_txnOpen() {
+    invariant(!_active);
+    _ensureSession();
+
+    // Only start a timer for transaction's lifetime if we're going to log it.
+    if (shouldLog(kSlowTransactionSeverity)) {
+        _timer.reset(new Timer());
+    }
+    WT_SESSION* session = _session->getSession();
+
+    if (_readAtTimestamp != SnapshotName::min()) {
+        _sessionCache->snapshotManager().beginTransactionAtTimestamp(_readAtTimestamp, session);
+    } else if (_readFromMajorityCommittedSnapshot) {
+        _majorityCommittedSnapshot =
+            _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);
+    } else if (_isOplogReader) {
+        _sessionCache->snapshotManager().beginTransactionOnOplog(
+            _sessionCache->getKVEngine()->getOplogManager(), session);
+    } else {
+        invariantWTOK(session->begin_transaction(session, NULL));
+    }
+
+    LOG(3) << "WT begin_transaction for snapshot id " << _mySnapshotId;
     _active = true;
 }
 
-void WiredTigerRecoveryUnit::beingReleasedFromOperationContext() {
-    LOG(2) << "WiredTigerRecoveryUnit::beingReleased";
-    _currentlySquirreled = true;
-    if (_active == false && !wt_keeptxnopen()) {
-        _commit();
-    }
-}
-void WiredTigerRecoveryUnit::beingSetOnOperationContext() {
-    LOG(2) << "WiredTigerRecoveryUnit::broughtBack";
-    _currentlySquirreled = false;
+
+Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
+    _ensureSession();
+    LOG(3) << "WT set timestamp of future write operations to " << timestamp;
+    WT_SESSION* session = _session->getSession();
+    invariant(_inUnitOfWork);
+
+    // Starts the WT transaction associated with this session.
+    getSession(nullptr);
+
+    const std::string conf = str::stream() << "commit_timestamp=" << timestamp.toString();
+    auto rc = session->timestamp_transaction(session, conf.c_str());
+    return wtRCToStatus(rc, "timestamp_transaction");
 }
 
+Status WiredTigerRecoveryUnit::selectSnapshot(SnapshotName timestamp) {
+    _readAtTimestamp = timestamp;
+    return Status::OK();
+}
+
+void WiredTigerRecoveryUnit::setIsOplogReader() {
+    // Note: it would be nice to assert !active here, but OplogStones currently opens a cursor on
+    // the oplog while the recovery unit is already active.
+    _isOplogReader = true;
+}
 
 // ---------------------
 
 WiredTigerCursor::WiredTigerCursor(const std::string& uri,
-                                   uint64_t id,
+                                   uint64_t tableId,
                                    bool forRecordStore,
-                                   OperationContext* txn) {
-    _uriID = id;
-    _ru = WiredTigerRecoveryUnit::get(txn);
-    _session = _ru->getSession(txn);
-    _cursor = _session->getCursor(uri, id, forRecordStore);
+                                   OperationContext* opCtx) {
+    _tableID = tableId;
+    _ru = WiredTigerRecoveryUnit::get(opCtx);
+    _session = _ru->getSession(opCtx);
+    _cursor = _session->getCursor(uri, tableId, forRecordStore);
     if (!_cursor) {
         error() << "no cursor for uri: " << uri;
     }
 }
 
 WiredTigerCursor::~WiredTigerCursor() {
-    _session->releaseCursor(_uriID, _cursor);
+    _session->releaseCursor(_tableID, _cursor);
     _cursor = NULL;
 }
 
 void WiredTigerCursor::reset() {
     invariantWTOK(_cursor->reset(_cursor));
-}
-
-WT_SESSION* WiredTigerCursor::getWTSession() {
-    return _session->getSession();
 }
 }

@@ -5,6 +5,7 @@ Driver of the test execution framework.
 from __future__ import absolute_import
 
 import threading
+import time
 
 from . import fixtures
 from . import hooks as _hooks
@@ -13,14 +14,13 @@ from . import report as _report
 from . import testcases
 from .. import config as _config
 from .. import errors
-from .. import logging
 from .. import utils
 from ..utils import queue as _queue
 
 
-class TestGroupExecutor(object):
+class TestSuiteExecutor(object):
     """
-    Executes a test group.
+    Executes a test suite.
 
     Responsible for setting up and tearing down the fixtures that the
     tests execute against.
@@ -30,46 +30,53 @@ class TestGroupExecutor(object):
 
     def __init__(self,
                  exec_logger,
-                 test_group,
-                 logging_config,
+                 suite,
                  config=None,
                  fixture=None,
                  hooks=None):
         """
-        Initializes the TestGroupExecutor with the test group to run.
+        Initializes the TestSuiteExecutor with the test suite to run.
         """
+        self.logger = exec_logger
 
-        # Build a logger for executing this group of tests.
-        logger_name = "%s:%s" % (exec_logger.name, test_group.test_kind)
-        self.logger = logging.loggers.new_logger(logger_name, parent=exec_logger)
+        if _config.SHELL_CONN_STRING is not None:
+            # Specifying the shellConnString command line option should override the fixture
+            # specified in the YAML configuration to be the no-op fixture.
+            self.fixture_config = {"class": fixtures.NOOP_FIXTURE_CLASS}
+        else:
+            self.fixture_config = fixture
 
-        self.logging_config = logging_config
-        self.fixture_config = fixture
         self.hooks_config = utils.default_if_none(hooks, [])
         self.test_config = utils.default_if_none(config, {})
 
-        self._test_group = test_group
+        self._suite = suite
 
-        self._using_buildlogger = logging.config.using_buildlogger(logging_config)
-        self._build_config = None
+        # Only start as many jobs as we need. Note this means that the number of jobs we run may not
+        # actually be _config.JOBS.
+        jobs_to_start = _config.JOBS
+        num_tests = len(suite.tests)
 
-        if self._using_buildlogger:
-            self._build_config = logging.buildlogger.get_config()
+        if num_tests < jobs_to_start:
+            self.logger.info("Reducing the number of jobs from %d to %d since there are only %d "
+                             "test(s) to run.",
+                _config.JOBS, num_tests, num_tests)
+            jobs_to_start = num_tests
 
         # Must be done after getting buildlogger configuration.
-        self._jobs = [self._make_job(job_num) for job_num in xrange(_config.JOBS)]
+        self._jobs = [self._make_job(job_num) for job_num in xrange(jobs_to_start)]
 
     def run(self):
         """
-        Executes the test group.
+        Executes the test suite.
 
         Any exceptions that occur during setting up or tearing down a
         fixture are propagated.
         """
 
-        self.logger.info("Starting execution of %ss...", self._test_group.test_kind)
+        self.logger.info("Starting execution of %ss...", self._suite.test_kind)
 
         return_code = 0
+        teardown_flag = None
         try:
             if not self._setup_fixtures():
                 return_code = 2
@@ -78,38 +85,55 @@ class TestGroupExecutor(object):
             num_repeats = _config.REPEAT
             while num_repeats > 0:
                 test_queue = self._make_test_queue()
-                self._test_group.record_start()
-                (report, interrupted) = self._run_tests(test_queue)
-                self._test_group.record_end(report)
+
+                partial_reports = [job.report for job in self._jobs]
+                self._suite.record_test_start(partial_reports)
+
+                # Have the Job threads destroy their fixture during the final repetition after they
+                # finish running their last test. This avoids having a large number of processes
+                # still running if an Evergreen task were to time out from a hang/deadlock being
+                # triggered.
+                teardown_flag = threading.Event() if num_repeats == 1 else None
+                (report, interrupted) = self._run_tests(test_queue, teardown_flag)
+
+                self._suite.record_test_end(report)
 
                 # If the user triggered a KeyboardInterrupt, then we should stop.
                 if interrupted:
-                    raise errors.StopExecution("Received interrupt from user")
+                    raise errors.UserInterrupt("Received interrupt from user")
+
+                if teardown_flag and teardown_flag.is_set():
+                    return_code = 2
 
                 sb = []  # String builder.
-                self._test_group.summarize_latest(sb)
+                self._suite.summarize_latest(sb)
                 self.logger.info("Summary: %s", "\n    ".join(sb))
 
                 if not report.wasSuccessful():
                     return_code = 1
                     if _config.FAIL_FAST:
                         break
+
+                # Clear the report so it can be reused for the next execution.
+                for job in self._jobs:
+                    job.report.reset()
                 num_repeats -= 1
         finally:
-            if not self._teardown_fixtures():
-                return_code = 2
-            self._test_group.return_code = return_code
+            if not teardown_flag:
+                if not self._teardown_fixtures():
+                    return_code = 2
+            self._suite.return_code = return_code
 
     def _setup_fixtures(self):
         """
         Sets up a fixture for each job.
         """
-
         for job in self._jobs:
             try:
                 job.fixture.setup()
             except:
-                self.logger.exception("Encountered an error while setting up %s.", job.fixture)
+                self.logger.exception(
+                    "Encountered an error while setting up %s.", job.fixture)
                 return False
 
         # Once they have all been started, wait for them to become available.
@@ -117,13 +141,12 @@ class TestGroupExecutor(object):
             try:
                 job.fixture.await_ready()
             except:
-                self.logger.exception("Encountered an error while waiting for %s to be ready",
-                                      job.fixture)
+                self.logger.exception(
+                    "Encountered an error while waiting for %s to be ready", job.fixture)
                 return False
-
         return True
 
-    def _run_tests(self, test_queue):
+    def _run_tests(self, test_queue, teardown_flag):
         """
         Starts a thread for each Job instance and blocks until all of
         the tests are run.
@@ -139,17 +162,24 @@ class TestGroupExecutor(object):
         try:
             # Run each Job instance in its own thread.
             for job in self._jobs:
-                t = threading.Thread(target=job, args=(test_queue, interrupt_flag))
+                t = threading.Thread(target=job,
+                                     args=(test_queue, interrupt_flag),
+                                     kwargs=dict(teardown_flag=teardown_flag))
                 # Do not wait for tests to finish executing if interrupted by the user.
                 t.daemon = True
                 t.start()
                 threads.append(t)
+                # SERVER-24729 Need to stagger when jobs start to reduce I/O load if there
+                # are many of them.  Both the 5 and the 10 are arbitrary.
+                # Currently only enabled on Evergreen.
+                if _config.STAGGER_JOBS and len(threads) >= 5:
+                    time.sleep(10)
 
             joined = False
             while not joined:
                 # Need to pass a timeout to join() so that KeyboardInterrupt exceptions
                 # are propagated.
-                joined = test_queue.join(TestGroupExecutor._TIMEOUT)
+                joined = test_queue.join(TestSuiteExecutor._TIMEOUT)
         except (KeyboardInterrupt, SystemExit):
             interrupt_flag.set()
             user_interrupted = True
@@ -163,7 +193,7 @@ class TestGroupExecutor(object):
 
         # We cannot return 'interrupt_flag.is_set()' because the interrupt flag can be set by a Job
         # instance if a test fails and it decides to drain the queue. We only want to raise a
-        # StopExecution exception in TestGroupExecutor.run() if the user triggered the interrupt.
+        # StopExecution exception in TestSuiteExecutor.run() if the user triggered the interrupt.
         return (combined_report, user_interrupted)
 
     def _teardown_fixtures(self):
@@ -173,43 +203,18 @@ class TestGroupExecutor(object):
         Returns true if all fixtures were torn down successfully, and
         false otherwise.
         """
-
         success = True
         for job in self._jobs:
             try:
-                if not job.fixture.teardown():
+                if not job.fixture.teardown(finished=True):
                     self.logger.warn("Teardown of %s was not successful.", job.fixture)
                     success = False
             except:
                 self.logger.exception("Encountered an error while tearing down %s.", job.fixture)
                 success = False
-
         return success
 
-    def _get_build_id(self, job_num):
-        """
-        Returns a unique build id for a job.
-        """
-
-        build_config = self._build_config
-
-        if self._using_buildlogger:
-            # Use a distinct "builder" for each job in order to separate their logs.
-            if build_config is not None and "builder" in build_config:
-                build_config = build_config.copy()
-                build_config["builder"] = "%s_job%d" % (build_config["builder"], job_num)
-
-            build_id = logging.buildlogger.new_build_id(build_config)
-
-            if build_config is None or build_id is None:
-                self.logger.info("Encountered an error configuring buildlogger for job #%d, falling"
-                                 " back to stderr.", job_num)
-
-            return build_id, build_config
-
-        return None, build_config
-
-    def _make_fixture(self, job_num, build_id, build_config):
+    def _make_fixture(self, job_num, job_logger):
         """
         Creates a fixture for a job.
         """
@@ -221,14 +226,9 @@ class TestGroupExecutor(object):
             fixture_config = self.fixture_config.copy()
             fixture_class = fixture_config.pop("class")
 
-        logger_name = "%s:job%d" % (fixture_class, job_num)
-        logger = logging.loggers.new_logger(logger_name, parent=logging.loggers.FIXTURE)
-        logging.config.apply_buildlogger_global_handler(logger,
-                                                        self.logging_config,
-                                                        build_id=build_id,
-                                                        build_config=build_config)
+        fixture_logger = job_logger.new_fixture_logger(fixture_class)
 
-        return fixtures.make_fixture(fixture_class, logger, job_num, **fixture_config)
+        return fixtures.make_fixture(fixture_class, fixture_logger, job_num, **fixture_config)
 
     def _make_hooks(self, job_num, fixture):
         """
@@ -241,10 +241,9 @@ class TestGroupExecutor(object):
             behavior_config = behavior_config.copy()
             behavior_class = behavior_config.pop("class")
 
-            logger_name = "%s:job%d" % (behavior_class, job_num)
-            logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+            hook_logger = self.logger.new_hook_logger(behavior_class, job_num)
             behavior = _hooks.make_custom_behavior(behavior_class,
-                                                   logger,
+                                                   hook_logger,
                                                    fixture,
                                                    **behavior_config)
             behaviors.append(behavior)
@@ -256,25 +255,14 @@ class TestGroupExecutor(object):
         Returns a Job instance with its own fixture, hooks, and test
         report.
         """
+        job_logger = self.logger.new_job_logger(self._suite.test_kind, job_num)
 
-        build_id, build_config = self._get_build_id(job_num)
-        fixture = self._make_fixture(job_num, build_id, build_config)
+        fixture = self._make_fixture(job_num, job_logger)
         hooks = self._make_hooks(job_num, fixture)
 
-        logger_name = "%s:job%d" % (self.logger.name, job_num)
-        logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        report = _report.TestReport(job_logger)
 
-        if build_id is not None:
-            endpoint = logging.buildlogger.APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
-            url = "%s/%s/" % (_config.BUILDLOGGER_URL.rstrip("/"), endpoint.strip("/"))
-            logger.info("Writing output of job #%d to %s.", job_num, url)
-
-        report = _report.TestReport(logger,
-                                    self.logging_config,
-                                    build_id=build_id,
-                                    build_config=build_config)
-
-        return _job.Job(logger, fixture, hooks, report)
+        return _job.Job(job_logger, fixture, hooks, report)
 
     def _make_test_queue(self):
         """
@@ -284,20 +272,18 @@ class TestGroupExecutor(object):
         that the test cases can be dispatched to multiple threads.
         """
 
-        test_kind_logger = logging.loggers.new_logger(self._test_group.test_kind,
-                                                      parent=logging.loggers.TESTS)
-
+        test_queue_logger = self.logger.new_testqueue_logger(self._suite.test_kind)
         # Put all the test cases in a queue.
         queue = _queue.Queue()
-        for test_name in self._test_group.tests:
-            test_case = testcases.make_test_case(self._test_group.test_kind,
-                                                 test_kind_logger,
+        for test_name in self._suite.tests:
+            test_case = testcases.make_test_case(self._suite.test_kind,
+                                                 test_queue_logger,
                                                  test_name,
                                                  **self.test_config)
             queue.put(test_case)
 
         # Add sentinel value for each job to indicate when there are no more items to process.
-        for _ in xrange(_config.JOBS):
+        for _ in xrange(len(self._jobs)):
             queue.put(None)
 
         return queue

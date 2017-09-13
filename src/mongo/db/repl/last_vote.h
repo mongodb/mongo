@@ -28,28 +28,31 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+
 namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
-class Status;
 
 namespace repl {
 
 class LastVote {
 public:
-    Status initialize(const BSONObj& argsObj);
+    LastVote(long long term, long long candidateIndex);
+
+    static StatusWith<LastVote> readFromLastVote(const BSONObj& doc);
 
     long long getTerm() const;
-    long long getCandidateId() const;
+    long long getCandidateIndex() const;
 
     void setTerm(long long term);
-    void setCandidateId(long long candidateId);
+    void setCandidateIndex(long long candidateIndex);
     BSONObj toBSON() const;
 
 private:
-    long long _candidateId = -1;
-    long long _term = -1;
+    long long _candidateIndex;
+    long long _term;
 };
 
 }  // namespace repl

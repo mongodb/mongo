@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -47,18 +48,20 @@ public:
     /**
      * Construct an empty request.
      */
-    CountRequest(const std::string& fullNs, BSONObj query);
+    CountRequest(NamespaceString nss, BSONObj query);
 
-    const std::string& getNs() const {
-        return _fullNs;
+    const NamespaceString& getNs() const {
+        return _nss;
     }
-    const BSONObj getQuery() const {
+
+    BSONObj getQuery() const {
         return _query;
     }
 
     long long getLimit() const {
         return _limit.value_or(0);
     }
+
     void setLimit(long long limit) {
         _limit = limit;
     }
@@ -66,29 +69,79 @@ public:
     long long getSkip() const {
         return _skip.value_or(0);
     }
+
     void setSkip(long long skip) {
         _skip = skip;
     }
 
-    const BSONObj getHint() const {
+    BSONObj getHint() const {
         return _hint.value_or(BSONObj());
     }
+
     void setHint(BSONObj hint);
 
-    /**
-     * Constructs a BSON representation of this request, which can be used for sending it in
-     * commands.
-     */
-    BSONObj toBSON() const;
+    BSONObj getCollation() const {
+        return _collation.value_or(BSONObj());
+    }
+
+    void setCollation(BSONObj collation);
+
+    bool isExplain() const {
+        return _explain;
+    }
+
+    void setExplain(bool explain) {
+        _explain = explain;
+    }
+
+    const std::string& getComment() const {
+        return _comment;
+    }
+
+    void setComment(StringData comment) {
+        _comment = comment.toString();
+    }
+
+    unsigned int getMaxTimeMS() const {
+        return _maxTimeMS;
+    }
+
+    void setMaxTimeMS(unsigned int maxTimeMS) {
+        _maxTimeMS = maxTimeMS;
+    }
+
+    BSONObj getReadConcern() const {
+        return _readConcern;
+    }
+
+    void setReadConcern(BSONObj readConcern) {
+        _readConcern = readConcern.getOwned();
+    }
+
+    BSONObj getUnwrappedReadPref() const {
+        return _unwrappedReadPref;
+    }
+
+    void setUnwrappedReadPref(BSONObj unwrappedReadPref) {
+        _unwrappedReadPref = unwrappedReadPref.getOwned();
+    }
 
     /**
-     * Construct a CountRequest from the command specification and db name.
+     * Converts this CountRequest into an aggregation.
      */
-    static StatusWith<CountRequest> parseFromBSON(const std::string& dbname, const BSONObj& cmdObj);
+    StatusWith<BSONObj> asAggregationCommand() const;
+
+    /**
+     * Construct a CountRequest from the command specification and db name. Caller must indicate if
+     * this is an explained count via 'isExplain'.
+     */
+    static StatusWith<CountRequest> parseFromBSON(const std::string& dbname,
+                                                  const BSONObj& cmdObj,
+                                                  bool isExplain);
 
 private:
     // Namespace to operate on (e.g. "foo.bar").
-    const std::string _fullNs;
+    const NamespaceString _nss;
 
     // A predicate describing the set of documents to count.
     const BSONObj _query;
@@ -102,6 +155,25 @@ private:
     // Optional. Indicates to the query planner that it should generate a count plan using a
     // particular index.
     boost::optional<BSONObj> _hint;
+
+    // Optional. The collation used to compare strings.
+    boost::optional<BSONObj> _collation;
+
+    BSONObj _readConcern;
+
+    // The unwrapped readPreference object, if one was given to us by the mongos command processor.
+    // This object will be empty when no readPreference is specified or if the request does not
+    // originate from mongos.
+    BSONObj _unwrappedReadPref;
+
+    // When non-empty, represents a user comment.
+    std::string _comment;
+
+    // A user-specified maxTimeMS limit, or a value of '0' if not specified.
+    unsigned int _maxTimeMS = 0;
+
+    // If true, generate an explain plan instead of the actual count.
+    bool _explain = false;
 };
 
 }  // namespace mongo

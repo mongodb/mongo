@@ -159,11 +159,6 @@ struct Interval {
 
     IntervalComparison compare(const Interval& other) const;
 
-    /**
-     * toString for IntervalComparison
-     */
-    static std::string cmpstr(IntervalComparison c);
-
     //
     // Mutation of intervals
     //
@@ -188,6 +183,10 @@ struct Interval {
 
 inline bool operator==(const Interval& lhs, const Interval& rhs) {
     return lhs.compare(rhs) == Interval::INTERVAL_EQUALS;
+}
+
+inline bool operator!=(const Interval& lhs, const Interval& rhs) {
+    return !(lhs == rhs);
 }
 
 }  // namespace mongo

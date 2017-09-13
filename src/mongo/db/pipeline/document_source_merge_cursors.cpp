@@ -28,8 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_merge_cursors.h"
 
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {
 
@@ -38,24 +39,23 @@ using std::make_pair;
 using std::string;
 using std::vector;
 
-const char DocumentSourceMergeCursors::name[] = "$mergeCursors";
-
-const char* DocumentSourceMergeCursors::getSourceName() const {
-    return name;
-}
-
-void DocumentSourceMergeCursors::setSource(DocumentSource* pSource) {
-    /* this doesn't take a source */
-    verify(false);
-}
+constexpr StringData DocumentSourceMergeCursors::kStageName;
 
 DocumentSourceMergeCursors::DocumentSourceMergeCursors(
-    const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _cursorIds(cursorIds), _unstarted(true) {}
+    std::vector<CursorDescriptor> cursorDescriptors,
+    const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx), _cursorDescriptors(std::move(cursorDescriptors)), _unstarted(true) {}
+
+REGISTER_DOCUMENT_SOURCE(mergeCursors,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceMergeCursors::createFromBson);
 
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
-    const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
+    std::vector<CursorDescriptor> cursorDescriptors,
+    const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    intrusive_ptr<DocumentSourceMergeCursors> source(
+        new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx));
+    return source;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
@@ -64,33 +64,43 @@ intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
             string("Expected an Array, but got a ") + typeName(elem.type()),
             elem.type() == Array);
 
-    CursorIds cursorIds;
+    std::vector<CursorDescriptor> cursorDescriptors;
     BSONObj array = elem.embeddedObject();
     BSONForEach(cursor, array) {
         massert(17027,
                 string("Expected an Object, but got a ") + typeName(cursor.type()),
                 cursor.type() == Object);
 
-        cursorIds.push_back(
-            make_pair(ConnectionString(HostAndPort(cursor["host"].String())), cursor["id"].Long()));
+        // The cursor descriptors for the merge cursors stage used to lack an "ns" field; "ns" was
+        // understood to be the expression context namespace in that case. For mixed-version
+        // compatibility, we accept both the old and new formats here.
+        std::string cursorNs = cursor["ns"] ? cursor["ns"].String() : pExpCtx->ns.ns();
+
+        cursorDescriptors.emplace_back(ConnectionString(HostAndPort(cursor["host"].String())),
+                                       std::move(cursorNs),
+                                       cursor["id"].Long());
     }
 
-    return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
+    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx);
 }
 
-Value DocumentSourceMergeCursors::serialize(bool explain) const {
+Value DocumentSourceMergeCursors::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
     vector<Value> cursors;
-    for (size_t i = 0; i < _cursorIds.size(); i++) {
-        cursors.push_back(Value(
-            DOC("host" << Value(_cursorIds[i].first.toString()) << "id" << _cursorIds[i].second)));
+    for (size_t i = 0; i < _cursorDescriptors.size(); i++) {
+        cursors.push_back(
+            Value(DOC("host" << Value(_cursorDescriptors[i].connectionString.toString()) << "ns"
+                             << _cursorDescriptors[i].ns
+                             << "id"
+                             << _cursorDescriptors[i].cursorId)));
     }
-    return Value(DOC(getSourceName() << Value(cursors)));
+    return Value(DOC(kStageName << Value(cursors)));
 }
 
-DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(ConnectionString host,
-                                                                     NamespaceString ns,
-                                                                     CursorId id)
-    : connection(host), cursor(connection.get(), ns, id, 0, 0) {}
+DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(
+    const CursorDescriptor& cursorDescriptor)
+    : connection(cursorDescriptor.connectionString),
+      cursor(connection.get(), cursorDescriptor.ns, cursorDescriptor.cursorId, 0, 0) {}
 
 vector<DBClientCursor*> DocumentSourceMergeCursors::getCursors() {
     verify(_unstarted);
@@ -107,18 +117,17 @@ void DocumentSourceMergeCursors::start() {
     _unstarted = false;
 
     // open each cursor and send message asking for a batch
-    for (CursorIds::const_iterator it = _cursorIds.begin(); it != _cursorIds.end(); ++it) {
-        _cursors.push_back(
-            std::make_shared<CursorAndConnection>(it->first, pExpCtx->ns, it->second));
+    for (auto&& cursorDescriptor : _cursorDescriptors) {
+        _cursors.push_back(std::make_shared<CursorAndConnection>(cursorDescriptor));
         verify(_cursors.back()->connection->lazySupported());
         _cursors.back()->cursor.initLazy();  // shouldn't block
     }
 
     // wait for all cursors to return a batch
     // TODO need a way to keep cursors alive if some take longer than 10 minutes.
-    for (Cursors::const_iterator it = _cursors.begin(); it != _cursors.end(); ++it) {
+    for (auto&& cursor : _cursors) {
         bool retry = false;
-        bool ok = (*it)->cursor.initLazyFinish(retry);  // blocks here for first batch
+        bool ok = cursor->cursor.initLazyFinish(retry);  // blocks here for first batch
 
         uassert(
             17028, "error reading response from " + _cursors.back()->connection->toString(), ok);
@@ -134,12 +143,15 @@ Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
         const int code = next.hasField("code") ? next["code"].numberInt() : 17029;
         uasserted(code,
                   str::stream() << "Received error in response from " << cursor->originalHost()
-                                << ": " << next);
+                                << ": "
+                                << next);
     }
     return Document::fromBsonWithMetaData(next);
 }
 
-boost::optional<Document> DocumentSourceMergeCursors::getNext() {
+DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
+    pExpCtx->checkForInterrupt();
+
     if (_unstarted)
         start();
 
@@ -151,18 +163,33 @@ boost::optional<Document> DocumentSourceMergeCursors::getNext() {
     }
 
     if (_cursors.empty())
-        return boost::none;
+        return GetNextResult::makeEOF();
 
-    const Document next = nextSafeFrom(&((*_currentCursor)->cursor));
+    auto next = nextSafeFrom(&((*_currentCursor)->cursor));
 
     // advance _currentCursor, wrapping if needed
     if (++_currentCursor == _cursors.end())
         _currentCursor = _cursors.begin();
 
-    return next;
+    return std::move(next);
 }
 
-void DocumentSourceMergeCursors::dispose() {
+bool DocumentSourceMergeCursors::remotesExhausted() const {
+    return std::all_of(_cursors.begin(), _cursors.end(), [](const auto& cursorAndConn) {
+        return cursorAndConn->cursor.isDead();
+    });
+}
+
+void DocumentSourceMergeCursors::doDispose() {
+    for (auto&& cursorAndConn : _cursors) {
+        // Note it is an error to call done() on a connection before consuming the reply from a
+        // request.
+        if (cursorAndConn->cursor.connectionHasPendingReplies()) {
+            continue;
+        }
+        cursorAndConn->cursor.kill();
+        cursorAndConn->connection.done();
+    }
     _cursors.clear();
     _currentCursor = _cursors.end();
 }

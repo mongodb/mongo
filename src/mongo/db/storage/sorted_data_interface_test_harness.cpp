@@ -36,9 +36,9 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
-std::unique_ptr<SortedDataInterface> HarnessHelper::newSortedDataInterface(
-    bool unique, std::initializer_list<IndexKeyEntry> toInsert) {
+auto mongo::SortedDataInterfaceHarnessHelper::newSortedDataInterface(
+    bool unique, std::initializer_list<IndexKeyEntry> toInsert)
+    -> std::unique_ptr<SortedDataInterface> {
     invariant(std::is_sorted(
         toInsert.begin(), toInsert.end(), IndexEntryComparison(Ordering::make(BSONObj()))));
 
@@ -47,190 +47,195 @@ std::unique_ptr<SortedDataInterface> HarnessHelper::newSortedDataInterface(
     return index;
 }
 
-void insertToIndex(unowned_ptr<OperationContext> txn,
-                   unowned_ptr<SortedDataInterface> index,
-                   std::initializer_list<IndexKeyEntry> toInsert) {
-    WriteUnitOfWork wuow(txn);
+void mongo::insertToIndex(unowned_ptr<OperationContext> opCtx,
+                          unowned_ptr<SortedDataInterface> index,
+                          std::initializer_list<IndexKeyEntry> toInsert) {
+    WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toInsert) {
-        ASSERT_OK(index->insert(txn, entry.key, entry.loc, true));
+        ASSERT_OK(index->insert(opCtx, entry.key, entry.loc, true));
     }
     wuow.commit();
 }
 
-void removeFromIndex(unowned_ptr<OperationContext> txn,
-                     unowned_ptr<SortedDataInterface> index,
-                     std::initializer_list<IndexKeyEntry> toRemove) {
-    WriteUnitOfWork wuow(txn);
+void mongo::removeFromIndex(unowned_ptr<OperationContext> opCtx,
+                            unowned_ptr<SortedDataInterface> index,
+                            std::initializer_list<IndexKeyEntry> toRemove) {
+    WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toRemove) {
-        index->unindex(txn, entry.key, entry.loc, true);
+        index->unindex(opCtx, entry.key, entry.loc, true);
     }
     wuow.commit();
 }
+
+namespace mongo {
+namespace {
 
 TEST(SortedDataInterface, InsertWithDups1) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 2), true);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 2), true).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(6, 2), true);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(6, 2), true).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
 
         long long x = 0;
-        sorted->fullValidate(opCtx.get(), false, &x, NULL);
+        sorted->fullValidate(opCtx.get(), &x, NULL);
         ASSERT_EQUALS(2, x);
     }
 }
 
 TEST(SortedDataInterface, InsertWithDups2) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 20), true);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 20), true).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 }
 
 TEST(SortedDataInterface, InsertWithDups3AndRollback) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 20), true);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 20), true).transitional_ignore();
             // no commit
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
 
 TEST(SortedDataInterface, InsertNoDups1) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), false);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), false)
+                .transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 2), RecordId(5, 20), false);
+            sorted->insert(opCtx.get(), BSON("" << 2), RecordId(5, 20), false)
+                .transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 }
 
 TEST(SortedDataInterface, InsertNoDups2) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 2), false);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 2), false).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 4), false);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 4), false).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
 
 TEST(SortedDataInterface, Unindex1) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), BSON("" << 1), RecordId(5, 20), true);
@@ -240,12 +245,12 @@ TEST(SortedDataInterface, Unindex1) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), BSON("" << 2), RecordId(5, 18), true);
@@ -255,13 +260,13 @@ TEST(SortedDataInterface, Unindex1) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), BSON("" << 1), RecordId(5, 18), true);
@@ -271,31 +276,31 @@ TEST(SortedDataInterface, Unindex1) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 }
 
 TEST(SortedDataInterface, Unindex2Rollback) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true);
+            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true).transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), BSON("" << 1), RecordId(5, 18), true);
@@ -305,19 +310,19 @@ TEST(SortedDataInterface, Unindex2Rollback) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
 
 
 TEST(SortedDataInterface, CursorIterate1) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     int N = 5;
     for (int i = 0; i < N; i++) {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << i), RecordId(5, i * 2), true));
@@ -326,7 +331,7 @@ TEST(SortedDataInterface, CursorIterate1) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int n = 0;
         for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
@@ -338,28 +343,29 @@ TEST(SortedDataInterface, CursorIterate1) {
 }
 
 TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     int N = 5;
     for (int i = 0; i < N; i++) {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << i), RecordId(5, i * 2), true);
+            sorted->insert(opCtx.get(), BSON("" << i), RecordId(5, i * 2), true)
+                .transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int n = 0;
         for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
             n++;
-            cursor->savePositioned();
-            cursor->restore(opCtx.get());
+            cursor->save();
+            cursor->restore();
         }
         ASSERT_EQUALS(N, n);
     }
@@ -367,28 +373,29 @@ TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
 
 
 TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     int N = 5;
     for (int i = 0; i < N; i++) {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 5), RecordId(5, i * 2), true);
+            sorted->insert(opCtx.get(), BSON("" << 5), RecordId(5, i * 2), true)
+                .transitional_ignore();
             uow.commit();
         }
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int n = 0;
         for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << 5), RecordId(5, n * 2)));
             n++;
-            cursor->savePositioned();
-            cursor->restore(opCtx.get());
+            cursor->save();
+            cursor->restore();
         }
         ASSERT_EQUALS(N, n);
     }
@@ -396,20 +403,20 @@ TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
 
 
 TEST(SortedDataInterface, Locate1) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     BSONObj key = BSON("" << 1);
     RecordId loc(5, 16);
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         ASSERT(!cursor->seek(key, true));
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             Status res = sorted->insert(opCtx.get(), key, loc, true);
@@ -419,18 +426,18 @@ TEST(SortedDataInterface, Locate1) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         ASSERT_EQ(cursor->seek(key, true), IndexKeyEntry(key, loc));
     }
 }
 
 TEST(SortedDataInterface, Locate2) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
 
@@ -442,7 +449,7 @@ TEST(SortedDataInterface, Locate2) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         ASSERT_EQ(cursor->seek(BSON("a" << 2), true), IndexKeyEntry(BSON("" << 2), RecordId(1, 4)));
 
@@ -452,11 +459,11 @@ TEST(SortedDataInterface, Locate2) {
 }
 
 TEST(SortedDataInterface, Locate2Empty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
 
@@ -468,13 +475,13 @@ TEST(SortedDataInterface, Locate2Empty) {
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         ASSERT_EQ(cursor->seek(BSONObj(), true), IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
     }
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         ASSERT_EQ(cursor->seek(BSONObj(), false), boost::none);
@@ -483,13 +490,13 @@ TEST(SortedDataInterface, Locate2Empty) {
 
 
 TEST(SortedDataInterface, Locate3Descending) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     auto buildEntry = [](int i) { return IndexKeyEntry(BSON("" << i), RecordId(1, i * 2)); };
 
     {
-        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         for (int i = 0; i < 10; i++) {
             if (i == 6)
                 continue;
@@ -500,7 +507,7 @@ TEST(SortedDataInterface, Locate3Descending) {
         }
     }
 
-    const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), true));
     ASSERT_EQ(cursor->seek(BSON("" << 5), true), buildEntry(5));
     ASSERT_EQ(cursor->next(), buildEntry(7));
@@ -526,13 +533,13 @@ TEST(SortedDataInterface, Locate3Descending) {
 }
 
 TEST(SortedDataInterface, Locate4) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto sorted = harnessHelper->newSortedDataInterface(false,
                                                         {
-                                                         {BSON("" << 1), RecordId(1, 2)},
-                                                         {BSON("" << 1), RecordId(1, 4)},
-                                                         {BSON("" << 1), RecordId(1, 6)},
-                                                         {BSON("" << 2), RecordId(1, 8)},
+                                                            {BSON("" << 1), RecordId(1, 2)},
+                                                            {BSON("" << 1), RecordId(1, 4)},
+                                                            {BSON("" << 1), RecordId(1, 6)},
+                                                            {BSON("" << 2), RecordId(1, 8)},
                                                         });
 
     {
@@ -557,4 +564,5 @@ TEST(SortedDataInterface, Locate4) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

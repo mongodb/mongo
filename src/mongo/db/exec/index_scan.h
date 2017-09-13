@@ -70,7 +70,7 @@ struct IndexScanParams {
  *
  * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
  */
-class IndexScan : public PlanStage {
+class IndexScan final : public PlanStage {
 public:
     /**
      * Keeps track of what this index scan is currently doing so that it
@@ -90,30 +90,26 @@ public:
         HIT_END
     };
 
-    IndexScan(OperationContext* txn,
+    IndexScan(OperationContext* opCtx,
               const IndexScanParams& params,
               WorkingSet* workingSet,
               const MatchExpression* filter);
 
-    virtual ~IndexScan() {}
+    StageState doWork(WorkingSetID* out) final;
+    bool isEOF() final;
+    void doSaveState() final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext() final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
-    virtual StageState work(WorkingSetID* out);
-    virtual bool isEOF();
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_IXSCAN;
     }
 
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
@@ -122,9 +118,6 @@ private:
      * Initialize the underlying index Cursor, returning first result if any.
      */
     boost::optional<IndexKeyEntry> initIndexScan();
-
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
 
     // The WorkingSet we fill with results.  Not owned by us.
     WorkingSet* const _workingSet;
@@ -150,7 +143,6 @@ private:
     const IndexScanParams _params;
 
     // Stats
-    CommonStats _commonStats;
     IndexScanStats _specificStats;
 
     //
@@ -173,9 +165,13 @@ private:
     //    BSON compares against scanned keys. In this case _checker will be NULL.
     //
 
+    // The key that the index cursor should start on/after.
+    BSONObj _startKey;
     // The key that the index cursor should stop on/after.
     BSONObj _endKey;
 
+    // Is the start key included in the range?
+    bool _startKeyInclusive;
     // Is the end key included in the range?
     bool _endKeyInclusive;
 };

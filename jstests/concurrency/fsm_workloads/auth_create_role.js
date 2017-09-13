@@ -5,7 +5,7 @@
  *
  * Repeatedly creates new roles on a database.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropRoles
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
 var $config = (function() {
 
@@ -29,15 +29,9 @@ var $config = (function() {
             var roleName = uniqueRoleName(this.prefix, this.tid, this.num++);
             db.createRole({
                 role: roleName,
-                privileges: [
-                    {
-                        resource: { db: db.getName(), collection: collName },
-                        actions: ['update']
-                    }
-                ],
-                roles: [
-                    { role: 'read', db: db.getName() }
-                ]
+                privileges:
+                    [{resource: {db: db.getName(), collection: collName}, actions: ['update']}],
+                roles: [{role: 'read', db: db.getName()}]
             });
 
             // Verify the newly created role exists, as well as all previously created roles
@@ -50,17 +44,11 @@ var $config = (function() {
             }
         }
 
-        return {
-            init: init,
-            createRole: createRole
-        };
+        return {init: init, createRole: createRole};
 
     })();
 
-    var transitions = {
-        init: { createRole: 1 },
-        createRole: { createRole: 1 }
-    };
+    var transitions = {init: {createRole: 1}, createRole: {createRole: 1}};
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');

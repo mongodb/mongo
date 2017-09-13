@@ -63,7 +63,7 @@ public:
      * The object pointed to by "request" must stay in scope for the life of the constructed
      * ParsedDelete.
      */
-    ParsedDelete(OperationContext* txn, const DeleteRequest* request);
+    ParsedDelete(OperationContext* opCtx, const DeleteRequest* request);
 
     /**
      * Parses the delete request to a canonical query. On success, the parsed delete can be
@@ -84,9 +84,9 @@ public:
     const DeleteRequest* getRequest() const;
 
     /**
-     * Is this delete allowed to yield?
+     * Get the YieldPolicy, adjusted for $isolated and GodMode.
      */
-    bool canYield() const;
+    PlanExecutor::YieldPolicy yieldPolicy() const;
 
     /**
      * Is this update supposed to be isolated?
@@ -102,11 +102,11 @@ public:
     /**
      * Releases ownership of the canonical query to the caller.
      */
-    CanonicalQuery* releaseParsedQuery();
+    std::unique_ptr<CanonicalQuery> releaseParsedQuery();
 
 private:
     // Transactional context.  Not owned by us.
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // Unowned pointer to the request object that this executor will process.
     const DeleteRequest* const _request;

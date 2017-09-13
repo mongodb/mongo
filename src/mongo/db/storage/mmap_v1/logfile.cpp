@@ -35,7 +35,7 @@
 #include "mongo/db/storage/mmap_v1/logfile.h"
 
 #include "mongo/db/storage/mmap_v1/mmap.h"
-#include "mongo/db/storage/paths.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/log.h"
@@ -110,7 +110,7 @@ void LogFile::readAt(unsigned long long offset, void* _buf, size_t _len) {
 void LogFile::synchronousAppend(const void* _buf, size_t _len) {
     const size_t BlockSize = 8 * 1024 * 1024;
     verify(_fd);
-    verify(_len % g_minOSPageSizeBytes == 0);
+    verify(_len % minDirectIOSizeBytes == 0);
     const char* buf = (const char*)_buf;
     size_t left = _len;
     while (left) {
@@ -123,7 +123,9 @@ void LogFile::synchronousAppend(const void* _buf, size_t _len) {
             else
                 uasserted(13517,
                           str::stream() << "error appending to file " << _name << ' ' << _len << ' '
-                                        << toWrite << ' ' << errnoWithDescription(e));
+                                        << toWrite
+                                        << ' '
+                                        << errnoWithDescription(e));
         } else {
             dassert(written == toWrite);
         }
@@ -137,10 +139,10 @@ void LogFile::synchronousAppend(const void* _buf, size_t _len) {
 
 /// posix
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #ifdef __linux__
 #include <linux/fs.h>
@@ -159,7 +161,7 @@ LogFile::LogFile(const std::string& name, bool readwrite) : _name(name) {
         ;
 
     _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
-    _blkSize = g_minOSPageSizeBytes;
+    _blkSize = minDirectIOSizeBytes;
 
 #if defined(O_DIRECT)
     _direct = true;
@@ -197,7 +199,7 @@ LogFile::~LogFile() {
 void LogFile::truncate() {
     verify(_fd >= 0);
 
-    BOOST_STATIC_ASSERT(sizeof(off_t) == 8);    // we don't want overflow here
+    MONGO_STATIC_ASSERT(sizeof(off_t) == 8);    // we don't want overflow here
     const off_t pos = lseek(_fd, 0, SEEK_CUR);  // doesn't actually seek
     if (ftruncate(_fd, pos) != 0) {
         msgasserted(15873, "Couldn't truncate file: " + errnoWithDescription());
@@ -207,7 +209,7 @@ void LogFile::truncate() {
 }
 
 void LogFile::writeAt(unsigned long long offset, const void* buf, size_t len) {
-    verify(((size_t)buf) % g_minOSPageSizeBytes == 0);  // aligned
+    verify(((size_t)buf) % minDirectIOSizeBytes == 0);  // aligned
     ssize_t written = pwrite(_fd, buf, len, offset);
     if (written != (ssize_t)len) {
         log() << "writeAt fails " << errnoWithDescription() << endl;
@@ -220,7 +222,7 @@ void LogFile::writeAt(unsigned long long offset, const void* buf, size_t len) {
 }
 
 void LogFile::readAt(unsigned long long offset, void* _buf, size_t _len) {
-    verify(((size_t)_buf) % g_minOSPageSizeBytes == 0);  // aligned
+    verify(((size_t)_buf) % minDirectIOSizeBytes == 0);  // aligned
     ssize_t rd = pread(_fd, _buf, _len, offset);
     verify(rd != -1);
 }
@@ -261,7 +263,7 @@ void LogFile::synchronousAppend(const void* b, size_t len) {
     }
 
 #ifdef POSIX_FADV_DONTNEED
-    if (!_direct)
+    if (!_direct && pos >= 0)  // current position cannot be negative
         posix_fadvise(_fd, pos, len, POSIX_FADV_DONTNEED);
 #endif
 }

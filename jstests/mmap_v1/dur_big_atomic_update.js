@@ -7,42 +7,40 @@ d = conn.getDB("test");
 d.foo.drop();
 
 var bulk = d.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 1024; i++){
-    bulk.insert({ _id: i });
+for (var i = 0; i < 1024; i++) {
+    bulk.insert({_id: i});
 }
 assert.writeOK(bulk.execute());
 
 var server_bits = db.serverStatus().mem.bits;
-var big_string_size = (server_bits == 32 ? 64 * 1024 : 1024*1024);
+var big_string_size = (server_bits == 32 ? 64 * 1024 : 1024 * 1024);
 
 var big_string = 'xxxxxxxxxxxxxxxx';
 while (big_string.length < big_string_size) {
     big_string += big_string;
 }
 
-var res = assert.writeOK(d.foo.update({ $atomic: 1 },
-                                      { $set: { big_string: big_string }},
-                                      false, true /* multi */ ));
+var res = assert.writeOK(
+    d.foo.update({$atomic: 1}, {$set: {big_string: big_string}}, false, true /* multi */));
 assert.eq(1024, res.nModified);
 
 d.dropDatabase();
 
 bulk = d.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 1024; i++){
-    bulk.insert({ _id: i });
+for (var i = 0; i < 1024; i++) {
+    bulk.insert({_id: i});
 }
 assert.writeOK(bulk.execute());
 
 // Do it again but in a db.eval
-d.eval(
-    function(big_string) {
-        new Mongo().getDB("test").foo.update({}, {$set: {big_string: big_string}}, false, /*multi*/true)
-    }, big_string); // Can't pass in connection or DB objects
+var err = d.eval(function(big_string) {
+    var db = new Mongo().getDB("test");
+    db.foo.update({}, {$set: {big_string: big_string}}, false, /*multi*/ true);
+    return db.getLastErrorObj();
+}, big_string);  // Can't pass in connection or DB objects
 
-err = d.getLastErrorObj();
-
-assert(err.err == null);
-assert(err.n == 1024);
+assert.eq(err.err, null, tojson(err));
+assert.eq(err.n, 1024, tojson(err));
 
 // free up space
 d.dropDatabase();

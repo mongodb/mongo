@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/rpc/protocol.h"
+#include "mongo/util/net/op_msg.h"
 
 #include <memory>
 
@@ -41,20 +42,33 @@ namespace mongo {
 class Message;
 
 namespace rpc {
+class ReplyBuilderInterface;
 class ReplyInterface;
-class RequestBuilderInterface;
 
 /**
  * Returns the appropriate concrete RequestBuilder. Throws if one cannot be chosen.
  */
-std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientProtos,
-                                                            ProtocolSet serverProtos);
+std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage);
 
 /**
- * Returns the appropriate concrete Reply according to the contents of the message.
- * Throws if one cannot be chosen.
+ * Serializes an OpMsgRequest for a server that speaks the requested protocol.
  */
-std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage);
+Message messageFromOpMsgRequest(Protocol proto, const OpMsgRequest&);
+inline Message messageFromOpMsgRequest(ProtocolSet clientProtos,
+                                       ProtocolSet serverProtos,
+                                       const OpMsgRequest& request) {
+    return messageFromOpMsgRequest(uassertStatusOK(negotiate(clientProtos, serverProtos)), request);
+}
+
+/**
+ * Parses the message (from any protocol) into an OpMsgRequest.
+ */
+OpMsgRequest opMsgRequestFromAnyProtocol(const Message& unownedMessage);
+
+/**
+ * Returns the appropriate concrete ReplyBuilder.
+ */
+std::unique_ptr<ReplyBuilderInterface> makeReplyBuilder(Protocol protocol);
 
 }  // namespace rpc
 }  // namespace mongo

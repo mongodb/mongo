@@ -67,15 +67,12 @@ var.Add('CPPPATH', 'C Preprocessor include path', [
 ])
 
 var.Add('CFLAGS', 'C Compiler Flags', [
-    "/Z7", # Generate debugging symbols
+    "/W3", # Warning level 3
+    "/WX", # Warnings are fatal
     "/wd4090", # Ignore warning about mismatched const qualifiers
     "/wd4996", # Ignore deprecated functions
-    "/W3", # Warning level 3
-    #"/we4244", # Possible loss of data
-    "/we4013", # Error on undefined functions
-    #"/we4047", # Indirection differences in types
-    #"/we4024", # Differences in parameter types
-    #"/we4100", # Unreferenced local parameter
+    "/we4100", # Complain about unreferenced format parameter
+    "/Z7", # Generate debugging symbols
     "/TC", # Compile as C code
     #"/Od", # Disable optimization
     "/Ob1", # inline expansion
@@ -167,6 +164,7 @@ if useTcmalloc:
     if conf.CheckCHeader('gperftools/tcmalloc.h'):
         wtlibs.append("libtcmalloc_minimal")
         conf.env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
+        conf.env.Append(CPPDEFINES=['HAVE_POSIX_MEMALIGN'])
     else:
         print 'tcmalloc.h must be installed!'
         Exit(1)
@@ -213,6 +211,7 @@ if (VERSION_MAJOR == None or
 wiredtiger_includes = """
         #include <sys/types.h>
         #include <stdarg.h>
+        #include <stdbool.h>
         #include <stdint.h>
         #include <stdio.h>
     """
@@ -238,12 +237,29 @@ wtheader = env.Substfile(
 #
 # WiredTiger library
 #
-filelistfile = r'build_win\filelist.win'
-filelist = open(filelistfile)
-wtsources = [line.strip()
-             for line in filelist
-             if not line.startswith("#") and len(line) > 1]
-filelist.close()
+# Map WiredTiger build conditions: any conditions that appear in WiredTiger's
+# dist/filelist must appear here, and if the value is true, those files will be
+# included.
+#
+condition_map = {
+    'ARM64_HOST' : False,
+    'POSIX_HOST' : env['PLATFORM'] == 'posix',
+    'POWERPC_HOST' : False,
+    'WINDOWS_HOST' : env['PLATFORM'] == 'win32',
+    'X86_HOST' : True,
+    'ZSERIES_HOST' : False,
+}
+
+def filtered_filelist(f):
+    for line in f:
+        file_cond = line.split()
+        if line.startswith("#") or len(file_cond) == 0:
+            continue
+        if len(file_cond) == 1 or condition_map[file_cond[1]]:
+            yield file_cond[0]
+
+filelistfile = r'dist/filelist'
+wtsources = list(filtered_filelist(open(filelistfile)))
 
 if useZlib:
     wtsources.append("ext/compressors/zlib/zlib_compress.c")
@@ -275,10 +291,12 @@ env.Depends(wtdll, [filelistfile, version_file])
 Default(wtlib, wtdll)
 
 wtbin = env.Program("wt", [
+    "src/utilities/util_alter.c",
     "src/utilities/util_backup.c",
     "src/utilities/util_cpyright.c",
     "src/utilities/util_compact.c",
     "src/utilities/util_create.c",
+    "src/utilities/util_downgrade.c",
     "src/utilities/util_drop.c",
     "src/utilities/util_dump.c",
     "src/utilities/util_list.c",
@@ -289,9 +307,11 @@ wtbin = env.Program("wt", [
     "src/utilities/util_misc.c",
     "src/utilities/util_printlog.c",
     "src/utilities/util_read.c",
+    "src/utilities/util_rebalance.c",
     "src/utilities/util_rename.c",
     "src/utilities/util_salvage.c",
     "src/utilities/util_stat.c",
+    "src/utilities/util_truncate.c",
     "src/utilities/util_upgrade.c",
     "src/utilities/util_verbose.c",
     "src/utilities/util_verify.c",
@@ -316,6 +336,9 @@ if GetOption("lang-python"):
             "-nodefaultctor",
             "-nodefaultdtor",
             ])
+    # Ignore warnings in swig-generated code.
+    pythonEnv['CFLAGS'].remove("/WX")
+    pythonEnv['CFLAGS'].remove("/we4100")
 
     swiglib = pythonEnv.SharedLibrary('_wiredtiger',
                       [ 'lang\python\wiredtiger.i'],
@@ -343,18 +366,17 @@ examples = [
     "ex_all",
     "ex_async",
     "ex_call_center",
-    "ex_config",
     "ex_config_parse",
     "ex_cursor",
     "ex_data_source",
     "ex_encrypt",
     "ex_extending",
+    "ex_file_system",
     "ex_hello",
     "ex_log",
     "ex_pack",
     "ex_process",
     "ex_schema",
-    "ex_scope",
     "ex_stat",
     "ex_thread",
     ]
@@ -389,86 +411,82 @@ def builder_smoke_test(target, source, env):
 env.Append(BUILDERS={'SmokeTest' : Builder(action = builder_smoke_test)})
 
 #Build the tests and setup the "scons test" target
+testutil = env.Library('testutil',
+            [
+                'test/utility/misc.c',
+                'test/utility/parse_opts.c'
+            ])
+env.Append(CPPPATH=["test/utility"])
 
-#Don't test bloom on Windows, its broken
 t = env.Program("t_bloom",
     "test/bloom/test_bloom.c",
-    LIBS=[wtlib] + wtlibs)
-#env.Alias("check", env.SmokeTest(t))
+    LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
-#env.Program("t_checkpoint",
-    #["test/checkpoint/checkpointer.c",
-    #"test/checkpoint/test_checkpoint.c",
-    #"test/checkpoint/workers.c"],
-    #LIBS=[wtlib])
+t = env.Program("t_checkpoint",
+    ["test/checkpoint/checkpointer.c",
+    "test/checkpoint/test_checkpoint.c",
+    "test/checkpoint/workers.c"],
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
 
-t = env.Program("t_huge",
-    "test/huge/huge.c",
-    LIBS=[wtlib] + wtlibs)
-#env.Alias("check", env.SmokeTest(t))
+t = env.Program("t_cursor_order",
+    ["test/cursor_order/cursor_order.c",
+    "test/cursor_order/cursor_order_file.c",
+    "test/cursor_order/cursor_order_ops.c"],
+    LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
 t = env.Program("t_fops",
     ["test/fops/file.c",
     "test/fops/fops.c",
     "test/fops/t.c"],
-    LIBS=[wtlib, shim] + wtlibs)
-env.Append(CPPPATH=["test/utility"])
-env.Alias("check", env.SmokeTest(t))
+    LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
-if useBdb:
-    benv = env.Clone()
+t = env.Program("t_format",
+    ["test/format/backup.c",
+    "test/format/bulk.c",
+    "test/format/compact.c",
+    "test/format/config.c",
+    "test/format/lrt.c",
+    "test/format/ops.c",
+    "test/format/rebalance.c",
+    "test/format/salvage.c",
+    "test/format/t.c",
+    "test/format/util.c",
+    "test/format/wts.c"],
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
 
-    benv.Append(CPPDEFINES=['BERKELEY_DB_PATH=\\"' + useBdb.replace("\\", "\\\\") + '\\"'])
+t = env.Program("t_huge",
+    "test/huge/huge.c",
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
 
-    t = benv.Program("t_format",
-        ["test/format/backup.c",
-        "test/format/bdb.c",
-        "test/format/bulk.c",
-        "test/format/compact.c",
-        "test/format/config.c",
-        "test/format/ops.c",
-        "test/format/salvage.c",
-        "test/format/t.c",
-        "test/format/util.c",
-        "test/format/wts.c"],
-         LIBS=[wtlib, shim, "libdb61"] + wtlibs)
-    env.Alias("test", env.SmokeTest(t))
-    Default(t)
-
-#env.Program("t_thread",
-    #["test/thread/file.c",
-    #"test/thread/rw.c",
-    #"test/thread/stats.c",
-    #"test/thread/t.c"],
-    #LIBS=[wtlib])
-
-#env.Program("t_salvage",
-    #["test/salvage/salvage.c"],
-    #LIBS=[wtlib])
+t = env.Program("t_manydbs",
+    "test/manydbs/manydbs.c",
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
 
 t = env.Program("wtperf", [
     "bench/wtperf/config.c",
+    "bench/wtperf/idle_table_cycle.c",
     "bench/wtperf/misc.c",
     "bench/wtperf/track.c",
     "bench/wtperf/wtperf.c",
+    "bench/wtperf/wtperf_throttle.c",
+    "bench/wtperf/wtperf_truncate.c",
     ],
-    LIBS=[wtlib, shim]  + wtlibs)
+    LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
 #Build the Examples
 for ex in examples:
-    if(ex in ['ex_all', 'ex_async', 'ex_thread', 'ex_encrypt']):
-        exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim] + wtlibs)
-        Default(exp)
-        env.Alias("check", env.SmokeTest(exp))
-    else:
-        exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtdll[1]] + wtlibs)
-        Default(exp)
-        if not ex == 'ex_log':
-            env.Alias("check", env.SmokeTest(exp))
+    exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim, testutil] + wtlibs)
+    Default(exp)
+    if not ex == 'ex_log':
+	env.Alias("check", env.SmokeTest(exp))
 
 # Install Target
 #

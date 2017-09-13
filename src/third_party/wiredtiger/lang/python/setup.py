@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2017 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -35,8 +35,9 @@ from distutils.core import setup, Extension
 if not 'ARCHFLAGS' in os.environ:
     os.environ['ARCHFLAGS'] = ''
 
-# Suppress warnings building SWIG generated code
-extra_cflags = [ '-w', '-I../../src/include']
+# Suppress warnings building SWIG generated code.  SWIG boiler plate
+# functions have sign conversion warnings, so those warnings must be disabled.
+extra_cflags = [ '-w', '-I../../src/include', '-Wno-sign-conversion']
 
 dir = os.path.dirname(__file__)
 

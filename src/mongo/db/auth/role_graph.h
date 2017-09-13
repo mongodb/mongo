@@ -34,12 +34,15 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
+
+class OperationContext;
 
 /**
  * A graph of role and privilege relationships.
@@ -54,6 +57,12 @@ namespace mongo {
  */
 class RoleGraph {
 public:
+    RoleGraph() = default;
+
+    // Explicitly make RoleGraph movable
+    RoleGraph(RoleGraph&&) = default;
+    RoleGraph& operator=(RoleGraph&&) = default;
+
     /**
      * Adds to "privileges" the privileges associated with the named built-in role, and returns
      * true. Returns false if "role" does not name a built-in role, and does not modify
@@ -61,10 +70,6 @@ public:
      * Privilege::addPrivilegeToPrivilegeVector.
      */
     static bool addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* privileges);
-
-    RoleGraph();
-    RoleGraph(const RoleGraph& other);
-    ~RoleGraph();
 
     // Built-in roles for backwards compatibility with 2.2 and prior
     static const std::string BUILTIN_ROLE_V0_READ;
@@ -122,6 +127,25 @@ public:
      * inherited from the role's subordinate roles.
      */
     const PrivilegeVector& getAllPrivileges(const RoleName& role);
+
+    /**
+     * Returns the RestrictionDocument (if any) attached to the given role.
+     * Restrictions applied transitively through this role's subordinate roles
+     * are not included.
+     */
+    const SharedRestrictionDocument& getDirectAuthenticationRestrictions(const RoleName& role) {
+        return _directRestrictionsForRole[role];
+    }
+
+    /**
+     * Returns a vector of all restriction documents that the given role contains.
+     * This includes both the restrictions set on this role directly,
+     * as well as any restrictions inherited from the role's subordinate roles.
+     */
+    const std::vector<SharedRestrictionDocument>& getAllAuthenticationRestrictions(
+        const RoleName& role) {
+        return _allRestrictionsForRole[role];
+    }
 
     /**
      * Returns whether or not the given role exists in the role graph.  Will implicitly
@@ -216,17 +240,26 @@ public:
     Status removeAllPrivilegesFromRole(const RoleName& role);
 
     /**
+     * Replace all restrictions on a role with a new Document
+     * Returns RoleNotFound if "role" doesn't exist in the role graph.
+     * Returns InvalidRoleModification if "role" is a built-in role.
+     */
+    Status replaceRestrictionsForRole(const RoleName& role, SharedRestrictionDocument restrictions);
+
+    /**
      * Updates the RoleGraph by adding the role named "roleName", with the given role
-     * memberships and privileges.  If the name "roleName" already exists, it is replaced.  Any
-     * subordinate roles mentioned in role.roles are created, if needed, with empty privilege
-     * and subordinate role lists.
+     * memberships, privileges, and authentication restrictions.
+     * If the name "roleName" already exists, it is replaced.
+     * Any subordinate roles mentioned in role.roles are created, if needed,
+     * with empty privilege, restriction, and subordinate role lists.
      *
      * Should _only_ fail if the role to replace is a builtin role, in which
      * case it will return ErrorCodes::InvalidRoleModification.
      */
     Status replaceRole(const RoleName& roleName,
                        const std::vector<RoleName>& roles,
-                       const PrivilegeVector& privileges);
+                       const PrivilegeVector& privileges,
+                       SharedRestrictionDocument restrictions);
 
     /**
      * Adds the role described in "doc" the role graph.
@@ -240,7 +273,8 @@ public:
      * operation is not supported, and other codes (typically BadValue) if the oplog operation
      * is ill-described.
      */
-    Status handleLogOp(const char* op,
+    Status handleLogOp(OperationContext* opCtx,
+                       const char* op,
                        const NamespaceString& ns,
                        const BSONObj& o,
                        const BSONObj* o2);
@@ -294,18 +328,28 @@ private:
 
 
     // Represents all the outgoing edges to other roles from any given role.
-    typedef unordered_map<RoleName, std::vector<RoleName>> EdgeSet;
+    using EdgeSet = unordered_map<RoleName, std::vector<RoleName>>;
     // Maps a role name to a list of privileges associated with that role.
-    typedef unordered_map<RoleName, PrivilegeVector> RolePrivilegeMap;
+    using RolePrivilegeMap = unordered_map<RoleName, PrivilegeVector>;
+
+    // Maps a role name to a restriction document.
+    using RestrictionDocumentMap = stdx::unordered_map<RoleName, SharedRestrictionDocument>;
+    // Maps a role name to all restriction documents from self and subordinates.
+    using RestrictionDocumentsMap =
+        stdx::unordered_map<RoleName, std::vector<SharedRestrictionDocument>>;
 
     EdgeSet _roleToSubordinates;
     unordered_map<RoleName, unordered_set<RoleName>> _roleToIndirectSubordinates;
     EdgeSet _roleToMembers;
     RolePrivilegeMap _directPrivilegesForRole;
     RolePrivilegeMap _allPrivilegesForRole;
+    RestrictionDocumentMap _directRestrictionsForRole;
+    RestrictionDocumentsMap _allRestrictionsForRole;
     std::set<RoleName> _allRoles;
 };
 
-void swap(RoleGraph& lhs, RoleGraph& rhs);
+inline void swap(RoleGraph& lhs, RoleGraph& rhs) {
+    lhs.swap(rhs);
+}
 
 }  // namespace mongo

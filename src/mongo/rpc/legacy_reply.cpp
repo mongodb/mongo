@@ -30,55 +30,74 @@
 
 #include "mongo/rpc/legacy_reply.h"
 
-#include <utility>
 #include <tuple>
+#include <utility>
 
+#include "mongo/bson/bson_validate.h"
+#include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/rpc/metadata.h"
 
 namespace mongo {
 namespace rpc {
 
-LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) {
+LegacyReply::LegacyReply(const Message* message) {
     invariant(message->operation() == opReply);
 
-    QueryResult::View qr = _message->singleData().view2ptr();
+    QueryResult::View qr = message->singleData().view2ptr();
 
     // should be checked by caller.
-    invariant(qr.msgdata().getOperation() == opReply);
+    invariant(qr.msgdata().getNetworkOp() == opReply);
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Got legacy command reply with a bad cursorId field,"
-                          << " expected a value of 0 but got " << qr.getCursorId(),
+                          << " expected a value of 0 but got "
+                          << qr.getCursorId(),
             qr.getCursorId() == 0);
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Got legacy command reply with a bad nReturned field,"
-                          << " expected a value of 1 but got " << qr.getNReturned(),
+                          << " expected a value of 1 but got "
+                          << qr.getNReturned(),
             qr.getNReturned() == 1);
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Got legacy command reply with a bad startingFrom field,"
-                          << " expected a value of 0 but got " << qr.getStartingFrom(),
+                          << " expected a value of 0 but got "
+                          << qr.getStartingFrom(),
             qr.getStartingFrom() == 0);
 
-    // TODO bson validation
-    std::tie(_commandReply, _metadata) =
-        uassertStatusOK(rpc::upconvertReplyMetadata(BSONObj(qr.data())));
+    auto status = Validator<BSONObj>::validateLoad(qr.data(), qr.dataLen());
+    uassert(ErrorCodes::InvalidBSON,
+            str::stream() << "Got legacy command reply with invalid BSON in the metadata field"
+                          << causedBy(status),
+            status.isOK());
+
+    _commandReply = BSONObj(qr.data());
+    _commandReply.shareOwnershipWith(message->sharedBuffer());
+
+    if (_commandReply.firstElementFieldName() == "$err"_sd) {
+        // Upconvert legacy errors.
+        BSONObjBuilder bob;
+        bob.appendAs(_commandReply.firstElement(), "errmsg");
+        bob.append("ok", 0.0);
+        if (auto code = _commandReply["code"]) {
+            bob.append(code);
+        }
+        _commandReply = bob.obj();
+    }
+
+    return;
 }
 
 const BSONObj& LegacyReply::getMetadata() const {
-    return _metadata;
+    return _commandReply;
 }
 
 const BSONObj& LegacyReply::getCommandReply() const {
     return _commandReply;
-}
-
-DocumentRange LegacyReply::getOutputDocs() const {
-    // return empty range
-    return DocumentRange{};
 }
 
 Protocol LegacyReply::getProtocol() const {

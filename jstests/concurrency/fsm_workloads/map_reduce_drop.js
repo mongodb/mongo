@@ -36,7 +36,7 @@ var $config = (function() {
     var states = (function() {
 
         function dropColl(db, collName) {
-            var mapReduceDB = db.getSiblingDB(uniqueDBName);
+            var mapReduceDB = db.getSiblingDB(db.getName() + uniqueDBName);
 
             // We don't check the return value of drop() because the collection
             // might not exist due to a drop() in another thread.
@@ -44,14 +44,14 @@ var $config = (function() {
         }
 
         function dropDB(db, collName) {
-            var mapReduceDB = db.getSiblingDB(uniqueDBName);
+            var mapReduceDB = db.getSiblingDB(db.getName() + uniqueDBName);
 
             var res = mapReduceDB.dropDatabase();
             assertAlways.commandWorked(res);
         }
 
         function mapReduce(db, collName) {
-            var mapReduceDB = db.getSiblingDB(uniqueDBName);
+            var mapReduceDB = db.getSiblingDB(db.getName() + uniqueDBName);
 
             // Try to ensure that some documents have been inserted before running
             // the mapReduce command.  Although it's possible for the documents to
@@ -60,7 +60,7 @@ var $config = (function() {
             // iterations and threads in this workload.
             var bulk = mapReduceDB[collName].initializeUnorderedBulkOp();
             for (var i = 0; i < this.numDocs; ++i) {
-                bulk.insert({ key: Random.randInt(10000) });
+                bulk.insert({key: Random.randInt(10000)});
             }
             var res = bulk.execute();
             assertAlways.writeOK(res);
@@ -74,29 +74,24 @@ var $config = (function() {
 
             try {
                 mapReduceDB[collName].mapReduce(this.mapper, this.reducer, options);
-            }
-            catch (e) {
+            } catch (e) {
                 // Ignore all mapReduce exceptions.  This workload is only concerned
                 // with verifying server availability.
             }
         }
 
-        return {
-            dropColl: dropColl,
-            dropDB: dropDB,
-            mapReduce: mapReduce
-        };
+        return {dropColl: dropColl, dropDB: dropDB, mapReduce: mapReduce};
 
     })();
 
     var transitions = {
-        dropColl: { mapReduce: 1 },
-        dropDB: { mapReduce: 1 },
-        mapReduce: { mapReduce: 0.7, dropDB: 0.05, dropColl: 0.25 }
+        dropColl: {mapReduce: 1},
+        dropDB: {mapReduce: 1},
+        mapReduce: {mapReduce: 0.7, dropDB: 0.05, dropColl: 0.25}
     };
 
     function teardown(db, collName, cluster) {
-        var mapReduceDB = db.getSiblingDB(uniqueDBName);
+        var mapReduceDB = db.getSiblingDB(db.getName() + uniqueDBName);
 
         // Ensure that the database that was created solely for this workload
         // has been dropped, in case it hasn't already been dropped by a

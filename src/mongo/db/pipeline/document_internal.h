@@ -30,10 +30,12 @@
 
 #include <third_party/murmurhash3/MurmurHash3.h>
 
+#include <bitset>
 #include <boost/intrusive_ptr.hpp>
 
-#include "mongo/util/intrusive_counter.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 /** Helper class to make the position in a document abstract
@@ -95,7 +97,6 @@ public:
 
 
     // helpers for doing pointer arithmetic with this class
-    // Note: These don't dereference 'this' so they are safe to use with NULL
     char* ptr() {
         return reinterpret_cast<char*>(this);
     }
@@ -123,7 +124,7 @@ private:
 };
 // Real size is sizeof(ValueElement) + nameLen
 #pragma pack()
-BOOST_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1));
+MONGO_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1));
 
 // This is an internal class for Document. See FieldIterator for the public version.
 class DocumentStorageIterator {
@@ -180,20 +181,28 @@ private:
 /// Storage class used by both Document and MutableDocument
 class DocumentStorage : public RefCountable {
 public:
-    // Note: default constructor should zero-init to support emptyDoc()
     DocumentStorage()
         : _buffer(NULL),
           _bufferEnd(NULL),
           _usedBytes(0),
           _numFields(0),
           _hashTabMask(0),
-          _hasTextScore(false),
-          _textScore(0) {}
+          _metaFields(),
+          _textScore(0),
+          _randVal(0) {}
+
     ~DocumentStorage();
 
+    enum MetaType : char {
+        TEXT_SCORE,
+        RAND_VAL,
+        SORT_KEY,
+
+        NUM_FIELDS
+    };
+
     static const DocumentStorage& emptyDoc() {
-        static const char emptyBytes[sizeof(DocumentStorage)] = {0};
-        return *reinterpret_cast<const DocumentStorage*>(emptyBytes);
+        return kEmptyDoc;
     }
 
     size_t size() const {
@@ -269,23 +278,51 @@ public:
         if (source.hasTextScore()) {
             setTextScore(source.getTextScore());
         }
+        if (source.hasRandMetaField()) {
+            setRandMetaField(source.getRandMetaField());
+        }
+        if (source.hasSortKeyMetaField()) {
+            setSortKeyMetaField(source.getSortKeyMetaField());
+        }
     }
 
     bool hasTextScore() const {
-        return _hasTextScore;
+        return _metaFields.test(MetaType::TEXT_SCORE);
     }
     double getTextScore() const {
         return _textScore;
     }
     void setTextScore(double score) {
-        _hasTextScore = true;
+        _metaFields.set(MetaType::TEXT_SCORE);
         _textScore = score;
+    }
+
+    bool hasRandMetaField() const {
+        return _metaFields.test(MetaType::RAND_VAL);
+    }
+    double getRandMetaField() const {
+        return _randVal;
+    }
+    void setRandMetaField(double val) {
+        _metaFields.set(MetaType::RAND_VAL);
+        _randVal = val;
+    }
+
+    bool hasSortKeyMetaField() const {
+        return _metaFields.test(MetaType::SORT_KEY);
+    }
+    BSONObj getSortKeyMetaField() const {
+        return _sortKey;
+    }
+    void setSortKeyMetaField(BSONObj sortKey) {
+        _metaFields.set(MetaType::SORT_KEY);
+        _sortKey = sortKey.getOwned();
     }
 
 private:
     /// Same as lastElement->next() or firstElement() if empty.
     const ValueElement* end() const {
-        return _firstElement->plusBytes(_usedBytes);
+        return _firstElement ? _firstElement->plusBytes(_usedBytes) : nullptr;
     }
 
     /// Allocates space in _buffer. Copies existing data if there is any.
@@ -360,8 +397,13 @@ private:
     unsigned _numFields;    // this includes removed fields
     unsigned _hashTabMask;  // equal to hashTabBuckets()-1 but used more often
 
-    bool _hasTextScore;  // When adding more metadata fields, this should become a bitvector
+    std::bitset<MetaType::NUM_FIELDS> _metaFields;
     double _textScore;
+    double _randVal;
+    BSONObj _sortKey;
     // When adding a field, make sure to update clone() method
+
+    // Defined in document.cpp
+    static const DocumentStorage kEmptyDoc;
 };
 }

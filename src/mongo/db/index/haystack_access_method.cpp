@@ -34,6 +34,9 @@
 
 
 #include "mongo/base/status.h"
+#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
@@ -45,6 +48,8 @@
 namespace mongo {
 
 using std::unique_ptr;
+
+namespace dps = ::mongo::dotted_path_support;
 
 HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
                                            SortedDataInterface* btree)
@@ -58,11 +63,13 @@ HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
     uassert(16774, "no non-geo fields specified", _otherFields.size());
 }
 
-void HaystackAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
+void HaystackAccessMethod::doGetKeys(const BSONObj& obj,
+                                     BSONObjSet* keys,
+                                     MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
 }
 
-void HaystackAccessMethod::searchCommand(OperationContext* txn,
+void HaystackAccessMethod::searchCommand(OperationContext* opCtx,
                                          Collection* collection,
                                          const BSONObj& nearObj,
                                          double maxDistance,
@@ -71,8 +78,8 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
                                          unsigned limit) {
     Timer t;
 
-    LOG(1) << "SEARCH near:" << nearObj << " maxDistance:" << maxDistance << " search: " << search
-           << endl;
+    LOG(1) << "SEARCH near:" << redact(nearObj) << " maxDistance:" << maxDistance
+           << " search: " << redact(search);
     int x, y;
     {
         BSONObjIterator i(nearObj);
@@ -81,7 +88,7 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
     }
     int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
 
-    GeoHaystackSearchHopper hopper(txn, nearObj, maxDistance, limit, _geoField, collection);
+    GeoHaystackSearchHopper hopper(opCtx, nearObj, maxDistance, limit, _geoField, collection);
 
     long long btreeMatches = 0;
 
@@ -92,7 +99,7 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
 
             for (unsigned i = 0; i < _otherFields.size(); i++) {
                 // See if the non-geo field we're indexing on is in the provided search term.
-                BSONElement e = search.getFieldDotted(_otherFields[i]);
+                BSONElement e = dps::extractElementAtPath(search, _otherFields[i]);
                 if (e.eoo())
                     bb.appendNull("");
                 else
@@ -104,11 +111,17 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
             unordered_set<RecordId, RecordId::Hasher> thisPass;
 
 
-            unique_ptr<PlanExecutor> exec(
-                InternalPlanner::indexScan(txn, collection, _descriptor, key, key, true));
+            auto exec = InternalPlanner::indexScan(opCtx,
+                                                   collection,
+                                                   _descriptor,
+                                                   key,
+                                                   key,
+                                                   BoundInclusion::kIncludeBothStartAndEndKeys,
+                                                   PlanExecutor::NO_YIELD);
             PlanExecutor::ExecState state;
+            BSONObj obj;
             RecordId loc;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
                 if (hopper.limitReached()) {
                     break;
                 }
@@ -121,6 +134,9 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
                     btreeMatches++;
                 }
             }
+
+            // Non-yielding collection scans from InternalPlanner will never error.
+            invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);
         }
     }
 

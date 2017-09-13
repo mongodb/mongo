@@ -33,18 +33,18 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/db/commands.h"
 
 namespace {
 
 using namespace mongo;
 
-class TopCommand : public Command {
+class TopCommand : public BasicCommand {
 public:
-    TopCommand() : Command("top", true) {}
+    TopCommand() : BasicCommand("top") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -52,7 +52,7 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual void help(std::stringstream& help) const {
@@ -65,16 +65,14 @@ public:
         actions.addAction(ActionType::top);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& db,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         {
             BSONObjBuilder b(result.subobjStart("totals"));
             b.append("note", "all times in microseconds");
-            Top::get(txn->getClient()->getServiceContext()).append(b);
+            Top::get(opCtx->getClient()->getServiceContext()).append(b);
             b.done();
         }
         return true;

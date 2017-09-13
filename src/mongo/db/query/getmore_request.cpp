@@ -31,25 +31,47 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/namespace_string.h"
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
 
+namespace {
+
+const char kCollectionField[] = "collection";
+const char kBatchSizeField[] = "batchSize";
+const char kAwaitDataTimeoutField[] = "maxTimeMS";
+const char kTermField[] = "term";
+const char kLastKnownCommittedOpTimeField[] = "lastKnownCommittedOpTime";
+
+}  // namespace
+
+const char GetMoreRequest::kGetMoreCommandName[] = "getMore";
+
 GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
-GetMoreRequest::GetMoreRequest(const std::string& fullns,
+GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
                                CursorId id,
-                               boost::optional<int> sizeOfBatch)
-    : nss(fullns), cursorid(id), batchSize(sizeOfBatch) {}
+                               boost::optional<long long> sizeOfBatch,
+                               boost::optional<Milliseconds> awaitDataTimeout,
+                               boost::optional<long long> term,
+                               boost::optional<repl::OpTime> lastKnownCommittedOpTime)
+    : nss(std::move(namespaceString)),
+      cursorid(id),
+      batchSize(sizeOfBatch),
+      awaitDataTimeout(awaitDataTimeout),
+      term(term),
+      lastKnownCommittedOpTime(lastKnownCommittedOpTime) {}
 
 Status GetMoreRequest::isValid() const {
     if (!nss.isValid()) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "Invalid namespace for getMore: " << nss.ns());
     }
 
@@ -60,18 +82,19 @@ Status GetMoreRequest::isValid() const {
     if (batchSize && *batchSize <= 0) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Batch size for getMore must be positive, "
-                                    << "but received: " << *batchSize);
+                                    << "but received: "
+                                    << *batchSize);
     }
 
     return Status::OK();
 }
 
 // static
-std::string GetMoreRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
+NamespaceString GetMoreRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
     BSONElement collElt = cmdObj["collection"];
     const std::string coll = (collElt.type() == BSONType::String) ? collElt.String() : "";
 
-    return str::stream() << dbname << "." << coll;
+    return NamespaceString(dbname, coll);
 }
 
 // static
@@ -81,43 +104,66 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 
     // Required fields.
     boost::optional<CursorId> cursorid;
-    boost::optional<std::string> fullns;
+    boost::optional<NamespaceString> nss;
 
-    // Optional field.
-    boost::optional<int> batchSize;
+    // Optional fields.
+    boost::optional<long long> batchSize;
+    boost::optional<Milliseconds> awaitDataTimeout;
+    boost::optional<long long> term;
+    boost::optional<repl::OpTime> lastKnownCommittedOpTime;
 
     for (BSONElement el : cmdObj) {
-        const char* fieldName = el.fieldName();
-        if (str::equals(fieldName, "getMore")) {
+        const auto fieldName = el.fieldNameStringData();
+        if (fieldName == kGetMoreCommandName) {
             if (el.type() != BSONType::NumberLong) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'getMore' must be of type long in: " << cmdObj};
             }
 
             cursorid = el.Long();
-        } else if (str::equals(fieldName, "collection")) {
+        } else if (fieldName == kCollectionField) {
             if (el.type() != BSONType::String) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream()
-                            << "Field 'collection' must be of type string in: " << cmdObj};
+                        str::stream() << "Field 'collection' must be of type string in: "
+                                      << cmdObj};
             }
 
-            fullns = parseNs(dbname, cmdObj);
-        } else if (str::equals(fieldName, "batchSize")) {
+            nss = parseNs(dbname, cmdObj);
+        } else if (fieldName == kBatchSizeField) {
             if (!el.isNumber()) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'batchSize' must be a number in: " << cmdObj};
             }
 
-            batchSize = el.numberInt();
-        } else if (str::equals(fieldName, "maxTimeMS")) {
-            // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
-            // here.
-            continue;
-        } else if (!str::startsWith(fieldName, "$")) {
+            batchSize = el.numberLong();
+        } else if (fieldName == kAwaitDataTimeoutField) {
+            auto maxAwaitDataTime = QueryRequest::parseMaxTimeMS(el);
+            if (!maxAwaitDataTime.isOK()) {
+                return maxAwaitDataTime.getStatus();
+            }
+
+            if (maxAwaitDataTime.getValue()) {
+                awaitDataTimeout = Milliseconds(maxAwaitDataTime.getValue());
+            }
+        } else if (fieldName == kTermField) {
+            if (el.type() != BSONType::NumberLong) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "Field 'term' must be of type NumberLong in: " << cmdObj};
+            }
+            term = el.Long();
+        } else if (fieldName == kLastKnownCommittedOpTimeField) {
+            repl::OpTime ot;
+            Status status = bsonExtractOpTimeField(el.wrap(), kLastKnownCommittedOpTimeField, &ot);
+            if (!status.isOK()) {
+                return status;
+            }
+            lastKnownCommittedOpTime = ot;
+        } else if (!Command::isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "Failed to parse: " << cmdObj << ". "
-                                  << "Unrecognized field '" << fieldName << "'."};
+                                  << "Unrecognized field '"
+                                  << fieldName
+                                  << "'."};
         }
     }
 
@@ -126,18 +172,44 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 str::stream() << "Field 'getMore' missing in: " << cmdObj};
     }
 
-    if (!fullns) {
+    if (!nss) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "Field 'collection' missing in: " << cmdObj};
     }
 
-    GetMoreRequest request(*fullns, *cursorid, batchSize);
+    GetMoreRequest request(
+        std::move(*nss), *cursorid, batchSize, awaitDataTimeout, term, lastKnownCommittedOpTime);
     Status validStatus = request.isValid();
     if (!validStatus.isOK()) {
         return validStatus;
     }
 
     return request;
+}
+
+BSONObj GetMoreRequest::toBSON() const {
+    BSONObjBuilder builder;
+
+    builder.append(kGetMoreCommandName, cursorid);
+    builder.append(kCollectionField, nss.coll());
+
+    if (batchSize) {
+        builder.append(kBatchSizeField, *batchSize);
+    }
+
+    if (awaitDataTimeout) {
+        builder.append(kAwaitDataTimeoutField, durationCount<Milliseconds>(*awaitDataTimeout));
+    }
+
+    if (term) {
+        builder.append(kTermField, *term);
+    }
+
+    if (lastKnownCommittedOpTime) {
+        lastKnownCommittedOpTime->append(&builder, kLastKnownCommittedOpTimeField);
+    }
+
+    return builder.obj();
 }
 
 }  // namespace mongo

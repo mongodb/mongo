@@ -36,10 +36,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/match_details.h"
 
 
 namespace mongo {
+
+class CollatorInterface;
 
 /**
  * Matcher is a simple wrapper around a BSONObj and the MatchExpression created from it.
@@ -48,9 +51,15 @@ class Matcher {
     MONGO_DISALLOW_COPYING(Matcher);
 
 public:
-    explicit Matcher(const BSONObj& pattern,
-                     const MatchExpressionParser::WhereCallback& whereCallback =
-                         MatchExpressionParser::WhereCallback());
+    /**
+     * 'collator' must outlive the returned Matcher and any MatchExpression cloned from it.
+     */
+    Matcher(const BSONObj& pattern,
+            const CollatorInterface* collator,
+            const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
+            const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
+            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+                MatchExpressionParser::kDefaultSpecialFeatures);
 
     bool matches(const BSONObj& doc, MatchDetails* details = NULL) const;
 
@@ -60,6 +69,10 @@ public:
 
     std::string toString() const {
         return _pattern.toString();
+    }
+
+    MatchExpression* getMatchExpression() {
+        return _expression.get();
     }
 
 private:

@@ -57,8 +57,8 @@ const std::string kLegalHeartbeatFieldNames[] = {kCheckEmptyFieldName,
 }  // namespace
 
 Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
-    Status status =
-        bsonCheckOnlyHasFields("ReplSetHeartbeatArgs", argsObj, kLegalHeartbeatFieldNames);
+    Status status = bsonCheckOnlyHasFieldsForCommand(
+        "ReplSetHeartbeatArgs", argsObj, kLegalHeartbeatFieldNames);
     if (!status.isOK())
         return status;
 
@@ -106,6 +106,7 @@ void ReplSetHeartbeatArgsV1::setConfigVersion(long long newVal) {
 
 void ReplSetHeartbeatArgsV1::setSenderHost(const HostAndPort& newVal) {
     _senderHost = newVal;
+    _hasSender = true;
 }
 
 void ReplSetHeartbeatArgsV1::setSenderId(long long newVal) {

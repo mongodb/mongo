@@ -28,310 +28,87 @@
 
 #include "mongo/platform/basic.h"
 
-#include <vector>
-
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/pipeline_proxy.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/pipeline_d.h"
-#include "mongo/db/query/cursor_responses.h"
-#include "mongo/db/query/find_constants.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/storage_options.h"
 
 namespace mongo {
+namespace {
 
-using boost::intrusive_ptr;
-using std::endl;
-using std::shared_ptr;
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
-
-/**
- * Returns true if we need to keep a ClientCursor saved for this pipeline (for future getMore
- * requests).  Otherwise, returns false.
- */
-static bool handleCursorCommand(OperationContext* txn,
-                                const string& ns,
-                                ClientCursorPin* pin,
-                                PlanExecutor* exec,
-                                const BSONObj& cmdObj,
-                                BSONObjBuilder& result) {
-    ClientCursor* cursor = pin ? pin->c() : NULL;
-    if (pin) {
-        invariant(cursor);
-        invariant(cursor->getExecutor() == exec);
-        invariant(cursor->isAggCursor());
+bool isMergePipeline(const std::vector<BSONObj>& pipeline) {
+    if (pipeline.empty()) {
+        return false;
     }
-
-    const long long defaultBatchSize = 101;  // Same as query.
-    long long batchSize;
-    uassertStatusOK(Command::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
-
-    // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
-    BSONArrayBuilder resultsArray;
-    const int byteLimit = MaxBytesToReturnToClientAtOnce;
-    BSONObj next;
-    for (int objCount = 0; objCount < batchSize; objCount++) {
-        // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
-        // do it when batchSize is 0 since that indicates a desire for a fast return.
-        if (exec->getNext(&next, NULL) != PlanExecutor::ADVANCED) {
-            // make it an obvious error to use cursor or executor after this point
-            cursor = NULL;
-            exec = NULL;
-            break;
-        }
-
-        if (resultsArray.len() + next.objsize() > byteLimit) {
-            // Get the pipeline proxy stage wrapped by this PlanExecutor.
-            PipelineProxyStage* proxy = static_cast<PipelineProxyStage*>(exec->getRootStage());
-            // too big. next will be the first doc in the second batch
-            proxy->pushBack(next);
-            break;
-        }
-
-        resultsArray.append(next);
-    }
-
-    // NOTE: exec->isEOF() can have side effects such as writing by $out. However, it should
-    // be relatively quick since if there was no pin then the input is empty. Also, this
-    // violates the contract for batchSize==0. Sharding requires a cursor to be returned in that
-    // case. This is ok for now however, since you can't have a sharded collection that doesn't
-    // exist.
-    const bool canReturnMoreBatches = pin;
-    if (!canReturnMoreBatches && exec && !exec->isEOF()) {
-        // msgasserting since this shouldn't be possible to trigger from today's aggregation
-        // language. The wording assumes that the only reason pin would be null is if the
-        // collection doesn't exist.
-        msgasserted(
-            17391,
-            str::stream() << "Aggregation has more results than fit in initial batch, but can't "
-                          << "create cursor since collection " << ns << " doesn't exist");
-    }
-
-    if (cursor) {
-        // If a time limit was set on the pipeline, remaining time is "rolled over" to the
-        // cursor (for use by future getmore ops).
-        cursor->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
-
-        CurOp::get(txn)->debug().cursorid = cursor->cursorid();
-
-        if (txn->getClient()->isInDirectClient()) {
-            cursor->setUnownedRecoveryUnit(txn->recoveryUnit());
-        } else {
-            // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
-            // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
-            txn->recoveryUnit()->abandonSnapshot();
-            cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-            invariant(txn->setRecoveryUnit(storageEngine->newRecoveryUnit(),
-                                           OperationContext::kNotInUnitOfWork) ==
-                      OperationContext::kNotInUnitOfWork);
-        }
-
-        // Cursor needs to be in a saved state while we yield locks for getmore. State
-        // will be restored in getMore().
-        exec->saveState();
-    }
-
-    const long long cursorId = cursor ? cursor->cursorid() : 0LL;
-    appendCursorResponseObject(cursorId, ns, resultsArray.arr(), &result);
-
-    return static_cast<bool>(cursor);
+    return pipeline[0].hasField("$mergeCursors");
 }
 
-
-class PipelineCommand : public Command {
+class PipelineCommand : public BasicCommand {
 public:
-    PipelineCommand() : Command(Pipeline::commandName) {}  // command is called "aggregate"
+    PipelineCommand() : BasicCommand("aggregate") {}
 
-    // Locks are managed manually, in particular by DocumentSourceCursor.
-    virtual bool isWriteCommandForConfigServer() const {
+    void help(std::stringstream& help) const override {
+        help << "Runs the aggregation command. See http://dochub.mongodb.org/core/aggregation for "
+                "more details.";
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return Pipeline::aggSupportsWriteConcern(cmd);
+    }
+
+    bool slaveOk() const override {
         return false;
     }
-    virtual bool slaveOk() const {
-        return false;
-    }
-    virtual bool slaveOverrideOk() const {
+
+    bool slaveOverrideOk() const override {
         return true;
     }
-    virtual void help(stringstream& help) const {
-        help << "{ pipeline: [ { $operator: {...}}, ... ]"
-             << ", explain: <bool>"
-             << ", allowDiskUse: <bool>"
-             << ", cursor: {batchSize: <number>}"
-             << " }" << endl
-             << "See http://dochub.mongodb.org/core/aggregation for more details.";
+
+    bool supportsNonLocalReadConcern(const std::string& dbName,
+                                     const BSONObj& cmdObj) const override {
+        return !AggregationRequest::parseNs(dbName, cmdObj).isCollectionlessAggregateNS();
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
+    ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kRead;
     }
 
-    virtual bool run(OperationContext* txn,
-                     const string& db,
-                     BSONObj& cmdObj,
-                     int options,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
-        const std::string ns = parseNs(db, cmdObj);
-        if (nsToCollectionSubstring(ns).empty()) {
-            errmsg = "missing collection name";
-            return false;
-        }
-        NamespaceString nss(ns);
-
-        intrusive_ptr<ExpressionContext> pCtx = new ExpressionContext(txn, nss);
-        pCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-
-        /* try to parse the command; if this fails, then we didn't run */
-        intrusive_ptr<Pipeline> pPipeline = Pipeline::parseCommand(errmsg, cmdObj, pCtx);
-        if (!pPipeline.get())
-            return false;
-
-        // This is outside of the if block to keep the object alive until the pipeline is finished.
-        BSONObj parsed;
-        if (kDebugBuild && !pPipeline->isExplain() && !pCtx->inShard) {
-            // Make sure all operations round-trip through Pipeline::toBson() correctly by
-            // reparsing every command in debug builds. This is important because sharded
-            // aggregations rely on this ability.  Skipping when inShard because this has
-            // already been through the transformation (and this unsets pCtx->inShard).
-            parsed = pPipeline->serialize().toBson();
-            pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
-            verify(pPipeline);
-        }
-
-        PlanExecutor* exec = NULL;
-        unique_ptr<ClientCursorPin> pin;  // either this OR the execHolder will be non-null
-        unique_ptr<PlanExecutor> execHolder;
-        {
-            // This will throw if the sharding version for this connection is out of date. The
-            // lock must be held continuously from now until we have we created both the output
-            // ClientCursor and the input executor. This ensures that both are using the same
-            // sharding version that we synchronize on here. This is also why we always need to
-            // create a ClientCursor even when we aren't outputting to a cursor. See the comment
-            // on ShardFilterStage for more details.
-            AutoGetCollectionForRead ctx(txn, nss.ns());
-
-            Collection* collection = ctx.getCollection();
-
-            // This does mongod-specific stuff like creating the input PlanExecutor and adding
-            // it to the front of the pipeline if needed.
-            std::shared_ptr<PlanExecutor> input =
-                PipelineD::prepareCursorSource(txn, collection, pPipeline, pCtx);
-            pPipeline->stitch();
-
-            // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
-            // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created
-            // PlanExecutor.
-            unique_ptr<WorkingSet> ws(new WorkingSet());
-            unique_ptr<PipelineProxyStage> proxy(
-                new PipelineProxyStage(pPipeline, input, ws.get()));
-            Status execStatus = Status::OK();
-            if (NULL == collection) {
-                execStatus = PlanExecutor::make(txn,
-                                                ws.release(),
-                                                proxy.release(),
-                                                nss.ns(),
-                                                PlanExecutor::YIELD_MANUAL,
-                                                &exec);
-            } else {
-                execStatus = PlanExecutor::make(txn,
-                                                ws.release(),
-                                                proxy.release(),
-                                                collection,
-                                                PlanExecutor::YIELD_MANUAL,
-                                                &exec);
-            }
-            invariant(execStatus.isOK());
-            execHolder.reset(exec);
-
-            if (!collection && input) {
-                // If we don't have a collection, we won't be able to register any executors, so
-                // make sure that the input PlanExecutor (likely wrapping an EOFStage) doesn't
-                // need to be registered.
-                invariant(!input->collection());
-            }
-
-            if (collection) {
-                const bool isAggCursor = true;  // enable special locking behavior
-                ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
-                                                        execHolder.release(),
-                                                        nss.ns(),
-                                                        0,
-                                                        cmdObj.getOwned(),
-                                                        isAggCursor);
-                pin.reset(new ClientCursorPin(collection->getCursorManager(), cursor->cursorid()));
-                // Don't add any code between here and the start of the try block.
-            }
-
-            // At this point, it is safe to release the collection lock.
-            // - In the case where we have a collection: we will need to reacquire the
-            //   collection lock later when cleaning up our ClientCursorPin.
-            // - In the case where we don't have a collection: our PlanExecutor won't be
-            //   registered, so it will be safe to clean it up outside the lock.
-            invariant(NULL == execHolder.get() || NULL == execHolder->collection());
-        }
-
-        try {
-            // Unless set to true, the ClientCursor created above will be deleted on block exit.
-            bool keepCursor = false;
-
-            const bool isCursorCommand = !cmdObj["cursor"].eoo();
-
-            // If both explain and cursor are specified, explain wins.
-            if (pPipeline->isExplain()) {
-                result << "stages" << Value(pPipeline->writeExplainOps());
-            } else if (isCursorCommand) {
-                keepCursor = handleCursorCommand(txn, nss.ns(), pin.get(), exec, cmdObj, result);
-            } else {
-                pPipeline->run(result);
-            }
-
-            // Clean up our ClientCursorPin, if needed.  We must reacquire the collection lock
-            // in order to do so.
-            if (pin) {
-                // We acquire locks here with DBLock and CollectionLock instead of using
-                // AutoGetCollectionForRead.  AutoGetCollectionForRead will throw if the
-                // sharding version is out of date, and we don't care if the sharding version
-                // has changed.
-                Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_IS);
-                Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IS);
-                if (keepCursor) {
-                    pin->release();
-                } else {
-                    pin->deleteUnderlying();
-                }
-            }
-        } catch (...) {
-            // On our way out of scope, we clean up our ClientCursorPin if needed.
-            if (pin) {
-                Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_IS);
-                Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IS);
-                pin->deleteUnderlying();
-            }
-            throw;
-        }
-        // Any code that needs the cursor pinned must be inside the try block, above.
-
-        return true;
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) override {
+        const NamespaceString nss(AggregationRequest::parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj, false);
     }
-} cmdPipeline;
 
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const auto aggregationRequest =
+            uassertStatusOK(AggregationRequest::parseFromBSON(dbname, cmdObj, boost::none));
+
+        return appendCommandStatus(result,
+                                   runAggregate(opCtx,
+                                                aggregationRequest.getNamespaceString(),
+                                                aggregationRequest,
+                                                cmdObj,
+                                                result));
+    }
+
+    Status explain(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   ExplainOptions::Verbosity verbosity,
+                   BSONObjBuilder* out) const override {
+        const auto aggregationRequest =
+            uassertStatusOK(AggregationRequest::parseFromBSON(dbname, cmdObj, verbosity));
+
+        return runAggregate(
+            opCtx, aggregationRequest.getNamespaceString(), aggregationRequest, cmdObj, *out);
+    }
+
+} pipelineCmd;
+
+}  // namespace
 }  // namespace mongo

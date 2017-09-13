@@ -7,8 +7,8 @@
  * occurs once the collection reaches a certain size or contains a
  * certain number of documents.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/create_capped_collection.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload
+load('jstests/concurrency/fsm_workloads/create_capped_collection.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -18,7 +18,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     var options = {
         capped: true,
-        size: 8192, // multiple of 256; larger than 4096 default
+        size: 8192,  // multiple of 256; larger than 4096 default
         max: 3
     };
 
@@ -38,7 +38,8 @@ var $config = extendWorkload($config, function($config, $super) {
         this.verifySizeTruncation(db, myCollName, options);
 
         // Insert multiple small documents and verify that at least one truncation has occurred.
-        // There should never be more than 3 documents in the collection, regardless of the storage
+        // There should never be more than 3 documents in the collection, regardless of the
+        // storage
         // engine. They should always be the most recently inserted documents.
 
         var ids = [];

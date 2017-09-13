@@ -1,0 +1,555 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# IDL Unit Tests IDL file
+global:
+    # Use a nested namespace simply to exercise nested namespace support for the code generator.
+    cpp_namespace: "mongo::idl::test"
+    cpp_includes:
+        - "mongo/idl/idl_test_types.h"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/idl/unittest_import.idl"
+
+types:
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for a bindata type
+#
+##################################################################################################
+
+    bindata_custom:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: "A MongoDB BinDataCustomType"
+        cpp_type: "mongo::BinDataCustomType"
+        serializer: mongo::BinDataCustomType::serializeToBSON
+        deserializer: mongo::BinDataCustomType::parseFromBSON
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for an any type
+#
+##################################################################################################
+
+    any_basic_type:
+        bson_serialization_type: any
+        description: "An Any Type"
+        cpp_type: "mongo::AnyBasicType"
+        serializer: mongo::AnyBasicType::serializeToBSON
+        deserializer: mongo::AnyBasicType::parseFromBSON
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for an object type
+#
+##################################################################################################
+
+    object_basic_type:
+        bson_serialization_type: object
+        description: "An object Type"
+        cpp_type: "mongo::ObjectBasicType"
+        serializer: mongo::ObjectBasicType::serializeToBSON
+        deserializer: mongo::ObjectBasicType::parseFromBSON
+
+##################################################################################################
+#
+# Test types that accept multiple serialization types
+#
+##################################################################################################
+
+    safeInt32:
+        description: Accepts any numerical type within int32 range
+        cpp_type: std::int64_t
+        bson_serialization_type: 
+                                - long
+                                - int
+                                - decimal
+                                - double
+        deserializer: "mongo::BSONElement::numberInt"
+
+##################################################################################################
+#
+# Test types used in parser chaining testing
+#
+##################################################################################################
+
+    ChainedType:
+        bson_serialization_type: chain
+        description: "An Chain Type to test chaining"
+        cpp_type: "mongo::ChainedType"
+        serializer: mongo::ChainedType::serializeToBSON
+        deserializer: mongo::ChainedType::parseFromBSON
+
+    AnotherChainedType:
+        bson_serialization_type: chain
+        description: "Another Chain Type to test chaining"
+        cpp_type: "mongo::AnotherChainedType"
+        serializer: mongo::AnotherChainedType::serializeToBSON
+        deserializer: mongo::AnotherChainedType::parseFromBSON
+
+
+##################################################################################################
+#
+# Unit test structs for a single value to ensure type validation works correctly
+#
+##################################################################################################
+enums:
+
+    IntEnum:
+        description: "An example int enum"
+        type: int
+        values:
+            a0: 0
+            b1: 1
+            c2: 2
+
+    StringEnum:
+        description: "An example string enum"
+        type: string
+        values:
+            s0: "zero"
+            s1: "one"
+            s2: "two"
+
+structs:
+
+    one_plain_object:
+        description: UnitTest for a single BSONObj
+        fields:
+            value: object
+
+
+##################################################################################################
+#
+# Structs to test derived parsers
+#
+##################################################################################################
+
+    DerivedBaseStruct:
+        description: UnitTest for parser that will derive from a type
+        fields:
+            field1: int
+            field2: int
+
+
+##################################################################################################
+#
+# Structs to test various options for structs/fields
+#
+##################################################################################################
+    RequiredStrictField3:
+        description: UnitTest for a strict struct with 3 required fields
+        fields:
+            field1: int
+            field2: int
+            field3: int
+
+    RequiredNonStrictField3:
+        description: UnitTest for a non-strict struct with 3 required fields
+        strict: false
+        fields:
+            1:
+                type: int
+                cpp_name: cppField1
+            2:
+                type: int
+                cpp_name: cppField2
+            3:
+                type: int
+                cpp_name: cppField3
+
+
+##################################################################################################
+#
+# Nested Structs with duplicate types
+#
+##################################################################################################
+    NestedWithDuplicateTypes:
+        description: UnitTest for a non-strict struct with 3 required fields
+        strict: false
+        fields:
+            field1: RequiredStrictField3
+            field2: 
+                type: RequiredNonStrictField3
+                optional: true
+            field3: RequiredStrictField3
+
+##################################################################################################
+#
+# Structs to test various options for fields
+#
+##################################################################################################
+    ignoredField:
+        description: UnitTest for a struct with an ignored_field
+        fields:
+            required_field: int
+            ignored_field:
+                type: int
+                ignore: true
+
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for a string type
+#
+##################################################################################################
+
+    one_namespacestring:
+        description: UnitTest for a single namespacestring
+        fields:
+            value: namespacestring
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for a bindata type
+#
+##################################################################################################
+
+    one_bindata_custom:
+        description: UnitTest for a custom bindata
+        fields:
+            value: bindata_custom
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for an any type
+#
+##################################################################################################
+
+    one_any_basic_type:
+        description: UnitTest for a single any type
+        fields:
+            value: any_basic_type
+
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for an object type
+#
+##################################################################################################
+
+    one_object_basic_type:
+        description: UnitTest for a single object type
+        fields:
+            value: object_basic_type
+
+
+##################################################################################################
+#
+# Test types that accept multiple serialization types
+#
+##################################################################################################
+
+    one_safeint32:
+        description: UnitTest for a single safeInt32
+        fields:
+            value: safeInt32
+
+##################################################################################################
+#
+# Test fields with default values
+#
+##################################################################################################
+
+    default_values:
+        description: UnitTest for a single safeInt32
+        fields:
+            V_string:
+                type: string
+                default: '"a default"'
+            V_int:
+                type: int
+                default: 42
+            V_long:
+                type: long
+                default: 423
+            V_double:
+                type: double
+                default: 3.14159
+            V_bool:
+                type: bool
+                default: true
+
+##################################################################################################
+#
+# Test fields with optional values
+#
+##################################################################################################
+
+    optional_field:
+        description: UnitTest for a optional field
+        fields:
+            field1:
+                type: string
+                optional: true
+            field2:
+                type: int
+                optional: true
+            field3:
+                type: object
+                optional: true
+            field4:
+                type: bindata_generic
+                optional: true
+            field5:
+                type: bindata_uuid
+                optional: true
+
+##################################################################################################
+#
+# Test array of simple types
+#
+##################################################################################################
+    simple_int_array:
+        description: UnitTest for arrays of ints
+        fields:
+            field1:
+                type: array<int>
+
+    simple_array_fields:
+        description: UnitTest for arrays of simple types
+        fields:
+            field1:
+                type: array<string>
+            field2:
+                type: array<int>
+            field3:
+                type: array<double>
+            field4:
+                type: array<bindata_generic>
+            field5:
+                type: array<bindata_uuid>
+
+    optional_array_fields:
+        description: UnitTest for arrays of optional simple types
+        fields:
+            field1:
+                type: array<string>
+                optional: true
+            field2:
+                type: array<int>
+                optional: true
+            field3:
+                type: array<double>
+                optional: true
+            field4:
+                type: array<bindata_generic>
+                optional: true
+            field5:
+                type: array<bindata_uuid>
+                optional: true
+
+##################################################################################################
+#
+# Test array of complex types
+#
+##################################################################################################
+
+    complex_array_fields:
+        description: UnitTest for arrays of complex optional and non-optional simple types
+        fields:
+            field1:
+                type: array<safeInt32>
+            field2:
+                type: array<namespacestring>
+            field3:
+                type: array<any_basic_type>
+            field4:
+                type: array<object_basic_type>
+            field5:
+                type: array<object>
+            field6:
+                type: array<one_string>
+            field1o:
+                type: array<safeInt32>
+                optional: true
+            field2o:
+                type: array<namespacestring>
+                optional: true
+            field3o:
+                type: array<any_basic_type>
+                optional: true
+            field4o:
+                type: array<object_basic_type>
+                optional: true
+            field5o:
+                type: array<object>
+                optional: true
+            field6o:
+                type: array<one_string>
+                optional: true
+
+##################################################################################################
+#
+# Test Chained Types
+#
+##################################################################################################
+
+    chained_string_basic_type:
+        description: Base struct type for a chained string
+        strict: false
+        fields:
+            stringField: string
+
+    chained_any_basic_type:
+        description: Base struct type for a chained any
+        strict: false
+        fields:
+            anyField: any_basic_type
+
+    chained_object_basic_type:
+        description: Base struct type for a chained object
+        strict: false
+        fields:
+            objectField: object_basic_type
+
+    chained_struct_only:
+        description: UnitTest for chained struct with only chained types
+        strict: false
+        chained_types:
+            ChainedType : ChainedType
+            AnotherChainedType : AnotherChainedType
+
+    chained_struct_mixed:
+        description: Chained struct with chained structs and fields
+        strict: true
+        chained_structs:
+            chained_any_basic_type : chained_any_basic_type
+            chained_object_basic_type : ChainedObjectBasicType
+        fields:
+            field3: string
+
+    chained_struct_type_mixed:
+        description: Chained struct with chained types, structs, and fields
+        strict: false
+        chained_types:
+            ChainedType : chained_type
+            AnotherChainedType:
+                cpp_name: AnotherChainedType
+        chained_structs:
+            chained_string_basic_type:
+                cpp_name: ChainedStringBasicType
+        fields:
+            field3:
+                type: int
+
+
+##################################################################################################
+#
+# Test struct with enum
+#
+##################################################################################################
+    one_int_enum:
+        description: mock
+        fields:
+            value: IntEnum
+
+    one_string_enum:
+        description: mock
+        fields:
+            value: StringEnum
+
+    StructWithEnum:
+        description: mock
+        fields:
+            field1: IntEnum
+            field2: StringEnum
+            field1o:
+                type: IntEnum
+                optional: true
+            field2o:
+                type: StringEnum
+                optional: true
+
+##################################################################################################
+#
+# Test commands
+#
+##################################################################################################
+
+commands:
+    BasicIgnoredCommand:
+        description: UnitTest for a basic ignored command
+        namespace: ignored
+        fields:
+            field1: int
+            field2: string
+
+    BasicConcatenateWithDbCommand:
+        description: UnitTest for a basic concatenate_with_db command
+        namespace: concatenate_with_db
+        fields:
+            field1: int
+            field2: string
+
+    KnownFieldCommand:
+        description: UnitTest for a command that has a field that is special known generic command field
+        namespace: concatenate_with_db
+        fields:
+            field1: int
+            maxTimeMS: int
+
+    DocSequenceCommand:
+        description: UnitTest for a basic command with fields marked with supports_doc_sequence
+        namespace: concatenate_with_db
+        fields:
+            field1: int
+            field2: string
+            structs:
+                type: array<one_string>
+                supports_doc_sequence: true
+            objects:
+                type: array<object>
+                supports_doc_sequence: true
+            objects_custom:
+                type: array<object_basic_type>
+                supports_doc_sequence: true
+                optional: true
+
+    DocSequenceCommandNonStrict:
+        description: UnitTest for a basic command with fields marked with supports_doc_sequence and non-strict parsing
+        namespace: concatenate_with_db
+        strict: false
+        fields:
+            field1: int
+            field2: string
+            structs:
+                type: array<one_string>
+                supports_doc_sequence: true
+            objects:
+                type: array<object>
+                supports_doc_sequence: true
+            objects_custom:
+                type: array<object_basic_type>
+                supports_doc_sequence: true
+                optional: true
+
+    chained_command_type_mixed:
+        description: Chained command with chained types, structs, and fields
+        namespace: concatenate_with_db
+        strict: false
+        chained_types:
+            ChainedType : chained_type
+            AnotherChainedType:
+                cpp_name: AnotherChainedType
+        chained_structs:
+            chained_string_basic_type:
+                cpp_name: ChainedStringBasicType
+        fields:
+            field3:
+                type: int

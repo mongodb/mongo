@@ -7,6 +7,8 @@ on whether they apply to C++ unit tests, dbtests, or JS tests.
 
 from __future__ import absolute_import
 
+import collections
+import errno
 import fnmatch
 import os.path
 import subprocess
@@ -17,38 +19,105 @@ from . import errors
 from . import utils
 from .utils import globstar
 from .utils import jscomment
+from ..ciconfig import tags as _tags
 
 
-def filter_cpp_unit_tests(root="build/unittests.txt", include_files=None, exclude_files=None):
+def _parse_tag_file(test_kind):
     """
-    Filters out what C++ unit tests to run.
+    Parse the tag file and return a dict of tagged tests, with the key the filename and
+    a list of tags, i.e., {'file1.js': ['tag1', 'tag2'], 'file2.js': ['tag2', 'tag3']}
     """
+    if config.TAG_FILE:
+        tags_conf = _tags.TagsConfig.from_file(config.TAG_FILE)
+        tagged_roots = tags_conf.get_test_patterns(test_kind)
+    else:
+        tagged_roots = []
+    tagged_tests = collections.defaultdict(list)
+    for tagged_root in tagged_roots:
+        # Multiple tests could be returned for a set of tags.
+        tests = globstar.iglob(tagged_root)
+        test_tags = tags_conf.get_tags(test_kind, tagged_root)
+        for test in tests:
+            # A test could have a tag in more than one place, due to wildcards in the selector.
+            tagged_tests[test].extend(test_tags)
+    return tagged_tests
+
+
+def _tags_from_list(tags):
+    """
+    Returns list of tags from tag list.
+    Each tag in the list may be a list of comma separated tags, with empty strings ignored.
+    """
+
+    if tags is not None:
+        for tag in tags:
+            return [t for t in tag.split(",") if t != ""]
+    return []
+
+
+def _filter_cpp_tests(kind, root, include_files, exclude_files):
+    """
+    Generic filtering logic for C++ tests that are sourced from a list
+    of test executables.
+    """
+
+    # TODO: SERVER-22170 Implement full tagging support
+    # If --includeWithAnyTags is supplied, then no tests should be run since
+    # C++ tests cannot be tagged.
+    if _tags_from_list(config.INCLUDE_WITH_ANY_TAGS):
+        return []
 
     include_files = utils.default_if_none(include_files, [])
     exclude_files = utils.default_if_none(exclude_files, [])
 
-    unit_tests = []
+    tests = []
     with open(root, "r") as fp:
-        for unit_test_path in fp:
-            unit_test_path = unit_test_path.rstrip()
-            unit_tests.append(unit_test_path)
+        for test_path in fp:
+            test_path = test_path.rstrip()
+            tests.append(test_path)
 
-    (remaining, included, _) = _filter_by_filename("C++ unit test",
-                                                   unit_tests,
-                                                   include_files,
-                                                   exclude_files)
-
-    if include_files:
-        return list(included)
-    elif exclude_files:
-        return list(remaining)
-    return unit_tests
+    return list(_filter_by_filename(kind, tests, include_files, exclude_files))
 
 
-def filter_dbtests(binary=None, include_suites=None):
+def filter_cpp_unit_tests(root=config.DEFAULT_UNIT_TEST_LIST,
+                          roots=None,
+                          include_files=None,
+                          exclude_files=None):
+    """
+    Filters out what C++ unit tests to run.
+    """
+    # 'roots' is provided only if a file list is given from the command line.
+    if roots is not None:
+        return roots
+    return _filter_cpp_tests("C++ unit test", root, include_files, exclude_files)
+
+
+def filter_cpp_integration_tests(root=config.DEFAULT_INTEGRATION_TEST_LIST,
+                                 roots=None,
+                                 include_files=None,
+                                 exclude_files=None):
+    """
+    Filters out what C++ integration tests to run.
+    """
+    # 'roots' is provided only if a file list is given from the command line.
+    if roots is not None:
+        return roots
+    return _filter_cpp_tests("C++ integration test", root, include_files, exclude_files)
+
+
+def filter_dbtests(binary=None, roots=None, include_suites=None):
     """
     Filters out what dbtests to run.
     """
+    # 'roots' is provided only if a file list is given from the command line.
+    if roots is not None:
+        return roots
+
+    # TODO: SERVER-22170 Implement full tagging support
+    # If --includeWithAnyTags is supplied, then no tests should be run since
+    # dbtests tests cannot be tagged.
+    if _tags_from_list(config.INCLUDE_WITH_ANY_TAGS):
+        return []
 
     # Command line option overrides the YAML configuration.
     binary = utils.default_if_none(config.DBTEST_EXECUTABLE, binary)
@@ -63,6 +132,9 @@ def filter_dbtests(binary=None, include_suites=None):
     # Ensure that executable files on Windows have a ".exe" extension.
     if sys.platform == "win32" and os.path.splitext(binary)[1] != ".exe":
         binary += ".exe"
+
+    if not os.path.isfile(binary):
+        raise IOError(errno.ENOENT, "File not found", binary)
 
     program = subprocess.Popen([binary, "--list"], stdout=subprocess.PIPE)
     stdout = program.communicate()[0]
@@ -90,85 +162,107 @@ def filter_dbtests(binary=None, include_suites=None):
 
 def filter_jstests(roots,
                    include_files=None,
-                   include_with_all_tags=None,
                    include_with_any_tags=None,
                    exclude_files=None,
-                   exclude_with_all_tags=None,
                    exclude_with_any_tags=None):
     """
     Filters out what jstests to run.
     """
-
     include_files = utils.default_if_none(include_files, [])
     exclude_files = utils.default_if_none(exclude_files, [])
 
-    include_with_all_tags = set(utils.default_if_none(include_with_all_tags, []))
-    include_with_any_tags = set(utils.default_if_none(include_with_any_tags, []))
-    exclude_with_all_tags = set(utils.default_if_none(exclude_with_all_tags, []))
-    exclude_with_any_tags = set(utils.default_if_none(exclude_with_any_tags, []))
+    # Command line options are merged with YAML options.
+    tags = {
+        # The constructor for an empty set does not accept "None".
+        "exclude_with_any_tags": set(utils.default_if_none(exclude_with_any_tags, [])),
+        "include_with_any_tags": set(utils.default_if_none(include_with_any_tags, [])),
+    }
 
-    using_tags = 0
-    for (name, value) in (("include_with_all_tags", include_with_all_tags),
-                          ("include_with_any_tags", include_with_any_tags),
-                          ("exclude_with_all_tags", exclude_with_all_tags),
-                          ("exclude_with_any_tags", exclude_with_any_tags)):
-        if not utils.is_string_set(value):
-            raise TypeError("%s must be a list of strings" % (name))
-        if len(value) > 0:
-            using_tags += 1
+    for name in tags:
+        if not utils.is_string_set(tags[name]):
+            raise TypeError("%s must be a YAML list of strings" % (name))
 
-    if using_tags > 1:
-        raise ValueError("Can only specify one of 'include_with_all_tags', 'include_with_any_tags',"
-                         " 'exclude_with_all_tags', and 'exclude_with_any_tags'")
+    cmd_line_lists = (
+        ("exclude_with_any_tags", config.EXCLUDE_WITH_ANY_TAGS),
+        ("include_with_any_tags", config.INCLUDE_WITH_ANY_TAGS),
+    )
 
-    jstests = []
+    # Merge command line options with YAML options.
+    for (tag_category, cmd_line_list) in cmd_line_lists:
+        if cmd_line_list is not None:
+            # Ignore the empty string when it is used as a tag. Specifying an empty string on the
+            # command line has no effect and allows a user to more easily synthesize a resmoke.py
+            # invocation in their Evergreen project configuration.
+            for cmd_line_tags in cmd_line_list:
+                tags[tag_category] |= set(_tags_from_list([cmd_line_tags]))
+
+    jstests_list = []
     for root in roots:
-        jstests.extend(globstar.iglob(root))
+        jstests_list.extend(globstar.iglob(root))
 
-    (remaining, included, _) = _filter_by_filename("jstest",
-                                                   jstests,
-                                                   include_files,
-                                                   exclude_files)
+    using_tags = False
+    for tag in tags.values():
+        if tag:
+            using_tags = True
 
-    # Skip parsing comments if not using tags
+    # Skip converting 'jstests_list' to a set when it isn't being filtered in order to retain its
+    # ordering.
+    if not include_files and not exclude_files and not using_tags:
+        return jstests_list
+
+    jstests_set = _filter_by_filename("jstest", jstests_list, include_files, exclude_files)
+
+    # Skip parsing comments if not using tags.
     if not using_tags:
-        if include_files:
-            return list(included)
-        elif exclude_files:
-            return list(remaining)
-        return jstests
+        return list(jstests_set)
 
-    jstests = set(remaining)
     excluded = set()
 
-    for filename in jstests:
+    # Tags can also be specified in an external file.
+    tagged_js_tests = _parse_tag_file("js_test")
+
+    for filename in jstests_set:
         file_tags = set(jscomment.get_tags(filename))
-        if include_with_all_tags and not include_with_all_tags - file_tags:
-            included.add(filename)
-        elif include_with_any_tags and include_with_any_tags & file_tags:
-            included.add(filename)
-        elif exclude_with_all_tags and not exclude_with_all_tags - file_tags:
+        if filename in tagged_js_tests:
+            file_tags.update(tagged_js_tests[filename])
+        if tags["include_with_any_tags"] and not tags["include_with_any_tags"] & file_tags:
             excluded.add(filename)
-        elif exclude_with_any_tags and exclude_with_any_tags & file_tags:
+        if tags["exclude_with_any_tags"] and tags["exclude_with_any_tags"] & file_tags:
             excluded.add(filename)
 
-    if include_with_all_tags or include_with_any_tags:
-        if exclude_files:
-            return list((included & jstests) - excluded)
-        return list(included)
-    else:
-        if include_files:
-            return list(included | (jstests - excluded))
-        return list(jstests - excluded)
+    # Specifying include_files overrides tags.
+    return list((jstests_set - excluded) | set(include_files))
 
+def filter_json_schema_tests(roots,
+                             include_files=None,
+                             exclude_files=None):
+    """
+    Filters out what json test cases to load.
+    """
+    include_files = utils.default_if_none(include_files, [])
+    exclude_files = utils.default_if_none(exclude_files, [])
+
+    # TODO: SERVER-22170 Implement full tagging support
+    # If --includeWithAnyTags is supplied, then no tests should be run since
+    # JSON Schema tests cannot be tagged.
+    if _tags_from_list(config.INCLUDE_WITH_ANY_TAGS):
+        return []
+
+    tests = []
+    for root in roots:
+        tests.extend(globstar.iglob(root))
+
+    return list(_filter_by_filename("JSON Schema Test", tests, include_files, exclude_files))
 
 def _filter_by_filename(kind, universe, include_files, exclude_files):
     """
     Filters out what tests to run solely by filename.
 
-    Returns the triplet (remaining, included, excluded), where
-    'remaining' is 'universe' after 'included' and 'excluded' were
-    removed from it.
+    Returns either the set of files from 'universe' that are present in 'include_files', or the
+    set of files from 'universe' that aren't present in 'exclude_files', depending on which of
+    'include_files' and 'exclude_files' is non-empty.
+
+    An error is raised if both 'include_files' and 'exclude_files' are specified.
     """
 
     if not utils.is_string_list(include_files):
@@ -179,38 +273,25 @@ def _filter_by_filename(kind, universe, include_files, exclude_files):
         raise ValueError("Cannot specify both include_files and exclude_files")
 
     universe = set(universe)
+    files = include_files if include_files else exclude_files
+
+    (verbatim, globbed) = _partition(files)
+    # Remove all matching files of 'verbatim' from 'universe'.
+    files_verbatim = _pop_all(kind, universe, verbatim)
+    files_globbed = set()
+
+    for file_pattern in globbed:
+        files_globbed.update(globstar.iglob(file_pattern))
+
+    # Remove all matching files of 'files_globbed' from 'universe' without checking whether
+    # the same file is expanded to multiple times. This implicitly takes an intersection
+    # between 'files_globbed' and 'universe'.
+    files_globbed = _pop_all(kind, universe, files_globbed, validate=False)
+
     if include_files:
-        (verbatim, globbed) = _partition(include_files)
-        # Remove all matching files of 'verbatim' from 'universe'.
-        included_verbatim = _pop_all(kind, universe, verbatim)
-        included_globbed = set()
+        return files_verbatim | files_globbed
 
-        for file_pattern in globbed:
-            included_globbed.update(globstar.iglob(file_pattern))
-
-        # Remove all matching files of 'included_globbed' from 'universe' without checking whether
-        # the same file is expanded to multiple times. This implicitly takes an intersection
-        # between 'included_globbed' and 'universe'.
-        included_globbed = _pop_all(kind, universe, included_globbed, validate=False)
-        return (universe, included_verbatim | included_globbed, set())
-
-    elif exclude_files:
-        (verbatim, globbed) = _partition(exclude_files)
-
-        # Remove all matching files of 'verbatim' from 'universe'.
-        excluded_verbatim = _pop_all(kind, universe, verbatim)
-        excluded_globbed = set()
-
-        for file_pattern in globbed:
-            excluded_globbed.update(globstar.iglob(file_pattern))
-
-        # Remove all matching files of 'excluded_globbed' from 'universe' without checking whether
-        # the same file is expanded to multiple times. This implicitly takes an intersection
-        # between 'excluded_globbed' and 'universe'.
-        excluded_globbed = _pop_all(kind, universe, excluded_globbed, validate=False)
-        return (universe, set(), excluded_verbatim | excluded_globbed)
-
-    return (universe, set(), set())
+    return universe
 
 
 def _partition(pathnames, normpath=True):

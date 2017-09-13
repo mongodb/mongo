@@ -29,10 +29,11 @@
 
 #include "mongo/bson/json.h"
 
+#include <cstdint>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/strtoll.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
@@ -71,12 +72,13 @@ enum {
     NS_RESERVE_SIZE = 64,
     DB_RESERVE_SIZE = 64,
     NUMBERLONG_RESERVE_SIZE = 64,
+    NUMBERDECIMAL_RESERVE_SIZE = 64,
     DATE_RESERVE_SIZE = 64
 };
 
-static const char* LBRACE = "{", * RBRACE = "}", * LBRACKET = "[", * RBRACKET = "]", * LPAREN = "(",
-                   * RPAREN = ")", * COLON = ":", * COMMA = ",", * FORWARDSLASH = "/",
-                   * SINGLEQUOTE = "'", * DOUBLEQUOTE = "\"";
+static const char *LBRACE = "{", *RBRACE = "}", *LBRACKET = "[", *RBRACKET = "]", *LPAREN = "(",
+                  *RPAREN = ")", *COLON = ":", *COMMA = ",", *FORWARDSLASH = "/",
+                  *SINGLEQUOTE = "'", *DOUBLEQUOTE = "\"";
 
 JParse::JParse(StringData str)
     : _buf(str.rawData()), _input(_buf), _input_end(_input + str.size()) {}
@@ -130,6 +132,11 @@ Status JParse::value(StringData fieldName, BSONObjBuilder& builder) {
         }
     } else if (readToken("NumberInt")) {
         Status ret = numberInt(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+    } else if (readToken("NumberDecimal")) {
+        Status ret = numberDecimal(fieldName, builder);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -265,6 +272,14 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
         if (ret != Status::OK()) {
             return ret;
         }
+    } else if (firstField == "$numberDecimal") {
+        if (!subObject) {
+            return parseError("Reserved field name in base object: $numberDecimal");
+        }
+        Status ret = numberDecimalObject(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
     } else if (firstField == "$minKey") {
         if (!subObject) {
             return parseError("Reserved field name in base object: $minKey");
@@ -379,8 +394,16 @@ Status JParse::binaryObject(StringData fieldName, BSONObjBuilder& builder) {
             "Argument of $type in $bindata object must be a hex string representation of a single "
             "byte");
     }
+
+    // The fromHex function returns a signed char, but the highest
+    // BinDataType value is 128, which can only be represented as an
+    // unsigned char. If we don't coerce it to an unsigned char before
+    // wrapping it in a BinDataType (currently implicitly a signed
+    // integer), we get undefined behavior.
+    const auto binDataTypeNumeric = static_cast<unsigned char>(fromHex(binDataType));
+
     builder.appendBinData(
-        fieldName, binData.length(), BinDataType(fromHex(binDataType)), binData.data());
+        fieldName, binData.length(), BinDataType(binDataTypeNumeric), binData.data());
     return Status::OK();
 }
 
@@ -470,6 +493,7 @@ Status JParse::timestampObject(StringData fieldName, BSONObjBuilder& builder) {
     if (!readField("t")) {
         return parseError("Expected field name \"t\" in \"$timestamp\" sub object");
     }
+
     if (!readToken(COLON)) {
         return parseError("Expecting ':'");
     }
@@ -634,7 +658,26 @@ Status JParse::numberLongObject(StringData fieldName, BSONObjBuilder& builder) {
         return ret;
     }
 
-    builder.appendNumber(fieldName, numberLong);
+    builder.append(fieldName, numberLong);
+    return Status::OK();
+}
+
+Status JParse::numberDecimalObject(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(COLON)) {
+        return parseError("Expecting ':'");
+    }
+    // The number must be a quoted string, since large decimal numbers could overflow other types
+    // and thus may not be valid JSON
+    std::string numberDecimalString;
+    numberDecimalString.reserve(NUMBERDECIMAL_RESERVE_SIZE);
+    Status ret = quotedString(&numberDecimalString);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    Decimal128 numberDecimal(numberDecimalString);
+
+    builder.appendNumber(fieldName, numberDecimal);
     return Status::OK();
 }
 
@@ -696,7 +739,7 @@ Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObje
  * have the same behavior.  XXX: this may not be desired. */
 Status JParse::constructor(StringData fieldName, BSONObjBuilder& builder) {
     if (readToken("Date")) {
-        date(fieldName, builder);
+        date(fieldName, builder).transitional_ignore();
     } else {
         return parseError("\"new\" keyword not followed by Date constructor");
     }
@@ -819,7 +862,27 @@ Status JParse::numberLong(StringData fieldName, BSONObjBuilder& builder) {
     if (!readToken(RPAREN)) {
         return parseError("Expecting ')'");
     }
-    builder.appendNumber(fieldName, static_cast<long long int>(val));
+    builder.append(fieldName, static_cast<long long int>(val));
+    return Status::OK();
+}
+
+Status JParse::numberDecimal(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(LPAREN)) {
+        return parseError("Expecting '('");
+    }
+
+    std::string decString;
+    decString.reserve(NUMBERDECIMAL_RESERVE_SIZE);
+    Status ret = quotedString(&decString);
+    if (ret != Status::OK()) {
+        return ret;
+    }
+    Decimal128 val(decString);
+
+    if (!readToken(RPAREN)) {
+        return parseError("Expecting ')'");
+    }
+    builder.appendNumber(fieldName, val);
     return Status::OK();
 }
 
@@ -845,7 +908,6 @@ Status JParse::numberInt(StringData fieldName, BSONObjBuilder& builder) {
     builder.appendNumber(fieldName, static_cast<int>(val));
     return Status::OK();
 }
-
 
 Status JParse::dbRef(StringData fieldName, BSONObjBuilder& builder) {
     BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
@@ -1218,13 +1280,7 @@ bool JParse::isHexString(StringData str) const {
 
 bool JParse::isBase64String(StringData str) const {
     MONGO_JSON_DEBUG("str: " << str);
-    std::size_t i;
-    for (i = 0; i < str.size(); i++) {
-        if (!match(str[i], base64::chars)) {
-            return false;
-        }
-    }
-    return true;
+    return base64::validate(str);
 }
 
 bool JParse::isArray() {
@@ -1246,13 +1302,13 @@ BSONObj fromjson(const char* jsonString, int* len) {
     } catch (std::exception& e) {
         std::ostringstream message;
         message << "caught exception from within JSON parser: " << e.what();
-        throw MsgAssertionException(17031, message.str());
+        throw AssertionException(17031, message.str());
     }
 
     if (ret != Status::OK()) {
         ostringstream message;
         message << "code " << ret.code() << ": " << ret.codeString() << ": " << ret.reason();
-        throw MsgAssertionException(16619, message.str());
+        throw AssertionException(16619, message.str());
     }
     if (len)
         *len = jparse.offset();

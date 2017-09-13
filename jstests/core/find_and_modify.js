@@ -1,49 +1,66 @@
+// Cannot implicitly shard accessed collections because of following errmsg: A single
+// update/delete on a sharded collection must contain an exact match on _id or contain the shard
+// key.
+// @tags: [assumes_unsharded_collection]
+
 t = db.find_and_modify;
 t.drop();
 
 // fill db
-for(var i=1; i<=10; i++) {
-    t.insert({priority:i, inprogress:false, value:0});
+for (var i = 1; i <= 10; i++) {
+    t.insert({priority: i, inprogress: false, value: 0});
 }
 
 // returns old
-out = t.findAndModify({update: {$set: {inprogress: true}, $inc: {value:1}}});
+out = t.findAndModify({update: {$set: {inprogress: true}, $inc: {value: 1}}});
 assert.eq(out.value, 0);
 assert.eq(out.inprogress, false);
 t.update({_id: out._id}, {$set: {inprogress: false}});
 
 // returns new
-out = t.findAndModify({update: {$set: {inprogress: true}, $inc: {value:1}}, 'new': true});
+out = t.findAndModify({update: {$set: {inprogress: true}, $inc: {value: 1}}, 'new': true});
 assert.eq(out.value, 2);
 assert.eq(out.inprogress, true);
 t.update({_id: out._id}, {$set: {inprogress: false}});
 
 // update highest priority
-out = t.findAndModify({query: {inprogress:false}, sort:{priority:-1}, update: {$set: {inprogress: true}}});
+out = t.findAndModify(
+    {query: {inprogress: false}, sort: {priority: -1}, update: {$set: {inprogress: true}}});
 assert.eq(out.priority, 10);
 // update next highest priority
-out = t.findAndModify({query: {inprogress:false}, sort:{priority:-1}, update: {$set: {inprogress: true}}});
+out = t.findAndModify(
+    {query: {inprogress: false}, sort: {priority: -1}, update: {$set: {inprogress: true}}});
 assert.eq(out.priority, 9);
 
 // remove lowest priority
-out = t.findAndModify({sort:{priority:1}, remove:true});
+out = t.findAndModify({sort: {priority: 1}, remove: true});
 assert.eq(out.priority, 1);
 
 // remove next lowest priority
-out = t.findAndModify({sort:{priority:1}, remove:1});
+out = t.findAndModify({sort: {priority: 1}, remove: 1});
 assert.eq(out.priority, 2);
 
 // return null (was {} before 1.5.4) if no matches (drivers may handle this differently)
-out = t.findAndModify({query:{no_such_field:1}, remove:1});
+out = t.findAndModify({query: {no_such_field: 1}, remove: 1});
 assert.eq(out, null);
 
 // make sure we fail with conflicting params to findAndModify SERVER-16601
-t.insert({x:1});
-assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:true}); });
-assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:true, sort: {x:1}}); });
-assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:true, upsert:true}); });
-assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, new:true, remove:true}); });
-assert.throws(function() { t.findAndModify({query:{x:1}, upsert:true, remove:true}); });
+t.insert({x: 1});
+assert.throws(function() {
+    t.findAndModify({query: {x: 1}, update: {y: 2}, remove: true});
+});
+assert.throws(function() {
+    t.findAndModify({query: {x: 1}, update: {y: 2}, remove: true, sort: {x: 1}});
+});
+assert.throws(function() {
+    t.findAndModify({query: {x: 1}, update: {y: 2}, remove: true, upsert: true});
+});
+assert.throws(function() {
+    t.findAndModify({query: {x: 1}, update: {y: 2}, new: true, remove: true});
+});
+assert.throws(function() {
+    t.findAndModify({query: {x: 1}, upsert: true, remove: true});
+});
 
 //
 // SERVER-17387: Find and modify should throw in the case of invalid projection.
@@ -109,12 +126,8 @@ assert.commandFailed(cmdRes);
 //
 
 t.drop();
-cmdRes = db.runCommand({
-    findAndModify: t.getName(),
-    query: {_id: "miss"},
-    update: {$inc: {y: 1}},
-    upsert: true
-});
+cmdRes = db.runCommand(
+    {findAndModify: t.getName(), query: {_id: "miss"}, update: {$inc: {y: 1}}, upsert: true});
 assert.commandWorked(cmdRes);
 assert("value" in cmdRes);
 assert.eq(null, cmdRes.value);

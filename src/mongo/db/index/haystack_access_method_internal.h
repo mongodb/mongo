@@ -30,10 +30,14 @@
 
 #include <vector>
 
+#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
+
+namespace dps = ::mongo::dotted_path_support;
 
 class GeoHaystackSearchHopper {
 public:
@@ -45,13 +49,13 @@ public:
      * @param limit  The maximum number of results to return
      * @param geoField  Which field in the provided RecordId has the point to test.
      */
-    GeoHaystackSearchHopper(OperationContext* txn,
+    GeoHaystackSearchHopper(OperationContext* opCtx,
                             const BSONObj& nearObj,
                             double maxDistance,
                             unsigned limit,
                             const std::string& geoField,
                             const Collection* collection)
-        : _txn(txn),
+        : _opCtx(opCtx),
           _collection(collection),
           _near(nearObj),
           _maxDistance(maxDistance),
@@ -63,7 +67,7 @@ public:
     void consider(const RecordId& loc) {
         if (limitReached())
             return;
-        Point p(_collection->docFor(_txn, loc).value().getFieldDotted(_geoField));
+        Point p(dps::extractElementAtPath(_collection->docFor(_opCtx, loc).value(), _geoField));
         if (distance(_near, p) > _maxDistance)
             return;
         _locs.push_back(loc);
@@ -71,7 +75,7 @@ public:
 
     int appendResultsTo(BSONArrayBuilder* b) {
         for (unsigned i = 0; i < _locs.size(); i++)
-            b->append(_collection->docFor(_txn, _locs[i]).value());
+            b->append(_collection->docFor(_opCtx, _locs[i]).value());
         return _locs.size();
     }
 
@@ -81,7 +85,7 @@ public:
     }
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     const Collection* _collection;
 
     Point _near;

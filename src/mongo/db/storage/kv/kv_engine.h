@@ -30,20 +30,25 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
 class IndexDescriptor;
+class JournalListener;
 class OperationContext;
-class RecordStore;
 class RecoveryUnit;
 class SortedDataInterface;
+class SnapshotManager;
 
 class KVEngine {
 public:
@@ -52,35 +57,105 @@ public:
     // ---------
 
     /**
-     * Caller takes ownership
-     * Having multiple out for the same ns is a rules violation;
-     * Calling on a non-created ident is invalid and may crash.
+     * Having multiple out for the same ns is a rules violation; Calling on a non-created ident is
+     * invalid and may crash.
      */
-    virtual RecordStore* getRecordStore(OperationContext* opCtx,
-                                        StringData ns,
-                                        StringData ident,
-                                        const CollectionOptions& options) = 0;
+    virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
+                                                        StringData ns,
+                                                        StringData ident,
+                                                        const CollectionOptions& options) = 0;
+
+    /**
+     * Get a RecordStore that may share an underlying table with other RecordStores. 'prefix' is
+     * guaranteed to be 'KVPrefix::kNotPrefixed' when 'groupCollections' is not enabled.
+     *
+     * @param prefix dictates the value keys for the RecordStore should be prefixed with to
+     *        distinguish between RecordStores sharing an underlying table. A value of
+     *        `KVPrefix::kNotPrefixed` guarantees the index is the sole resident of the table.
+     */
+    virtual std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
+                                                               StringData ns,
+                                                               StringData ident,
+                                                               const CollectionOptions& options,
+                                                               KVPrefix prefix) {
+        invariant(prefix == KVPrefix::kNotPrefixed);
+        return getRecordStore(opCtx, ns, ident, options);
+    }
 
     virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
                                                         StringData ident,
                                                         const IndexDescriptor* desc) = 0;
 
-    //
-    // The create and drop methods on KVEngine are not transactional. Transactional semantics
-    // are provided by the KVStorageEngine code that calls these. For example, drop will be
-    // called if a create is rolled back. A higher-level drop operation will only propagate to a
-    // drop call on the KVEngine once the WUOW commits. Therefore drops will never be rolled
-    // back and it is safe to immediately reclaim storage.
-    //
+    /**
+     * Get a SortedDataInterface that may share an underlying table with other
+     * SortedDataInterface. 'prefix' is guaranteed to be 'KVPrefix::kNotPrefixed' when
+     * 'groupCollections' is not enabled.
+     *
+     * @param prefix dictates the value keys for the index should be prefixed with to distinguish
+     *        between indexes sharing an underlying table. A value of `KVPrefix::kNotPrefixed`
+     *        guarantees the index is the sole resident of the table.
+     */
+    virtual SortedDataInterface* getGroupedSortedDataInterface(OperationContext* opCtx,
+                                                               StringData ident,
+                                                               const IndexDescriptor* desc,
+                                                               KVPrefix prefix) {
+        invariant(prefix == KVPrefix::kNotPrefixed);
+        return getSortedDataInterface(opCtx, ident, desc);
+    }
 
+    /**
+     * The create and drop methods on KVEngine are not transactional. Transactional semantics
+     * are provided by the KVStorageEngine code that calls these. For example, drop will be
+     * called if a create is rolled back. A higher-level drop operation will only propagate to a
+     * drop call on the KVEngine once the WUOW commits. Therefore drops will never be rolled
+     * back and it is safe to immediately reclaim storage.
+     */
     virtual Status createRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
                                      const CollectionOptions& options) = 0;
 
+    /**
+     * Create a RecordStore that MongoDB considers eligible to share space in an underlying table
+     * with other RecordStores. 'prefix' is guaranteed to be 'KVPrefix::kNotPrefixed' when
+     * 'groupCollections' is not enabled.
+     *
+     * @param prefix signals whether the RecordStore may be shared by an underlying table. A
+     *        prefix of `KVPrefix::kNotPrefixed` must remain isolated in its own table. Otherwise
+     *        the storage engine implementation ultimately chooses which RecordStores share a
+     *        table. Sharing RecordStores belonging to different databases within the same table
+     *        is forbidden.
+     */
+    virtual Status createGroupedRecordStore(OperationContext* opCtx,
+                                            StringData ns,
+                                            StringData ident,
+                                            const CollectionOptions& options,
+                                            KVPrefix prefix) {
+        invariant(prefix == KVPrefix::kNotPrefixed);
+        return createRecordStore(opCtx, ns, ident, options);
+    }
+
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
                                              const IndexDescriptor* desc) = 0;
+
+    /**
+     * Create a SortedDataInterface that MongoDB considers eligible to share space in an
+     * underlying table with other SortedDataInterfaces. 'prefix' is guaranteed to be
+     * 'KVPrefix::kNotPrefixed' when 'groupCollections' is not enabled.
+     *
+     * @param prefix signals whether the SortedDataInterface (index) may be shared by an
+     *        underlying table. A prefix of `KVPrefix::kNotPrefixed` must remain isolated in its own
+     *        table. Otherwise the storage engine implementation ultimately chooses which indexes
+     *        share a table. Sharing indexes belonging to different databases is forbidden.
+     */
+    virtual Status createGroupedSortedDataInterface(OperationContext* opCtx,
+                                                    StringData ident,
+                                                    const IndexDescriptor* desc,
+                                                    KVPrefix prefix) {
+        invariant(prefix == KVPrefix::kNotPrefixed);
+        return createSortedDataInterface(opCtx, ident, desc);
+    }
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) = 0;
 
@@ -89,16 +164,44 @@ public:
     virtual Status dropIdent(OperationContext* opCtx, StringData ident) = 0;
 
     // optional
-    virtual int flushAllFiles(bool sync) {
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync) {
         return 0;
+    }
+
+    /**
+     * See StorageEngine::beginBackup for details
+     */
+    virtual Status beginBackup(OperationContext* opCtx) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine doesn't support backup mode");
+    }
+
+    /**
+     * See StorageEngine::endBackup for details
+     */
+    virtual void endBackup(OperationContext* opCtx) {
+        MONGO_UNREACHABLE;
     }
 
     virtual bool isDurable() const = 0;
 
     /**
+     * Returns true if the KVEngine is ephemeral -- that is, it is NOT persistent and all data is
+     * lost after shutdown. Otherwise, returns false.
+     */
+    virtual bool isEphemeral() const = 0;
+
+    /**
      * This must not change over the lifetime of the engine.
      */
     virtual bool supportsDocLocking() const = 0;
+
+    /**
+     * This must not change over the lifetime of the engine.
+     */
+    virtual bool supportsDBLocking() const {
+        return true;
+    }
 
     /**
      * Returns true if storage engine supports --directoryperdb.
@@ -127,6 +230,43 @@ public:
      * There is intentionally no uncleanShutdown().
      */
     virtual void cleanShutdown() = 0;
+
+    /**
+     * Return the SnapshotManager for this KVEngine or NULL if not supported.
+     *
+     * Pointer remains owned by the StorageEngine, not the caller.
+     */
+    virtual SnapshotManager* getSnapshotManager() const {
+        return nullptr;
+    }
+
+    /**
+     * Sets a new JournalListener, which is used to alert the rest of the
+     * system about journaled write progress.
+     */
+    virtual void setJournalListener(JournalListener* jl) = 0;
+
+    /**
+     * See `StorageEngine::setStableTimestamp`
+     */
+    virtual void setStableTimestamp(SnapshotName stableTimestamp) {}
+
+    /**
+     * See `StorageEngine::setInitialDataTimestamp`
+     */
+    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) {}
+
+    /**
+     * See `StorageEngine::supportsRecoverToStableTimestamp`
+     */
+    virtual bool supportsRecoverToStableTimestamp() const {
+        return false;
+    }
+
+    /**
+     * See `StorageEngine::replicationBatchIsComplete()`
+     */
+    virtual void replicationBatchIsComplete() const {};
 
     /**
      * The destructor will never be called from mongod, but may be called from tests.

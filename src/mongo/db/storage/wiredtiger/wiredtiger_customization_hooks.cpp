@@ -41,7 +41,7 @@ namespace mongo {
 /* Make a WiredTigerCustomizationHooks pointer a decoration on the global ServiceContext */
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetWiredTigerCustomizationHooks, ("SetGlobalEnvironment"))
 (InitializerContext* context) {
-    auto customizationHooks = stdx::make_unique<EmptyWiredTigerCustomizationHooks>();
+    auto customizationHooks = stdx::make_unique<WiredTigerCustomizationHooks>();
     WiredTigerCustomizationHooks::set(getGlobalServiceContext(), std::move(customizationHooks));
 
     return Status::OK();
@@ -63,11 +63,13 @@ WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* 
     return getCustomizationHooks(service).get();
 }
 
-EmptyWiredTigerCustomizationHooks::~EmptyWiredTigerCustomizationHooks() {}
+WiredTigerCustomizationHooks::~WiredTigerCustomizationHooks() {}
 
-void EmptyWiredTigerCustomizationHooks::appendUID(BSONObjBuilder* builder) {}
+bool WiredTigerCustomizationHooks::enabled() const {
+    return false;
+}
 
-std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableName) {
+std::string WiredTigerCustomizationHooks::getTableCreateConfig(StringData tableName) {
     return "";
 }
 

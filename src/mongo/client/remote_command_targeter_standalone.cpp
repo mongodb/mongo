@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_standalone.h"
 
 #include "mongo/base/status_with.h"
@@ -37,9 +38,28 @@ namespace mongo {
 RemoteCommandTargeterStandalone::RemoteCommandTargeterStandalone(const HostAndPort& hostAndPort)
     : _hostAndPort(hostAndPort) {}
 
-StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
-    const ReadPreferenceSetting& readPref) {
+ConnectionString RemoteCommandTargeterStandalone::connectionString() {
+    return ConnectionString(_hostAndPort);
+}
+
+StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHostWithMaxWait(
+    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
     return _hostAndPort;
+}
+
+StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
+    OperationContext* opCtx, const ReadPreferenceSetting& readPref) {
+    return _hostAndPort;
+}
+
+void RemoteCommandTargeterStandalone::markHostNotMaster(const HostAndPort& host,
+                                                        const Status& status) {
+    dassert(host == _hostAndPort);
+}
+
+void RemoteCommandTargeterStandalone::markHostUnreachable(const HostAndPort& host,
+                                                          const Status& status) {
+    dassert(host == _hostAndPort);
 }
 
 }  // namespace mongo

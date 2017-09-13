@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -20,38 +20,63 @@ struct __wt_condvar {
 
 	int waiters;			/* Numbers of waiters, or
 					   -1 if signalled with no waiters. */
+	/*
+	 * The following fields are used for automatically adjusting condition
+	 * variable wait times.
+	 */
+	uint64_t	min_wait;	/* Minimum wait duration */
+	uint64_t	max_wait;	/* Maximum wait duration */
+	uint64_t	prev_wait;	/* Wait duration used last time */
 };
-
-/*
- * !!!
- * Don't touch this structure without understanding the read/write
- * locking functions.
- */
-typedef union {			/* Read/write lock */
-#ifdef WORDS_BIGENDIAN
-	WiredTiger read/write locks require modification for big-endian systems.
-#else
-	uint64_t u;
-	uint32_t us;
-	struct {
-		uint16_t writers;
-		uint16_t readers;
-		uint16_t users;
-		uint16_t pad;
-	} s;
-#endif
-} wt_rwlock_t;
 
 /*
  * Read/write locks:
  *
  * WiredTiger uses read/write locks for shared/exclusive access to resources.
+ * !!!
+ * Don't modify this structure without understanding the read/write locking
+ * functions.
  */
-struct __wt_rwlock {
-	const char *name;		/* Lock name for debugging */
+struct __wt_rwlock {			/* Read/write lock */
+	volatile union {
+		uint64_t v;			/* Full 64-bit value */
+		struct {
+			uint8_t current;	/* Current ticket */
+			uint8_t next;		/* Next available ticket */
+			uint8_t reader;		/* Read queue ticket */
+			uint8_t __notused;	/* Padding */
+			uint16_t readers_active;/* Count of active readers */
+			uint16_t readers_queued;/* Count of queued readers */
+		} s;
+	} u;
 
-	wt_rwlock_t rwlock;		/* Read/write lock */
+	int16_t stat_read_count_off;	/* read acquisitions offset */
+	int16_t stat_write_count_off;	/* write acquisitions offset */
+	int16_t stat_app_usecs_off;	/* waiting application threads offset */
+	int16_t stat_int_usecs_off;	/* waiting server threads offset */
+
+	WT_CONDVAR *cond_readers;	/* Blocking readers */
+	WT_CONDVAR *cond_writers;	/* Blocking writers */
 };
+
+/*
+ * WT_RWLOCK_INIT_TRACKED --
+ *	Read write lock initialization, with tracking.
+ *
+ * Implemented as a macro so we can pass in a statistics field and convert
+ * it into a statistics structure array offset.
+ */
+#define	WT_RWLOCK_INIT_TRACKED(session, l, name) do {                   \
+	WT_RET(__wt_rwlock_init(session, l));                           \
+	(l)->stat_read_count_off = (int16_t)WT_STATS_FIELD_TO_OFFSET(   \
+	    S2C(session)->stats, lock_##name##_read_count);             \
+	(l)->stat_write_count_off = (int16_t)WT_STATS_FIELD_TO_OFFSET(  \
+	    S2C(session)->stats, lock_##name##_write_count);            \
+	(l)->stat_app_usecs_off = (int16_t)WT_STATS_FIELD_TO_OFFSET(    \
+	    S2C(session)->stats, lock_##name##_wait_application);       \
+	(l)->stat_int_usecs_off = (int16_t)WT_STATS_FIELD_TO_OFFSET(    \
+	    S2C(session)->stats, lock_##name##_wait_internal);          \
+} while (0)
 
 /*
  * Spin locks:
@@ -65,25 +90,33 @@ struct __wt_rwlock {
 #define	SPINLOCK_PTHREAD_MUTEX		2
 #define	SPINLOCK_PTHREAD_MUTEX_ADAPTIVE	3
 
+struct __wt_spinlock {
 #if SPINLOCK_TYPE == SPINLOCK_GCC
-
-typedef volatile int WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT)
-    WT_SPINLOCK;
-
-#elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
-	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||\
+	WT_CACHE_LINE_PAD_BEGIN
+	volatile int lock;
+#elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||			\
+	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||		\
 	SPINLOCK_TYPE == SPINLOCK_MSVC
-
-typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	wt_mutex_t lock;
+#else
+#error Unknown spinlock type
+#endif
 
-	const char *name;		/* Statistics: mutex name */
+	const char *name;		/* Mutex name */
+
+	/*
+	 * We track acquisitions and time spent waiting for some locks. For
+	 * performance reasons and to make it possible to write generic code
+	 * that tracks statistics for different locks, we store the offset
+	 * of the statistics fields to be updated during lock acquisition.
+	 */
+	int16_t stat_count_off;		/* acquisitions offset */
+	int16_t stat_app_usecs_off;	/* waiting application threads offset */
+	int16_t stat_int_usecs_off;	/* waiting server threads offset */
 
 	int8_t initialized;		/* Lock initialized, for cleanup */
-} WT_SPINLOCK;
 
-#else
-
-#error Unknown spinlock type
-
+#if SPINLOCK_TYPE == SPINLOCK_GCC
+	WT_CACHE_LINE_PAD_END
 #endif
+};

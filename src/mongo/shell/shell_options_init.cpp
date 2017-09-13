@@ -30,6 +30,7 @@
 
 #include <iostream>
 
+#include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"
@@ -44,10 +45,6 @@ MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
         quickExit(EXIT_SUCCESS);
     }
     Status ret = moe::startupOptionsParsed.validate();
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = validateMongoShellOptions(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         return ret;
     }

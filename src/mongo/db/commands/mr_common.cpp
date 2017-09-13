@@ -88,9 +88,12 @@ Config::OutputOptions Config::parseOutputOptions(const std::string& dbname, cons
     }
 
     if (outputOptions.outType != INMEMORY) {
-        outputOptions.finalNamespace = mongoutils::str::stream()
-            << (outputOptions.outDB.empty() ? dbname : outputOptions.outDB) << "."
-            << outputOptions.collectionName;
+        const StringData outDb(outputOptions.outDB.empty() ? dbname : outputOptions.outDB);
+        const NamespaceString nss(outDb, outputOptions.collectionName);
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid 'out' namespace: " << nss.ns(),
+                nss.isValid());
+        outputOptions.finalNamespace = std::move(nss);
     }
 
     return outputOptions;
@@ -103,7 +106,7 @@ void addPrivilegesRequiredForMapReduce(Command* commandTemplate,
     Config::OutputOptions outputOptions = Config::parseOutputOptions(dbname, cmdObj);
 
     ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbname, cmdObj));
-    uassert(17142,
+    uassert(ErrorCodes::InvalidNamespace,
             mongoutils::str::stream() << "Invalid input resource " << inputResource.toString(),
             inputResource.isExactNamespacePattern());
     out->push_back(Privilege(inputResource, ActionType::find));
@@ -123,13 +126,23 @@ void addPrivilegesRequiredForMapReduce(Command* commandTemplate,
 
         ResourcePattern outputResource(
             ResourcePattern::forExactNamespace(NamespaceString(outputOptions.finalNamespace)));
-        uassert(17143,
+        uassert(ErrorCodes::InvalidNamespace,
                 mongoutils::str::stream() << "Invalid target namespace "
                                           << outputResource.ns().ns(),
                 outputResource.ns().isValid());
 
         // TODO: check if outputNs exists and add createCollection privilege if not
         out->push_back(Privilege(outputResource, outputActions));
+    }
+}
+
+bool mrSupportsWriteConcern(const BSONObj& cmd) {
+    if (!cmd.hasField("out")) {
+        return false;
+    } else if (cmd["out"].type() == Object && cmd["out"].Obj().hasField("inline")) {
+        return false;
+    } else {
+        return true;
     }
 }
 }

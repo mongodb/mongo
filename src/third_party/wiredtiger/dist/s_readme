@@ -1,7 +1,7 @@
 #! /bin/sh
 
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 f=../README
 
 . ../RELEASE_INFO
@@ -60,3 +60,5 @@ END_TEXT
 
 cmp $t $f > /dev/null 2>&1 ||
     (echo "Building $f" && rm -f $f && cp $t $f)
+
+exit 0

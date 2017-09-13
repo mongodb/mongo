@@ -51,41 +51,34 @@ namespace mongo {
  * operates with RecordIds, we are unable to evaluate the AND for the invalidated RecordId, and it
  * must be fully matched later.
  */
-class AndSortedStage : public PlanStage {
+class AndSortedStage final : public PlanStage {
 public:
-    AndSortedStage(WorkingSet* ws, const Collection* collection);
-    virtual ~AndSortedStage();
+    AndSortedStage(OperationContext* opCtx, WorkingSet* ws, const Collection* collection);
 
     void addChild(PlanStage* child);
 
-    virtual StageState work(WorkingSetID* out);
-    virtual bool isEOF();
+    StageState doWork(WorkingSetID* out) final;
+    bool isEOF() final;
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_AND_SORTED;
     }
 
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
 private:
     // Find a node to AND against.
-    PlanStage::StageState getTargetLoc(WorkingSetID* out);
+    PlanStage::StageState getTargetRecordId(WorkingSetID* out);
 
     // Move a child which hasn't advanced to the target node forward.
     // Returns the target node in 'out' if all children successfully advance to it.
-    PlanStage::StageState moveTowardTargetLoc(WorkingSetID* out);
+    PlanStage::StageState moveTowardTargetRecordId(WorkingSetID* out);
 
     // Not owned by us.
     const Collection* _collection;
@@ -93,16 +86,13 @@ private:
     // Not owned by us.
     WorkingSet* _ws;
 
-    // Owned by us.
-    std::vector<PlanStage*> _children;
-
     // The current node we're AND-ing against.
     size_t _targetNode;
-    RecordId _targetLoc;
+    RecordId _targetRecordId;
     WorkingSetID _targetId;
 
     // Nodes we're moving forward until they hit the element we're AND-ing.
-    // Everything in here has not advanced to _targetLoc yet.
+    // Everything in here has not advanced to _targetRecordId yet.
     // These are indices into _children.
     std::queue<size_t> _workingTowardRep;
 
@@ -110,7 +100,6 @@ private:
     bool _isEOF;
 
     // Stats
-    CommonStats _commonStats;
     AndSortedStats _specificStats;
 };
 

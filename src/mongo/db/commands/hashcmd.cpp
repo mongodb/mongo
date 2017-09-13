@@ -50,10 +50,10 @@ using std::string;
 using std::stringstream;
 
 // Testing only, enabled via command-line.
-class CmdHashElt : public Command {
+class CmdHashElt : public ErrmsgCommandDeprecated {
 public:
-    CmdHashElt() : Command("_hashBSONElement"){};
-    virtual bool isWriteCommandForConfigServer() const {
+    CmdHashElt() : ErrmsgCommandDeprecated("_hashBSONElement"){};
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual bool slaveOk() const {
@@ -79,12 +79,11 @@ public:
      *>  "out" : NumberLong(6271151123721111923),
      *>  "ok" : 1 }
      **/
-    bool run(OperationContext* txn,
-             const string& db,
-             BSONObj& cmdObj,
-             int options,
-             string& errmsg,
-             BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& db,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) {
         result.appendAs(cmdObj.firstElement(), "key");
 
         int seed = 0;

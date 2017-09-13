@@ -2,15 +2,28 @@
 
 Import('env')
 
+env = env.Clone()
+
+
+env.SConscript(
+    dirs=[
+        'embedded',
+    ],
+    exports=[
+        'env',
+    ],
+)
+	
 # Contains only the core ConnectionString functionality, *not* the ability to call connect()
 # and return a DBClientBase* back. For that you need to link against the 'clientdriver' library.
 env.Library(
     target='connection_string',
     source=[
         'connection_string.cpp',
+        'mongo_uri.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
     ]
 )
 
@@ -18,9 +31,10 @@ env.CppUnitTest(
     target='connection_string_test',
     source=[
         'connection_string_test.cpp',
+        'mongo_uri_test.cpp',
     ],
     LIBDEPS=[
-        'connection_string',
+        'clientdriver',
     ]
 )
 
@@ -33,6 +47,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/service_context'
     ],
 )
 
@@ -48,38 +63,122 @@ env.CppUnitTest(
     ]
 )
 
+saslClientEnv = env.Clone()
+saslLibs = []
+saslClientSource = [
+    'native_sasl_client_session.cpp',
+    'sasl_client_authenticate.cpp',
+    'sasl_client_authenticate_impl.cpp',
+    'sasl_client_conversation.cpp',
+    'sasl_client_session.cpp',
+    'sasl_plain_client_conversation.cpp',
+    'sasl_scramsha1_client_conversation.cpp',
+    'scram_sha1_client_cache.cpp',
+]
+
+# Add in actual sasl dependencies if sasl is enabled, otherwise
+# leave library empty so other targets can link to it unconditionally
+# without needing to first test MONGO_BUILD_SASL_CLIENT.
+if env['MONGO_BUILD_SASL_CLIENT']:
+    saslClientSource.extend([
+        'cyrus_sasl_client_session.cpp',
+        'sasl_sspi.cpp',
+        'sasl_sspi_options.cpp',
+    ])
+
+    saslLibs.extend(['sasl2'])
+    if env.TargetOSIs('windows'):
+        saslLibs.extend(['secur32'])
+
+saslClientEnv.Library(
+    target='sasl_client',
+    source=saslClientSource,
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/crypto/scramauth',
+        '$BUILD_DIR/mongo/executor/remote_command',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/util/md5',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+    SYSLIBDEPS=saslLibs
+)
+
 env.Library(
+    target='authentication',
+    source=[
+        'authenticate.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/executor/remote_command',
+        'sasl_client'
+    ]
+)
+
+env.CppUnitTest(
+    target=[
+        'authenticate_test',
+    ],
+    source=[
+        'authenticate_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/md5',
+        'authentication',
+    ]
+)
+
+env.Library(
+    target='client_query',
+    source=[
+        'query.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'read_preference',
+    ],
+)
+
+clientDriverEnv = env.Clone()
+clientDriverEnv.InjectThirdPartyIncludePaths('asio')
+
+clientDriverEnv.Library(
     target='clientdriver',
     source=[
         'connection_string_connect.cpp',
+        'mongo_uri_connect.cpp',
         'connpool.cpp',
         'dbclient.cpp',
         'dbclient_rs.cpp',
         'dbclientcursor.cpp',
+        'index_spec.cpp',
         'global_conn_pool.cpp',
-        'native_sasl_client_session.cpp',
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
-        'sasl_client_authenticate.cpp',
-        'sasl_client_authenticate_impl.cpp',
-        'sasl_client_conversation.cpp',
-        'sasl_client_session.cpp',
-        'sasl_plain_client_conversation.cpp',
-        'sasl_scramsha1_client_conversation.cpp',
-        'syncclusterconnection.cpp',
-        '$BUILD_DIR/mongo/db/dbmessage.cpp',
     ],
     LIBDEPS=[
-        'connection_string',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/crypto/scramauth',
         '$BUILD_DIR/mongo/db/auth/authcommon',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/dbmessage',
+        '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/executor/connection_pool_stats',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/net/network',
-        'cyrus_sasl_client_session',
+        'authentication',
+        'connection_string',
         'read_preference',
-    ]
+    ],
 )
 
 env.Library(
@@ -89,43 +188,7 @@ env.Library(
     ],
     LIBDEPS=[
         'clientdriver',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-    ]
-)
-
-env.Library(
-    target='remote_command_runner',
-    source=[
-        'remote_command_runner.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/util/foundation',
-        '$BUILD_DIR/mongo/util/net/hostandport',
-    ]
-)
-
-env.Library(
-    target='remote_command_runner_impl',
-    source=[
-        'remote_command_runner_impl.cpp',
-    ],
-    LIBDEPS=[
-        'connection_pool',
-        'remote_command_runner',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/lite_parsed_query',
-    ]
-)
-
-env.Library(
-    target='remote_command_runner_mock',
-    source=[
-        'remote_command_runner_mock.cpp',
-    ],
-    LIBDEPS=[
-         'remote_command_runner',
+        '$BUILD_DIR/mongo/db/auth/authcommon',
     ]
 )
 
@@ -138,6 +201,7 @@ env.Library(
     ],
     LIBDEPS=[
         'clientdriver',
+        '$BUILD_DIR/mongo/db/service_context',
     ]
 )
 
@@ -148,7 +212,8 @@ env.Library(
         'remote_command_targeter_factory_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/s/coreshard',
     ]
 )
 
@@ -160,39 +225,28 @@ env.CppUnitTest(
         'replica_set_monitor_test.cpp',
     ],
     LIBDEPS=[
-        'clientdriver'
+        '$BUILD_DIR/mongo/db/write_concern_options',
+        'clientdriver',
     ]
 )
 
 env.CppUnitTest('dbclient_rs_test',
                 ['dbclient_rs_test.cpp'],
-                LIBDEPS=['clientdriver', '$BUILD_DIR/mongo/dbtests/mocklib'])
+                LIBDEPS=[
+                    'clientdriver',
+                    '$BUILD_DIR/mongo/dbtests/mocklib',
+                ]
+)
 
-if env['MONGO_BUILD_SASL_CLIENT']:
-    saslLibs = ['sasl2']
-    if env.TargetOSIs('windows'):
-        saslLibs.extend(['secur32'])
-
-    env.Library(
-        target='cyrus_sasl_client_session',
-        source=[
-            'cyrus_sasl_client_session.cpp',
-            'sasl_sspi.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/util/foundation',
-            '$BUILD_DIR/mongo/util/signal_handlers_synchronous',
-        ],
-        SYSLIBDEPS=saslLibs,
-    )
-else:
-    # Create a dummy sasl client library so that other targets can unconditionally
-    # link to it, without needing to first test MONGO_BUILD_SASL_CLIENT.
-    env.Library(
-        target='cyrus_sasl_client_session',
-        source=[],
-        LIBDEPS=[]
-    )
+env.CppUnitTest(
+    target='index_spec_test',
+    source=[
+        'index_spec_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+    ],
+)
 
 env.CppUnitTest(
     target='scoped_db_conn_test',
@@ -200,22 +254,12 @@ env.CppUnitTest(
         'scoped_db_conn_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/coredb',
+        'clientdriver',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/util/net/message_server_port',
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/mongoscore',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
-    ],
-    NO_CRUTCH=True,
-)
-
-env.Library(
-    target='parallel',
-    source=[
-        'parallel.cpp',
-    ],
-    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/transport/transport_layer',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )
 
@@ -223,11 +267,11 @@ env.Library(
     target='fetcher',
     source=[
         'fetcher.cpp',
-        'query_fetcher.cpp',
     ],
     LIBDEPS=[
+        'remote_command_retry_scheduler',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/logger/logger',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/rpc/command_status',
     ],
@@ -238,6 +282,29 @@ env.CppUnitTest(
     source='fetcher_test.cpp',
     LIBDEPS=[
         'fetcher',
-        '$BUILD_DIR/mongo/db/repl/replication_executor_test_fixture',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+    ],
+)
+
+env.Library(
+    target='remote_command_retry_scheduler',
+    source=[
+        'remote_command_retry_scheduler.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='remote_command_retry_scheduler_test',
+    source='remote_command_retry_scheduler_test.cpp',
+    LIBDEPS=[
+        'remote_command_retry_scheduler',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )

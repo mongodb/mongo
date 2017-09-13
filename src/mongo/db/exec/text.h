@@ -28,30 +28,25 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/fts/fts_index_format.h"
-#include "mongo/db/fts/fts_matcher.h"
-#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/record_id.h"
-#include "mongo/platform/unordered_map.h"
-
-#include <map>
-#include <queue>
-#include <vector>
 
 namespace mongo {
 
-using fts::FTSIndexFormat;
-using fts::FTSMatcher;
-using fts::FTSQuery;
-using fts::FTSSpec;
-using fts::MAX_WEIGHT;
+using std::unique_ptr;
+using std::vector;
 
+using fts::FTSQueryImpl;
+using fts::FTSSpec;
+
+class MatchExpression;
 class OperationContext;
 
 struct TextStageParams {
@@ -67,138 +62,48 @@ struct TextStageParams {
     BSONObj indexPrefix;
 
     // The text query.
-    FTSQuery query;
+    FTSQueryImpl query;
 };
 
 /**
  * Implements a blocking stage that returns text search results.
  *
- * Prerequisites: None; is a leaf node.
- * Output type: LOC_AND_OBJ_UNOWNED.
- *
- * TODO: Should the TextStage ever generate NEED_YIELD requests for fetching MMAP v1 records?
- * Right now this stage could reduce concurrency by failing to request a yield during fetch.
+ * Output type: LOC_AND_OBJ.
  */
-class TextStage : public PlanStage {
+class TextStage final : public PlanStage {
 public:
-    /**
-     * The text stage has a few 'states' it transitions between.
-     */
-    enum State {
-        // 1. Initialize the index scans we use to retrieve term/score info.
-        INIT_SCANS,
-
-        // 2. Read the terms/scores from the text index.
-        READING_TERMS,
-
-        // 3. Return results to our parent.
-        RETURNING_RESULTS,
-
-        // 4. Done.
-        DONE,
-    };
-
-    TextStage(OperationContext* txn,
+    TextStage(OperationContext* opCtx,
               const TextStageParams& params,
               WorkingSet* ws,
               const MatchExpression* filter);
 
-    virtual ~TextStage();
 
-    virtual StageState work(WorkingSetID* out);
-    virtual bool isEOF();
+    StageState doWork(WorkingSetID* out) final;
+    bool isEOF() final;
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
-
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_TEXT;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
 private:
     /**
-     * Initializes sub-scanners.
+     * Helper method to built the query execution plan for the text stage.
      */
-    StageState initScans(WorkingSetID* out);
-
-    /**
-     * Helper for buffering results array.  Returns NEED_TIME (if any results were produced),
-     * IS_EOF, or FAILURE.
-     */
-    StageState readFromSubScanners(WorkingSetID* out);
-
-    /**
-     * Helper called from readFromSubScanners to update aggregate score with a new-found (term,
-     * score) pair for this document.  Also rejects documents that don't match this stage's
-     * filter.
-     */
-    StageState addTerm(WorkingSetID wsid, WorkingSetID* out);
-
-    /**
-     * Possibly return a result.  FYI, this may perform a fetch directly if it is needed to
-     * evaluate all filters.
-     */
-    StageState returnResults(WorkingSetID* out);
-
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
+    unique_ptr<PlanStage> buildTextTree(OperationContext* opCtx,
+                                        WorkingSet* ws,
+                                        const MatchExpression* filter) const;
 
     // Parameters of this text stage.
     TextStageParams _params;
 
-    // Text-specific phrase and negated term matcher.
-    FTSMatcher _ftsMatcher;
-
-    // Working set. Not owned by us.
-    WorkingSet* _ws;
-
-    // Filter. Not owned by us.
-    const MatchExpression* _filter;
-
     // Stats.
-    CommonStats _commonStats;
     TextStats _specificStats;
-
-    // What state are we in?  See the State enum above.
-    State _internalState;
-
-    // Used in INIT_SCANS and READING_TERMS.  The index scans we're using to retrieve text
-    // terms.
-    OwnedPointerVector<PlanStage> _scanners;
-
-    // Which _scanners are we currently reading from?
-    size_t _currentIndexScanner;
-
-    // If not Null, we use this rather than asking our child what to do next.
-    WorkingSetID _idRetrying;
-
-    // Map each buffered record id to this data.
-    struct TextRecordData {
-        TextRecordData() : wsid(WorkingSet::INVALID_ID), score(0.0) {}
-        WorkingSetID wsid;
-        double score;
-    };
-
-    // Temporary score data filled out by sub-scans.  Used in READING_TERMS and
-    // RETURNING_RESULTS.
-    // Maps from diskloc -> (aggregate score for doc, wsid).
-    typedef unordered_map<RecordId, TextRecordData, RecordId::Hasher> ScoreMap;
-    ScoreMap _scores;
-    ScoreMap::const_iterator _scoreIterator;
-
-    // Used for fetching records from the collection.
-    std::unique_ptr<RecordCursor> _recordCursor;
 };
 
 }  // namespace mongo

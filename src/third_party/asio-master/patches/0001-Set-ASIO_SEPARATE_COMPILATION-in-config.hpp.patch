@@ -1,0 +1,36 @@
+From 24ecbd03f7045da0b1cd6ddf98b11f6198b3c6a9 Mon Sep 17 00:00:00 2001
+From: Spencer Jackson <spencer.jackson@mongodb.com>
+Date: Mon, 5 Jun 2017 10:37:25 -0400
+Subject: [PATCH] Set ASIO_SEPARATE_COMPILATION in config.hpp
+
+---
+ asio/include/asio/detail/config.hpp | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/asio/include/asio/detail/config.hpp b/asio/include/asio/detail/config.hpp
+index 26eecfa4..115c4500 100644
+--- a/asio/include/asio/detail/config.hpp
++++ b/asio/include/asio/detail/config.hpp
+@@ -9,10 +9,19 @@
+ //
+ 
+ #ifndef ASIO_DETAIL_CONFIG_HPP
+ #define ASIO_DETAIL_CONFIG_HPP
+ 
++// MongoDB modification. We want this standalone, and we want separate
++// compilation for what we can to cut down on compile times.
++// We cannot set these outside of the ASIO drop, because a system copy of ASIO might not have been
++// built with ASIO_SEPARATE_COMPILATION.
++// TODO: Remove this once we have a mechanism for injecting third party includes and CPPDEFINES into
++// individual scons objects.
++# define ASIO_STANDALONE // MongoDB
++# define ASIO_SEPARATE_COMPILATION // MongoDB
++
+ #if defined(ASIO_STANDALONE)
+ # define ASIO_DISABLE_BOOST_ARRAY 1
+ # define ASIO_DISABLE_BOOST_ASSERT 1
+ # define ASIO_DISABLE_BOOST_BIND 1
+ # define ASIO_DISABLE_BOOST_CHRONO 1
+-- 
+2.13.0
+

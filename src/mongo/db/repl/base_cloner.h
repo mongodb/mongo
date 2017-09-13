@@ -49,11 +49,6 @@ public:
     virtual ~BaseCloner() {}
 
     /**
-     * Returns diagnostic information.
-     */
-    virtual std::string getDiagnosticString() const = 0;
-
-    /**
      * Returns true if the cloner has been started (but has not completed).
      */
     virtual bool isActive() const = 0;
@@ -61,7 +56,7 @@ public:
     /**
      * Starts cloning by scheduling initial command to be run by the executor.
      */
-    virtual Status start() = 0;
+    virtual Status startup() noexcept = 0;
 
     /**
      * Cancels current remote command request.
@@ -69,13 +64,13 @@ public:
      *
      * Callback function may be invoked with an ErrorCodes::CallbackCanceled status.
      */
-    virtual void cancel() = 0;
+    virtual void shutdown() = 0;
 
     /**
      * Waits for active remote commands and database worker to complete.
      * Returns immediately if cloner is not active.
      */
-    virtual void wait() = 0;
+    virtual void join() = 0;
 };
 
 }  // namespace repl

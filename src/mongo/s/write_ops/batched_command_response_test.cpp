@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -17,35 +17,32 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects
- *    for all of the code used other than as permitted herein. If you modify
- *    file(s) with this exception, you may extend this exception to your
- *    version of the file(s), but you are not obligated to do so. If you do not
- *    wish to do so, delete this exception statement from your version. If you
- *    delete this exception statement from all source files in the program,
- *    then also delete it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
-#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/platform/basic.h"
 
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/write_error_detail.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+
+namespace mongo {
+
+using std::string;
 
 namespace {
 
-using mongo::BSONArray;
-using mongo::BSONObj;
-using mongo::BatchedCommandResponse;
-using mongo::WriteErrorDetail;
-using mongo::WCErrorDetail;
-using mongo::Date_t;
-using std::string;
-
-TEST(RoundTrip, Normal) {
+TEST(BatchedCommandResponse, Basic) {
     BSONArray writeErrorsArray = BSON_ARRAY(
         BSON(WriteErrorDetail::index(0) << WriteErrorDetail::errCode(-2)
                                         << WriteErrorDetail::errInfo(BSON("more info" << 1))
@@ -54,17 +51,22 @@ TEST(RoundTrip, Normal) {
                                            << WriteErrorDetail::errInfo(BSON("more info" << 1))
                                            << WriteErrorDetail::errMessage("index 1 failed too")));
 
-    BSONObj writeConcernError(BSON(WCErrorDetail::errCode(8)
-                                   << WCErrorDetail::errInfo(BSON("a" << 1))
-                                   << WCErrorDetail::errMessage("norepl")));
+    BSONObj writeConcernError(BSON(
+        "code" << 8 << "codeName" << ErrorCodes::errorString(ErrorCodes::fromInt(8)) << "errInfo"
+               << BSON("a" << 1)
+               << "errmsg"
+               << "norepl"));
 
-    BSONObj origResponseObj = BSON(
-        BatchedCommandResponse::ok(false)
-        << BatchedCommandResponse::errCode(-1)
-        << BatchedCommandResponse::errMessage("this batch didn't work")
-        << BatchedCommandResponse::n(0) << BatchedCommandResponse::lastOp(mongo::Timestamp(1ULL))
-        << BatchedCommandResponse::writeErrors() << writeErrorsArray
-        << BatchedCommandResponse::writeConcernError() << writeConcernError);
+    BSONObj origResponseObj = BSON(BatchedCommandResponse::ok(false)
+                                   << BatchedCommandResponse::errCode(-1)
+                                   << BatchedCommandResponse::errMessage("this batch didn't work")
+                                   << BatchedCommandResponse::n(0)
+                                   << "opTime"
+                                   << mongo::Timestamp(1ULL)
+                                   << BatchedCommandResponse::writeErrors()
+                                   << writeErrorsArray
+                                   << BatchedCommandResponse::writeConcernError()
+                                   << writeConcernError);
 
     string errMsg;
     BatchedCommandResponse response;
@@ -72,7 +74,72 @@ TEST(RoundTrip, Normal) {
     ASSERT_TRUE(ok);
 
     BSONObj genResponseObj = response.toBSON();
-    ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj));
+    ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj)) << "parsed: " << genResponseObj
+                                                                << " original: " << origResponseObj;
 }
 
-}  // unnamed namespace
+TEST(BatchedCommandResponse, TooManySmallErrors) {
+    BatchedCommandResponse response;
+
+    const auto bigstr = std::string(1024, 'x');
+
+    for (int i = 0; i < 100'000; i++) {
+        auto errDetail = stdx::make_unique<WriteErrorDetail>();
+        errDetail->setIndex(i);
+        errDetail->setErrCode(ErrorCodes::BadValue);
+        errDetail->setErrMessage(bigstr);
+        response.addToErrDetails(errDetail.release());
+    }
+
+    const auto bson = response.toBSON();
+    ASSERT_LT(bson.objsize(), BSONObjMaxUserSize);
+    const auto errDetails = bson["writeErrors"].Array();
+    ASSERT_EQ(errDetails.size(), 100'000u);
+
+    for (int i = 0; i < 100'000; i++) {
+        auto errDetail = errDetails[i].Obj();
+        ASSERT_EQ(errDetail["index"].Int(), i);
+        ASSERT_EQ(errDetail["code"].Int(), ErrorCodes::BadValue);
+
+        if (i < 1024) {
+            ASSERT_EQ(errDetail["errmsg"].String(), bigstr) << i;
+        } else {
+            ASSERT_EQ(errDetail["errmsg"].String(), ""_sd) << i;
+        }
+    }
+}
+
+TEST(BatchedCommandResponse, TooManyBigErrors) {
+    BatchedCommandResponse response;
+
+    const auto bigstr = std::string(2'000'000, 'x');
+    const auto smallstr = std::string(10, 'x');
+
+    for (int i = 0; i < 100'000; i++) {
+        auto errDetail = stdx::make_unique<WriteErrorDetail>();
+        errDetail->setIndex(i);
+        errDetail->setErrCode(ErrorCodes::BadValue);
+        errDetail->setErrMessage(i < 10 ? bigstr : smallstr);  // Don't waste too much RAM.
+        response.addToErrDetails(errDetail.release());
+    }
+
+    const auto bson = response.toBSON();
+    ASSERT_LT(bson.objsize(), BSONObjMaxUserSize);
+    const auto errDetails = bson["writeErrors"].Array();
+    ASSERT_EQ(errDetails.size(), 100'000u);
+
+    for (int i = 0; i < 100'000; i++) {
+        auto errDetail = errDetails[i].Obj();
+        ASSERT_EQ(errDetail["index"].Int(), i);
+        ASSERT_EQ(errDetail["code"].Int(), ErrorCodes::BadValue);
+
+        if (i < 2) {
+            ASSERT_EQ(errDetail["errmsg"].String(), bigstr) << i;
+        } else {
+            ASSERT_EQ(errDetail["errmsg"].String(), ""_sd) << i;
+        }
+    }
+}
+
+}  // namespace
+}  // namespace mongo

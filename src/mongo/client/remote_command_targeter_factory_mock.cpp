@@ -37,6 +37,39 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
+
+class TargeterProxy final : public RemoteCommandTargeter {
+public:
+    TargeterProxy(std::shared_ptr<RemoteCommandTargeter> mock) : _mock(mock) {}
+
+    ConnectionString connectionString() override {
+        return _mock->connectionString();
+    }
+
+    StatusWith<HostAndPort> findHost(OperationContext* opCtx,
+                                     const ReadPreferenceSetting& readPref) override {
+        return _mock->findHost(opCtx, readPref);
+    }
+
+    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                Milliseconds maxWait) override {
+        return _mock->findHostWithMaxWait(readPref, maxWait);
+    }
+
+    void markHostNotMaster(const HostAndPort& host, const Status& status) override {
+        _mock->markHostNotMaster(host, status);
+    }
+
+    void markHostUnreachable(const HostAndPort& host, const Status& status) override {
+        _mock->markHostUnreachable(host, status);
+    }
+
+private:
+    const std::shared_ptr<RemoteCommandTargeter> _mock;
+};
+
+}  // namespace
 
 RemoteCommandTargeterFactoryMock::RemoteCommandTargeterFactoryMock() = default;
 
@@ -44,7 +77,26 @@ RemoteCommandTargeterFactoryMock::~RemoteCommandTargeterFactoryMock() = default;
 
 std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryMock::create(
     const ConnectionString& connStr) {
+    auto it = _mockTargeters.find(connStr);
+    if (it != _mockTargeters.end()) {
+        return stdx::make_unique<TargeterProxy>(it->second);
+    }
+
     return stdx::make_unique<RemoteCommandTargeterMock>();
+}
+
+void RemoteCommandTargeterFactoryMock::addTargeterToReturn(
+    const ConnectionString& connStr, std::unique_ptr<RemoteCommandTargeterMock> mockTargeter) {
+    _mockTargeters[connStr] = std::move(mockTargeter);
+}
+
+void RemoteCommandTargeterFactoryMock::removeTargeterToReturn(const ConnectionString& connStr) {
+    MockTargetersMap::iterator it = _mockTargeters.find(connStr);
+
+    invariant(it != _mockTargeters.end());
+    invariant(it->second.unique());
+
+    _mockTargeters.erase(it);
 }
 
 }  // namespace mongo

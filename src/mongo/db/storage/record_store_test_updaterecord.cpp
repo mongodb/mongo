@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/record_store_test_updaterecord.h"
 
 
@@ -37,30 +39,31 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+namespace {
+
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
-namespace mongo {
-
 // Insert a record and try to update it.
 TEST(RecordStoreTestHarness, UpdateRecord) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     string data = "my record";
     RecordId loc;
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -68,25 +71,34 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
     data = "updated record-";
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
+            Status res =
                 rs->updateRecord(opCtx.get(), loc, data.c_str(), data.size() + 1, false, NULL);
-            ASSERT_OK(res.getStatus());
-            loc = res.getValue();
+
+            if (ErrorCodes::NeedsDocumentMove == res) {
+                StatusWith<RecordId> newLocation = rs->insertRecord(
+                    opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                ASSERT_OK(newLocation.getStatus());
+                rs->deleteRecord(opCtx.get(), loc);
+                loc = newLocation.getValue();
+            } else {
+                ASSERT_OK(res);
+            }
+
             uow.commit();
         }
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
@@ -97,18 +109,18 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
 
 // Insert multiple records and try to update them.
 TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record " << i;
@@ -116,7 +128,7 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             uow.commit();
@@ -124,28 +136,37 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "update record-" << i;
             string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
+            Status res =
                 rs->updateRecord(opCtx.get(), locs[i], data.c_str(), data.size() + 1, false, NULL);
-            ASSERT_OK(res.getStatus());
-            locs[i] = res.getValue();
+
+            if (ErrorCodes::NeedsDocumentMove == res) {
+                StatusWith<RecordId> newLocation = rs->insertRecord(
+                    opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                ASSERT_OK(newLocation.getStatus());
+                rs->deleteRecord(opCtx.get(), locs[i]);
+                locs[i] = newLocation.getValue();
+            } else {
+                ASSERT_OK(res);
+            }
+
             uow.commit();
         }
     }
 
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "update record-" << i;
@@ -160,22 +181,22 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
 
 // Insert a record, try to update it, and examine how the UpdateNotifier is called.
 TEST(RecordStoreTestHarness, UpdateRecordWithMoveNotifier) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     string oldData = "my record";
     RecordId loc;
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), oldData.c_str(), oldData.size() + 1, false);
+            StatusWith<RecordId> res = rs->insertRecord(
+                opCtx.get(), oldData.c_str(), oldData.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -183,38 +204,38 @@ TEST(RecordStoreTestHarness, UpdateRecordWithMoveNotifier) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
     string newData = "my updated record--";
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             UpdateNotifierSpy umn(opCtx.get(), loc, oldData.c_str(), oldData.size());
 
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->updateRecord(
+            Status res = rs->updateRecord(
                 opCtx.get(), loc, newData.c_str(), newData.size() + 1, false, &umn);
-            ASSERT_OK(res.getStatus());
-            // UpdateNotifier::recordStoreGoingToMove() called only if
-            // the RecordId for the record changes
-            if (loc == res.getValue()) {
-                ASSERT_EQUALS(0, umn.numMoveCallbacks());
-                // Only MMAP v1 is required to use the UpdateNotifier for in-place updates,
-                // so the number of callbacks is expected to be 0 for non-MMAP storage engines.
-                ASSERT_GTE(1, umn.numInPlaceCallbacks());
-            } else {
-                ASSERT_EQUALS(1, umn.numMoveCallbacks());
+
+            if (ErrorCodes::NeedsDocumentMove == res) {
+                StatusWith<RecordId> newLocation = rs->insertRecord(
+                    opCtx.get(), newData.c_str(), newData.size() + 1, Timestamp(), false);
+                ASSERT_OK(newLocation.getStatus());
+                rs->deleteRecord(opCtx.get(), loc);
+                loc = newLocation.getValue();
                 ASSERT_EQUALS(0, umn.numInPlaceCallbacks());
+            } else {
+                ASSERT_OK(res);
+                ASSERT_GTE(1, umn.numInPlaceCallbacks());
             }
-            loc = res.getValue();
+
             uow.commit();
         }
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(newData.size() + 1, static_cast<size_t>(record.size()));
@@ -223,4 +244,5 @@ TEST(RecordStoreTestHarness, UpdateRecordWithMoveNotifier) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

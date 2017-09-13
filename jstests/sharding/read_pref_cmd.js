@@ -7,12 +7,14 @@ var NODE_COUNT = 2;
  */
 var setUp = function() {
     var configDB = st.s.getDB('config');
-    configDB.adminCommand({ enableSharding: 'test' });
-    configDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
+    configDB.adminCommand({enableSharding: 'test'});
+    configDB.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 
-    // Each time we drop the 'test' DB we have to re-enable profiling
+    // Each time we drop the 'test' DB we have to re-enable profiling. Enable profiling on 'admin'
+    // to test the $currentOp aggregation stage.
     st.rs0.nodes.forEach(function(node) {
         node.getDB('test').setProfilingLevel(2);
+        node.getDB('admin').setProfilingLevel(2);
     });
 };
 
@@ -38,7 +40,8 @@ var tearDown = function() {
  */
 var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secExpected) {
     var testDB = conn.getDB('test');
-    conn.setSlaveOk(false); // purely rely on readPref
+    var adminDB = conn.getDB('admin');
+    conn.setSlaveOk(false);  // purely rely on readPref
     jsTest.log('Testing mode: ' + mode + ', tag sets: ' + tojson(tagSets));
     conn.setReadPref(mode, tagSets);
 
@@ -50,33 +53,37 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
      * @param secOk true if command should be routed to a secondary.
      * @param profileQuery the query to perform agains the profile collection to
      *     look for the cmd just sent.
+     * @param dbName the name of the database against which to run the command,
+     *     and to which the 'system.profile' entry for this command is written.
      */
-    var cmdTest = function(cmdObj, secOk, profileQuery) {
+    var cmdTest = function(cmdObj, secOk, profileQuery, dbName = "test") {
         jsTest.log('about to do: ' + tojson(cmdObj));
+
+        let runCmdDB = conn.getDB(dbName);
+
         // use runReadCommand so that the cmdObj is modified with the readPreference
         // set on the connection.
-        var cmdResult = testDB.runReadCommand(cmdObj);
+        var cmdResult = runCmdDB.runReadCommand(cmdObj);
         jsTest.log('cmd result: ' + tojson(cmdResult));
         assert(cmdResult.ok);
 
         var testedAtLeastOnce = false;
-        var query = { op: 'command', ns: 'test.$cmd' };
+        var query = {op: 'command'};
         Object.extend(query, profileQuery);
 
         hostList.forEach(function(node) {
-            var testDB = node.getDB('test');
-            var result = testDB.system.profile.findOne(query);
+            var profileDB = node.getDB(dbName);
+            var result = profileDB.system.profile.findOne(query);
 
             if (result != null) {
                 if (secOk && secExpected) {
                     // The command obeys read prefs and we expect to run
                     // commands on secondaries with this mode and tag sets
-                    assert(testDB.adminCommand({ isMaster: 1 }).secondary);
-                }
-                else {
+                    assert(profileDB.adminCommand({isMaster: 1}).secondary);
+                } else {
                     // The command does not obey read prefs, or we expect to run
                     // commands on primary with this mode or tag sets
-                    assert(testDB.adminCommand({ isMaster: 1 }).ismaster);
+                    assert(profileDB.adminCommand({isMaster: 1}).ismaster);
                 }
 
                 testedAtLeastOnce = true;
@@ -100,71 +107,98 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     };
 
     // Test command that can be sent to secondary
-    cmdTest({ distinct: 'user', key: 'x', query: { x: 1 }}, true,
-        formatProfileQuery({ distinct: 'user' }));
+    cmdTest(
+        {distinct: 'user', key: 'x', query: {x: 1}}, true, formatProfileQuery({distinct: 'user'}));
 
     // Test command that can't be sent to secondary
-    cmdTest({ create: 'mrIn' }, false, formatProfileQuery({ create: 'mrIn' }));
+    cmdTest({create: 'mrIn'}, false, formatProfileQuery({create: 'mrIn'}));
     // Make sure mrIn is propagated to secondaries before proceeding
-    testDB.runCommand({ getLastError: 1, w: NODE_COUNT });
+    testDB.runCommand({getLastError: 1, w: NODE_COUNT});
 
     var mapFunc = function(doc) {};
-    var reduceFunc = function(key, values) { return values; };
+    var reduceFunc = function(key, values) {
+        return values;
+    };
 
     // Test inline mapReduce on sharded collection.
     // Note that in sharded map reduce, it will output the result in a temp collection
     // even if out is inline.
     if (isMongos) {
-        cmdTest({ mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: { inline: 1 }},
-            false, formatProfileQuery({ mapreduce: 'user', shardedFirstPass: true }));
+        cmdTest({mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
+                false,
+                formatProfileQuery({mapreduce: 'user', shardedFirstPass: true}));
     }
 
     // Test inline mapReduce on unsharded collection.
-    cmdTest({ mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: { inline: 1 }}, true,
-        formatProfileQuery({ mapreduce: 'mrIn', 'out.inline': 1 }));
+    cmdTest({mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
+            true,
+            formatProfileQuery({mapreduce: 'mrIn', 'out.inline': 1}));
 
     // Test non-inline mapReduce on sharded collection.
     if (isMongos) {
-        cmdTest({ mapreduce: 'user', map: mapFunc, reduce: reduceFunc,
-            out: { replace: 'mrOut' }}, false,
-            formatProfileQuery({ mapreduce: 'user', shardedFirstPass: true }));
+        cmdTest({mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: {replace: 'mrOut'}},
+                false,
+                formatProfileQuery({mapreduce: 'user', shardedFirstPass: true}));
     }
 
     // Test non-inline mapReduce on unsharded collection.
-    cmdTest({ mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: { replace: 'mrOut' }},
-        false, formatProfileQuery({ mapreduce: 'mrIn', 'out.replace': 'mrOut' }));
+    cmdTest({mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: {replace: 'mrOut'}},
+            false,
+            formatProfileQuery({mapreduce: 'mrIn', 'out.replace': 'mrOut'}));
 
     // Test other commands that can be sent to secondary.
-    cmdTest({ count: 'user' }, true, formatProfileQuery({ count: 'user' }));
-    cmdTest({ group: { key: { x: true }, '$reduce': function(a, b) {}, ns: 'mrIn',
-        initial: { x: 0  }}}, true, formatProfileQuery({ 'group.ns': 'mrIn' }));
+    cmdTest({count: 'user'}, true, formatProfileQuery({count: 'user'}));
+    cmdTest({group: {key: {x: true}, '$reduce': function(a, b) {}, ns: 'mrIn', initial: {x: 0}}},
+            true,
+            formatProfileQuery({'group.ns': 'mrIn'}));
 
-    cmdTest({ collStats: 'user' }, true, formatProfileQuery({ count: 'user' }));
-    cmdTest({ dbStats: 1 }, true, formatProfileQuery({ dbStats: 1 }));
+    cmdTest({collStats: 'user'}, true, formatProfileQuery({count: 'user'}));
+    cmdTest({dbStats: 1}, true, formatProfileQuery({dbStats: 1}));
 
-    testDB.user.ensureIndex({ loc: '2d' });
-    testDB.user.ensureIndex({ position: 'geoHaystack', type:1 }, { bucketSize: 10 });
-    testDB.runCommand({ getLastError: 1, w: NODE_COUNT });
-    cmdTest({ geoNear: 'user', near: [1, 1] }, true,
-        formatProfileQuery({ geoNear: 'user' }));
+    testDB.user.ensureIndex({loc: '2d'});
+    testDB.user.ensureIndex({position: 'geoHaystack', type: 1}, {bucketSize: 10});
+    testDB.runCommand({getLastError: 1, w: NODE_COUNT});
+    cmdTest({geoNear: 'user', near: [1, 1]}, true, formatProfileQuery({geoNear: 'user'}));
 
     // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
-    // We'll omit geoWalk, it's not a public command.
     if (!isMongos) {
-        cmdTest(
-            {
-                geoSearch: 'user', near: [1, 1],
-                search: { type: 'restaurant'}, maxDistance: 10
-            }, true, formatProfileQuery({ geoSearch: 'user'}));
+        cmdTest({geoSearch: 'user', near: [1, 1], search: {type: 'restaurant'}, maxDistance: 10},
+                true,
+                formatProfileQuery({geoSearch: 'user'}));
     }
 
     // Test on sharded
-    cmdTest({ aggregate: 'user', pipeline: [{ $project: { x: 1 }}] }, true,
-        formatProfileQuery({ aggregate: 'user' }));
+    cmdTest({aggregate: 'user', pipeline: [{$project: {x: 1}}], cursor: {}},
+            true,
+            formatProfileQuery({aggregate: 'user'}));
 
     // Test on non-sharded
-    cmdTest({ aggregate: 'mrIn', pipeline: [{ $project: { x: 1 }}] }, true,
-        formatProfileQuery({ aggregate: 'mrIn' }));
+    cmdTest({aggregate: 'mrIn', pipeline: [{$project: {x: 1}}], cursor: {}},
+            true,
+            formatProfileQuery({aggregate: 'mrIn'}));
+
+    // Test $currentOp aggregation stage.
+    if (!isMongos) {
+        let curOpComment = 'agg_currentOp_' + ObjectId();
+
+        // A $currentOp without any foreign namespaces takes no collection locks and will not be
+        // profiled, so we add a dummy $lookup stage to force an entry in system.profile.
+        cmdTest({
+            aggregate: 1,
+            pipeline: [
+                {$currentOp: {}},
+                {
+                  $lookup:
+                      {from: "dummy", localField: "dummy", foreignField: "dummy", as: "dummy"}
+                }
+            ],
+            comment: curOpComment,
+            cursor: {}
+        },
+                true,
+                formatProfileQuery({comment: curOpComment}),
+                "admin");
+    }
 };
 
 /**
@@ -188,20 +222,20 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
     // Test that a command that could be routed to a secondary fails with bad mode / tags.
     if (isMongos) {
         // Command result should have ok: 0.
-        cmdResult = testDB.runReadCommand({ distinct: 'user', key: 'x' });
+        cmdResult = testDB.runReadCommand({distinct: 'user', key: 'x'});
         jsTest.log('cmd result: ' + tojson(cmdResult));
         assert(!cmdResult.ok);
     } else {
         try {
             // conn should throw error
-            testDB.runReadCommand({ distinct: 'user', key: 'x' });
+            testDB.runReadCommand({distinct: 'user', key: 'x'});
             failureMsg = "Unexpected success running distinct!";
-        }
-        catch (e) {
+        } catch (e) {
             jsTest.log(e);
         }
 
-        if (failureMsg) throw failureMsg;
+        if (failureMsg)
+            throw failureMsg;
     }
 };
 
@@ -223,7 +257,7 @@ var testAllModes = function(conn, hostList, isMongos) {
         ['secondary', undefined, true],
         ['secondary', [{tag: 'two'}], true],
         ['secondary', [{tag: 'doesntexist'}, {}], true],
-        ['secondary', [{tag: 'doesntexist'}, {tag:'two'}], true],
+        ['secondary', [{tag: 'doesntexist'}, {tag: 'two'}], true],
 
         ['secondaryPreferred', undefined, true],
         ['secondaryPreferred', [{tag: 'one'}], false],
@@ -264,17 +298,16 @@ var testAllModes = function(conn, hostList, isMongos) {
     });
 };
 
-var st = new ShardingTest({shards : {rs0 : {nodes : NODE_COUNT, verbose : 1}},
-                           other : {mongosOptions : {verbose : 3}}});
+var st = new ShardingTest({shards: {rs0: {nodes: NODE_COUNT}}});
 st.stopBalancer();
 
-ReplSetTest.awaitRSClientHosts(st.s, st.rs0.nodes);
+awaitRSClientHosts(st.s, st.rs0.nodes);
 
 // Tag primary with { dc: 'ny', tag: 'one' }, secondary with { dc: 'ny', tag: 'two' }
 var primary = st.rs0.getPrimary();
 var secondary = st.rs0.getSecondary();
-var PRIMARY_TAG = { dc: 'ny', tag: 'one' };
-var SECONDARY_TAG = { dc: 'ny', tag: 'two' };
+var PRIMARY_TAG = {dc: 'ny', tag: 'one'};
+var SECONDARY_TAG = {dc: 'ny', tag: 'two'};
 
 var rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log('got rsconf ' + tojson(rsConfig));
@@ -288,13 +321,11 @@ rsConfig.members.forEach(function(member) {
 
 rsConfig.version++;
 
-
 jsTest.log('new rsconf ' + tojson(rsConfig));
 
 try {
-    primary.adminCommand({ replSetReconfig: rsConfig });
-}
-catch(e) {
+    primary.adminCommand({replSetReconfig: rsConfig});
+} catch (e) {
     jsTest.log('replSetReconfig error: ' + e);
 }
 
@@ -303,10 +334,9 @@ st.rs0.awaitSecondaryNodes();
 // Force mongos to reconnect after our reconfig
 assert.soon(function() {
     try {
-        st.s.getDB('foo').runCommand({ create: 'foo' });
+        st.s.getDB('foo').runCommand({create: 'foo'});
         return true;
-    }
-    catch (x) {
+    } catch (x) {
         // Intentionally caused an error that forces mongos's monitor to refresh.
         jsTest.log('Caught exception while doing dummy command: ' + tojson(x));
         return false;
@@ -322,8 +352,16 @@ jsTest.log('got rsconf ' + tojson(rsConfig));
 var replConn = new Mongo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
-_awaitRSHostViaRSMonitor(primary.name, { ok: true, tags: PRIMARY_TAG }, st.rs0.name);
-_awaitRSHostViaRSMonitor(secondary.name, { ok: true, tags: SECONDARY_TAG }, st.rs0.name);
+_awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: PRIMARY_TAG}, st.rs0.name);
+_awaitRSHostViaRSMonitor(secondary.name, {ok: true, tags: SECONDARY_TAG}, st.rs0.name);
+
+st.rs0.nodes.forEach(function(conn) {
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, logComponentVerbosity: {command: {verbosity: 1}}}));
+});
+
+assert.commandWorked(
+    st.s.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 3}}}));
 
 testAllModes(replConn, st.rs0.nodes, false);
 

@@ -36,19 +36,26 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 namespace copydb {
 
-Status checkAuthForCopydbCommand(ClientBasic* client,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) {
+Status checkAuthForCopydbCommand(Client* client, const std::string& dbname, const BSONObj& cmdObj) {
+    const auto fromdbElt = cmdObj["fromdb"];
+    if (fromdbElt.type() != BSONType::String) {
+        return Status(ErrorCodes::TypeMismatch, "'fromdb' must be of type String");
+    }
+    const auto todbElt = cmdObj["todb"];
+    if (todbElt.type() != BSONType::String) {
+        return Status(ErrorCodes::TypeMismatch, "'todb' must be of type String");
+    }
+
     bool fromSelf = StringData(cmdObj.getStringField("fromhost")).empty();
-    StringData fromdb = cmdObj.getStringField("fromdb");
-    StringData todb = cmdObj.getStringField("todb");
+    const StringData fromdb = fromdbElt.valueStringData();
+    const StringData todb = todbElt.valueStringData();
 
     // get system collections
     std::vector<std::string> legalClientSystemCollections;
@@ -69,8 +76,8 @@ Status checkAuthForCopydbCommand(ClientBasic* client,
         actions.addAction(ActionType::bypassDocumentValidation);
     }
 
-    if (!AuthorizationSession::get(client)
-             ->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(todb), actions)) {
+    if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forDatabaseName(todb), actions)) {
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 

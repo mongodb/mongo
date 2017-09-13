@@ -37,6 +37,13 @@
 
 namespace mongo {
 
+enum class BoundInclusion {
+    kExcludeBothStartAndEndKeys,
+    kIncludeStartKeyOnly,
+    kIncludeEndKeyOnly,
+    kIncludeBothStartAndEndKeys
+};
+
 /**
  * An ordered list of intervals for one field.
  */
@@ -47,7 +54,6 @@ struct OrderedIntervalList {
     // Must be ordered according to the index order.
     std::vector<Interval> intervals;
 
-    // TODO: We could drop this.  Only used in IndexBounds::isValidFor.
     std::string name;
 
     bool isValidFor(int expectedOrientation) const;
@@ -65,6 +71,9 @@ struct OrderedIntervalList {
      *   where this OIL has direction==1.
      */
     void complement();
+
+    bool operator==(const OrderedIntervalList& other) const;
+    bool operator!=(const OrderedIntervalList& other) const;
 };
 
 /**
@@ -72,7 +81,7 @@ struct OrderedIntervalList {
  * interpret.  Previously known as FieldRangeVector.
  */
 struct IndexBounds {
-    IndexBounds() : isSimpleRange(false), endKeyInclusive(false) {}
+    IndexBounds() : isSimpleRange(false), boundInclusion(BoundInclusion::kIncludeStartKeyOnly) {}
 
     // For each indexed field, the values that the field is allowed to take on.
     std::vector<OrderedIntervalList> fields;
@@ -95,6 +104,29 @@ struct IndexBounds {
     Interval getInterval(size_t i, size_t j) const;
     std::string toString() const;
 
+    bool operator==(const IndexBounds& other) const;
+    bool operator!=(const IndexBounds& other) const;
+
+    /**
+     * Returns if the start key should be included in the bounds specified by the given
+     * BoundInclusion.
+     */
+    static bool isStartIncludedInBound(BoundInclusion boundInclusion);
+
+    /**
+     * Returns if the end key should be included in the bounds specified by the given
+     * BoundInclusion.
+     */
+    static bool isEndIncludedInBound(BoundInclusion boundInclusion);
+
+    /**
+     * Returns a BoundInclusion given two booleans of whether to included the start key and the end
+     * key.
+     */
+    static BoundInclusion makeBoundInclusionFromBoundBools(bool startKeyInclusive,
+                                                           bool endKeyInclusive);
+
+
     /**
      * BSON format for explain. The format is an array of strings for each field.
      * Each string represents an interval. The strings use "[" and "]" if the interval
@@ -109,7 +141,7 @@ struct IndexBounds {
     bool isSimpleRange;
     BSONObj startKey;
     BSONObj endKey;
-    bool endKeyInclusive;
+    BoundInclusion boundInclusion;
 };
 
 /**

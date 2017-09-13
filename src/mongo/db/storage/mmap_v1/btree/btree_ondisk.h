@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
@@ -181,7 +182,7 @@ struct BtreeBucketV0 {
 };
 
 // BtreeBucketV0 is part of the on-disk format, so it should never be changed
-BOOST_STATIC_ASSERT(sizeof(BtreeBucketV0) - sizeof(static_cast<BtreeBucketV0*>(NULL)->data) ==
+MONGO_STATIC_ASSERT(sizeof(BtreeBucketV0) - sizeof(static_cast<BtreeBucketV0*>(NULL)->data) ==
                     BtreeBucketV0::HeaderSize);
 
 /**
@@ -322,7 +323,7 @@ struct BtreeBucketV1 {
 };
 
 // BtreeBucketV1 is part of the on-disk format, so it should never be changed
-BOOST_STATIC_ASSERT(sizeof(BtreeBucketV1) - sizeof(static_cast<BtreeBucketV1*>(NULL)->data) ==
+MONGO_STATIC_ASSERT(sizeof(BtreeBucketV1) - sizeof(static_cast<BtreeBucketV1*>(NULL)->data) ==
                     BtreeBucketV1::HeaderSize);
 
 enum Flags { Packed = 1 };

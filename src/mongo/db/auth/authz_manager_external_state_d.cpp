@@ -60,13 +60,13 @@ AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(AuthorizationMana
 }
 
 Status AuthzManagerExternalStateMongod::query(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const NamespaceString& collectionName,
     const BSONObj& query,
     const BSONObj& projection,
     const stdx::function<void(const BSONObj&)>& resultProcessor) {
     try {
-        DBDirectClient client(txn);
+        DBDirectClient client(opCtx);
         client.query(resultProcessor, collectionName.ns(), query, &projection);
         return Status::OK();
     } catch (const DBException& e) {
@@ -74,20 +74,21 @@ Status AuthzManagerExternalStateMongod::query(
     }
 }
 
-Status AuthzManagerExternalStateMongod::findOne(OperationContext* txn,
+Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
                                                 const NamespaceString& collectionName,
                                                 const BSONObj& query,
                                                 BSONObj* result) {
-    AutoGetCollectionForRead ctx(txn, collectionName);
+    AutoGetCollectionForReadCommand ctx(opCtx, collectionName);
 
     BSONObj found;
-    if (Helpers::findOne(txn, ctx.getCollection(), query, found)) {
+    if (Helpers::findOne(opCtx, ctx.getCollection(), query, found)) {
         *result = found.getOwned();
         return Status::OK();
     }
     return Status(ErrorCodes::NoMatchingDocument,
                   mongoutils::str::stream() << "No document in " << collectionName.ns()
-                                            << " matches " << query);
+                                            << " matches "
+                                            << query);
 }
 
 }  // namespace mongo

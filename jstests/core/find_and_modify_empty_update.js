@@ -1,3 +1,8 @@
+// Cannot implicitly shard accessed collections because of following errmsg: A single
+// update/delete on a sharded collection must contain an exact match on _id or contain the shard
+// key.
+// @tags: [assumes_unsharded_collection]
+
 // Test passing update:{} to findAndModify.  SERVER-13883.
 
 var coll = db.find_and_modify_empty_update;
@@ -46,7 +51,7 @@ assert.eq(coll.findOne({_id: 0}), {_id: 0});
 
 // Test update:{} with a sort, upsert:true, and new:true.
 coll.remove({});
-ret = coll.findAndModify({query: {_id: 0, a: 1}, update: {}, upsert: true, sort: {a: 1},
-                          new: true});
+ret =
+    coll.findAndModify({query: {_id: 0, a: 1}, update: {}, upsert: true, sort: {a: 1}, new: true});
 assert.eq(ret, {_id: 0});
 assert.eq(coll.findOne({_id: 0}), {_id: 0});

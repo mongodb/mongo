@@ -34,97 +34,84 @@
 
 #include <string>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
-#include "mongo/rpc/metadata/audit_metadata.h"
-#include "mongo/s/client/scc_fast_query_handler.h"
-#include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/version_manager.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/client/version_manager.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 using std::string;
 
-namespace {
-
-bool initWireVersion(DBClientBase* conn, std::string* errMsg) {
-    BSONObj response;
-    if (!conn->runCommand("admin", BSON("isMaster" << 1), response)) {
-        *errMsg = str::stream() << "Failed to determine wire version "
-                                << "for internal connection: " << response;
-        return false;
-    }
-
-    if (response.hasField("minWireVersion") && response.hasField("maxWireVersion")) {
-        int minWireVersion = response["minWireVersion"].numberInt();
-        int maxWireVersion = response["maxWireVersion"].numberInt();
-        conn->setWireVersions(minWireVersion, maxWireVersion);
-    }
-
-    return true;
-}
-
-}  // namespace
-
-
-ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections)
-    : _shardedConnections(shardedConnections) {}
+ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections,
+                                               std::unique_ptr<rpc::EgressMetadataHook> egressHook)
+    : _shardedConnections(shardedConnections), _egressHook(std::move(egressHook)) {}
 
 void ShardingConnectionHook::onCreate(DBClientBase* conn) {
+    if (conn->type() == ConnectionString::INVALID) {
+        throw AssertionException(ErrorCodes::BadValue,
+                                 str::stream() << "Unrecognized connection string.");
+    }
+
     // Authenticate as the first thing we do
     // NOTE: Replica set authentication allows authentication against *any* online host
-    if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+    if (isInternalAuthSet()) {
         LOG(2) << "calling onCreate auth for " << conn->toString();
 
-        bool result = authenticateInternalUser(conn);
+        bool result = conn->authenticateInternalUser();
 
         uassert(15847,
                 str::stream() << "can't authenticate to server " << conn->getServerAddress(),
                 result);
     }
 
-    // Initialize the wire version of single connections
-    if (conn->type() == ConnectionString::MASTER) {
-        LOG(2) << "checking wire version of new connection " << conn->toString();
-
-        // Initialize the wire protocol version of the connection to find out if we
-        // can send write commands to this connection.
-        string errMsg;
-        if (!initWireVersion(conn, &errMsg)) {
-            uasserted(17363, errMsg);
-        }
-    }
-
+    // Delegate the metadata hook logic to the egress hook; use lambdas to pass the arguments in
+    // the order expected by the egress hook.
     if (_shardedConnections) {
-        // For every DBClient created by mongos, add a hook that will capture the response from
-        // commands we pass along from the client, so that we can target the correct node when
-        // subsequent getLastError calls are made by mongos.
-        conn->setReplyMetadataReader([](const BSONObj& metadataObj, StringData hostString)
-                                         -> Status {
-                                             saveGLEStats(metadataObj, hostString);
-                                             return Status::OK();
-                                         });
+        conn->setReplyMetadataReader(
+            [this](OperationContext* opCtx, const BSONObj& metadataObj, StringData target) {
+                return _egressHook->readReplyMetadata(opCtx, target, metadataObj);
+            });
     }
-
-    // For every DBClient created by mongos, add a hook that will append impersonated users
-    // to the end of every runCommand.  mongod uses this information to produce auditing
-    // records attributed to the proper authenticated user(s).
-    conn->setRequestMetadataWriter([](BSONObjBuilder* metadataBob) -> Status {
-        audit::writeImpersonatedUsersToMetadata(metadataBob);
-        return Status::OK();
+    conn->setRequestMetadataWriter([this](OperationContext* opCtx, BSONObjBuilder* metadataBob) {
+        return _egressHook->writeRequestMetadata(opCtx, metadataBob);
     });
 
-    // For every SCC created, add a hook that will allow fastest-config-first config reads if
-    // the appropriate server options are set.
-    if (conn->type() == ConnectionString::SYNC) {
-        SyncClusterConnection* scc = dynamic_cast<SyncClusterConnection*>(conn);
-        if (scc) {
-            scc->attachQueryHandler(new SCCFastQueryHandler);
+
+    if (conn->type() == ConnectionString::MASTER) {
+        BSONObj isMasterResponse;
+        if (!conn->runCommand("admin", BSON("ismaster" << 1), isMasterResponse)) {
+            uassertStatusOK(getStatusFromCommandResult(isMasterResponse));
         }
+
+        long long configServerModeNumber;
+        Status status =
+            bsonExtractIntegerField(isMasterResponse, "configsvr", &configServerModeNumber);
+
+        if (status == ErrorCodes::NoSuchKey) {
+            // This isn't a config server we're talking to.
+            return;
+        }
+        uassertStatusOK(status);
+
+        const long long minKnownConfigServerMode = 1;
+        const long long maxKnownConfigServerMode = 2;
+        uassert(28785,
+                str::stream() << "Unrecognized configsvr mode number: " << configServerModeNumber
+                              << ". Range of known configsvr mode numbers is: ["
+                              << minKnownConfigServerMode
+                              << ", "
+                              << maxKnownConfigServerMode
+                              << "]",
+                configServerModeNumber >= minKnownConfigServerMode &&
+                    configServerModeNumber <= maxKnownConfigServerMode);
+
+        uassertStatusOK(status);
     }
 }
 

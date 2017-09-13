@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -44,14 +44,14 @@ util_err(WT_SESSION *session, int e, const char *fmt, ...)
  *	Read a line from stdin into a ULINE.
  */
 int
-util_read_line(WT_SESSION *session, ULINE *l, int eof_expected, int *eofp)
+util_read_line(WT_SESSION *session, ULINE *l, bool eof_expected, bool *eofp)
 {
 	static uint64_t line = 0;
 	size_t len;
 	int ch;
 
 	++line;
-	*eofp = 0;
+	*eofp = false;
 
 	if (l->memsize == 0) {
 		if ((l->mem = realloc(l->mem, l->memsize + 1024)) == NULL)
@@ -62,7 +62,7 @@ util_read_line(WT_SESSION *session, ULINE *l, int eof_expected, int *eofp)
 		if ((ch = getchar()) == EOF) {
 			if (len == 0) {
 				if (eof_expected) {
-					*eofp = 1;
+					*eofp = true;
 					return (0);
 				}
 				return (util_err(session, 0,
@@ -108,7 +108,7 @@ util_str2recno(WT_SESSION *session, const char *p, uint64_t *recnop)
 	 * forth -- none of them are OK with us.  Check the string starts with
 	 * digit, that turns off the special processing.
 	 */
-	if (!isdigit(p[0]))
+	if (!__wt_isdigit((u_char)p[0]))
 		goto format;
 
 	errno = 0;
@@ -140,12 +140,18 @@ util_flush(WT_SESSION *session, const char *uri)
 	if ((buf = malloc(len)) == NULL)
 		return (util_err(session, errno, NULL));
 
-	(void)snprintf(buf, len, "target=(\"%s\")", uri);
-	if ((ret = session->checkpoint(session, buf)) != 0) {
-		ret = util_err(session, ret, "%s: session.checkpoint", uri);
-		(void)session->drop(session, uri, NULL);
+	if ((ret = __wt_snprintf(buf, len, "target=(\"%s\")", uri)) != 0) {
+		free(buf);
+		return (util_err(session, ret, NULL));
 	}
-
+	ret = session->checkpoint(session, buf);
 	free(buf);
-	return (ret);
+
+	if (ret == 0)
+		return (0);
+
+	(void)util_err(session, ret, "%s: session.checkpoint", uri);
+	if ((ret = session->drop(session, uri, NULL)) != 0)
+		(void)util_err(session, ret, "%s: session.drop", uri);
+	return (1);
 }

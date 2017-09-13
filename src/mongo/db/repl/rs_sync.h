@@ -28,20 +28,32 @@
 
 #pragma once
 
-#include <deque>
-#include <vector>
-
-#include "mongo/db/client.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/initial_sync.h"
-#include "mongo/db/repl/sync_tail.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 namespace repl {
-// Body of the thread that will do the background sync.
-void runSyncThread();
+class BackgroundSync;
+class ReplicationCoordinator;
+
+/**
+ * This class is used to apply oplog entries supplied by bgsync. It will automatically shutdown once
+ * bgsync shuts down.  Callers must not call into methods concurrently.
+ */
+class RSDataSync {
+public:
+    RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord);
+    ~RSDataSync();
+    void startup();
+    void join();
+
+private:
+    // Runs in a loop apply oplog entries from the buffer until this class cancels, or an error.
+    void _run();
+
+    stdx::thread _runThread;
+    BackgroundSync* _bgsync;
+    ReplicationCoordinator* _replCoord;
+};
 
 }  // namespace repl
 }  // namespace mongo

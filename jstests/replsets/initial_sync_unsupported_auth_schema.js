@@ -1,25 +1,10 @@
 // Test that initial sync aborts when it encounters auth data from unsupported
 // auth schemas (see: SERVER-17671)
 
-function checkedReInitiate(rst) {
-    try {
-        rst.reInitiate();
-    }
-    catch (e) {
-        // reInitiate can throw because it tries to run an ismaster command on
-        // all secondaries, including the new one that may have already aborted
-        var errMsg = tojson(e);
-        if (errMsg.indexOf('error doing query: failed') > -1 ||
-            errMsg.indexOf('socket exception') > -1) {
-            // Ignore these exceptions, which are indicative of an aborted node
-        } else {
-            throw e;
-        }
-    }
-}
-
 function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     'use strict';
+
+    load("jstests/replsets/rslib.js");  // For reInitiateWithoutThrowingOnAbortedMember
 
     // Create a replica set with one data-bearing node and one arbiter to
     // ensure availability when the added node fasserts later in the test
@@ -34,10 +19,11 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     assert.writeOK(res);
 
     // Add another node to the replica set to allow an initial sync to occur
-    rst.add();
+    var initSyncNode = rst.add();
+    var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
     clearRawMongoProgramOutput();
-    checkedReInitiate(rst);
+    reInitiateWithoutThrowingOnAbortedMember(rst);
 
     var msg;
     if (schema.hasOwnProperty('currentVersion')) {
@@ -46,12 +32,30 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
         msg = /During initial sync, found malformed auth schema version/;
     }
 
-    var assertFn = function() {
-        return rawMongoProgramOutput().match(msg);
-    };
-    assert.soon(assertFn, 'Initial sync should have aborted due to an invalid or unsupported' +
-                          ' authSchema version: ' + tojson(schema), 60000);
+    print("**** Looking for string in logs: " + msg);
 
+    var assertFn = function() {
+        var foundMatch = rawMongoProgramOutput().match(msg);
+        if (foundMatch) {
+            print("***** found matching string in log: " + msg);
+        }
+        return foundMatch;
+    };
+    assert.soon(assertFn,
+                'Initial sync should have aborted due to an invalid or unsupported' +
+                    ' authSchema version: ' + tojson(schema),
+                60000);
+
+    assert.soon(function() {
+        try {
+            initSyncNodeAdminDB.runCommand({ping: 1});
+        } catch (e) {
+            return true;
+        }
+        return false;
+    }, "Node did not terminate due to unsupported auth schema during initial sync", 60 * 1000);
+
+    rst.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
     rst.stopSet();
 }
 
@@ -71,19 +75,39 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     assert.writeOK(res);
 
     // Add another node to the replica set to allow an initial sync to occur
-    rst.add();
+    var initSyncNode = rst.add();
+    var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
     clearRawMongoProgramOutput();
-    checkedReInitiate(rst);
+    reInitiateWithoutThrowingOnAbortedMember(rst);
 
     var msg = /During initial sync, found documents in admin\.system\.users/;
+
+    print("**** Looking for string in logs: " + msg);
+
     var assertFn = function() {
-        return rawMongoProgramOutput().match(msg);
+        var foundMatch = rawMongoProgramOutput().match(msg);
+        if (foundMatch) {
+            print("***** found matching string in log: " + msg);
+        }
+        return foundMatch;
     };
 
-    assert.soon(assertFn, 'Initial sync should have aborted due to an existing user document and' +
-                          ' a missing auth schema', 60000);
+    assert.soon(assertFn,
+                'Initial sync should have aborted due to an existing user document and' +
+                    ' a missing auth schema',
+                60 * 1000);
 
+    assert.soon(function() {
+        try {
+            initSyncNodeAdminDB.runCommand({ping: 1});
+        } catch (e) {
+            return true;
+        }
+        return false;
+    }, "Node did not terminate due to unsupported auth schema during initial sync", 60 * 1000);
+
+    rst.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
     rst.stopSet();
 }
 

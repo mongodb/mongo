@@ -185,9 +185,9 @@ public:
     /**
      * Return a CollectionScanNode that scans as requested in 'query'.
      */
-    static QuerySolutionNode* makeCollectionScan(const CanonicalQuery& query,
-                                                 bool tailable,
-                                                 const QueryPlannerParams& params);
+    static std::unique_ptr<QuerySolutionNode> makeCollectionScan(const CanonicalQuery& query,
+                                                                 bool tailable,
+                                                                 const QueryPlannerParams& params);
 
     /**
      * Return a plan that uses the provided index as a proxy for a collection scan.
@@ -265,15 +265,34 @@ public:
                                       std::vector<MatchExpression*>* subnodesOut);
 
     /**
+     * Given a list of OR-related subtrees returned by processIndexScans(), looks for logically
+     * equivalent IndexScanNodes and combines them. This is an optimization to avoid creating
+     * plans that repeat index access work.
+     *
+     * Example:
+     *  Suppose processIndexScans() returns a list of the following three query solutions:
+     *    1) IXSCAN (bounds: {b: [[2,2]]})
+     *    2) FETCH (filter: {d:1}) -> IXSCAN (bounds: {c: [[3,3]]})
+     *    3) FETCH (filter: {e:1}) -> IXSCAN (bounds: {c: [[3,3]]})
+     *  This method would collapse scans #2 and #3, resulting in the following output:
+     *    1) IXSCAN (bounds: {b: [[2,2]]})
+     *    2) FETCH (filter: {$or:[{d:1}, {e:1}]}) -> IXSCAN (bounds: {c: [[3,3]]})
+     *
+     * Used as a helper for buildIndexedOr().
+     *
+     * Takes ownership of 'scans'. The caller assumes ownership of the pointers in the returned
+     * list of QuerySolutionNode*.
+     */
+    static std::vector<QuerySolutionNode*> collapseEquivalentScans(
+        const std::vector<QuerySolutionNode*> scans);
+
+    /**
      * Helper used by buildIndexedAnd and buildIndexedOr.
      *
      * The children of AND and OR nodes are sorted by the index that the subtree rooted at
      * that node uses.  Child nodes that use the same index are adjacent to one another to
      * facilitate grouping of index scans.  As such, the processing for AND and OR is
      * almost identical.
-     *
-     * See tagForSort and sortUsingTags in index_tag.h for details on ordering the children
-     * of OR and AND.
      *
      * Does not take ownership of 'root' but may remove children from it.
      */

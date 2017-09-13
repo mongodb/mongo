@@ -1,0 +1,60 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/aggregation/*.js
+  - jstests/aggregation/bugs/*.js
+  - jstests/aggregation/expressions/*.js
+  - jstests/aggregation/sources/*/*.js
+  exclude_files:
+  # The following tests start their own ShardingTest.
+  - jstests/aggregation/bugs/server6179.js
+  - jstests/aggregation/bugs/server7781.js
+  - jstests/aggregation/mongos_merge.js
+  - jstests/aggregation/mongos_slaveok.js
+  - jstests/aggregation/shard_targeting.js
+  - jstests/aggregation/sources/addFields/use_cases.js
+  - jstests/aggregation/sources/addFields/weather.js
+  - jstests/aggregation/sources/collStats/shard_host_info.js
+  - jstests/aggregation/sources/facet/use_cases.js
+  - jstests/aggregation/sources/graphLookup/sharded.js
+  - jstests/aggregation/sources/lookup/lookup.js
+  - jstests/aggregation/sources/replaceRoot/address.js
+  - jstests/aggregation/testshard1.js
+  # The following tests start their own ReplSetTest.
+  - jstests/aggregation/testSlave.js
+  - jstests/aggregation/sources/changeStream/*.js
+  # The following tests start their own mongod.
+  - jstests/aggregation/bugs/cursor_timeout.js
+  - jstests/aggregation/bugs/lookup_unwind_getmore.js
+  - jstests/aggregation/bugs/lookup_unwind_killcursor.js
+  # TODO: Remove after SERVER-23229 is fixed.
+  - jstests/aggregation/bugs/groupMissing.js
+  # TODO SERVER-30731: Remove once ChunkManager::getShardIdsForQuery() supports query with $expr.
+  - jstests/aggregation/sources/match/expr_match.js
+  exclude_with_any_tags:
+  # Tests tagged with the following will fail because they assume collections are not sharded.
+  - assumes_no_implicit_collection_creation_after_drop
+  - assumes_no_implicit_index_creation
+  - assumes_unsharded_collection
+  - cannot_create_unique_index_when_using_hashed_shard_key
+
+executor:
+  config:
+    shell_options:
+      readMode: commands
+      eval: load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      nopreallocj: ''
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1

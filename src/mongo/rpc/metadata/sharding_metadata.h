@@ -25,8 +25,11 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
 class BSONObj;
@@ -34,11 +37,13 @@ class BSONObjBuilder;
 class Status;
 template <typename T>
 class StatusWith;
+
 namespace rpc {
 
 /**
  * This class compromises the reply metadata fields that concern sharding. MongoD attaches
  * this information to a command reply, which MongoS uses to process getLastError.
+ * TODO(spencer): Rename this to ShardingResponseMetadata.
  */
 class ShardingMetadata {
 public:
@@ -53,36 +58,20 @@ public:
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
     /**
-     * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
-     * format.
-     */
-    static Status downconvert(const BSONObj& commandReply,
-                              const BSONObj& replyMetadata,
-                              BSONObjBuilder* legacyCommandReply);
-
-    /**
-     * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
-     * format.
-     */
-    static Status upconvert(const BSONObj& legacyCommandReply,
-                            BSONObjBuilder* commandReplyBob,
-                            BSONObjBuilder* metadataBob);
-
-    /**
-     * Gets the OpTime of the oplog entry of the last succssful write operation executed by the
+     * Gets the OpTime of the oplog entry of the last successful write operation executed by the
      * server that produced the metadata.
      */
-    const Timestamp& getLastOpTime() const;
+    const repl::OpTime& getLastOpTime() const;
 
     /**
      * Gets the most recent election id observed by the server that produced the metadata.
      */
     const OID& getLastElectionId() const;
 
-    ShardingMetadata(Timestamp lastOpTime, OID lastElectionId);
+    ShardingMetadata(repl::OpTime lastOpTime, OID lastElectionId);
 
 private:
-    Timestamp _lastOpTime;
+    repl::OpTime _lastOpTime;
     OID _lastElectionId;
 };
 

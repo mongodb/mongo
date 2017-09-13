@@ -7,7 +7,7 @@ load("jstests/ssl/libs/ssl_helpers.js");
 print("=== Testing requireSSL/requireSSL cluster ===");
 mixedShardTest(requireSSL, requireSSL, true);
 
-print("=== Testing preferSSL/requireSSL cluster ===")
+print("=== Testing preferSSL/requireSSL cluster ===");
 mixedShardTest(preferSSL, requireSSL, true);
 mixedShardTest(requireSSL, preferSSL, true);
 
@@ -16,4 +16,4 @@ mixedShardTest(preferSSL, allowSSL, true);
 mixedShardTest(allowSSL, preferSSL, true);
 
 print("=== Testing allowSSL/requireSSL cluster - SHOULD FAIL ===");
-mixedShardTest(requireSSL, allowSSL,  false);
+mixedShardTest(requireSSL, allowSSL, false);

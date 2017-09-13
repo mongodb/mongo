@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -13,7 +13,7 @@
  *	Return if the process has special privileges, defined as having
  *	different effective and read UIDs or GIDs.
  */
-int
+bool
 __wt_has_priv(void)
 {
 	return (0);

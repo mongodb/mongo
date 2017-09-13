@@ -3,14 +3,15 @@
 // are user documents stored in the configuration information, it must assume that
 // there are.
 
-var dopts = { smallfiles: "", nopreallocj: ""}
-var st = new ShardingTest(
-    { shards: 1,
-      mongos: 1,
-      config: 1,
-      keyFile: 'jstests/libs/key1',
-      useHostname: false, // Needed when relying on the localhost exception
-      other: { shardOptions: dopts, configOptions: dopts, mongosOptions: { verbose: 1 } } } );
+var dopts = {smallfiles: "", nopreallocj: ""};
+var st = new ShardingTest({
+    shards: 1,
+    mongos: 1,
+    config: 1,
+    keyFile: 'jstests/libs/key1',
+    useHostname: false,  // Needed when relying on the localhost exception
+    other: {shardOptions: dopts, configOptions: dopts, mongosOptions: {verbose: 1}}
+});
 var mongos = st.s;
 var config = st.config0;
 var authzErrorCode = 13;
@@ -32,10 +33,10 @@ assert.commandFailedWithCode(db.adminCommand('serverStatus'), authzErrorCode);
 db.auth('user', 'pwd');
 assert.commandWorked(db.adminCommand('serverStatus'));
 
-jsTest.log('repeat without config server')
+jsTest.log('repeat without config server');
 
 // shut down only config server
-MongoRunner.stopMongod(config.port, /*signal*/15);
+MongoRunner.stopMongod(config);
 
 // open a new connection to mongos (unauthorized)
 var conn2 = new Mongo(mongos.host);

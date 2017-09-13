@@ -1,0 +1,43 @@
+Import("env")
+
+# Create a new environment since this one doesn't build without errors when using -Wno-virtual-dtor
+env = env.Clone()
+
+try:
+    env['CXXFLAGS'].remove('-Wnon-virtual-dtor')
+    env['CCFLAGS'].remove('-Wall')
+except ValueError:
+    pass
+
+env.Library("yaml",
+            [
+             "src/binary.cpp",
+             "src/contrib/graphbuilder.cpp",
+             "src/contrib/graphbuilderadapter.cpp",
+             "src/convert.cpp",
+             "src/directives.cpp",
+             "src/emit.cpp",
+             "src/emitfromevents.cpp",
+             "src/emitter.cpp",
+             "src/emitterstate.cpp",
+             "src/emitterutils.cpp",
+             "src/exp.cpp",
+             "src/memory.cpp",
+             "src/node.cpp",
+             "src/node_data.cpp",
+             "src/nodebuilder.cpp",
+             "src/nodeevents.cpp",
+             "src/null.cpp",
+             "src/ostream_wrapper.cpp",
+             "src/parse.cpp",
+             "src/parser.cpp",
+             "src/regex_yaml.cpp",
+             "src/scanner.cpp",
+             "src/scanscalar.cpp",
+             "src/scantag.cpp",
+             "src/scantoken.cpp",
+             "src/simplekey.cpp",
+             "src/singledocparser.cpp",
+             "src/stream.cpp",
+             "src/tag.cpp",
+            ])

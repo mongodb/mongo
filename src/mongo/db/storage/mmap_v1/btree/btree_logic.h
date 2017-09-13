@@ -41,6 +41,7 @@
 
 namespace mongo {
 
+class PseudoRandom;
 class RecordStore;
 class SavedCursorRegistry;
 
@@ -82,12 +83,14 @@ public:
                RecordStore* store,
                SavedCursorRegistry* cursors,
                const Ordering& ordering,
-               const std::string& indexName)
+               const std::string& indexName,
+               bool isUnique)
         : _headManager(head),
           _recordStore(store),
           _cursorRegistry(cursors),
           _ordering(ordering),
-          _indexName(indexName) {}
+          _indexName(indexName),
+          _isUnique(isUnique) {}
 
     //
     // Public-facing
@@ -105,7 +108,7 @@ public:
 
         class SetRightLeafLocChange;
 
-        Builder(BtreeLogic* logic, OperationContext* txn, bool dupsAllowed);
+        Builder(BtreeLogic* logic, OperationContext* opCtx, bool dupsAllowed);
 
         /**
          * Creates and returns a new empty bucket to the right of leftSib, maintaining the
@@ -125,18 +128,18 @@ public:
         std::unique_ptr<KeyDataOwnedType> _keyLast;
 
         // Not owned.
-        OperationContext* _txn;
+        OperationContext* _opCtx;
     };
 
     /**
      * Caller owns the returned pointer.
      * 'this' must outlive the returned pointer.
      */
-    Builder* newBuilder(OperationContext* txn, bool dupsAllowed);
+    Builder* newBuilder(OperationContext* opCtx, bool dupsAllowed);
 
-    Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) const;
+    Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key, const DiskLoc& loc) const;
 
-    Status insert(OperationContext* txn,
+    Status insert(OperationContext* opCtx,
                   const BSONObj& rawKey,
                   const DiskLoc& value,
                   bool dupsAllowed);
@@ -149,23 +152,23 @@ public:
      *      bucketLocOut would contain the bucket containing key which is before or after the
      *      searched one (dependent on the direction).
      */
-    bool locate(OperationContext* txn,
+    bool locate(OperationContext* opCtx,
                 const BSONObj& key,
                 const DiskLoc& recordLoc,
                 const int direction,
                 int* posOut,
                 DiskLoc* bucketLocOut) const;
 
-    void advance(OperationContext* txn,
+    void advance(OperationContext* opCtx,
                  DiskLoc* bucketLocInOut,
                  int* posInOut,
                  int direction) const;
 
-    bool exists(OperationContext* txn, const KeyDataType& key) const;
+    bool exists(OperationContext* opCtx, const KeyDataType& key) const;
 
-    bool unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& recordLoc);
+    bool unindex(OperationContext* opCtx, const BSONObj& key, const DiskLoc& recordLoc);
 
-    bool isEmpty(OperationContext* txn) const;
+    bool isEmpty(OperationContext* opCtx) const;
 
     long long fullValidate(OperationContext*,
                            long long* unusedCount,
@@ -173,21 +176,29 @@ public:
                            bool dumpBuckets,
                            unsigned depth) const;
 
-    DiskLoc getDiskLoc(OperationContext* txn, const DiskLoc& bucketLoc, const int keyOffset) const;
+    DiskLoc getDiskLoc(OperationContext* opCtx,
+                       const DiskLoc& bucketLoc,
+                       const int keyOffset) const;
 
-    BSONObj getKey(OperationContext* txn, const DiskLoc& bucketLoc, const int keyOffset) const;
+    BSONObj getKey(OperationContext* opCtx, const DiskLoc& bucketLoc, const int keyOffset) const;
 
-    DiskLoc getHead(OperationContext* txn) const {
-        return DiskLoc::fromRecordId(_headManager->getHead(txn));
+    /**
+     * Returns a pseudo-random element from the tree. It is an error to call this method if the tree
+     * is empty.
+     */
+    IndexKeyEntry getRandomEntry(OperationContext* opCtx) const;
+
+    DiskLoc getHead(OperationContext* opCtx) const {
+        return DiskLoc::fromRecordId(_headManager->getHead(opCtx));
     }
 
-    Status touch(OperationContext* txn) const;
+    Status touch(OperationContext* opCtx) const;
 
     //
     // Composite key navigation methods
     //
 
-    void customLocate(OperationContext* txn,
+    void customLocate(OperationContext* opCtx,
                       DiskLoc* locInOut,
                       int* keyOfsInOut,
                       const IndexSeekPoint& seekPoint,
@@ -199,7 +210,7 @@ public:
                    const IndexSeekPoint& seekPoint,
                    int direction) const;
 
-    void restorePosition(OperationContext* txn,
+    void restorePosition(OperationContext* opCtx,
                          const BSONObj& savedKey,
                          const DiskLoc& savedLoc,
                          int direction,
@@ -213,7 +224,7 @@ public:
     /**
      * Returns OK if the index was uninitialized before, error status otherwise.
      */
-    Status initAsEmpty(OperationContext* txn);
+    Status initAsEmpty(OperationContext* opCtx);
 
     //
     // Size constants
@@ -236,6 +247,10 @@ public:
     int customBSONCmp(const BSONObj& inIndex_left,
                       const IndexSeekPoint& seekPoint_right,
                       int direction) const;
+
+    bool isUnique() const {
+        return _isUnique;
+    }
 
 private:
     friend class BtreeLogic::Builder;
@@ -306,7 +321,7 @@ private:
 
     static void setNotPacked(BucketType* bucket);
 
-    static BucketType* btreemod(OperationContext* txn, BucketType* bucket);
+    static BucketType* btreemod(OperationContext* opCtx, BucketType* bucket);
 
     static int splitPos(BucketType* bucket, int keypos);
 
@@ -332,7 +347,7 @@ private:
     // information).
     //
 
-    bool basicInsert(OperationContext* txn,
+    bool basicInsert(OperationContext* opCtx,
                      BucketType* bucket,
                      const DiskLoc bucketLoc,
                      int& keypos,
@@ -341,16 +356,16 @@ private:
 
     void dropFront(BucketType* bucket, int nDrop, int& refpos);
 
-    void _pack(OperationContext* txn, BucketType* bucket, const DiskLoc thisLoc, int& refPos);
+    void _pack(OperationContext* opCtx, BucketType* bucket, const DiskLoc thisLoc, int& refPos);
 
-    void customLocate(OperationContext* txn,
+    void customLocate(OperationContext* opCtx,
                       DiskLoc* locInOut,
                       int* keyOfsInOut,
                       const IndexSeekPoint& seekPoint,
                       int direction,
                       std::pair<DiskLoc, int>& bestParent) const;
 
-    Status _find(OperationContext* txn,
+    Status _find(OperationContext* opCtx,
                  BucketType* bucket,
                  const KeyDataType& key,
                  const DiskLoc& recordLoc,
@@ -358,7 +373,7 @@ private:
                  int* keyPositionOut,
                  bool* foundOut) const;
 
-    bool customFind(OperationContext* txn,
+    bool customFind(OperationContext* opCtx,
                     int low,
                     int high,
                     const IndexSeekPoint& seekPoint,
@@ -367,24 +382,24 @@ private:
                     int* keyOfsInOut,
                     std::pair<DiskLoc, int>& bestParent) const;
 
-    void advanceToImpl(OperationContext* txn,
+    void advanceToImpl(OperationContext* opCtx,
                        DiskLoc* thisLocInOut,
                        int* keyOfsInOut,
                        const IndexSeekPoint& seekPoint,
                        int direction) const;
 
-    bool wouldCreateDup(OperationContext* txn, const KeyDataType& key, const DiskLoc self) const;
+    bool wouldCreateDup(OperationContext* opCtx, const KeyDataType& key, const DiskLoc self) const;
 
-    bool keyIsUsed(OperationContext* txn, const DiskLoc& loc, const int& pos) const;
+    bool keyIsUsed(OperationContext* opCtx, const DiskLoc& loc, const int& pos) const;
 
-    void skipUnusedKeys(OperationContext* txn, DiskLoc* loc, int* pos, int direction) const;
+    void skipUnusedKeys(OperationContext* opCtx, DiskLoc* loc, int* pos, int direction) const;
 
-    DiskLoc advance(OperationContext* txn,
+    DiskLoc advance(OperationContext* opCtx,
                     const DiskLoc& bucketLoc,
                     int* posInOut,
                     int direction) const;
 
-    DiskLoc _locate(OperationContext* txn,
+    DiskLoc _locate(OperationContext* opCtx,
                     const DiskLoc& bucketLoc,
                     const KeyDataType& key,
                     int* posOut,
@@ -392,28 +407,28 @@ private:
                     const DiskLoc& recordLoc,
                     const int direction) const;
 
-    long long _fullValidate(OperationContext* txn,
+    long long _fullValidate(OperationContext* opCtx,
                             const DiskLoc bucketLoc,
                             long long* unusedCount,
                             bool strict,
                             bool dumpBuckets,
                             unsigned depth) const;
 
-    DiskLoc _addBucket(OperationContext* txn);
+    DiskLoc _addBucket(OperationContext* opCtx);
 
-    bool canMergeChildren(OperationContext* txn,
+    bool canMergeChildren(OperationContext* opCtx,
                           BucketType* bucket,
                           const DiskLoc bucketLoc,
                           const int leftIndex);
 
     // has to look in children of 'bucket' and requires record store
-    int _rebalancedSeparatorPos(OperationContext* txn, BucketType* bucket, int leftIndex);
+    int _rebalancedSeparatorPos(OperationContext* opCtx, BucketType* bucket, int leftIndex);
 
     void _packReadyForMod(BucketType* bucket, int& refPos);
 
     void truncateTo(BucketType* bucket, int N, int& refPos);
 
-    void split(OperationContext* txn,
+    void split(OperationContext* opCtx,
                BucketType* bucket,
                const DiskLoc bucketLoc,
                int keypos,
@@ -422,7 +437,7 @@ private:
                const DiskLoc lchild,
                const DiskLoc rchild);
 
-    Status _insert(OperationContext* txn,
+    Status _insert(OperationContext* opCtx,
                    BucketType* bucket,
                    const DiskLoc bucketLoc,
                    const KeyDataType& key,
@@ -432,7 +447,7 @@ private:
                    const DiskLoc rightChild);
 
     // TODO take a BucketType*?
-    void insertHere(OperationContext* txn,
+    void insertHere(OperationContext* opCtx,
                     const DiskLoc bucketLoc,
                     int pos,
                     const KeyDataType& key,
@@ -442,7 +457,7 @@ private:
 
     std::string dupKeyError(const KeyDataType& key) const;
 
-    void setInternalKey(OperationContext* txn,
+    void setInternalKey(OperationContext* opCtx,
                         BucketType* bucket,
                         const DiskLoc bucketLoc,
                         int keypos,
@@ -457,16 +472,16 @@ private:
                        int firstIndex = 0,
                        int lastIndex = -1);
 
-    bool mayBalanceWithNeighbors(OperationContext* txn,
+    bool mayBalanceWithNeighbors(OperationContext* opCtx,
                                  BucketType* bucket,
                                  const DiskLoc bucketLoc);
 
-    void doBalanceChildren(OperationContext* txn,
+    void doBalanceChildren(OperationContext* opCtx,
                            BucketType* bucket,
                            const DiskLoc bucketLoc,
                            int leftIndex);
 
-    void doBalanceLeftToRight(OperationContext* txn,
+    void doBalanceLeftToRight(OperationContext* opCtx,
                               BucketType* bucket,
                               const DiskLoc thisLoc,
                               int leftIndex,
@@ -476,7 +491,7 @@ private:
                               BucketType* r,
                               const DiskLoc rchild);
 
-    void doBalanceRightToLeft(OperationContext* txn,
+    void doBalanceRightToLeft(OperationContext* opCtx,
                               BucketType* bucket,
                               const DiskLoc thisLoc,
                               int leftIndex,
@@ -486,30 +501,30 @@ private:
                               BucketType* r,
                               const DiskLoc rchild);
 
-    bool tryBalanceChildren(OperationContext* txn,
+    bool tryBalanceChildren(OperationContext* opCtx,
                             BucketType* bucket,
                             const DiskLoc bucketLoc,
                             int leftIndex);
 
-    int indexInParent(OperationContext* txn, BucketType* bucket, const DiskLoc bucketLoc) const;
+    int indexInParent(OperationContext* opCtx, BucketType* bucket, const DiskLoc bucketLoc) const;
 
-    void doMergeChildren(OperationContext* txn,
+    void doMergeChildren(OperationContext* opCtx,
                          BucketType* bucket,
                          const DiskLoc bucketLoc,
                          int leftIndex);
 
-    void replaceWithNextChild(OperationContext* txn, BucketType* bucket, const DiskLoc bucketLoc);
+    void replaceWithNextChild(OperationContext* opCtx, BucketType* bucket, const DiskLoc bucketLoc);
 
-    void deleteInternalKey(OperationContext* txn,
+    void deleteInternalKey(OperationContext* opCtx,
                            BucketType* bucket,
                            const DiskLoc bucketLoc,
                            int keypos);
 
-    void delKeyAtPos(OperationContext* txn, BucketType* bucket, const DiskLoc bucketLoc, int p);
+    void delKeyAtPos(OperationContext* opCtx, BucketType* bucket, const DiskLoc bucketLoc, int p);
 
-    void delBucket(OperationContext* txn, BucketType* bucket, const DiskLoc bucketLoc);
+    void delBucket(OperationContext* opCtx, BucketType* bucket, const DiskLoc bucketLoc);
 
-    void deallocBucket(OperationContext* txn, BucketType* bucket, const DiskLoc bucketLoc);
+    void deallocBucket(OperationContext* opCtx, BucketType* bucket, const DiskLoc bucketLoc);
 
     bool _keyIsAt(const BSONObj& savedKey,
                   const DiskLoc& savedLoc,
@@ -530,16 +545,23 @@ private:
                   const DiskLoc prevChild);
 
 
-    BucketType* childForPos(OperationContext* txn, BucketType* bucket, int pos) const;
+    BucketType* childForPos(OperationContext* opCtx, BucketType* bucket, int pos) const;
 
-    BucketType* getBucket(OperationContext* txn, const DiskLoc dl) const {
-        return getBucket(txn, dl.toRecordId());
+    BucketType* getBucket(OperationContext* opCtx, const DiskLoc dl) const {
+        return getBucket(opCtx, dl.toRecordId());
     }
-    BucketType* getBucket(OperationContext* txn, const RecordId dl) const;
+    BucketType* getBucket(OperationContext* opCtx, const RecordId dl) const;
 
-    BucketType* getRoot(OperationContext* txn) const;
+    BucketType* getRoot(OperationContext* opCtx) const;
 
-    DiskLoc getRootLoc(OperationContext* txn) const;
+    DiskLoc getRootLoc(OperationContext* opCtx) const;
+
+    void recordRandomWalk(OperationContext* opCtx,
+                          PseudoRandom* prng,
+                          BucketType* curBucket,
+                          int64_t nBucketsInCurrentLevel,
+                          std::vector<int64_t>* nKeysInLevel,
+                          std::vector<FullKey>* selectedKeys) const;
 
     //
     // Data
@@ -557,6 +579,9 @@ private:
     Ordering _ordering;
 
     std::string _indexName;
+
+    // True if this is a unique index, i.e. if duplicate key values are disallowed.
+    const bool _isUnique;
 };
 
 }  // namespace mongo

@@ -30,16 +30,22 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <string.h>  // strlen
 #include <string>
 #include <vector>
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/config.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/platform/strnlen.h"
 
 namespace mongo {
 class BSONObj;
@@ -51,9 +57,12 @@ typedef BSONElement be;
 typedef BSONObj bo;
 typedef BSONObjBuilder bob;
 
-/* l and r MUST have same type when called: check that first. */
-int compareElementValues(const BSONElement& l, const BSONElement& r);
-
+/** l and r MUST have same type when called: check that first.
+    If comparator is non-null, it is used for all comparisons between two strings.
+*/
+int compareElementValues(const BSONElement& l,
+                         const BSONElement& r,
+                         const StringData::ComparatorInterface* comparator = nullptr);
 
 /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
     'a : 3' is the first element (key+value).
@@ -70,7 +79,16 @@ int compareElementValues(const BSONElement& l, const BSONElement& r);
 */
 class BSONElement {
 public:
-    /** These functions, which start with a capital letter, throw a MsgAssertionException if the
+    // Declared in bsonobj_comparator_interface.h.
+    class ComparatorInterface;
+
+    /**
+     * Operator overloads for relops return a DeferredComparison which can subsequently be evaluated
+     * by a BSONObj::ComparatorInterface.
+     */
+    using DeferredComparison = BSONComparatorInterfaceBase<BSONElement>::DeferredComparison;
+
+    /** These functions, which start with a capital letter, throw if the
         element is not of the required type. Example:
 
         std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
@@ -85,7 +103,15 @@ public:
         return chk(mongo::Date).date();
     }
     double Number() const {
-        return chk(isNumber()).number();
+        uassert(13118,
+                str::stream() << "expected " << fieldName()
+                              << " to have a numberic type, but it is a "
+                              << type(),
+                isNumber());
+        return number();
+    }
+    Decimal128 Decimal() const {
+        return chk(NumberDecimal)._numberDecimal();
     }
     double Double() const {
         return chk(NumberDouble)._numberDouble();
@@ -103,18 +129,12 @@ public:
     mongo::OID OID() const {
         return chk(jstOID).__oid();
     }
-    void Null() const {
-        chk(isNull());
-    }  // throw MsgAssertionException if not null
-    void OK() const {
-        chk(ok());
-    }  // throw MsgAssertionException if element DNE
 
     /** @return the embedded object associated with this field.
         Note the returned object is a reference to within the parent bson object. If that
         object is out of scope, this pointer will no longer be valid. Call getOwned() on the
         returned BSONObj if you need your own copy.
-        throws UserException if the element is not of type object.
+        throws AssertionException if the element is not of type object.
     */
     BSONObj Obj() const;
 
@@ -126,6 +146,9 @@ public:
     }
     void Val(long long& v) const {
         v = Long();
+    }
+    void Val(Decimal128& v) const {
+        v = Decimal();
     }
     void Val(bool& v) const {
         v = Bool();
@@ -170,6 +193,7 @@ public:
     void toString(StringBuilder& s,
                   bool includeFieldName = true,
                   bool full = false,
+                  bool redactValues = false,
                   int depth = 0) const;
     std::string jsonString(JsonStringFormat format,
                            bool includeFieldNames = true,
@@ -187,7 +211,7 @@ public:
     /** retrieve a field within this element
         throws exception if *this is not an embedded object
     */
-    BSONElement operator[](const std::string& field) const;
+    BSONElement operator[](StringData field) const;
 
     /** See canonicalizeBSONType in bsontypes.h */
     int canonicalType() const {
@@ -273,9 +297,6 @@ public:
     */
     bool trueValue() const;
 
-    /** True if number, string, bool, date, OID */
-    bool isSimpleType() const;
-
     /** True if element is of a numeric type. */
     bool isNumber() const;
 
@@ -287,6 +308,13 @@ public:
     /** Return int value for this field. MUST be NumberInt type. */
     int _numberInt() const {
         return ConstDataView(value()).read<LittleEndian<int>>();
+    }
+
+    /** Return decimal128 value for this field. MUST be NumberDecimal type. */
+    Decimal128 _numberDecimal() const {
+        uint64_t low = ConstDataView(value()).read<LittleEndian<long long>>();
+        uint64_t high = ConstDataView(value() + sizeof(long long)).read<LittleEndian<long long>>();
+        return Decimal128(Decimal128::Value({low, high}));
     }
 
     /** Return long long value for this field. MUST be NumberLong type. */
@@ -307,6 +335,9 @@ public:
      *  very large doubles -> LLONG_MAX
      *  very small doubles -> LLONG_MIN  */
     long long safeNumberLong() const;
+
+    /** Retrieve decimal value for the element safely. */
+    Decimal128 numberDecimal() const;
 
     /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0.
         Note: casts to double, data loss may occur with large (>52 bit) NumberLong values.
@@ -437,6 +468,19 @@ public:
         return (BinDataType)c;
     }
 
+    std::vector<uint8_t> _binDataVector() const {
+        if (binDataType() != ByteArrayDeprecated) {
+            return std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(value()) + 5,
+                                        reinterpret_cast<const uint8_t*>(value()) + 5 +
+                                            valuestrsize());
+        } else {
+            // Skip the extra int32 size
+            return std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(value()) + 4,
+                                        reinterpret_cast<const uint8_t*>(value()) + 4 +
+                                            valuestrsize() - 4);
+        }
+    }
+
     /** Retrieve the regex std::string for a Regex element */
     const char* regex() const {
         verify(type() == RegEx);
@@ -449,44 +493,68 @@ public:
         return p + strlen(p) + 1;
     }
 
-    /** like operator== but doesn't check the fieldname,
-        just the value.
-    */
-    bool valuesEqual(const BSONElement& r) const {
-        return woCompare(r, false) == 0;
-    }
+    //
+    // Comparison API.
+    //
+    // BSONElement instances can be compared via a raw bytewise comparison or a logical comparison.
+    //
+    // Logical comparison can be done either using woCompare() or with operator overloads. Most
+    // callers should prefer operator overloads. Note that the operator overloads return a
+    // DeferredComparison, which must subsequently be evaluated by a
+    // BSONElement::ComparatorInterface. See bsonelement_comparator_interface.h for details.
+    //
 
-    /** Returns true if elements are equal. */
-    bool operator==(const BSONElement& r) const {
-        return woCompare(r, true) == 0;
-    }
-    /** Returns true if elements are unequal. */
-    bool operator!=(const BSONElement& r) const {
-        return !operator==(r);
-    }
+    /**
+     * Compares the raw bytes of the two BSONElements, including the field names. This will treat
+     * different types (e.g. integers and doubles) as distinct values, even if they have the same
+     * field name and bit pattern in the value portion of the BSON element.
+     */
+    bool binaryEqual(const BSONElement& rhs) const;
+
+    /**
+     * Compares the raw bytes of the two BSONElements, excluding the field names. This will treat
+     * different types (e.g integers and doubles) as distinct values, even if they have the same bit
+     * pattern in the value portion of the BSON element.
+     */
+    bool binaryEqualValues(const BSONElement& rhs) const;
 
     /** Well ordered comparison.
         @return <0: l<r. 0:l==r. >0:l>r
         order by type, field name, and field value.
         If considerFieldName is true, pay attention to the field name.
+        If comparator is non-null, it is used for all comparisons between two strings.
     */
-    int woCompare(const BSONElement& e, bool considerFieldName = true) const;
+    int woCompare(const BSONElement& e,
+                  bool considerFieldName = true,
+                  const StringData::ComparatorInterface* comparator = nullptr) const;
 
-    /**
-     * Functor compatible with std::hash for std::unordered_{map,set}
-     * Warning: The hash function is subject to change. Do not use in cases where hashes need
-     *          to be consistent across versions.
-     */
-    struct Hasher {
-        size_t operator()(const BSONElement& elem) const;
-    };
+    DeferredComparison operator<(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kLT, *this, other);
+    }
+
+    DeferredComparison operator<=(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kLTE, *this, other);
+    }
+
+    DeferredComparison operator>(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kGT, *this, other);
+    }
+
+    DeferredComparison operator>=(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kGTE, *this, other);
+    }
+
+    DeferredComparison operator==(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kEQ, *this, other);
+    }
+
+    DeferredComparison operator!=(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kNE, *this, other);
+    }
 
     const char* rawdata() const {
         return data;
     }
-
-    /** 0 == Equality, just not defined yet */
-    int getGtLtOp(int def = 0) const;
 
     /** Constructs an empty element */
     BSONElement();
@@ -521,6 +589,31 @@ public:
         return Timestamp();
     }
 
+    const std::array<unsigned char, 16> uuid() const {
+        int len = 0;
+        const char* data = nullptr;
+        if (type() == BinData && binDataType() == BinDataType::newUUID)
+            data = binData(len);
+        uassert(ErrorCodes::InvalidUUID,
+                "uuid must be a 16-byte binary field with UUID (4) subtype",
+                len == 16);
+        std::array<unsigned char, 16> result;
+        memcpy(&result, data, len);
+        return result;
+    }
+
+    const std::array<unsigned char, 16> md5() const {
+        int len = 0;
+        const char* data = nullptr;
+        if (type() == BinData && binDataType() == BinDataType::MD5Type)
+            data = binData(len);
+        uassert(40437, "md5 must be a 16-byte binary field with MD5 (5) subtype", len == 16);
+        std::array<unsigned char, 16> result;
+        memcpy(&result, data, len);
+        return result;
+    }
+
+
     Date_t timestampTime() const {
         unsigned long long t = ConstDataView(value() + 4).read<LittleEndian<unsigned int>>();
         return Date_t::fromMillisSinceEpoch(t * 1000);
@@ -543,16 +636,6 @@ public:
         const char* start = value();
         start += 4 + ConstDataView(start).read<LittleEndian<int>>();
         return mongo::OID::from(start);
-    }
-
-    /** this does not use fieldName in the comparison, just the value */
-    bool operator<(const BSONElement& other) const {
-        int x = (int)canonicalType() - (int)other.canonicalType();
-        if (x < 0)
-            return true;
-        else if (x > 0)
-            return false;
-        return compareElementValues(*this, other) < 0;
     }
 
     // @param maxLen don't scan more than maxLen bytes
@@ -606,19 +689,15 @@ private:
 
     friend class BSONObjIterator;
     friend class BSONObj;
-    const BSONElement& chk(int t) const {
+    const BSONElement& chk(BSONType t) const {
         if (t != type()) {
             StringBuilder ss;
             if (eoo())
                 ss << "field not found, expected type " << t;
             else
                 ss << "wrong type for field (" << fieldName() << ") " << type() << " != " << t;
-            msgasserted(13111, ss.str());
+            uasserted(13111, ss.str());
         }
-        return *this;
-    }
-    const BSONElement& chk(bool expr) const {
-        massert(13118, "unexpected or missing type value in BSON object", expr);
         return *this;
     }
 };
@@ -630,6 +709,8 @@ inline bool BSONElement::trueValue() const {
             return _numberLong() != 0;
         case NumberDouble:
             return _numberDouble() != 0;
+        case NumberDecimal:
+            return _numberDecimal().isNotEqual(Decimal128(0));
         case NumberInt:
             return _numberInt() != 0;
         case mongo::Bool:
@@ -638,11 +719,9 @@ inline bool BSONElement::trueValue() const {
         case jstNULL:
         case Undefined:
             return false;
-
         default:
-            ;
+            return true;
     }
-    return true;
 }
 
 /** @return true if element is of a numeric type. */
@@ -650,6 +729,7 @@ inline bool BSONElement::isNumber() const {
     switch (type()) {
         case NumberLong:
         case NumberDouble:
+        case NumberDecimal:
         case NumberInt:
             return true;
         default:
@@ -657,18 +737,18 @@ inline bool BSONElement::isNumber() const {
     }
 }
 
-inline bool BSONElement::isSimpleType() const {
+inline Decimal128 BSONElement::numberDecimal() const {
     switch (type()) {
-        case NumberLong:
         case NumberDouble:
+            return Decimal128(_numberDouble());
         case NumberInt:
-        case mongo::String:
-        case mongo::Bool:
-        case mongo::Date:
-        case jstOID:
-            return true;
+            return Decimal128(_numberInt());
+        case NumberLong:
+            return Decimal128(static_cast<int64_t>(_numberLong()));
+        case NumberDecimal:
+            return _numberDecimal();
         default:
-            return false;
+            return Decimal128::kNormalizedZero;
     }
 }
 
@@ -680,6 +760,8 @@ inline double BSONElement::numberDouble() const {
             return _numberInt();
         case NumberLong:
             return _numberLong();
+        case NumberDecimal:
+            return _numberDecimal().toDouble();
         default:
             return 0;
     }
@@ -695,6 +777,8 @@ inline int BSONElement::numberInt() const {
             return _numberInt();
         case NumberLong:
             return (int)_numberLong();
+        case NumberDecimal:
+            return _numberDecimal().toInt();
         default:
             return 0;
     }
@@ -709,21 +793,22 @@ inline long long BSONElement::numberLong() const {
             return _numberInt();
         case NumberLong:
             return _numberLong();
+        case NumberDecimal:
+            return _numberDecimal().toLong();
         default:
             return 0;
     }
 }
 
-/** Like numberLong() but with well-defined behavior for doubles that
+/** Like numberLong() but with well-defined behavior for doubles and decimals that
  *  are NaNs, or too large/small to be represented as long longs.
  *  NaNs -> 0
- *  very large doubles -> LLONG_MAX
- *  very small doubles -> LLONG_MIN  */
+ *  very large values -> LLONG_MAX
+ *  very small values -> LLONG_MIN  */
 inline long long BSONElement::safeNumberLong() const {
-    double d;
     switch (type()) {
-        case NumberDouble:
-            d = numberDouble();
+        case NumberDouble: {
+            double d = numberDouble();
             if (std::isnan(d)) {
                 return 0;
             }
@@ -733,18 +818,33 @@ inline long long BSONElement::safeNumberLong() const {
             if (d < std::numeric_limits<long long>::min()) {
                 return std::numeric_limits<long long>::min();
             }
+            return numberLong();
+        }
+        case NumberDecimal: {
+            Decimal128 d = numberDecimal();
+            if (d.isNaN()) {
+                return 0;
+            }
+            if (d.isGreater(Decimal128(std::numeric_limits<int64_t>::max()))) {
+                return static_cast<long long>(std::numeric_limits<int64_t>::max());
+            }
+            if (d.isLess(Decimal128(std::numeric_limits<int64_t>::min()))) {
+                return static_cast<long long>(std::numeric_limits<int64_t>::min());
+            }
+            return numberLong();
+        }
         default:
             return numberLong();
     }
 }
 
 inline BSONElement::BSONElement() {
-    static const char kEooElement[] = "";
+    // This needs to be 2 elements because we check the strlen of data + 1 and GCC sees that as
+    // accessing beyond the end of a constant string, even though we always check whether the
+    // element is an eoo.
+    static const char kEooElement[2] = {'\0', '\0'};
     data = kEooElement;
     fieldNameSize_ = 0;
     totalSize = 1;
 }
-
-// TODO(SERVER-14596): move to a better place; take a StringData.
-std::string escape(const std::string& s, bool escape_slash = false);
 }

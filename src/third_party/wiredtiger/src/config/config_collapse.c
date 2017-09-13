@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -38,14 +38,16 @@ __wt_config_collapse(
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 
+	*config_ret = NULL;
+
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-	WT_ERR(__wt_config_init(session, &cparser, cfg[0]));
+	__wt_config_init(session, &cparser, cfg[0]);
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != WT_CONFIG_ITEM_STRING &&
 		    k.type != WT_CONFIG_ITEM_ID)
 			WT_ERR_MSG(session, EINVAL,
-			    "Invalid configuration key found: '%s'\n", k.str);
+			    "Invalid configuration key found: '%s'", k.str);
 		WT_ERR(__wt_config_get(session, cfg, &k, &v));
 		/* Include the quotes around string keys/values. */
 		if (k.type == WT_CONFIG_ITEM_STRING) {
@@ -59,6 +61,8 @@ __wt_config_collapse(
 		WT_ERR(__wt_buf_catfmt(session, tmp, "%.*s=%.*s,",
 		    (int)k.len, k.str, (int)v.len, v.str));
 	}
+
+	/* We loop until error, and the expected error is WT_NOTFOUND. */
 	if (ret != WT_NOTFOUND)
 		goto err;
 
@@ -90,9 +94,9 @@ err:	__wt_scr_free(session, &tmp);
  * the qsort stable.
  */
 typedef struct {
-	char  *k, *v;				/* key, value */
+	char *k, *v;				/* key, value */
 	size_t gen;				/* generation */
-	int    strip;				/* remove the value */
+	bool strip;				/* remove the value */
 } WT_CONFIG_MERGE_ENTRY;
 
 /*
@@ -111,7 +115,7 @@ typedef struct {
  */
 static int
 __config_merge_scan(WT_SESSION_IMPL *session,
-    const char *key, const char *value, int strip, WT_CONFIG_MERGE *cp)
+    const char *key, const char *value, bool strip, WT_CONFIG_MERGE *cp)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
@@ -123,12 +127,12 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &kb));
 	WT_ERR(__wt_scr_alloc(session, 0, &vb));
 
-	WT_ERR(__wt_config_init(session, &cparser, value));
+	__wt_config_init(session, &cparser, value);
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != WT_CONFIG_ITEM_STRING &&
 		    k.type != WT_CONFIG_ITEM_ID)
 			WT_ERR_MSG(session, EINVAL,
-			    "Invalid configuration key found: '%s'\n", k.str);
+			    "Invalid configuration key found: '%s'", k.str);
 
 		/* Include the quotes around string keys/values. */
 		if (k.type == WT_CONFIG_ITEM_STRING) {
@@ -368,6 +372,7 @@ __config_merge_cmp(const void *a, const void *b)
 int
 __wt_config_merge(WT_SESSION_IMPL *session,
     const char **cfg, const char *cfg_strip, const char **config_ret)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_CONFIG_MERGE merge;
 	WT_DECL_RET;
@@ -385,10 +390,10 @@ __wt_config_merge(WT_SESSION_IMPL *session,
 	 * so their generation numbers are the highest.
 	 */
 	for (; *cfg != NULL; ++cfg)
-		WT_ERR(__config_merge_scan(session, NULL, *cfg, 0, &merge));
+		WT_ERR(__config_merge_scan(session, NULL, *cfg, false, &merge));
 	if (cfg_strip != NULL)
-		WT_ERR(
-		    __config_merge_scan(session, NULL, cfg_strip, 1, &merge));
+		WT_ERR(__config_merge_scan(
+		    session, NULL, cfg_strip, true, &merge));
 
 	/*
 	 * Sort the array by key and, in the case of identical keys, by

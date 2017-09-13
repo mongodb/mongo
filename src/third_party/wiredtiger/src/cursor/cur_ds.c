@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -12,13 +12,11 @@
  * __curds_txn_enter --
  *	Do transactional initialization when starting an operation.
  */
-static int
+static void
 __curds_txn_enter(WT_SESSION_IMPL *session)
 {
 	session->ncursors++;				/* XXX */
 	__wt_txn_cursor_op(session);
-
-	return (0);
 }
 
 /*
@@ -40,17 +38,16 @@ static int
 __curds_key_set(WT_CURSOR *cursor)
 {
 	WT_CURSOR *source;
-	WT_DECL_RET;
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_RET(__cursor_needkey(cursor));
 
 	source->recno = cursor->recno;
 	source->key.data = cursor->key.data;
 	source->key.size = cursor->key.size;
 
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -61,16 +58,15 @@ static int
 __curds_value_set(WT_CURSOR *cursor)
 {
 	WT_CURSOR *source;
-	WT_DECL_RET;
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_RET(__cursor_needvalue(cursor));
 
 	source->value.data = cursor->value.data;
 	source->value.size = cursor->value.size;
 
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -144,8 +140,8 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
-	WT_CURSOR_NEEDKEY(a);
-	WT_CURSOR_NEEDKEY(b);
+	WT_ERR(__cursor_needkey(a));
+	WT_ERR(__cursor_needkey(b));
 
 	if (WT_CURSOR_RECNO(a)) {
 		if (a->recno < b->recno)
@@ -184,12 +180,12 @@ __curds_next(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_next); 
-	WT_STAT_FAST_DATA_INCR(session, cursor_next);
+	WT_STAT_CONN_INCR(session, cursor_next);
+	WT_STAT_DATA_INCR(session, cursor_next);
 
-	WT_ERR(__curds_txn_enter(session));
+	__curds_txn_enter(session);
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);         
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	ret = __curds_cursor_resolve(cursor, source->next(source));
 
 err:	__curds_txn_leave(session);
@@ -212,12 +208,12 @@ __curds_prev(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_prev);
-	WT_STAT_FAST_DATA_INCR(session, cursor_prev);
+	WT_STAT_CONN_INCR(session, cursor_prev);
+	WT_STAT_DATA_INCR(session, cursor_prev);
 
-	WT_ERR(__curds_txn_enter(session));
+	__curds_txn_enter(session);
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);         
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	ret = __curds_cursor_resolve(cursor, source->prev(source));
 
 err:	__curds_txn_leave(session);
@@ -239,8 +235,8 @@ __curds_reset(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_reset);      
-	WT_STAT_FAST_DATA_INCR(session, cursor_reset);
+	WT_STAT_CONN_INCR(session, cursor_reset);
+	WT_STAT_DATA_INCR(session, cursor_reset);
 
 	WT_ERR(source->reset(source));
 
@@ -264,10 +260,10 @@ __curds_search(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_search);
-	WT_STAT_FAST_DATA_INCR(session, cursor_search);
+	WT_STAT_CONN_INCR(session, cursor_search);
+	WT_STAT_DATA_INCR(session, cursor_search);
 
-	WT_ERR(__curds_txn_enter(session));
+	__curds_txn_enter(session);
 
 	WT_ERR(__curds_key_set(cursor));
 	ret = __curds_cursor_resolve(cursor, source->search(source));
@@ -292,10 +288,10 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_search_near);
-	WT_STAT_FAST_DATA_INCR(session, cursor_search_near);
+	WT_STAT_CONN_INCR(session, cursor_search_near);
+	WT_STAT_DATA_INCR(session, cursor_search_near);
 
-	WT_ERR(__curds_txn_enter(session));
+	__curds_txn_enter(session);
 
 	WT_ERR(__curds_key_set(cursor));
 	ret =
@@ -319,13 +315,13 @@ __curds_insert(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
+	CURSOR_UPDATE_API_CALL(cursor, session, insert);
 
-	WT_ERR(__curds_txn_enter(session));
+	__curds_txn_enter(session);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_insert);     
-	WT_STAT_FAST_DATA_INCR(session, cursor_insert);
-	WT_STAT_FAST_DATA_INCRV(session,
+	WT_STAT_CONN_INCR(session, cursor_insert);
+	WT_STAT_DATA_INCR(session, cursor_insert);
+	WT_STAT_DATA_INCRV(session,
 	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
 
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
@@ -352,14 +348,13 @@ __curds_update(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
+	CURSOR_UPDATE_API_CALL(cursor, session, update);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_update);     
-	WT_STAT_FAST_DATA_INCR(session, cursor_update);
-	WT_STAT_FAST_DATA_INCRV(
-	    session, cursor_update_bytes, cursor->value.size);
+	WT_STAT_CONN_INCR(session, cursor_update);
+	WT_STAT_DATA_INCR(session, cursor_update);
+	WT_STAT_DATA_INCRV(session, cursor_update_bytes, cursor->value.size);
 
-	WT_ERR(__curds_txn_enter(session));
+	__curds_txn_enter(session);
 
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
@@ -384,13 +379,13 @@ __curds_remove(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
+	CURSOR_REMOVE_API_CALL(cursor, session, NULL);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_remove);     
-	WT_STAT_FAST_DATA_INCR(session, cursor_remove);
-	WT_STAT_FAST_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
+	WT_STAT_CONN_INCR(session, cursor_remove);
+	WT_STAT_DATA_INCR(session, cursor_remove);
+	WT_STAT_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
-	WT_ERR(__curds_txn_enter(session));
+	__curds_txn_enter(session);
 
 	WT_ERR(__curds_key_set(cursor));
 	ret = __curds_cursor_resolve(cursor, source->remove(source));
@@ -449,22 +444,24 @@ __wt_curds_open(
     const char *cfg[], WT_DATA_SOURCE *dsrc, WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __wt_cursor_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __wt_cursor_set_value,	/* set-value */
-	    __curds_compare,		/* compare */
-	    __wt_cursor_equals,		/* equals */
-	    __curds_next,		/* next */
-	    __curds_prev,		/* prev */
-	    __curds_reset,		/* reset */
-	    __curds_search,		/* search */
-	    __curds_search_near,	/* search-near */
-	    __curds_insert,		/* insert */
-	    __curds_update,		/* update */
-	    __curds_remove,		/* remove */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __curds_close);		/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __curds_compare,			/* compare */
+	    __wt_cursor_equals,			/* equals */
+	    __curds_next,			/* next */
+	    __curds_prev,			/* prev */
+	    __curds_reset,			/* reset */
+	    __curds_search,			/* search */
+	    __curds_search_near,		/* search-near */
+	    __curds_insert,			/* insert */
+	    __wt_cursor_modify_notsup,		/* modify */
+	    __curds_update,			/* update */
+	    __curds_remove,			/* remove */
+	    __wt_cursor_notsup,			/* reserve */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __curds_close);			/* close */
 	WT_CONFIG_ITEM cval, metadata;
 	WT_CURSOR *cursor, *source;
 	WT_CURSOR_DATA_SOURCE *data_source;
@@ -510,7 +507,7 @@ __wt_curds_open(
 	source = data_source->source;
 	source->session = (WT_SESSION *)session;
 	memset(&source->q, 0, sizeof(source->q));
-	source->recno = 0;
+	source->recno = WT_RECNO_OOB;
 	memset(source->raw_recno_buf, 0, sizeof(source->raw_recno_buf));
 	memset(&source->key, 0, sizeof(source->key));
 	memset(&source->value, 0, sizeof(source->value));
@@ -518,10 +515,7 @@ __wt_curds_open(
 	source->flags = 0;
 
 	if (0) {
-err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
-			WT_TRET(cursor->close(cursor));
-		else
-			__wt_free(session, data_source);
+err:		WT_TRET(__curds_close(cursor));
 		*cursorp = NULL;
 	}
 

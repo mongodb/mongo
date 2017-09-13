@@ -78,7 +78,8 @@ StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
     if (error_msg != nullptr) {
         return StatusWith<void*>(ErrorCodes::InternalError,
                                  str::stream() << "dlsym failed for symbol " << name
-                                               << " with error message: " << error_msg);
+                                               << " with error message: "
+                                               << error_msg);
     }
 
     return StatusWith<void*>(symbol);

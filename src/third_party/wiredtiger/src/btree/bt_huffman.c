@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -133,10 +133,10 @@ static int __wt_huffman_read(WT_SESSION_IMPL *,
  *	Check for a Huffman configuration file and return the file name.
  */
 static int
-__huffman_confchk_file(
-    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v, int *is_utf8p, FILE **fpp)
+__huffman_confchk_file(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *v, bool *is_utf8p, WT_FSTREAM **fsp)
 {
-	FILE *fp;
+	WT_FSTREAM *fs;
 	WT_DECL_RET;
 	size_t len;
 	char *fname;
@@ -157,14 +157,14 @@ __huffman_confchk_file(
 
 	/* Check the file exists. */
 	WT_RET(__wt_strndup(session, v->str + len, v->len - len, &fname));
-	WT_ERR(__wt_fopen(session,
-	    fname, WT_FHANDLE_READ, WT_FOPEN_FIXED, &fp));
+	WT_ERR(__wt_fopen(
+	    session, fname, WT_FS_OPEN_FIXED, WT_STREAM_READ, &fs));
 
 	/* Optionally return the file handle. */
-	if (fpp == NULL)
-		(void)__wt_fclose(&fp, WT_FHANDLE_READ);
+	if (fsp == NULL)
+		(void)__wt_fclose(session, &fs);
 	else
-		*fpp = fp;
+		*fsp = fs;
 
 err:	__wt_free(session, fname);
 
@@ -298,22 +298,24 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
     struct __wt_huffman_table **tablep, u_int *entriesp, u_int *numbytesp)
 {
 	struct __wt_huffman_table *table, *tp;
-	FILE *fp;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	WT_FSTREAM *fs;
 	int64_t symbol, frequency;
 	u_int entries, lineno;
-	int is_utf8;
+	int n;
+	bool is_utf8;
 
 	*tablep = NULL;
 	*entriesp = *numbytesp = 0;
 
-	fp = NULL;
+	fs = NULL;
 	table = NULL;
 
 	/*
 	 * Try and open the backing file.
 	 */
-	WT_RET(__huffman_confchk_file(session, ip, &is_utf8, &fp));
+	WT_RET(__huffman_confchk_file(session, ip, &is_utf8, &fs));
 
 	/*
 	 * UTF-8 table is 256 bytes, with a range of 0-255.
@@ -329,15 +331,25 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		WT_ERR(__wt_calloc_def(session, entries, &table));
 	}
 
-	for (tp = table, lineno = 1; (ret =
-	    fscanf(fp, "%" SCNi64 " %" SCNi64, &symbol, &frequency)) != EOF;
-	    ++tp, ++lineno) {
-		if (lineno > entries)
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+	for (tp = table, lineno = 1;; ++tp, ++lineno) {
+		WT_ERR(__wt_getline(session, fs, tmp));
+		if (tmp->size == 0)
+			break;
+		n = sscanf(
+		    tmp->data, "%" SCNi64 " %" SCNi64, &symbol, &frequency);
+		/*
+		 * Entries is 0-based, that is, there are (entries +1) possible
+		 * values that can be configured. The line number is 1-based, so
+		 * adjust the test for too many entries, and report (entries +1)
+		 * in the error as the maximum possible number of entries.
+		 */
+		if (lineno > entries + 1)
 			WT_ERR_MSG(session, EINVAL,
 			    "Huffman table file %.*s is corrupted, "
 			    "more than %" PRIu32 " entries",
-			    (int)ip->len, ip->str, entries);
-		if (ret != 2)
+			    (int)ip->len, ip->str, entries + 1);
+		if (n != 2)
 			WT_ERR_MSG(session, EINVAL,
 			    "line %u of Huffman table file %.*s is corrupted: "
 			    "expected two unsigned integral values",
@@ -359,7 +371,6 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		tp->symbol = (uint32_t)symbol;
 		tp->frequency = (uint32_t)frequency;
 	}
-	ret = ferror(fp) ? WT_ERROR : 0;
 
 	*entriesp = lineno - 1;
 	*tablep = table;
@@ -367,7 +378,9 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	if (0) {
 err:		__wt_free(session, table);
 	}
-	(void)__wt_fclose(&fp, WT_FHANDLE_READ);
+	(void)__wt_fclose(session, &fs);
+
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 

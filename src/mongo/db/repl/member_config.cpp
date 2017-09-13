@@ -75,7 +75,7 @@ const Seconds kMaxSlaveDelay(3600 * 24 * 366);
 
 }  // namespace
 
-Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagConfig) {
+Status MemberConfig::initialize(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
     Status status = bsonCheckOnlyHasFields(
         "replica set member configuration", mcfg, kLegalMemberConfigFieldNames);
     if (!status.isOK())
@@ -126,11 +126,20 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagCon
     }
 
     //
+    // Parse arbiterOnly field.
+    //
+    status = bsonExtractBooleanFieldWithDefault(
+        mcfg, kArbiterOnlyFieldName, kArbiterOnlyFieldDefault, &_arbiterOnly);
+    if (!status.isOK())
+        return status;
+
+    //
     // Parse priority field.
     //
     BSONElement priorityElement = mcfg[kPriorityFieldName];
-    if (priorityElement.eoo()) {
-        _priority = kPriorityFieldDefault;
+    if (priorityElement.eoo() ||
+        (priorityElement.isNumber() && priorityElement.numberDouble() == kPriorityFieldDefault)) {
+        _priority = _arbiterOnly ? 0.0 : kPriorityFieldDefault;
     } else if (priorityElement.isNumber()) {
         _priority = priorityElement.numberDouble();
     } else {
@@ -138,14 +147,6 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagCon
                       str::stream() << kPriorityFieldName << " field has non-numeric type "
                                     << typeName(priorityElement.type()));
     }
-
-    //
-    // Parse arbiterOnly field.
-    //
-    status = bsonExtractBooleanFieldWithDefault(
-        mcfg, kArbiterOnlyFieldName, kArbiterOnlyFieldDefault, &_arbiterOnly);
-    if (!status.isOK())
-        return status;
 
     //
     // Parse slaveDelay field.
@@ -252,21 +253,26 @@ Status MemberConfig::validate() const {
                                     << durationCount<Seconds>(_slaveDelay)
                                     << " seconds is out of range");
     }
-    if (_slaveDelay > Seconds(0) && _priority != 0) {
-        return Status(ErrorCodes::BadValue, "slaveDelay requires priority be zero");
-    }
-    if (_hidden && _priority != 0) {
-        return Status(ErrorCodes::BadValue, "priority must be 0 when hidden=true");
-    }
-    if (!_buildIndexes && _priority != 0) {
-        return Status(ErrorCodes::BadValue, "priority must be 0 when buildIndexes=false");
+    // Check for additional electable requirements, when priority is non zero
+    if (_priority != 0) {
+        if (_votes == 0) {
+            return Status(ErrorCodes::BadValue, "priority must be 0 when non-voting (votes:0)");
+        }
+        if (_slaveDelay > Seconds(0)) {
+            return Status(ErrorCodes::BadValue, "priority must be 0 when slaveDelay is used");
+        }
+        if (_hidden) {
+            return Status(ErrorCodes::BadValue, "priority must be 0 when hidden=true");
+        }
+        if (!_buildIndexes) {
+            return Status(ErrorCodes::BadValue, "priority must be 0 when buildIndexes=false");
+        }
     }
     return Status::OK();
 }
 
-bool MemberConfig::hasTags(const ReplicaSetTagConfig& tagConfig) const {
-    for (std::vector<ReplicaSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end();
-         tag++) {
+bool MemberConfig::hasTags(const ReplSetTagConfig& tagConfig) const {
+    for (std::vector<ReplSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end(); tag++) {
         std::string tagKey = tagConfig.getTagKey(*tag);
         if (tagKey[0] == '$') {
             // Filter out internal tags
@@ -277,7 +283,7 @@ bool MemberConfig::hasTags(const ReplicaSetTagConfig& tagConfig) const {
     return false;
 }
 
-BSONObj MemberConfig::toBSON(const ReplicaSetTagConfig& tagConfig) const {
+BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig) const {
     BSONObjBuilder configBuilder;
     configBuilder.append("_id", _id);
     configBuilder.append("host", _host.toString());
@@ -287,8 +293,7 @@ BSONObj MemberConfig::toBSON(const ReplicaSetTagConfig& tagConfig) const {
     configBuilder.append("priority", _priority);
 
     BSONObjBuilder tags(configBuilder.subobjStart("tags"));
-    for (std::vector<ReplicaSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end();
-         tag++) {
+    for (std::vector<ReplSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end(); tag++) {
         std::string tagKey = tagConfig.getTagKey(*tag);
         if (tagKey[0] == '$') {
             // Filter out internal tags

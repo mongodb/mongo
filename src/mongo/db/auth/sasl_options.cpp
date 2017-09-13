@@ -49,34 +49,42 @@ SASLGlobalParams::SASLGlobalParams() {
     authenticationMechanisms.push_back("MONGODB-CR");
     authenticationMechanisms.push_back("MONGODB-X509");
     authenticationMechanisms.push_back("SCRAM-SHA-1");
+
     // Default iteration count for SCRAM authentication.
-    scramIterationCount = defaultScramIterationCount;
+    scramIterationCount.store(defaultScramIterationCount);
+
+    // Default value for auth failed delay
+    authFailedDelay.store(0);
 }
 
 Status addSASLOptions(moe::OptionSection* options) {
     moe::OptionSection saslOptions("SASL Options");
 
-    saslOptions.addOptionChaining("security.authenticationMechanisms",
-                                  "",
-                                  moe::StringVector,
-                                  "List of supported authentication mechanisms.  "
-                                  "Default is MONGODB-CR, SCRAM-SHA-1 and MONGODB-X509.")
+    saslOptions
+        .addOptionChaining("security.authenticationMechanisms",
+                           "",
+                           moe::StringVector,
+                           "List of supported authentication mechanisms.  "
+                           "Default is MONGODB-CR, SCRAM-SHA-1 and MONGODB-X509.")
         .setSources(moe::SourceYAMLConfig);
 
-    saslOptions.addOptionChaining(
-                    "security.sasl.hostName", "", moe::String, "Fully qualified server domain name")
+    saslOptions
+        .addOptionChaining(
+            "security.sasl.hostName", "", moe::String, "Fully qualified server domain name")
         .setSources(moe::SourceYAMLConfig);
 
-    saslOptions.addOptionChaining("security.sasl.serviceName",
-                                  "",
-                                  moe::String,
-                                  "Registered name of the service using SASL")
+    saslOptions
+        .addOptionChaining("security.sasl.serviceName",
+                           "",
+                           moe::String,
+                           "Registered name of the service using SASL")
         .setSources(moe::SourceYAMLConfig);
 
-    saslOptions.addOptionChaining("security.sasl.saslauthdSocketPath",
-                                  "",
-                                  moe::String,
-                                  "Path to Unix domain socket file for saslauthd")
+    saslOptions
+        .addOptionChaining("security.sasl.saslauthdSocketPath",
+                           "",
+                           moe::String,
+                           "Path to Unix domain socket file for saslauthd")
         .setSources(moe::SourceYAMLConfig);
 
     Status ret = options->addSection(saslOptions);
@@ -131,8 +139,8 @@ Status storeSASLOptions(const moe::Environment& params) {
         saslGlobalParams.authdPath = params["security.sasl.saslauthdSocketPath"].as<std::string>();
     }
     if (params.count("security.sasl.scramIterationCount") && !haveScramIterationCount) {
-        saslGlobalParams.scramIterationCount =
-            params["security.sasl.scramIterationCount"].as<int>();
+        saslGlobalParams.scramIterationCount.store(
+            params["security.sasl.scramIterationCount"].as<int>());
     }
 
     return Status::OK();
@@ -148,49 +156,39 @@ MONGO_STARTUP_OPTIONS_STORE(SASLOptions)(InitializerContext* context) {
 
 // SASL Startup Parameters, making them settable via setParameter on the command line or in the
 // legacy INI config file.  None of these parameters are modifiable at runtime.
-ExportedServerParameter<std::vector<std::string>> SASLAuthenticationMechanismsSetting(
-    ServerParameterSet::getGlobal(),
-    "authenticationMechanisms",
-    &saslGlobalParams.authenticationMechanisms,
-    true,    // Change at startup
-    false);  // Change at runtime
+ExportedServerParameter<std::vector<std::string>, ServerParameterType::kStartupOnly>
+    SASLAuthenticationMechanismsSetting(ServerParameterSet::getGlobal(),
+                                        "authenticationMechanisms",
+                                        &saslGlobalParams.authenticationMechanisms);
 
-ExportedServerParameter<std::string> SASLHostNameSetting(ServerParameterSet::getGlobal(),
-                                                         "saslHostName",
-                                                         &saslGlobalParams.hostName,
-                                                         true,    // Change at startup
-                                                         false);  // Change at runtime
+ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLHostNameSetting(
+    ServerParameterSet::getGlobal(), "saslHostName", &saslGlobalParams.hostName);
 
-ExportedServerParameter<std::string> SASLServiceNameSetting(ServerParameterSet::getGlobal(),
-                                                            "saslServiceName",
-                                                            &saslGlobalParams.serviceName,
-                                                            true,    // Change at startup
-                                                            false);  // Change at runtime
+ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLServiceNameSetting(
+    ServerParameterSet::getGlobal(), "saslServiceName", &saslGlobalParams.serviceName);
 
-ExportedServerParameter<std::string> SASLAuthdPathSetting(ServerParameterSet::getGlobal(),
-                                                          "saslauthdPath",
-                                                          &saslGlobalParams.authdPath,
-                                                          true,    // Change at startup
-                                                          false);  // Change at runtime
+ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLAuthdPathSetting(
+    ServerParameterSet::getGlobal(), "saslauthdPath", &saslGlobalParams.authdPath);
 
 const std::string scramIterationCountServerParameter = "scramIterationCount";
-class ExportedScramIterationCountParameter : public ExportedServerParameter<int> {
+class ExportedScramIterationCountParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedScramIterationCountParameter()
-        : ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
-                                       scramIterationCountServerParameter,
-                                       &saslGlobalParams.scramIterationCount,
-                                       true,     // Change at startup
-                                       true) {}  // Change at runtime
+        : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              scramIterationCountServerParameter,
+              &saslGlobalParams.scramIterationCount) {}
 
     virtual Status validate(const int& newValue) {
         if (newValue < minimumScramIterationCount) {
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream()
-                              << "Invalid value for SCRAM iteration count: " << newValue
-                              << " is less than the minimum SCRAM iteration count, "
-                              << minimumScramIterationCount);
+            return Status(
+                ErrorCodes::BadValue,
+                mongoutils::str::stream() << "Invalid value for SCRAM iteration count: " << newValue
+                                          << " is less than the minimum SCRAM iteration count, "
+                                          << minimumScramIterationCount);
         }
+
         return Status::OK();
     }
 } scramIterationCountParam;

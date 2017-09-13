@@ -30,6 +30,7 @@
 
 #include <iostream>
 
+#include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"
@@ -39,7 +40,10 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* contex
     return addMongodOptions(&moe::startupOptions);
 }
 
-MONGO_STARTUP_OPTIONS_VALIDATE(MongodOptions)(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(MongodOptions,
+                          ("BeginStartupOptionValidation", "AllFailPointsRegistered"),
+                          ("EndStartupOptionValidation"))
+(InitializerContext* context) {
     if (!handlePreValidationMongodOptions(moe::startupOptionsParsed, context->args())) {
         quickExit(EXIT_SUCCESS);
     }
@@ -68,7 +72,7 @@ MONGO_INITIALIZER_GENERAL(MongodOptions_Store,
                           ("BeginStartupOptionStorage"),
                           ("EndStartupOptionStorage"))
 (InitializerContext* context) {
-    Status ret = storeMongodOptions(moe::startupOptionsParsed, context->args());
+    Status ret = storeMongodOptions(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;

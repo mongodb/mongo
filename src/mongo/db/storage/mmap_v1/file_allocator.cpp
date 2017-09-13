@@ -38,8 +38,8 @@
 #include <fcntl.h>
 
 #if defined(__FreeBSD__)
-#include <sys/param.h>
 #include <sys/mount.h>
+#include <sys/param.h>
 #endif
 
 #if defined(__linux__)
@@ -50,16 +50,18 @@
 #include <io.h>
 #endif
 
-#include "mongo/db/storage/paths.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -129,6 +131,7 @@ FileAllocator::FileAllocator() : _failed() {}
 
 void FileAllocator::start() {
     stdx::thread t(stdx::bind(&FileAllocator::run, this));
+    t.detach();
 }
 
 void FileAllocator::requestAllocation(const string& name, long& size) {
@@ -195,8 +198,9 @@ static bool useSparseFiles(int fd) {
 // these are from <linux/magic.h> but that isn't available on all systems
 #define NFS_SUPER_MAGIC 0x6969
 #define TMPFS_MAGIC 0x01021994
-
-    return (fs_stats.f_type == NFS_SUPER_MAGIC) || (fs_stats.f_type == TMPFS_MAGIC);
+#define ZFS_SUPER_MAGIC 0x2fc12fc1
+    return (fs_stats.f_type == NFS_SUPER_MAGIC) || (fs_stats.f_type == TMPFS_MAGIC) ||
+        (fs_stats.f_type == ZFS_SUPER_MAGIC);
 
 #elif defined(__FreeBSD__)
 
@@ -255,8 +259,10 @@ void FileAllocator::ensureLength(int fd, long size) {
 
 #if defined(__linux__)
     int ret = posix_fallocate(fd, 0, size);
-    if (ret == 0)
+    if (ret == 0) {
+        LOG(1) << "used fallocate to create empty file";
         return;
+    }
 
     log() << "FileAllocator: posix_fallocate failed: " << errnoWithDescription(ret)
           << " falling back" << endl;
@@ -298,6 +304,7 @@ void FileAllocator::ensureLength(int fd, long size) {
 
         lseek(fd, 0, SEEK_SET);
 
+        log() << "filling with zeroes...";
         const long z = 256 * 1024;
         const std::unique_ptr<char[]> buf_holder(new char[z]);
         char* buf = buf_holder.get();
@@ -319,7 +326,7 @@ void FileAllocator::checkFailure() {
     if (_failed) {
         // we want to log the problem (diskfull.js expects it) but we do not want to dump a stack
         // trace
-        msgassertedNoTrace(12520, "new file allocation failure");
+        msgasserted(12520, "new file allocation failure");
     }
 }
 
@@ -371,8 +378,10 @@ void FileAllocator::run(FileAllocator* fa) {
     while (1) {
         {
             stdx::unique_lock<stdx::mutex> lk(fa->_pendingMutex);
-            if (fa->_pending.size() == 0)
+            if (fa->_pending.size() == 0) {
+                MONGO_IDLE_THREAD_BLOCK;
                 fa->_pendingUpdated.wait(lk);
+            }
         }
         while (1) {
             string name;
@@ -388,14 +397,16 @@ void FileAllocator::run(FileAllocator* fa) {
             string tmp;
             long fd = 0;
             try {
-                log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
+                log() << "allocating new datafile " << name;
 
                 boost::filesystem::path parent = ensureParentDirCreated(name);
                 tmp = fa->makeTempFileName(parent);
                 ensureParentDirCreated(tmp);
 
 #if defined(_WIN32)
-                fd = _open(tmp.c_str(), _O_RDWR | _O_CREAT | O_NOATIME, _S_IREAD | _S_IWRITE);
+                fd = _wopen(toNativeString(tmp.c_str()).c_str(),
+                            _O_RDWR | _O_CREAT | O_NOATIME,
+                            _S_IREAD | _S_IWRITE);
 #else
                 fd = open(tmp.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
 #endif
@@ -420,12 +431,15 @@ void FileAllocator::run(FileAllocator* fa) {
                 close(fd);
                 fd = 0;
 
-                if (rename(tmp.c_str(), name.c_str())) {
-                    const string& errStr = errnoWithDescription();
+                boost::system::error_code ec;
+                boost::filesystem::rename(tmp.c_str(), name.c_str(), ec);
+                if (ec) {
                     const string& errMessage = str::stream() << "error: couldn't rename " << tmp
-                                                             << " to " << name << ' ' << errStr;
+                                                             << " to " << name << ' '
+                                                             << ec.message();
                     msgasserted(13653, errMessage);
                 }
+
                 flushMyDirectory(name);
 
                 log() << "done allocating datafile " << name << ", "
@@ -470,12 +484,9 @@ void FileAllocator::run(FileAllocator* fa) {
     }
 }
 
-FileAllocator* FileAllocator::_instance = 0;
-
 FileAllocator* FileAllocator::get() {
-    if (!_instance)
-        _instance = new FileAllocator();
-    return _instance;
+    static FileAllocator instance;
+    return &instance;
 }
 
 }  // namespace mongo

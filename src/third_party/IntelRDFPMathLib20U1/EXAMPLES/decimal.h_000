@@ -1,0 +1,100 @@
+/******************************************************************************
+  Copyright (c) 2011, Intel Corp.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without 
+  modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright 
+      notice, this list of conditions and the following disclaimer in the 
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors 
+      may be used to endorse or promote products derived from this software 
+      without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  THE POSSIBILITY OF SUCH DAMAGE.
+******************************************************************************/
+
+// 000:
+// 0 arguments passed by value (except fpsf)
+// 0 rounding mode passed as argument
+// 0 pointer to status flags passed as argument 
+
+#ifdef WINDOWS
+  #define LX "%I64x"
+#else
+  #ifdef HPUX_OS
+    #define LX "%llx"
+  #else
+    #define LX "%Lx"
+  #endif
+#endif
+
+/* basic decimal floating-point types */
+
+#if defined _MSC_VER
+#if defined _M_IX86 && !defined __INTEL_COMPILER // Win IA-32, MS compiler
+#define ALIGN(n)
+#else
+#define ALIGN(n) __declspec(align(n))
+#endif
+#else
+#define ALIGN(n) __attribute__ ((aligned(n)))
+#endif
+
+typedef unsigned int Decimal32;
+typedef unsigned long long Decimal64;
+typedef ALIGN(16) struct { unsigned long long w[2]; } Decimal128;
+
+/* rounding modes */
+
+typedef enum _IDEC_roundingmode {
+    _IDEC_nearesteven = 0,
+    _IDEC_downward    = 1,
+    _IDEC_upward      = 2,
+    _IDEC_towardzero  = 3,
+    _IDEC_nearestaway = 4,
+    _IDEC_dflround    = _IDEC_nearesteven
+} _IDEC_roundingmode;
+typedef unsigned int _IDEC_round;
+
+
+/* exception flags */
+
+typedef enum _IDEC_flagbits {
+    _IDEC_invalid       = 0x01,
+    _IDEC_zerodivide    = 0x04,
+    _IDEC_overflow      = 0x08,
+    _IDEC_underflow     = 0x10,
+    _IDEC_inexact       = 0x20,
+    _IDEC_allflagsclear = 0x00
+} _IDEC_flagbits;
+typedef unsigned int _IDEC_flags;  // could be a struct with diagnostic info
+
+extern
+Decimal128 __bid128_mul (
+    Decimal128,
+    Decimal128,
+    _IDEC_round,
+    _IDEC_flags *
+);
+
+#if BID_BIG_ENDIAN
+#define HIGH_128W 0
+#define LOW_128W  1
+#else
+#define HIGH_128W 1
+#define LOW_128W  0
+#endif

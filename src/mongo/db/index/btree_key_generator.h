@@ -28,11 +28,18 @@
 
 #pragma once
 
-#include <vector>
+#include <memory>
 #include <set>
+#include <vector>
+
+#include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+class CollatorInterface;
 
 /**
  * Internal class used by BtreeAccessMethod to generate keys for indexed documents.
@@ -46,9 +53,13 @@ public:
 
     virtual ~BtreeKeyGenerator() {}
 
-    void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+    static std::unique_ptr<BtreeKeyGenerator> make(IndexDescriptor::IndexVersion indexVersion,
+                                                   std::vector<const char*> fieldNames,
+                                                   std::vector<BSONElement> fixed,
+                                                   bool isSparse,
+                                                   const CollatorInterface* collator);
 
-    static const int ParallelArraysCode;
+    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const;
 
 protected:
     // These are used by the getKeysImpl(s) below.
@@ -59,11 +70,11 @@ protected:
     BSONSizeTracker _sizeTracker;
 
 private:
-    // We have V0 and V1.  Sigh.
     virtual void getKeysImpl(std::vector<const char*> fieldNames,
                              std::vector<BSONElement> fixed,
                              const BSONObj& obj,
-                             BSONObjSet* keys) const = 0;
+                             BSONObjSet* keys,
+                             MultikeyPaths* multikeyPaths) const = 0;
 
     std::vector<BSONElement> _fixed;
 };
@@ -77,17 +88,26 @@ public:
     virtual ~BtreeKeyGeneratorV0() {}
 
 private:
-    virtual void getKeysImpl(std::vector<const char*> fieldNames,
-                             std::vector<BSONElement> fixed,
-                             const BSONObj& obj,
-                             BSONObjSet* keys) const;
+    /**
+     * Generates the index keys for the document 'obj' and stores them in the set 'keys'.
+     *
+     * It isn't possible to create a v0 index, so it's unnecessary to track the prefixes of the
+     * indexed fields that cause the index to be mulitkey. This function therefore ignores its
+     * 'multikeyPaths' parameter.
+     */
+    void getKeysImpl(std::vector<const char*> fieldNames,
+                     std::vector<BSONElement> fixed,
+                     const BSONObj& obj,
+                     BSONObjSet* keys,
+                     MultikeyPaths* multikeyPaths) const final;
 };
 
 class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
 public:
     BtreeKeyGeneratorV1(std::vector<const char*> fieldNames,
                         std::vector<BSONElement> fixed,
-                        bool isSparse);
+                        bool isSparse,
+                        const CollatorInterface* collator);
 
     virtual ~BtreeKeyGeneratorV1() {}
 
@@ -123,18 +143,17 @@ private:
         // The array to which 'positionallyIndexedElt' belongs.
         BSONObj arrayObj;
 
-        // If we find a positionally indexed element, we traverse the remainder of the path
-        // until we find either another array element or the end of the path. The result of
-        // this traversal (implemented using getFieldDottedOrArray()), is stored here and used
-        // during the recursive call for each array element.
+        // If we find a positionally indexed element, we traverse the remainder of the path until we
+        // find either another array element or the end of the path. The result of this traversal is
+        // stored here and used during the recursive call for each array element.
         //
         // Example:
         //   Suppose we have key pattern {"a.1.b.0.c": 1}. The document for which we are
         //   generating keys is {a: [0, {b: [{c: 99}]}]}. We will find that {b: [{c: 99}]}
         //   is a positionally indexed element and store it as 'positionallyIndexedElt'.
         //
-        //   We then call getFieldDottedOrArray() to traverse the remainder of the path,
-        //   "b.1.c". The result is the array [{c: 99}] which is stored here as 'dottedElt'.
+        //   We then traverse the remainder of the path, "b.0.c", until encountering an array. The
+        //   result is the array [{c: 99}] which is stored here as 'dottedElt'.
         BSONElement dottedElt;
 
         // The remaining path that must be traversed in 'dottedElt' to find the indexed
@@ -147,18 +166,24 @@ private:
     };
 
     /**
+     * Generates the index keys for the document 'obj' and stores them in the set 'keys'.
+     *
      * @param fieldNames - fields to index, may be postfixes in recursive calls
      * @param fixed - values that have already been identified for their index fields
      * @param obj - object from which keys should be extracted, based on names in fieldNames
      * @param keys - set where index keys are written
-     * @param numNotFound - number of index fields that have already been identified as missing
-     * @param array - array from which keys should be extracted, based on names in fieldNames
-     *        If obj and array are both nonempty, obj will be one of the elements of array.
+     *
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
+     * index type supports tracking path-level multikey information, then this function resizes
+     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
+     * element with the prefixes of the indexed field that would cause this index to be multikey as
+     * a result of inserting 'keys'.
      */
-    virtual void getKeysImpl(std::vector<const char*> fieldNames,
-                             std::vector<BSONElement> fixed,
-                             const BSONObj& obj,
-                             BSONObjSet* keys) const;
+    void getKeysImpl(std::vector<const char*> fieldNames,
+                     std::vector<BSONElement> fixed,
+                     const BSONObj& obj,
+                     BSONObjSet* keys,
+                     MultikeyPaths* multikeyPaths) const final;
 
     /**
      * This recursive method does the heavy-lifting for getKeysImpl().
@@ -168,10 +193,12 @@ private:
                               const BSONObj& obj,
                               BSONObjSet* keys,
                               unsigned numNotFound,
-                              const std::vector<PositionalPathInfo>& positionalInfo) const;
+                              const std::vector<PositionalPathInfo>& positionalInfo,
+                              MultikeyPaths* multikeyPaths) const;
     /**
-     * A call to getKeysImplWithArray() begins by calling this for each field in the key
-     * pattern. It uses getFieldDottedOrArray() to traverse the path '*field' in 'obj'.
+     * A call to getKeysImplWithArray() begins by calling this for each field in the key pattern. It
+     * traverses the path '*field' in 'obj' until either reaching the end of the path or an array
+     * element.
      *
      * The 'positionalInfo' arg is used for handling a field path where 'obj' has an
      * array indexed by position. See the comments for PositionalPathInfo for more detail.
@@ -217,11 +244,20 @@ private:
                              BSONObjSet* keys,
                              unsigned numNotFound,
                              const BSONElement& arrObjElt,
-                             const std::set<unsigned>& arrIdxs,
+                             const std::set<size_t>& arrIdxs,
                              bool mayExpandArrayUnembedded,
-                             const std::vector<PositionalPathInfo>& positionalInfo) const;
+                             const std::vector<PositionalPathInfo>& positionalInfo,
+                             MultikeyPaths* multikeyPaths) const;
 
     const std::vector<PositionalPathInfo> _emptyPositionalInfo;
+
+    // A vector with size equal to the number of elements in the index key pattern. Each element in
+    // the vector is the number of path components in the indexed field.
+    std::vector<size_t> _pathLengths;
+
+    // Null if this key generator orders strings according to the simple binary compare. If
+    // non-null, represents the collator used to generate index keys for indexed strings.
+    const CollatorInterface* _collator;
 };
 
 }  // namespace mongo

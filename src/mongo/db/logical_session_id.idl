@@ -1,0 +1,164 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# This IDL file describes the BSON format for a LogicalSessionId, and
+# handles the serialization to and deserialization from its BSON representation
+# for that class.
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/util/uuid.h"
+
+imports:
+  - "mongo/idl/basic_types.idl"
+  - "mongo/crypto/sha256_block.idl"
+
+types:
+
+  TxnNumber:
+    description: "A strictly-increasing per-session counter, which indicates to which transaction
+                  of a given session does the specified command belong. The combination of
+                  LogicalSessionId:TxnNumber is referred to as the transaction identifier."
+    bson_serialization_type: long
+    cpp_type: "std::int64_t"
+    deserializer: "mongo::BSONElement::_numberLong"
+
+  StmtId:
+    description: "A number representing an operation within a transaction."
+    bson_serialization_type: int
+    cpp_type: "std::int32_t"
+    deserializer: "mongo::BSONElement::_numberLong"
+
+structs:
+
+  LogicalSessionId:
+    description: "A struct representing a LogicalSessionId"
+    strict: true
+    fields:
+      id: uuid
+      uid: sha256Block
+
+  LogicalSessionIdToClient:
+    description: "A struct representing a LogicalSessionId to external clients"
+    strict: true
+    fields:
+      id: uuid
+
+  LogicalSessionToClient:
+    description: "A struct representing a LogicalSession reply to external clients"
+    strict: true
+    fields:
+      id: LogicalSessionIdToClient
+      timeoutMinutes: int
+
+  LogicalSessionRecord:
+    description: "A struct representing a LogicalSessionRecord"
+    strict: true
+    fields:
+      _id:
+        type: LogicalSessionId
+        cpp_name: id
+      lastUse: date
+      user:
+        type: string
+        optional: true
+
+  LogicalSessionFromClient:
+    description: "A struct representing a LogicalSessionId from external clients"
+    strict: true
+    fields:
+      id: uuid
+      uid:
+        type: sha256Block
+        optional: true
+
+  OperationSessionInfo:
+    description: "Parser for serializing sessionId/txnNumber combination"
+    strict: false
+    fields:
+      lsid:
+        type: LogicalSessionId
+        cpp_name: sessionId
+        optional: true
+      txnNumber:
+        description: "The transaction number relative to the session in which a particular write
+                      operation executes."
+        type: TxnNumber
+        optional: true
+
+  OperationSessionInfoFromClient:
+    description: "Parser for pulling out the sessionId/txnNumber combination from commands"
+    strict: false
+    fields:
+      lsid:
+        type: LogicalSessionFromClient
+        cpp_name: sessionId
+        optional: true
+      txnNumber:
+        description: "The transaction number relative to the session in which a particular write
+                      operation executes."
+        type: TxnNumber
+        optional: true
+
+  SessionsCollectionFetchResultIndividualResult:
+    description: "Individual result"
+    strict: true
+    fields:
+      _id: LogicalSessionId
+
+  SessionsCollectionFetchResultCursor:
+    description: "Cursor object"
+    strict: false
+    fields:
+      firstBatch: array<SessionsCollectionFetchResultIndividualResult>
+
+  SessionsCollectionFetchResult:
+    description: "Parser for pulling out the fetch results from SessionsCollection::fetch"
+    strict: false
+    fields:
+      cursor: SessionsCollectionFetchResultCursor
+
+  SessionsCollectionFetchRequestFilterId:
+    description: "Id"
+    strict: true
+    fields:
+      $in:
+        type: array<LogicalSessionId>
+        cpp_name: "in"
+
+  SessionsCollectionFetchRequestFilter:
+    description: "filter"
+    strict: true
+    fields:
+      _id: SessionsCollectionFetchRequestFilterId
+
+  SessionsCollectionFetchRequestProjection:
+    description: "projection"
+    strict: true
+    fields:
+      _id: int
+
+  SessionsCollectionFetchRequest:
+    description: "Parser for forming the fetch request for SessionsCollection::fetch"
+    strict: true
+    fields:
+      find: namespacestring
+      filter: SessionsCollectionFetchRequestFilter
+      projection: SessionsCollectionFetchRequestProjection
+      batchSize: int
+      singleBatch: bool
+      allowPartialResults: bool
+      limit: int

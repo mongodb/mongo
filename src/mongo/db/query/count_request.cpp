@@ -30,7 +30,7 @@
 
 #include "mongo/db/query/count_request.h"
 
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -41,49 +41,37 @@ const char kQueryField[] = "query";
 const char kLimitField[] = "limit";
 const char kSkipField[] = "skip";
 const char kHintField[] = "hint";
-
+const char kCollationField[] = "collation";
+const char kExplainField[] = "explain";
+const char kCommentField[] = "comment";
+const char kMaxTimeMSField[] = "maxTimeMS";
+const char kReadConcernField[] = "readConcern";
 }  // namespace
 
-CountRequest::CountRequest(const std::string& fullNs, BSONObj query)
-    : _fullNs(fullNs), _query(query.getOwned()) {}
+CountRequest::CountRequest(NamespaceString nss, BSONObj query)
+    : _nss(std::move(nss)), _query(query.getOwned()) {}
 
 void CountRequest::setHint(BSONObj hint) {
     _hint = hint.getOwned();
 }
 
-BSONObj CountRequest::toBSON() const {
-    BSONObjBuilder builder;
-
-    builder.append(kCmdName, _fullNs);
-    builder.append(kQueryField, _query);
-
-    if (_limit) {
-        builder.append(kLimitField, _limit.get());
-    }
-
-    if (_skip) {
-        builder.append(kSkipField, _skip.get());
-    }
-
-    if (_hint) {
-        builder.append(kHintField, _hint.get());
-    }
-
-    return builder.obj();
+void CountRequest::setCollation(BSONObj collation) {
+    _collation = collation.getOwned();
 }
 
 StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
-                                                     const BSONObj& cmdObj) {
+                                                     const BSONObj& cmdObj,
+                                                     bool isExplain) {
     BSONElement firstElt = cmdObj.firstElement();
     const std::string coll = (firstElt.type() == BSONType::String) ? firstElt.str() : "";
 
-    const std::string ns = str::stream() << dbname << "." << coll;
-    if (!nsIsFull(ns)) {
-        return Status(ErrorCodes::BadValue, "invalid collection name");
+    NamespaceString nss(dbname, coll);
+    if (!nss.isValid()) {
+        return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
     }
 
     // We don't validate that "query" is a nested object due to SERVER-15456.
-    CountRequest request(ns, cmdObj.getObjectField(kQueryField));
+    CountRequest request(std::move(nss), cmdObj.getObjectField(kQueryField));
 
     // Limit
     if (cmdObj[kLimitField].isNumber()) {
@@ -111,15 +99,114 @@ StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
         return Status(ErrorCodes::BadValue, "skip value is not a valid number");
     }
 
+    // maxTimeMS
+    if (cmdObj[kMaxTimeMSField].ok()) {
+        auto maxTimeMS = QueryRequest::parseMaxTimeMS(cmdObj[kMaxTimeMSField]);
+        if (!maxTimeMS.isOK()) {
+            return maxTimeMS.getStatus();
+        }
+        request.setMaxTimeMS(static_cast<unsigned int>(maxTimeMS.getValue()));
+    }
+
     // Hint
-    if (Object == cmdObj[kHintField].type()) {
+    if (BSONType::Object == cmdObj[kHintField].type()) {
         request.setHint(cmdObj[kHintField].Obj());
     } else if (String == cmdObj[kHintField].type()) {
         const std::string hint = cmdObj.getStringField(kHintField);
         request.setHint(BSON("$hint" << hint));
     }
 
+    // Collation
+    if (BSONType::Object == cmdObj[kCollationField].type()) {
+        request.setCollation(cmdObj[kCollationField].Obj());
+    } else if (cmdObj[kCollationField].ok()) {
+        return Status(ErrorCodes::BadValue, "collation value is not a document");
+    }
+
+    // readConcern
+    if (BSONType::Object == cmdObj[kReadConcernField].type()) {
+        request.setReadConcern(cmdObj[kReadConcernField].Obj());
+    } else if (cmdObj[kReadConcernField].ok()) {
+        return Status(ErrorCodes::BadValue, "readConcern value is not a document");
+    }
+
+    // unwrappedReadPref
+    if (BSONType::Object == cmdObj[QueryRequest::kUnwrappedReadPrefField].type()) {
+        request.setUnwrappedReadPref(cmdObj[QueryRequest::kUnwrappedReadPrefField].Obj());
+    } else if (cmdObj[QueryRequest::kUnwrappedReadPrefField].ok()) {
+        return Status(ErrorCodes::BadValue, "readPreference value is not a document");
+    }
+
+    // Comment
+    if (BSONType::String == cmdObj[kCommentField].type()) {
+        request.setComment(cmdObj[kCommentField].valueStringData());
+    } else if (cmdObj[kCommentField].ok()) {
+        return Status(ErrorCodes::BadValue, "comment value is not a string");
+    }
+
+
+    // Explain
+    request.setExplain(isExplain);
+
     return request;
 }
 
+StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
+    BSONObjBuilder aggregationBuilder;
+    aggregationBuilder.append("aggregate", _nss.coll());
+
+    // Build an aggregation pipeline that performs the counting. We add stages that satisfy the
+    // query, skip and limit before finishing with the actual $count stage.
+    BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
+    if (!_query.isEmpty()) {
+        BSONObjBuilder matchBuilder(pipelineBuilder.subobjStart());
+        matchBuilder.append("$match", _query);
+        matchBuilder.doneFast();
+    }
+    if (_skip) {
+        BSONObjBuilder skipBuilder(pipelineBuilder.subobjStart());
+        skipBuilder.append("$skip", *_skip);
+        skipBuilder.doneFast();
+    }
+    if (_limit) {
+        BSONObjBuilder limitBuilder(pipelineBuilder.subobjStart());
+        limitBuilder.append("$limit", *_limit);
+        limitBuilder.doneFast();
+    }
+
+    BSONObjBuilder countBuilder(pipelineBuilder.subobjStart());
+    countBuilder.append("$count", "count");
+    countBuilder.doneFast();
+    pipelineBuilder.doneFast();
+
+    // Complete the command by appending the other options to count.
+    if (_collation) {
+        aggregationBuilder.append(kCollationField, *_collation);
+    }
+
+    if (_hint) {
+        aggregationBuilder.append(kHintField, *_hint);
+    }
+
+    if (!_comment.empty()) {
+        aggregationBuilder.append(kCommentField, _comment);
+    }
+
+    if (_maxTimeMS > 0) {
+        aggregationBuilder.append(kMaxTimeMSField, _maxTimeMS);
+    }
+
+    if (!_readConcern.isEmpty()) {
+        aggregationBuilder.append(kReadConcernField, _readConcern);
+    }
+
+    if (!_unwrappedReadPref.isEmpty()) {
+        aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, _unwrappedReadPref);
+    }
+
+    // The 'cursor' option is always specified so that aggregation uses the cursor interface.
+    aggregationBuilder.append("cursor", BSONObj());
+
+    return aggregationBuilder.obj();
+}
 }  // namespace mongo

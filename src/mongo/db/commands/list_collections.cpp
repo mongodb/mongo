@@ -1,59 +1,201 @@
-// list_collections.cpp
-
 /**
-*    Copyright (C) 2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2014-2016 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
+#include <vector>
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/cursor_responses.h"
-#include "mongo/db/query/find_constants.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/query/cursor_request.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/views/view_catalog.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::list;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
+using std::vector;
+using stdx::make_unique;
 
-class CmdListCollections : public Command {
+namespace {
+
+/**
+ * Determines if 'matcher' is an exact match on the "name" field. If so, returns a vector of all the
+ * collection names it is matching against. Returns {} if there is no obvious exact match on name.
+ *
+ * Note the collection names returned are not guaranteed to exist, nor are they guaranteed to match
+ * 'matcher'.
+ */
+boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* matcher) {
+    if (!matcher) {
+        return {};
+    }
+
+    MatchExpression::MatchType matchType(matcher->matchType());
+    if (matchType == MatchExpression::EQ) {
+        auto eqMatch = checked_cast<const EqualityMatchExpression*>(matcher);
+        if (eqMatch->path() == "name") {
+            auto& elem = eqMatch->getData();
+            if (elem.type() == String) {
+                return {vector<StringData>{elem.valueStringData()}};
+            } else {
+                return vector<StringData>();
+            }
+        }
+    } else if (matchType == MatchExpression::MATCH_IN) {
+        auto matchIn = checked_cast<const InMatchExpression*>(matcher);
+        if (matchIn->path() == "name" && matchIn->getRegexes().empty()) {
+            vector<StringData> exactMatches;
+            for (auto&& elem : matchIn->getEqualities()) {
+                if (elem.type() == String) {
+                    exactMatches.push_back(elem.valueStringData());
+                }
+            }
+            return {std::move(exactMatches)};
+        }
+    }
+    return {};
+}
+
+/**
+ * Uses 'matcher' to determine if the collection's information should be added to 'root'. If so,
+ * allocates a WorkingSetMember containing information about 'collection', and adds it to 'root'.
+ *
+ * Does not add any information about the system.namespaces collection, or non-existent collections.
+ */
+void _addWorkingSetMember(OperationContext* opCtx,
+                          const BSONObj& maybe,
+                          const MatchExpression* matcher,
+                          WorkingSet* ws,
+                          QueuedDataStage* root) {
+    if (matcher && !matcher->matchesBSON(maybe)) {
+        return;
+    }
+
+    WorkingSetID id = ws->allocate();
+    WorkingSetMember* member = ws->get(id);
+    member->keyData.clear();
+    member->recordId = RecordId();
+    member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
+    member->transitionToOwnedObj();
+    root->pushBack(id);
+}
+
+BSONObj buildViewBson(const ViewDefinition& view) {
+    BSONObjBuilder b;
+    b.append("name", view.name().coll());
+    b.append("type", "view");
+
+    BSONObjBuilder optionsBuilder(b.subobjStart("options"));
+    optionsBuilder.append("viewOn", view.viewOn().coll());
+    optionsBuilder.append("pipeline", view.pipeline());
+    if (view.defaultCollator()) {
+        optionsBuilder.append("collation", view.defaultCollator()->getSpec().toBSON());
+    }
+    optionsBuilder.doneFast();
+
+    BSONObj info = BSON("readOnly" << true);
+    b.append("info", info);
+    return b.obj();
+}
+
+BSONObj buildCollectionBson(OperationContext* opCtx,
+                            const Collection* collection,
+                            bool includePendingDrops) {
+
+    if (!collection) {
+        return {};
+    }
+
+    auto nss = collection->ns();
+    auto collectionName = nss.coll();
+    if (collectionName == "system.namespaces") {
+        return {};
+    }
+
+    // Drop-pending collections are replicated collections that have been marked for deletion.
+    // These collections are considered dropped and should not be returned in the results for this
+    // command, unless specified explicitly by the 'includePendingDrops' command argument.
+    if (nss.isDropPendingNamespace() && !includePendingDrops) {
+        return {};
+    }
+
+    BSONObjBuilder b;
+    b.append("name", collectionName);
+    b.append("type", "collection");
+
+    CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
+
+    // While the UUID is stored as a collection option, from the user's perspective it is an
+    // unsettable read-only property, so put it in the 'info' section.
+    auto uuid = options.uuid;
+    options.uuid.reset();
+    b.append("options", options.toBSON());
+
+    BSONObjBuilder infoBuilder;
+    infoBuilder.append("readOnly", storageGlobalParams.readOnly);
+    if (uuid)
+        infoBuilder.appendElements(uuid->toBSON());
+    b.append("info", infoBuilder.obj());
+
+    auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
+    if (idIndex) {
+        b.append("idIndex", idIndex->infoObj());
+    }
+
+    return b.obj();
+}
+
+class CmdListCollections : public BasicCommand {
 public:
     virtual bool slaveOk() const {
         return false;
@@ -64,7 +206,7 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -72,141 +214,149 @@ public:
         help << "list collections for this db";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-        // Check for the listCollections ActionType on the database
-        // or find on system.namespaces for pre 3.0 systems.
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
-                                                           ActionType::listCollections) ||
-            authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.namespaces")),
-                ActionType::find)) {
+        if (authzSession->isAuthorizedToListCollections(dbname)) {
             return Status::OK();
         }
 
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to create users on db: " << dbname);
+                      str::stream() << "Not authorized to list collections on db: " << dbname);
     }
 
-    CmdListCollections() : Command("listCollections") {}
+    CmdListCollections() : BasicCommand("listCollections") {}
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
-             int,
-             string& errmsg,
+             const BSONObj& jsobj,
              BSONObjBuilder& result) {
-        std::unique_ptr<MatchExpression> matcher;
+        unique_ptr<MatchExpression> matcher;
+
+        // Check for 'filter' argument.
         BSONElement filterElt = jsobj["filter"];
         if (!filterElt.eoo()) {
             if (filterElt.type() != mongo::Object) {
                 return appendCommandStatus(
                     result, Status(ErrorCodes::BadValue, "\"filter\" must be an object"));
             }
+            // The collator is null because collection objects are compared using binary comparison.
+            const CollatorInterface* collator = nullptr;
             StatusWithMatchExpression statusWithMatcher =
-                MatchExpressionParser::parse(filterElt.Obj());
+                MatchExpressionParser::parse(filterElt.Obj(), collator);
             if (!statusWithMatcher.isOK()) {
                 return appendCommandStatus(result, statusWithMatcher.getStatus());
             }
-            matcher.reset(statusWithMatcher.getValue());
+            matcher = std::move(statusWithMatcher.getValue());
         }
 
         const long long defaultBatchSize = std::numeric_limits<long long>::max();
         long long batchSize;
-        Status parseCursorStatus = parseCommandCursorOptions(jsobj, defaultBatchSize, &batchSize);
+        Status parseCursorStatus =
+            CursorRequest::parseCommandCursorOptions(jsobj, defaultBatchSize, &batchSize);
         if (!parseCursorStatus.isOK()) {
             return appendCommandStatus(result, parseCursorStatus);
         }
 
-        ScopedTransaction scopedXact(txn, MODE_IS);
-        AutoGetDb autoDb(txn, dbname, MODE_S);
+        // Check for 'includePendingDrops' flag. The default is to not include drop-pending
+        // collections.
+        bool includePendingDrops;
+        Status status = bsonExtractBooleanFieldWithDefault(
+            jsobj, "includePendingDrops", false, &includePendingDrops);
 
-        const Database* d = autoDb.getDb();
-        const DatabaseCatalogEntry* dbEntry = NULL;
-
-        list<string> names;
-        if (d) {
-            dbEntry = d->getDatabaseCatalogEntry();
-            dbEntry->getCollectionNamespaces(&names);
-            names.sort();
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
         }
 
-        std::unique_ptr<WorkingSet> ws(new WorkingSet());
-        std::unique_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
+        AutoGetDb autoDb(opCtx, dbname, MODE_S);
 
-        for (std::list<std::string>::const_iterator i = names.begin(); i != names.end(); ++i) {
-            const std::string& ns = *i;
+        Database* db = autoDb.getDb();
 
-            StringData collection = nsToCollectionSubstring(ns);
-            if (collection == "system.namespaces") {
-                continue;
+        auto ws = make_unique<WorkingSet>();
+        auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
+
+        if (db) {
+            if (auto collNames = _getExactNameMatches(matcher.get())) {
+                for (auto&& collName : *collNames) {
+                    auto nss = NamespaceString(db->name(), collName);
+                    Collection* collection = db->getCollection(opCtx, nss);
+                    BSONObj collBson = buildCollectionBson(opCtx, collection, includePendingDrops);
+                    if (!collBson.isEmpty()) {
+                        _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
+                    }
+                }
+            } else {
+                for (auto&& collection : *db) {
+                    BSONObj collBson = buildCollectionBson(opCtx, collection, includePendingDrops);
+                    if (!collBson.isEmpty()) {
+                        _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
+                    }
+                }
             }
 
-            BSONObjBuilder b;
-            b.append("name", collection);
-
-            CollectionOptions options =
-                dbEntry->getCollectionCatalogEntry(ns)->getCollectionOptions(txn);
-            b.append("options", options.toBSON());
-
-            BSONObj maybe = b.obj();
-            if (matcher && !matcher->matchesBSON(maybe)) {
-                continue;
+            // Skipping views is only necessary for internal cloning operations.
+            bool skipViews = filterElt.type() == mongo::Object &&
+                SimpleBSONObjComparator::kInstance.evaluate(
+                    filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
+            if (!skipViews) {
+                db->getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) {
+                    BSONObj viewBson = buildViewBson(view);
+                    if (!viewBson.isEmpty()) {
+                        _addWorkingSetMember(opCtx, viewBson, matcher.get(), ws.get(), root.get());
+                    }
+                });
             }
-
-            WorkingSetMember member;
-            member.state = WorkingSetMember::OWNED_OBJ;
-            member.keyData.clear();
-            member.loc = RecordId();
-            member.obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
-            root->pushBack(member);
         }
 
-        std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;
-        dassert(NamespaceString(cursorNamespace).isValid());
-        dassert(NamespaceString(cursorNamespace).isListCollectionsGetMore());
+        const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
 
-        PlanExecutor* rawExec;
-        Status makeStatus = PlanExecutor::make(txn,
-                                               ws.release(),
-                                               root.release(),
-                                               cursorNamespace,
-                                               PlanExecutor::YIELD_MANUAL,
-                                               &rawExec);
-        std::unique_ptr<PlanExecutor> exec(rawExec);
-        if (!makeStatus.isOK()) {
-            return appendCommandStatus(result, makeStatus);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
+        if (!statusWithPlanExecutor.isOK()) {
+            return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         BSONArrayBuilder firstBatch;
 
-        const int byteLimit = MaxBytesToReturnToClientAtOnce;
-        for (long long objCount = 0; objCount < batchSize && firstBatch.len() < byteLimit;
-             objCount++) {
+        for (long long objCount = 0; objCount < batchSize; objCount++) {
             BSONObj next;
             PlanExecutor::ExecState state = exec->getNext(&next, NULL);
             if (state == PlanExecutor::IS_EOF) {
                 break;
             }
             invariant(state == PlanExecutor::ADVANCED);
+
+            // If we can't fit this result inside the current batch, then we stash it for later.
+            if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
+                exec->enqueue(next);
+                break;
+            }
+
             firstBatch.append(next);
         }
 
         CursorId cursorId = 0LL;
         if (!exec->isEOF()) {
             exec->saveState();
-            ClientCursor* cursor = new ClientCursor(
-                CursorManager::getGlobalCursorManager(), exec.release(), cursorNamespace);
-            cursorId = cursor->cursorid();
+            exec->detachFromOperationContext();
+            auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+                opCtx,
+                {std::move(exec),
+                 cursorNss,
+                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                 opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                 jsobj});
+            cursorId = pinnedCursor.getCursor()->cursorid();
         }
 
-        appendCursorResponseObject(cursorId, cursorNamespace, firstBatch.arr(), &result);
+        appendCursorResponseObject(cursorId, cursorNss.ns(), firstBatch.arr(), &result);
 
         return true;
     }
-
 } cmdListCollections;
-}
+
+}  // namespace
+}  // namespace mongo

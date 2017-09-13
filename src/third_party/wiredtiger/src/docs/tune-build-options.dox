@@ -1,0 +1,9 @@
+/*! @page tune_build_options gcc/clang build options
+
+WiredTiger can be built using the gcc/clang \c -fvisibility=hidden flag,
+which may significantly reduce the size and load time of the WiredTiger
+library when built as a dynamic shared object, and allow the optimizer
+to produce better code (for example, by eliminating most lookups in the
+procedure linkage table).
+
+ */

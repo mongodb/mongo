@@ -36,6 +36,8 @@
 #ifndef __LINENOISE_H
 #define __LINENOISE_H
 
+#include "mongo/base/status.h"
+
 struct linenoiseCompletions;
 
 typedef void(linenoiseCompletionCallback)(const char*, linenoiseCompletions*);
@@ -46,8 +48,8 @@ char* linenoise(const char* prompt);
 void linenoisePreloadBuffer(const char* preloadText);
 int linenoiseHistoryAdd(const char* line);
 int linenoiseHistorySetMaxLen(int len);
-int linenoiseHistorySave(const char* filename);
-int linenoiseHistoryLoad(const char* filename);
+mongo::Status linenoiseHistorySave(const char* filename);
+mongo::Status linenoiseHistoryLoad(const char* filename);
 void linenoiseHistoryFree(void);
 void linenoiseClearScreen(void);
 

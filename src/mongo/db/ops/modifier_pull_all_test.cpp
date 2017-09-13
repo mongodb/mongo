@@ -29,6 +29,8 @@
 
 #include "mongo/db/ops/modifier_pull_all.h"
 
+#include <cstdint>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"
@@ -36,13 +38,14 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using mongo::BSONObj;
+using mongo::CollatorInterfaceMock;
 using mongo::LogBuilder;
 using mongo::ModifierPullAll;
 using mongo::ModifierInterface;
@@ -59,9 +62,10 @@ class Mod {
 public:
     Mod() : _mod() {}
 
-    explicit Mod(BSONObj modObj) : _modObj(modObj), _mod() {
-        ASSERT_OK(_mod.init(_modObj["$pullAll"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+    explicit Mod(BSONObj modObj,
+                 ModifierInterface::Options options = ModifierInterface::Options::normal())
+        : _modObj(modObj), _mod() {
+        ASSERT_OK(_mod.init(_modObj["$pullAll"].embeddedObject().firstElement(), options));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -244,4 +248,32 @@ TEST(Prepare, FromArrayElementPath) {
     ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
 }
 
+
+TEST(Collation, RespectsCollationFromOptions) {
+    Document doc(fromjson("{ a : ['foo', 'bar' ] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    Mod mod(fromjson("{ $pullAll : { 'a' : ['FOO', 'BAR'] } }"),
+            ModifierInterface::Options::normal(&collator));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, fromjson("{ a : [] }"));
+}
+
+TEST(Collation, RespectsCollationFromSetCollation) {
+    Document doc(fromjson("{ a : ['foo', 'bar' ] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    Mod mod(fromjson("{ $pullAll : { 'a' : ['FOO', 'BAR'] } }"));
+    mod.mod().setCollator(&collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_EQUALS(doc, fromjson("{ a : [] }"));
+}
 }  // namespace

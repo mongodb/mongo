@@ -1,0 +1,171 @@
+# -*- mode: python -*-
+
+Import("endian")
+Import("env")
+Import("use_system_version_of_library")
+
+env = env.Clone()
+
+env.Library(
+    target="collator_interface",
+    source=[
+        "collation_index_key.cpp",
+        "collation_spec.cpp",
+        "collator_interface.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.CppUnitTest(
+    target="collation_spec_test",
+    source=[
+        "collation_spec_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_interface",
+    ],
+)
+
+env.Library(
+    target="collator_interface_mock",
+    source=[
+        "collator_interface_mock.cpp",
+    ],
+    LIBDEPS=[
+        "collator_interface",
+    ],
+)
+
+env.CppUnitTest(
+    target="collator_interface_mock_test",
+    source=[
+        "collator_interface_mock_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_interface_mock",
+    ],
+)
+
+env.CppUnitTest(
+    target="collation_bson_comparison_test",
+    source=[
+        "collation_bson_comparison_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_interface_mock",
+    ],
+)
+
+env.CppUnitTest(
+    target="collation_index_key_test",
+    source=[
+        "collation_index_key_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_interface",
+        "collator_interface_mock",
+    ],
+)
+
+env.Library(
+    target="collator_factory_interface",
+    source=[
+        "collator_factory_interface.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context",
+        "collator_interface",
+    ],
+)
+
+env.Library(
+    target="collator_factory_mock",
+    source=[
+        "collator_factory_mock.cpp",
+    ],
+    LIBDEPS=[
+        "collator_factory_interface",
+        "collator_interface_mock",
+    ],
+)
+
+env.CppUnitTest(
+    target="collator_factory_mock_test",
+    source=[
+        "collator_factory_mock_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_factory_mock",
+    ],
+)
+
+env.CppUnitTest(
+    target="collator_factory_icu_test",
+    source=[
+        "collator_factory_icu_locales_test.cpp",
+        "collator_factory_icu_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_icu",
+    ],
+)
+
+# The collator_icu library and the collator_interface_icu_test unit tests need an environment which
+# has access to the third-party ICU headers.
+icuEnv = env.Clone()
+
+if not use_system_version_of_library("icu"):
+    generateICUInit = icuEnv.Command(
+        target="icu_init.cpp",
+        source=[
+            "generate_icu_init_cpp.py",
+            ("$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57l.dat"
+                if endian == "little"
+                else "$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57b.dat"),
+        ],
+        action="$PYTHON ${SOURCES[0]} -o $TARGET -i ${SOURCES[1]}",
+    )
+
+    icuEnv.Alias("generated-sources", generateICUInit)
+
+    icuEnv.InjectThirdPartyIncludePaths("icu")
+
+    # Since we are injecting the third-party ICU headers, we must also copy the same defines that we
+    # use to configure ICU when building ICU sources. See comment in
+    # src/third_party/icu4c-57.1/source/SConscript.
+    icuEnv.Append(
+        CPPDEFINES=[
+            ("UCONFIG_ONLY_COLLATION", 1),
+            ("U_CHARSET_IS_UTF8", 1),
+            ("U_DISABLE_RENAMING", 1),
+            ("U_STATIC_IMPLEMENTATION", 1),
+            ("U_USING_ICU_NAMESPACE", 0),
+        ],
+    )
+
+icuEnv.Library(
+    target="collator_icu",
+    source=[
+        "collator_factory_icu.cpp",
+        "collator_interface_icu.cpp",
+        "icu_init.cpp" if not use_system_version_of_library("icu") else "icu_init_stub.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/third_party/shim_icu",
+        "collator_factory_interface",
+    ],
+)
+
+icuEnv.CppUnitTest(
+    target="collator_interface_icu_test",
+    source=[
+        "collator_interface_icu_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_icu",
+    ],
+)

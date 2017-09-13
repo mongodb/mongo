@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <cstdint>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -35,7 +36,6 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/rpc/command_reply.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -51,12 +51,10 @@ using std::end;
 class ReplyTest : public mongo::unittest::Test {
 protected:
     std::vector<char> _cmdData{};
-    // using unique ptr so we can destroy and replace easily
-    // since message does not have operator= or swap defined...
-    std::unique_ptr<Message> _message{};
+    Message _message{};
 
     virtual void setUp() override {
-        _message = stdx::make_unique<Message>();
+        _message.reset();
     }
 
     virtual void tearDown() override {
@@ -73,53 +71,30 @@ protected:
 
     const Message* buildMessage() {
         _cmdData.shrink_to_fit();
-        _message->setData(dbCommandReply, _cmdData.data(), _cmdData.size());
-        return _message.get();
+        _message.setData(dbCommandReply, _cmdData.data(), _cmdData.size());
+        return &_message;
     }
 };
 
 TEST_F(ReplyTest, ParseAllFields) {
-    BSONObjBuilder metadataBob{};
-    metadataBob.append("foo", "bar");
-    auto metadata = metadataBob.done();
-    writeObj(metadata);
-
     BSONObjBuilder commandReplyBob{};
     commandReplyBob.append("baz", "garply");
     auto commandReply = commandReplyBob.done();
     writeObj(commandReply);
 
-    BSONObjBuilder outputDoc1Bob{};
-    outputDoc1Bob.append("meep", "boop").append("meow", "chirp");
-    auto outputDoc1 = outputDoc1Bob.done();
-    writeObj(outputDoc1);
-
-    BSONObjBuilder outputDoc2Bob{};
-    outputDoc1Bob.append("bleep", "bop").append("woof", "squeak");
-    auto outputDoc2 = outputDoc2Bob.done();
-    writeObj(outputDoc2);
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    writeObj(metadata);
 
     rpc::CommandReply opCmdReply{buildMessage()};
 
-    ASSERT_EQUALS(opCmdReply.getMetadata(), metadata);
-    ASSERT_EQUALS(opCmdReply.getCommandReply(), commandReply);
-
-    auto outputDocRange = opCmdReply.getOutputDocs();
-    auto outputDocRangeIter = outputDocRange.begin();
-
-    ASSERT_EQUALS(*outputDocRangeIter, outputDoc1);
-    // can't use assert equals since we don't have an op to print the iter.
-    ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
-    ++outputDocRangeIter;
-    ASSERT_EQUALS(*outputDocRangeIter, outputDoc2);
-    ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
-    ++outputDocRangeIter;
-
-    ASSERT_TRUE(outputDocRangeIter == outputDocRange.end());
+    ASSERT_BSONOBJ_EQ(opCmdReply.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(opCmdReply.getCommandReply(), commandReply);
 }
 
 TEST_F(ReplyTest, EmptyMessageThrows) {
-    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, AssertionException);
 }
 
 TEST_F(ReplyTest, MetadataOnlyThrows) {
@@ -128,7 +103,7 @@ TEST_F(ReplyTest, MetadataOnlyThrows) {
     auto metadata = metadataBob.done();
     writeObj(metadata);
 
-    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, AssertionException);
 }
 
 TEST_F(ReplyTest, MetadataInvalidLengthThrows) {
@@ -145,7 +120,7 @@ TEST_F(ReplyTest, MetadataInvalidLengthThrows) {
     auto commandReply = commandReplyBob.done();
     writeObj(commandReply);
 
-    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, AssertionException);
 }
 
 TEST_F(ReplyTest, InvalidLengthThrows) {
@@ -163,6 +138,6 @@ TEST_F(ReplyTest, InvalidLengthThrows) {
     DataView(const_cast<char*>(commandReply.objdata())).write<LittleEndian<int32_t>>(100000);
     writeObj(commandReply, trueSize);
 
-    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
+    ASSERT_THROWS(rpc::CommandReply{buildMessage()}, AssertionException);
 }
 }

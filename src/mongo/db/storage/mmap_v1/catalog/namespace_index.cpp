@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -44,6 +44,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -51,8 +52,10 @@ using std::endl;
 using std::list;
 using std::string;
 
-NamespaceIndex::NamespaceIndex(const std::string& dir, const std::string& database)
-    : _dir(dir), _database(database), _ht(nullptr) {}
+NamespaceIndex::NamespaceIndex(OperationContext* opCtx,
+                               const std::string& dir,
+                               const std::string& database)
+    : _dir(dir), _database(database), _f(opCtx, MongoFile::Options::SEQUENTIAL), _ht(nullptr) {}
 
 NamespaceIndex::~NamespaceIndex() {}
 
@@ -65,33 +68,38 @@ NamespaceDetails* NamespaceIndex::details(const Namespace& ns) const {
     return _ht->get(ns);
 }
 
-void NamespaceIndex::add_ns(OperationContext* txn, StringData ns, const DiskLoc& loc, bool capped) {
+void NamespaceIndex::add_ns(OperationContext* opCtx,
+                            StringData ns,
+                            const DiskLoc& loc,
+                            bool capped) {
     NamespaceDetails details(loc, capped);
-    add_ns(txn, ns, &details);
+    add_ns(opCtx, ns, &details);
 }
 
-void NamespaceIndex::add_ns(OperationContext* txn, StringData ns, const NamespaceDetails* details) {
+void NamespaceIndex::add_ns(OperationContext* opCtx,
+                            StringData ns,
+                            const NamespaceDetails* details) {
     Namespace n(ns);
-    add_ns(txn, n, details);
+    add_ns(opCtx, n, details);
 }
 
-void NamespaceIndex::add_ns(OperationContext* txn,
+void NamespaceIndex::add_ns(OperationContext* opCtx,
                             const Namespace& ns,
                             const NamespaceDetails* details) {
     const NamespaceString nss(ns.toString());
-    invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
     massert(17315, "no . in ns", nsIsFull(nss.toString()));
 
-    uassert(10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
+    uassert(10081, "too many namespaces/collections", _ht->put(opCtx, ns, *details));
 }
 
-void NamespaceIndex::kill_ns(OperationContext* txn, StringData ns) {
+void NamespaceIndex::kill_ns(OperationContext* opCtx, StringData ns) {
     const NamespaceString nss(ns.toString());
-    invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
     const Namespace n(ns);
-    _ht->kill(txn, n);
+    _ht->kill(opCtx, n);
 
     if (ns.size() <= Namespace::MaxNsColletionLen) {
         // Larger namespace names don't have room for $extras so they can't exist. The code
@@ -100,7 +108,7 @@ void NamespaceIndex::kill_ns(OperationContext* txn, StringData ns) {
         for (int i = 0; i <= 1; i++) {
             try {
                 Namespace extra(n.extraName(i));
-                _ht->kill(txn, extra);
+                _ht->kill(opCtx, extra);
             } catch (DBException&) {
                 LOG(3) << "caught exception in kill_ns" << endl;
             }
@@ -145,7 +153,7 @@ void NamespaceIndex::maybeMkdir() const {
                                            "create dir for db ");
 }
 
-void NamespaceIndex::init(OperationContext* txn) {
+void NamespaceIndex::init(OperationContext* opCtx) {
     invariant(!_ht.get());
 
     unsigned long long len = 0;
@@ -156,7 +164,7 @@ void NamespaceIndex::init(OperationContext* txn) {
     void* p = 0;
 
     if (boost::filesystem::exists(nsPath)) {
-        if (_f.open(pathString, true)) {
+        if (_f.open(opCtx, pathString)) {
             len = _f.length();
 
             if (len % (1024 * 1024) != 0) {
@@ -171,6 +179,10 @@ void NamespaceIndex::init(OperationContext* txn) {
             p = _f.getView();
         }
     } else {
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot create a database in read-only mode.",
+                !storageGlobalParams.readOnly);
+
         // use mmapv1GlobalOptions.lenForNewNsFiles, we are making a new database
         massert(10343,
                 "bad mmapv1GlobalOptions.lenForNewNsFiles",
@@ -181,6 +193,7 @@ void NamespaceIndex::init(OperationContext* txn) {
         unsigned long long l = mmapv1GlobalOptions.lenForNewNsFiles;
         log() << "allocating new ns file " << pathString << ", filling with zeroes..." << endl;
 
+        Timer timer;
         {
             // Due to SERVER-15369 we need to explicitly write zero-bytes to the NS file.
             const unsigned long long kBlockSize = 1024 * 1024;
@@ -211,7 +224,7 @@ void NamespaceIndex::init(OperationContext* txn) {
             massert(18826, str::stream() << "failure writing file " << pathString, !file.bad());
         }
 
-        if (_f.create(pathString, l, true)) {
+        if (_f.create(opCtx, pathString, l)) {
             // The writes done in this function must not be rolled back. This will leave the
             // file empty, but available for future use. That is why we go directly to the
             // global dur dirty list rather than going through the OperationContext.
@@ -220,13 +233,17 @@ void NamespaceIndex::init(OperationContext* txn) {
             // Commit the journal and all changes to disk so that even if exceptions occur
             // during subsequent initialization, we won't have uncommited changes during file
             // close.
-            getDur().commitNow(txn);
+            getDur().commitNow(opCtx);
 
             len = l;
             invariant(len == mmapv1GlobalOptions.lenForNewNsFiles);
 
             p = _f.getView();
         }
+
+        log() << "done allocating ns file " << pathString << ", "
+              << "size: " << (len / 1024 / 1024) << "MB, "
+              << "took " << static_cast<double>(timer.millis()) / 1000.0 << " seconds";
     }
 
     if (p == 0) {

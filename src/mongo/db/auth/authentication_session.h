@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-class ClientBasic;
+class Client;
 
 /**
  * Abstract type representing an ongoing authentication session.
@@ -52,12 +52,12 @@ public:
     /**
      * Sets the authentication session for the given "client" to "newSession".
      */
-    static void set(ClientBasic* client, std::unique_ptr<AuthenticationSession> newSession);
+    static void set(Client* client, std::unique_ptr<AuthenticationSession> newSession);
 
     /**
      * Swaps "client"'s current authentication session with "other".
      */
-    static void swap(ClientBasic* client, std::unique_ptr<AuthenticationSession>& other);
+    static void swap(Client* client, std::unique_ptr<AuthenticationSession>& other);
 
     virtual ~AuthenticationSession() = default;
 

@@ -59,11 +59,14 @@ inline bool operator==(const Document& lhs, const BSONObj& rhs) {
     return checkDoc(lhs, rhs);
 }
 
+/** Stream out an constelement; useful within ASSERT calls */
+std::ostream& operator<<(std::ostream& stream, const ConstElement& elt);
+
 /** Stream out a document; useful within ASSERT calls */
 std::ostream& operator<<(std::ostream& stream, const Document& doc);
 
 /** Stream out an element; useful within ASSERT calls */
-std::ostream& operator<<(std::ostream& stream, const ConstElement& elt);
+std::ostream& operator<<(std::ostream& stream, const Element& elt);
 
 /** Check that the two provided Documents are equivalent modulo field ordering in Object
  *  Elements. Leaf values are considered equal via woCompare.

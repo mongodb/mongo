@@ -41,35 +41,34 @@ namespace mongo {
 
 TEST(MatchExpressionParserTreeTest, OR1) {
     BSONObj query = BSON("$or" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("y" << 2)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("y" << 1)));
-
-    delete result.getValue();
 }
 
 TEST(MatchExpressionParserTreeTest, OREmbedded) {
     BSONObj query1 = BSON("$or" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
     BSONObj query2 = BSON("$or" << BSON_ARRAY(query1));
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query2);
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query2, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("y" << 2)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("y" << 1)));
-
-    delete result.getValue();
 }
 
 
 TEST(MatchExpressionParserTreeTest, AND1) {
     BSONObj query = BSON("$and" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -78,113 +77,36 @@ TEST(MatchExpressionParserTreeTest, AND1) {
     ASSERT(!result.getValue()->matchesBSON(BSON("y" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1 << "y" << 2)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2 << "y" << 2)));
-
-    delete result.getValue();
 }
 
 TEST(MatchExpressionParserTreeTest, NOREmbedded) {
     BSONObj query = BSON("$nor" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(!result.getValue()->matchesBSON(BSON("y" << 2)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
     ASSERT(result.getValue()->matchesBSON(BSON("y" << 1)));
-
-    delete result.getValue();
 }
 
 TEST(MatchExpressionParserTreeTest, NOT1) {
     BSONObj query = BSON("x" << BSON("$not" << BSON("$gt" << 5)));
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 8)));
-
-    delete result.getValue();
-}
-
-// Test a deep match tree that is not deep enough to hit the maximum depth limit.
-TEST(MatchExpressionParserTreeTest, MaximumTreeDepthNotExceed) {
-    static const int depth = 60;
-
-    std::stringstream ss;
-    for (int i = 0; i < depth / 2; i++) {
-        ss << "{$and: [{a: 3}, {$or: [{b: 2},";
-    }
-    ss << "{b: 4}";
-    for (int i = 0; i < depth / 2; i++) {
-        ss << "]}]}";
-    }
-
-    BSONObj query = fromjson(ss.str());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
-    ASSERT(result.isOK());
-    delete result.getValue();
-}
-
-// Test a tree that exceeds the maximum depth limit.
-TEST(MatchExpressionParserTreeTest, MaximumTreeDepthExceed) {
-    static const int depth = 105;
-
-    std::stringstream ss;
-    for (int i = 0; i < depth / 2; i++) {
-        ss << "{$and: [{a: 3}, {$or: [{b: 2},";
-    }
-    ss << "{b: 4}";
-    for (int i = 0; i < depth / 2; i++) {
-        ss << "]}]}";
-    }
-
-    BSONObj query = fromjson(ss.str());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
-    ASSERT_FALSE(result.isOK());
-}
-
-// We should also exceed the depth limit through deeply nested $not.
-TEST(MatchExpressionParserTreeTest, MaximumTreeDepthExceededNestedNots) {
-    static const int depth = 105;
-
-    std::stringstream ss;
-    ss << "{a: ";
-    for (int i = 0; i < depth; i++) {
-        ss << "{$not: ";
-    }
-    ss << "{$eq: 5}";
-    for (int i = 0; i < depth + 1; i++) {
-        ss << "}";
-    }
-
-    BSONObj query = fromjson(ss.str());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
-    ASSERT_FALSE(result.isOK());
-}
-
-// Depth limit with nested $elemMatch object.
-TEST(MatchExpressionParserTreeTest, MaximumTreeDepthExceededNestedElemMatch) {
-    static const int depth = 105;
-
-    std::stringstream ss;
-    for (int i = 0; i < depth; i++) {
-        ss << "{a: {$elemMatch: ";
-    }
-    ss << "{b: 5}";
-    for (int i = 0; i < depth; i++) {
-        ss << "}}";
-    }
-
-    BSONObj query = fromjson(ss.str());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
-    ASSERT_FALSE(result.isOK());
 }
 
 TEST(MatchExpressionParserLeafTest, NotRegex1) {
     BSONObjBuilder b;
     b.appendRegex("$not", "abc", "i");
     BSONObj query = BSON("x" << b.obj());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x"
@@ -193,7 +115,5 @@ TEST(MatchExpressionParserLeafTest, NotRegex1) {
                                                 << "ABC")));
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "AC")));
-
-    delete result.getValue();
 }
 }

@@ -28,11 +28,15 @@
 
 #pragma once
 
+#include <memory>
 
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
+class ClockSource;
+class Date_t;
 class MmapV1RecordHeader;
 
 /**
@@ -46,7 +50,7 @@ class RecordAccessTracker {
     MONGO_DISALLOW_COPYING(RecordAccessTracker);
 
 public:
-    RecordAccessTracker();
+    RecordAccessTracker(ClockSource* cs);
 
     enum Constants {
         SliceSize = 1024,
@@ -111,13 +115,10 @@ private:
          */
         bool put(int regionHash, size_t region, short offset);
 
-        time_t lastReset() const;
-
     private:
         Entry* _get(int start, size_t region, bool add);
 
         Entry _data[SliceSize];
-        time_t _lastReset;
     };
 
     /**
@@ -127,7 +128,7 @@ private:
      */
     class Rolling {
     public:
-        Rolling();
+        Rolling() = default;
 
         /**
          * After this call, we assume the page is in RAM.
@@ -136,13 +137,18 @@ private:
          *
          * @return whether we know the page is in RAM
          */
-        bool access(size_t region, short offset, bool doHalf);
+        bool access(size_t region, short offset, bool doHalf, ClockSource* cs);
+
+        /**
+         * Updates _lastRotate to the current time.
+         */
+        void updateLastRotate(ClockSource* cs);
 
     private:
-        void _rotate();
+        void _rotate(ClockSource* cs);
 
-        int _curSlice;
-        long long _lastRotate;
+        int _curSlice = 0;
+        Date_t _lastRotate;
         Slice _slices[NumSlices];
 
         SimpleMutex _lock;
@@ -150,6 +156,7 @@ private:
 
     // Should this record tracker fallback to making a system call?
     bool _blockSupported;
+    ClockSource* _clock;
 
     // An array of Rolling instances for tracking record accesses.
     std::unique_ptr<Rolling[]> _rollingTable;

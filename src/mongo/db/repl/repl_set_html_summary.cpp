@@ -32,8 +32,8 @@
 
 #include "mongo/db/repl/repl_set_html_summary.h"
 
-#include <string>
 #include <sstream>
+#include <string>
 
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/mongoutils/str.h"
@@ -138,7 +138,7 @@ const std::string ReplSetHtmlSummary::toHtmlString() const {
 
     for (int i = 0; i < _config.getNumMembers(); ++i) {
         const MemberConfig& memberConfig = _config.getMemberAt(i);
-        const MemberHeartbeatData& memberHB = _hbData[i];
+        const MemberData& memberHB = _memberData[i];
         bool isSelf = _selfIndex == i;
         bool up = memberHB.getHealth() > 0;
 
@@ -185,8 +185,9 @@ const std::string ReplSetHtmlSummary::toHtmlString() const {
             }
             memberTable << td(grey(memberHB.getLastHeartbeatMsg(), !up));
             // TODO(dannenberg): change timestamp to optime in V1
-            memberTable << td(
-                memberHB.getLastHeartbeat() == Date_t() ? "?" : memberHB.getOpTime().toString());
+            memberTable << td(memberHB.getLastHeartbeat() == Date_t()
+                                  ? "?"
+                                  : memberHB.getHeartbeatAppliedOpTime().toString());
         }
         memberTable << _tr();
     }
@@ -200,7 +201,7 @@ const std::string ReplSetHtmlSummary::toHtmlString() const {
     const MemberConfig& selfConfig = _config.getMemberAt(_selfIndex);
 
     if (_primaryIndex >= 0 && _primaryIndex != _selfIndex && !selfConfig.isArbiter()) {
-        int lag = _hbData[_primaryIndex].getOpTime().getTimestamp().getSecs() -
+        int lag = _memberData[_primaryIndex].getHeartbeatAppliedOpTime().getTimestamp().getSecs() -
             _selfOptime.getTimestamp().getSecs();
         s << tr("Lag: ", str::stream() << lag << " secs");
     }

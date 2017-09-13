@@ -153,8 +153,8 @@ S2LatLngRect S2Cap::GetRectBound() const {
     double sin_c = cos(axis_ll.lat().radians());
     if (sin_a <= sin_c) {
       double angle_A = asin(sin_a / sin_c);
-      lng[0] = drem(axis_ll.lng().radians() - angle_A, 2 * M_PI);
-      lng[1] = drem(axis_ll.lng().radians() + angle_A, 2 * M_PI);
+      lng[0] = remainder(axis_ll.lng().radians() - angle_A, 2 * M_PI);
+      lng[1] = remainder(axis_ll.lng().radians() + angle_A, 2 * M_PI);
     }
   }
   return S2LatLngRect(R1Interval(lat[0], lat[1]),

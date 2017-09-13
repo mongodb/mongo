@@ -58,21 +58,14 @@ public:
     // DBClientBase methods
     //
 
-    bool connect(const char* hostName, std::string& errmsg);
+    bool connect(const char* hostName, StringData applicationName, std::string& errmsg);
 
-    inline bool connect(const HostAndPort& host, std::string& errmsg) {
-        return connect(host.toString().c_str(), errmsg);
+    inline bool connect(const HostAndPort& host, StringData applicationName, std::string& errmsg) {
+        return connect(host.toString().c_str(), applicationName, errmsg);
     }
 
-    bool runCommand(const std::string& dbname,
-                    const mongo::BSONObj& cmdObj,
-                    mongo::BSONObj& info,
-                    int options = 0);
-
-    rpc::UniqueReply runCommandWithMetadata(StringData database,
-                                            StringData command,
-                                            const BSONObj& metadata,
-                                            const BSONObj& commandArgs) final;
+    using DBClientBase::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
 
     std::unique_ptr<mongo::DBClientCursor> query(const std::string& ns,
                                                  mongo::Query query = mongo::Query(),
@@ -87,8 +80,6 @@ public:
     virtual void insert(const std::string& ns, BSONObj obj, int flags = 0);
 
     virtual void insert(const std::string& ns, const std::vector<BSONObj>& objList, int flags = 0);
-
-    virtual void remove(const std::string& ns, Query query, bool justOne = false);
 
     virtual void remove(const std::string& ns, Query query, int flags = 0);
 
@@ -121,14 +112,12 @@ public:
     // Unsupported methods (these are pure virtuals in the base class)
     //
 
-    void killCursor(long long cursorID);
-    bool callRead(mongo::Message& toSend, mongo::Message& response);
+    void killCursor(const NamespaceString& ns, long long cursorID);
     bool call(mongo::Message& toSend,
               mongo::Message& response,
-              bool assertOk = true,
-              std::string* actualServer = 0);
+              bool assertOk,
+              std::string* actualServer);
     void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    void sayPiggyBack(mongo::Message& toSend);
     bool lazySupported() const;
 
 private:

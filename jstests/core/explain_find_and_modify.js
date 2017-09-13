@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of collection existing when none
+// expected.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
 /**
  * Test correctness of explaining findAndModify. Asserts the following:
  *
@@ -15,8 +19,9 @@
     // Different types of findAndModify explain requests.
     var explainRemove = {explain: {findAndModify: cName, remove: true, query: {_id: 0}}};
     var explainUpdate = {explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}}};
-    var explainUpsert = {explain:
-        {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}, upsert: true}};
+    var explainUpsert = {
+        explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}, upsert: true}
+    };
 
     // 1. Explaining findAndModify should never create a database.
 
@@ -71,9 +76,8 @@
     assert.eq(t.findOne(), onlyDoc, "Explaining an update should not update any documents.");
 
     // Explaining an upsert should not insert anything.
-    var matchingUpsertCmd = {
-        findAndModify: cName, update: {x: "x"}, query: {_id: "non-match"}, upsert: true
-    };
+    var matchingUpsertCmd =
+        {findAndModify: cName, update: {x: "x"}, query: {_id: "non-match"}, upsert: true};
     var res = db.runCommand({explain: matchingUpsertCmd});
     assert.commandWorked(res);
     assert.eq(t.find().itcount(), 1, "Explaining an upsert should not insert any documents.");
@@ -85,139 +89,105 @@
     var testCases = [
         // -------------------------------------- Removes ----------------------------------------
         {
-            // Non-matching remove command.
-            cmd: {remove: true, query: {_id: "no-match"}},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 0,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "DELETE",
-                        nWouldDelete: 0
-                    }
-                }
-            }
+          // Non-matching remove command.
+          cmd: {remove: true, query: {_id: "no-match"}},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 0,
+                  executionSuccess: true,
+                  executionStages: {stage: "DELETE", nWouldDelete: 0}
+              }
+          }
         },
         {
-            // Matching remove command.
-            cmd: {remove: true, query: {_id: onlyDoc._id}},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 1,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "DELETE",
-                        nWouldDelete: 1
-                    }
-                }
-            }
+          // Matching remove command.
+          cmd: {remove: true, query: {_id: onlyDoc._id}},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 1,
+                  executionSuccess: true,
+                  executionStages: {stage: "DELETE", nWouldDelete: 1}
+              }
+          }
         },
         // -------------------------------------- Updates ----------------------------------------
         {
-            // Non-matching update query.
-            cmd: {update: {$inc: {i: 1}}, query: {_id: "no-match"}},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 0,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "UPDATE",
-                        nWouldModify: 0,
-                        wouldInsert: false
-                    }
-                }
-            }
+          // Non-matching update query.
+          cmd: {update: {$inc: {i: 1}}, query: {_id: "no-match"}},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 0,
+                  executionSuccess: true,
+                  executionStages: {stage: "UPDATE", nWouldModify: 0, wouldInsert: false}
+              }
+          }
         },
         {
-            // Non-matching update query, returning new doc.
-            cmd: {update: {$inc: {i: 1}}, query: {_id: "no-match"}, new: true},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 0,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "UPDATE",
-                        nWouldModify: 0,
-                        wouldInsert: false
-                    }
-                }
-            }
+          // Non-matching update query, returning new doc.
+          cmd: {update: {$inc: {i: 1}}, query: {_id: "no-match"}, new: true},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 0,
+                  executionSuccess: true,
+                  executionStages: {stage: "UPDATE", nWouldModify: 0, wouldInsert: false}
+              }
+          }
         },
         {
-            // Matching update query.
-            cmd: {update: {$inc: {i: 1}}, query: {_id: onlyDoc._id}},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 1,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "UPDATE",
-                        nWouldModify: 1,
-                        wouldInsert: false
-                    }
-                }
-            }
+          // Matching update query.
+          cmd: {update: {$inc: {i: 1}}, query: {_id: onlyDoc._id}},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 1,
+                  executionSuccess: true,
+                  executionStages: {stage: "UPDATE", nWouldModify: 1, wouldInsert: false}
+              }
+          }
         },
         {
-            // Matching update query, returning new doc.
-            cmd: {update: {$inc: {i: 1}}, query: {_id: onlyDoc._id}, new: true},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 1,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "UPDATE",
-                        nWouldModify: 1,
-                        wouldInsert: false
-                    }
-                }
-            }
+          // Matching update query, returning new doc.
+          cmd: {update: {$inc: {i: 1}}, query: {_id: onlyDoc._id}, new: true},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 1,
+                  executionSuccess: true,
+                  executionStages: {stage: "UPDATE", nWouldModify: 1, wouldInsert: false}
+              }
+          }
         },
         // -------------------------------------- Upserts ----------------------------------------
         {
-            // Non-matching upsert query.
-            cmd: {update: {$inc: {i: 1}}, upsert: true, query: {_id: "no-match"}},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 0,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "UPDATE",
-                        nWouldModify: 0,
-                        wouldInsert: true
-                    }
-                }
-            }
+          // Non-matching upsert query.
+          cmd: {update: {$inc: {i: 1}}, upsert: true, query: {_id: "no-match"}},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 0,
+                  executionSuccess: true,
+                  executionStages: {stage: "UPDATE", nWouldModify: 0, wouldInsert: true}
+              }
+          }
         },
         {
-            // Non-matching upsert query, returning new doc.
-            cmd: {update: {$inc: {i: 1}}, upsert: true, query: {_id: "no-match"}, new: true},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 1,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "UPDATE",
-                        nWouldModify: 0,
-                        wouldInsert: true
-                    }
-                }
-            }
+          // Non-matching upsert query, returning new doc.
+          cmd: {update: {$inc: {i: 1}}, upsert: true, query: {_id: "no-match"}, new: true},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 1,
+                  executionSuccess: true,
+                  executionStages: {stage: "UPDATE", nWouldModify: 0, wouldInsert: true}
+              }
+          }
         },
         {
-            // Matching upsert query, returning new doc.
-            cmd: {update: {$inc: {i: 1}}, upsert: true, query: {_id: onlyDoc._id}, new: true},
-            expectedResult: {
-                executionStats: {
-                    nReturned: 1,
-                    executionSuccess: true,
-                    executionStages: {
-                        stage: "UPDATE",
-                        nWouldModify: 1,
-                        wouldInsert: false
-                    }
-                }
-            }
+          // Matching upsert query, returning new doc.
+          cmd: {update: {$inc: {i: 1}}, upsert: true, query: {_id: onlyDoc._id}, new: true},
+          expectedResult: {
+              executionStats: {
+                  nReturned: 1,
+                  executionSuccess: true,
+                  executionStages: {stage: "UPDATE", nWouldModify: 1, wouldInsert: false}
+              }
+          }
         }
     ];
 
@@ -294,18 +264,13 @@
                    preMsg + "Explain's output does not have a value for " + key);
             if (typeof expectedMatches[key] === "object") {
                 // Sub-doc, recurse to match on it's fields
-                assertExplainResultsMatch(explainOut[key],
-                                          expectedMatches[key],
-                                          preMsg,
-                                          totalFieldName);
-            }
-            else {
-                assert.eq(
-                    explainOut[key],
-                    expectedMatches[key],
-                    preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
-                             " does not match expected value (" + expectedMatches[key] + ")."
-                );
+                assertExplainResultsMatch(
+                    explainOut[key], expectedMatches[key], preMsg, totalFieldName);
+            } else {
+                assert.eq(explainOut[key],
+                          expectedMatches[key],
+                          preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
+                              " does not match expected value (" + expectedMatches[key] + ").");
             }
         });
     }
@@ -340,8 +305,7 @@
     }
 
     function assertCollDoesNotExist(cName, msg) {
-        assert.eq(db.getCollectionNames().indexOf(cName),
-                  -1,
-                  msg + "collection " + cName + " exists.");
+        assert.eq(
+            db.getCollectionNames().indexOf(cName), -1, msg + "collection " + cName + " exists.");
     }
 })();

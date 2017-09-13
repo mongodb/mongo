@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/record_store_test_harness.h"
 
 
@@ -36,27 +38,27 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+namespace {
+
 using std::set;
 using std::string;
 using std::stringstream;
 using std::vector;
-
-namespace mongo {
-
 using std::unique_ptr;
 
 // Create multiple iterators over an empty record store.
 TEST(RecordStoreTestHarness, GetManyIteratorsEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         for (auto&& cursor : rs->getManyCursors(opCtx.get())) {
             ASSERT(!cursor->next());
             ASSERT(!cursor->next());
@@ -66,18 +68,18 @@ TEST(RecordStoreTestHarness, GetManyIteratorsEmpty) {
 
 // Create multiple iterators over a nonempty record store.
 TEST(RecordStoreTestHarness, GetManyIteratorsNonEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record " << i;
@@ -85,7 +87,7 @@ TEST(RecordStoreTestHarness, GetManyIteratorsNonEmpty) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             uow.commit();
@@ -93,13 +95,13 @@ TEST(RecordStoreTestHarness, GetManyIteratorsNonEmpty) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     set<RecordId> remain(locs, locs + nToInsert);
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         for (auto&& cursor : rs->getManyCursors(opCtx.get())) {
             while (auto record = cursor->next()) {
                 ASSERT_EQ(remain.erase(record->id), size_t(1));
@@ -111,4 +113,5 @@ TEST(RecordStoreTestHarness, GetManyIteratorsNonEmpty) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

@@ -28,12 +28,15 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace ClientTests {
@@ -45,15 +48,17 @@ using std::vector;
 class Base {
 public:
     Base(string coll) : _ns("test." + coll) {
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
 
         db.dropDatabase("test");
     }
 
     virtual ~Base() {
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
 
         db.dropCollection(_ns);
     }
@@ -70,19 +75,20 @@ class DropIndex : public Base {
 public:
     DropIndex() : Base("dropindex") {}
     void run() {
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
 
         db.insert(ns(), BSON("x" << 2));
         ASSERT_EQUALS(1u, db.getIndexSpecs(ns()).size());
 
-        ASSERT_OK(dbtests::createIndex(&txn, ns(), BSON("x" << 1)));
+        ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(2u, db.getIndexSpecs(ns()).size());
 
         db.dropIndex(ns(), BSON("x" << 1));
         ASSERT_EQUALS(1u, db.getIndexSpecs(ns()).size());
 
-        ASSERT_OK(dbtests::createIndex(&txn, ns(), BSON("x" << 1)));
+        ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(2u, db.getIndexSpecs(ns()).size());
 
         db.dropIndexes(ns());
@@ -99,10 +105,11 @@ class BuildIndex : public Base {
 public:
     BuildIndex() : Base("buildIndex") {}
     void run() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
 
-        OldClientWriteContext ctx(&txn, ns());
-        DBDirectClient db(&txn);
+        OldClientWriteContext ctx(&opCtx, ns());
+        DBDirectClient db(&opCtx);
 
         db.insert(ns(), BSON("x" << 1 << "y" << 2));
         db.insert(ns(), BSON("x" << 2 << "y" << 2));
@@ -111,19 +118,19 @@ public:
         ASSERT(collection);
         IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&txn));
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&opCtx));
         // _id index
         ASSERT_EQUALS(1U, db.getIndexSpecs(ns()).size());
 
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
-                      dbtests::createIndex(&txn, ns(), BSON("y" << 1), true));
+                      dbtests::createIndex(&opCtx, ns(), BSON("y" << 1), true));
 
-        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&txn));
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&opCtx));
         ASSERT_EQUALS(1U, db.getIndexSpecs(ns()).size());
 
-        ASSERT_OK(dbtests::createIndex(&txn, ns(), BSON("x" << 1), true));
+        ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1), true));
 
-        ASSERT_EQUALS(2, indexCatalog->numIndexesReady(&txn));
+        ASSERT_EQUALS(2, indexCatalog->numIndexesReady(&opCtx));
         ASSERT_EQUALS(2U, db.getIndexSpecs(ns()).size());
     }
 };
@@ -132,15 +139,16 @@ class CS_10 : public Base {
 public:
     CS_10() : Base("CS_10") {}
     void run() {
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
 
         const string longs(770, 'c');
         for (int i = 0; i < 1111; ++i) {
             db.insert(ns(), BSON("a" << i << "b" << longs));
         }
 
-        ASSERT_OK(dbtests::createIndex(&txn, ns(), BSON("a" << 1 << "b" << 1)));
+        ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("a" << 1 << "b" << 1)));
 
         unique_ptr<DBClientCursor> c = db.query(ns(), Query().sort(BSON("a" << 1 << "b" << 1)));
         ASSERT_EQUALS(1111, c->itcount());
@@ -151,8 +159,9 @@ class PushBack : public Base {
 public:
     PushBack() : Base("PushBack") {}
     void run() {
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
 
         for (int i = 0; i < 10; ++i) {
             db.insert(ns(), BSON("i" << i));
@@ -196,8 +205,9 @@ class Create : public Base {
 public:
     Create() : Base("Create") {}
     void run() {
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
 
         db.createCollection("unittests.clienttests.create", 4096, true);
         BSONObj info;
@@ -224,6 +234,154 @@ public:
     }
 };
 
+class CreateSimpleV1Index : public Base {
+public:
+    CreateSimpleV1Index() : Base("CreateSimpleV1Index") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(), IndexSpec().addKey("aField").version(1));
+    }
+};
+
+class CreateSimpleNamedV1Index : public Base {
+public:
+    CreateSimpleNamedV1Index() : Base("CreateSimpleNamedV1Index") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(), IndexSpec().addKey("aField").version(1).name("aFieldV1Index"));
+    }
+};
+
+class CreateCompoundNamedV1Index : public Base {
+public:
+    CreateCompoundNamedV1Index() : Base("CreateCompoundNamedV1Index") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField")
+                           .addKey("bField", IndexSpec::kIndexTypeDescending)
+                           .version(1)
+                           .name("aFieldbFieldV1Index"));
+    }
+};
+
+class CreateUniqueSparseDropDupsIndexInBackground : public Base {
+public:
+    CreateUniqueSparseDropDupsIndexInBackground()
+        : Base("CreateUniqueSparseDropDupsIndexInBackground") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(
+            ns(), IndexSpec().addKey("aField").background().unique().sparse().dropDuplicates());
+    }
+};
+
+class CreateComplexTextIndex : public Base {
+public:
+    CreateComplexTextIndex() : Base("CreateComplexTextIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField", IndexSpec::kIndexTypeText)
+                           .addKey("bField", IndexSpec::kIndexTypeText)
+                           .textWeights(BSON("aField" << 100))
+                           .textDefaultLanguage("spanish")
+                           .textLanguageOverride("lang")
+                           .textIndexVersion(2));
+    }
+};
+
+class Create2DIndex : public Base {
+public:
+    Create2DIndex() : Base("Create2DIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField", IndexSpec::kIndexTypeGeo2D)
+                           .geo2DBits(20)
+                           .geo2DMin(-120.0)
+                           .geo2DMax(120.0));
+    }
+};
+
+class CreateHaystackIndex : public Base {
+public:
+    CreateHaystackIndex() : Base("CreateHaystackIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField", IndexSpec::kIndexTypeGeoHaystack)
+                           .addKey("otherField", IndexSpec::kIndexTypeDescending)
+                           .geoHaystackBucketSize(1.0));
+    }
+};
+
+class Create2DSphereIndex : public Base {
+public:
+    Create2DSphereIndex() : Base("Create2DSphereIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField", IndexSpec::kIndexTypeGeo2DSphere)
+                           .geo2DSphereIndexVersion(2));
+    }
+};
+
+class CreateHashedIndex : public Base {
+public:
+    CreateHashedIndex() : Base("CreateHashedIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(), IndexSpec().addKey("aField", IndexSpec::kIndexTypeHashed));
+    }
+};
+
+class CreateIndexFailure : public Base {
+public:
+    CreateIndexFailure() : Base("CreateIndexFailure") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient db(&opCtx);
+
+        db.createIndex(ns(), IndexSpec().addKey("aField"));
+        ASSERT_THROWS(db.createIndex(ns(), IndexSpec().addKey("aField").unique()),
+                      AssertionException);
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("client") {}
@@ -235,6 +393,16 @@ public:
         add<PushBack>();
         add<Create>();
         add<ConnectionStringTests>();
+        add<CreateSimpleV1Index>();
+        add<CreateSimpleNamedV1Index>();
+        add<CreateCompoundNamedV1Index>();
+        add<CreateUniqueSparseDropDupsIndexInBackground>();
+        add<CreateComplexTextIndex>();
+        add<Create2DIndex>();
+        add<CreateHaystackIndex>();
+        add<Create2DSphereIndex>();
+        add<CreateHashedIndex>();
+        add<CreateIndexFailure>();
     }
 };
 

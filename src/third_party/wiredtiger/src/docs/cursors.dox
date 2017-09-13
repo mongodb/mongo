@@ -1,0 +1,144 @@
+/*! @m_page{{c,java},cursors,Cursors}
+
+Common operations in WiredTiger are performed using WT_CURSOR handles.
+A cursor includes:
+
+- a position within a data source
+- getter/setters for key and value fields
+- encoding of fields to store in the data source
+- methods to navigate within and iterate through the data
+
+See @subpage cursor_ops for a description of how to use cursors.
+
+@section cursor_types Cursor types
+
+@copydoc doc_cursor_types
+
+See the following for more details:
+
+- @subpage data_sources
+- @ref metadata
+- @ref cursor_log
+- @ref cursor_join
+
+@section cursor_projections Projections
+
+Cursors on tables and indices can return a subset of columns.  This is done by
+listing the column names in parenthesis in the <code>uri</code> parameter to
+WT_SESSION::open_cursor.  Only the fields from the listed columns are returned
+by WT_CURSOR::get_value.
+
+The @ex_ref{ex_schema.c} example creates a table where the value format is
+\c "5sHq", where the initial string is the country, the short is a year,
+and the long is a population.  The following example lists just the country
+and year columns from the table record values:
+
+@snippet ex_schema.c Return a subset of values from the table
+
+This is particularly useful with index cursors, because if all columns in
+the projection are available in the index (including primary key columns,
+which are the values of the index), the data can be read from the index
+without accessing any column groups.  See @ref schema_index_projections for
+more information.
+
+@section cursors_transactions Cursors and Transactions
+
+If there is a transaction active in a session, cursors operate in the
+context of that transaction.  Reads performed while a transaction is
+active inherit the isolation level of the transaction, and updates
+performed within a transaction are made durable by calling
+WT_SESSION::commit_transaction, or discarded by calling
+WT_SESSION::rollback_transaction.
+
+If no transaction is active, cursor reads are performed at the isolation
+level of the session, set with the \c isolation configuration key to
+WT_CONNECTION::open_session and successful updates are automatically
+committed before the update operation completes.
+
+Any operation that consists of multiple related updates should be
+enclosed in an explicit transaction to ensure that the updates are
+applied atomically.
+
+At \c read-committed (the default) or \c snapshot isolation levels,
+committed changes from concurrent transactions become visible when no
+cursor is positioned.  In other words, at these isolation levels, all
+cursors in a session read from a stable snapshot while any cursor in the
+session remains positioned.
+
+Cursor positions survive transaction boundaries, unless a transaction
+is rolled back. When a transaction is rolled-back either implicitly
+or explicitly, all cursors in the session are reset as if the
+WT_CURSOR::reset method was called, discarding any cursor position as
+well as any key and value.
+
+See @ref transactions for more information.
+
+@section cursors_eviction Cursors and Eviction
+
+Cursor positions hold resources that can inhibit the eviction of memory
+pages. If a cursor is active on a page being considered for eviction,
+the eviction will defer until the cursor is moved or reset. To avoid
+this and to keep resources freed in general, an application should call
+WT_CURSOR::reset during times it does not need to keep the cursor
+positioned.  A cursor that has been reset is not active and will not
+inhibit eviction.
+
+@section cursor_raw Raw mode
+
+Cursors can be configured for raw mode by specifying the \c "raw" config
+keyword to WT_SESSION::open_cursor.  In this mode, the methods
+WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and
+WT_CURSOR::set_value all take a single
+@m_if{c}
+WT_ITEM
+@m_else
+byte array
+@m_endif
+in the variable-length
+argument list instead of a separate argument for each column.
+
+@m_if{c}
+WT_ITEM structures do not need to be cleared before use.
+
+For WT_CURSOR::get_key and WT_CURSOR::get_value in raw mode, the WT_ITEM
+can be split into columns by calling WT_EXTENSION_API::struct_unpack
+with the cursor's \c key_format or \c value_format, respectively.  For
+WT_CURSOR::set_key and WT_CURSOR::set_value in raw mode, the WT_ITEM
+should be equivalent to calling WT_EXTENSION_API::struct_pack for the
+cursor's \c key_format or \c value_format, respectively.
+
+The @ex_ref{ex_schema.c} example creates a table where the value format is
+\c "5sHq", where the initial string is the country, the short is a year,
+and the long is a population.
+@m_endif
+The following example lists the table record
+values, using raw mode:
+
+@snippet ex_schema.c List the records in the table using raw mode.
+
+Raw mode can be used in combination with projections.  The following
+example lists just the country and year columns from the table record
+values, using raw mode:
+
+@snippet ex_schema.c Return a subset of values from the table using raw mode
+
+@section metadata Reading WiredTiger Metadata
+
+WiredTiger cursors provide access to data from a variety of sources.
+One of these sources is the list of objects in the database.
+
+To retrieve the list of database objects, open a cursor on the uri
+<code>metadata:</code>.  Each returned key will be a database object and
+each returned value will be the information stored in the metadata for
+object named by the key.
+
+For example:
+
+@snippet ex_all.c Open a cursor on the metadata
+
+To retrieve value strings that are valid arguments for calls to
+WT_SESSION::create, open a cursor on <code>metadata:create</code>.
+
+The metadata cursor is read-only, and the metadata cannot be modified.
+
+*/

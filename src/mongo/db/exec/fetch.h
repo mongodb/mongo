@@ -37,44 +37,42 @@
 
 namespace mongo {
 
-class RecordCursor;
+class SeekableRecordCursor;
 
 /**
  * This stage turns a RecordId into a BSONObj.
  *
- * In WorkingSetMember terms, it transitions from LOC_AND_IDX to LOC_AND_UNOWNED_OBJ by reading
- * the record at the provided loc.  Returns verbatim any data that already has an object.
+ * In WorkingSetMember terms, it transitions from RID_AND_IDX to RID_AND_OBJ by reading
+ * the record at the provided RecordId.  Returns verbatim any data that already has an object.
  *
  * Preconditions: Valid RecordId.
  */
 class FetchStage : public PlanStage {
 public:
-    FetchStage(OperationContext* txn,
+    FetchStage(OperationContext* opCtx,
                WorkingSet* ws,
                PlanStage* child,
                const MatchExpression* filter,
                const Collection* collection);
 
-    virtual ~FetchStage();
+    ~FetchStage();
 
-    virtual bool isEOF();
-    virtual StageState work(WorkingSetID* out);
+    bool isEOF() final;
+    StageState doWork(WorkingSetID* out) final;
 
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void doSaveState() final;
+    void doRestoreState() final;
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext() final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
-    virtual std::vector<PlanStage*> getChildren() const;
-
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_FETCH;
     }
 
-    PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats();
 
-    virtual const CommonStats* getCommonStats() const;
-
-    virtual const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
 
@@ -85,17 +83,14 @@ private:
      */
     StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
 
-    OperationContext* _txn;
-
     // Collection which is used by this stage. Used to resolve record ids retrieved by child
     // stages. The lifetime of the collection must supersede that of the stage.
     const Collection* _collection;
     // Used to fetch Records from _collection.
-    std::unique_ptr<RecordCursor> _cursor;
+    std::unique_ptr<SeekableRecordCursor> _cursor;
 
     // _ws is not owned by us.
     WorkingSet* _ws;
-    std::unique_ptr<PlanStage> _child;
 
     // The filter is not owned by us.
     const MatchExpression* _filter;
@@ -104,7 +99,6 @@ private:
     WorkingSetID _idRetrying;
 
     // Stats
-    CommonStats _commonStats;
     FetchStats _specificStats;
 };
 

@@ -30,8 +30,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
-#include "mongo/s/type_lockpings.h"
-#include "mongo/s/type_locks.h"
+#include "mongo/s/catalog/type_lockpings.h"
+#include "mongo/s/catalog/type_locks.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
@@ -89,18 +89,22 @@ public:
     using GetLockByNameFunc = stdx::function<void(StringData name)>;
     using GetServerInfoFunc = stdx::function<void()>;
 
-    virtual StatusWith<LockpingsType> getPing(StringData processID) override;
+    virtual StatusWith<LockpingsType> getPing(OperationContext* opCtx,
+                                              StringData processID) override;
 
-    virtual Status ping(StringData processID, Date_t ping) override;
+    virtual Status ping(OperationContext* opCtx, StringData processID, Date_t ping) override;
 
-    virtual StatusWith<LocksType> grabLock(StringData lockID,
+    virtual StatusWith<LocksType> grabLock(OperationContext* opCtx,
+                                           StringData lockID,
                                            const OID& lockSessionID,
                                            StringData who,
                                            StringData processId,
                                            Date_t time,
-                                           StringData why) override;
+                                           StringData why,
+                                           const WriteConcernOptions& writeConcern) override;
 
-    virtual StatusWith<LocksType> overtakeLock(StringData lockID,
+    virtual StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
+                                               StringData lockID,
                                                const OID& lockSessionID,
                                                const OID& currentHolderTS,
                                                StringData who,
@@ -108,15 +112,22 @@ public:
                                                Date_t time,
                                                StringData why) override;
 
-    virtual Status unlock(const OID& lockSessionID) override;
+    virtual Status unlock(OperationContext* opCtx, const OID& lockSessionID) override;
 
-    virtual StatusWith<ServerInfo> getServerInfo() override;
+    virtual Status unlock(OperationContext* opCtx,
+                          const OID& lockSessionID,
+                          StringData name) override;
 
-    virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) override;
+    virtual Status unlockAll(OperationContext* opCtx, const std::string& processID) override;
 
-    virtual StatusWith<LocksType> getLockByName(StringData name) override;
+    virtual StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) override;
 
-    virtual Status stopPing(StringData processId) override;
+    virtual StatusWith<LocksType> getLockByTS(OperationContext* opCtx,
+                                              const OID& lockSessionID) override;
+
+    virtual StatusWith<LocksType> getLockByName(OperationContext* opCtx, StringData name) override;
+
+    virtual Status stopPing(OperationContext* opCtx, StringData processId) override;
 
     /**
      * Sets the checker method to use and the return value for grabLock to return every

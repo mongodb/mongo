@@ -23,6 +23,7 @@ alter those programs' behavior.
 MongoDB module SConscript files can describe libraries, programs and unit tests, just as other
 MongoDB SConscript files do.
 """
+from __future__ import print_function
 
 __all__ = ('discover_modules', 'discover_module_directories', 'configure_modules',
             'register_module_test')
@@ -53,11 +54,11 @@ def discover_modules(module_root, allowed_modules):
         module = None
 
         if allowed_modules is not None and name not in allowed_modules:
-            print "skipping module: %s" % name
+            print("skipping module: %s" % (name))
             continue
 
         if os.path.isfile(build_py):
-            print "adding module: %s" % name
+            print("adding module: %s" % (name))
             fp = open(build_py, "r")
             try:
                 module = imp.load_module("module_" + name, fp, build_py,
@@ -91,11 +92,11 @@ def discover_module_directories(module_root, allowed_modules):
         build_py = os.path.join(root, 'build.py')
 
         if allowed_modules is not None and name not in allowed_modules:
-            print "skipping module: %s" % name
+            print("skipping module: %s" % (name))
             continue
 
         if os.path.isfile(build_py):
-            print "adding module: %s" % name
+            print("adding module: %s" % (name))
             found_modules.append(name)
 
     return found_modules
@@ -108,7 +109,7 @@ def configure_modules(modules, conf):
     """
     for module in modules:
         name = module.name
-        print "configuring module: %s" % name
+        print("configuring module: %s" % (name))
 
         root = os.path.dirname(module.__file__)
         module.configure(conf, conf.env)

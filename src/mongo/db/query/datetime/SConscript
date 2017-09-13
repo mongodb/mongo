@@ -1,0 +1,40 @@
+# -*- mode: python -*-
+
+Import('env')
+
+env = env.Clone()
+
+timeZoneEnv = env.Clone()
+timeZoneEnv.InjectThirdPartyIncludePaths(libraries=['timelib'])
+timeZoneEnv.Library(
+    target='date_time_support',
+    source=[
+        'date_time_support.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/third_party/shim_timelib',
+    ]
+)
+
+timeZoneEnv.Library(
+    target='init_timezone_data',
+    source=[
+        'init_timezone_data.cpp'
+    ],
+    LIBDEPS=[
+        'date_time_support',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/third_party/shim_timelib',
+    ]
+)
+
+timeZoneEnv.CppUnitTest(
+    target='date_time_support_test',
+    source=[
+        'date_time_support_test.cpp',
+    ],
+    LIBDEPS=[
+        'date_time_support',
+    ]
+)

@@ -34,6 +34,8 @@
 #include <vector>
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 
 namespace mongo {
 
@@ -47,28 +49,32 @@ public:
 
     virtual ~BSONCollectionCatalogEntry() {}
 
-    virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
+    virtual CollectionOptions getCollectionOptions(OperationContext* opCtx) const;
 
-    virtual int getTotalIndexCount(OperationContext* txn) const;
+    virtual int getTotalIndexCount(OperationContext* opCtx) const;
 
-    virtual int getCompletedIndexCount(OperationContext* txn) const;
+    virtual int getCompletedIndexCount(OperationContext* opCtx) const;
 
-    virtual BSONObj getIndexSpec(OperationContext* txn, StringData idxName) const;
+    virtual BSONObj getIndexSpec(OperationContext* opCtx, StringData idxName) const;
 
-    virtual void getAllIndexes(OperationContext* txn, std::vector<std::string>* names) const;
+    virtual void getAllIndexes(OperationContext* opCtx, std::vector<std::string>* names) const;
 
-    virtual bool isIndexMultikey(OperationContext* txn, StringData indexName) const;
+    virtual bool isIndexMultikey(OperationContext* opCtx,
+                                 StringData indexName,
+                                 MultikeyPaths* multikeyPaths) const;
 
-    virtual RecordId getIndexHead(OperationContext* txn, StringData indexName) const;
+    virtual RecordId getIndexHead(OperationContext* opCtx, StringData indexName) const;
 
-    virtual bool isIndexReady(OperationContext* txn, StringData indexName) const;
+    virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const;
+
+    virtual KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const;
 
     // ------ for implementors
 
     struct IndexMetaData {
         IndexMetaData() {}
-        IndexMetaData(BSONObj s, bool r, RecordId h, bool m)
-            : spec(s), ready(r), head(h), multikey(m) {}
+        IndexMetaData(BSONObj s, bool r, RecordId h, bool m, KVPrefix prefix)
+            : spec(s), ready(r), head(h), multikey(m), prefix(prefix) {}
 
         void updateTTLSetting(long long newExpireSeconds);
 
@@ -80,6 +86,13 @@ public:
         bool ready;
         RecordId head;
         bool multikey;
+        KVPrefix prefix = KVPrefix::kNotPrefixed;
+
+        // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in
+        // the index key pattern. Each element in the vector is an ordered set of positions
+        // (starting at 0) into the corresponding indexed field that represent what prefixes of the
+        // indexed field cause the index to be multikey.
+        MultikeyPaths multikeyPaths;
     };
 
     struct MetaData {
@@ -96,12 +109,15 @@ public:
 
         void rename(StringData toNS);
 
+        KVPrefix getMaxPrefix() const;
+
         std::string ns;
         CollectionOptions options;
         std::vector<IndexMetaData> indexes;
+        KVPrefix prefix = KVPrefix::kNotPrefixed;
     };
 
 protected:
-    virtual MetaData _getMetaData(OperationContext* txn) const = 0;
+    virtual MetaData _getMetaData(OperationContext* opCtx) const = 0;
 };
 }

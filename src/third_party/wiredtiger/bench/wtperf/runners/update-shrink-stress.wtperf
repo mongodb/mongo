@@ -1,0 +1,15 @@
+# wtperf options file: Shrink the size of values.  Checkpoint frequently
+# and insert new records too.
+#
+conn_config="cache_size=2GB,checkpoint=(wait=30)"
+table_config="type=file,leaf_page_max=32k,leaf_value_max=128k,split_pct=90"
+# Since we're continually inserting, start with a smaller number initially.
+icount=200000
+report_interval=5
+run_time=240
+populate_threads=1
+# Continue inserting new records.
+threads=((count=1,inserts=1,throttle=1000),(count=4,update=1,update_delta=-100))
+# Start with moderate values and let them shrink slowly.
+value_sz_min=1000
+value_sz=10000

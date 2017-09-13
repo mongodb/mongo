@@ -28,266 +28,36 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/index_spec.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/cstdint.h"
-#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/message_port.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
-/** the query field 'options' can have these bits set: */
-enum QueryOptions {
-    /** Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor
-     * marks the final object's position.  you can resume using the cursor later, from where it was
-       located, if more data were received.  Set on dbQuery and dbGetMore.
-
-       like any "latent cursor", the cursor may become invalid at some point -- for example if that
-       final object it references were deleted.  Thus, you should be prepared to requery if you get
-       back ResultFlag_CursorNotFound.
-    */
-    QueryOption_CursorTailable = 1 << 1,
-
-    /** allow query of replica slave.  normally these return an error except for namespace "local".
-    */
-    QueryOption_SlaveOk = 1 << 2,
-
-    // findingStart mode is used to find the first operation of interest when
-    // we are scanning through a repl log.  For efficiency in the common case,
-    // where the first operation of interest is closer to the tail than the head,
-    // we start from the tail of the log and work backwards until we find the
-    // first operation of interest.  Then we scan forward from that first operation,
-    // actually returning results to the client.  During the findingStart phase,
-    // we release the db mutex occasionally to avoid blocking the db process for
-    // an extended period of time.
-    QueryOption_OplogReplay = 1 << 3,
-
-    /** The server normally times out idle cursors after an inactivity period to prevent excess
-     * memory uses
-        Set this option to prevent that.
-    */
-    QueryOption_NoCursorTimeout = 1 << 4,
-
-    /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while
-     * rather than returning no data. After a timeout period, we do return as normal.
-    */
-    QueryOption_AwaitData = 1 << 5,
-
-    /** Stream the data down full blast in multiple "more" packages, on the assumption that the
-     * client will fully read all data queried.  Faster when you are pulling a lot of data and know
-     * you want to pull it all down.  Note: it is not allowed to not read all the data unless you
-     * close the connection.
-
-        Use the query( stdx::function<void(const BSONObj&)> f, ... ) version of the connection's
-        query()
-        method, and it will take care of all the details for you.
-    */
-    QueryOption_Exhaust = 1 << 6,
-
-    /** When sharded, this means its ok to return partial results
-        Usually we will fail a query if all required shards aren't up
-        If this is set, it'll be a partial result set
-     */
-    QueryOption_PartialResults = 1 << 7,
-
-    QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk |
-        QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData |
-        QueryOption_Exhaust | QueryOption_PartialResults,
-
-    QueryOption_AllSupportedForSharding = QueryOption_CursorTailable | QueryOption_SlaveOk |
-        QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData |
-        QueryOption_PartialResults,
-};
-
-enum UpdateOptions {
-    /** Upsert - that is, insert the item if no matching item is found. */
-    UpdateOption_Upsert = 1 << 0,
-
-    /** Update multiple documents (if multiple documents match query expression).
-       (Default is update a single document and stop.) */
-    UpdateOption_Multi = 1 << 1,
-
-    /** flag from mongo saying this update went everywhere */
-    UpdateOption_Broadcast = 1 << 2
-};
-
-enum RemoveOptions {
-    /** only delete one option */
-    RemoveOption_JustOne = 1 << 0,
-
-    /** flag from mongo saying this update went everywhere */
-    RemoveOption_Broadcast = 1 << 1
-};
-
-enum InsertOptions {
-    /** With muli-insert keep processing inserts if one fails */
-    InsertOption_ContinueOnError = 1 << 0
-};
-
-/**
- * Start from *top* of bits, these are generic write options that apply to all
- */
-enum WriteOptions {
-    /** logical writeback option */
-    WriteOption_FromWriteback = 1 << 31
-};
-
-//
-// For legacy reasons, the reserved field pre-namespace of certain types of messages is used
-// to store options as opposed to the flags after the namespace.  This should be transparent to
-// the api user, but we need these constants to disassemble/reassemble the messages correctly.
-//
-
-enum ReservedOptions {
-    Reserved_InsertOption_ContinueOnError = 1 << 0,
-    Reserved_FromWriteback = 1 << 1
-};
+namespace executor {
+struct RemoteCommandResponse;
+}
 
 class DBClientCursor;
 class DBClientCursorBatchIterator;
-
-/** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a
- * Query object.
-    Examples:
-       QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
-       QUERY( "age" << GT << 30 << LT << 50 )
-*/
-class Query {
-public:
-    static const BSONField<BSONObj> ReadPrefField;
-    static const BSONField<std::string> ReadPrefModeField;
-    static const BSONField<BSONArray> ReadPrefTagsField;
-
-    BSONObj obj;
-    Query() : obj(BSONObj()) {}
-    Query(const BSONObj& b) : obj(b) {}
-    Query(const std::string& json);
-    Query(const char* json);
-
-    /** Add a sort (ORDER BY) criteria to the query expression.
-        @param sortPattern the sort order template.  For example to order by name ascending, time
-            descending:
-          { name : 1, ts : -1 }
-        i.e.
-          BSON( "name" << 1 << "ts" << -1 )
-        or
-          fromjson(" name : 1, ts : -1 ")
-    */
-    Query& sort(const BSONObj& sortPattern);
-
-    /** Add a sort (ORDER BY) criteria to the query expression.
-        This version of sort() assumes you want to sort on a single field.
-        @param asc = 1 for ascending order
-        asc = -1 for descending order
-    */
-    Query& sort(const std::string& field, int asc = 1) {
-        sort(BSON(field << asc));
-        return *this;
-    }
-
-    /** Provide a hint to the query.
-        @param keyPattern Key pattern for the index to use.
-        Example:
-          hint("{ts:1}")
-    */
-    Query& hint(BSONObj keyPattern);
-    Query& hint(const std::string& jsonKeyPatt);
-
-    /** Provide min and/or max index limits for the query.
-        min <= x < max
-     */
-    Query& minKey(const BSONObj& val);
-    /**
-       max is exclusive
-     */
-    Query& maxKey(const BSONObj& val);
-
-    /** Return explain information about execution of this query instead of the actual query
-     * results.
-     *  Normally it is easier to use the mongo shell to run db.find(...).explain().
-     */
-    Query& explain();
-
-    /** Use snapshot mode for the query.  Snapshot mode assures no duplicates are returned, or
-     * objects missed, which were present at both the start and end of the query's execution (if an
-     * object is new during the query, or deleted during the query, it may or may not be returned,
-     * even with snapshot mode).
-
-        Note that short query responses (less than 1MB) are always effectively snapshotted.
-
-        Currently, snapshot mode may not be used with sorting or explicit hints.
-    */
-    Query& snapshot();
-
-    /** Queries to the Mongo database support a $where parameter option which contains
-        a javascript function that is evaluated to see whether objects being queried match
-        its criteria.  Use this helper to append such a function to a query object.
-        Your query may also contain other traditional Mongo query terms.
-
-        @param jscode The javascript function to evaluate against each potential object
-               match.  The function must return true for matched objects.  Use the this
-               variable to inspect the current object.
-        @param scope SavedContext for the javascript object.  List in a BSON object any
-               variables you would like defined when the jscode executes.  One can think
-               of these as "bind variables".
-
-        Examples:
-          conn.findOne("test.coll", Query("{a:3}").where("this.b == 2 || this.c == 3"));
-          Query badBalance = Query().where("this.debits - this.credits < 0");
-    */
-    Query& where(const std::string& jscode, BSONObj scope);
-    Query& where(const std::string& jscode) {
-        return where(jscode, BSONObj());
-    }
-
-    /**
-     * Sets the read preference for this query.
-     *
-     * @param pref the read preference mode for this query.
-     * @param tags the set of tags to use for this query.
-     */
-    Query& readPref(ReadPreference pref, const BSONArray& tags);
-
-    /**
-     * @return true if this query has an orderby, hint, or some other field
-     */
-    bool isComplex(bool* hasDollar = 0) const;
-    static bool isComplex(const BSONObj& obj, bool* hasDollar = 0);
-
-    BSONObj getFilter() const;
-    BSONObj getSort() const;
-    BSONObj getHint() const;
-    bool isExplain() const;
-
-    /**
-     * @return true if the query object contains a read preference specification object.
-     */
-    static bool hasReadPreference(const BSONObj& queryObj);
-
-    std::string toString() const;
-    operator std::string() const {
-        return toString();
-    }
-
-private:
-    void makeComplex();
-    template <class T>
-    void appendComplex(const char* fieldName, const T& val) {
-        makeComplex();
-        BSONObjBuilder b;
-        b.appendElements(obj);
-        b.append(fieldName, val);
-        obj = b.obj();
-    }
-};
 
 /**
  * Represents a full query description, including all options required for the query to be passed on
@@ -369,9 +139,14 @@ public:
     }
 
     std::string toString() const {
-        return str::stream() << "QSpec " << BSON("ns" << _ns << "n2skip" << _ntoskip << "n2return"
-                                                      << _ntoreturn << "options" << _options
-                                                      << "query" << _query << "fields" << _fields);
+        return str::stream() << "QSpec "
+                             << BSON("ns" << _ns << "n2skip" << _ntoskip << "n2return" << _ntoreturn
+                                          << "options"
+                                          << _options
+                                          << "query"
+                                          << _query
+                                          << "fields"
+                                          << _fields);
     }
 };
 
@@ -389,69 +164,19 @@ std::string nsGetDB(const std::string& ns);
 std::string nsGetCollection(const std::string& ns);
 
 /**
-   interface that handles communication with the db
+ abstract class that implements the core db operations
  */
-class DBConnector {
-public:
-    virtual ~DBConnector() {}
-    /** actualServer is set to the actual server where they call went if there was a choice
-     * (SlaveOk) */
-    virtual bool call(Message& toSend,
-                      Message& response,
-                      bool assertOk = true,
-                      std::string* actualServer = 0) = 0;
-    virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0) = 0;
-    virtual void sayPiggyBack(Message& toSend) = 0;
-    /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
-    virtual bool recv(Message& m) {
-        verify(false);
-        return false;
-    }
-    // In general, for lazy queries, we'll need to say, recv, then checkResponse
-    virtual void checkResponse(const char* data,
-                               int nReturned,
-                               bool* retry = NULL,
-                               std::string* targetHost = NULL) {
-        if (retry)
-            *retry = false;
-        if (targetHost)
-            *targetHost = "";
-    }
-    virtual bool lazySupported() const = 0;
-};
-
-/**
-   The interface that any db connection should implement
- */
-class DBClientInterface {
-    MONGO_DISALLOW_COPYING(DBClientInterface);
+class DBClientBase {
+    MONGO_DISALLOW_COPYING(DBClientBase);
 
 public:
-    virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
-                                                  Query query,
-                                                  int nToReturn = 0,
-                                                  int nToSkip = 0,
-                                                  const BSONObj* fieldsToReturn = 0,
-                                                  int queryOptions = 0,
-                                                  int batchSize = 0) = 0;
+    DBClientBase()
+        : _logLevel(logger::LogSeverity::Log()),
+          _connectionId(ConnectionIdSequence.fetchAndAdd(1)),
+          _cachedAvailableOptions((enum QueryOptions)0),
+          _haveCachedAvailableOptions(false) {}
 
-    virtual void insert(const std::string& ns, BSONObj obj, int flags = 0) = 0;
-
-    virtual void insert(const std::string& ns, const std::vector<BSONObj>& v, int flags = 0) = 0;
-
-    virtual void remove(const std::string& ns, Query query, bool justOne = 0) = 0;
-
-    virtual void remove(const std::string& ns, Query query, int flags) = 0;
-
-    virtual void update(const std::string& ns,
-                        Query query,
-                        BSONObj obj,
-                        bool upsert = false,
-                        bool multi = false) = 0;
-
-    virtual void update(const std::string& ns, Query query, BSONObj obj, int flags) = 0;
-
-    virtual ~DBClientInterface() {}
+    virtual ~DBClientBase() {}
 
     /**
        @return a single object that matches the query.  if none do, then the object is empty
@@ -473,31 +198,19 @@ public:
                const BSONObj* fieldsToReturn = 0,
                int queryOptions = 0);
 
+    /**
+     * @return a pair with a single object that matches the filter within the collection specified
+     * by the UUID and the namespace of that collection on the queried node.
+     *
+     * If the command fails, an assertion error is thrown. Otherwise, if no document matches
+     * the query, an empty BSONObj is returned.
+     * @throws AssertionException
+     */
+    virtual std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+                                                              UUID uuid,
+                                                              const BSONObj& filter);
+
     virtual std::string getServerAddress() const = 0;
-
-    /** don't use this - called automatically by DBClientCursor for you */
-    virtual std::unique_ptr<DBClientCursor> getMore(const std::string& ns,
-                                                    long long cursorId,
-                                                    int nToReturn = 0,
-                                                    int options = 0) = 0;
-
-protected:
-    DBClientInterface() = default;
-};
-
-/**
-   DB "commands"
-   Basically just invocations of connection.$cmd.findOne({...});
-*/
-class DBClientWithCommands : public DBClientInterface, public DBConnector {
-public:
-    /** controls how chatty the client is about network errors & such.  See log.h */
-    logger::LogSeverity _logLevel;
-
-    DBClientWithCommands()
-        : _logLevel(logger::LogSeverity::Log()),
-          _cachedAvailableOptions((enum QueryOptions)0),
-          _haveCachedAvailableOptions(false) {}
 
     /** helper function.  run a simple command where the command expression is simply
           { command : 1 }
@@ -511,6 +224,38 @@ public:
     rpc::ProtocolSet getServerRPCProtocols() const;
 
     void setClientRPCProtocols(rpc::ProtocolSet clientProtocols);
+
+    /**
+     * actualServer is set to the actual server where they call went if there was a choice (for
+     * example SlaveOk).
+     */
+    virtual bool call(Message& toSend,
+                      Message& response,
+                      bool assertOk = true,
+                      std::string* actualServer = nullptr) = 0;
+
+    virtual void say(Message& toSend,
+                     bool isRetry = false,
+                     std::string* actualServer = nullptr) = 0;
+
+    /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
+    virtual bool recv(Message& m, int lastRequestId) {
+        verify(false);
+        return false;
+    }
+
+    // In general, for lazy queries, we'll need to say, recv, then checkResponse
+    virtual void checkResponse(const std::vector<BSONObj>& batch,
+                               bool networkError,
+                               bool* retry = nullptr,
+                               std::string* targetHost = nullptr) {
+        if (retry)
+            *retry = false;
+        if (targetHost)
+            *targetHost = "";
+    }
+
+    virtual bool lazySupported() const = 0;
 
     /**
      * Sets a RequestMetadataWriter on this connection.
@@ -541,15 +286,24 @@ public:
     const rpc::ReplyMetadataReader& getReplyMetadataReader();
 
     /**
-     * Runs a database command. This variant allows the caller to manually specify the metadata
-     * for the request, and receive it for the reply.
-     *
-     * TODO: rename this to runCommand, and change the old one to runCommandLegacy.
+     * Runs the specified command request.
      */
-    virtual rpc::UniqueReply runCommandWithMetadata(StringData database,
-                                                    StringData command,
-                                                    const BSONObj& metadata,
-                                                    const BSONObj& commandArgs);
+    virtual std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request);
+
+    /**
+     * Runs the specified command request. This thin wrapper just unwraps the reply and ignores the
+     * target connection from the above runCommandWithTarget().
+     */
+    rpc::UniqueReply runCommand(OpMsgRequest request) {
+        return runCommandWithTarget(std::move(request)).first;
+    }
+
+    /**
+     * Runs the specified command request in fire-and-forget mode and returns the connection that
+     * the command was actually sent on. If the connection doesn't support OP_MSG, the request will
+     * be run as a normal two-way command and the reply will be ignored after parsing.
+     */
+    virtual DBClientBase* runFireAndForgetCommand(OpMsgRequest request);
 
     /** Run a database command.  Database commands are represented as BSON objects.  Common database
         commands have prebuilt helper functions -- see below.  If a helper is not available you can
@@ -564,10 +318,26 @@ public:
 
         @return true if the command returned "ok".
     */
-    virtual bool runCommand(const std::string& dbname,
-                            const BSONObj& cmd,
-                            BSONObj& info,
-                            int options = 0);
+    bool runCommand(const std::string& dbname, BSONObj cmd, BSONObj& info, int options = 0);
+
+    /*
+     * This wraps up the runCommand function avove, but returns the DBClient that actually ran
+     * the command. When called against a replica set, this will return the specific
+     * replica set member the command ran against.
+     *
+     * This is used in the shell so that cursors can send getMore through the correct connection.
+     */
+    std::tuple<bool, DBClientBase*> runCommandWithTarget(const std::string& dbname,
+                                                         BSONObj cmd,
+                                                         BSONObj& info,
+                                                         int options = 0);
+
+    /**
+    * Authenticates to another cluster member using appropriate authentication data.
+    * Uses getInternalUserAuthParams() to retrive authentication parameters.
+    * @return true if the authentication was succesful
+    */
+    bool authenticateInternalUser();
 
     /**
      * Authenticate a user.
@@ -704,37 +474,25 @@ public:
     */
     BSONObj getPrevError();
 
-    /** Reset the previous error state for this connection (accessed via getLastError and
-        getPrevError).  Useful when performing several operations at once and then checking
-        for an error after attempting all operations.
-    */
-    bool resetError() {
-        return simpleCommand("admin", 0, "reseterror");
-    }
-
     /** Delete the specified collection.
      *  @param info An optional output parameter that receives the result object the database
      *  returns from the drop command.  May be null if the caller doesn't need that info.
      */
-    virtual bool dropCollection(const std::string& ns, BSONObj* info = NULL) {
+    virtual bool dropCollection(const std::string& ns,
+                                const WriteConcernOptions& writeConcern = WriteConcernOptions(),
+                                BSONObj* info = nullptr) {
         std::string db = nsGetDB(ns);
         std::string coll = nsGetCollection(ns);
         uassert(10011, "no collection name", coll.size());
 
         BSONObj temp;
-        if (info == NULL) {
+        if (info == nullptr) {
             info = &temp;
         }
 
-        bool res = runCommand(db.c_str(), BSON("drop" << coll), *info);
+        bool res = runCommand(
+            db.c_str(), BSON("drop" << coll << "writeConcern" << writeConcern.toBSON()), *info);
         return res;
-    }
-
-    /** Perform a repair and compaction of the specified database.  May take a long time to run.
-     * Disk space must be available equal to the size of the database while repairing.
-     */
-    bool repairDatabase(const std::string& dbname, BSONObj* info = 0) {
-        return simpleCommand(dbname, info, "repairDatabase");
     }
 
     /** Copy database from one server or name to another server or name.
@@ -822,19 +580,6 @@ public:
     }
 
     /**
-       get a list of all the current databases
-       uses the { listDatabases : 1 } command.
-       throws on error
-     */
-    std::list<std::string> getDatabaseNames();
-
-    /**
-     * Get a list of all the current collections in db.
-     * Returns fully qualified names.
-     */
-    std::list<std::string> getCollectionNames(const std::string& db);
-
-    /**
      * { name : "<short collection name>",
      *   options : { }
      * }
@@ -843,23 +588,28 @@ public:
 
     bool exists(const std::string& ns);
 
-    /** Create an index if it does not already exist.
-       @param ns collection to be indexed
-       @param keys the "key pattern" for the index.  e.g., { name : 1 }
-       @param unique if true, indicates that key uniqueness should be enforced for this index
-       @param name if not specified, it will be created from the keys automatically (which is
-              recommended)
-       @param background build index in the background (see mongodb docs for details)
-       @param v index version. leave at default value. (unit tests set this parameter.)
-       @param ttl. The value of how many seconds before data should be removed from a collection.
+    /** Create an index on the collection 'ns' as described by the given keys. If you wish
+     *  to specify options, see the more flexible overload of 'createIndex' which takes an
+     *  IndexSpec object. Failure to construct the index is reported by throwing a
+     *  AssertionException.
+     *
+     *  @param ns Namespace on which to create the index
+     *  @param keys Document describing keys and index types. You must provide at least one
+     *  field and its direction.
      */
-    virtual void ensureIndex(const std::string& ns,
-                             BSONObj keys,
-                             bool unique = false,
-                             const std::string& name = "",
-                             bool background = false,
-                             int v = -1,
-                             int ttl = 0);
+    void createIndex(StringData ns, const BSONObj& keys) {
+        return createIndex(ns, IndexSpec().addKeys(keys));
+    }
+
+    /** Create an index on the collection 'ns' as described by the given
+     *  descriptor. Failure to construct the index is reported by throwing a
+     *  AssertionException.
+     *
+     *  @param ns Namespace on which to create the index
+     *  @param descriptor Configuration object describing the index to create. The
+     *  descriptor must describe at least one key and index type.
+     */
+    virtual void createIndex(StringData ns, const IndexSpec& descriptor);
 
     virtual std::list<BSONObj> getIndexSpecs(const std::string& ns, int options = 0);
 
@@ -876,8 +626,14 @@ public:
     static std::string genIndexName(const BSONObj& keys);
 
     /** Erase / drop an entire database */
-    virtual bool dropDatabase(const std::string& dbname, BSONObj* info = 0) {
-        return simpleCommand(dbname, info, "dropDatabase");
+    virtual bool dropDatabase(const std::string& dbname,
+                              const WriteConcernOptions& writeConcern = WriteConcernOptions(),
+                              BSONObj* info = nullptr) {
+        BSONObj o;
+        if (info == nullptr)
+            info = &o;
+        return runCommand(
+            dbname, BSON("dropDatabase" << 1 << "writeConcern" << writeConcern.toBSON()), *info);
     }
 
     virtual std::string toString() const = 0;
@@ -901,104 +657,19 @@ public:
                                   BSONObj& info,
                                   int options = 0);
 
-protected:
-    /** if the result of a command is ok*/
-    bool isOk(const BSONObj&);
-
-    /** if the element contains a not master error */
-    bool isNotMasterErrorString(const BSONElement& e);
-
-    BSONObj _countCmd(
-        const std::string& ns, const BSONObj& query, int options, int limit, int skip);
-
     /**
-     * Look up the options available on this client.  Caches the answer from
-     * _lookupAvailableOptions(), below.
+     * Reconnect if needed and allowed.
      */
-    QueryOptions availableOptions();
+    virtual void checkConnection() {}
 
-    virtual QueryOptions _lookupAvailableOptions();
-
-    virtual void _auth(const BSONObj& params);
-
-    /**
-     * Use the MONGODB-CR protocol to authenticate as "username" against the database "dbname",
-     * with the given password.  If digestPassword is false, the password is assumed to be
-     * pre-digested.  Returns false on failure, and sets "errmsg".
-     */
-    bool _authMongoCR(const std::string& dbname,
-                      const std::string& username,
-                      const std::string& pwd,
-                      BSONObj* info,
-                      bool digestPassword);
-
-    /**
-     * Use the MONGODB-X509 protocol to authenticate as "username. The certificate details
-     * has already been communicated automatically as part of the connect call.
-     * Returns false on failure and set "errmsg".
-     */
-    bool _authX509(const std::string& dbname, const std::string& username, BSONObj* info);
-
-    // should be set by subclasses during connection.
-    void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
-
-private:
-    /**
-     * The rpc protocols this client supports.
-     *
-     * TODO: Change to rpc::supports::kAll once OP_COMMAND is implemented in
-     * mongos (SERVER-18292).
-     */
-    rpc::ProtocolSet _clientRPCProtocols{rpc::supports::kOpQueryOnly};
-
-    /**
-     * The rpc protocol the remote server(s) support.
-     *
-     * TODO: implement proper detection of RPC protocol support when OP_COMMAND
-     * is implemented in mongos (SERVER-18292).
-     */
-    rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kAll};
-
-    rpc::RequestMetadataWriter _metadataWriter;
-    rpc::ReplyMetadataReader _metadataReader;
-
-    enum QueryOptions _cachedAvailableOptions;
-    bool _haveCachedAvailableOptions;
-};
-
-/**
- abstract class that implements the core db operations
- */
-class DBClientBase : public DBClientWithCommands {
-protected:
-    static AtomicInt64 ConnectionIdSequence;
-    long long _connectionId;  // unique connection id for this connection
-    int _minWireVersion;
-    int _maxWireVersion;
-
-public:
     static const uint64_t INVALID_SOCK_CREATION_TIME;
-
-    DBClientBase() {
-        _connectionId = ConnectionIdSequence.fetchAndAdd(1);
-        _minWireVersion = _maxWireVersion = 0;
-    }
 
     long long getConnectionId() const {
         return _connectionId;
     }
 
-    void setWireVersions(int minWireVersion, int maxWireVersion) {
-        _minWireVersion = minWireVersion;
-        _maxWireVersion = maxWireVersion;
-    }
-
-    int getMinWireVersion() {
-        return _minWireVersion;
-    }
-    int getMaxWireVersion() {
-        return _maxWireVersion;
-    }
+    virtual int getMinWireVersion() = 0;
+    virtual int getMaxWireVersion() = 0;
 
     /** send a query to the database.
      @param ns namespace to query, format is <dbname>.<collectname>[.<collectname>]*
@@ -1073,13 +744,7 @@ public:
 
     virtual void update(const std::string& ns, Query query, BSONObj obj, int flags);
 
-    /**
-       remove matching objects from the database
-       @param justOne if this true, then once a single match is found will stop
-     */
-    virtual void remove(const std::string& ns, Query q, bool justOne = 0);
-
-    virtual void remove(const std::string& ns, Query query, int flags);
+    virtual void remove(const std::string& ns, Query query, int flags = 0);
 
     virtual bool isFailed() const = 0;
 
@@ -1088,9 +753,7 @@ public:
      */
     virtual bool isStillConnected() = 0;
 
-    virtual void killCursor(long long cursorID) = 0;
-
-    virtual bool callRead(Message& toSend, Message& response) = 0;
+    virtual void killCursor(const NamespaceString& ns, long long cursorID);
 
     virtual ConnectionString::ConnectionType type() const = 0;
 
@@ -1102,12 +765,63 @@ public:
 
     virtual void reset() {}
 
-};  // DBClientBase
+    virtual bool isMongos() const = 0;
 
-class ConnectException : public UserException {
-public:
-    ConnectException(std::string msg) : UserException(9000, msg) {}
-};
+    /**
+     * Parses command replies and runs them through the metadata reader.
+     * This is virtual and non-const to allow subclasses to act on failures.
+     */
+    virtual rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
+                                                      const Message& replyMsg);
+
+protected:
+    /** if the result of a command is ok*/
+    bool isOk(const BSONObj&);
+
+    /** if the element contains a not master error */
+    bool isNotMasterErrorString(const BSONElement& e);
+
+    BSONObj _countCmd(
+        const std::string& ns, const BSONObj& query, int options, int limit, int skip);
+
+    /**
+     * Look up the options available on this client.  Caches the answer from
+     * _lookupAvailableOptions(), below.
+     */
+    QueryOptions availableOptions();
+
+    virtual QueryOptions _lookupAvailableOptions();
+
+    virtual void _auth(const BSONObj& params);
+
+    // should be set by subclasses during connection.
+    void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
+
+    /** controls how chatty the client is about network errors & such.  See log.h */
+    const logger::LogSeverity _logLevel;
+
+    static AtomicInt64 ConnectionIdSequence;
+    long long _connectionId;  // unique connection id for this connection
+
+private:
+    /**
+     * The rpc protocols this client supports.
+     *
+     */
+    rpc::ProtocolSet _clientRPCProtocols{rpc::supports::kAll};
+
+    /**
+     * The rpc protocol the remote server(s) support. We support 'opQueryOnly' by default unless
+     * we detect support for OP_COMMAND at connection time.
+     */
+    rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kOpQueryOnly};
+
+    rpc::RequestMetadataWriter _metadataWriter;
+    rpc::ReplyMetadataReader _metadataReader;
+
+    enum QueryOptions _cachedAvailableOptions;
+    bool _haveCachedAvailableOptions;
+};  // DBClientBase
 
 /**
     A basic connection to the database.
@@ -1118,29 +832,64 @@ public:
     using DBClientBase::query;
 
     /**
+     * A hook used to validate the reply of an 'isMaster' command during connection. If the hook
+     * returns a non-OK Status, the DBClientConnection object will disconnect from the remote
+     * server. This function must not throw - it can only indicate failure by returning a non-OK
+     * status.
+     */
+    using HandshakeValidationHook =
+        stdx::function<Status(const executor::RemoteCommandResponse& isMasterReply)>;
+
+    /**
        @param _autoReconnect if true, automatically reconnect on a connection failure
        @param timeout tcp timeout in seconds - this is for read/write, not connect.
        Connect timeout is fixed, but short, at 5 seconds.
      */
-    DBClientConnection(bool _autoReconnect = false, double so_timeout = 0);
+    DBClientConnection(bool _autoReconnect = false,
+                       double so_timeout = 0,
+                       MongoURI uri = {},
+                       const HandshakeValidationHook& hook = HandshakeValidationHook());
 
     virtual ~DBClientConnection() {
         _numConnections.fetchAndAdd(-1);
     }
 
-    /** Connect to a Mongo database server.
+    /**
+     * Connect to a Mongo database server.
+     *
+     * If autoReconnect is true, you can try to use the DBClientConnection even when
+     * false was returned -- it will try to connect again.
+     *
+     * @param server server to connect to.
+     * @param errmsg any relevant error message will appended to the string
+     * @return false if fails to connect.
+     */
+    virtual bool connect(const HostAndPort& server,
+                         StringData applicationName,
+                         std::string& errmsg);
 
-       If autoReconnect is true, you can try to use the DBClientConnection even when
-       false was returned -- it will try to connect again.
+    /**
+     * Semantically equivalent to the previous connect method, but returns a Status
+     * instead of taking an errmsg out parameter. Also allows optional validation of the reply to
+     * the 'isMaster' command executed during connection.
+     *
+     * @param server The server to connect to.
+     * @param a hook to validate the 'isMaster' reply received during connection. If the hook
+     * fails, the connection will be terminated and a non-OK status will be returned.
+     */
+    Status connect(const HostAndPort& server, StringData applicationName);
 
-       @param server server to connect to.
-       @param errmsg any relevant error message will appended to the string
-       @return false if fails to connect.
-    */
-    virtual bool connect(const HostAndPort& server, std::string& errmsg);
+    /**
+     * This version of connect does not run 'isMaster' after creating a TCP connection to the
+     * remote host. This method should be used only when calling 'isMaster' would create a deadlock,
+     * such as in 'isSelf'.
+     *
+     * @param server The server to connect to.
+     */
+    Status connectSocketOnly(const HostAndPort& server);
 
     /** Connect to a Mongo database server.  Exception throwing version.
-        Throws a UserException if cannot connect.
+        Throws a AssertionException if cannot connect.
 
        If autoReconnect is true, you can try to use the DBClientConnection even when
        false was returned -- it will try to connect again.
@@ -1148,11 +897,6 @@ public:
        @param serverHostname host to connect to.  can include port number ( 127.0.0.1 ,
                                127.0.0.1:5555 )
     */
-    void connect(const std::string& serverHostname) {
-        std::string errmsg;
-        if (!connect(HostAndPort(serverHostname), errmsg))
-            throw ConnectException(std::string("can't connect ") + errmsg);
-    }
 
     /**
      * Logs out the connection for the given database.
@@ -1181,10 +925,11 @@ public:
                                      const BSONObj* fieldsToReturn,
                                      int queryOptions);
 
-    virtual bool runCommand(const std::string& dbname,
-                            const BSONObj& cmd,
-                            BSONObj& info,
-                            int options = 0);
+    using DBClientBase::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
+
+    rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
+                                              const Message& replyMsg) override;
 
     /**
        @return true if this connection is currently in a failed state.  When autoreconnect is on,
@@ -1195,45 +940,51 @@ public:
     }
 
     bool isStillConnected() {
-        return p ? p->isStillConnected() : true;
+        return _port ? _port->isStillConnected() : true;
     }
 
-    MessagingPort& port() {
-        verify(p);
-        return *p;
+    void setWireVersions(int minWireVersion, int maxWireVersion) {
+        _minWireVersion = minWireVersion;
+        _maxWireVersion = maxWireVersion;
+    }
+
+    int getMinWireVersion() final {
+        return _minWireVersion;
+    }
+
+    int getMaxWireVersion() final {
+        return _maxWireVersion;
+    }
+
+    AbstractMessagingPort& port() {
+        verify(_port);
+        return *_port;
     }
 
     std::string toString() const {
         std::stringstream ss;
-        ss << _serverString;
-        if (!_serverAddrString.empty())
-            ss << " (" << _serverAddrString << ")";
+        ss << _serverAddress;
+        if (!_resolvedAddress.empty())
+            ss << " (" << _resolvedAddress << ")";
         if (_failed)
             ss << " failed";
         return ss.str();
     }
 
     std::string getServerAddress() const {
-        return _serverString;
+        return _serverAddress.toString();
     }
     const HostAndPort& getServerHostAndPort() const {
-        return _server;
+        return _serverAddress;
     }
 
-    virtual void killCursor(long long cursorID);
-    virtual bool callRead(Message& toSend, Message& response) {
-        return call(toSend, response);
-    }
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    virtual bool recv(Message& m);
-    virtual void checkResponse(const char* data,
-                               int nReturned,
+    virtual bool recv(Message& m, int lastRequestId);
+    virtual void checkResponse(const std::vector<BSONObj>& batch,
+                               bool networkError,
                                bool* retry = NULL,
                                std::string* host = NULL);
-    virtual bool call(Message& toSend,
-                      Message& response,
-                      bool assertOk = true,
-                      std::string* actualServer = 0);
+    virtual bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer);
     virtual ConnectionString::ConnectionType type() const {
         return ConnectionString::MASTER;
     }
@@ -1256,42 +1007,45 @@ public:
      */
     void setParentReplSetName(const std::string& replSetName);
 
-    static void setLazyKillCursor(bool lazy) {
-        _lazyKillCursor = lazy;
-    }
-    static bool getLazyKillCursor() {
-        return _lazyKillCursor;
-    }
-
     uint64_t getSockCreationMicroSec() const;
 
-protected:
-    friend class SyncClusterConnection;
-    virtual void _auth(const BSONObj& params);
-    virtual void sayPiggyBack(Message& toSend);
-
-    std::unique_ptr<MessagingPort> p;
-    std::unique_ptr<SockAddr> server;
-    bool _failed;
-    const bool autoReconnect;
-    Backoff autoReconnectBackoff;
-    HostAndPort _server;            // remember for reconnects
-    std::string _serverString;      // server host and port
-    std::string _serverAddrString;  // resolved ip of server
-    void _checkConnection();
+    MessageCompressorManager& getCompressorManager() {
+        return _compressorManager;
+    }
 
     // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
-    void checkConnection() {
+    void checkConnection() override {
         if (_failed)
             _checkConnection();
     }
 
+    bool isMongos() const override {
+        return _isMongos;
+    }
+
+protected:
+    int _minWireVersion{0};
+    int _maxWireVersion{0};
+    bool _isMongos = false;
+
+    virtual void _auth(const BSONObj& params);
+
+    std::unique_ptr<AbstractMessagingPort> _port;
+
+    bool _failed;
+    const bool autoReconnect;
+    Backoff autoReconnectBackoff;
+
+    HostAndPort _serverAddress;
+    std::string _resolvedAddress;
+    std::string _applicationName;
+
+    void _checkConnection();
+
     std::map<std::string, BSONObj> authCache;
     double _so_timeout;
-    bool _connect(std::string& errmsg);
 
     static AtomicInt32 _numConnections;
-    static bool _lazyKillCursor;  // lazy means we piggy back kill cursors on next op
 
 private:
     /**
@@ -1304,6 +1058,13 @@ private:
     // Contains the string for the replica set name of the host this is connected to.
     // Should be empty if this connection is not pointing to a replica set member.
     std::string _parentReplSetName;
+
+    // Hook ran on every call to connect()
+    HandshakeValidationHook _hook;
+
+    MessageCompressorManager _compressorManager;
+
+    MongoURI _uri;
 };
 
 BSONElement getErrField(const BSONObj& result);
@@ -1312,14 +1073,6 @@ bool hasErrField(const BSONObj& result);
 inline std::ostream& operator<<(std::ostream& s, const Query& q) {
     return s << q.toString();
 }
-
-void assembleQueryRequest(const std::string& ns,
-                          BSONObj query,
-                          int nToReturn,
-                          int nToSkip,
-                          const BSONObj* fieldsToReturn,
-                          int queryOptions,
-                          Message& toSend);
 
 }  // namespace mongo
 

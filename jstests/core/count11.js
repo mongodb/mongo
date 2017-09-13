@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of collection existing when none
+// expected.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
 // SERVER-8514: Test the count command returns an error to the user when given an invalid query
 // predicate, even when the collection doesn't exist.
 
@@ -16,11 +20,15 @@ assert.eq(0, t.find().itcount());
 // Returns 0 on valid syntax query.
 // Fails on invalid syntax query.
 assert.eq(0, t.find(validQuery).count());
-assert.throws(function() { t.find(invalidQuery).count(); });
+assert.throws(function() {
+    t.find(invalidQuery).count();
+});
 
 // Query existing collection.
 // Returns 0 on valid syntax query.
 // Fails on invalid syntax query.
 assert.commandWorked(db.createCollection(t.getName()));
 assert.eq(0, t.find(validQuery).count());
-assert.throws(function() { t.find(invalidQuery).count(); });
+assert.throws(function() {
+    t.find(invalidQuery).count();
+});

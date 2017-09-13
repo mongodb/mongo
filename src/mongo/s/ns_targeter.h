@@ -28,18 +28,21 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <vector>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/write_ops/batched_update_document.h"
-#include "mongo/s/write_ops/batched_delete_document.h"
+#include "mongo/s/shard_id.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
+class OperationContext;
 struct ShardEndpoint;
 
 /**
@@ -81,37 +84,43 @@ public:
      *
      * Returns !OK with message if document could not be targeted for other reasons.
      */
-    virtual Status targetInsert(const BSONObj& doc, ShardEndpoint** endpoint) const = 0;
+    virtual Status targetInsert(OperationContext* opCtx,
+                                const BSONObj& doc,
+                                ShardEndpoint** endpoint) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard update.
      *
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
-    virtual Status targetUpdate(const BatchedUpdateDocument& updateDoc,
-                                std::vector<ShardEndpoint*>* endpoints) const = 0;
+    virtual Status targetUpdate(OperationContext* opCtx,
+                                const write_ops::UpdateOpEntry& updateDoc,
+                                std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard delete.
      *
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
-    virtual Status targetDelete(const BatchedDeleteDocument& deleteDoc,
-                                std::vector<ShardEndpoint*>* endpoints) const = 0;
+    virtual Status targetDelete(OperationContext* opCtx,
+                                const write_ops::DeleteOpEntry& deleteDoc,
+                                std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for the entire collection.
      *
      * Returns !OK with message if the full collection could not be targeted.
      */
-    virtual Status targetCollection(std::vector<ShardEndpoint*>* endpoints) const = 0;
+    virtual Status targetCollection(
+        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for all shards.
      *
      * Returns !OK with message if all shards could not be targeted.
      */
-    virtual Status targetAllShards(std::vector<ShardEndpoint*>* endpoints) const = 0;
+    virtual Status targetAllShards(
+        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
      * Informs the targeter that a targeting failure occurred during one of the last targeting
@@ -141,7 +150,7 @@ public:
      * NOTE: This function may block for shared resources or network calls.
      * Returns !OK with message if could not refresh
      */
-    virtual Status refreshIfNeeded(bool* wasChanged) = 0;
+    virtual Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
 };
 
 /**
@@ -149,31 +158,14 @@ public:
  * the logical target (shard name/version/broadcast) and the physical target (host name).
  */
 struct ShardEndpoint {
-    ShardEndpoint() {}
-
     ShardEndpoint(const ShardEndpoint& other)
         : shardName(other.shardName), shardVersion(other.shardVersion) {}
 
-    ShardEndpoint(const std::string& shardName, const ChunkVersion& shardVersion)
+    ShardEndpoint(const ShardId& shardName, const ChunkVersion& shardVersion)
         : shardName(shardName), shardVersion(shardVersion) {}
 
-    const std::string shardName;
-    const ChunkVersion shardVersion;
-
-    //
-    // For testing *only* - do not use as part of API
-    //
-
-    BSONObj toBSON() const {
-        BSONObjBuilder b;
-        appendBSON(&b);
-        return b.obj();
-    }
-
-    void appendBSON(BSONObjBuilder* builder) const {
-        builder->append("shardName", shardName);
-        shardVersion.addToBSON(*builder, "shardVersion");
-    }
+    ShardId shardName;
+    ChunkVersion shardVersion;
 };
 
 }  // namespace mongo

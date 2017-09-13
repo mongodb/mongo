@@ -1,52 +1,47 @@
-// @file namespacestring.h
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2017 MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #pragma once
 
 #include <algorithm>
+#include <boost/optional.hpp>
+#include <iosfwd>
 #include <string>
 
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/platform/hash_namespace.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-/* in the mongo source code, "client" means "database". */
-
 const size_t MaxDatabaseNameLen = 128;  // max str len for the db name, including null char
-
-/** @return true if a client can modify this namespace even though it is under ".system."
-    For example <dbname>.system.users is ok for regular clients to update.
-    @param write used when .system.js
-*/
-bool legalClientSystemNS(StringData ns, bool write);
 
 /* e.g.
    NamespaceString ns("acme.orders");
@@ -54,6 +49,37 @@ bool legalClientSystemNS(StringData ns, bool write);
 */
 class NamespaceString {
 public:
+    // Reserved system namespaces
+
+    // Namespace for the admin database
+    static constexpr StringData kAdminDb = "admin"_sd;
+
+    // Namespace for the local database
+    static constexpr StringData kLocalDb = "local"_sd;
+
+    // Namespace for the sharding config database
+    static constexpr StringData kConfigDb = "config"_sd;
+
+    // Name for the system views collection
+    static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
+
+    // Name for a shard's collections metadata collection, each document of which indicates the
+    // state of a specific collection.
+    static constexpr StringData kShardConfigCollectionsCollectionName = "config.collections"_sd;
+
+    // Namespace for storing configuration data, which needs to be replicated if the server is
+    // running as a replica set. Documents in this collection should represent some configuration
+    // state of the server, which needs to be recovered/consulted at startup. Each document in this
+    // namespace should have its _id set to some string, which meaningfully describes what it
+    // represents.
+    static const NamespaceString kServerConfigurationNamespace;
+
+    // Namespace for storing the transaction information for each session
+    static const NamespaceString kSessionTransactionsTableNamespace;
+
+    // Namespace of the the oplog collection.
+    static const NamespaceString kRsOplogNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */
@@ -69,6 +95,24 @@ public:
      * "dbName" must not contain a ".", and "collectionName" must not start with one.
      */
     NamespaceString(StringData dbName, StringData collectionName);
+
+    /**
+     * Constructs the namespace '<dbName>.$cmd.aggregate', which we use as the namespace for
+     * aggregation commands with the format {aggregate: 1}.
+     */
+    static NamespaceString makeCollectionlessAggregateNSS(StringData dbName);
+
+    /**
+     * Constructs a NamespaceString representing a listCollections namespace. The format for this
+     * namespace is "<dbName>.$cmd.listCollections".
+     */
+    static NamespaceString makeListCollectionsNSS(StringData dbName);
+
+    /**
+     * Constructs a NamespaceString representing a listIndexes namespace. The format for this
+     * namespace is "<dbName>.$cmd.listIndexes.<collectionName>".
+     */
+    static NamespaceString makeListIndexesNSS(StringData dbName, StringData collectionName);
 
     /**
      * Note that these values are derived from the mmap_v1 implementation and that
@@ -87,6 +131,16 @@ public:
         MaxNsCollectionLen = MaxNsLen - 7 /*strlen(".$extra")*/,
     };
 
+    /**
+     * DollarInDbNameBehavior::allow is deprecated.
+     * Please use DollarInDbNameBehavior::disallow and check explicitly for any DB names that must
+     * contain a $.
+     */
+    enum class DollarInDbNameBehavior {
+        Disallow,
+        Allow,  // Deprecated
+    };
+
     StringData db() const;
     StringData coll() const;
 
@@ -94,9 +148,6 @@ public:
         return _ns;
     }
 
-    operator const std::string&() const {
-        return ns();
-    }
     const std::string& toString() const {
         return ns();
     }
@@ -105,18 +156,37 @@ public:
         return _ns.size();
     }
 
+    bool isEmpty() const {
+        return _ns.empty();
+    }
+
+    struct Hasher {
+        size_t operator()(const NamespaceString& nss) const {
+            return std::hash<std::string>()(nss._ns);
+        }
+    };
+
     //
     // The following methods assume isValid() is true for this NamespaceString.
     //
 
+    bool isHealthlog() const {
+        return isLocal() && coll() == "system.healthlog";
+    }
     bool isSystem() const {
         return coll().startsWith("system.");
+    }
+    bool isLocal() const {
+        return db() == "local";
     }
     bool isSystemDotIndexes() const {
         return coll() == "system.indexes";
     }
     bool isSystemDotProfile() const {
         return coll() == "system.profile";
+    }
+    bool isSystemDotViews() const {
+        return coll() == kSystemDotViewsCollectionName;
     }
     bool isConfigDB() const {
         return db() == "config";
@@ -127,9 +197,6 @@ public:
     bool isOplog() const {
         return oplog(_ns);
     }
-    bool isSpecialCommand() const {
-        return coll().startsWith("$cmd.sys");
-    }
     bool isSpecial() const {
         return special(_ns);
     }
@@ -139,21 +206,77 @@ public:
     bool isNormal() const {
         return normal(_ns);
     }
-    bool isListCollectionsGetMore() const;
-    bool isListIndexesGetMore() const;
+
+    // Check if the NamespaceString references a special collection that cannot
+    // be used for generic data storage.
+    bool isVirtualized() const {
+        return virtualized(_ns);
+    }
 
     /**
-     * Given a NamespaceString for which isListIndexesGetMore() returns true, returns the
-     * NamespaceString for the collection that the "listIndexesGetMore" targets.
+     * Returns true if cursors for this namespace are registered with the global cursor manager.
      */
-    NamespaceString getTargetNSForListIndexesGetMore() const;
+    bool isGloballyManagedNamespace() const {
+        return coll().startsWith("$cmd."_sd);
+    }
+
+    bool isCollectionlessAggregateNS() const;
+    bool isListCollectionsCursorNS() const;
+    bool isListIndexesCursorNS() const;
+
+    /**
+     * Returns true if a client can modify this namespace even though it is under ".system."
+     * For example <dbname>.system.users is ok for regular clients to update.
+     */
+    bool isLegalClientSystemNS() const;
+
+    /**
+     * Given a NamespaceString for which isGloballyManagedNamespace() returns true, returns the
+     * namespace the command targets, or boost::none for commands like 'listCollections' which
+     * do not target a collection.
+     */
+    boost::optional<NamespaceString> getTargetNSForGloballyManagedNamespace() const;
+
+    /**
+     * Returns true if this namespace refers to a drop-pending collection.
+     */
+    bool isDropPendingNamespace() const;
+
+    /**
+     * Returns the drop-pending namespace name for this namespace, provided the given optime.
+     *
+     * Example:
+     *     test.foo -> test.system.drop.<timestamp seconds>i<timestamp increment>t<term>.foo
+     *
+     * Original collection name may be truncated so that the generated namespace length does not
+     * exceed MaxNsCollectionLen.
+     */
+    NamespaceString makeDropPendingNamespace(const repl::OpTime& opTime) const;
+
+    /**
+     * Returns the optime used to generate the drop-pending namespace.
+     * Returns an error if this namespace is not drop-pending.
+     */
+    StatusWith<repl::OpTime> getDropPendingNamespaceOpTime() const;
+
+    /**
+     * Checks if this namespace is valid as a target namespace for a rename operation, given
+     * the length of the longest index name in the source collection.
+     */
+    Status checkLengthForRename(const std::string::size_type longestIndexNameLength) const;
+
+    /**
+     * Given a NamespaceString for which isListIndexesCursorNS() returns true, returns the
+     * NamespaceString for the collection that the "listIndexes" targets.
+     */
+    NamespaceString getTargetNSForListIndexes() const;
 
     /**
      * @return true if the namespace is valid. Special namespaces for internal use are considered as
      * valid.
      */
     bool isValid() const {
-        return validDBName(db()) && !coll().empty();
+        return validDBName(db(), DollarInDbNameBehavior::Allow) && !coll().empty();
     }
 
     bool operator==(const std::string& nsIn) const {
@@ -184,8 +307,8 @@ public:
     // @return db() + ".system.indexes"
     std::string getSystemIndexesCollection() const;
 
-    // @return db() + ".$cmd"
-    std::string getCommandNS() const;
+    // @return {db(), "$cmd"}
+    NamespaceString getCommandNS() const;
 
     /**
      * Function to escape most non-alpha characters from file names
@@ -205,15 +328,19 @@ public:
 
     static bool special(StringData ns);
 
+    // Check if `ns` references a special collection that cannot be used for
+    // generic data storage.
+    static bool virtualized(StringData ns);
+
     /**
      * Returns true for DBs with special meaning to mongodb.
      */
-    static bool internalDb(StringData ns) {
-        if (ns == "admin")
+    static bool internalDb(StringData db) {
+        if (db == "admin")
             return true;
-        if (ns == "local")
+        if (db == "local")
             return true;
-        if (ns == "config")
+        if (db == "config")
             return true;
         return false;
     }
@@ -230,9 +357,12 @@ public:
      *      foo"bar
      *
      * @param db - a possible database name
+     * @param DollarInDbNameBehavior - please do not change the default value. DB names that must
+     *                                 contain a $ should be checked explicitly.
      * @return if db is an allowed database name
      */
-    static bool validDBName(StringData dbin);
+    static bool validDBName(StringData db,
+                            DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow);
 
     /**
      * Takes a fully qualified namespace (ie dbname.collectionName), and returns true if
@@ -266,6 +396,7 @@ private:
     size_t _dotIndex;
 };
 
+std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss);
 
 // "database.a.b.c" -> "database"
 inline StringData nsToDatabaseSubstring(StringData ns) {
@@ -323,31 +454,20 @@ inline bool nsIsDbOnly(StringData ns) {
 }
 
 /**
- * NamespaceDBHash and NamespaceDBEquals allow you to do something like
- * unordered_map<std::string,int,NamespaceDBHash,NamespaceDBEquals>
- * and use the full namespace for the string
- * but comparisons are done only on the db piece
- */
-
-/**
  * this can change, do not store on disk
  */
 int nsDBHash(const std::string& ns);
 
-bool nsDBEquals(const std::string& a, const std::string& b);
-
-struct NamespaceDBHash {
-    int operator()(const std::string& ns) const {
-        return nsDBHash(ns);
-    }
-};
-
-struct NamespaceDBEquals {
-    bool operator()(const std::string& a, const std::string& b) const {
-        return nsDBEquals(a, b);
-    }
-};
-}
-
+}  // namespace mongo
 
 #include "mongo/db/namespace_string-inl.h"
+
+MONGO_HASH_NAMESPACE_START
+template <>
+struct hash<mongo::NamespaceString> {
+    size_t operator()(const mongo::NamespaceString& nss) const {
+        mongo::NamespaceString::Hasher hasher;
+        return hasher(nss);
+    }
+};
+MONGO_HASH_NAMESPACE_END

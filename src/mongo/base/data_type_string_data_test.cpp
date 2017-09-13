@@ -28,9 +28,9 @@
 
 #include "mongo/base/data_type_string_data.h"
 
-#include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_terminated.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

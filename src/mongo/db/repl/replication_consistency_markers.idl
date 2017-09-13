@@ -1,0 +1,89 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the GNU Affero General Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+# Replication Consistency Markers IDL File
+
+global:
+    cpp_namespace: "mongo::repl"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/db/repl/replication_types.idl"
+
+structs:
+    MinValidDocument:
+        description: A document in which the server stores its minValid and appliedThrough information.
+        fields:
+            ts:
+                cpp_name: minValidTimestamp
+                type: timestamp
+                description: "The timestamp for the OpTime at which the data on disk will be consistent"
+            t:
+                cpp_name: minValidTerm
+                type: safeInt64
+                description: "The term for the OpTime at which the data on disk will be consistent; -1 for PV0."
+            begin:
+                cpp_name: appliedThrough
+                type: optime
+                optional: true # This field is unset when we want to mark that we are consistent at the top of the oplog
+                description: "The OpTime of the last oplog entry we applied"
+            # TODO (SERVER-30556): Delete this field since it cannot exist after 3.6.
+            oplogDeleteFromPoint:
+                cpp_name: oldOplogDeleteFromPoint
+                type: timestamp
+                optional: true # This field only exists on 3.4 upgrade
+                description: "The timestamp of the first oplog entry in a batch when we are writing
+                              oplog entries to the oplog after which the oplog may be inconsistent.
+                              This field only exists on 3.4 upgrade."
+            doingInitialSync:
+                cpp_name: initialSyncFlag
+                type: bool
+                optional: true # This field is unset when we are not doing initial sync
+                description: "A flag for if we are in the middle of initial sync"
+            _id:
+                type: objectid
+                optional: true # This is automatically created when the document is upserted
+                description: "An objectid that is not used but is automatically generated"
+    OplogTruncateAfterPointDocument:
+        description: A document in which the server stores information on where to truncate the oplog on unclean shutdown.
+        fields:
+            oplogTruncateAfterPoint:
+                type: timestamp
+                description: "The timestamp of the first oplog entry in a batch when we are writing oplog entries to the oplog after which the oplog may be inconsistent."
+            _id:
+                type: string
+                description: "Always set to 'oplogTruncateAfterPoint' to easily retrieve it."
+    CheckpointTimestampDocument:
+        description: A document that stores the latest timestamp the database can recover to.
+        fields:
+            checkpointTimestamp:
+                type: timestamp
+                description: "The checkpoint timestamp. Should be set by a storage engine
+                              before a checkpoint is taken."
+            _id:
+                type: string
+                description: "Always set to 'checkpointTimestamp' to easily retrieve it."
+

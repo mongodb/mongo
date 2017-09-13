@@ -30,6 +30,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -49,14 +50,12 @@ class OperationContext;
  */
 class DBDirectClient : public DBClientBase {
 public:
-    static const HostAndPort dummyHost;
-
-    DBDirectClient(OperationContext* txn);
+    DBDirectClient(OperationContext* opCtx);
 
     using DBClientBase::query;
 
     // XXX: is this valid or useful?
-    void setOpCtx(OperationContext* txn);
+    void setOpCtx(OperationContext* opCtx);
 
     virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
                                                   Query query,
@@ -81,12 +80,6 @@ public:
 
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
 
-    virtual void sayPiggyBack(Message& toSend);
-
-    virtual void killCursor(long long cursorID);
-
-    virtual bool callRead(Message& toSend, Message& response);
-
     virtual unsigned long long count(const std::string& ns,
                                      const BSONObj& query = BSONObj(),
                                      int options = 0,
@@ -101,8 +94,16 @@ public:
 
     virtual QueryOptions _lookupAvailableOptions();
 
+    int getMinWireVersion() final;
+    int getMaxWireVersion() final;
+
+    bool isMongos() const final {
+        return false;
+    }
+
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
+    LastError _lastError;  // This LastError will be used for all operations on this client.
 };
 
 }  // namespace mongo

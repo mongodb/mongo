@@ -32,6 +32,7 @@
 #include <utility>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -59,7 +60,9 @@ public:
      * connections. */
     DBClientReplicaSet(const std::string& name,
                        const std::vector<HostAndPort>& servers,
-                       double so_timeout = 0);
+                       StringData applicationName,
+                       double so_timeout = 0,
+                       MongoURI uri = {});
     virtual ~DBClientReplicaSet();
 
     /**
@@ -105,7 +108,7 @@ public:
 
     virtual void update(const std::string& ns, Query query, BSONObj obj, int flags);
 
-    virtual void killCursor(long long cursorID);
+    virtual void killCursor(const NamespaceString& ns, long long cursorID);
 
     // ---- access raw connections ----
 
@@ -129,9 +132,9 @@ public:
     // ---- callback pieces -------
 
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    virtual bool recv(Message& toRecv);
-    virtual void checkResponse(const char* data,
-                               int nReturned,
+    virtual bool recv(Message& toRecv, int lastRequestId);
+    virtual void checkResponse(const std::vector<BSONObj>& batch,
+                               bool networkError,
                                bool* retry = NULL,
                                std::string* targetHost = NULL);
 
@@ -183,23 +186,19 @@ public:
         return true;
     }
 
-    rpc::UniqueReply runCommandWithMetadata(StringData database,
-                                            StringData command,
-                                            const BSONObj& metadata,
-                                            const BSONObj& commandArgs) final;
+    using DBClientBase::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) final;
+    DBClientBase* runFireAndForgetCommand(OpMsgRequest request) final;
 
     void setRequestMetadataWriter(rpc::RequestMetadataWriter writer) final;
 
     void setReplyMetadataReader(rpc::ReplyMetadataReader reader) final;
+
+    int getMinWireVersion() final;
+    int getMaxWireVersion() final;
     // ---- low level ------
 
-    virtual bool call(Message& toSend,
-                      Message& response,
-                      bool assertOk = true,
-                      std::string* actualServer = 0);
-    virtual bool callRead(Message& toSend, Message& response) {
-        return checkMaster()->callRead(toSend, response);
-    }
+    virtual bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer);
 
     /**
      * Returns whether a query or command can be sent to secondaries based on the query object
@@ -219,6 +218,10 @@ public:
      */
     virtual void reset();
 
+    bool isMongos() const override {
+        return false;
+    }
+
     /**
      * @bool setting if true, DBClientReplicaSet connections will make sure that secondary
      *    connections are authenticated and log them before returning them to the pool.
@@ -229,10 +232,6 @@ protected:
     /** Authorize.  Authorizes all nodes as needed
     */
     virtual void _auth(const BSONObj& params);
-
-    virtual void sayPiggyBack(Message& toSend) {
-        checkMaster()->say(toSend);
-    }
 
 private:
     /**
@@ -267,11 +266,12 @@ private:
     bool checkLastHost(const ReadPreferenceSetting* readPref);
 
     /**
-     * Destroys all cached information about the last slaveOk operation.
+     * Destroys all cached information about the last slaveOk operation and reports the host as
+     * failed in the replica set monitor with the specified 'status'.
      */
-    void invalidateLastSlaveOkCache();
+    void _invalidateLastSlaveOkCache(const Status& status);
 
-    void _auth(DBClientConnection* conn);
+    void _authConnection(DBClientConnection* conn);
 
     /**
      * Calls logout on the connection for all known database this DBClientRS instance has
@@ -289,19 +289,15 @@ private:
      */
     void resetSlaveOkConn();
 
-    /**
-     * Maximum number of retries to make for auto-retry logic when performing a slave ok
-     * operation.
-     */
-    static const size_t MAX_RETRY;
-
     // TODO: remove this when processes other than mongos uses the driver version.
     static bool _authPooledSecondaryConn;
 
     // Throws a DBException if the monitor doesn't exist and there isn't a cached seed to use.
-    ReplicaSetMonitorPtr _getMonitor() const;
+    ReplicaSetMonitorPtr _getMonitor();
 
     std::string _setName;
+    std::string _applicationName;
+    std::shared_ptr<ReplicaSetMonitor> _rsm;
 
     HostAndPort _masterHost;
     std::unique_ptr<DBClientConnection> _master;
@@ -322,6 +318,8 @@ private:
     // this could be a security issue, as the password is stored in memory
     // not sure if/how we should handle
     std::map<std::string, BSONObj> _auths;  // dbName -> auth parameters
+
+    MongoURI _uri;
 
 protected:
     /**

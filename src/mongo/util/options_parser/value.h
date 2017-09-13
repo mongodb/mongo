@@ -75,6 +75,7 @@ public:
     explicit Value(int val) : _intVal(val), _type(Int) {}
     explicit Value(long val) : _longVal(val), _type(Long) {}
     explicit Value(std::string val) : _stringVal(val), _type(String) {}
+    explicit Value(const char* val) : _stringVal(val), _type(String) {}
     explicit Value(unsigned long long val) : _unsignedLongLongVal(val), _type(UnsignedLongLong) {}
     explicit Value(unsigned val) : _unsignedVal(val), _type(Unsigned) {}
 
@@ -121,7 +122,7 @@ public:
      */
 
     /**
-     *  Returns the contents of this Value as type T.  Throws MsgAssertionException if the type
+     *  Returns the contents of this Value as type T.  Throws AssertionException if the type
      *  does not match
      */
     template <typename T>
@@ -170,7 +171,7 @@ T Value::as() const {
     if (!ret.isOK()) {
         StringBuilder message;
         message << "failed to extract typed value from Value container: " << ret.toString();
-        throw MsgAssertionException(17114, message.str());
+        throw AssertionException(17114, message.str());
     }
 
     return valueType;

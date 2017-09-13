@@ -9,6 +9,7 @@ import sys
 
 from .. import config
 from .. import errors
+from .. import logging
 from ..utils import queue as _queue
 
 
@@ -28,10 +29,15 @@ class Job(object):
         self.hooks = hooks
         self.report = report
 
-    def __call__(self, queue, interrupt_flag):
+    def __call__(self, queue, interrupt_flag, teardown_flag=None):
         """
         Continuously executes tests from 'queue' and records their
         details in 'report'.
+
+        If 'teardown_flag' is not None, then 'self.fixture.teardown()'
+        will be called before this method returns. If an error occurs
+        while destroying the fixture, then the 'teardown_flag' will be
+        set.
         """
 
         should_stop = False
@@ -51,6 +57,15 @@ class Job(object):
             interrupt_flag.set()
             # Drain the queue to unblock the main thread.
             Job._drain_queue(queue)
+
+        if teardown_flag is not None:
+            try:
+                if not self.fixture.teardown(finished=True):
+                    self.logger.warn("Teardown of %s was not successful.", self.fixture)
+                    teardown_flag.set()
+            except:
+                self.logger.exception("Encountered an error while tearing down %s.", self.fixture)
+                teardown_flag.set()
 
     def _run(self, queue, interrupt_flag):
         """
@@ -79,12 +94,12 @@ class Job(object):
         Calls the before/after test hooks and executes 'test'.
         """
 
-        test.configure(self.fixture)
+        test.configure(self.fixture, config.NUM_CLIENTS_PER_FIXTURE)
         self._run_hooks_before_tests(test)
 
         test(self.report)
         if config.FAIL_FAST and not self.report.wasSuccessful():
-            test.logger.info("%s failed, so stopping..." % (test.shortDescription()))
+            self.logger.info("%s failed, so stopping..." % (test.shortDescription()))
             raise errors.StopExecution("%s failed" % (test.shortDescription()))
 
         if not self.fixture.is_running():
@@ -107,20 +122,20 @@ class Job(object):
 
         try:
             for hook in self.hooks:
-                hook.before_test(self.report)
+                hook.before_test(test, self.report)
 
         except errors.StopExecution:
             raise
 
         except errors.ServerFailure:
-            self.logger.error("%s marked as a failure by a hook's before_test.",
-                              test.shortDescription())
+            self.logger.exception("%s marked as a failure by a hook's before_test.",
+                                  test.shortDescription())
             self._fail_test(test, sys.exc_info(), return_code=2)
             raise errors.StopExecution("A hook's before_test failed")
 
         except errors.TestFailure:
-            self.logger.error("%s marked as a failure by a hook's before_test.",
-                              test.shortDescription())
+            self.logger.exception("%s marked as a failure by a hook's before_test.",
+                                  test.shortDescription())
             self._fail_test(test, sys.exc_info(), return_code=1)
             if config.FAIL_FAST:
                 raise errors.StopExecution("A hook's before_test failed")
@@ -141,20 +156,20 @@ class Job(object):
         """
         try:
             for hook in self.hooks:
-                hook.after_test(self.report)
+                hook.after_test(test, self.report)
 
         except errors.StopExecution:
             raise
 
         except errors.ServerFailure:
-            self.logger.error("%s marked as a failure by a hook's after_test.",
-                              test.shortDescription())
+            self.logger.exception("%s marked as a failure by a hook's after_test.",
+                                  test.shortDescription())
             self.report.setFailure(test, return_code=2)
             raise errors.StopExecution("A hook's after_test failed")
 
         except errors.TestFailure:
-            self.logger.error("%s marked as a failure by a hook's after_test.",
-                              test.shortDescription())
+            self.logger.exception("%s marked as a failure by a hook's after_test.",
+                                  test.shortDescription())
             self.report.setFailure(test, return_code=1)
             if config.FAIL_FAST:
                 raise errors.StopExecution("A hook's after_test failed")

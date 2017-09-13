@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -36,7 +37,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -51,7 +51,8 @@ class SaslAuthenticationSession : public AuthenticationSession {
     MONGO_DISALLOW_COPYING(SaslAuthenticationSession);
 
 public:
-    typedef stdx::function<SaslAuthenticationSession*(AuthorizationSession*, const std::string&)>
+    typedef stdx::function<SaslAuthenticationSession*(
+        AuthorizationSession*, StringData, StringData)>
         SaslAuthenticationSessionFactoryFn;
     static SaslAuthenticationSessionFactoryFn create;
 
@@ -104,10 +105,10 @@ public:
      * SaslAuthenticationSession.
      */
     OperationContext* getOpCtxt() const {
-        return _txn;
+        return _opCtx;
     }
-    void setOpCtxt(OperationContext* txn) {
-        _txn = txn;
+    void setOpCtxt(OperationContext* opCtx) {
+        _opCtx = opCtx;
     }
 
     /**
@@ -166,7 +167,7 @@ public:
     }
 
 protected:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     AuthorizationSession* _authzSession;
     std::string _authenticationDatabase;
     std::string _serviceName;

@@ -43,6 +43,18 @@ HeartbeatResponseAction HeartbeatResponseAction::makeReconfigAction() {
     return result;
 }
 
+HeartbeatResponseAction HeartbeatResponseAction::makePriorityTakeoverAction() {
+    HeartbeatResponseAction result;
+    result._action = PriorityTakeover;
+    return result;
+}
+
+HeartbeatResponseAction HeartbeatResponseAction::makeCatchupTakeoverAction() {
+    HeartbeatResponseAction result;
+    result._action = CatchupTakeover;
+    return result;
+}
+
 HeartbeatResponseAction HeartbeatResponseAction::makeElectAction() {
     HeartbeatResponseAction result;
     result._action = StartElection;
@@ -67,6 +79,10 @@ HeartbeatResponseAction::HeartbeatResponseAction() : _action(NoAction), _primary
 
 void HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {
     _nextHeartbeatStartDate = when;
+}
+
+void HeartbeatResponseAction::setAdvancedOpTime(bool advanced) {
+    _advancedOpTime = advanced;
 }
 
 }  // namespace repl

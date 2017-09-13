@@ -33,10 +33,17 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
+
+const BSONField<bool> kNoBalance("noBalance");
+const BSONField<bool> kDropped("dropped");
+
+}  // namespace
 
 const std::string CollectionType::ConfigNS = "config.collections";
 
@@ -44,10 +51,9 @@ const BSONField<std::string> CollectionType::fullNs("_id");
 const BSONField<OID> CollectionType::epoch("lastmodEpoch");
 const BSONField<Date_t> CollectionType::updatedAt("lastmod");
 const BSONField<BSONObj> CollectionType::keyPattern("key");
+const BSONField<BSONObj> CollectionType::defaultCollation("defaultCollation");
 const BSONField<bool> CollectionType::unique("unique");
-const BSONField<bool> CollectionType::noBalance("noBalance");
-const BSONField<bool> CollectionType::dropped("dropped");
-
+const BSONField<UUID> CollectionType::uuid("uuid");
 
 StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     CollectionType coll;
@@ -63,7 +69,7 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
 
     {
         OID collEpoch;
-        Status status = bsonExtractOIDField(source, epoch.name(), &collEpoch);
+        Status status = bsonExtractOIDFieldWithDefault(source, epoch.name(), OID(), &collEpoch);
         if (!status.isOK())
             return status;
 
@@ -81,7 +87,7 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
 
     {
         bool collDropped;
-        Status status = bsonExtractBooleanField(source, dropped.name(), &collDropped);
+        Status status = bsonExtractBooleanField(source, kDropped.name(), &collDropped);
         if (status.isOK()) {
             coll._dropped = collDropped;
         } else if (status == ErrorCodes::NoSuchKey) {
@@ -101,9 +107,32 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
             }
 
             coll._keyPattern = KeyPattern(obj.getOwned());
-        } else if ((status == ErrorCodes::NoSuchKey) && coll.getDropped()) {
-            // Sharding key can be missing if the collection is dropped
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Sharding key can only be missing if the collection is dropped
+            if (!coll.getDropped()) {
+                return {status.code(),
+                        str::stream() << "Shard key for collection " << coll._fullNs->ns()
+                                      << " is missing, but the collection is not marked as "
+                                         "dropped. This is an indication of corrupted sharding "
+                                         "metadata."};
+            }
         } else {
+            return status;
+        }
+    }
+
+    {
+        BSONElement collDefaultCollation;
+        Status status =
+            bsonExtractTypedField(source, defaultCollation.name(), Object, &collDefaultCollation);
+        if (status.isOK()) {
+            BSONObj obj = collDefaultCollation.Obj();
+            if (obj.isEmpty()) {
+                return Status(ErrorCodes::BadValue, "empty defaultCollation");
+            }
+
+            coll._defaultCollation = obj.getOwned();
+        } else if (status != ErrorCodes::NoSuchKey) {
             return status;
         }
     }
@@ -121,8 +150,25 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     }
 
     {
+        BSONElement uuidElem;
+        Status status = bsonExtractField(source, uuid.name(), &uuidElem);
+        if (status.isOK()) {
+            auto swUUID = UUID::parse(uuidElem);
+            if (!swUUID.isOK()) {
+                return swUUID.getStatus();
+            }
+            coll._uuid = swUUID.getValue();
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // UUID can be missing in 3.6, because featureCompatibilityVersion can be 3.4, in which
+            // case it remains boost::none.
+        } else {
+            return status;
+        }
+    }
+
+    {
         bool collNoBalance;
-        Status status = bsonExtractBooleanField(source, noBalance.name(), &collNoBalance);
+        Status status = bsonExtractBooleanField(source, kNoBalance.name(), &collNoBalance);
         if (status.isOK()) {
             coll._allowBalance = !collNoBalance;
         } else if (status == ErrorCodes::NoSuchKey) {
@@ -180,24 +226,29 @@ BSONObj CollectionType::toBSON() const {
     }
     builder.append(epoch.name(), _epoch.get_value_or(OID()));
     builder.append(updatedAt.name(), _updatedAt.get_value_or(Date_t()));
+    builder.append(kDropped.name(), _dropped.get_value_or(false));
 
     // These fields are optional, so do not include them in the metadata for the purposes of
     // consuming less space on the config servers.
 
-    if (_dropped.is_initialized()) {
-        builder.append(dropped.name(), _dropped.get());
-    }
-
     if (_keyPattern.is_initialized()) {
         builder.append(keyPattern.name(), _keyPattern->toBSON());
+    }
+
+    if (!_defaultCollation.isEmpty()) {
+        builder.append(defaultCollation.name(), _defaultCollation);
     }
 
     if (_unique.is_initialized()) {
         builder.append(unique.name(), _unique.get());
     }
 
+    if (_uuid.is_initialized()) {
+        _uuid->appendToBuilder(&builder, uuid.name());
+    }
+
     if (_allowBalance.is_initialized()) {
-        builder.append(noBalance.name(), !_allowBalance.get());
+        builder.append(kNoBalance.name(), !_allowBalance.get());
     }
 
     return builder.obj();
@@ -223,6 +274,18 @@ void CollectionType::setUpdatedAt(Date_t updatedAt) {
 void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
     invariant(!keyPattern.toBSON().isEmpty());
     _keyPattern = keyPattern;
+}
+
+bool CollectionType::hasSameOptions(CollectionType& other) {
+    // The relevant options must have been set on this CollectionType.
+    invariant(_fullNs && _keyPattern && _unique);
+
+    return *_fullNs == other.getNs() &&
+        SimpleBSONObjComparator::kInstance.evaluate(_keyPattern->toBSON() ==
+                                                    other.getKeyPattern().toBSON()) &&
+        SimpleBSONObjComparator::kInstance.evaluate(_defaultCollation ==
+                                                    other.getDefaultCollation()) &&
+        *_unique == other.getUnique();
 }
 
 }  // namespace mongo

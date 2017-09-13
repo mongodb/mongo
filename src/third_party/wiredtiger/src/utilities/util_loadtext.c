@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -8,16 +8,18 @@
 
 #include "util.h"
 
-static int insert(WT_CURSOR *, const char *, int);
+static int insert(WT_CURSOR *, const char *, bool);
 static int text(WT_SESSION *, const char *);
 static int usage(void);
 
 int
 util_loadtext(WT_SESSION *session, int argc, char *argv[])
 {
+	WT_DECL_RET;
 	int ch;
-	const char *uri;
+	char *uri;
 
+	uri = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "f:")) != EOF)
 		switch (ch) {
 		case 'f':	/* input file */
@@ -35,10 +37,13 @@ util_loadtext(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the uri. */
 	if (argc != 1)
 		return (usage());
-	if ((uri = util_name(session, *argv, "table")) == NULL)
+	if ((uri = util_uri(session, *argv, "table")) == NULL)
 		return (1);
 
-	return (text(session, uri));
+	ret = text(session, uri);
+
+	free(uri);
+	return (ret);
 }
 
 /*
@@ -50,7 +55,8 @@ text(WT_SESSION *session, const char *uri)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	int readkey, tret;
+	int tret;
+	bool readkey;
 
 	/*
 	 * Open the cursor, configured to append new records (in the case of
@@ -60,7 +66,7 @@ text(WT_SESSION *session, const char *uri)
 	 */
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, "append,overwrite", &cursor)) != 0)
-		return (util_err(session, ret, "%s: session.open", uri));
+		return (util_err(session, ret, "%s: session.open_cursor", uri));
 
 	/*
 	 * We're about to load strings, make sure the formats match.
@@ -74,7 +80,7 @@ text(WT_SESSION *session, const char *uri)
 		return (util_err(session, EINVAL,
 		    "the loadtext command can only load objects configured "
 		    "for record number or string keys, and string values"));
-	readkey = strcmp(cursor->key_format, "r") == 0 ? 0 : 1;
+	readkey = strcmp(cursor->key_format, "r") != 0;
 
 	/* Insert the records */
 	ret = insert(cursor, uri, readkey);
@@ -100,13 +106,13 @@ text(WT_SESSION *session, const char *uri)
  *	Read and insert data.
  */
 static int
-insert(WT_CURSOR *cursor, const char *name, int readkey)
+insert(WT_CURSOR *cursor, const char *name, bool readkey)
 {
 	ULINE key, value;
 	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t insert_count;
-	int eof;
+	bool eof;
 
 	session = cursor->session;
 
@@ -122,15 +128,15 @@ insert(WT_CURSOR *cursor, const char *name, int readkey)
 		 * all (flat-text load).
 		 */
 		if (readkey) {
-			if (util_read_line(session, &key, 1, &eof))
+			if (util_read_line(session, &key, true, &eof))
 				return (1);
-			if (eof == 1)
+			if (eof)
 				break;
 			cursor->set_key(cursor, key.mem);
 		}
-		if (util_read_line(session, &value, readkey ? 0 : 1, &eof))
+		if (util_read_line(session, &value, !readkey, &eof))
 			return (1);
-		if (eof == 1)
+		if (eof)
 			break;
 		cursor->set_value(cursor, value.mem);
 

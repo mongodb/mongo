@@ -26,64 +26,42 @@
  */
 
 #include "mongo/base/status.h"
+#include "mongo/util/mongoutils/str.h"
 
 #include <ostream>
 #include <sstream>
 
 namespace mongo {
 
-Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, std::string aReason, int aLocation)
-    : code(aCode), reason(std::move(aReason)), location(aLocation) {}
+Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, std::string aReason)
+    : code(aCode), reason(std::move(aReason)) {}
 
-Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, std::string r, int l) {
-    const bool needRep = ((c != ErrorCodes::OK) || !r.empty() || (l != 0));
-    return needRep ? new ErrorInfo(c, std::move(r), l) : NULL;
+Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, std::string r) {
+    if (c == ErrorCodes::OK)
+        return nullptr;
+    return new ErrorInfo(c, std::move(r));
 }
 
-Status::Status(ErrorCodes::Error code, std::string reason, int location)
-    : _error(ErrorInfo::create(code, std::move(reason), location)) {
+Status::Status(ErrorCodes::Error code, std::string reason)
+    : _error(ErrorInfo::create(code, std::move(reason))) {
     ref(_error);
 }
 
-bool Status::compare(const Status& other) const {
-    return code() == other.code() && location() == other.location();
-}
+Status::Status(ErrorCodes::Error code, const char* reason) : Status(code, std::string(reason)) {}
+Status::Status(ErrorCodes::Error code, StringData reason) : Status(code, reason.toString()) {}
 
-bool Status::operator==(const Status& other) const {
-    return compare(other);
-}
-
-bool Status::operator!=(const Status& other) const {
-    return !compare(other);
-}
-
-bool Status::compareCode(const ErrorCodes::Error other) const {
-    return code() == other;
-}
-
-bool Status::operator==(const ErrorCodes::Error other) const {
-    return compareCode(other);
-}
-
-bool Status::operator!=(const ErrorCodes::Error other) const {
-    return !compareCode(other);
-}
+Status::Status(ErrorCodes::Error code, const mongoutils::str::stream& reason)
+    : Status(code, std::string(reason)) {}
 
 std::ostream& operator<<(std::ostream& os, const Status& status) {
     return os << status.codeString() << " " << status.reason();
-}
-
-std::ostream& operator<<(std::ostream& os, ErrorCodes::Error code) {
-    return os << ErrorCodes::errorString(code);
 }
 
 std::string Status::toString() const {
     std::ostringstream ss;
     ss << codeString();
     if (!isOK())
-        ss << " " << reason();
-    if (location() != 0)
-        ss << " @ " << location();
+        ss << ": " << reason();
     return ss.str();
 }
 

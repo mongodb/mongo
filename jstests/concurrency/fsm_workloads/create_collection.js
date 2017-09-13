@@ -5,7 +5,7 @@
  *
  * Repeatedly creates a collection.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = (function() {
 
@@ -32,17 +32,11 @@ var $config = (function() {
             assertAlways.commandWorked(db.createCollection(myCollName));
         }
 
-        return {
-            init: init,
-            create: create
-        };
+        return {init: init, create: create};
 
     })();
 
-    var transitions = {
-        init: { create: 1 },
-        create: { create: 1 }
-    };
+    var transitions = {init: {create: 1}, create: {create: 1}};
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');

@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of collection existing when none
+// expected.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
 // Test basic inserts and updates with document validation.
 (function() {
     "use strict";
@@ -34,14 +38,12 @@
     // Drop will assert on failure.
     coll.drop();
 
-
     // Check that we can only update documents that pass validation.
 
     // Set up valid and invalid docs then set validator.
     assert.writeOK(coll.insert({_id: 'valid1', a: 1}));
     assert.writeOK(coll.insert({_id: 'invalid2', b: 1}));
-    assert.commandWorked(db.runCommand({"collMod": collName,
-                                        "validator" : {a: {$exists: true}}}));
+    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {a: {$exists: true}}}));
 
     // Updates affecting fields not included in validator document
     // on a conforming document.
@@ -63,21 +65,31 @@
     // A no-op update of an invalid doc will succeed.
     assert.writeOK(coll.update({_id: 'invalid2'}, {$set: {b: 1}}));
 
+    // Verify that the validator respects the collection's default collation. We do this by setting
+    // a case-insensitive (strength 2) US English collation, and ensuring that the validation is
+    // case-insensitive.
     coll.drop();
-
+    assert.commandWorked(db.createCollection(
+        collName, {validator: {a: "xyz"}, collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({a: "XYZ"}));
+    assert.writeOK(coll.insert({a: "XyZ", b: "foo"}));
+    assert.writeOK(coll.update({b: "foo"}, {a: "xyZ", b: "foo"}));
+    assert.writeOK(coll.update({b: "foo"}, {$set: {a: "Xyz"}}));
+    assertFailsValidation(coll.insert({a: "not xyz"}));
+    assertFailsValidation(coll.update({b: "foo"}, {$set: {a: "xyzz"}}));
 
     // Verify can't make a conforming doc fail validation,
     // but can update non-conforming doc to pass validation.
+    coll.drop();
     assert.writeOK(coll.insert({_id: 'valid1', a: 1}));
     assert.writeOK(coll.insert({_id: 'invalid2', b: 1}));
-    assert.commandWorked(db.runCommand({"collMod": collName,
-                                        "validator" : {a: {$exists: true}}}));
+    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {a: {$exists: true}}}));
 
     assertFailsValidation(coll.update({_id: 'valid1'}, {$unset: {a: 1}}));
     assert.writeOK(coll.update({_id: 'invalid2'}, {$set: {a: 1}}));
 
     // Modify collection to remove validator statement
-    assert.commandWorked(db.runCommand({"collMod": collName, "validator" : {}}));
+    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {}}));
 
     // Verify no validation applied to updates.
     assert.writeOK(coll.update({_id: 'valid1'}, {$set: {z: 1}}));

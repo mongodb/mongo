@@ -30,8 +30,8 @@
 
 #include <set>
 
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
+#include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 
@@ -42,17 +42,19 @@ namespace mongo {
  */
 class RecordStoreV1RepairCursor final : public RecordCursor {
 public:
-    RecordStoreV1RepairCursor(OperationContext* txn, const RecordStoreV1Base* recordStore);
+    RecordStoreV1RepairCursor(OperationContext* opCtx, const RecordStoreV1Base* recordStore);
 
     boost::optional<Record> next() final;
-    boost::optional<Record> seekExact(const RecordId& id) final;
-    void invalidate(const RecordId& dl);
-    void savePositioned() final {
-        _txn = nullptr;
-    }
-    bool restore(OperationContext* txn) final {
-        _txn = txn;
+    void invalidate(OperationContext* opCtx, const RecordId& dl);
+    void save() final {}
+    bool restore() final {
         return true;
+    }
+    void detachFromOperationContext() final {
+        _opCtx = nullptr;
+    }
+    void reattachToOperationContext(OperationContext* opCtx) final {
+        _opCtx = opCtx;
     }
 
     // Explicitly not supporting fetcherForNext(). The expected use case for this class is a
@@ -72,7 +74,7 @@ private:
     bool _advanceToNextValidExtent();
 
     // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // Reference to the owning RecordStore. The store must not be deleted while there are
     // active iterators on it.

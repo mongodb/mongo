@@ -31,9 +31,10 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/ops/field_checker.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/update/field_checker.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -92,10 +93,13 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     _exprElt = modExpr;
+
+    _collator = opts.collator;
 
     // If the element in the mod is actually an object or a regular expression, we need to
     // build a matcher, instead of just doing an equality comparision.
@@ -104,7 +108,9 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
             _exprObj = _exprElt.embeddedObject();
 
             // If not is not a query operator, then it is a primitive.
-            _matcherOnPrimitive = (_exprObj.firstElement().getGtLtOp() != 0);
+            _matcherOnPrimitive = (MatchExpressionParser::parsePathAcceptingKeyword(
+                                       _exprObj.firstElement(), PathAcceptingKeyword::EQUALITY) !=
+                                   PathAcceptingKeyword::EQUALITY);
 
             // If the object is primitive then wrap it up into an object.
             if (_matcherOnPrimitive)
@@ -115,17 +121,25 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
             _exprObj = _exprElt.wrap("");
         }
 
-        // Build the matcher around the object we built above. Currently, we do not allow
-        // $pull operations to contain $where clauses, so preserving this behaviour.
-        StatusWithMatchExpression parseResult =
-            MatchExpressionParser::parse(_exprObj, MatchExpressionParser::WhereCallback());
-        if (!parseResult.isOK())
+        // Build the matcher around the object we built above. Currently, we do not allow $pull
+        // operations to contain $text/$where/$geoNear/$near/$nearSphere/$expr clauses.
+        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(_exprObj, _collator);
+        if (!parseResult.isOK()) {
             return parseResult.getStatus();
+        }
 
-        _matchExpr.reset(parseResult.getValue());
+        _matchExpr = std::move(parseResult.getValue());
     }
 
     return Status::OK();
+}
+
+void ModifierPull::setCollator(const CollatorInterface* collator) {
+    invariant(!_collator);
+    _collator = collator;
+    if (_matchExpr) {
+        _matchExpr->setCollator(_collator);
+    }
 }
 
 Status ModifierPull::prepare(mb::Element root, StringData matchedField, ExecInfo* execInfo) {
@@ -200,7 +214,7 @@ Status ModifierPull::apply() const {
     std::vector<mb::Element>::const_iterator where = _preparedState->elementsToRemove.begin();
     const std::vector<mb::Element>::const_iterator end = _preparedState->elementsToRemove.end();
     for (; where != end; ++where)
-        const_cast<mb::Element&>(*where).remove();
+        const_cast<mb::Element&>(*where).remove().transitional_ignore();
 
     return Status::OK();
 }
@@ -258,7 +272,7 @@ bool ModifierPull::isMatch(mutablebson::ConstElement element) {
     dassert(element.hasValue());
 
     if (!_matchExpr)
-        return (element.compareWithBSONElement(_exprElt, false) == 0);
+        return (element.compareWithBSONElement(_exprElt, _collator, false) == 0);
 
     if (_matcherOnPrimitive) {
         // TODO: This is kinda slow.

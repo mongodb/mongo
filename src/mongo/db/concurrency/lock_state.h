@@ -32,6 +32,7 @@
 
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
@@ -54,9 +55,9 @@ public:
     /**
      * Uninterruptible blocking method, which waits for the notification to fire.
      *
-     * @param timeoutMs How many milliseconds to wait before returning LOCK_TIMEOUT.
+     * @param timeout How many milliseconds to wait before returning LOCK_TIMEOUT.
      */
-    LockResult wait(unsigned timeoutMs);
+    LockResult wait(Milliseconds timeout);
 
 private:
     virtual void notify(ResourceId resId, LockResult result);
@@ -92,17 +93,23 @@ public:
 
     virtual ~LockerImpl();
 
+    virtual ClientState getClientState() const;
+
     virtual LockerId getId() const {
         return _id;
     }
 
-    virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
-    virtual LockResult lockGlobalBegin(LockMode mode);
-    virtual LockResult lockGlobalComplete(unsigned timeoutMs);
+    stdx::thread::id getThreadId() const override;
+
+    virtual LockResult lockGlobal(LockMode mode);
+    virtual LockResult lockGlobalBegin(LockMode mode, Milliseconds timeout) {
+        return _lockGlobalBegin(mode, timeout);
+    }
+    virtual LockResult lockGlobalComplete(Milliseconds timeout);
     virtual void lockMMAPV1Flush();
 
     virtual void downgradeGlobalXtoSForMMAPV1();
-    virtual bool unlockAll();
+    virtual bool unlockGlobal();
 
     virtual void beginWriteUnitOfWork();
     virtual void endWriteUnitOfWork();
@@ -113,7 +120,7 @@ public:
 
     virtual LockResult lock(ResourceId resId,
                             LockMode mode,
-                            unsigned timeoutMs = UINT_MAX,
+                            Milliseconds timeout = Milliseconds::max(),
                             bool checkDeadlock = false);
 
     virtual void downgrade(ResourceId resId, LockMode newMode);
@@ -162,12 +169,12 @@ public:
      *
      * @param resId Resource id which was passed to an earlier lockBegin call. Must match.
      * @param mode Mode which was passed to an earlier lockBegin call. Must match.
-     * @param timeoutMs How long to wait for the lock acquisition to complete.
+     * @param timeout How long to wait for the lock acquisition to complete.
      * @param checkDeadlock whether to perform deadlock detection while waiting.
      */
     LockResult lockComplete(ResourceId resId,
                             LockMode mode,
-                            unsigned timeoutMs,
+                            Milliseconds timeout,
                             bool checkDeadlock);
 
 private:
@@ -175,12 +182,17 @@ private:
 
     typedef FastMapNoAlloc<ResourceId, LockRequest, 16> LockRequestsMap;
 
+    /**
+     * Like lockGlobalBegin, but accepts a timeout for acquiring a ticket.
+     */
+    LockResult _lockGlobalBegin(LockMode, Milliseconds timeout);
 
     /**
      * The main functionality of the unlock method, except accepts iterator in order to avoid
-     * additional lookups during unlockAll.
+     * additional lookups during unlockGlobal. Frees locks immediately, so must not be called from
+     * inside a WUOW.
      */
-    bool _unlockImpl(LockRequestsMap::Iterator& it);
+    bool _unlockImpl(LockRequestsMap::Iterator* it);
 
     /**
      * MMAP V1 locking code yields and re-acquires the flush lock occasionally in order to
@@ -188,7 +200,6 @@ private:
      * acquired. It is based on the type of the operation (IS for readers, IX for writers).
      */
     LockMode _getModeForMMAPV1FlushLock() const;
-
 
     // Used to disambiguate different lockers
     const LockerId _id;
@@ -205,10 +216,6 @@ private:
     // and condition variable every time.
     CondVarLockGrantNotification _notify;
 
-    // Timer for measuring duration and timeouts. This value is set when lock acquisition is
-    // about to wait and is sampled at grant time.
-    uint64_t _requestStartTime;
-
     // Per-locker locking statistics. Reported in the slow-query log message and through
     // db.currentOp. Complementary to the per-instance locking statistics.
     SingleThreadedLockStats _stats;
@@ -218,6 +225,14 @@ private:
     int _wuowNestingLevel;
     std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
 
+    // Mode for which the Locker acquired a ticket, or MODE_NONE if no ticket was acquired.
+    LockMode _modeForTicket = MODE_NONE;
+
+    // Indicates whether the client is active reader/writer or is queued.
+    AtomicWord<ClientState> _clientState{kInactive};
+
+    // Track the thread who owns the lock for debugging purposes
+    stdx::thread::id _threadId;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -235,23 +250,9 @@ public:
     virtual bool isWriteLocked() const;
     virtual bool isReadLocked() const;
 
-    virtual void assertEmptyAndReset();
-
     virtual bool hasLockPending() const {
         return getWaitingResource().isValid();
     }
-
-    virtual void setIsBatchWriter(bool newValue) {
-        _batchWriter = newValue;
-    }
-    virtual bool isBatchWriter() const {
-        return _batchWriter;
-    }
-
-    virtual bool hasStrongLocks() const;
-
-private:
-    bool _batchWriter;
 };
 
 typedef LockerImpl<false> DefaultLockerImpl;

@@ -31,11 +31,13 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
 class BSONObjBuilder;
 class Client;
+class OperationContext;
 
 namespace repl {
 
@@ -43,11 +45,22 @@ class ReplClientInfo {
 public:
     static const Client::Decoration<ReplClientInfo> forClient;
 
-    void setLastOp(const OpTime& op) {
-        _lastOp = op;
-    }
+    void setLastOp(const OpTime& op);
+
     OpTime getLastOp() const {
         return _lastOp;
+    }
+
+    // Resets the last op on this client; should only be used in testing.
+    void clearLastOp_forTest() {
+        _lastOp = OpTime();
+    }
+
+    void setLastSnapshot(SnapshotName name) {
+        _lastSnapshot = name;
+    }
+    SnapshotName getLastSnapshot() const {
+        return _lastSnapshot;
     }
 
     // Only used for master/slave
@@ -58,22 +71,19 @@ public:
         return _remoteId;
     }
 
-    // If we haven't cached a term from replication coordinator, get the current term
-    // and cache it during the life cycle of this client.
-    //
-    // Used by logOp() to attach the current term to each log entries. Assume we don't change
-    // the term since caching it. This is true for write commands, since we acquire the
-    // global lock (IX) for write commands and stepping down also needs that lock (S).
-    // Stepping down will kill all user operations, so there is no write after stepping down
-    // in the case of yielding.
-    long long getTerm();
+    /**
+     * Use this to set the LastOp to the latest known OpTime in the oplog.
+     * This is necessary when doing no-op writes, as we need to set the client's lastOp to a proper
+     * value for write concern wait to work.
+     */
+    void setLastOpToSystemLastOpTime(OperationContext* opCtx);
 
 private:
     static const long long kUninitializedTerm = -1;
 
     OpTime _lastOp = OpTime();
+    SnapshotName _lastSnapshot = SnapshotName::min();
     OID _remoteId = OID();
-    long long _cachedTerm = kUninitializedTerm;
 };
 
 }  // namespace repl

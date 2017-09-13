@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -52,8 +52,8 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 			for (; len > 0;
 			    len -= WT_VECTOR_SIZE,
 			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
-				u = _mm_load_si128((__m128i *)userp);
-				t = _mm_load_si128((__m128i *)treep);
+				u = _mm_load_si128((const __m128i *)userp);
+				t = _mm_load_si128((const __m128i *)treep);
 				res_eq = _mm_cmpeq_epi8(u, t);
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
@@ -62,8 +62,8 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 			for (; len > 0;
 			    len -= WT_VECTOR_SIZE,
 			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
-				u = _mm_loadu_si128((__m128i *)userp);
-				t = _mm_loadu_si128((__m128i *)treep);
+				u = _mm_loadu_si128((const __m128i *)userp);
+				t = _mm_loadu_si128((const __m128i *)treep);
 				res_eq = _mm_cmpeq_epi8(u, t);
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
@@ -123,8 +123,8 @@ __wt_lex_compare_skip(
 	tsz = tree_item->size;
 	len = WT_MIN(usz, tsz) - *matchp;
 
-	userp = (uint8_t *)user_item->data + *matchp;
-	treep = (uint8_t *)tree_item->data + *matchp;
+	userp = (const uint8_t *)user_item->data + *matchp;
+	treep = (const uint8_t *)tree_item->data + *matchp;
 
 #ifdef HAVE_X86INTRIN_H
 	/* Use vector instructions if we'll execute at least 2 of them. */
@@ -139,8 +139,8 @@ __wt_lex_compare_skip(
 			    len -= WT_VECTOR_SIZE,
 			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
 			    *matchp += WT_VECTOR_SIZE) {
-				u = _mm_load_si128((__m128i *)userp);
-				t = _mm_load_si128((__m128i *)treep);
+				u = _mm_load_si128((const __m128i *)userp);
+				t = _mm_load_si128((const __m128i *)treep);
 				res_eq = _mm_cmpeq_epi8(u, t);
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
@@ -150,8 +150,8 @@ __wt_lex_compare_skip(
 			    len -= WT_VECTOR_SIZE,
 			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
 			    *matchp += WT_VECTOR_SIZE) {
-				u = _mm_loadu_si128((__m128i *)userp);
-				t = _mm_loadu_si128((__m128i *)treep);
+				u = _mm_loadu_si128((const __m128i *)userp);
+				t = _mm_loadu_si128((const __m128i *)treep);
 				res_eq = _mm_cmpeq_epi8(u, t);
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
@@ -187,4 +187,97 @@ __wt_compare_skip(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
 	}
 	return (collator->compare(
 	    collator, &session->iface, user_item, tree_item, cmpp));
+}
+
+/*
+ * __wt_lex_compare_short --
+ *	Lexicographic comparison routine for short keys.
+ *
+ * Returns:
+ *	< 0 if user_item is lexicographically < tree_item
+ *	= 0 if user_item is lexicographically = tree_item
+ *	> 0 if user_item is lexicographically > tree_item
+ *
+ * We use the names "user" and "tree" so it's clear in the btree code which
+ * the application is looking at when we call its comparison function.
+ */
+static inline int
+__wt_lex_compare_short(const WT_ITEM *user_item, const WT_ITEM *tree_item)
+{
+	size_t len, usz, tsz;
+	const uint8_t *userp, *treep;
+
+	usz = user_item->size;
+	tsz = tree_item->size;
+	len = WT_MIN(usz, tsz);
+
+	userp = user_item->data;
+	treep = tree_item->data;
+
+	/*
+	 * The maximum packed uint64_t is 9B, catch row-store objects using
+	 * packed record numbers as keys.
+	 *
+	 * Don't use a #define to compress this case statement: gcc7 complains
+	 * about implicit fallthrough and doesn't support explicit fallthrough
+	 * comments in macros.
+	 */
+#define	WT_COMPARE_SHORT_MAXLEN 9
+	switch (len) {
+	case 9:
+		if (*userp != *treep)
+			break;
+		++userp;
+		++treep;
+		/* FALLTHROUGH */
+	case 8:
+		if (*userp != *treep)
+			break;
+		++userp;
+		++treep;
+		/* FALLTHROUGH */
+	case 7:
+		if (*userp != *treep)
+			break;
+		++userp;
+		++treep;
+		/* FALLTHROUGH */
+	case 6:
+		if (*userp != *treep)
+			break;
+		++userp;
+		++treep;
+		/* FALLTHROUGH */
+	case 5:
+		if (*userp != *treep)
+			break;
+		++userp;
+		++treep;
+		/* FALLTHROUGH */
+	case 4:
+		if (*userp != *treep)
+			break;
+		++userp;
+		++treep;
+		/* FALLTHROUGH */
+	case 3:
+		if (*userp != *treep)
+			break;
+		++userp;
+		++treep;
+		/* FALLTHROUGH */
+	case 2:
+		if (*userp != *treep)
+			break;
+		++userp;
+		++treep;
+		/* FALLTHROUGH */
+	case 1:
+		if (*userp != *treep)
+			break;
+
+		/* Contents are equal up to the smallest length. */
+		return ((usz == tsz) ?  0 : (usz < tsz) ? -1 : 1);
+	}
+	return (*userp < *treep ? -1 : 1);
 }

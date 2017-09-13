@@ -11,9 +11,9 @@
  * Uses the "reduce" action to combine the results with the contents
  * of the output collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/map_reduce_inline.js'); // for $config
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -37,10 +37,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways(db[this.outCollName].exists() !== null,
                      "output collection '" + fullName + "' should exist");
 
-        var options = {
-            finalize: this.finalizer,
-            out: { reduce: this.outCollName }
-        };
+        var options = {finalize: this.finalizer, out: {reduce: this.outCollName}};
 
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);
         assertAlways.commandWorked(res);

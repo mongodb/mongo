@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 #include <vector>
 
@@ -60,23 +61,20 @@ struct ShellGlobalParams {
     bool runShell;
     bool nodb;
     bool norc;
+    bool nojit = false;
+    bool javascriptProtection = true;
 
     std::string script;
 
-    bool autoKillOp;
-    bool useWriteCommandsDefault;
-    std::string writeMode;
+    bool autoKillOp = false;
+    bool useWriteCommandsDefault = true;
 
-    std::string readMode;
+    std::string writeMode = "commands";
+    std::string readMode = "compatibility";
 
-    rpc::ProtocolSet rpcProtocols;
+    boost::optional<rpc::ProtocolSet> rpcProtocols = boost::none;
 
-    ShellGlobalParams()
-        : autoKillOp(false),
-          useWriteCommandsDefault(true),
-          writeMode("commands"),
-          readMode("compatibility"),
-          rpcProtocols(rpc::supports::kOpQueryOnly) {}
+    int jsHeapLimitMB = 0;
 };
 
 extern ShellGlobalParams shellGlobalParams;
@@ -94,6 +92,4 @@ bool handlePreValidationMongoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args);
 
 Status storeMongoShellOptions(const moe::Environment& params, const std::vector<std::string>& args);
-
-Status validateMongoShellOptions(const moe::Environment& params);
 }

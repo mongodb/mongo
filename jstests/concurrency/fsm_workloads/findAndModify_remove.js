@@ -8,9 +8,7 @@
  */
 var $config = (function() {
 
-    var data = {
-        shardKey: { tid: 1 }
-    };
+    var data = {shardKey: {tid: 1}};
 
     var states = (function() {
 
@@ -19,14 +17,14 @@ var $config = (function() {
         }
 
         function insertAndRemove(db, collName) {
-            var res = db[collName].insert({ tid: this.tid, value: this.iter });
+            var res = db[collName].insert({tid: this.tid, value: this.iter});
             assertAlways.writeOK(res);
             assertAlways.eq(1, res.nInserted);
 
             res = db.runCommand({
                 findandmodify: db[collName].getName(),
-                query: { tid: this.tid },
-                sort: { iter: -1 },
+                query: {tid: this.tid},
+                sort: {iter: -1},
                 remove: true
             });
             assertAlways.commandWorked(res);
@@ -42,24 +40,12 @@ var $config = (function() {
             this.iter++;
         }
 
-        return {
-            init: init,
-            insertAndRemove: insertAndRemove
-        };
+        return {init: init, insertAndRemove: insertAndRemove};
 
     })();
 
-    var transitions = {
-        init: { insertAndRemove: 1 },
-        insertAndRemove: { insertAndRemove: 1 }
-    };
+    var transitions = {init: {insertAndRemove: 1}, insertAndRemove: {insertAndRemove: 1}};
 
-    return {
-        threadCount: 20,
-        iterations: 20,
-        data: data,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 20, iterations: 20, data: data, states: states, transitions: transitions};
 
 })();

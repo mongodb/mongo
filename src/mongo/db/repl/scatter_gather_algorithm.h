@@ -30,12 +30,10 @@
 
 #include <vector>
 
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 
 namespace mongo {
-
-template <typename T>
-class StatusWith;
 
 namespace repl {
 
@@ -57,13 +55,13 @@ public:
     /**
      * Returns the list of requests that should be sent.
      */
-    virtual std::vector<RemoteCommandRequest> getRequests() const = 0;
+    virtual std::vector<executor::RemoteCommandRequest> getRequests() const = 0;
 
     /**
      * Method to call once for each received response.
      */
-    virtual void processResponse(const RemoteCommandRequest& request,
-                                 const ResponseStatus& response) = 0;
+    virtual void processResponse(const executor::RemoteCommandRequest& request,
+                                 const executor::RemoteCommandResponse& response) = 0;
 
     /**
      * Returns true if no more calls to processResponse are needed to consider the

@@ -1,50 +1,55 @@
-// parallel_collection_scan.cpp
-
 /**
-*    Copyright (C) 2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2014-2016 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/multi_iterator.h"
-#include "mongo/db/query/cursor_responses.h"
-#include "mongo/util/touch_pages.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::string;
+using stdx::make_unique;
 
-class ParallelCollectionScanCmd : public Command {
+namespace {
+
+class ParallelCollectionScanCmd : public BasicCommand {
 public:
     struct ExtentInfo {
         ExtentInfo(RecordId dl, size_t s) : diskLoc(dl), size(s) {}
@@ -52,18 +57,24 @@ public:
         size_t size;
     };
 
-    // ------------------------------------------------
+    ParallelCollectionScanCmd() : BasicCommand("parallelCollectionScan") {}
 
-    ParallelCollectionScanCmd() : Command("parallelCollectionScan") {}
-
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     virtual bool slaveOk() const {
         return true;
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    bool supportsNonLocalReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
+        return true;
+    }
+
+    ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kCommand;
+    }
+
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         ActionSet actions;
@@ -74,15 +85,14 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        NamespaceString ns(dbname, cmdObj[name].String());
+        Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
+        const NamespaceString ns(parseNsOrUUID(opCtx, dbname, cmdObj));
 
-        AutoGetCollectionForRead ctx(txn, ns.ns());
+        AutoGetCollectionForReadCommand ctx(opCtx, ns, std::move(dbSLock));
 
         Collection* collection = ctx.getCollection();
         if (!collection)
@@ -97,57 +107,67 @@ public:
                                        Status(ErrorCodes::BadValue,
                                               str::stream()
                                                   << "numCursors has to be between 1 and 10000"
-                                                  << " was: " << numCursors));
+                                                  << " was: "
+                                                  << numCursors));
 
-        auto iterators = collection->getManyCursors(txn);
-        if (iterators.size() < numCursors) {
-            numCursors = iterators.size();
+        std::vector<std::unique_ptr<RecordCursor>> iterators;
+        // Opening multiple cursors on a capped collection and reading them in parallel can produce
+        // behavior that is not well defined. This can be removed when support for parallel
+        // collection scan on capped collections is officially added. The 'getCursor' function
+        // ensures that the cursor returned iterates the capped collection in proper document
+        // insertion order.
+        if (collection->isCapped()) {
+            iterators.push_back(collection->getCursor(opCtx));
+            numCursors = 1;
+        } else {
+            iterators = collection->getManyCursors(opCtx);
+            if (iterators.size() < numCursors) {
+                numCursors = iterators.size();
+            }
         }
 
-        OwnedPointerVector<PlanExecutor> execs;
+        std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
         for (size_t i = 0; i < numCursors; i++) {
-            WorkingSet* ws = new WorkingSet();
-            MultiIteratorStage* mis = new MultiIteratorStage(txn, ws, collection);
+            unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+            unique_ptr<MultiIteratorStage> mis =
+                make_unique<MultiIteratorStage>(opCtx, ws.get(), collection);
 
-            PlanExecutor* rawExec;
             // Takes ownership of 'ws' and 'mis'.
-            Status execStatus =
-                PlanExecutor::make(txn, ws, mis, collection, PlanExecutor::YIELD_AUTO, &rawExec);
-            invariant(execStatus.isOK());
-            unique_ptr<PlanExecutor> curExec(rawExec);
-
-            // The PlanExecutor was registered on construction due to the YIELD_AUTO policy.
-            // We have to deregister it, as it will be registered with ClientCursor.
-            curExec->deregisterExec();
-
-            // Need to save state while yielding locks between now and getMore().
-            curExec->saveState();
-
-            execs.push_back(curExec.release());
+            auto statusWithPlanExecutor = PlanExecutor::make(
+                opCtx, std::move(ws), std::move(mis), collection, PlanExecutor::YIELD_AUTO);
+            invariant(statusWithPlanExecutor.isOK());
+            execs.push_back(std::move(statusWithPlanExecutor.getValue()));
         }
 
         // transfer iterators to executors using a round-robin distribution.
         // TODO consider using a common work queue once invalidation issues go away.
         for (size_t i = 0; i < iterators.size(); i++) {
-            PlanExecutor* theExec = execs[i % execs.size()];
-            MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getRootStage());
-
-            // This wasn't called above as they weren't assigned yet
-            iterators[i]->savePositioned();
-
+            auto& planExec = execs[i % execs.size()];
+            MultiIteratorStage* mis = checked_cast<MultiIteratorStage*>(planExec->getRootStage());
             mis->addIterator(std::move(iterators[i]));
         }
 
         {
             BSONArrayBuilder bucketsBuilder;
-            for (size_t i = 0; i < execs.size(); i++) {
-                // transfer ownership of an executor to the ClientCursor (which manages its own
-                // lifetime).
-                ClientCursor* cc =
-                    new ClientCursor(collection->getCursorManager(), execs.releaseAt(i), ns.ns());
+            for (auto&& exec : execs) {
+                // Need to save state while yielding locks between now and getMore().
+                exec->saveState();
+                exec->detachFromOperationContext();
+
+                // Create and register a new ClientCursor.
+                auto pinnedCursor = collection->getCursorManager()->registerCursor(
+                    opCtx,
+                    {std::move(exec),
+                     ns,
+                     AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                     opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                     cmdObj});
+                pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(
+                    opCtx->getRemainingMaxTimeMicros());
 
                 BSONObjBuilder threadResult;
-                appendCursorResponseObject(cc->cursorid(), ns.ns(), BSONArray(), &threadResult);
+                appendCursorResponseObject(
+                    pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &threadResult);
                 threadResult.appendBool("ok", 1);
 
                 bucketsBuilder.append(threadResult.obj());
@@ -158,4 +178,6 @@ public:
         return true;
     }
 } parallelCollectionScanCmd;
-}
+
+}  // namespace
+}  // namespace mongo

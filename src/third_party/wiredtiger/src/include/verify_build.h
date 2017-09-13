@@ -1,13 +1,10 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
-
-#undef ALIGN_CHECK
-#undef SIZE_CHECK
 
 /*
  * NOTE: If you see a compile failure in this file, your compiler is laying out
@@ -36,12 +33,12 @@
  */
 #define	WT_STATIC_ASSERT(cond)	(void)sizeof(char[1 - 2 * !(cond)])
 
-#define	SIZE_CHECK(type, e)	do {					\
+#define	WT_SIZE_CHECK(type, e)	do {					\
 	char __check_##type[1 - 2 * !(sizeof(type) == (e))];		\
 	(void)__check_##type;						\
 } while (0)
 
-#define	ALIGN_CHECK(type, a)						\
+#define	WT_ALIGN_CHECK(type, a)						\
 	WT_STATIC_ASSERT(WT_ALIGN(sizeof(type), (a)) == sizeof(type))
 
 /*
@@ -53,8 +50,25 @@ static inline void
 __wt_verify_build(void)
 {
 	/* Check specific structures weren't padded. */
-	SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
-	SIZE_CHECK(WT_REF, WT_REF_SIZE);
+	WT_SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
+	WT_SIZE_CHECK(WT_REF, WT_REF_SIZE);
+
+	/*
+	 * WT_UPDATE is special: we arrange fields to avoid padding within the
+	 * structure but it could be padded at the end depending on the
+	 * timestamp size.  Further check that the data field in the update
+	 * structure is where we expect it.
+	 */
+	WT_SIZE_CHECK(WT_UPDATE, WT_ALIGN(WT_UPDATE_SIZE, 8));
+	WT_STATIC_ASSERT(offsetof(WT_UPDATE, data) == WT_UPDATE_SIZE);
+
+	/* Check specific structures were padded. */
+#define	WT_PADDING_CHECK(s)						\
+	WT_STATIC_ASSERT(						\
+	    sizeof(s) > WT_CACHE_LINE_ALIGNMENT ||			\
+	    sizeof(s) % WT_CACHE_LINE_ALIGNMENT == 0)
+	WT_PADDING_CHECK(WT_LOGSLOT);
+	WT_PADDING_CHECK(WT_TXN_STATE);
 
 	/*
 	 * The btree code encodes key/value pairs in size_t's, and requires at
@@ -71,6 +85,3 @@ __wt_verify_build(void)
 	 */
 	WT_STATIC_ASSERT(sizeof(wt_off_t) == 8);
 }
-
-#undef ALIGN_CHECK
-#undef SIZE_CHECK

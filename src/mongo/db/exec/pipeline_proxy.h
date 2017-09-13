@@ -28,81 +28,77 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 /**
  * Stage for pulling results out from an aggregation pipeline.
  */
-class PipelineProxyStage : public PlanStage {
+class PipelineProxyStage final : public PlanStage {
 public:
-    PipelineProxyStage(boost::intrusive_ptr<Pipeline> pipeline,
-                       const std::shared_ptr<PlanExecutor>& child,
+    PipelineProxyStage(OperationContext* opCtx,
+                       std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline,
                        WorkingSet* ws);
 
-    virtual PlanStage::StageState work(WorkingSetID* out);
+    PlanStage::StageState doWork(WorkingSetID* out) final;
 
-    virtual bool isEOF();
-
-    virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    bool isEOF() final;
 
     //
-    // Manage our OperationContext. We intentionally don't propagate to the child
-    // Runner as that is handled by DocumentSourceCursor as it needs to.
+    // Manage our OperationContext.
     //
-    virtual void saveState();
-    virtual void restoreState(OperationContext* opCtx);
-
-    /**
-     * Make obj the next object returned by getNext().
-     */
-    void pushBack(const BSONObj& obj);
-
-    /**
-     * Return a shared pointer to the PlanExecutor that feeds the pipeline. The returned
-     * pointer may be NULL.
-     */
-    std::shared_ptr<PlanExecutor> getChildExecutor();
+    void doDetachFromOperationContext() final;
+    void doReattachToOperationContext() final;
 
     // Returns empty PlanStageStats object
-    virtual PlanStageStats* getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
     // Not used.
-    virtual CommonStats* getCommonStats() const {
-        return NULL;
+    SpecificStats* getSpecificStats() const final {
+        MONGO_UNREACHABLE;
     }
 
-    // Not used.
-    virtual SpecificStats* getSpecificStats() const {
-        return NULL;
+    void doInvalidate(OperationContext* opCtx, const RecordId& rid, InvalidationType type) final {
+        // A PlanExecutor with a PipelineProxyStage should be registered with the global cursor
+        // manager, so should not receive invalidations.
+        MONGO_UNREACHABLE;
     }
 
-    // Not used.
-    virtual std::vector<PlanStage*> getChildren() const;
+    std::string getPlanSummaryStr() const;
+    void getPlanSummaryStats(PlanSummaryStats* statsOut) const;
 
-    // Not used.
-    virtual StageType stageType() const {
+    StageType stageType() const final {
         return STAGE_PIPELINE_PROXY;
     }
 
     static const char* kStageType;
 
+protected:
+    void doDispose() final;
+
 private:
     boost::optional<BSONObj> getNextBson();
 
-    // Things in the _stash sould be returned before pulling items from _pipeline.
-    const boost::intrusive_ptr<Pipeline> _pipeline;
+    // Things in the _stash should be returned before pulling items from _pipeline.
+    std::unique_ptr<Pipeline, Pipeline::Deleter> _pipeline;
     std::vector<BSONObj> _stash;
     const bool _includeMetaData;
-    std::weak_ptr<PlanExecutor> _childExec;
+
+    // When the aggregation request is from a 3.4 mongos, the merge may happen on a 3.4 shard (which
+    // does not understand sort key metadata), so we should not serialize the sort key, and
+    // '_includeSortKey' is set to false.
+    // TODO SERVER-30924: remove this.
+    const bool _includeSortKey;
 
     // Not owned by us.
     WorkingSet* _ws;

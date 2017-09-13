@@ -28,7 +28,10 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <queue>
+#include <vector>
 
 #include "mongo/db/geo/hash.h"
 
@@ -37,14 +40,11 @@ namespace mongo {
 
 class R2Region;
 
-class R2RegionCoverer {
-    MONGO_DISALLOW_COPYING(R2RegionCoverer);
-
+class R2RegionCoverer : boost::noncopyable {
     // By default, the covering uses at most 8 cells at any level.
     static const int kDefaultMaxCells;  // = 8;
 
 public:
-    R2RegionCoverer() = default;
     R2RegionCoverer(GeoHashConverter* hashConverter);
     ~R2RegionCoverer();
 
@@ -112,35 +112,38 @@ private:
     R2Region const* _region;
 
     // We keep the candidates that may intersect with this region in a priority queue.
+    struct CompareQueueEntries;
     typedef std::pair<int, Candidate*> QueueEntry;
-
-    // We define our own own comparison function on QueueEntries in order to
-    // make the results deterministic.  Using the default less<QueueEntry>,
-    // entries of equal priority would be sorted according to the memory address
-    // of the candidate.
-    struct CompareQueueEntries {
-        bool operator()(QueueEntry const& x, QueueEntry const& y) const {
-            return x.first < y.first;
-        }
-    };
-
     typedef std::priority_queue<QueueEntry, std::vector<QueueEntry>, CompareQueueEntries>
         CandidateQueue;
-    std::unique_ptr<CandidateQueue> _candidateQueue;  // Priority queue owns candidate pointers.
-    std::unique_ptr<std::vector<GeoHash>> _results;
+    boost::scoped_ptr<CandidateQueue> _candidateQueue;  // Priority queue owns candidate pointers.
+    boost::scoped_ptr<std::vector<GeoHash>> _results;
 };
 
 
 // An R2CellUnion is a region consisting of cells of various sizes.
-class R2CellUnion {
-    MONGO_DISALLOW_COPYING(R2CellUnion);
-
+class R2CellUnion : boost::noncopyable {
 public:
-    R2CellUnion() = default;
-
     void init(const std::vector<GeoHash>& cellIds);
+    // Returns true if the cell union contains the given cell id.
     bool contains(const GeoHash cellId) const;
+    // Return true if the cell union intersects the given cell id.
+    bool intersects(const GeoHash cellId) const;
     std::string toString() const;
+
+    // Direct access to the underlying vector.
+    std::vector<GeoHash> const& cellIds() const {
+        return _cellIds;
+    }
+
+    // Swaps _cellIds with the given vector of cellIds.
+    void detach(std::vector<GeoHash>* cellIds);
+
+    // Adds the cells to _cellIds and calls normalize().
+    void add(const std::vector<GeoHash>& cellIds);
+
+    // Subtracts cellUnion from *this
+    void getDifference(const R2CellUnion& cellUnion);
 
 private:
     // Normalizes the cell union by discarding cells that are contained by other

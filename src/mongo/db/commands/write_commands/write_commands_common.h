@@ -28,10 +28,11 @@
 
 #pragma once
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/net/op_msg.h"
 
 /**
  * Contains common functionality shared between the batch write commands in mongos and mongod.
@@ -42,7 +43,7 @@ namespace auth {
 
 Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
                                 BatchedCommandRequest::BatchType cmdType,
-                                const NamespaceString& cmdNSS,
-                                const BSONObj& cmdObj);
-}
-}
+                                const OpMsgRequest& request);
+
+}  // namespace auth
+}  // namespace mongo

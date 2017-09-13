@@ -28,7 +28,16 @@
 
 #include "mongo/db/query/canonical_query.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -38,33 +47,40 @@ using std::string;
 using std::unique_ptr;
 using unittest::assertGet;
 
-static const char* ns = "somebogusns";
+static const NamespaceString nss("testdb.testcoll");
 
 /**
  * Helper function to parse the given BSON object as a MatchExpression, checks the status,
  * and return the MatchExpression*.
  */
 MatchExpression* parseMatchExpression(const BSONObj& obj) {
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+    const CollatorInterface* collator = nullptr;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(obj,
+                                     collator,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!status.isOK()) {
         mongoutils::str::stream ss;
         ss << "failed to parse query: " << obj.toString()
            << ". Reason: " << status.getStatus().toString();
         FAIL(ss);
     }
-    return status.getValue();
+
+    return status.getValue().release();
 }
 
 /**
  * Helper function which parses and normalizes 'queryStr', and returns whether the given
- * (expression tree, lite parsed query) tuple passes CanonicalQuery::isValid().
+ * (expression tree, query request) tuple passes CanonicalQuery::isValid().
  * Returns Status::OK() if the tuple is valid, else returns an error Status.
  */
-Status isValid(const std::string& queryStr, const LiteParsedQuery& lpqRaw) {
+Status isValid(const std::string& queryStr, const QueryRequest& qrRaw) {
     BSONObj queryObj = fromjson(queryStr);
-    std::unique_ptr<MatchExpression> me(
-        CanonicalQuery::normalizeTree(parseMatchExpression(queryObj)));
-    return CanonicalQuery::isValid(me.get(), lpqRaw);
+    unique_ptr<MatchExpression> me(CanonicalQuery::normalizeTree(parseMatchExpression(queryObj)));
+    return CanonicalQuery::isValid(me.get(), qrRaw);
 }
 
 void assertEquivalent(const char* queryStr,
@@ -95,307 +111,270 @@ void assertNotEquivalent(const char* queryStr,
 
 
 TEST(CanonicalQueryTest, IsValidText) {
-    // Passes in default values for LiteParsedQuery.
-    // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    ASSERT_OK(qr->validate());
 
     // Valid: regular TEXT.
-    ASSERT_OK(isValid("{$text: {$search: 's'}}", *lpq));
+    ASSERT_OK(isValid("{$text: {$search: 's'}}", *qr));
 
     // Valid: TEXT inside OR.
-    ASSERT_OK(isValid(
-        "{$or: ["
-        "    {$text: {$search: 's'}},"
-        "    {a: 1}"
-        "]}",
-        *lpq));
+    ASSERT_OK(
+        isValid("{$or: ["
+                "    {$text: {$search: 's'}},"
+                "    {a: 1}"
+                "]}",
+                *qr));
 
     // Valid: TEXT outside NOR.
-    ASSERT_OK(isValid("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}", *lpq));
+    ASSERT_OK(isValid("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}", *qr));
 
     // Invalid: TEXT inside NOR.
-    ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *lpq));
+    ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *qr));
 
     // Invalid: TEXT inside NOR.
-    ASSERT_NOT_OK(isValid(
-        "{$nor: ["
-        "    {$or: ["
-        "        {$text: {$search: 's'}},"
-        "        {a: 1}"
-        "    ]},"
-        "    {a: 2}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$nor: ["
+                "    {$or: ["
+                "        {$text: {$search: 's'}},"
+                "        {a: 1}"
+                "    ]},"
+                "    {a: 2}"
+                "]}",
+                *qr));
 
     // Invalid: >1 TEXT.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {$text: {$search: 's'}},"
-        "    {$text: {$search: 't'}}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {$text: {$search: 's'}},"
+                "    {$text: {$search: 't'}}"
+                "]}",
+                *qr));
 
     // Invalid: >1 TEXT.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {$or: ["
-        "        {$text: {$search: 's'}},"
-        "        {a: 1}"
-        "    ]},"
-        "    {$or: ["
-        "        {$text: {$search: 't'}},"
-        "        {b: 1}"
-        "    ]}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {$or: ["
+                "        {$text: {$search: 's'}},"
+                "        {a: 1}"
+                "    ]},"
+                "    {$or: ["
+                "        {$text: {$search: 't'}},"
+                "        {b: 1}"
+                "    ]}"
+                "]}",
+                *qr));
+}
+
+TEST(CanonicalQueryTest, IsValidTextTailable) {
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setTailable(true);
+    ASSERT_OK(qr->validate());
+
+    // Invalid: TEXT and tailable.
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
 }
 
 TEST(CanonicalQueryTest, IsValidGeo) {
-    // Passes in default values for LiteParsedQuery.
-    // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    ASSERT_OK(qr->validate());
 
     // Valid: regular GEO_NEAR.
-    ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *lpq));
+    ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *qr));
 
     // Valid: GEO_NEAR inside nested AND.
-    ASSERT_OK(isValid(
-        "{$and: ["
-        "    {$and: ["
-        "        {a: {$near: [0, 0]}},"
-        "        {b: 1}"
-        "    ]},"
-        "    {c: 1}"
-        "]}",
-        *lpq));
+    ASSERT_OK(
+        isValid("{$and: ["
+                "    {$and: ["
+                "        {a: {$near: [0, 0]}},"
+                "        {b: 1}"
+                "    ]},"
+                "    {c: 1}"
+                "]}",
+                *qr));
 
     // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {a: {$near: [0, 0]}},"
-        "    {b: {$near: [0, 0]}}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {a: {$near: [0, 0]}},"
+                "    {b: {$near: [0, 0]}}"
+                "]}",
+                *qr));
 
     // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {a: {$geoNear: [0, 0]}},"
-        "    {b: {$near: [0, 0]}}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {a: {$geoNear: [0, 0]}},"
+                "    {b: {$near: [0, 0]}}"
+                "]}",
+                *qr));
 
     // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {$and: ["
-        "        {a: {$near: [0, 0]}},"
-        "        {b: 1}"
-        "    ]},"
-        "    {$and: ["
-        "        {c: {$near: [0, 0]}},"
-        "        {d: 1}"
-        "    ]}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {$and: ["
+                "        {a: {$near: [0, 0]}},"
+                "        {b: 1}"
+                "    ]},"
+                "    {$and: ["
+                "        {c: {$near: [0, 0]}},"
+                "        {d: 1}"
+                "    ]}"
+                "]}",
+                *qr));
 
     // Invalid: GEO_NEAR inside NOR.
-    ASSERT_NOT_OK(isValid(
-        "{$nor: ["
-        "    {a: {$near: [0, 0]}},"
-        "    {b: 1}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$nor: ["
+                "    {a: {$near: [0, 0]}},"
+                "    {b: 1}"
+                "]}",
+                *qr));
 
     // Invalid: GEO_NEAR inside OR.
-    ASSERT_NOT_OK(isValid(
-        "{$or: ["
-        "    {a: {$near: [0, 0]}},"
-        "    {b: 1}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$or: ["
+                "    {a: {$near: [0, 0]}},"
+                "    {b: 1}"
+                "]}",
+                *qr));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndGeo) {
-    // Passes in default values for LiteParsedQuery.
-    // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    ASSERT_OK(qr->validate());
 
     // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$near: [0, 0]}}", *lpq));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$near: [0, 0]}}", *qr));
 
     // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}", *lpq));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}", *qr));
 
     // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(isValid(
-        "{$or: ["
-        "    {$text: {$search: 's'}},"
-        "    {a: 1}"
-        " ],"
-        " b: {$near: [0, 0]}}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$or: ["
+                "    {$text: {$search: 's'}},"
+                "    {a: 1}"
+                " ],"
+                " b: {$near: [0, 0]}}",
+                *qr));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndNaturalAscending) {
-    // Passes in default values for LiteParsedQuery except for sort order.
-    // Filter inside LiteParsedQuery is not used.
-    BSONObj sort = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             sort,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setSort(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr->validate());
 
     // Invalid: TEXT and {$natural: 1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndNaturalDescending) {
-    // Passes in default values for LiteParsedQuery except for sort order.
-    // Filter inside LiteParsedQuery is not used.
-    BSONObj sort = fromjson("{$natural: -1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             sort,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setSort(fromjson("{$natural: -1}"));
+    ASSERT_OK(qr->validate());
 
     // Invalid: TEXT and {$natural: -1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndHint) {
-    // Passes in default values for LiteParsedQuery except for hint.
-    // Filter inside LiteParsedQuery is not used.
-    BSONObj hint = fromjson("{a: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             hint,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setHint(fromjson("{a: 1}"));
+    ASSERT_OK(qr->validate());
 
     // Invalid: TEXT and {$natural: -1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
 }
 
 // SERVER-14366
 TEST(CanonicalQueryTest, IsValidGeoNearNaturalSort) {
-    // Passes in default values for LiteParsedQuery except for sort order.
-    // Filter inside LiteParsedQuery is not used.
-    BSONObj sort = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             sort,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setSort(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr->validate());
 
     // Invalid: GEO_NEAR and {$natural: 1} sort order.
-    ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *lpq));
+    ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *qr));
 }
 
 // SERVER-14366
 TEST(CanonicalQueryTest, IsValidGeoNearNaturalHint) {
-    // Passes in default values for LiteParsedQuery except for the hint.
-    // Filter inside LiteParsedQuery is not used.
-    BSONObj hint = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             hint,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setHint(fromjson("{$natural: 1}"));
+    ASSERT_OK(qr->validate());
 
     // Invalid: GEO_NEAR and {$natural: 1} hint.
-    ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *lpq));
+    ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *qr));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
-    // Passes in default values for LiteParsedQuery except for snapshot.
-    // Filter inside LiteParsedQuery is not used.
-    bool snapshot = true;
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             snapshot,
-                                                                             false)));  // explain
+    // Filter inside QueryRequest is not used.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setSnapshot(true);
+    ASSERT_OK(qr->validate());
 
     // Invalid: TEXT and snapshot.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
+}
+
+TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    // Passing a sortKey meta-projection without a sort is an error.
+    {
+        const bool isExplain = false;
+        auto qr = assertGet(QueryRequest::makeFromFindCommand(
+            nss, fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}}"), isExplain));
+        auto cq = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+        ASSERT_NOT_OK(cq.getStatus());
+    }
+
+    // Should be able to successfully create a CQ when there is a sort.
+    {
+        const bool isExplain = false;
+        auto qr = assertGet(QueryRequest::makeFromFindCommand(
+            nss,
+            fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}, sort: {bar: 1}}"),
+            isExplain));
+        auto cq = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+        ASSERT_OK(cq.getStatus());
+    }
+}
+
+TEST(CanonicalQueryTest, IsValidNaturalSortIndexHint) {
+    const bool isExplain = false;
+    auto qr = assertGet(QueryRequest::makeFromFindCommand(
+        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {a: 1}}"), isExplain));
+
+    // Invalid: {$natural: 1} sort order and index hint.
+    ASSERT_NOT_OK(isValid("{}", *qr));
+}
+
+TEST(CanonicalQueryTest, IsValidNaturalSortNaturalHint) {
+    const bool isExplain = false;
+    auto qr = assertGet(QueryRequest::makeFromFindCommand(
+        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: 1}}"), isExplain));
+
+    // Valid: {$natural: 1} sort order and {$natural: 1} hint.
+    ASSERT_OK(isValid("{}", *qr));
+}
+
+TEST(CanonicalQueryTest, IsValidNaturalSortNaturalHintDifferentDirections) {
+    const bool isExplain = false;
+    auto qr = assertGet(QueryRequest::makeFromFindCommand(
+        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: -1}}"), isExplain));
+
+    // Invalid: {$natural: 1} sort order and {$natural: -1} hint.
+    ASSERT_NOT_OK(isValid("{}", *qr));
 }
 
 //
@@ -454,53 +433,56 @@ TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
                  "{$or: [{a: 1, b: 1}, {a: 1, b: 1, c: 1}]}");
 }
 
-//
-// Tests for CanonicalQuery::logicalRewrite
-//
-
 /**
  * Utility function to create a CanonicalQuery
  */
-CanonicalQuery* canonicalize(const char* queryStr) {
-    BSONObj queryObj = fromjson(queryStr);
-    CanonicalQuery* cq;
-    Status result = CanonicalQuery::canonicalize(ns, queryObj, &cq);
-    ASSERT_OK(result);
-    return cq;
+unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson(queryStr));
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
-CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr, const char* projStr) {
-    BSONObj queryObj = fromjson(queryStr);
-    BSONObj sortObj = fromjson(sortStr);
-    BSONObj projObj = fromjson(projStr);
-    CanonicalQuery* cq;
-    Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cq);
-    ASSERT_OK(result);
-    return cq;
+std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
+                                             const char* sortStr,
+                                             const char* projStr) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson(queryStr));
+    qr->setSort(fromjson(sortStr));
+    qr->setProj(fromjson(projStr));
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
-// Don't do anything with a double OR.
-TEST(CanonicalQueryTest, RewriteNoDoubleOr) {
-    string queryStr = "{$or:[{a:1}, {b:1}], $or:[{c:1}, {d:1}], e:1}";
-    BSONObj queryObj = fromjson(queryStr);
-    unique_ptr<MatchExpression> base(parseMatchExpression(queryObj));
-    unique_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(base->shallowClone()));
-    assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
+/**
+ * Test that CanonicalQuery::isIsolated() returns correctly.
+ */
+TEST(CanonicalQueryTest, IsIsolatedReturnsTrueWithIsolated) {
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$isolated: 1, x: 3}");
+    ASSERT_TRUE(cq->isIsolated());
 }
 
-// Do something with a single or.
-TEST(CanonicalQueryTest, RewriteSingleOr) {
-    // Rewrite of this...
-    string queryStr = "{$or:[{a:1}, {b:1}], e:1}";
-    BSONObj queryObj = fromjson(queryStr);
-    unique_ptr<MatchExpression> rewrite(
-        CanonicalQuery::logicalRewrite(parseMatchExpression(queryObj)));
+TEST(CanonicalQueryTest, IsIsolatedReturnsTrueWithAtomic) {
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$atomic: 1, x: 3}");
+    ASSERT_TRUE(cq->isIsolated());
+}
 
-    // Should look like this.
-    string rewriteStr = "{$or:[{a:1, e:1}, {b:1, e:1}]}";
-    BSONObj rewriteObj = fromjson(rewriteStr);
-    unique_ptr<MatchExpression> base(parseMatchExpression(rewriteObj));
-    assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
+TEST(CanonicalQueryTest, IsIsolatedReturnsFalseWithIsolated) {
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$isolated: 0, x: 3}");
+    ASSERT_FALSE(cq->isIsolated());
+}
+
+TEST(CanonicalQueryTest, IsIsolatedReturnsFalseWithAtomic) {
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$atomic: 0, x: 3}");
+    ASSERT_FALSE(cq->isIsolated());
 }
 
 /**
@@ -534,6 +516,176 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
     // $and absorbs $and children.
     testNormalizeQuery("{$and: [{$and: [{a: 1}, {b: 1}]}, {c: 1}]}",
                        "{$and: [{a: 1}, {b: 1}, {c: 1}]}");
+    // $in with one argument is rewritten as an equality or regex predicate.
+    testNormalizeQuery("{a: {$in: [1]}}", "{a: {$eq: 1}}");
+    testNormalizeQuery("{a: {$in: [/./]}}", "{a: {$regex: '.'}}");
+    // $in with 0 or more than 1 argument is not modified.
+    testNormalizeQuery("{a: {$in: []}}", "{a: {$in: []}}");
+    testNormalizeQuery("{a: {$in: [/./, 3]}}", "{a: {$in: [/./, 3]}}");
+    // Child of $elemMatch object expression is normalized.
+    testNormalizeQuery("{a: {$elemMatch: {$or: [{b: 1}]}}}", "{a: {$elemMatch: {b: 1}}}");
+}
+
+TEST(CanonicalQueryTest, NormalizeWithInPreservesTags) {
+    BSONObj obj = fromjson("{x: {$in: [1]}}");
+    unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    matchExpression->setTag(new IndexTag(2U, 1U, false));
+    matchExpression.reset(CanonicalQuery::normalizeTree(matchExpression.release()));
+    IndexTag* tag = dynamic_cast<IndexTag*>(matchExpression->getTag());
+    ASSERT(tag);
+    ASSERT_EQ(2U, tag->index);
+}
+
+TEST(CanonicalQueryTest, NormalizeWithInAndRegexPreservesTags) {
+    BSONObj obj = fromjson("{x: {$in: [/a.b/]}}");
+    unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    matchExpression->setTag(new IndexTag(2U, 1U, false));
+    matchExpression.reset(CanonicalQuery::normalizeTree(matchExpression.release()));
+    IndexTag* tag = dynamic_cast<IndexTag*>(matchExpression->getTag());
+    ASSERT(tag);
+    ASSERT_EQ(2U, tag->index);
+}
+
+TEST(CanonicalQueryTest, NormalizeWithInPreservesCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObj obj = fromjson("{'': 'string'}");
+    auto inMatchExpression = stdx::make_unique<InMatchExpression>();
+    inMatchExpression->setCollator(&collator);
+    std::vector<BSONElement> equalities{obj.firstElement()};
+    ASSERT_OK(inMatchExpression->setEqualities(std::move(equalities)));
+    unique_ptr<MatchExpression> matchExpression(
+        CanonicalQuery::normalizeTree(inMatchExpression.release()));
+    ASSERT(matchExpression->matchType() == MatchExpression::MatchType::EQ);
+    EqualityMatchExpression* eqMatchExpression =
+        static_cast<EqualityMatchExpression*>(matchExpression.get());
+    ASSERT_EQ(eqMatchExpression->getCollator(), &collator);
+}
+
+TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    const bool isExplain = true;
+    const std::string cmdStr =
+        "{find:'bogusns', filter:{$or:[{a:1,b:1},{a:1,c:1}]}, projection:{a:1}, sort:{b:1}}";
+    auto qr = assertGet(QueryRequest::makeFromFindCommand(nss, fromjson(cmdStr), isExplain));
+    auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(qr)));
+
+    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
+
+    // Descriptive test. The childCq's filter should be the relevant $or clause, rather than the
+    // entire query predicate.
+    ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getFilter(),
+                      baseCq->getQueryRequest().getFilter());
+
+    ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getProj(), baseCq->getQueryRequest().getProj());
+    ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getSort(), baseCq->getQueryRequest().getSort());
+    ASSERT_TRUE(childCq->getQueryRequest().isExplain());
+}
+
+TEST(CanonicalQueryTest, CanonicalQueryFromQRWithNoCollation) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto cq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(qr)));
+    ASSERT_TRUE(cq->getCollator() == nullptr);
+}
+
+TEST(CanonicalQueryTest, CanonicalQueryFromQRWithCollation) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setCollation(BSON("locale"
+                          << "reverse"));
+    auto cq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(qr)));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT_TRUE(CollatorInterface::collatorsMatch(cq->getCollator(), &collator));
+}
+
+TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithNoCollation) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
+    auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(qr)));
+    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
+    ASSERT_TRUE(baseCq->getCollator() == nullptr);
+    ASSERT_TRUE(childCq->getCollator() == nullptr);
+}
+
+TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
+    qr->setCollation(BSON("locale"
+                          << "reverse"));
+    auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(qr)));
+    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
+    ASSERT(baseCq->getCollator());
+    ASSERT(childCq->getCollator());
+    ASSERT_TRUE(*(childCq->getCollator()) == *(baseCq->getCollator()));
+}
+
+TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson("{a: 'foo', b: {$in: ['bar', 'baz']}}"));
+    auto cq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(qr)));
+    ASSERT_EQUALS(2U, cq->root()->numChildren());
+    auto firstChild = cq->root()->getChild(0);
+    auto secondChild = cq->root()->getChild(1);
+    auto equalityExpr = static_cast<EqualityMatchExpression*>(
+        firstChild->matchType() == MatchExpression::EQ ? firstChild : secondChild);
+    auto inExpr = static_cast<InMatchExpression*>(
+        firstChild->matchType() == MatchExpression::MATCH_IN ? firstChild : secondChild);
+    ASSERT_EQUALS(MatchExpression::EQ, equalityExpr->matchType());
+    ASSERT_EQUALS(MatchExpression::MATCH_IN, inExpr->matchType());
+
+    ASSERT(!cq->getCollator());
+    ASSERT(!equalityExpr->getCollator());
+    ASSERT(!inExpr->getCollator());
+
+    unique_ptr<CollatorInterface> collator =
+        assertGet(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                      ->makeFromBSON(BSON("locale"
+                                          << "reverse")));
+    cq->setCollator(std::move(collator));
+
+    ASSERT(cq->getCollator());
+    ASSERT_EQUALS(equalityExpr->getCollator(), cq->getCollator());
+    ASSERT_EQUALS(inExpr->getCollator(), cq->getCollator());
+}
+
+TEST(CanonicalQueryTest, NorWithOneChildNormalizedToNot) {
+    unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{a: 1}]}"));
+    auto root = cq->root();
+    ASSERT_EQ(MatchExpression::NOT, root->matchType());
+    ASSERT_EQ(1U, root->numChildren());
+    ASSERT_EQ(MatchExpression::EQ, root->getChild(0)->matchType());
+}
+
+TEST(CanonicalQueryTest, NorWithTwoChildrenNotNormalized) {
+    unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{a: 1}, {b: 1}]}"));
+    auto root = cq->root();
+    ASSERT_EQ(MatchExpression::NOR, root->matchType());
+}
+
+TEST(CanonicalQueryTest, NorWithOneChildNormalizedAfterNormalizingChild) {
+    unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{$or: [{a: 1}]}]}"));
+    auto root = cq->root();
+    ASSERT_EQ(MatchExpression::NOT, root->matchType());
+    ASSERT_EQ(1U, root->numChildren());
+    ASSERT_EQ(MatchExpression::EQ, root->getChild(0)->matchType());
 }
 
 }  // namespace

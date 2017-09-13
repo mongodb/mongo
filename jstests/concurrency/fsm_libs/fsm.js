@@ -4,6 +4,8 @@ var fsm = (function() {
     // args.data = 'this' object of the state functions
     // args.db = database object
     // args.collName = collection name
+    // args.cluster = connection strings for all cluster nodes (see fsm_libs/cluster.js for format)
+    // args.passConnectionCache = boolean, whether to pass a connection cache to the workload states
     // args.startState = name of initial state function
     // args.states = state functions of the form
     //               { stateName: function(db, collName) { ... } }
@@ -13,12 +15,35 @@ var fsm = (function() {
     // args.iterations = number of iterations to run the FSM for
     function runFSM(args) {
         var currentState = args.startState;
+
+        // We build a cache of connections that can be used in workload states. This cache
+        // allows state functions to access arbitrary cluster nodes for verification checks.
+        // See fsm_libs/cluster.js for the format of args.cluster.
+        var connCache;
+        if (args.passConnectionCache) {
+            connCache = {mongos: [], config: [], shards: {}};
+            connCache.mongos = args.cluster.mongos.map(connStr => new Mongo(connStr));
+            connCache.config = args.cluster.config.map(connStr => new Mongo(connStr));
+
+            var shardNames = Object.keys(args.cluster.shards);
+
+            shardNames.forEach(name => (connCache.shards[name] = args.cluster.shards[name].map(
+                                            connStr => new Mongo(connStr))));
+        }
+
         for (var i = 0; i < args.iterations; ++i) {
             var fn = args.states[currentState];
             assert.eq('function', typeof fn, 'states.' + currentState + ' is not a function');
-            fn.call(args.data, args.db, args.collName);
+            fn.call(args.data, args.db, args.collName, connCache);
             var nextState = getWeightedRandomChoice(args.transitions[currentState], Random.rand());
             currentState = nextState;
+        }
+
+        // Null out the workload connection cache and perform garbage collection to clean up,
+        // i.e., close, the open connections.
+        if (args.passConnectionCache) {
+            connCache = null;
+            gc();
         }
     }
 
@@ -36,7 +61,9 @@ var fsm = (function() {
 
         // weights = [ 0.25, 0.5, 0.25 ]
         // => accumulated = [ 0.25, 0.75, 1 ]
-        var weights = states.map(function(k) { return doc[k]; });
+        var weights = states.map(function(k) {
+            return doc[k];
+        });
 
         var accumulated = [];
         var sum = weights.reduce(function(a, b, i) {
@@ -45,7 +72,7 @@ var fsm = (function() {
         }, 0);
 
         // Scale the random value by the sum of the weights
-        randVal *= sum; // ~ U[0, sum)
+        randVal *= sum;  // ~ U[0, sum)
 
         // Find the state corresponding to randVal
         for (var i = 0; i < accumulated.length; ++i) {
@@ -56,8 +83,5 @@ var fsm = (function() {
         assert(false, 'not reached');
     }
 
-    return {
-        run: runFSM,
-        _getWeightedRandomChoice: getWeightedRandomChoice
-    };
+    return {run: runFSM, _getWeightedRandomChoice: getWeightedRandomChoice};
 })();

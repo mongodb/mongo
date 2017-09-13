@@ -32,8 +32,11 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <list>
+#include <memory>
 
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -53,13 +56,17 @@ public:
     RecoveryJob();
     ~RecoveryJob();
 
-    void go(std::vector<boost::filesystem::path>& files);
+    void go(OperationContext* opCtx, std::vector<boost::filesystem::path>& files);
 
     /** @param data data between header and footer. compressed if recovering. */
-    void processSection(const JSectHeader* h, const void* data, unsigned len, const JSectFooter* f);
+    void processSection(OperationContext* opCtx,
+                        const JSectHeader* h,
+                        const void* data,
+                        unsigned len,
+                        const JSectFooter* f);
 
     // locks and calls _close()
-    void close();
+    void close(OperationContext* opCtx);
 
     static RecoveryJob& get() {
         return _instance;
@@ -68,10 +75,16 @@ public:
 private:
     class Last {
     public:
-        Last();
+        Last(OperationContext* opCtx);
+
         DurableMappedFile* newEntry(const ParsedJournalEntry&, RecoveryJob&);
 
+        OperationContext* opCtx() {
+            return _opCtx;
+        }
+
     private:
+        OperationContext* _opCtx;
         DurableMappedFile* mmf;
         std::string dbName;
         int fileNo;
@@ -80,11 +93,10 @@ private:
 
     void write(Last& last, const ParsedJournalEntry& entry);  // actually writes to the file
     void applyEntry(Last& last, const ParsedJournalEntry& entry, bool apply, bool dump);
-    void applyEntries(const std::vector<ParsedJournalEntry>& entries);
-    bool processFileBuffer(const void*, unsigned len);
-    bool processFile(boost::filesystem::path journalfile);
-    void _close();  // doesn't lock
-
+    void applyEntries(OperationContext* opCtx, const std::vector<ParsedJournalEntry>& entries);
+    bool processFileBuffer(OperationContext* opCtx, const void*, unsigned len);
+    bool processFile(OperationContext* opCtx, boost::filesystem::path journalfile);
+    void _close(OperationContext* opCtx);  // doesn't lock
 
     // Set of memory mapped files and a mutex to protect them
     stdx::mutex _mx;
@@ -94,7 +106,8 @@ private:
     bool _recovering;
 
     unsigned long long _lastDataSyncedFromLastRun;
-    unsigned long long _lastSeqMentionedInConsoleLog;
+    unsigned long long _lastSeqSkipped;
+    bool _appliedAnySections;
 
 
     static RecoveryJob& _instance;

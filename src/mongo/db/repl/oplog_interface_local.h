@@ -42,12 +42,12 @@ namespace repl {
 
 class OplogInterfaceLocal : public OplogInterface {
 public:
-    OplogInterfaceLocal(OperationContext* txn, const std::string& collectionName);
+    OplogInterfaceLocal(OperationContext* opCtx, const std::string& collectionName);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     std::string _collectionName;
 };
 

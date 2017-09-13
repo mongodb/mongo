@@ -30,9 +30,10 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/ops/field_checker.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/update/field_checker.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -63,7 +64,7 @@ void deduplicate(mb::Element parent, Ordering comp, Equality equal) {
         std::vector<mb::Element>::iterator next = where;
         ++next;
         while (next != end && equal(*where, *next)) {
-            next->remove();
+            next->remove().transitional_ignore();
             ++next;
         }
         where = next;
@@ -124,7 +125,8 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     // TODO: The driver could potentially do this re-writing.
@@ -148,8 +150,6 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
                 return status;
 
             _val = _valDoc.root().leftChild();
-
-            deduplicate(_val, mb::woLess(false), mb::woEqual(false));
         }
     }
 
@@ -169,35 +169,15 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
         _val = each;
     }
 
-    // Check if no invalid data (such as fields with '$'s) are being used in the $each
-    // clause.
-    mb::ConstElement valCursor = _val.leftChild();
-    while (valCursor.ok()) {
-        const BSONType type = valCursor.getType();
-        dassert(valCursor.hasValue());
-        switch (type) {
-            case mongo::Object: {
-                Status s = valCursor.getValueObject().storageValidEmbedded();
-                if (!s.isOK())
-                    return s;
-
-                break;
-            }
-            case mongo::Array: {
-                Status s = valCursor.getValueArray().storageValidEmbedded();
-                if (!s.isOK())
-                    return s;
-
-                break;
-            }
-            default:
-                break;
-        }
-
-        valCursor = valCursor.rightSibling();
-    }
-
+    setCollator(opts.collator);
     return Status::OK();
+}
+
+void ModifierAddToSet::setCollator(const CollatorInterface* collator) {
+    invariant(!_collator);
+    _collator = collator;
+    // Deduplicate _val (must be performed after collator is set to final value.)
+    deduplicate(_val, mb::woLess(_collator, false), mb::woEqual(_collator, false));
 }
 
 Status ModifierAddToSet::prepare(mb::Element root, StringData matchedField, ExecInfo* execInfo) {
@@ -247,11 +227,12 @@ Status ModifierAddToSet::prepare(mb::Element root, StringData matchedField, Exec
     if (_preparedState->elemFound.getType() != mongo::Array) {
         mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Cannot apply $addToSet to a non-array field. Field named '"
-                          << _preparedState->elemFound.getFieldName() << "' has a non-array type "
-                          << typeName(_preparedState->elemFound.getType()) << " in the document "
-                          << idElem.toString());
+                      str::stream() << "Cannot apply $addToSet to a non-array field. Field named '"
+                                    << _preparedState->elemFound.getFieldName()
+                                    << "' has a non-array type "
+                                    << typeName(_preparedState->elemFound.getType())
+                                    << " in the document "
+                                    << idElem.toString());
     }
 
     // If the array is empty, then we don't need to check anything: all of the values are
@@ -265,8 +246,8 @@ Status ModifierAddToSet::prepare(mb::Element root, StringData matchedField, Exec
     // the element is not present, record it as one to add.
     mb::Element eachIter = _val.leftChild();
     while (eachIter.ok()) {
-        mb::Element where =
-            mb::findElement(_preparedState->elemFound.leftChild(), mb::woEqualTo(eachIter, false));
+        mb::Element where = mb::findElement(_preparedState->elemFound.leftChild(),
+                                            mb::woEqualTo(eachIter, _collator, false));
         if (!where.ok()) {
             // The element was not found. Record the element from $each as one to be added.
             _preparedState->elementsToAdd.push_back(eachIter);
@@ -309,8 +290,10 @@ Status ModifierAddToSet::apply() const {
         }
 
         // createPathAt() will complete the path and attach 'elemToSet' at the end of it.
-        Status status = pathsupport::createPathAt(
-            _fieldRef, _preparedState->idxFound, _preparedState->elemFound, baseArray);
+        Status status =
+            pathsupport::createPathAt(
+                _fieldRef, _preparedState->idxFound, _preparedState->elemFound, baseArray)
+                .getStatus();
         if (!status.isOK()) {
             return status;
         }
@@ -387,7 +370,8 @@ Status ModifierAddToSet::log(LogBuilder* logBuilder) const {
         if (!status.isOK()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Could not append entry for $addToSet oplog entry."
-                                        << "Underlying cause: " << status.toString());
+                                        << "Underlying cause: "
+                                        << status.toString());
         }
         curr = curr.rightSibling();
     }

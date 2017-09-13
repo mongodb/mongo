@@ -29,12 +29,17 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
+using mongo::WireVersion;
 using namespace mongo::rpc;
+using mongo::unittest::assertGet;
+using mongo::BSONObj;
 
 // Checks if negotiation of the first to protocol sets results in the 'proto'
 const auto assert_negotiated = [](ProtocolSet fst, ProtocolSet snd, Protocol proto) {
@@ -44,7 +49,8 @@ const auto assert_negotiated = [](ProtocolSet fst, ProtocolSet snd, Protocol pro
 };
 
 TEST(Protocol, SuccessfulNegotiation) {
-    assert_negotiated(supports::kAll, supports::kAll, Protocol::kOpCommandV1);
+    assert_negotiated(supports::kAll, supports::kAll, Protocol::kOpMsg);
+    assert_negotiated(supports::kAll, supports::kOpMsgOnly, Protocol::kOpMsg);
     assert_negotiated(supports::kAll, supports::kOpCommandOnly, Protocol::kOpCommandV1);
     assert_negotiated(supports::kAll, supports::kOpQueryOnly, Protocol::kOpQuery);
 }
@@ -61,6 +67,116 @@ TEST(Protocol, FailedNegotiation) {
     assert_not_negotiated(supports::kAll, supports::kNone);
     assert_not_negotiated(supports::kOpQueryOnly, supports::kNone);
     assert_not_negotiated(supports::kOpCommandOnly, supports::kNone);
+}
+
+TEST(Protocol, parseProtocolSetFromIsMasterReply) {
+    {
+        // MongoDB 3.6
+        auto mongod36 =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::SUPPORTS_OP_MSG)  //
+                                  << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
+
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod36)).protocolSet,
+                  supports::kAll);
+    }
+    {
+        // MongoDB 3.2 (mongod)
+        auto mongod32 =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN)
+                                  << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
+
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod32)).protocolSet,
+                  supports::kOpQueryOnly | supports::kOpCommandOnly);
+    }
+    {
+        // MongoDB 3.2 (mongos)
+        auto mongos32 =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN)
+                                  << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE)
+                                  << "msg"
+                                  << "isdbgrid");
+
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongos32)).protocolSet,
+                  supports::kOpQueryOnly);
+    }
+    {
+        // MongoDB 3.0 (mongod)
+        auto mongod30 = BSON(
+            "maxWireVersion" << static_cast<int>(WireVersion::RELEASE_2_7_7) << "minWireVersion"
+                             << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod30)).protocolSet,
+                  supports::kOpQueryOnly);
+    }
+    {
+        auto mongod24 = BSONObj();
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod24)).protocolSet,
+                  supports::kOpQueryOnly);
+    }
+}
+
+#define VALIDATE_WIRE_VERSION(macro, clientMin, clientMax, serverMin, serverMax)            \
+    do {                                                                                    \
+        auto msg = BSON("minWireVersion" << static_cast<int>(serverMin) << "maxWireVersion" \
+                                         << static_cast<int>(serverMax));                   \
+        auto swReply = parseProtocolSetFromIsMasterReply(msg);                              \
+        ASSERT_OK(swReply.getStatus());                                                     \
+        macro(validateWireVersion({clientMin, clientMax}, swReply.getValue().version));     \
+    } while (0);
+
+TEST(Protocol, validateWireVersion) {
+    // Base Test
+    VALIDATE_WIRE_VERSION(ASSERT_OK,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+
+    // Allowed during upgrade
+    // MongoD 3.4 client -> MongoD 3.4 server
+    VALIDATE_WIRE_VERSION(ASSERT_OK,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+
+    // MongoD 3.4 client -> MongoD 3.2 server
+    VALIDATE_WIRE_VERSION(ASSERT_OK,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::FIND_COMMAND);
+
+    // MongoD 3.2 client -> MongoD 3.4 server
+    VALIDATE_WIRE_VERSION(ASSERT_OK,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+
+    // MongoS 3.4 client -> MongoD 3.4 server
+    VALIDATE_WIRE_VERSION(ASSERT_OK,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+
+    // MongoS 3.2 client -> MongoD 3.4 server
+    VALIDATE_WIRE_VERSION(ASSERT_OK,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::FIND_COMMAND,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+
+    // Disallowed
+    // MongoS 3.4 -> MongoDB 3.2 server
+    VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN,
+                          WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN,
+                          WireVersion::RELEASE_2_4_AND_BEFORE,
+                          WireVersion::FIND_COMMAND);
 }
 
 }  // namespace

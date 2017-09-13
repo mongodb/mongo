@@ -32,10 +32,12 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
@@ -43,6 +45,7 @@
 #include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_options.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
@@ -63,6 +66,14 @@ struct AuthInfo {
     User* user;
 };
 extern AuthInfo internalSecurity;  // set at startup and not changed after initialization.
+
+/**
+ * How user management functions should structure the BSON representation of privileges and roles.
+ */
+enum class AuthenticationRestrictionsFormat {
+    kOmit,  // AuthenticationRestrictions should not be included in the BSON representation.
+    kShow,  // AuthenticationRestrictions should be included in the BSON representation.
+};
 
 /**
  * Contains server/cluster-wide information about Authorization.
@@ -96,6 +107,12 @@ public:
     static const NamespaceString versionCollectionNamespace;
     static const NamespaceString defaultTempUsersCollectionNamespace;  // for mongorestore
     static const NamespaceString defaultTempRolesCollectionNamespace;  // for mongorestore
+
+    /**
+     * Status to be returned when authentication fails. Being consistent about our returned Status
+     * prevents information leakage.
+     */
+    static const Status authenticationFailedStatus;
 
     /**
      * Query to match the auth schema version document in the versionCollectionNamespace.
@@ -165,6 +182,16 @@ public:
     std::unique_ptr<AuthorizationSession> makeAuthorizationSession();
 
     /**
+     * Sets whether or not startup AuthSchema validation checks should be applied in this manager.
+     */
+    void setShouldValidateAuthSchemaOnStartup(bool validate);
+
+    /**
+     * Returns true if startup AuthSchema validation checks should be applied in this manager.
+     */
+    bool shouldValidateAuthSchemaOnStartup();
+
+    /**
      * Sets whether or not access control enforcement is enabled for this manager.
      */
     void setAuthEnabled(bool enabled);
@@ -181,7 +208,7 @@ public:
      * returns a non-OK status.  When returning a non-OK status, *version will be set to
      * schemaVersionInvalid (0).
      */
-    Status getAuthorizationVersion(OperationContext* txn, int* version);
+    Status getAuthorizationVersion(OperationContext* opCtx, int* version);
 
     /**
      * Returns the user cache generation identifier.
@@ -196,7 +223,7 @@ public:
      * meaning that once this method returns true it will continue to return true for the
      * lifetime of this process, even if all users are subsequently dropped from the system.
      */
-    bool hasAnyPrivilegeDocuments(OperationContext* txn);
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx);
 
     // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
     // "system.users" collection of database "dbname".
@@ -209,46 +236,43 @@ public:
     ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly) const;
 
     /**
-     * Writes into "result" a document describing the named user and returns Status::OK().  The
-     * description includes the user credentials and customData, if present, the user's role
-     * membership and delegation information, a full list of the user's privileges, and a full
-     * list of the user's roles, including those roles held implicitly through other roles
-     * (indirect roles).  In the event that some of this information is inconsistent, the
-     * document will contain a "warnings" array, with std::string messages describing
-     * inconsistencies.
-     *
-     * If the user does not exist, returns ErrorCodes::UserNotFound.
+     * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getUserDescription(OperationContext* txn, const UserName& userName, BSONObj* result);
+    Status getUserDescription(OperationContext* opCtx, const UserName& userName, BSONObj* result);
 
     /**
-     * Writes into "result" a document describing the named role and returns Status::OK().  The
-     * description includes the roles in which the named role has membership and a full list of
-     * the roles of which the named role is a member, including those roles memberships held
-     * implicitly through other roles (indirect roles). If "showPrivileges" is true, then the
-     * description documents will also include a full list of the role's privileges.
-     * In the event that some of this information is inconsistent, the document will contain a
-     * "warnings" array, with std::string messages describing inconsistencies.
-     *
-     * If the role does not exist, returns ErrorCodes::RoleNotFound.
+     * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getRoleDescription(const RoleName& roleName, bool showPrivileges, BSONObj* result);
+    Status getRoleDescription(OperationContext* opCtx,
+                              const RoleName& roleName,
+                              PrivilegeFormat privilegeFormat,
+                              AuthenticationRestrictionsFormat,
+                              BSONObj* result);
 
     /**
-     * Writes into "result" documents describing the roles that are defined on the given
-     * database. Each role description document includes the other roles in which the role has
-     * membership and a full list of the roles of which the named role is a member,
-     * including those roles memberships held implicitly through other roles (indirect roles).
-     * If showPrivileges is true, then the description documents will also include a full list
-     * of the role's privileges.  If showBuiltinRoles is true, then the result array will
-     * contain description documents for all the builtin roles for the given database, if it
-     * is false the result will just include user defined roles.
-     * In the event that some of the information in a given role description is inconsistent,
-     * the document will contain a "warnings" array, with std::string messages describing
-     * inconsistencies.
+     * Convenience wrapper for getRoleDescription() defaulting formats to kOmit.
      */
-    Status getRoleDescriptionsForDB(const std::string dbname,
-                                    bool showPrivileges,
+    Status getRoleDescription(OperationContext* ctx, const RoleName& roleName, BSONObj* result) {
+        return getRoleDescription(
+            ctx, roleName, PrivilegeFormat::kOmit, AuthenticationRestrictionsFormat::kOmit, result);
+    }
+
+    /**
+     * Delegates method call to the underlying AuthzManagerExternalState.
+     */
+    Status getRolesDescription(OperationContext* opCtx,
+                               const std::vector<RoleName>& roleName,
+                               PrivilegeFormat privilegeFormat,
+                               AuthenticationRestrictionsFormat,
+                               BSONObj* result);
+
+    /**
+     * Delegates method call to the underlying AuthzManagerExternalState.
+     */
+    Status getRoleDescriptionsForDB(OperationContext* opCtx,
+                                    const std::string dbname,
+                                    PrivilegeFormat privilegeFormat,
+                                    AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result);
 
@@ -262,7 +286,7 @@ public:
      *  The AuthorizationManager retains ownership of the returned User object.
      *  On non-OK Status return values, acquiredUser will not be modified.
      */
-    Status acquireUser(OperationContext* txn, const UserName& userName, User** acquiredUser);
+    Status acquireUser(OperationContext* opCtx, const UserName& userName, User** acquiredUser);
 
     /**
      * Decrements the refcount of the given User object.  If the refcount has gone to zero,
@@ -285,7 +309,7 @@ public:
      * system is at, this may involve building up the user cache and/or the roles graph.
      * Call this function at startup and after resynchronizing a slave/secondary.
      */
-    Status initialize(OperationContext* txn);
+    Status initialize(OperationContext* opCtx);
 
     /**
      * Invalidates all of the contents of the user cache.
@@ -304,11 +328,11 @@ public:
      * Hook called by replication code to let the AuthorizationManager observe changes
      * to relevant collections.
      */
-    void logOp(OperationContext* txn,
+    void logOp(OperationContext* opCtx,
                const char* opstr,
-               const char* ns,
+               const NamespaceString& nss,
                const BSONObj& obj,
-               BSONObj* patt);
+               const BSONObj* patt);
 
 private:
     /**
@@ -329,7 +353,7 @@ private:
      * with oplog entries that have been pre-verified to actually affect authorization data.
      */
     void _invalidateRelevantCacheData(const char* op,
-                                      const char* ns,
+                                      const NamespaceString& ns,
                                       const BSONObj& o,
                                       const BSONObj* o2);
 
@@ -342,9 +366,17 @@ private:
      * Fetches user information from a v2-schema user document for the named user,
      * and stores a pointer to a new user object into *acquiredUser on success.
      */
-    Status _fetchUserV2(OperationContext* txn,
+    Status _fetchUserV2(OperationContext* opCtx,
                         const UserName& userName,
                         std::unique_ptr<User>* acquiredUser);
+
+    /**
+     * True if AuthSchema startup checks should be applied in this AuthorizationManager.
+     *
+     * Defaults to true.  Changes to its value are not synchronized, so it should only be set
+     * at initalization-time.
+     */
+    bool _startupAuthSchemaValidation;
 
     /**
      * True if access control enforcement is enabled in this AuthorizationManager.

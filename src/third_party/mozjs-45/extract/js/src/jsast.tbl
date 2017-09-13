@@ -1,0 +1,84 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* AST_ERROR = -1 */
+
+ASTDEF(AST_PROGRAM,               "Program",                        "program")
+
+ASTDEF(AST_IDENTIFIER,            "Identifier",                     "identifier")
+ASTDEF(AST_LITERAL,               "Literal",                        "literal")
+ASTDEF(AST_PROPERTY,              "Property",                       "property")
+ASTDEF(AST_PROTOTYPEMUTATION,     "PrototypeMutation",              "prototypeMutation")
+
+ASTDEF(AST_MODULE_DECL,           "ModuleDeclaration",              "moduleDeclaration")
+ASTDEF(AST_FUNC_DECL,             "FunctionDeclaration",            "functionDeclaration")
+ASTDEF(AST_VAR_DECL,              "VariableDeclaration",            "variableDeclaration")
+ASTDEF(AST_VAR_DTOR,              "VariableDeclarator",             "variableDeclarator")
+
+ASTDEF(AST_LIST_EXPR,             "SequenceExpression",             "sequenceExpression")
+ASTDEF(AST_COND_EXPR,             "ConditionalExpression",          "conditionalExpression")
+ASTDEF(AST_UNARY_EXPR,            "UnaryExpression",                "unaryExpression")
+ASTDEF(AST_BINARY_EXPR,           "BinaryExpression",               "binaryExpression")
+ASTDEF(AST_ASSIGN_EXPR,           "AssignmentExpression",           "assignmentExpression")
+ASTDEF(AST_LOGICAL_EXPR,          "LogicalExpression",              "logicalExpression")
+ASTDEF(AST_UPDATE_EXPR,           "UpdateExpression",               "updateExpression")
+ASTDEF(AST_NEW_EXPR,              "NewExpression",                  "newExpression")
+ASTDEF(AST_CALL_EXPR,             "CallExpression",                 "callExpression")
+ASTDEF(AST_MEMBER_EXPR,           "MemberExpression",               "memberExpression")
+ASTDEF(AST_FUNC_EXPR,             "FunctionExpression",             "functionExpression")
+ASTDEF(AST_ARROW_EXPR,            "ArrowFunctionExpression",        "arrowFunctionExpression")
+ASTDEF(AST_ARRAY_EXPR,            "ArrayExpression",                "arrayExpression")
+ASTDEF(AST_SPREAD_EXPR,           "SpreadExpression",               "spreadExpression")
+ASTDEF(AST_OBJECT_EXPR,           "ObjectExpression",               "objectExpression")
+ASTDEF(AST_THIS_EXPR,             "ThisExpression",                 "thisExpression")
+ASTDEF(AST_COMP_EXPR,             "ComprehensionExpression",        "comprehensionExpression")
+ASTDEF(AST_GENERATOR_EXPR,        "GeneratorExpression",            "generatorExpression")
+ASTDEF(AST_YIELD_EXPR,            "YieldExpression",                "yieldExpression")
+ASTDEF(AST_CLASS_EXPR,            "ClassExpression",                "classExpression")
+ASTDEF(AST_METAPROPERTY,          "MetaProperty",                   "metaProperty")
+ASTDEF(AST_SUPER,                 "Super",                          "super")
+
+ASTDEF(AST_EMPTY_STMT,            "EmptyStatement",                 "emptyStatement")
+ASTDEF(AST_BLOCK_STMT,            "BlockStatement",                 "blockStatement")
+ASTDEF(AST_EXPR_STMT,             "ExpressionStatement",            "expressionStatement")
+ASTDEF(AST_LAB_STMT,              "LabeledStatement",               "labeledStatement")
+ASTDEF(AST_IF_STMT,               "IfStatement",                    "ifStatement")
+ASTDEF(AST_SWITCH_STMT,           "SwitchStatement",                "switchStatement")
+ASTDEF(AST_WHILE_STMT,            "WhileStatement",                 "whileStatement")
+ASTDEF(AST_DO_STMT,               "DoWhileStatement",               "doWhileStatement")
+ASTDEF(AST_FOR_STMT,              "ForStatement",                   "forStatement")
+ASTDEF(AST_FOR_IN_STMT,           "ForInStatement",                 "forInStatement")
+ASTDEF(AST_FOR_OF_STMT,           "ForOfStatement",                 "forOfStatement")
+ASTDEF(AST_BREAK_STMT,            "BreakStatement",                 "breakStatement")
+ASTDEF(AST_CONTINUE_STMT,         "ContinueStatement",              "continueStatement")
+ASTDEF(AST_WITH_STMT,             "WithStatement",                  "withStatement")
+ASTDEF(AST_RETURN_STMT,           "ReturnStatement",                "returnStatement")
+ASTDEF(AST_TRY_STMT,              "TryStatement",                   "tryStatement")
+ASTDEF(AST_THROW_STMT,            "ThrowStatement",                 "throwStatement")
+ASTDEF(AST_DEBUGGER_STMT,         "DebuggerStatement",              "debuggerStatement")
+ASTDEF(AST_LET_STMT,              "LetStatement",                   "letStatement")
+ASTDEF(AST_IMPORT_DECL,           "ImportDeclaration",              "importDeclaration")
+ASTDEF(AST_IMPORT_SPEC,           "ImportSpecifier",                "importSpecifier")
+ASTDEF(AST_EXPORT_DECL,           "ExportDeclaration",              "exportDeclaration")
+ASTDEF(AST_EXPORT_SPEC,           "ExportSpecifier",                "exportSpecifier")
+ASTDEF(AST_EXPORT_BATCH_SPEC,     "ExportBatchSpecifier",           "exportBatchSpecifier")
+
+ASTDEF(AST_CASE,                  "SwitchCase",                     "switchCase")
+ASTDEF(AST_CATCH,                 "CatchClause",                    "catchClause")
+ASTDEF(AST_COMP_BLOCK,            "ComprehensionBlock",             "comprehensionBlock")
+ASTDEF(AST_COMP_IF,               "ComprehensionIf",                "comprehensionIf")
+
+ASTDEF(AST_ARRAY_PATT,            "ArrayPattern",                   "arrayPattern")
+ASTDEF(AST_OBJECT_PATT,           "ObjectPattern",                  "objectPattern")
+ASTDEF(AST_PROP_PATT,             "Property",                       "propertyPattern")
+ASTDEF(AST_TEMPLATE_LITERAL,      "TemplateLiteral",                "templateLiteral")
+ASTDEF(AST_TAGGED_TEMPLATE,       "TaggedTemplate",                 "taggedTemplate")
+ASTDEF(AST_CALL_SITE_OBJ,         "CallSiteObject",                 "callSiteObject")
+ASTDEF(AST_COMPUTED_NAME,         "ComputedName",                   "computedName")
+
+ASTDEF(AST_CLASS_STMT,            "ClassStatement",                 "classStatement")
+ASTDEF(AST_CLASS_METHOD,          "ClassMethod",                    "classMethod")
+/* AST_LIMIT = last + 1 */

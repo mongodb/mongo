@@ -31,6 +31,8 @@
 #include <sstream>
 #include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/logger/labeled_level.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
@@ -64,7 +66,7 @@ public:
      * "contextName" is a short name of the thread or other context.
      * "severity" is the logging severity of the message.
      */
-    LogstreamBuilder(MessageLogDomain* domain, std::string contextName, LogSeverity severity);
+    LogstreamBuilder(MessageLogDomain* domain, StringData contextName, LogSeverity severity);
 
     /**
      * Construct a LogstreamBuilder that writes to "domain" on destruction.
@@ -72,33 +74,25 @@ public:
      * "contextName" is a short name of the thread or other context.
      * "severity" is the logging severity of the message.
      * "component" is the primary log component of the message.
+     *
+     * By default, this class will create one ostream per thread, and it
+     * will cache that object in a threadlocal and reuse it for subsequent
+     * logs messages. Set "shouldCache" to false to create a new ostream
+     * for each instance of this class rather than cacheing.
      */
     LogstreamBuilder(MessageLogDomain* domain,
-                     std::string contextName,
+                     StringData contextName,
                      LogSeverity severity,
-                     LogComponent component);
+                     LogComponent component,
+                     bool shouldCache = true);
 
     /**
      * Deprecated.
      */
-    LogstreamBuilder(MessageLogDomain* domain,
-                     const std::string& contextName,
-                     LabeledLevel labeledLevel);
+    LogstreamBuilder(MessageLogDomain* domain, StringData contextName, LabeledLevel labeledLevel);
 
-    /**
-     * Move constructor.
-     *
-     * TODO: Replace with = default implementation when minimum MSVC version is bumped to
-     * MSVC2015.
-     */
-    LogstreamBuilder(LogstreamBuilder&& other);
-
-    /**
-     * Move assignment operator.
-     *
-     * TODO: Replace with =default implementation when minimum MSVC version is bumped to VS2015.
-     */
-    LogstreamBuilder& operator=(LogstreamBuilder&& other);
+    LogstreamBuilder(LogstreamBuilder&& other) = default;
+    LogstreamBuilder& operator=(LogstreamBuilder&& other) = default;
 
     /**
      * Destroys a LogstreamBuilder().  If anything was written to it via stream() or operator<<,
@@ -112,6 +106,11 @@ public:
      */
     LogstreamBuilder& setBaseMessage(const std::string& baseMessage) {
         _baseMessage = baseMessage;
+        return *this;
+    }
+
+    LogstreamBuilder& setIsTruncatable(bool isTruncatable) {
+        _isTruncatable = isTruncatable;
         return *this;
     }
 
@@ -190,9 +189,19 @@ public:
         return *this;
     }
 
-    template <typename Rep, typename Period>
-    LogstreamBuilder& operator<<(stdx::chrono::duration<Rep, Period> d) {
+    template <typename Period>
+    LogstreamBuilder& operator<<(const Duration<Period>& d) {
         stream() << d;
+        return *this;
+    }
+
+    LogstreamBuilder& operator<<(BSONType t) {
+        stream() << typeName(t);
+        return *this;
+    }
+
+    LogstreamBuilder& operator<<(ErrorCodes::Error ec) {
+        stream() << ErrorCodes::errorString(ec);
         return *this;
     }
 
@@ -227,6 +236,8 @@ private:
     std::string _baseMessage;
     std::unique_ptr<std::ostringstream> _os;
     Tee* _tee;
+    bool _isTruncatable = true;
+    bool _shouldCache;
 };
 
 

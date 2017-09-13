@@ -38,10 +38,11 @@
 #include <sys/resource.h>
 #endif
 
+#include "mongo/db/server_options.h"
 #include "mongo/db/startup_warnings_common.h"
-#include "mongo/db/storage_options.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
 
@@ -108,9 +109,9 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
 
         opMode = line.substr(posBegin + 1, posEnd - posBegin - 1);
         if (opMode.empty()) {
-            return StatusWith<std::string>(ErrorCodes::BadValue,
-                                           str::stream() << "invalid mode in " << filename << ": '"
-                                                         << line << "'");
+            return StatusWith<std::string>(
+                ErrorCodes::BadValue,
+                str::stream() << "invalid mode in " << filename << ": '" << line << "'");
         }
 
         // Check against acceptable values of opMode.
@@ -119,19 +120,24 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
                 ErrorCodes::BadValue,
                 str::stream()
                     << "** WARNING: unrecognized transparent Huge Pages mode of operation in "
-                    << filename << ": '" << opMode << "''");
+                    << filename
+                    << ": '"
+                    << opMode
+                    << "''");
         }
     } catch (const boost::filesystem::filesystem_error& err) {
         return StatusWith<std::string>(ErrorCodes::UnknownError,
                                        str::stream() << "Failed to probe \"" << err.path1().string()
-                                                     << "\": " << err.code().message());
+                                                     << "\": "
+                                                     << err.code().message());
     }
 
     return StatusWith<std::string>(opMode);
 }
 
-void logMongodStartupWarnings(const StorageGlobalParams& params) {
-    logCommonStartupWarnings();
+void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
+                              const ServerGlobalParams& serverParams) {
+    logCommonStartupWarnings(serverParams);
 
     bool warned = false;
 
@@ -140,7 +146,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& params) {
         log() << "** NOTE: This is a 32 bit MongoDB binary." << startupWarningsLog;
         log() << "**       32 bit builds are limited to less than 2GB of data "
               << "(or less with --journal)." << startupWarningsLog;
-        if (!params.dur) {
+        if (!storageParams.dur) {
             log() << "**       Note that journaling defaults to off for 32 bit "
                   << "and is currently off." << startupWarningsLog;
         }
@@ -219,7 +225,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& params) {
         }
     }
 
-    if (params.dur) {
+    if (storageParams.dur) {
         std::fstream f("/proc/sys/vm/overcommit_memory", ios_base::in);
         unsigned val;
         f >> val;
@@ -281,18 +287,39 @@ void logMongodStartupWarnings(const StorageGlobalParams& params) {
     }
 #endif  // __linux__
 
-#if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)
-    // Check that # of files rlmit > 1000 , and # of processes > # of files/2
+#ifndef _WIN32
+    // Check that # of files rlmit >= 1000
     const unsigned int minNumFiles = 1000;
-    const double filesToProcsRatio = 2.0;
-    struct rlimit rlnproc;
     struct rlimit rlnofile;
 
-    if (!getrlimit(RLIMIT_NPROC, &rlnproc) && !getrlimit(RLIMIT_NOFILE, &rlnofile)) {
+    if (!getrlimit(RLIMIT_NOFILE, &rlnofile)) {
         if (rlnofile.rlim_cur < minNumFiles) {
             log() << startupWarningsLog;
             log() << "** WARNING: soft rlimits too low. Number of files is " << rlnofile.rlim_cur
                   << ", should be at least " << minNumFiles << startupWarningsLog;
+        }
+    } else {
+        const auto errmsg = errnoWithDescription();
+        log() << startupWarningsLog;
+        log() << "** WARNING: getrlimit failed. " << errmsg << startupWarningsLog;
+    }
+
+// Solaris does not have RLIMIT_NPROC & RLIMIT_MEMLOCK, these are exposed via getrctl(2) instead
+#ifndef __sun
+    // Check # of processes >= # of files/2
+    // Check we can lock at least 16 pages for the SecureAllocator
+    const double filesToProcsRatio = 2.0;
+    const unsigned int minLockedPages = 16;
+
+    struct rlimit rlmemlock;
+    struct rlimit rlnproc;
+
+    if (!getrlimit(RLIMIT_NPROC, &rlnproc) && !getrlimit(RLIMIT_MEMLOCK, &rlmemlock)) {
+        if ((rlmemlock.rlim_cur / ProcessInfo::getPageSize()) < minLockedPages) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: soft rlimits too low. The locked memory size is "
+                  << rlmemlock.rlim_cur << " bytes, it should be at least "
+                  << minLockedPages * ProcessInfo::getPageSize() << " bytes" << startupWarningsLog;
         }
 
         if (false) {
@@ -313,9 +340,11 @@ void logMongodStartupWarnings(const StorageGlobalParams& params) {
                   << " times number of files." << startupWarningsLog;
         }
     } else {
+        const auto errmsg = errnoWithDescription();
         log() << startupWarningsLog;
-        log() << "** WARNING: getrlimit failed. " << errnoWithDescription() << startupWarningsLog;
+        log() << "** WARNING: getrlimit failed. " << errmsg << startupWarningsLog;
     }
+#endif
 #endif
 
 #ifdef _WIN32
@@ -331,7 +360,22 @@ void logMongodStartupWarnings(const StorageGlobalParams& params) {
               << startupWarningsLog;
         warned = true;
     }
+
+    if (p.isDataFileZeroingNeeded()) {
+        log() << "Hotfix KB2731284 or later update is not installed, will zero-out data files."
+              << startupWarningsLog;
+        warned = true;
+    }
+
 #endif  // #ifdef _WIN32
+
+    if (storageParams.engine == "ephemeralForTest") {
+        log() << startupWarningsLog;
+        log() << "** NOTE: The ephemeralForTest storage engine is for testing only. "
+              << startupWarningsLog;
+        log() << "**       Do not use in production." << startupWarningsLog;
+        warned = true;
+    }
 
     if (warned) {
         log() << startupWarningsLog;

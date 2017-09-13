@@ -28,98 +28,95 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
+/**
+ * Utility class which represents a field path with nested paths separated by dots.
+ */
 class FieldPath {
 public:
     /**
-     * Constructor.
+     * Throws a AssertionException if a field name does not pass validation.
+     */
+    static void uassertValidFieldName(StringData fieldName);
+
+    /**
+     * Concatenates 'prefix' and 'suffix' using dotted path notation. 'prefix' is allowed to be
+     * empty.
+     */
+    static std::string getFullyQualifiedPath(StringData prefix, StringData suffix);
+
+    /**
+     * Returns the substring of 'path' until the first '.', or the entire string if there is no '.'.
+     */
+    static StringData extractFirstFieldFromDottedPath(StringData path) {
+        return path.substr(0, path.find('.'));
+    }
+
+    /**
+     * Throws a AssertionException if the string is empty or if any of the field names fail
+     * validation.
      *
-     * @param fieldPath the dotted field path std::string or non empty pre-split vector.
-     * The constructed object will have getPathLength() > 0.
-     * Uassert if any component field names do not pass validation.
+     * Field names are validated using uassertValidFieldName().
      */
-    FieldPath(const std::string& fieldPath);
-    FieldPath(const std::vector<std::string>& fieldPath);
+    /* implicit */ FieldPath(std::string inputPath);
+    /* implicit */ FieldPath(StringData inputPath) : FieldPath(inputPath.toString()) {}
+    /* implicit */ FieldPath(const char* inputPath) : FieldPath(std::string(inputPath)) {}
 
     /**
-      Get the number of path elements in the field path.
-
-      @returns the number of path elements
+     * Returns the number of path elements in the field path.
      */
-    size_t getPathLength() const;
+    size_t getPathLength() const {
+        return _fieldPathDotPosition.size() - 1;
+    }
 
     /**
-      Get a particular path element from the path.
-
-      @param i the zero based index of the path element.
-      @returns the path element
+     * Return the ith field name from this path using zero-based indexes.
      */
-    const std::string& getFieldName(size_t i) const;
+    StringData getFieldName(size_t i) const {
+        dassert(i < getPathLength());
+        const auto begin = _fieldPathDotPosition[i] + 1;
+        const auto end = _fieldPathDotPosition[i + 1];
+        return StringData(&_fieldPath[begin], end - begin);
+    }
 
     /**
-      Get the full path.
-
-      @param fieldPrefix whether or not to include the field prefix
-      @returns the complete field path
+     * Returns the full path, not including the prefix 'FieldPath::prefix'.
      */
-    std::string getPath(bool fieldPrefix) const;
+    const std::string& fullPath() const {
+        return _fieldPath;
+    }
 
     /**
-      Write the full path.
-
-      @param outStream where to write the path to
-      @param fieldPrefix whether or not to include the field prefix
-    */
-    void writePath(std::ostream& outStream, bool fieldPrefix) const;
-
-    /**
-       Get the prefix string.
-
-       @returns the prefix string
+     * Returns the full path, including the prefix 'FieldPath::prefix'.
      */
-    static const char* getPrefix();
-
-    static const char prefix[];
-
+    std::string fullPathWithPrefix() const {
+        return prefix + _fieldPath;
+    }
     /**
      * A FieldPath like this but missing the first element (useful for recursion).
      * Precondition getPathLength() > 1.
      */
-    FieldPath tail() const;
+    FieldPath tail() const {
+        massert(16409, "FieldPath::tail() called on single element path", getPathLength() > 1);
+        return {_fieldPath.substr(_fieldPathDotPosition[1] + 1)};
+    }
 
 private:
-    /** Uassert if a field name does not pass validation. */
-    static void uassertValidFieldName(const std::string& fieldName);
+    static const char prefix = '$';
 
-    /**
-     * Push a new field name to the back of the vector of names comprising the field path.
-     * Uassert if 'fieldName' does not pass validation.
-     */
-    void pushFieldName(const std::string& fieldName);
+    // Contains the full field path, with each field delimited by a '.' character.
+    std::string _fieldPath;
 
-    std::vector<std::string> vFieldName;
+    // Contains the position of field delimiter dots in '_fieldPath'. The first element contains
+    // string::npos (which evaluates to -1) and the last contains _fieldPath.size() to facilitate
+    // lookup.
+    std::vector<size_t> _fieldPathDotPosition;
 };
-}
-
-
-/* ======================= INLINED IMPLEMENTATIONS ========================== */
-
-namespace mongo {
-
-inline size_t FieldPath::getPathLength() const {
-    return vFieldName.size();
-}
-
-inline const std::string& FieldPath::getFieldName(size_t i) const {
-    dassert(i < getPathLength());
-    return vFieldName[i];
-}
-
-inline const char* FieldPath::getPrefix() {
-    return prefix;
-}
 }

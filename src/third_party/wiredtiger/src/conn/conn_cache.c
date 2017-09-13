@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -13,12 +13,12 @@
  *	Configure the underlying cache.
  */
 static int
-__cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
+__cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	uint32_t evict_workers_max, evict_workers_min;
+	uint32_t evict_threads_max, evict_threads_min;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -42,31 +42,53 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 	WT_RET(__wt_config_gets(session, cfg, "eviction_trigger", &cval));
 	cache->eviction_trigger = (u_int)cval.val;
 
+	WT_RET(__wt_config_gets(
+	    session, cfg, "eviction_checkpoint_target", &cval));
+	cache->eviction_checkpoint_target = (u_int)cval.val;
+
 	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_target", &cval));
 	cache->eviction_dirty_target = (u_int)cval.val;
+
+	/*
+	 * Don't allow the dirty target to be larger than the overall
+	 * target.
+	 */
+	if (cache->eviction_dirty_target > cache->eviction_target)
+		cache->eviction_dirty_target = cache->eviction_target;
+
+	/*
+	 * Sanity check the checkpoint target: don't allow a value
+	 * lower than the dirty target.
+	 */
+	if (cache->eviction_checkpoint_target > 0 &&
+	    cache->eviction_checkpoint_target < cache->eviction_dirty_target)
+		cache->eviction_checkpoint_target =
+		    cache->eviction_dirty_target;
 
 	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_trigger", &cval));
 	cache->eviction_dirty_trigger = (u_int)cval.val;
 
 	/*
-	 * The eviction thread configuration options include the main eviction
-	 * thread and workers. Our implementation splits them out. Adjust for
-	 * the difference when parsing the configuration.
+	 * Don't allow the dirty trigger to be larger than the overall
+	 * trigger or we can get stuck with a cache full of dirty data.
 	 */
+	if (cache->eviction_dirty_trigger > cache->eviction_trigger)
+		cache->eviction_dirty_trigger = cache->eviction_trigger;
+
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_max", &cval));
 	WT_ASSERT(session, cval.val > 0);
-	evict_workers_max = (uint32_t)cval.val - 1;
+	evict_threads_max = (uint32_t)cval.val;
 
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_min", &cval));
 	WT_ASSERT(session, cval.val > 0);
-	evict_workers_min = (uint32_t)cval.val - 1;
+	evict_threads_min = (uint32_t)cval.val;
 
-	if (evict_workers_min > evict_workers_max)
+	if (evict_threads_min > evict_threads_max)
 		WT_RET_MSG(session, EINVAL,
 		    "eviction=(threads_min) cannot be greater than "
 		    "eviction=(threads_max)");
-	conn->evict_workers_max = evict_workers_max;
-	conn->evict_workers_min = evict_workers_min;
+	conn->evict_threads_max = evict_threads_max;
+	conn->evict_threads_min = evict_threads_min;
 
 	return (0);
 }
@@ -76,11 +98,11 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
  *	Configure or reconfigure the current cache and shared cache.
  */
 int
-__wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
+__wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	int now_shared, was_shared;
+	bool now_shared, was_shared;
 
 	conn = S2C(session);
 
@@ -114,6 +136,17 @@ __wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
 			WT_RET(__wt_conn_cache_pool_open(session));
 	}
 
+	/*
+	 * Resize the thread group if reconfiguring, otherwise the thread group
+	 * will be initialized as part of creating the cache.
+	 */
+	if (reconfigure)
+		WT_RET(__wt_thread_group_resize(
+		    session, &conn->evict_threads,
+		    conn->evict_threads_min,
+		    conn->evict_threads_max,
+		    WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL));
+
 	return (0);
 }
 
@@ -127,6 +160,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	int i;
 
 	conn = S2C(session);
 
@@ -137,26 +171,47 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
-	WT_RET(__wt_cache_config(session, 0, cfg));
+	WT_RET(__wt_cache_config(session, false, cfg));
+
+	/*
+	 * The lowest possible page read-generation has a special meaning, it
+	 * marks a page for forcible eviction; don't let it happen by accident.
+	 */
+	cache->read_gen = WT_READGEN_START_VALUE;
 
 	/*
 	 * The target size must be lower than the trigger size or we will never
 	 * get any work done.
 	 */
 	if (cache->eviction_target >= cache->eviction_trigger)
-		WT_ERR_MSG(session, EINVAL,
+		WT_RET_MSG(session, EINVAL,
 		    "eviction target must be lower than the eviction trigger");
 
-	WT_ERR(__wt_cond_alloc(session,
-	    "cache eviction server", 0, &cache->evict_cond));
-	WT_ERR(__wt_cond_alloc(session,
-	    "eviction waiters", 0, &cache->evict_waiter_cond));
-	WT_ERR(__wt_spin_init(session, &cache->evict_lock, "cache eviction"));
-	WT_ERR(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
+	WT_RET(__wt_cond_auto_alloc(session,
+	    "cache eviction server", 10000, WT_MILLION, &cache->evict_cond));
+	WT_RET(__wt_spin_init(session, &cache->evict_pass_lock, "evict pass"));
+	WT_RET(__wt_spin_init(session,
+	    &cache->evict_queue_lock, "cache eviction queue"));
+	WT_RET(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
+	if ((ret = __wt_open_internal_session(conn, "evict pass",
+	    false, WT_SESSION_NO_DATA_HANDLES, &cache->walk_session)) != 0)
+		WT_RET_MSG(NULL, ret,
+		    "Failed to create session for eviction walks");
 
 	/* Allocate the LRU eviction queue. */
 	cache->evict_slots = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
-	WT_ERR(__wt_calloc_def(session, cache->evict_slots, &cache->evict));
+	for (i = 0; i < WT_EVICT_QUEUE_MAX; ++i) {
+		WT_RET(__wt_calloc_def(session,
+		    cache->evict_slots, &cache->evict_queues[i].evict_queue));
+		WT_RET(__wt_spin_init(session,
+		    &cache->evict_queues[i].evict_lock, "cache eviction"));
+	}
+
+	/* Ensure there are always non-NULL queues. */
+	cache->evict_current_queue = cache->evict_fill_queue =
+	    &cache->evict_queues[0];
+	cache->evict_other_queue = &cache->evict_queues[1];
+	cache->evict_urgent_queue = &cache->evict_queues[WT_EVICT_URGENT_QUEUE];
 
 	/*
 	 * We get/set some values in the cache statistics (rather than have
@@ -164,9 +219,6 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	__wt_cache_stats_update(session);
 	return (0);
-
-err:	WT_RET(__wt_cache_destroy(session));
-	return (ret);
 }
 
 /*
@@ -178,34 +230,49 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	WT_CONNECTION_STATS *stats;
-	uint64_t inuse, leaf, used;
+	WT_CONNECTION_STATS **stats;
+	uint64_t inuse, leaf;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	stats = &conn->stats;
+	stats = conn->stats;
 
 	inuse = __wt_cache_bytes_inuse(cache);
 	/*
 	 * There are races updating the different cache tracking values so
 	 * be paranoid calculating the leaf byte usage.
 	 */
-	used = cache->bytes_overflow + cache->bytes_internal;
-	leaf = inuse > used ? inuse - used : 0;
+	leaf = inuse > cache->bytes_internal ?
+	    inuse - cache->bytes_internal : 0;
 
-	WT_STAT_SET(stats, cache_bytes_max, conn->cache_size);
-	WT_STAT_SET(stats, cache_bytes_inuse, inuse);
+	WT_STAT_SET(session, stats, cache_bytes_max, conn->cache_size);
+	WT_STAT_SET(session, stats, cache_bytes_inuse, inuse);
+	WT_STAT_SET(session, stats, cache_overhead, cache->overhead_pct);
 
-	WT_STAT_SET(stats, cache_overhead, cache->overhead_pct);
-	WT_STAT_SET(stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
-	WT_STAT_SET(stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
-	WT_STAT_SET(stats,
+	WT_STAT_SET(
+	    session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
+	WT_STAT_SET(
+	    session, stats, cache_bytes_image, __wt_cache_bytes_image(cache));
+	WT_STAT_SET(
+	    session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
+	WT_STAT_SET(
+	    session, stats, cache_bytes_internal, cache->bytes_internal);
+	WT_STAT_SET(session, stats, cache_bytes_leaf, leaf);
+	WT_STAT_SET(
+	    session, stats, cache_bytes_other, __wt_cache_bytes_other(cache));
+
+	WT_STAT_SET(session, stats,
 	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
-	WT_STAT_SET(stats, cache_pages_dirty, cache->pages_dirty);
+	WT_STAT_SET(session, stats, cache_pages_dirty,
+	    cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
-	WT_STAT_SET(stats, cache_bytes_internal, cache->bytes_internal);
-	WT_STAT_SET(stats, cache_bytes_overflow, cache->bytes_overflow);
-	WT_STAT_SET(stats, cache_bytes_leaf, leaf);
+	/*
+	 * The number of files with active walks ~= number of hazard pointers
+	 * in the walk session.  Note: reading without locking.
+	 */
+	if (conn->evict_server_running)
+		WT_STAT_SET(session, stats, cache_eviction_walks_active,
+		    cache->walk_session->nhazard);
 }
 
 /*
@@ -218,6 +285,8 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
+	int i;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -235,18 +304,27 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 		__wt_errx(session,
 		    "cache server: exiting with %" PRIu64 " bytes in memory",
 		    cache->bytes_inmem);
-	if (cache->bytes_dirty != 0 || cache->pages_dirty != 0)
+	if (cache->bytes_dirty_intl + cache->bytes_dirty_leaf != 0 ||
+	    cache->pages_dirty_intl + cache->pages_dirty_leaf != 0)
 		__wt_errx(session,
 		    "cache server: exiting with %" PRIu64
 		    " bytes dirty and %" PRIu64 " pages dirty",
-		    cache->bytes_dirty, cache->pages_dirty);
+		    cache->bytes_dirty_intl + cache->bytes_dirty_leaf,
+		    cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
-	WT_TRET(__wt_cond_destroy(session, &cache->evict_cond));
-	WT_TRET(__wt_cond_destroy(session, &cache->evict_waiter_cond));
-	__wt_spin_destroy(session, &cache->evict_lock);
+	__wt_cond_destroy(session, &cache->evict_cond);
+	__wt_spin_destroy(session, &cache->evict_pass_lock);
+	__wt_spin_destroy(session, &cache->evict_queue_lock);
 	__wt_spin_destroy(session, &cache->evict_walk_lock);
+	wt_session = &cache->walk_session->iface;
+	if (wt_session != NULL)
+		WT_TRET(wt_session->close(wt_session, NULL));
 
-	__wt_free(session, cache->evict);
+	for (i = 0; i < WT_EVICT_QUEUE_MAX; ++i) {
+		__wt_spin_destroy(session, &cache->evict_queues[i].evict_lock);
+		__wt_free(session, cache->evict_queues[i].evict_queue);
+	}
+
 	__wt_free(session, conn->cache);
 	return (ret);
 }

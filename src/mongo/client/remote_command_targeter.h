@@ -29,9 +29,13 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
+class ConnectionString;
+class OperationContext;
 struct ReadPreferenceSetting;
 struct HostAndPort;
 template <typename T>
@@ -47,15 +51,60 @@ public:
     virtual ~RemoteCommandTargeter() = default;
 
     /**
-     * Obtains a host, which matches the read preferences specified by readPref.
-     *
-     * Returns OK and a host and port to use for the specified read preference or any
-     * ErrorCode. Known error codes are:
-     *      NotMaster if readPref is PrimaryOnly and there is no primary in the set
-     *      FailedToSatisfyReadPreference if it cannot find a node to match the read preference
-     *          and the readPref is anything other than PrimaryOnly
+     * Retrieves the full connection string for the replica set or standalone host which are
+     * represented by this targeter. This value is always constant for a standalone host and may
+     * vary for replica sets as hosts are added, discovered and removed during the lifetime of the
+     * set.
      */
-    virtual StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) = 0;
+    virtual ConnectionString connectionString() = 0;
+
+    /**
+     * Finds a host matching readPref blocking up to 20 seconds or until the given operation is
+     * interrupted or its deadline expires.
+     *
+     * TODO(schwerin): Once operation max-time behavior is more uniformly integrated into sharding,
+     * remove the 20-second ceiling on wait time.
+     */
+    virtual StatusWith<HostAndPort> findHost(OperationContext* opCtx,
+                                             const ReadPreferenceSetting& readPref) = 0;
+
+
+    /**
+     * Finds a host that matches the read preference specified by readPref, blocking for up to
+     * specified maxWait milliseconds, if a match cannot be found immediately.
+     *
+     * DEPRECATED. Prefer findHost(OperationContext*, const ReadPreferenceSetting&), whenever
+     * an OperationContext is available.
+     */
+    virtual StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                        Milliseconds maxWait) = 0;
+
+    /**
+     * Finds a host matching the given read preference, giving up if a match is not found promptly.
+     *
+     * This method may still engage in blocking networking calls, but will attempt contact every
+     * member of the replica set at most one time.
+     *
+     * TODO(schwerin): Change this implementation to not perform any networking, once existing
+     * callers have been shown to be safe with this behavior or changed to call findHost.
+     */
+    StatusWith<HostAndPort> findHostNoWait(const ReadPreferenceSetting& readPref) {
+        return findHostWithMaxWait(readPref, Milliseconds::zero());
+    }
+
+    /**
+     * Reports to the targeter that a 'status' indicating a not master error was received when
+     * communicating with 'host', and so it should update its bookkeeping to avoid giving out the
+     * host again on a subsequent request for the primary.
+     */
+    virtual void markHostNotMaster(const HostAndPort& host, const Status& status) = 0;
+
+    /**
+     * Reports to the targeter that a 'status' indicating a network error was received when trying
+     * to communicate with 'host', and so it should update its bookkeeping to avoid giving out the
+     * host again on a subsequent request for the primary.
+     */
+    virtual void markHostUnreachable(const HostAndPort& host, const Status& status) = 0;
 
 protected:
     RemoteCommandTargeter() = default;

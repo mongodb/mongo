@@ -54,12 +54,19 @@ public:
         invariant(end >= begin);
     }
 
+    ConstDataRange(const char* begin, std::size_t length, std::ptrdiff_t debug_offset = 0)
+        : ConstDataRange(begin, begin + length, debug_offset) {}
+
     const char* data() const {
         return _begin;
     }
 
     size_t length() const {
         return _end - _begin;
+    }
+
+    bool empty() const {
+        return length() == 0;
     }
 
     template <typename T>
@@ -107,6 +114,9 @@ public:
 
     DataRange(bytes_type begin, bytes_type end, std::ptrdiff_t debug_offset = 0)
         : ConstDataRange(begin, end, debug_offset) {}
+
+    DataRange(bytes_type begin, std::size_t length, std::ptrdiff_t debug_offset = 0)
+        : ConstDataRange(begin, length, debug_offset) {}
 
     template <typename T>
     Status write(const T& value, std::size_t offset = 0) {

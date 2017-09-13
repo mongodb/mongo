@@ -31,9 +31,9 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
-#include <math.h>
-#include <vector>
+#include <cmath>
 #include <utility>
+#include <vector>
 
 #include "mongo/db/query/plan_ranker.h"
 
@@ -76,7 +76,7 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
     double eofBonus = 1.0;
 
     // Each plan will have a stat tree.
-    vector<PlanStageStats*> statTrees;
+    std::vector<std::unique_ptr<PlanStageStats>> statTrees;
 
     // Get stat trees from each plan.
     // Copy stats trees instead of transferring ownership
@@ -93,15 +93,15 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
     // Compute score for each tree.  Record the best.
     for (size_t i = 0; i < statTrees.size(); ++i) {
         LOG(5) << "Scoring plan " << i << ":" << endl
-               << candidates[i].solution->toString() << "Stats:\n"
-               << Explain::statsToBSON(*statTrees[i]).jsonString(Strict, true);
-        LOG(2) << "Scoring query plan: " << Explain::getPlanSummary(candidates[i].root)
+               << redact(candidates[i].solution->toString()) << "Stats:\n"
+               << redact(Explain::statsToBSON(*statTrees[i]).jsonString(Strict, true));
+        LOG(2) << "Scoring query plan: " << redact(Explain::getPlanSummary(candidates[i].root))
                << " planHitEOF=" << statTrees[i]->common.isEOF;
 
-        double score = scoreTree(statTrees[i]);
-        LOG(5) << "score = " << score << endl;
+        double score = scoreTree(statTrees[i].get());
+        LOG(5) << "score = " << score;
         if (statTrees[i]->common.isEOF) {
-            LOG(5) << "Adding +" << eofBonus << " EOF bonus to score." << endl;
+            LOG(5) << "Adding +" << eofBonus << " EOF bonus to score.";
             score += 1;
         }
         scoresAndCandidateindices.push_back(std::make_pair(score, i));
@@ -110,6 +110,14 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
     // Sort (scores, candidateIndex). Get best child and populate candidate ordering.
     std::stable_sort(
         scoresAndCandidateindices.begin(), scoresAndCandidateindices.end(), scoreComparator);
+
+    // Determine whether plans tied for the win.
+    if (scoresAndCandidateindices.size() > 1U) {
+        double bestScore = scoresAndCandidateindices[0].first;
+        double runnerUpScore = scoresAndCandidateindices[1].first;
+        const double epsilon = 1e-10;
+        why->tieForBest = std::abs(bestScore - runnerUpScore) < epsilon;
+    }
 
     // Update results in 'why'
     // Stats and scores in 'why' are sorted in descending order by score.
@@ -143,7 +151,7 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
             score -= eofBonus;
         }
 
-        why->stats.mutableVector().push_back(statTrees[candidateIndex]);
+        why->stats.push_back(std::move(statTrees[candidateIndex]));
         why->scores.push_back(score);
         why->candidateOrder.push_back(candidateIndex);
     }
@@ -161,7 +169,7 @@ double computeSelectivity(const PlanStageStats* stats) {
     } else {
         double sum = 0;
         for (size_t i = 0; i < stats->children.size(); ++i) {
-            sum += computeSelectivity(stats->children[i]);
+            sum += computeSelectivity(stats->children[i].get());
         }
         return sum;
     }
@@ -172,7 +180,7 @@ bool hasStage(const StageType type, const PlanStageStats* stats) {
         return true;
     }
     for (size_t i = 0; i < stats->children.size(); ++i) {
-        if (hasStage(type, stats->children[i])) {
+        if (hasStage(type, stats->children[i].get())) {
             return true;
         }
     }
@@ -188,6 +196,7 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     // How many "units of work" did the plan perform. Each call to work(...)
     // counts as one unit.
     size_t workUnits = stats->common.works;
+    invariant(workUnits != 0);
 
     // How much did a plan produce?
     // Range: [0, 1]
@@ -196,7 +205,7 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
 
     // Just enough to break a tie. Must be small enough to ensure that a more productive
     // plan doesn't lose to a less productive plan due to tie breaking.
-    static const double epsilon = std::min(1.0 / static_cast<double>(10 * workUnits), 1e-4);
+    const double epsilon = std::min(1.0 / static_cast<double>(10 * workUnits), 1e-4);
 
     // We prefer covered projections.
     //
@@ -240,12 +249,12 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     std::string scoreStr = ss;
     LOG(2) << scoreStr;
 
-    if (internalQueryForceIntersectionPlans) {
+    if (internalQueryForceIntersectionPlans.load()) {
         if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
             // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
             // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.
             score += 3;
-            LOG(5) << "Score boosted to " << score << " due to intersection forcing." << endl;
+            LOG(5) << "Score boosted to " << score << " due to intersection forcing.";
         }
     }
 

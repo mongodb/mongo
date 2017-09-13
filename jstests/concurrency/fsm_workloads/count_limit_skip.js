@@ -10,18 +10,16 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * Each thread inserts docs into a unique collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/count.js'); // for $config
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/count.js');              // for $config
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'count_fsm_q_l_s';
 
     $config.data.getCount = function getCount(db, predicate) {
-        var query = Object.extend({ tid: this.tid }, predicate);
-        return db[this.threadCollName].find(query)
-                                      .skip(this.countPerNum - 1)
-                                      .limit(10).count(true);
+        var query = Object.extend({tid: this.tid}, predicate);
+        return db[this.threadCollName].find(query).skip(this.countPerNum - 1).limit(10).count(true);
     };
 
     $config.states.init = function init(db, collName) {
@@ -36,7 +34,7 @@ var $config = extendWorkload($config, function($config, $super) {
                              10);
 
         var num = Random.randInt(this.modulus);
-        assertWhenOwnColl.eq(this.getCount(db, { i: num }),
+        assertWhenOwnColl.eq(this.getCount(db, {i: num}),
                              // having done 'skip(this.countPerNum - 1).limit(10)'
                              1);
     };
@@ -49,4 +47,3 @@ var $config = extendWorkload($config, function($config, $super) {
 
     return $config;
 });
-

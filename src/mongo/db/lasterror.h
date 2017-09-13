@@ -65,8 +65,6 @@ public:
      */
     void setLastError(int code, std::string msg);
 
-    void recordInsert(long long nObjects);
-
     void recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId);
 
     void recordDelete(long long nDeleted);
@@ -84,8 +82,12 @@ public:
     bool isValid() const {
         return _valid;
     }
-    int const getNPrev() const {
+    int getNPrev() const {
         return _nPrev;
+    }
+
+    bool hadNotMasterError() const {
+        return _hadNotMasterError;
     }
 
     class Disabled {
@@ -117,6 +119,7 @@ private:
     int _nPrev = 1;
     bool _valid = false;
     bool _disabled = false;
+    bool _hadNotMasterError = false;
 };
 
 }  // namespace mongo

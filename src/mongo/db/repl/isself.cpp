@@ -37,15 +37,17 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
+#include "mongo/util/scopeguard.h"
 
 #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || \
     defined(__OpenBSD__)
@@ -66,11 +68,11 @@
 #endif
 
 #elif defined(_WIN32)
+#include <Ws2tcpip.h>
 #include <boost/asio/detail/socket_ops.hpp>
 #include <boost/system/error_code.hpp>
 #include <iphlpapi.h>
 #include <winsock2.h>
-#include <Ws2tcpip.h>
 #endif  // defined(_WIN32)
 
 namespace mongo {
@@ -154,7 +156,7 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 
 }  // namespace
 
-bool isSelf(const HostAndPort& hostAndPort) {
+bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
     // Fastpath: check if the host&port in question is bound to one
     // of the interfaces on this machine.
     // No need for ip match if the ports do not match
@@ -182,25 +184,23 @@ bool isSelf(const HostAndPort& hostAndPort) {
         }
     }
 
-    // Ensure that the server is up and ready to accept incoming network requests.
-    const Listener* listener = Listener::getTimeTracker();
-    if (!listener) {
-        return false;
-    }
-    listener->waitUntilListening();
+    ctx->waitForStartupComplete();
 
     try {
         DBClientConnection conn;
-        std::string errmsg;
         conn.setSoTimeout(30);  // 30 second timeout
-        if (!conn.connect(hostAndPort, errmsg)) {
+
+        // We need to avoid the isMaster call triggered by a normal connect, which would
+        // cause a deadlock. 'isSelf' is called by the Replication Coordinator when validating
+        // a replica set configuration document, but the 'isMaster' command requires a lock on the
+        // replication coordinator to execute. As such we call we call 'connectSocketOnly', which
+        // does not call 'isMaster'.
+        if (!conn.connectSocketOnly(hostAndPort).isOK()) {
             return false;
         }
 
-        if (getGlobalAuthorizationManager()->isAuthEnabled() && isInternalAuthSet()) {
-            if (!authenticateInternalUser(&conn)) {
-                return false;
-            }
+        if (isInternalAuthSet() && !conn.authenticateInternalUser()) {
+            return false;
         }
         BSONObj out;
         bool ok = conn.simpleCommand("admin", &out, "_isSelf");
@@ -208,7 +208,7 @@ bool isSelf(const HostAndPort& hostAndPort) {
 
         return me;
     } catch (const std::exception& e) {
-        warning() << "could't check isSelf (" << hostAndPort << ") " << e.what() << std::endl;
+        warning() << "couldn't check isSelf (" << hostAndPort << ") " << e.what() << std::endl;
     }
 
     return false;

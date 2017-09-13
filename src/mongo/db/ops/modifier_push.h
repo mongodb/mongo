@@ -35,7 +35,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/modifier_interface.h"
-#include "mongo/db/ops/modifier_push_sorter.h"
+#include "mongo/db/update/push_sorter.h"
 
 namespace mongo {
 
@@ -45,8 +45,7 @@ class ModifierPush : public ModifierInterface {
     MONGO_DISALLOW_COPYING(ModifierPush);
 
 public:
-    enum ModifierPushMode { PUSH_NORMAL, PUSH_ALL };
-    explicit ModifierPush(ModifierPushMode mode = PUSH_NORMAL);
+    ModifierPush();
 
     //
     // Modifier interface implementation
@@ -55,10 +54,10 @@ public:
     virtual ~ModifierPush();
 
     /**
-     * A 'modExpr' here is a BSONElement {<fieldname>: <each clause>, <slice clause>, <sort
-     * clause>} coming from a $push mod such as {$set: {x: $each[{a:1}], $slice:3,
-     * $sort{b:1}}}. init() extracts and validates the field name and the clauses. It
-     * returns OK if successful or a status describing the error.
+     * A 'modExpr' here is a BSONElement {<fieldname>: <each clause>, <slice clause>, <sort clause>,
+     * <position clause>} coming from a $push mod such as {$set: {x: $each: [{a: 1}], $slice: 3,
+     * $sort: {b: 1}, $position: 5}}. init() extracts and validates the field name and the clauses.
+     * It returns OK if successful or a status describing the error.
      *
      * There are currently a few restrictions concerning the clauses (but all can be
      * lifted):
@@ -95,6 +94,8 @@ public:
      */
     virtual Status log(LogBuilder* logBuilder) const;
 
+    virtual void setCollator(const CollatorInterface* collator);
+
 private:
     // Access to each component of fieldName that's the target of this mod.
     FieldRef _fieldRef;
@@ -108,12 +109,9 @@ private:
     bool _slicePresent;
     int64_t _slice;
     bool _sortPresent;
-    size_t _startPosition;
+    int32_t _position;  // Can be negative.
 
     PatternElementCmp _sort;
-
-    // Whether this mod is supposed to be parsed as a $pushAll.
-    const ModifierPushMode _pushMode;
 
     // Simple (old style) push value when the $each variation of the command is not
     // used. The _eachMode flag would be off if we're this mode.

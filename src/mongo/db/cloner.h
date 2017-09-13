@@ -30,8 +30,11 @@
 
 #pragma once
 
-#include "mongo/client/dbclientinterface.h"
+#include <string>
+#include <vector>
+
 #include "mongo/base/disallow_copying.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 
@@ -53,40 +56,64 @@ public:
 
     /**
      * Copies an entire database from the specified host.
+     * clonedColls: when not-null, the function will return with this populated with a list of
+     *              the collections that were cloned.  This is for the user-facing clone command.
+     * collectionsToClone: When opts.createCollections is false, this list reflects the collections
+     *              that are cloned.  When opts.createCollections is true, this parameter is
+     *              ignored and the collection list is fetched from the remote via _conn.
      */
-    Status copyDb(OperationContext* txn,
+    Status copyDb(OperationContext* opCtx,
                   const std::string& toDBName,
                   const std::string& masterHost,
                   const CloneOptions& opts,
-                  std::set<std::string>* clonedColls);
+                  std::set<std::string>* clonedColls,
+                  std::vector<BSONObj> collectionsToClone = std::vector<BSONObj>());
 
-    bool copyCollection(OperationContext* txn,
+    bool copyCollection(OperationContext* opCtx,
                         const std::string& ns,
                         const BSONObj& query,
                         std::string& errmsg,
-                        bool mayYield,
-                        bool mayBeInterrupted,
-                        bool copyIndexes = true);
+                        bool copyIndexes);
+
+    // Filters a database's collection list and removes collections that should not be cloned.
+    // CloneOptions should be populated with a fromDB and a list of collections to ignore, which
+    // will be filtered out.
+    StatusWith<std::vector<BSONObj>> filterCollectionsForClone(
+        const CloneOptions& opts, const std::list<BSONObj>& initialCollections);
+
+    struct CreateCollectionParams {
+        std::string collectionName;
+        BSONObj collectionInfo;
+        BSONObj idIndexSpec;
+    };
+
+    // Executes 'createCollection' for each collection described in 'createCollectionParams', in
+    // 'dbName'.
+    Status createCollectionsForDb(OperationContext* opCtx,
+                                  const std::vector<CreateCollectionParams>& createCollectionParams,
+                                  const std::string& dbName);
+
+    /*
+     * Returns the _id index spec from 'indexSpecs', or an empty BSONObj if none is found.
+     */
+    static BSONObj getIdIndexSpec(const std::list<BSONObj>& indexSpecs);
 
 private:
-    void copy(OperationContext* txn,
+    void copy(OperationContext* opCtx,
               const std::string& toDBName,
               const NamespaceString& from_ns,
+              const BSONObj& from_opts,
+              const BSONObj& from_id_index,
               const NamespaceString& to_ns,
-              bool masterSameProcess,
-              bool slaveOk,
-              bool mayYield,
-              bool mayBeInterrupted,
+              const CloneOptions& opts,
               Query q);
 
-    void copyIndexes(OperationContext* txn,
+    void copyIndexes(OperationContext* opCtx,
                      const std::string& toDBName,
                      const NamespaceString& from_ns,
-                     const NamespaceString& to_ns,
-                     bool masterSameProcess,
-                     bool slaveOk,
-                     bool mayYield,
-                     bool mayBeInterrupted);
+                     const BSONObj& from_opts,
+                     const std::list<BSONObj>& from_indexes,
+                     const NamespaceString& to_ns);
 
     struct Fun;
     std::unique_ptr<DBClientBase> _conn;
@@ -95,33 +122,23 @@ private:
 /**
  *  slaveOk     - if true it is ok if the source of the data is !ismaster.
  *  useReplAuth - use the credentials we normally use as a replication slave for the cloning
- *  snapshot    - use $snapshot mode for copying collections.  note this should not be used
+ *  snapshot    - use snapshot mode for copying collections.  note this should not be used
  *                when it isn't required, as it will be slower.  for example,
  *                repairDatabase need not use it.
+ *  createCollections - When 'true', will fetch a list of collections from the remote and create
+ *                them.  When 'false', assumes collections have already been created ahead of time.
  */
 struct CloneOptions {
-    CloneOptions() {
-        slaveOk = false;
-        useReplAuth = false;
-        snapshot = true;
-        mayYield = true;
-        mayBeInterrupted = false;
-
-        syncData = true;
-        syncIndexes = true;
-    }
-
     std::string fromDB;
     std::set<std::string> collsToIgnore;
 
-    bool slaveOk;
-    bool useReplAuth;
-    bool snapshot;
-    bool mayYield;
-    bool mayBeInterrupted;
+    bool slaveOk = false;
+    bool useReplAuth = false;
+    bool snapshot = true;
 
-    bool syncData;
-    bool syncIndexes;
+    bool syncData = true;
+    bool syncIndexes = true;
+    bool createCollections = true;
 };
 
 }  // namespace mongo

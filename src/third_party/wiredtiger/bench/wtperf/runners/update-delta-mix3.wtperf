@@ -1,0 +1,18 @@
+# wtperf options file: Mixed workload where we grow some values and shrink
+# others.  Mixed load leaning toward mostly a balance.
+#
+conn_config="cache_size=2GB,checkpoint=(wait=30)"
+table_config="type=file,leaf_page_max=32k,leaf_value_max=128k,split_pct=90"
+# The values are starting small, insert a lot so our database grows larger than
+# cache quickly.
+icount=200000
+report_interval=5
+run_time=300
+populate_threads=1
+#
+# Run a balance of threads.
+#
+threads=((count=3,update=1,update_delta=100),(count=3,update=1,update_delta=-100))
+value_sz=20000
+value_sz_min=1000
+value_sz_max=65536

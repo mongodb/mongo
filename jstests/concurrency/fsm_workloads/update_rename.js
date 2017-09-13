@@ -17,26 +17,26 @@ var $config = (function() {
     var states = {
         update: function update(db, collName) {
             var from = choose(fieldNames);
-            var to   = choose(fieldNames.filter(function(n) { return n !== from; }));
-            var updater = { $rename: {} };
+            var to = choose(fieldNames.filter(function(n) {
+                return n !== from;
+            }));
+            var updater = {$rename: {}};
             updater.$rename[from] = to;
 
             var query = {};
-            query[from] = { $exists: 1 };
+            query[from] = {$exists: 1};
 
             var res = db[collName].update(query, updater);
 
             assertAlways.eq(0, res.nUpserted, tojson(res));
-            assertWhenOwnColl.contains(res.nMatched, [0, 1],  tojson(res));
+            assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
             if (db.getMongo().writeMode() === 'commands') {
                 assertWhenOwnColl.eq(res.nMatched, res.nModified, tojson(res));
             }
         }
     };
 
-    var transitions = {
-        update: { update: 1 }
-    };
+    var transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
         // Create an index on all but one fieldName key to make it possible to test renames
@@ -46,6 +46,10 @@ var $config = (function() {
             indexSpec[fieldName] = 1;
             assertAlways.commandWorked(db[collName].ensureIndex(indexSpec));
         });
+
+        // numDocs should be much less than threadCount, to make more threads use the same docs.
+        this.numDocs = Math.floor(this.threadCount / 5);
+        assertAlways.gt(this.numDocs, 0, 'numDocs should be a positive number');
 
         for (var i = 0; i < this.numDocs; ++i) {
             var fieldName = fieldNames[i % fieldNames.length];
@@ -57,17 +61,12 @@ var $config = (function() {
         }
     }
 
-    var threadCount = 20;
     return {
-        threadCount: threadCount,
+        threadCount: 20,
         iterations: 20,
         startState: 'update',
         states: states,
         transitions: transitions,
-        data: {
-            // numDocs should be much less than threadCount, to make more threads use the same docs
-            numDocs: Math.floor(threadCount / 5)
-        },
         setup: setup
     };
 

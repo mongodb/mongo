@@ -28,19 +28,17 @@
 #pragma once
 
 #include <climits>
+#include <cstdint>
 #include <cstring>
-#include <boost/static_assert.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_signed.hpp>
+#include <type_traits>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/config.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/platform/decimal128.h"
 
 #pragma push_macro("MONGO_UINT16_SWAB")
 #pragma push_macro("MONGO_UINT32_SWAB")
 #pragma push_macro("MONGO_UINT64_SWAB")
-#pragma push_macro("MONGO_LITTLE_ENDIAN")
-#pragma push_macro("MONGO_BIG_ENDIAN")
 #pragma push_macro("htobe16")
 #pragma push_macro("htobe32")
 #pragma push_macro("htobe64")
@@ -57,8 +55,6 @@
 #undef MONGO_UINT16_SWAB
 #undef MONGO_UINT32_SWAB
 #undef MONGO_UINT64_SWAB
-#undef MONGO_LITTLE_ENDIAN
-#undef MONGO_BIG_ENDIAN
 #undef htobe16
 #undef htobe32
 #undef htobe64
@@ -75,7 +71,7 @@
 #define MONGO_LITTLE_ENDIAN 1234
 #define MONGO_BIG_ENDIAN 4321
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1300)
+#if defined(_MSC_VER)
 #include <cstdlib>
 #define MONGO_UINT16_SWAB(v) _byteswap_ushort(v)
 #define MONGO_UINT32_SWAB(v) _byteswap_ulong(v)
@@ -345,7 +341,7 @@ struct ByteOrderConverter<float> {
     typedef float T;
 
     inline static T nativeToBig(T t) {
-        BOOST_STATIC_ASSERT(sizeof(T) == sizeof(uint32_t));
+        MONGO_STATIC_ASSERT(sizeof(T) == sizeof(uint32_t));
 
         uint32_t temp;
         std::memcpy(&temp, &t, sizeof(t));
@@ -384,7 +380,7 @@ struct ByteOrderConverter<double> {
     typedef double T;
 
     inline static T nativeToBig(T t) {
-        BOOST_STATIC_ASSERT(sizeof(T) == sizeof(uint64_t));
+        MONGO_STATIC_ASSERT(sizeof(T) == sizeof(uint64_t));
 
         uint64_t temp;
         std::memcpy(&temp, &t, sizeof(t));
@@ -418,6 +414,35 @@ struct ByteOrderConverter<double> {
     }
 };
 
+template <>
+struct ByteOrderConverter<Decimal128::Value> {
+    typedef Decimal128::Value T;
+
+    inline static T nativeToBig(T t) {
+        ByteOrderConverter<uint64_t>::nativeToBig(t.low64);
+        ByteOrderConverter<uint64_t>::nativeToBig(t.high64);
+        return t;
+    }
+
+    inline static T bigToNative(T t) {
+        ByteOrderConverter<uint64_t>::bigToNative(t.low64);
+        ByteOrderConverter<uint64_t>::bigToNative(t.high64);
+        return t;
+    }
+
+    inline static T nativeToLittle(T t) {
+        ByteOrderConverter<uint64_t>::nativeToLittle(t.low64);
+        ByteOrderConverter<uint64_t>::nativeToLittle(t.high64);
+        return t;
+    }
+
+    inline static T littleToNative(T t) {
+        ByteOrderConverter<uint64_t>::littleToNative(t.low64);
+        ByteOrderConverter<uint64_t>::littleToNative(t.high64);
+        return t;
+    }
+};
+
 // Use a typemape to normalize non-fixed-width integral types to the associated fixed width
 // types.
 
@@ -428,31 +453,31 @@ struct IntegralTypeMap {
 
 template <>
 struct IntegralTypeMap<signed char> {
-    BOOST_STATIC_ASSERT(CHAR_BIT == 8);
+    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
     typedef int8_t type;
 };
 
 template <>
 struct IntegralTypeMap<unsigned char> {
-    BOOST_STATIC_ASSERT(CHAR_BIT == 8);
+    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
     typedef uint8_t type;
 };
 
 template <>
 struct IntegralTypeMap<char> {
-    BOOST_STATIC_ASSERT(CHAR_BIT == 8);
-    typedef boost::mpl::if_c<boost::is_signed<char>::value, int8_t, uint8_t>::type type;
+    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
+    typedef std::conditional<std::is_signed<char>::value, int8_t, uint8_t>::type type;
 };
 
 template <>
 struct IntegralTypeMap<long long> {
-    BOOST_STATIC_ASSERT(sizeof(long long) == sizeof(int64_t));
+    MONGO_STATIC_ASSERT(sizeof(long long) == sizeof(int64_t));
     typedef int64_t type;
 };
 
 template <>
 struct IntegralTypeMap<unsigned long long> {
-    BOOST_STATIC_ASSERT(sizeof(unsigned long long) == sizeof(uint64_t));
+    MONGO_STATIC_ASSERT(sizeof(unsigned long long) == sizeof(uint64_t));
     typedef uint64_t type;
 };
 
@@ -482,8 +507,6 @@ inline T littleToNative(T t) {
 #undef MONGO_UINT16_SWAB
 #undef MONGO_UINT32_SWAB
 #undef MONGO_UINT64_SWAB
-#undef MONGO_LITTLE_ENDIAN
-#undef MONGO_BIG_ENDIAN
 #undef htobe16
 #undef htobe32
 #undef htobe64
@@ -500,8 +523,6 @@ inline T littleToNative(T t) {
 #pragma pop_macro("MONGO_UINT16_SWAB")
 #pragma pop_macro("MONGO_UINT32_SWAB")
 #pragma pop_macro("MONGO_UINT64_SWAB")
-#pragma pop_macro("MONGO_LITTLE_ENDIAN")
-#pragma pop_macro("MONGO_BIG_ENDIAN")
 #pragma pop_macro("htobe16")
 #pragma pop_macro("htobe32")
 #pragma pop_macro("htobe64")

@@ -35,13 +35,16 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 class DatabaseCatalogEntry;
+class JournalListener;
 class OperationContext;
 class RecoveryUnit;
+class SnapshotManager;
 struct StorageGlobalParams;
 class StorageEngineLockFile;
 class StorageEngineMetadata;
@@ -65,10 +68,11 @@ public:
         virtual ~Factory() {}
 
         /**
-         * Return a new instance of the StorageEngine.  Caller owns the returned pointer.
+         * Return a new instance of the StorageEngine. The lockFile parameter may be null if
+         * params.readOnly is set. Caller owns the returned pointer.
          */
         virtual StorageEngine* create(const StorageGlobalParams& params,
-                                      const StorageEngineLockFile& lockFile) const = 0;
+                                      const StorageEngineLockFile* lockFile) const = 0;
 
         /**
          * Returns the name of the storage engine.
@@ -121,6 +125,17 @@ public:
          * on restart.
          */
         virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const = 0;
+
+        /**
+         * Returns whether the engine supports read-only mode. If read-only mode is enabled, the
+         * engine may be started on a read-only filesystem (either mounted read-only or with
+         * read-only permissions). If readOnly mode is enabled, it is undefined behavior to call
+         * methods that write data (e.g. insertRecord). This method is provided on the Factory
+         * because it must be called before the storageEngine is instantiated.
+         */
+        virtual bool supportsReadOnly() const {
+            return false;
+        }
     };
 
     /**
@@ -164,9 +179,21 @@ public:
     virtual bool supportsDocLocking() const = 0;
 
     /**
+     * Returns whether the storage engine supports locking at a database level.
+     */
+    virtual bool supportsDBLocking() const {
+        return true;
+    }
+
+    /**
      * Returns whether the engine supports a journalling concept or not.
      */
     virtual bool isDurable() const = 0;
+
+    /**
+     * Returns true if the engine does not persist data to disk; false otherwise.
+     */
+    virtual bool isEphemeral() const = 0;
 
     /**
      * Only MMAPv1 should override this and return true to trigger MMAPv1-specific behavior.
@@ -178,17 +205,52 @@ public:
     /**
      * Closes all file handles associated with a database.
      */
-    virtual Status closeDatabase(OperationContext* txn, StringData db) = 0;
+    virtual Status closeDatabase(OperationContext* opCtx, StringData db) = 0;
 
     /**
      * Deletes all data and metadata for a database.
      */
-    virtual Status dropDatabase(OperationContext* txn, StringData db) = 0;
+    virtual Status dropDatabase(OperationContext* opCtx, StringData db) = 0;
 
     /**
      * @return number of files flushed
      */
-    virtual int flushAllFiles(bool sync) = 0;
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync) = 0;
+
+    /**
+     * Transitions the storage engine into backup mode.
+     *
+     * During backup mode the storage engine must stabilize its on-disk files, and avoid
+     * any internal processing that may involve file I/O, such as online compaction, so
+     * a filesystem level backup may be performed.
+     *
+     * Storage engines that do not support this feature should use the default implementation.
+     * Storage engines that implement this must also implement endBackup().
+     *
+     * For Storage engines that implement beginBackup the _inBackupMode variable is provided
+     * to avoid multiple instance enterting/leaving backup concurrently.
+     *
+     * If this function returns an OK status, MongoDB can call endBackup to signal the storage
+     * engine that filesystem writes may continue. This function should return a non-OK status if
+     * filesystem changes cannot be stopped to allow for online backup. If the function should be
+     * retried, returns a non-OK status. This function may throw a WriteConflictException, which
+     * should trigger a retry by the caller. All other exceptions should be treated as errors.
+     */
+    virtual Status beginBackup(OperationContext* opCtx) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine doesn't support backup mode");
+    }
+
+    /**
+     * Transitions the storage engine out of backup mode.
+     *
+     * Storage engines that do not support this feature should use the default implementation.
+     *
+     * Storage engines implementing this feature should fassert when unable to leave backup mode.
+     */
+    virtual void endBackup(OperationContext* opCtx) {
+        return;
+    }
 
     /**
      * Recover as much data as possible from a potentially corrupt RecordStore.
@@ -199,7 +261,7 @@ public:
      *
      * NOTE: MMAPv1 does not support this method and has its own repairDatabase() method.
      */
-    virtual Status repairRecordStore(OperationContext* txn, const std::string& ns) = 0;
+    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns) = 0;
 
     /**
      * This method will be called before there is a clean shutdown.  Storage engines should
@@ -210,6 +272,82 @@ public:
      * There is intentionally no uncleanShutdown().
      */
     virtual void cleanShutdown() = 0;
+
+    /**
+     * Returns the SnapshotManager for this StorageEngine or NULL if not supported.
+     *
+     * Pointer remains owned by the StorageEngine, not the caller.
+     */
+    virtual SnapshotManager* getSnapshotManager() const {
+        return nullptr;
+    }
+
+    /**
+     * Sets a new JournalListener, which is used by the storage engine to alert the rest of the
+     * system about journaled write progress.
+     */
+    virtual void setJournalListener(JournalListener* jl) = 0;
+
+    /**
+     * Returns whether the storage engine supports "recover to stable timestamp". Returns false
+     * if the storage engine supports the "recover to stable timestamp" feature but does not have
+     * a stable timestamp, or if for some reason the storage engine is unable to recover to the
+     * last provided stable timestamp.
+     *
+     * It is illegal to call this concurrently with `setStableTimestamp` or
+     * `setInitialDataTimestamp`.
+     */
+    virtual bool supportsRecoverToStableTimestamp() const {
+        return false;
+    }
+
+    /**
+     * Recovers the storage engine state to the last stable timestamp. "Stable" in this case
+     * refers to a timestamp that is guaranteed to never be rolled back. The stable timestamp
+     * used should be one provided by StorageEngine::setStableTimestamp().
+     *
+     * The "local" database is exempt and should not roll back any state except for
+     * "local.replset.minvalid" and "local.replset.checkpointTimestamp" which must roll back to
+     * the last stable timestamp.
+     *
+     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false.
+     */
+    virtual Status recoverToStableTimestamp() {
+        fassertFailed(40547);
+    }
+
+    /**
+     * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
+     * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
+     */
+    virtual void setStableTimestamp(SnapshotName snapshotName) {}
+
+    /**
+     * Tells the storage engine the timestamp of the data at startup. This is necessary because
+     * timestamps are not persisted in the storage layer.
+     */
+    virtual void setInitialDataTimestamp(SnapshotName snapshotName) {}
+
+    /**
+     *  Notifies the storage engine that a replication batch has completed.
+     *  This means that all the writes associated with the oplog entries in the batch are
+     *  finished and no new writes with timestamps associated with those oplog entries will show
+     *  up in the future.
+     *  This function can be used to ensure oplog visibility rules are not broken, for example.
+     */
+    virtual void replicationBatchIsComplete() const {};
+
+    // (CollectionName, IndexName)
+    typedef std::pair<std::string, std::string> CollectionIndexNamePair;
+
+    /**
+     * Drop abandoned idents. In the successful case, returns a list of collection, index name
+     * pairs to rebuild.
+     */
+    virtual StatusWith<std::vector<CollectionIndexNamePair>> reconcileCatalogAndIdents(
+        OperationContext* opCtx) {
+        return std::vector<CollectionIndexNamePair>();
+    };
 
 protected:
     /**

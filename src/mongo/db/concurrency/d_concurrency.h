@@ -31,11 +31,13 @@
 #include <climits>  // For UINT_MAX
 
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 
 class StringData;
+class NamespaceString;
 
 class Lock {
 public:
@@ -81,8 +83,17 @@ public:
             lock(mode);
         }
 
+        ResourceLock(ResourceLock&& otherLock)
+            : _rid(otherLock._rid), _locker(otherLock._locker), _result(otherLock._result) {
+            // Mark as moved so the destructor doesn't invalidate the newly-
+            // constructed lock.
+            otherLock._result = LOCK_INVALID;
+        }
+
         ~ResourceLock() {
-            unlock();
+            if (isLocked()) {
+                unlock();
+            }
         }
 
         void lock(LockMode mode);
@@ -99,34 +110,120 @@ public:
         LockResult _result;
     };
 
+    class SharedLock;
+    class ExclusiveLock;
+
+    /**
+     * For use as general mutex or readers/writers lock, outside the general multi-granularity
+     * model. A ResourceMutex is not affected by yielding/temprelease and two phase locking
+     * semantics inside WUOWs. Lock with ResourceLock, SharedLock or ExclusiveLock. Uses same
+     * fairness as other LockManager locks.
+     */
+    class ResourceMutex {
+    public:
+        ResourceMutex(std::string resourceLabel);
+
+        std::string getName() const {
+            return getName(_rid);
+        };
+
+        static std::string getName(ResourceId resourceId);
+
+        bool isExclusivelyLocked(Locker* locker);
+
+        bool isAtLeastReadLocked(Locker* locker);
+
+    private:
+        friend class Lock::SharedLock;
+        friend class Lock::ExclusiveLock;
+
+        /**
+         * Each instantiation of this class allocates a new ResourceId.
+         */
+        ResourceId rid() const {
+            return _rid;
+        }
+
+        const ResourceId _rid;
+    };
+
+    /**
+     * Obtains a ResourceMutex for exclusive use.
+     */
+    class ExclusiveLock : public ResourceLock {
+    public:
+        ExclusiveLock(Locker* locker, ResourceMutex mutex)
+            : ResourceLock(locker, mutex.rid(), MODE_X) {}
+    };
+
+    /**
+     * Obtains a ResourceMutex for shared/non-exclusive use. This uses MODE_IS rather than MODE_S
+     * to take advantage of optimizations in the lock manager for intent modes. This is OK as
+     * this just has to conflict with exclusive locks.
+     */
+    class SharedLock : public ResourceLock {
+    public:
+        SharedLock(Locker* locker, ResourceMutex mutex)
+            : ResourceLock(locker, mutex.rid(), MODE_IS) {}
+    };
 
     /**
      * Global lock.
      *
      * Grabs global resource lock. Allows further (recursive) acquisition of the global lock
-     * in any mode, see LockMode.
+     * in any mode, see LockMode. An outermost GlobalLock calls abandonSnapshot() on destruction, so
+     * that the storage engine can release resources, such as snapshots or locks, that it may have
+     * acquired during the transaction. Note that any writes are committed in nested WriteUnitOfWork
+     * scopes, so write conflicts cannot happen when releasing the GlobalLock.
+     *
      * NOTE: Does not acquire flush lock.
      */
     class GlobalLock {
     public:
-        explicit GlobalLock(Locker* locker);
-        GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs);
+        class EnqueueOnly {};
+
+        GlobalLock(OperationContext* opCtx, LockMode lockMode, unsigned timeoutMs);
+        GlobalLock(GlobalLock&&);
+
+        /**
+         * Enqueues lock but does not block on lock acquisition.
+         * Call waitForLock() to complete locking process.
+         *
+         * Does not set that the global lock was taken on the GlobalLockAcquisitionTracker. Call
+         * waitForLock to do so.
+         */
+        GlobalLock(OperationContext* opCtx,
+                   LockMode lockMode,
+                   unsigned timeoutMs,
+                   EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
-            _unlock();
+            if (_result != LOCK_INVALID) {
+                if (isLocked() && _isOutermostLock) {
+                    _opCtx->recoveryUnit()->abandonSnapshot();
+                }
+                _unlock();
+            }
         }
+
+        /**
+         * Waits for lock to be granted. Sets that the global lock was taken on the
+         * GlobalLockAcquisitionTracker.
+         */
+        void waitForLock(unsigned timeoutMs);
 
         bool isLocked() const {
             return _result == LOCK_OK;
         }
 
     private:
-        void _lock(LockMode lockMode, unsigned timeoutMs);
+        void _enqueue(LockMode lockMode, unsigned timeoutMs);
         void _unlock();
 
-        Locker* const _locker;
+        OperationContext* const _opCtx;
         LockResult _result;
         ResourceLock _pbwm;
+        const bool _isOutermostLock;
     };
 
 
@@ -139,10 +236,10 @@ public:
      */
     class GlobalWrite : public GlobalLock {
     public:
-        explicit GlobalWrite(Locker* locker, unsigned timeoutMs = UINT_MAX)
-            : GlobalLock(locker, MODE_X, timeoutMs) {
+        explicit GlobalWrite(OperationContext* opCtx, unsigned timeoutMs = UINT_MAX)
+            : GlobalLock(opCtx, MODE_X, timeoutMs) {
             if (isLocked()) {
-                locker->lockMMAPV1Flush();
+                opCtx->lockState()->lockMMAPV1Flush();
             }
         }
     };
@@ -157,10 +254,10 @@ public:
      */
     class GlobalRead : public GlobalLock {
     public:
-        explicit GlobalRead(Locker* locker, unsigned timeoutMs = UINT_MAX)
-            : GlobalLock(locker, MODE_S, timeoutMs) {
+        explicit GlobalRead(OperationContext* opCtx, unsigned timeoutMs = UINT_MAX)
+            : GlobalLock(opCtx, MODE_S, timeoutMs) {
             if (isLocked()) {
-                locker->lockMMAPV1Flush();
+                opCtx->lockState()->lockMMAPV1Flush();
             }
         }
     };
@@ -182,7 +279,8 @@ public:
      */
     class DBLock {
     public:
-        DBLock(Locker* locker, StringData db, LockMode mode);
+        DBLock(OperationContext* opCtx, StringData db, LockMode mode);
+        DBLock(DBLock&&);
         ~DBLock();
 
         /**
@@ -195,7 +293,7 @@ public:
 
     private:
         const ResourceId _id;
-        Locker* const _locker;
+        OperationContext* const _opCtx;
 
         // May be changed through relockWithMode. The global lock mode won't change though,
         // because we never change from IS/S to IX/X or vice versa, just convert locks from
@@ -268,16 +366,26 @@ public:
      * Turn on "parallel batch writer mode" by locking the global ParallelBatchWriterMode
      * resource in exclusive mode. This mode is off by default.
      * Note that only one thread creates a ParallelBatchWriterMode object; the other batch
-     * writers just call setIsBatchWriter().
+     * writers just call setShouldConflictWithSecondaryBatchApplication(false).
      */
     class ParallelBatchWriterMode {
         MONGO_DISALLOW_COPYING(ParallelBatchWriterMode);
 
     public:
         explicit ParallelBatchWriterMode(Locker* lockState);
+        ~ParallelBatchWriterMode();
 
     private:
         ResourceLock _pbwm;
+        Locker* const _lockState;
+        const bool _orginalShouldConflict;
     };
 };
+
+/**
+ * Takes a lock on resourceCappedInFlight in MODE_IX which will be held until the end of your
+ * WUOW. This ensures that a MODE_X lock on this resource will wait for all in-flight oplog
+ * inserts to either commit or rollback and block new ones from starting.
+ */
+void synchronizeOnOplogInFlightResource(Locker* opCtx);
 }

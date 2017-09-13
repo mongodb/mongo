@@ -34,6 +34,9 @@
 #include <iterator>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -44,14 +47,42 @@ namespace {
 /**
  * Protocols supported by order of preference.
  */
-const Protocol kPreferredProtos[] = {Protocol::kOpCommandV1, Protocol::kOpQuery};
+const Protocol kPreferredProtos[] = {Protocol::kOpMsg, Protocol::kOpCommandV1, Protocol::kOpQuery};
 
-const char kNone[] = "none";
-const char kOpQueryOnly[] = "opQueryOnly";
-const char kOpCommandOnly[] = "opCommandOnly";
-const char kAll[] = "all";
+struct ProtocolSetAndName {
+    StringData name;
+    ProtocolSet protocols;
+};
+
+constexpr ProtocolSetAndName protocolSetNames[] = {
+    // Most common ones go first.
+    {"all"_sd, supports::kAll},                                                     // new mongod.
+    {"opQueryAndOpMsg"_sd, supports::kOpQueryOnly | supports::kOpMsgOnly},          // new mongos.
+    {"opQueryAndOpCommand"_sd, supports::kOpQueryOnly | supports::kOpCommandOnly},  // old mongod.
+    {"opQueryOnly"_sd, supports::kOpQueryOnly},  // old mongos or very old client or mongod.
+
+    // Then the rest (these should never happen in production).
+    {"none"_sd, supports::kNone},
+    {"opCommandOnly"_sd, supports::kOpCommandOnly},
+    {"opMsgOnly"_sd, supports::kOpMsgOnly},
+};
 
 }  // namespace
+
+Protocol protocolForMessage(const Message& message) {
+    switch (message.operation()) {
+        case mongo::dbMsg:
+            return Protocol::kOpMsg;
+        case mongo::dbQuery:
+            return Protocol::kOpQuery;
+        case mongo::dbCommand:
+            return Protocol::kOpCommandV1;
+        default:
+            uasserted(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "Received a reply message with unexpected opcode: "
+                                    << message.operation());
+    }
+}
 
 StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd) {
     using std::begin;
@@ -59,9 +90,9 @@ StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd) {
 
     ProtocolSet common = fst & snd;
 
-    auto it = std::find_if(begin(kPreferredProtos),
-                           end(kPreferredProtos),
-                           [common](Protocol p) { return common & static_cast<ProtocolSet>(p); });
+    auto it = std::find_if(begin(kPreferredProtos), end(kPreferredProtos), [common](Protocol p) {
+        return common & static_cast<ProtocolSet>(p);
+    });
 
     if (it == end(kPreferredProtos)) {
         return Status(ErrorCodes::RPCProtocolNegotiationFailed, "No common protocol found.");
@@ -70,39 +101,129 @@ StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd) {
 }
 
 StatusWith<StringData> toString(ProtocolSet protocols) {
-    switch (protocols) {
-        case supports::kNone:
-            return StringData(kNone);
-        case supports::kOpQueryOnly:
-            return StringData(kOpQueryOnly);
-        case supports::kOpCommandOnly:
-            return StringData(kOpCommandOnly);
-        case supports::kAll:
-            return StringData(kAll);
-        default:
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Can not convert ProtocolSet " << protocols
-                                        << " to a string, only the predefined ProtocolSet "
-                                        << "constants 'none' (0x0), 'opQueryOnly' (0x1), "
-                                        << "'opCommandOnly' (0x2), and 'all' (0x3) are supported.");
-    }
-}
-
-StatusWith<ProtocolSet> parseProtocolSet(StringData repr) {
-    if (repr == kNone) {
-        return supports::kNone;
-    } else if (repr == kOpQueryOnly) {
-        return supports::kOpQueryOnly;
-    } else if (repr == kOpCommandOnly) {
-        return supports::kOpCommandOnly;
-    } else if (repr == kAll) {
-        return supports::kAll;
+    for (auto& elem : protocolSetNames) {
+        if (elem.protocols == protocols)
+            return elem.name;
     }
     return Status(ErrorCodes::BadValue,
-                  str::stream() << "Can not parse a ProtocolSet from " << repr
-                                << " only the predefined ProtocolSet constants "
-                                << "'none' (0x0), 'opQueryOnly' (0x1), 'opCommandOnly' (0x2), "
-                                << "and 'all' (0x3) are supported.");
+                  str::stream() << "ProtocolSet " << protocols
+                                << " does not match any well-known value.");
+}
+
+StatusWith<ProtocolSet> parseProtocolSet(StringData name) {
+    for (auto& elem : protocolSetNames) {
+        if (elem.name == name)
+            return elem.protocols;
+    }
+    return Status(ErrorCodes::BadValue,
+                  str::stream() << name << " is not a valid name for a ProtocolSet.");
+}
+
+StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
+    const BSONObj& isMasterReply) {
+    long long maxWireVersion;
+    auto maxWireExtractStatus =
+        bsonExtractIntegerField(isMasterReply, "maxWireVersion", &maxWireVersion);
+
+    long long minWireVersion;
+    auto minWireExtractStatus =
+        bsonExtractIntegerField(isMasterReply, "minWireVersion", &minWireVersion);
+
+    // MongoDB 2.4 and earlier do not have maxWireVersion/minWireVersion in their 'isMaster' replies
+    if ((maxWireExtractStatus == minWireExtractStatus) &&
+        (maxWireExtractStatus == ErrorCodes::NoSuchKey)) {
+        return {{supports::kOpQueryOnly, {0, 0}}};
+    } else if (!maxWireExtractStatus.isOK()) {
+        return maxWireExtractStatus;
+    } else if (!minWireExtractStatus.isOK()) {
+        return minWireExtractStatus;
+    }
+
+    bool isMongos = false;
+
+    std::string msgField;
+    auto msgFieldExtractStatus = bsonExtractStringField(isMasterReply, "msg", &msgField);
+
+    if (msgFieldExtractStatus == ErrorCodes::NoSuchKey) {
+        isMongos = false;
+    } else if (!msgFieldExtractStatus.isOK()) {
+        return msgFieldExtractStatus;
+    } else {
+        isMongos = (msgField == "isdbgrid");
+    }
+
+    if (minWireVersion < 0 || maxWireVersion < 0 ||
+        minWireVersion >= std::numeric_limits<int>::max() ||
+        maxWireVersion >= std::numeric_limits<int>::max()) {
+        return Status(ErrorCodes::IncompatibleServerVersion,
+                      str::stream() << "Server min and max wire version have invalid values ("
+                                    << minWireVersion
+                                    << ","
+                                    << maxWireVersion
+                                    << ")");
+    }
+
+    WireVersionInfo version{static_cast<int>(minWireVersion), static_cast<int>(maxWireVersion)};
+
+    auto protos = computeProtocolSet(version);
+    if (isMongos) {
+        // Remove support for protocols that mongos doesn't support.
+        protos &= ~supports::kOpCommandOnly;
+    }
+
+    return {{protos, version}};
+}
+
+ProtocolSet computeProtocolSet(const WireVersionInfo version) {
+    ProtocolSet result = supports::kNone;
+    if (version.minWireVersion <= version.maxWireVersion) {
+        if (version.maxWireVersion >= WireVersion::SUPPORTS_OP_MSG) {
+            result |= supports::kOpMsgOnly;
+        }
+        if (version.maxWireVersion >= WireVersion::FIND_COMMAND &&
+            version.maxWireVersion <= WireVersion::SUPPORTS_OP_MSG) {
+            // Future versions may remove support for OP_COMMAND.
+            result |= supports::kOpCommandOnly;
+        }
+        if (version.minWireVersion <= WireVersion::RELEASE_2_4_AND_BEFORE) {
+            result |= supports::kOpQueryOnly;
+        }
+    }
+    return result;
+}
+
+Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo server) {
+    // Since this is defined in the code, it should always hold true since this is the versions that
+    // mongos/d wants to connect to.
+    invariant(client.minWireVersion <= client.maxWireVersion);
+
+    // Server may return bad data.
+    if (server.minWireVersion > server.maxWireVersion) {
+        return Status(ErrorCodes::IncompatibleServerVersion,
+                      str::stream() << "Server min and max wire version are incorrect ("
+                                    << server.minWireVersion
+                                    << ","
+                                    << server.maxWireVersion
+                                    << ")");
+    }
+
+    // Determine if the [min, max] tuples overlap.
+    // We assert the invariant that min < max above.
+    if (!(client.minWireVersion <= server.maxWireVersion &&
+          client.maxWireVersion >= server.minWireVersion)) {
+        return Status(ErrorCodes::IncompatibleServerVersion,
+                      str::stream() << "Server min and max wire version are incompatible ("
+                                    << server.minWireVersion
+                                    << ","
+                                    << server.maxWireVersion
+                                    << ") with client min wire version ("
+                                    << client.minWireVersion
+                                    << ","
+                                    << client.maxWireVersion
+                                    << ")");
+    }
+
+    return Status::OK();
 }
 
 }  // namespace rpc

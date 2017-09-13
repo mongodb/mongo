@@ -32,28 +32,27 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
-NearStage::NearStage(OperationContext* txn,
+NearStage::NearStage(OperationContext* opCtx,
+                     const char* typeName,
+                     StageType type,
                      WorkingSet* workingSet,
-                     Collection* collection,
-                     PlanStageStats* stats)
-    : _txn(txn),
+                     Collection* collection)
+    : PlanStage(typeName, opCtx),
       _workingSet(workingSet),
       _collection(collection),
       _searchState(SearchState_Initializing),
-      _stats(stats),
-      _nextInterval(NULL) {
-    // Ensure we have specific distance search stats unless a child class specified their
-    // own distance stats subclass
-    if (!_stats->specific) {
-        _stats->specific.reset(new NearStats);
-    }
-}
+      _nextIntervalStats(nullptr),
+      _stageType(type),
+      _nextInterval(nullptr) {}
 
 NearStage::~NearStage() {}
 
@@ -70,7 +69,7 @@ NearStage::CoveredInterval::CoveredInterval(PlanStage* covering,
 
 
 PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
-    PlanStage::StageState state = initialize(_txn, _workingSet, _collection, out);
+    PlanStage::StageState state = initialize(getOpCtx(), _workingSet, _collection, out);
     if (state == PlanStage::IS_EOF) {
         _searchState = SearchState_Buffering;
         return PlanStage::NEED_TIME;
@@ -82,12 +81,7 @@ PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
     return state;
 }
 
-PlanStage::StageState NearStage::work(WorkingSetID* out) {
-    ++_stats->common.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_stats->common.executionTimeMillis);
-
+PlanStage::StageState NearStage::doWork(WorkingSetID* out) {
     WorkingSetID toReturn = WorkingSet::INVALID_ID;
     Status error = Status::OK();
     PlanStage::StageState nextState = PlanStage::NEED_TIME;
@@ -115,14 +109,10 @@ PlanStage::StageState NearStage::work(WorkingSetID* out) {
         *out = WorkingSetCommon::allocateStatusMember(_workingSet, error);
     } else if (PlanStage::ADVANCED == nextState) {
         *out = toReturn;
-        ++_stats->common.advanced;
     } else if (PlanStage::NEED_YIELD == nextState) {
         *out = toReturn;
-        ++_stats->common.needYield;
-    } else if (PlanStage::NEED_TIME == nextState) {
-        ++_stats->common.needTime;
     } else if (PlanStage::IS_EOF == nextState) {
-        _stats->common.isEOF = true;
+        _commonStats.isEOF = true;
     }
 
     return nextState;
@@ -150,7 +140,8 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     //
 
     if (!_nextInterval) {
-        StatusWith<CoveredInterval*> intervalStatus = nextInterval(_txn, _workingSet, _collection);
+        StatusWith<CoveredInterval*> intervalStatus =
+            nextInterval(getOpCtx(), _workingSet, _collection);
         if (!intervalStatus.isOK()) {
             _searchState = SearchState_Finished;
             *error = intervalStatus.getStatus();
@@ -163,9 +154,11 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
         }
 
         // CoveredInterval and its child stage are owned by _childrenIntervals
-        _childrenIntervals.push_back(intervalStatus.getValue());
-        _nextInterval = _childrenIntervals.back();
-        _nextIntervalStats.reset(new IntervalStats());
+        _childrenIntervals.push_back(
+            std::unique_ptr<NearStage::CoveredInterval>{intervalStatus.getValue()});
+        _nextInterval = _childrenIntervals.back().get();
+        _specificStats.intervalStats.emplace_back();
+        _nextIntervalStats = &_specificStats.intervalStats.back();
         _nextIntervalStats->minDistanceAllowed = _nextInterval->minDistance;
         _nextIntervalStats->maxDistanceAllowed = _nextInterval->maxDistance;
         _nextIntervalStats->inclusiveMaxDistanceAllowed = _nextInterval->inclusiveMax;
@@ -175,9 +168,6 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     PlanStage::StageState intervalState = _nextInterval->covering->work(&nextMemberID);
 
     if (PlanStage::IS_EOF == intervalState) {
-        getNearStats()->intervalStats.push_back(*_nextIntervalStats);
-        _nextIntervalStats.reset();
-        _nextInterval = NULL;
         _searchState = SearchState_Advancing;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::FAILURE == intervalState) {
@@ -197,14 +187,14 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     WorkingSetMember* nextMember = _workingSet->get(nextMemberID);
 
     // The child stage may not dedup so we must dedup them ourselves.
-    if (_nextInterval->dedupCovering && nextMember->hasLoc()) {
-        if (_nextIntervalSeen.end() != _nextIntervalSeen.find(nextMember->loc)) {
+    if (_nextInterval->dedupCovering && nextMember->hasRecordId()) {
+        if (_seenDocuments.end() != _seenDocuments.find(nextMember->recordId)) {
             _workingSet->free(nextMemberID);
             return PlanStage::NEED_TIME;
         }
     }
 
-    ++_nextIntervalStats->numResultsFound;
+    ++_nextIntervalStats->numResultsBuffered;
 
     StatusWith<double> distanceStatus = computeDistance(nextMember);
 
@@ -217,66 +207,75 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     // If the member's distance is in the current distance interval, add it to our buffered
     // results.
     double memberDistance = distanceStatus.getValue();
-    bool inInterval = memberDistance >= _nextInterval->minDistance &&
-        (_nextInterval->inclusiveMax ? memberDistance <= _nextInterval->maxDistance
-                                     : memberDistance < _nextInterval->maxDistance);
 
-    // Update found distance stats
-    if (_nextIntervalStats->minDistanceFound < 0 ||
-        memberDistance < _nextIntervalStats->minDistanceFound) {
-        _nextIntervalStats->minDistanceFound = memberDistance;
-    }
+    // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+    nextMember->makeObjOwnedIfNeeded();
+    _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
 
-    if (_nextIntervalStats->maxDistanceFound < 0 ||
-        memberDistance > _nextIntervalStats->maxDistanceFound) {
-        _nextIntervalStats->maxDistanceFound = memberDistance;
-    }
-
-    if (inInterval) {
-        _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
-
-        // Store the member's RecordId, if available, for quick invalidation
-        if (nextMember->hasLoc()) {
-            _nextIntervalSeen.insert(std::make_pair(nextMember->loc, nextMemberID));
-        }
-
-        ++_nextIntervalStats->numResultsBuffered;
-
-        // Update buffered distance stats
-        if (_nextIntervalStats->minDistanceBuffered < 0 ||
-            memberDistance < _nextIntervalStats->minDistanceBuffered) {
-            _nextIntervalStats->minDistanceBuffered = memberDistance;
-        }
-
-        if (_nextIntervalStats->maxDistanceBuffered < 0 ||
-            memberDistance > _nextIntervalStats->maxDistanceBuffered) {
-            _nextIntervalStats->maxDistanceBuffered = memberDistance;
-        }
-    } else {
-        _workingSet->free(nextMemberID);
+    // Store the member's RecordId, if available, for quick invalidation
+    if (nextMember->hasRecordId()) {
+        _seenDocuments.insert(std::make_pair(nextMember->recordId, nextMemberID));
     }
 
     return PlanStage::NEED_TIME;
 }
 
 PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
-    if (_resultBuffer.empty()) {
-        // We're done returning the documents buffered for this annulus, so we can
-        // clear out our buffered RecordIds.
-        _nextIntervalSeen.clear();
+    // Returns documents to the parent stage.
+    // If the document does not fall in the current interval, it will be buffered so that
+    // it might be returned in a following interval.
+
+    // Check if the next member is in the search interval and that the buffer isn't empty
+    WorkingSetID resultID = WorkingSet::INVALID_ID;
+    // memberDistance is initialized to produce an error if used before its value is changed
+    double memberDistance = std::numeric_limits<double>::lowest();
+    if (!_resultBuffer.empty()) {
+        SearchResult result = _resultBuffer.top();
+        memberDistance = result.distance;
+
+        // Throw out all documents with memberDistance < minDistance
+        if (memberDistance < _nextInterval->minDistance) {
+            WorkingSetMember* member = _workingSet->get(result.resultID);
+            if (member->hasRecordId()) {
+                _seenDocuments.erase(member->recordId);
+            }
+            _resultBuffer.pop();
+            _workingSet->free(result.resultID);
+            return PlanStage::NEED_TIME;
+        }
+
+        bool inInterval = _nextInterval->inclusiveMax ? memberDistance <= _nextInterval->maxDistance
+                                                      : memberDistance < _nextInterval->maxDistance;
+        if (inInterval) {
+            resultID = result.resultID;
+        }
+    } else {
+        // A document should be in _seenDocuments if and only if it's in _resultBuffer
+        invariant(_seenDocuments.empty());
+    }
+
+    // memberDistance is not in the interval or _resultBuffer is empty,
+    // so we need to move to the next interval.
+    if (WorkingSet::INVALID_ID == resultID) {
+        _nextInterval = nullptr;
+        _nextIntervalStats = nullptr;
         _searchState = SearchState_Buffering;
         return PlanStage::NEED_TIME;
     }
 
-    *toReturn = _resultBuffer.top().resultID;
+    // The next document in _resultBuffer is in the search interval, so we can return it.
     _resultBuffer.pop();
 
     // If we're returning something, take it out of our RecordId -> WSID map so that future
     // calls to invalidate don't cause us to take action for a RecordId we're done with.
+    *toReturn = resultID;
     WorkingSetMember* member = _workingSet->get(*toReturn);
-    if (member->hasLoc()) {
-        _nextIntervalSeen.erase(member->loc);
+    if (member->hasRecordId()) {
+        _seenDocuments.erase(member->recordId);
     }
+
+    // This value is used by nextInterval() to determine the size of the next interval.
+    ++_nextIntervalStats->numResultsReturned;
 
     return PlanStage::ADVANCED;
 }
@@ -285,85 +284,38 @@ bool NearStage::isEOF() {
     return SearchState_Finished == _searchState;
 }
 
-void NearStage::saveState() {
-    _txn = NULL;
-    ++_stats->common.yields;
-    for (size_t i = 0; i < _childrenIntervals.size(); i++) {
-        _childrenIntervals[i]->covering->saveState();
-    }
-
-    // Subclass specific saving, e.g. saving the 2d or 2dsphere density estimator.
-    finishSaveState();
-}
-
-void NearStage::restoreState(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
-    ++_stats->common.unyields;
-    for (size_t i = 0; i < _childrenIntervals.size(); i++) {
-        _childrenIntervals[i]->covering->restoreState(opCtx);
-    }
-
-    // Subclass specific restoring, e.g. restoring the 2d or 2dsphere density estimator.
-    finishRestoreState(opCtx);
-}
-
-void NearStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    ++_stats->common.invalidates;
-    for (size_t i = 0; i < _childrenIntervals.size(); i++) {
-        _childrenIntervals[i]->covering->invalidate(txn, dl, type);
-    }
-
-    // If a result is in _resultBuffer and has a RecordId it will be in _nextIntervalSeen as
+void NearStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
+    // If a result is in _resultBuffer and has a RecordId it will be in _seenDocuments as
     // well. It's safe to return the result w/o the RecordId, so just fetch the result.
     unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt =
-        _nextIntervalSeen.find(dl);
+        _seenDocuments.find(dl);
 
-    if (seenIt != _nextIntervalSeen.end()) {
+    if (seenIt != _seenDocuments.end()) {
         WorkingSetMember* member = _workingSet->get(seenIt->second);
-        verify(member->hasLoc());
-        WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
-        verify(!member->hasLoc());
+        verify(member->hasRecordId());
+        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
+        verify(!member->hasRecordId());
 
         // Don't keep it around in the seen map since there's no valid RecordId anymore
-        _nextIntervalSeen.erase(seenIt);
+        _seenDocuments.erase(seenIt);
     }
-
-    // Subclass specific invalidation, e.g. passing the invalidation to the 2d or 2dsphere
-    // density estimator.
-    finishInvalidate(txn, dl, type);
 }
 
-vector<PlanStage*> NearStage::getChildren() const {
-    vector<PlanStage*> children;
-    for (size_t i = 0; i < _childrenIntervals.size(); i++) {
-        children.push_back(_childrenIntervals[i]->covering.get());
-    }
-    return children;
-}
-
-PlanStageStats* NearStage::getStats() {
-    PlanStageStats* statsClone = _stats->clone();
+unique_ptr<PlanStageStats> NearStage::getStats() {
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, _stageType);
+    ret->specific.reset(_specificStats.clone());
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
-        statsClone->children.push_back(_childrenIntervals[i]->covering->getStats());
+        ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());
     }
-    return statsClone;
+    return ret;
 }
 
 StageType NearStage::stageType() const {
-    return _stats->stageType;
-}
-
-const CommonStats* NearStage::getCommonStats() const {
-    return &_stats->common;
+    return _stageType;
 }
 
 const SpecificStats* NearStage::getSpecificStats() const {
-    return _stats->specific.get();
-}
-
-NearStats* NearStage::getNearStats() {
-    return static_cast<NearStats*>(_stats->specific.get());
+    return &_specificStats;
 }
 
 }  // namespace mongo

@@ -29,6 +29,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
@@ -71,9 +72,9 @@ struct CandidatePlan {
     CandidatePlan(QuerySolution* s, PlanStage* r, WorkingSet* w)
         : solution(s), root(r), ws(w), failed(false) {}
 
-    QuerySolution* solution;
-    PlanStage* root;
-    WorkingSet* ws;
+    std::unique_ptr<QuerySolution> solution;
+    PlanStage* root;  // Not owned here.
+    WorkingSet* ws;   // Not owned here.
 
     // Any results produced during the plan's execution prior to ranking are retained here.
     std::list<WorkingSetID> results;
@@ -94,9 +95,9 @@ struct PlanRankingDecision {
     PlanRankingDecision* clone() const {
         PlanRankingDecision* decision = new PlanRankingDecision();
         for (size_t i = 0; i < stats.size(); ++i) {
-            PlanStageStats* s = stats.vector()[i];
+            PlanStageStats* s = stats[i].get();
             invariant(s);
-            decision->stats.mutableVector().push_back(s->clone());
+            decision->stats.push_back(std::unique_ptr<PlanStageStats>{s->clone()});
         }
         decision->scores = scores;
         decision->candidateOrder = candidateOrder;
@@ -105,7 +106,7 @@ struct PlanRankingDecision {
 
     // Stats of all plans sorted in descending order by score.
     // Owned by us.
-    OwnedPointerVector<PlanStageStats> stats;
+    std::vector<std::unique_ptr<PlanStageStats>> stats;
 
     // The "goodness" score corresponding to 'stats'.
     // Sorted in descending order.
@@ -118,6 +119,12 @@ struct PlanRankingDecision {
     // candidates[candidateOrder[1]] followed by
     // candidates[candidateOrder[2]], ...
     std::vector<size_t> candidateOrder;
+
+    // Whether two plans tied for the win.
+    //
+    // Reading this flag is the only reliable way for callers to determine if there was a tie,
+    // because the scores kept inside the PlanRankingDecision do not incorporate the EOF bonus.
+    bool tieForBest = false;
 };
 
 }  // namespace mongo

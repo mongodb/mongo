@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -42,24 +43,25 @@ class OpTime;
 }
 
 /**
- * If txn->getWriteConcern() indicates a durable commit level,
- * marks the RecoveryUnit associated with "txn" appropriately.
- * Provides a hint to the storage engine that
- * particular operations will be waiting for their changes to become durable.
+ * Returns true if 'cmdObj' has a 'writeConcern' field.
  */
-void setupSynchronousCommit(OperationContext* txn);
+bool commandSpecifiesWriteConcern(const BSONObj& cmdObj);
 
 /**
  * Attempts to extract a writeConcern from cmdObj.
  * Verifies that the writeConcern is of type Object (BSON type) and
  * that the resulting writeConcern is valid for this particular host.
  */
-StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj);
+StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
+                                                    const BSONObj& cmdObj,
+                                                    const std::string& dbName);
 
 /**
- * Verifies that a WriteConcern is valid for this particular host.
+ * Verifies that a WriteConcern is valid for this particular host and database.
  */
-Status validateWriteConcern(const WriteConcernOptions& writeConcern);
+Status validateWriteConcern(OperationContext* opCtx,
+                            const WriteConcernOptions& writeConcern,
+                            StringData dbName);
 
 struct WriteConcernResult {
     WriteConcernResult() {
@@ -98,8 +100,9 @@ struct WriteConcernResult {
  * Returns NotMaster if the host steps down while waiting for replication
  * Returns UnknownReplWriteConcern if the wMode specified was not enforceable
  */
-Status waitForWriteConcern(OperationContext* txn,
+Status waitForWriteConcern(OperationContext* opCtx,
                            const repl::OpTime& replOpTime,
+                           const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result);
 
 

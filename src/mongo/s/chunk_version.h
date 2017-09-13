@@ -1,36 +1,40 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects
-*    for all of the code used other than as permitted herein. If you modify
-*    file(s) with this exception, you may extend this exception to your
-*    version of the file(s), but you are not obligated to do so. If you do not
-*    wish to do so, delete this exception statement from your version. If you
-*    delete this exception statement from all source files in the program,
-*    then also delete it in the license file.
-*/
+ *    Copyright (C) 2012-2015 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #pragma once
 
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+class BSONObj;
+template <typename T>
+class StatusWith;
 
 /**
  * ChunkVersions consist of a major/minor version scoped to a version epoch
@@ -46,32 +50,76 @@ namespace mongo {
  * expected from types.
  */
 struct ChunkVersion {
-    union {
-        struct {
-            int _minor;
-            int _major;
-        };
-        unsigned long long _combined;
-    };
-    OID _epoch;
+public:
+    /**
+     * The name for the shard version information field, which shard-aware commands should include
+     * if they want to convey shard version.
+     */
+    static const char kShardVersionField[];
 
-    ChunkVersion() : _minor(0), _major(0), _epoch(OID()) {}
-
-    //
-    // Constructors shouldn't have default parameters here, since it's vital we track from
-    // here on the epochs of versions, even if not used.
-    //
+    ChunkVersion() : _combined(0), _epoch(OID()) {}
 
     ChunkVersion(int major, int minor, const OID& epoch)
-        : _minor(minor), _major(major), _epoch(epoch) {}
+        : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)),
+          _epoch(epoch) {}
 
+    /**
+     * Interprets the specified BSON content as the format for commands, which is in the form:
+     *  { ..., shardVersion: [ <combined major/minor>, <OID epoch> ], ... }
+     */
+    static StatusWith<ChunkVersion> parseFromBSONForCommands(const BSONObj& obj);
+
+    /**
+     * Parses the BSON formatted by ChunkVersion::appendWithFieldForCommands.
+     *
+     * Interprets the specified BSON content as the format for commands, which is in the form:
+     *  { ..., <field>: [ <combined major/minor>, <OID epoch> ], ... }.
+     */
+    static StatusWith<ChunkVersion> parseFromBSONWithFieldForCommands(const BSONObj& obj,
+                                                                      StringData field);
+
+    /**
+     * Note: if possible, use ChunkVersion::parseFromBSONForCommands or
+     * ChunkVersion::parseFromBSONWithFieldForCommands instead. Phasing out this function.
+     *
+     * Interprets the specified BSON content as the format for the setShardVersion command, which
+     * is in the form:
+     *  { ..., version: [ <combined major/minor> ], versionEpoch: [ <OID epoch> ], ... }
+     */
+    static StatusWith<ChunkVersion> parseFromBSONForSetShardVersion(const BSONObj& obj);
+
+    /**
+     * Note: if possible, use ChunkVersion::parseFromBSONForCommands or
+     * ChunkVersion::parseFromBSONWithFieldForCommands instead. Phasing out this function.
+     *
+     * Interprets the specified BSON content as the format for chunk persistence, which is in the
+     * form:
+     *  { ..., lastmod: [ <combined major/minor> ], lastmodEpoch: [ <OID epoch> ], ... }
+     */
+    static StatusWith<ChunkVersion> parseFromBSONForChunk(const BSONObj& obj);
+
+    /**
+     * Interprets the lastmod (combined major/minor) from a BSONObj without an epoch
+     *  { ..., <field>: [ <combined major/minor> ], ... }
+     * and then sets the returned ChunkVersion's epoch field to 'epoch'.
+     */
+    static StatusWith<ChunkVersion> parseFromBSONWithFieldAndSetEpoch(const BSONObj& obj,
+                                                                      StringData field,
+                                                                      const OID& epoch);
+
+    /**
+     * Indicates a dropped collection. All components are zeroes (OID is zero time, zero
+     * machineId/inc).
+     */
     static ChunkVersion DROPPED() {
-        return ChunkVersion(0, 0, OID());  // dropped OID is zero time, zero machineId/inc
+        return ChunkVersion(0, 0, OID());
     }
 
+    /**
+     * Indicates that the collection is not sharded. Same as DROPPED.
+     */
     static ChunkVersion UNSHARDED() {
-        // TODO: Distinguish between these cases
-        return DROPPED();
+        return ChunkVersion(0, 0, OID());
     }
 
     static ChunkVersion IGNORED() {
@@ -92,19 +140,11 @@ struct ChunkVersion {
     }
 
     void incMajor() {
-        _major++;
-        _minor = 0;
+        _combined = static_cast<uint64_t>(majorVersion() + 1) << 32;
     }
 
     void incMinor() {
-        _minor++;
-    }
-
-    // Incrementing an epoch creates a new, randomly generated identifier
-    void incEpoch() {
-        _epoch = OID::gen();
-        _major = 0;
-        _minor = 0;
+        _combined++;
     }
 
     // Note: this shouldn't be used as a substitute for version except in specific cases -
@@ -117,24 +157,14 @@ struct ChunkVersion {
         return _combined > 0;
     }
 
-    bool isEpochSet() const {
-        return _epoch.isSet();
-    }
-
-    std::string toString() const {
-        std::stringstream ss;
-        // Similar to month/day/year.  For the most part when debugging, we care about major
-        // so it's first
-        ss << _major << "|" << _minor << "||" << _epoch;
-        return ss.str();
-    }
-
     int majorVersion() const {
-        return _major;
+        return _combined >> 32;
     }
+
     int minorVersion() const {
-        return _minor;
+        return _combined & 0xFFFF;
     }
+
     OID epoch() const {
         return _epoch;
     }
@@ -144,6 +174,10 @@ struct ChunkVersion {
     // > < operators do not check epoch cases.  Generally if using == we need to handle
     // more complex cases.
     //
+
+    bool operator==(const ChunkVersion& otherVersion) const {
+        return equals(otherVersion);
+    }
 
     bool operator>(const ChunkVersion& otherVersion) const {
         return this->_combined > otherVersion._combined;
@@ -169,7 +203,7 @@ struct ChunkVersion {
     bool isWriteCompatibleWith(const ChunkVersion& otherVersion) const {
         if (!hasEqualEpoch(otherVersion))
             return false;
-        return otherVersion._major == _major;
+        return otherVersion.majorVersion() == majorVersion();
     }
 
     // Is this the same version?
@@ -198,10 +232,10 @@ struct ChunkVersion {
         if (otherVersion._epoch != _epoch)
             return false;
 
-        if (_major != otherVersion._major)
-            return _major < otherVersion._major;
+        if (majorVersion() != otherVersion.majorVersion())
+            return majorVersion() < otherVersion.majorVersion();
 
-        return _minor < otherVersion._minor;
+        return minorVersion() < otherVersion.minorVersion();
     }
 
     // Is this in the same epoch?
@@ -225,17 +259,6 @@ struct ChunkVersion {
     //
     // { version : <TS> } and { version : [<TS>,<OID>] } format
     //
-
-    static bool canParseBSON(const BSONElement& el, const std::string& prefix = "") {
-        bool canParse;
-        fromBSON(el, prefix, &canParse);
-        return canParse;
-    }
-
-    static ChunkVersion fromBSON(const BSONElement& el, const std::string& prefix = "") {
-        bool canParse;
-        return fromBSON(el, prefix, &canParse);
-    }
 
     static ChunkVersion fromBSON(const BSONElement& el, const std::string& prefix, bool* canParse) {
         *canParse = true;
@@ -263,12 +286,6 @@ struct ChunkVersion {
     // { version : <TS>, versionEpoch : <OID> } object format
     //
 
-    static bool canParseBSON(const BSONObj& obj, const std::string& prefix = "") {
-        bool canParse;
-        fromBSON(obj, prefix, &canParse);
-        return canParse;
-    }
-
     static ChunkVersion fromBSON(const BSONObj& obj, const std::string& prefix = "") {
         bool canParse;
         return fromBSON(obj, prefix, &canParse);
@@ -283,7 +300,7 @@ struct ChunkVersion {
         if (prefixIn == "" && !obj["version"].eoo()) {
             prefix = (std::string) "version";
         }
-        // TODO: use ChunkType::DEPRECATED_lastmod()
+        // TODO: use ChunkType::lastmod()
         // NOTE: type_chunk.h includes this file
         else if (prefixIn == "" && !obj["lastmod"].eoo()) {
             prefix = (std::string) "lastmod";
@@ -302,17 +319,6 @@ struct ChunkVersion {
     //
     // { version : [<TS>, <OID>] } format
     //
-
-    static bool canParseBSON(const BSONArray& arr) {
-        bool canParse;
-        fromBSON(arr, &canParse);
-        return canParse;
-    }
-
-    static ChunkVersion fromBSON(const BSONArray& arr) {
-        bool canParse;
-        return fromBSON(arr, &canParse);
-    }
 
     static ChunkVersion fromBSON(const BSONArray& arr, bool* canParse) {
         *canParse = false;
@@ -340,110 +346,68 @@ struct ChunkVersion {
         return version;
     }
 
-    enum VersionChoice { VersionChoice_Local, VersionChoice_Remote, VersionChoice_Unknown };
-
-    /**
-     * Compares a remotely-loaded version 'remoteVersion' to the latest local version of a
-     * collection, 'localVersion', and returns the newest.
-     *
-     * Because it isn't clear during epoch changes which epoch is newer, the local version
-     * before the reload occurred, 'prevLocalVersion', is used to determine whether the remote
-     * epoch is definitely newer, or we're not sure.
-     */
-    static VersionChoice chooseNewestVersion(ChunkVersion prevLocalVersion,
-                                             ChunkVersion localVersion,
-                                             ChunkVersion remoteVersion) {
-        OID prevEpoch = prevLocalVersion.epoch();
-        OID localEpoch = localVersion.epoch();
-        OID remoteEpoch = remoteVersion.epoch();
-
-        // Everything changed in-flight, so we need to try again
-        if (prevEpoch != localEpoch && localEpoch != remoteEpoch) {
-            return VersionChoice_Unknown;
-        }
-
-        // We're in the same (zero) epoch as the latest metadata, nothing to do
-        if (localEpoch == remoteEpoch && !remoteEpoch.isSet()) {
-            return VersionChoice_Local;
-        }
-
-        // We're in the same (non-zero) epoch as the latest metadata, so increment the version
-        if (localEpoch == remoteEpoch && remoteEpoch.isSet()) {
-            // Use the newer version if possible
-            if (localVersion < remoteVersion) {
-                return VersionChoice_Remote;
-            } else {
-                return VersionChoice_Local;
-            }
-        }
-
-        // We're now sure we're installing a new epoch and the epoch didn't change during reload
-        dassert(prevEpoch == localEpoch && localEpoch != remoteEpoch);
-        return VersionChoice_Remote;
-    }
-
     //
     // Currently our BSON output is to two different fields, to cleanly work with older
     // versions that know nothing about epochs.
     //
 
-    BSONObj toBSONWithPrefix(const std::string& prefixIn) const {
+    BSONObj toBSONWithPrefix(const std::string& prefix) const {
+        invariant(!prefix.empty());
+
         BSONObjBuilder b;
-
-        std::string prefix = prefixIn;
-        if (prefix == "")
-            prefix = "version";
-
         b.appendTimestamp(prefix, _combined);
         b.append(prefix + "Epoch", _epoch);
         return b.obj();
     }
 
-    void addToBSON(BSONObjBuilder& b, const std::string& prefix = "") const {
+    /**
+     * Note: if possible, use ChunkVersion::appendForCommands or
+     * ChunkVersion::appendWithFieldForCommands instead. Phasing out this function.
+     */
+    void addToBSON(BSONObjBuilder& b, const std::string& prefix) const {
         b.appendElements(toBSONWithPrefix(prefix));
     }
 
-    void addEpochToBSON(BSONObjBuilder& b, const std::string& prefix = "") const {
-        b.append(prefix + "Epoch", _epoch);
+    /**
+     * Appends the contents to the specified builder in the format expected by the setShardVersion
+     * command.
+     */
+    void appendForSetShardVersion(BSONObjBuilder* builder) const;
+
+    /**
+     * Appends the contents to the specified builder in the format expected by the sharded commands.
+     */
+    void appendForCommands(BSONObjBuilder* builder) const;
+
+    /**
+     * Appends the contents as an array to "builder" with the field name "field" in the format
+     * expected by the sharded commands.
+     *
+     * { ..., <field>: [ <combined major/minor>, <OID epoch> ], ... }
+     *
+     * Use ChunkVersion::parseFromBSONWithFieldForCommands to retrieve the ChunkVersion from the
+     * BSON created by this function.
+     */
+    void appendWithFieldForCommands(BSONObjBuilder* builder, StringData field) const;
+
+    /**
+     * Appends the contents to the specified builder in the format expected by the chunk
+     * serialization/deserialization code.
+     */
+    void appendForChunk(BSONObjBuilder* builder) const;
+
+    std::string toString() const {
+        StringBuilder sb;
+        sb << majorVersion() << "|" << minorVersion() << "||" << _epoch;
+        return sb.str();
     }
 
-    BSONObj toBSON() const {
-        // ChunkVersion wants to be an array.
-        BSONArrayBuilder b;
-        b.appendTimestamp(_combined);
-        b.append(_epoch);
-        return b.arr();
-    }
+    BSONObj toBSON() const;
 
-    bool parseBSON(const BSONObj& source, std::string* errMsg) {
-        // ChunkVersion wants to be an array.
-        BSONArray arrSource = static_cast<BSONArray>(source);
+private:
+    uint64_t _combined;
 
-        bool canParse;
-        ChunkVersion version = fromBSON(arrSource, &canParse);
-        if (!canParse) {
-            *errMsg = "Could not parse version structure";
-            return false;
-        }
-
-        _minor = version._minor;
-        _major = version._major;
-        _epoch = version._epoch;
-        return true;
-    }
-
-    void clear() {
-        _minor = 0;
-        _major = 0;
-        _epoch = OID();
-    }
-
-    void cloneTo(ChunkVersion* other) const {
-        other->clear();
-        other->_minor = _minor;
-        other->_major = _major;
-        other->_epoch = _epoch;
-    }
+    OID _epoch;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {

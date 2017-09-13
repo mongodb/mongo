@@ -47,7 +47,8 @@ extern const double MAX_WEIGHT;
 std::ostream& operator<<(std::ostream& os, FTSElementIterator::FTSIteratorFrame& frame) {
     BSONObjIterator it = frame._it;
     return os << "FTSIteratorFrame["
-                 " element=" << (*it).toString() << ", _language=" << frame._language->str()
+                 " element="
+              << (*it).toString() << ", _language=" << frame._language->str()
               << ", _parentPath=" << frame._parentPath << ", _isArray=" << frame._isArray << "]";
 }
 

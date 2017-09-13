@@ -32,7 +32,7 @@
 
 
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
-#include "mongo/db/storage/paths.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/util/bufreader.h"
 
 namespace mongo {
@@ -49,7 +49,7 @@ namespace dur {
  *
  *  For each op we want to journal, we define a subclass.
  */
-class DurOp {/* copyable */
+class DurOp { /* copyable */
 public:
     // @param opcode a sentinel value near max unsigned which uniquely identifies the operation.
     // @see dur::JEntry

@@ -55,9 +55,9 @@ StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
 
     HMODULE handle = LoadLibraryW(full_path.c_str());
     if (handle == nullptr) {
-        return StatusWith<std::unique_ptr<SharedLibrary>>(
-            ErrorCodes::InternalError,
-            str::stream() << "Load library failed: " << errnoWithDescription());
+        return StatusWith<std::unique_ptr<SharedLibrary>>(ErrorCodes::InternalError,
+                                                          str::stream() << "Load library failed: "
+                                                                        << errnoWithDescription());
     }
 
     return StatusWith<std::unique_ptr<SharedLibrary>>(
@@ -73,9 +73,9 @@ StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
     if (function == nullptr) {
         DWORD gle = GetLastError();
         if (gle != ERROR_PROC_NOT_FOUND) {
-            return StatusWith<void*>(
-                ErrorCodes::InternalError,
-                str::stream() << "GetProcAddress failed for symbol: " << errnoWithDescription());
+            return StatusWith<void*>(ErrorCodes::InternalError,
+                                     str::stream() << "GetProcAddress failed for symbol: "
+                                                   << errnoWithDescription());
         }
     }
 

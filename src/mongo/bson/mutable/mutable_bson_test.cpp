@@ -32,9 +32,11 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -544,31 +546,34 @@ TEST(Element, setters) {
 
     mmb::Element t0 = doc.makeElementNull("t0");
 
-    t0.setValueBool(true);
+    t0.setValueBool(true).transitional_ignore();
     ASSERT_EQUALS(mongo::Bool, t0.getType());
 
-    t0.setValueInt(12345);
+    t0.setValueInt(12345).transitional_ignore();
     ASSERT_EQUALS(mongo::NumberInt, t0.getType());
 
-    t0.setValueLong(12345LL);
+    t0.setValueLong(12345LL).transitional_ignore();
     ASSERT_EQUALS(mongo::NumberLong, t0.getType());
 
-    t0.setValueTimestamp(mongo::Timestamp());
+    t0.setValueTimestamp(mongo::Timestamp()).transitional_ignore();
     ASSERT_EQUALS(mongo::bsonTimestamp, t0.getType());
 
-    t0.setValueDate(mongo::Date_t::fromMillisSinceEpoch(12345LL));
+    t0.setValueDate(mongo::Date_t::fromMillisSinceEpoch(12345LL)).transitional_ignore();
     ASSERT_EQUALS(mongo::Date, t0.getType());
 
-    t0.setValueDouble(123.45);
+    t0.setValueDouble(123.45).transitional_ignore();
     ASSERT_EQUALS(mongo::NumberDouble, t0.getType());
 
-    t0.setValueOID(mongo::OID("47cc67093475061e3d95369d"));
+    t0.setValueDecimal(mongo::Decimal128("123.45E1234")).transitional_ignore();
+    ASSERT_EQUALS(mongo::NumberDecimal, t0.getType());
+
+    t0.setValueOID(mongo::OID("47cc67093475061e3d95369d")).transitional_ignore();
     ASSERT_EQUALS(mongo::jstOID, t0.getType());
 
-    t0.setValueRegex("[a-zA-Z]?", "");
+    t0.setValueRegex("[a-zA-Z]?", "").transitional_ignore();
     ASSERT_EQUALS(mongo::RegEx, t0.getType());
 
-    t0.setValueString("foo bar baz");
+    t0.setValueString("foo bar baz").transitional_ignore();
     ASSERT_EQUALS(mongo::String, t0.getType());
 }
 
@@ -606,6 +611,37 @@ TEST(Element, toString) {
     ASSERT_FALSE(docChild.ok());
 }
 
+TEST(DecimalType, createElement) {
+    mmb::Document doc;
+
+    mmb::Element d0 = doc.makeElementDecimal("d0", mongo::Decimal128("12345"));
+    ASSERT_TRUE(mongo::Decimal128("12345").isEqual(d0.getValueDecimal()));
+}
+
+TEST(DecimalType, setElement) {
+    mmb::Document doc;
+
+    mmb::Element d0 = doc.makeElementDecimal("d0", mongo::Decimal128("128"));
+    d0.setValueDecimal(mongo::Decimal128("123456")).transitional_ignore();
+    ASSERT_TRUE(mongo::Decimal128("123456").isEqual(d0.getValueDecimal()));
+
+    d0.setValueDouble(0.1).transitional_ignore();
+    ASSERT_EQUALS(0.1, d0.getValueDouble());
+    d0.setValueDecimal(mongo::Decimal128("23")).transitional_ignore();
+    ASSERT_TRUE(mongo::Decimal128("23").isEqual(d0.getValueDecimal()));
+}
+
+TEST(DecimalType, appendElement) {
+    mmb::Document doc;
+
+    mmb::Element d0 = doc.makeElementObject("e0");
+    d0.appendDecimal("precision", mongo::Decimal128(34)).transitional_ignore();
+
+    mmb::Element it = mmb::findFirstChildNamed(d0, "precision");
+    ASSERT_TRUE(it.ok());
+    ASSERT_TRUE(mongo::Decimal128(34).isEqual(it.getValueDecimal()));
+}
+
 TEST(TimestampType, createElement) {
     mmb::Document doc;
 
@@ -620,18 +656,18 @@ TEST(TimestampType, setElement) {
     mmb::Document doc;
 
     mmb::Element t0 = doc.makeElementTimestamp("t0", mongo::Timestamp());
-    t0.setValueTimestamp(mongo::Timestamp(123, 456));
+    t0.setValueTimestamp(mongo::Timestamp(123, 456)).transitional_ignore();
     ASSERT(mongo::Timestamp(123, 456) == t0.getValueTimestamp());
 
     // Try setting to other types and back to Timestamp
-    t0.setValueLong(1234567890);
+    t0.setValueLong(1234567890).transitional_ignore();
     ASSERT_EQUALS(1234567890LL, t0.getValueLong());
-    t0.setValueTimestamp(mongo::Timestamp(789, 321));
+    t0.setValueTimestamp(mongo::Timestamp(789, 321)).transitional_ignore();
     ASSERT(mongo::Timestamp(789, 321) == t0.getValueTimestamp());
 
-    t0.setValueString("foo bar baz");
+    t0.setValueString("foo bar baz").transitional_ignore();
     ASSERT_EQUALS("foo bar baz", t0.getValueString());
-    t0.setValueTimestamp(mongo::Timestamp(9876, 5432));
+    t0.setValueTimestamp(mongo::Timestamp(9876, 5432)).transitional_ignore();
     ASSERT(mongo::Timestamp(9876, 5432) == t0.getValueTimestamp());
 }
 
@@ -639,7 +675,8 @@ TEST(TimestampType, appendElement) {
     mmb::Document doc;
 
     mmb::Element t0 = doc.makeElementObject("e0");
-    t0.appendTimestamp("a timestamp field", mongo::Timestamp(1352151971, 471));
+    t0.appendTimestamp("a timestamp field", mongo::Timestamp(1352151971, 471))
+        .transitional_ignore();
 
     mmb::Element it = mmb::findFirstChildNamed(t0, "a timestamp field");
     ASSERT_TRUE(it.ok());
@@ -660,40 +697,45 @@ TEST(SafeNumType, getSafeNum) {
     mmb::Element t0 = doc.makeElementInt("t0", 1234567890);
     ASSERT_EQUALS(1234567890, t0.getValueInt());
     mongo::SafeNum num = t0.getValueSafeNum();
-    ASSERT_EQUALS(num, 1234567890);
+    ASSERT_EQUALS(num, static_cast<int64_t>(1234567890));
 
-    t0.setValueLong(1234567890LL);
+    t0.setValueLong(1234567890LL).transitional_ignore();
     ASSERT_EQUALS(1234567890LL, t0.getValueLong());
     num = t0.getValueSafeNum();
-    ASSERT_EQUALS(num, 1234567890LL);
+    ASSERT_EQUALS(num, static_cast<int64_t>(1234567890LL));
 
-    t0.setValueDouble(123.456789);
+    t0.setValueDouble(123.456789).transitional_ignore();
     ASSERT_EQUALS(123.456789, t0.getValueDouble());
     num = t0.getValueSafeNum();
     ASSERT_EQUALS(num, 123.456789);
+
+    t0.setValueDecimal(mongo::Decimal128("12345678.1234")).transitional_ignore();
+    ASSERT_TRUE(mongo::Decimal128("12345678.1234").isEqual(t0.getValueDecimal()));
+    num = t0.getValueSafeNum();
+    ASSERT_EQUALS(num, mongo::Decimal128("12345678.1234"));
 }
 
 TEST(SafeNumType, setSafeNum) {
     mmb::Document doc;
 
     mmb::Element t0 = doc.makeElementSafeNum("t0", mongo::SafeNum(123456));
-    t0.setValueSafeNum(mongo::SafeNum(654321));
+    t0.setValueSafeNum(mongo::SafeNum(654321)).transitional_ignore();
     ASSERT_EQUALS(mongo::SafeNum(654321), t0.getValueSafeNum());
 
     // Try setting to other types and back to SafeNum
-    t0.setValueLong(1234567890);
+    t0.setValueLong(1234567890).transitional_ignore();
     ASSERT_EQUALS(1234567890LL, t0.getValueLong());
-    t0.setValueSafeNum(mongo::SafeNum(1234567890));
+    t0.setValueSafeNum(mongo::SafeNum(1234567890)).transitional_ignore();
     ASSERT_EQUALS(mongo::SafeNum(1234567890), t0.getValueSafeNum());
 
-    t0.setValueString("foo bar baz");
+    t0.setValueString("foo bar baz").transitional_ignore();
 
     mongo::StringData left = "foo bar baz";
     mongo::StringData right = t0.getValueString();
     ASSERT_EQUALS(left, right);
 
     ASSERT_EQUALS(mongo::StringData("foo bar baz"), t0.getValueString());
-    t0.setValueSafeNum(mongo::SafeNum(12345));
+    t0.setValueSafeNum(mongo::SafeNum(12345)).transitional_ignore();
     ASSERT_EQUALS(mongo::SafeNum(12345), t0.getValueSafeNum());
 }
 
@@ -701,18 +743,19 @@ TEST(SafeNumType, appendElement) {
     mmb::Document doc;
 
     mmb::Element t0 = doc.makeElementObject("e0");
-    t0.appendSafeNum("a timestamp field", mongo::SafeNum(1352151971LL));
+    t0.appendSafeNum("a timestamp field", mongo::SafeNum(static_cast<int64_t>(1352151971LL)))
+        .transitional_ignore();
 
     mmb::Element it = findFirstChildNamed(t0, "a timestamp field");
     ASSERT_TRUE(it.ok());
-    ASSERT_EQUALS(mongo::SafeNum(1352151971LL), it.getValueSafeNum());
+    ASSERT_EQUALS(mongo::SafeNum(static_cast<int64_t>(1352151971LL)), it.getValueSafeNum());
 }
 
 TEST(OIDType, getOidValue) {
     mmb::Document doc;
     mmb::Element t0 = doc.makeElementObject("e0");
     const mongo::OID generated = mongo::OID::gen();
-    t0.appendOID("myOid", generated);
+    t0.appendOID("myOid", generated).transitional_ignore();
     mmb::Element it = findFirstChildNamed(t0, "myOid");
     const mongo::OID recovered = mongo::OID(it.getValueOID());
     ASSERT_EQUALS(generated, recovered);
@@ -722,7 +765,7 @@ TEST(OIDType, nullOID) {
     mmb::Document doc;
     mmb::Element t0 = doc.makeElementObject("e0");
     const mongo::OID withNull("50a9c82263e413ad0028faad");
-    t0.appendOID("myOid", withNull);
+    t0.appendOID("myOid", withNull).transitional_ignore();
     mmb::Element it = findFirstChildNamed(t0, "myOid");
     const mongo::OID recovered = mongo::OID(it.getValueOID());
     ASSERT_EQUALS(withNull, recovered);
@@ -744,17 +787,35 @@ static const char jsonSample[] =
     "pattern:/match.*this/,"
     "lastfield:\"last\"}";
 
+static const char jsonSampleWithDecimal[] =
+    "{_id:ObjectId(\"47cc67093475061e3d95369d\"),"
+    "query:\"kate hudson\","
+    "owner:1234567887654321,"
+    "date:\"2011-05-13T14:22:46.777Z\","
+    "score:123.456,"
+    "decimal:NumberDecimal(\"2\"),"
+    "field1:Infinity,"
+    "\"field2\":-Infinity,"
+    "\"field3\":NaN,"
+    "users:["
+    "{uname:\"@aaaa\",editid:\"123\",date:1303959350,yes_votes:0,no_votes:0},"
+    "{uname:\"@bbbb\",editid:\"456\",date:1303959350,yes_votes:0,no_votes:0},"
+    "{uname:\"@cccc\",editid:\"789\",date:1303959350,yes_votes:0,no_votes:0}],"
+    "pattern:/match.*this/,"
+    "lastfield:\"last\"}";
+
 TEST(Serialization, RoundTrip) {
-    mongo::BSONObj obj = mongo::fromjson(jsonSample);
+    mongo::BSONObj obj;
+    obj = mongo::fromjson(jsonSampleWithDecimal);
     mmb::Document doc(obj.copy());
     mongo::BSONObj built = doc.getObject();
-    ASSERT_EQUALS(obj, built);
+    ASSERT_BSONOBJ_EQ(obj, built);
 }
 
 TEST(Documentation, Example1) {
     // Create a new document
     mmb::Document doc;
-    ASSERT_EQUALS(mongo::fromjson("{}"), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{}"), doc.getObject());
 
     // Get the root of the document.
     mmb::Element root = doc.root();
@@ -763,41 +824,41 @@ TEST(Documentation, Example1) {
     // everything, then push that Element into the root object, making it a child of root.
     mmb::Element e0 = doc.makeElementInt("ltuae", 42);
     ASSERT_OK(root.pushBack(e0));
-    ASSERT_EQUALS(mongo::fromjson("{ ltuae : 42 }"), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42 }"), doc.getObject());
 
     // Create a new empty mongo::Object-typed Element named 'magic', and push it back as a
     // child of the root, making it a sibling of e0.
     mmb::Element e1 = doc.makeElementObject("magic");
     ASSERT_OK(root.pushBack(e1));
-    ASSERT_EQUALS(mongo::fromjson("{ ltuae : 42, magic : {} }"), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, magic : {} }"), doc.getObject());
 
     // Create a new mongo::NumberDouble typed Element to represent Pi, and insert it as child
     // of the new object we just created.
     mmb::Element e3 = doc.makeElementDouble("pi", 3.14);
     ASSERT_OK(e1.pushBack(e3));
-    ASSERT_EQUALS(mongo::fromjson("{ ltuae : 42, magic : { pi : 3.14 } }"), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, magic : { pi : 3.14 } }"), doc.getObject());
 
     // Create a new mongo::NumberDouble to represent Plancks constant in electrovolt
     // micrometers, and add it as a child of the 'magic' object.
     mmb::Element e4 = doc.makeElementDouble("hbar", 1.239);
     ASSERT_OK(e1.pushBack(e4));
-    ASSERT_EQUALS(mongo::fromjson("{ ltuae : 42, magic : { pi : 3.14, hbar : 1.239 } }"),
-                  doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, magic : { pi : 3.14, hbar : 1.239 } }"),
+                      doc.getObject());
 
     // Rename the parent element of 'hbar' to be 'constants'.
     ASSERT_OK(e4.parent().rename("constants"));
-    ASSERT_EQUALS(mongo::fromjson("{ ltuae : 42, constants : { pi : 3.14, hbar : 1.239 } }"),
-                  doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, constants : { pi : 3.14, hbar : 1.239 } }"),
+                      doc.getObject());
 
     // Rename 'ltuae' to 'answer' by accessing it as the root objects left child.
     ASSERT_OK(doc.root().leftChild().rename("answer"));
-    ASSERT_EQUALS(mongo::fromjson("{ answer : 42, constants : { pi : 3.14, hbar : 1.239 } }"),
-                  doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ answer : 42, constants : { pi : 3.14, hbar : 1.239 } }"),
+                      doc.getObject());
 
     // Sort the constants by name.
     mmb::sortChildren(doc.root().rightChild(), mmb::FieldNameLessThan());
-    ASSERT_EQUALS(mongo::fromjson("{ answer : 42, constants : { hbar : 1.239, pi : 3.14 } }"),
-                  doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ answer : 42, constants : { hbar : 1.239, pi : 3.14 } }"),
+                      doc.getObject());
 }
 
 TEST(Documentation, Example2) {
@@ -860,7 +921,7 @@ TEST(Documentation, Example2) {
 
     mongo::BSONObjBuilder builder;
     doc.writeTo(&builder);
-    ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
 }
 
 namespace {
@@ -884,7 +945,7 @@ TEST(Documentation, Example2InPlaceWithDamageVector) {
     // Make the object, and make a copy for reference.
     mongo::BSONObj obj = mongo::fromjson(inJson);
     const mongo::BSONObj copyOfObj = obj.getOwned();
-    ASSERT_EQUALS(obj, copyOfObj);
+    ASSERT_BSONOBJ_EQ(obj, copyOfObj);
 
     // Create a new document representing BSONObj with the above contents.
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
@@ -925,7 +986,7 @@ TEST(Documentation, Example2InPlaceWithDamageVector) {
     // Demonstrate that while the document has changed, the underlying BSONObj has not yet
     // changed.
     ASSERT_FALSE(obj == doc);
-    ASSERT_EQUALS(copyOfObj, obj);
+    ASSERT_BSONOBJ_EQ(copyOfObj, obj);
 
     // Ensure that in-place updates are still enabled.
     ASSERT_EQUALS(mmb::Document::kInPlaceEnabled, doc.getCurrentInPlaceMode());
@@ -952,7 +1013,7 @@ TEST(Documentation, Example2InPlaceWithDamageVector) {
 
     mongo::BSONObjBuilder builder;
     doc.writeTo(&builder);
-    ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
 }
 
 TEST(Documentation, Example3) {
@@ -974,7 +1035,7 @@ TEST(Documentation, Example3) {
     ASSERT_OK(ys.pushBack(ycaps));
     mmb::Element pun = doc.makeElementArray("why");
     ASSERT_OK(ys.pushBack(pun));
-    pun.appendString("na", "not");
+    pun.appendString("na", "not").transitional_ignore();
     mongo::BSONObj outObj = doc.getObject();
 
     static const char outJson[] =
@@ -982,7 +1043,7 @@ TEST(Documentation, Example3) {
         "  'xs': { 'x' : 'x', 'X' : 'X' },"
         "  'ys': { 'y' : 'y', 'Y' : 'Y', 'why' : ['not'] }"
         "}";
-    ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
 }
 
 TEST(Document, LifecycleConstructDefault) {
@@ -1094,13 +1155,13 @@ TEST(Document, RenameDeserialization) {
     ASSERT_TRUE(b.ok());
     mmb::Element c = b.leftChild();
     ASSERT_TRUE(c.ok());
-    c.rename("C");
+    c.rename("C").transitional_ignore();
     mongo::BSONObj outObj = doc.getObject();
     static const char outJson[] =
         "{"
         "  'a' : { 'b' : { 'C' : { 'd' : 4 } } }"
         "}";
-    ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
 }
 
 TEST(Document, CantRenameRootElement) {
@@ -1123,14 +1184,14 @@ TEST(Document, RemoveElementWithOpaqueRightSibling) {
 
     mmb::Element a = doc.root().leftChild();
     ASSERT_TRUE(a.ok());
-    a.remove();
+    a.remove().transitional_ignore();
 
     static const char outJson[] =
         "{"
         "  'b' : 2, 'c' : 3"
         "}";
     mongo::BSONObj outObj = doc.getObject();
-    ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
 }
 
 TEST(Document, AddRightSiblingToElementWithOpaqueRightSibling) {
@@ -1155,7 +1216,7 @@ TEST(Document, AddRightSiblingToElementWithOpaqueRightSibling) {
         "  'a' : 1, 'X' : 'X', 'b' : 2, 'c' : 3"
         "}";
     mongo::BSONObj outObj = doc.getObject();
-    ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
 }
 
 TEST(Document, ArrayIndexedAccessFromJson) {
@@ -1313,6 +1374,9 @@ TEST(Element, IsNumeric) {
 
     elt = doc.makeElementDouble("dummy", 42.0);
     ASSERT_TRUE(elt.isNumeric());
+
+    elt = doc.makeElementDecimal("dummy", mongo::Decimal128(20));
+    ASSERT_TRUE(elt.isNumeric());
 }
 
 TEST(Element, IsIntegral) {
@@ -1332,6 +1396,9 @@ TEST(Element, IsIntegral) {
 
     elt = doc.makeElementDouble("dummy", 42.0);
     ASSERT_FALSE(elt.isIntegral());
+
+    elt = doc.makeElementDecimal("dummy", mongo::Decimal128(20));
+    ASSERT_FALSE(elt.isIntegral());
 }
 
 TEST(Document, ArraySerialization) {
@@ -1348,8 +1415,8 @@ TEST(Document, ArraySerialization) {
     mmb::Element b = a.leftChild();
     mmb::Element new_array = doc.makeElementArray("XXX");
     mmb::Element e = doc.makeElementString("e", "e");
-    new_array.pushBack(e);
-    b.pushBack(new_array);
+    new_array.pushBack(e).transitional_ignore();
+    b.pushBack(new_array).transitional_ignore();
 
     static const char outJson[] =
         "{ "
@@ -1357,7 +1424,7 @@ TEST(Document, ArraySerialization) {
         "}";
 
     const mongo::BSONObj outObj = doc.getObject();
-    ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), outObj);
 }
 
 TEST(Document, SetValueBSONElementFieldNameHandling) {
@@ -1373,10 +1440,172 @@ TEST(Document, SetValueBSONElementFieldNameHandling) {
     const mongo::BSONElement b = iterator.next();
 
     mmb::Element a = doc.root().leftChild();
-    a.setValueBSONElement(b);
+    a.setValueBSONElement(b).transitional_ignore();
 
     static const char outJson[] = "{ a : 5 }";
-    ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
+}
+
+TEST(Document, SetValueElementFromSeparateDocument) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    mmb::Document doc1(inObj);
+
+    mongo::BSONObj inObj2 = mongo::fromjson("{ b : 5 }");
+    const mmb::Document doc2(inObj2);
+
+    auto setTo = doc1.root().leftChild();
+    auto setFrom = doc2.root().leftChild();
+    ASSERT_OK(setTo.setValueElement(setFrom));
+
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ a : 5 }"), doc1.getObject());
+
+    // Doc containing the 'setFrom' element should be unchanged.
+    ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
+}
+
+TEST(Document, SetValueElementIsNoopWhenSetToSelf) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    mmb::Document doc(inObj);
+
+    auto element = doc.root().leftChild();
+    ASSERT_OK(element.setValueElement(element));
+
+    ASSERT_BSONOBJ_EQ(inObj, doc.getObject());
+}
+
+TEST(Document, SetValueElementIsNoopWhenSetToSelfFromCopy) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    mmb::Document doc(inObj);
+
+    auto element = doc.root().leftChild();
+    auto elementCopy = element;
+    ASSERT_OK(element.setValueElement(elementCopy));
+
+    ASSERT_BSONOBJ_EQ(inObj, doc.getObject());
+}
+
+TEST(Document, SetValueElementIsNoopWhenSetToSelfNonRootElement) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : { b : { c: 4 } } }");
+    mmb::Document doc(inObj);
+
+    auto element = doc.root().leftChild().leftChild().leftChild();
+    ASSERT_EQ("c", element.getFieldName());
+    ASSERT_OK(element.setValueElement(element));
+
+    ASSERT_BSONOBJ_EQ(inObj, doc.getObject());
+}
+
+TEST(Document, SetValueElementSetToNestedObject) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    mmb::Document doc1(inObj);
+
+    mongo::BSONObj inObj2 = mongo::fromjson("{ b : { c : 5, d : 6 } }");
+    const mmb::Document doc2(inObj2);
+
+    auto setTo = doc1.root().leftChild();
+    auto setFrom = doc2.root().leftChild();
+    ASSERT_OK(setTo.setValueElement(setFrom));
+
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ a : { c : 5, d : 6 } }"), doc1.getObject());
+
+    // Doc containing the 'setFrom' element should be unchanged.
+    ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
+}
+
+TEST(Document, SetValueElementNonRootElements) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : { b : 5, c : 6 } }");
+    mmb::Document doc1(inObj);
+
+    mongo::BSONObj inObj2 = mongo::fromjson("{ d : { e : 8, f : 9 } }");
+    const mmb::Document doc2(inObj2);
+
+    auto setTo = doc1.root().leftChild().rightChild();
+    ASSERT_EQ("c", setTo.getFieldName());
+    auto setFrom = doc2.root().leftChild().leftChild();
+    ASSERT_EQ("e", setFrom.getFieldName());
+    ASSERT_OK(setTo.setValueElement(setFrom));
+
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ a : { b : 5, c : 8 } }"), doc1.getObject());
+
+    // Doc containing the 'setFrom' element should be unchanged.
+    ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
+}
+
+TEST(Document, SetValueElementSetRootToSelfErrors) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    mmb::Document doc(inObj);
+
+    auto element = doc.root();
+    ASSERT_NOT_OK(element.setValueElement(element));
+    ASSERT_BSONOBJ_EQ(inObj, doc.getObject());
+}
+
+TEST(Document, SetValueElementSetRootToAnotherDocRootErrors) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    mmb::Document doc1(inObj);
+
+    mongo::BSONObj inObj2 = mongo::fromjson("{ b : 5 }");
+    const mmb::Document doc2(inObj2);
+
+    auto setTo = doc1.root();
+    auto setFrom = doc2.root();
+    ASSERT_NOT_OK(setTo.setValueElement(setFrom));
+
+    ASSERT_BSONOBJ_EQ(inObj, doc1.getObject());
+    ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
+}
+
+TEST(Document, SetValueElementSetRootToNotRootInSelfErrors) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    mmb::Document doc(inObj);
+
+    auto setTo = doc.root();
+    auto setFrom = doc.root().leftChild();
+    ASSERT_NOT_OK(setTo.setValueElement(setFrom));
+    ASSERT_BSONOBJ_EQ(inObj, doc.getObject());
+}
+
+TEST(Document, SetValueElementSetRootToNotRootInAnotherDocErrors) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : 4 }");
+    mmb::Document doc1(inObj);
+
+    mongo::BSONObj inObj2 = mongo::fromjson("{ b : 5 }");
+    const mmb::Document doc2(inObj2);
+
+    auto setTo = doc1.root();
+    auto setFrom = doc2.root().leftChild();
+    ASSERT_NOT_OK(setTo.setValueElement(setFrom));
+
+    ASSERT_BSONOBJ_EQ(inObj, doc1.getObject());
+    ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
+}
+
+TEST(Document, SetValueElementSetToOwnRootErrors) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : { b : 4 } }");
+    mmb::Document doc(inObj);
+
+    auto setTo = doc.root().leftChild().leftChild();
+    ASSERT_EQ("b", setTo.getFieldName());
+    auto setFrom = doc.root();
+
+    ASSERT_NOT_OK(setTo.setValueElement(setFrom));
+    ASSERT_BSONOBJ_EQ(inObj, doc.getObject());
+}
+
+TEST(Document, SetValueElementSetToOtherDocRoot) {
+    mongo::BSONObj inObj = mongo::fromjson("{ a : { b : 4 } }");
+    mmb::Document doc1(inObj);
+
+    mongo::BSONObj inObj2 = mongo::fromjson("{ c : 5 } }");
+    mmb::Document doc2(inObj2);
+
+    auto setTo = doc1.root().leftChild().leftChild();
+    ASSERT_EQ("b", setTo.getFieldName());
+    auto setFrom = doc2.root();
+
+    ASSERT_OK(setTo.setValueElement(setFrom));
+    ASSERT_BSONOBJ_EQ(mongo::fromjson("{ a : { b : { c : 5 } } }"), doc1.getObject());
+    ASSERT_BSONOBJ_EQ(inObj2, doc2.getObject());
 }
 
 TEST(Document, CreateElementWithEmptyFieldName) {
@@ -1435,7 +1664,9 @@ TEST(Document, ElementCloningToDifferentDocument) {
     mmb::Document source(mongo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    source.root()["d"].pushBack(source.makeElementInt(mongo::StringData(), 7));
+    source.root()["d"]
+        .pushBack(source.makeElementInt(mongo::StringData(), 7))
+        .transitional_ignore();
 
     mmb::Document target;
 
@@ -1467,7 +1698,7 @@ TEST(Document, ElementCloningToSameDocument) {
     mmb::Document doc(mongo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7));
+    doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7)).transitional_ignore();
 
     mmb::Element newElement = doc.makeElement(doc.root()["d"]);
     ASSERT_TRUE(newElement.ok());
@@ -1512,7 +1743,9 @@ TEST(Document, RootCloningToDifferentDocument) {
     mmb::Document source(mongo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    source.root()["d"].pushBack(source.makeElementInt(mongo::StringData(), 7));
+    source.root()["d"]
+        .pushBack(source.makeElementInt(mongo::StringData(), 7))
+        .transitional_ignore();
 
     mmb::Document target;
 
@@ -1531,7 +1764,7 @@ TEST(Document, RootCloningToSameDocument) {
     mmb::Document doc(mongo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7));
+    doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7)).transitional_ignore();
 
     mmb::Element newElement = doc.makeElementWithNewFieldName("X", doc.root());
     mongo::Status status = doc.root().pushBack(newElement);
@@ -1570,7 +1803,7 @@ TEST(Document, ValueOfEphemeralObjectElementIsEmpty) {
     ASSERT_OK(root.pushBack(ephemeralObject));
     ASSERT_FALSE(ephemeralObject.hasValue());
     // NOTE: You really shouldn't rely on this behavior; this test is mostly for coverage.
-    ASSERT_EQUALS(mongo::BSONElement(), ephemeralObject.getValue());
+    ASSERT_BSONELT_EQ(mongo::BSONElement(), ephemeralObject.getValue());
 }
 
 TEST(Element, RemovingRemovedElementFails) {
@@ -1627,7 +1860,7 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueDouble(value1);
+    c.setValueDouble(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::NumberDouble);
     ASSERT_TRUE(c.hasValue());
 
@@ -1667,7 +1900,7 @@ TEST(TypeSupport, EncodingEquivalenceString) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueString(value1);
+    c.setValueString(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::String);
     ASSERT_TRUE(c.hasValue());
 
@@ -1694,7 +1927,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     ASSERT_TRUE(a.ok());
     ASSERT_EQUALS(a.getType(), mongo::Object);
     ASSERT_TRUE(a.hasValue());
-    ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueObject());
+    ASSERT_BSONOBJ_EQ(value1, mmb::ConstElement(a).getValueObject());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
@@ -1707,7 +1940,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueObject(value1);
+    c.setValueObject(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::Object);
     ASSERT_TRUE(c.hasValue());
 
@@ -1735,7 +1968,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     ASSERT_TRUE(a.ok());
     ASSERT_EQUALS(a.getType(), mongo::Array);
     ASSERT_TRUE(a.hasValue());
-    ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueArray());
+    ASSERT_BSONOBJ_EQ(value1, mmb::ConstElement(a).getValueArray());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
@@ -1748,7 +1981,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueArray(value1);
+    c.setValueArray(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::Array);
     ASSERT_TRUE(c.hasValue());
 
@@ -1803,7 +2036,7 @@ TEST(TypeSupport, EncodingEquivalenceBinary) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueBinary(sizeof(value2), value1, &value2[0]);
+    c.setValueBinary(sizeof(value2), value1, &value2[0]).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::BinData);
     ASSERT_TRUE(c.hasValue());
 
@@ -1842,7 +2075,7 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueUndefined();
+    c.setValueUndefined().transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::Undefined);
     ASSERT_TRUE(c.hasValue());
 
@@ -1882,7 +2115,7 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueOID(value1);
+    c.setValueOID(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::jstOID);
     ASSERT_TRUE(c.hasValue());
 
@@ -1922,7 +2155,7 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueBool(value1);
+    c.setValueBool(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::Bool);
     ASSERT_TRUE(c.hasValue());
 
@@ -1962,7 +2195,7 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueDate(value1);
+    c.setValueDate(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::Date);
     ASSERT_TRUE(c.hasValue());
 
@@ -2001,7 +2234,7 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
     ASSERT_OK(doc.root().appendUndefined(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueNull();
+    c.setValueNull().transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::jstNULL);
     ASSERT_TRUE(c.hasValue());
 
@@ -2041,7 +2274,7 @@ TEST(TypeSupport, EncodingEquivalenceRegex) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueRegex(value1, value2);
+    c.setValueRegex(value1, value2).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::RegEx);
     ASSERT_TRUE(c.hasValue());
 
@@ -2081,7 +2314,7 @@ TEST(TypeSupport, EncodingEquivalenceDBRef) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueDBRef(value1, value2);
+    c.setValueDBRef(value1, value2).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::DBRef);
     ASSERT_TRUE(c.hasValue());
 
@@ -2120,7 +2353,7 @@ TEST(TypeSupport, EncodingEquivalenceCode) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueCode(value1);
+    c.setValueCode(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::Code);
     ASSERT_TRUE(c.hasValue());
 
@@ -2160,7 +2393,7 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueSymbol(value1);
+    c.setValueSymbol(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::Symbol);
     ASSERT_TRUE(c.hasValue());
 
@@ -2200,7 +2433,7 @@ TEST(TypeSupport, EncodingEquivalenceCodeWithScope) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueCodeWithScope(value1, value2);
+    c.setValueCodeWithScope(value1, value2).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::CodeWScope);
     ASSERT_TRUE(c.hasValue());
 
@@ -2240,7 +2473,7 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueInt(value1);
+    c.setValueInt(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::NumberInt);
     ASSERT_TRUE(c.hasValue());
 
@@ -2280,7 +2513,7 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueTimestamp(value1);
+    c.setValueTimestamp(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::bsonTimestamp);
     ASSERT_TRUE(c.hasValue());
 
@@ -2320,8 +2553,48 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueLong(value1);
+    c.setValueLong(value1).transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::NumberLong);
+    ASSERT_TRUE(c.hasValue());
+
+    // Ensure identity:
+    ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
+    ASSERT_TRUE(identical(a.getValue(), b.getValue()));
+    ASSERT_TRUE(identical(b.getValue(), c.getValue()));
+}
+
+TEST(TypeSupport, EncodingEquivalenceDecimal) {
+    mongo::BSONObjBuilder builder;
+    const char name[] = "thing";
+    const mongo::Decimal128 value1 = mongo::Decimal128(2);
+    builder.append(name, value1);
+    mongo::BSONObj source = builder.done();
+    const mongo::BSONElement thing = source.firstElement();
+    ASSERT_TRUE(thing.type() == mongo::NumberDecimal);
+
+    mmb::Document doc;
+
+    // Construct via direct call to append/make
+    ASSERT_OK(doc.root().appendDecimal(name, value1));
+    mmb::Element a = doc.root().rightChild();
+    ASSERT_TRUE(a.ok());
+    ASSERT_EQUALS(a.getType(), mongo::NumberDecimal);
+    ASSERT_TRUE(a.hasValue());
+    ASSERT_TRUE(value1.isEqual(mmb::ConstElement(a).getValueDecimal()));
+
+    // Construct via call passong BSON element
+    ASSERT_OK(doc.root().appendElement(thing));
+    mmb::Element b = doc.root().rightChild();
+    ASSERT_TRUE(b.ok());
+    ASSERT_EQUALS(b.getType(), mongo::NumberDecimal);
+    ASSERT_TRUE(b.hasValue());
+
+    // Construct via setValue call
+    ASSERT_OK(doc.root().appendNull(name));
+    mmb::Element c = doc.root().rightChild();
+    ASSERT_TRUE(c.ok());
+    c.setValueDecimal(value1).transitional_ignore();
+    ASSERT_EQUALS(c.getType(), mongo::NumberDecimal);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2359,7 +2632,7 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueMinKey();
+    c.setValueMinKey().transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::MinKey);
     ASSERT_TRUE(c.hasValue());
 
@@ -2398,7 +2671,7 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
-    c.setValueMaxKey();
+    c.setValueMaxKey().transitional_ignore();
     ASSERT_EQUALS(c.getType(), mongo::MaxKey);
     ASSERT_TRUE(c.hasValue());
 
@@ -2447,7 +2720,7 @@ TEST(Document, ManipulateComplexObjInLeafHeap) {
 
     static const char outJson[] =
         "{ embedded: { a: 1, b: 2, c: 2.0, d : ['w', 'y', 'z'] }, free: {} }";
-    ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
 }
 
 TEST(DocumentInPlace, EphemeralDocumentsDoNotUseInPlaceMode) {
@@ -2622,7 +2895,7 @@ TEST(DocumentInPlace, DisablingInPlaceDoesNotDiscardUpdates) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
     static const char outJson[] = "{ foo : true, bar : false, baz : 'baz' }";
-    ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    ASSERT_BSONOBJ_EQ(mongo::fromjson(outJson), doc.getObject());
 }
 
 TEST(DocumentInPlace, StringLifecycle) {
@@ -2634,7 +2907,7 @@ TEST(DocumentInPlace, StringLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueString("bar");
+    x.setValueString("bar").transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2660,7 +2933,7 @@ TEST(DocumentInPlace, BinDataLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueBinary(binData2.length, binData2.type, binData2.data);
+    x.setValueBinary(binData2.length, binData2.type, binData2.data).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2690,7 +2963,7 @@ TEST(DocumentInPlace, OIDLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueOID(oid2);
+    x.setValueOID(oid2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2710,7 +2983,7 @@ TEST(DocumentInPlace, BooleanLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueBool(false);
+    x.setValueBool(false).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2736,7 +3009,7 @@ TEST(DocumentInPlace, DateLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueDate(mongo::Date_t::fromMillisSinceEpoch(20000));
+    x.setValueDate(mongo::Date_t::fromMillisSinceEpoch(20000)).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2758,7 +3031,7 @@ TEST(DocumentInPlace, NumberIntLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueInt(value2);
+    x.setValueInt(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2784,7 +3057,8 @@ TEST(DocumentInPlace, TimestampLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueTimestamp(mongo::Timestamp(mongo::Date_t::fromMillisSinceEpoch(20000)));
+    x.setValueTimestamp(mongo::Timestamp(mongo::Date_t::fromMillisSinceEpoch(20000)))
+        .transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2807,7 +3081,7 @@ TEST(DocumentInPlace, NumberLongLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueLong(value2);
+    x.setValueLong(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2836,7 +3110,7 @@ TEST(DocumentInPlace, NumberDoubleLifecycle) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueDouble(value2);
+    x.setValueDouble(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
@@ -2853,6 +3127,35 @@ TEST(DocumentInPlace, NumberDoubleLifecycle) {
     // ASSERT_EQUALS(value1, x.getValueDouble());
 }
 
+TEST(DocumentInPlace, NumberDecimalLifecycle) {
+    const mongo::Decimal128 value1 = mongo::Decimal128(32);
+    const mongo::Decimal128 value2 = mongo::Decimal128(2);
+
+    mongo::BSONObj obj(BSON("x" << value1));
+    mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+
+    mmb::Element x = doc.root().leftChild();
+
+    mmb::DamageVector damages;
+    const char* source = NULL;
+
+    x.setValueDecimal(value2).transitional_ignore();
+    ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+    ASSERT_EQUALS(1U, damages.size());
+    apply(&obj, damages, source);
+    ASSERT_TRUE(x.hasValue());
+    ASSERT_TRUE(x.isType(mongo::NumberDecimal));
+    ASSERT_TRUE(value2.isEqual(x.getValueDecimal()));
+
+    // TODO: Re-enable when in-place updates to leaf elements is supported
+    // x.setValueDecimal(value1);
+    // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+    // apply(&obj, damages, source);
+    // ASSERT_TRUE(x.hasValue());
+    // ASSERT_TRUE(x.isType(mongo::NumberDecimal));
+    // ASSERT_TRUE(value1.isEqual(x.getValueDecimal()));
+}
+
 // Doubles and longs are the same size, 8 bytes, so we should be able to do in-place
 // updates between them.
 TEST(DocumentInPlace, DoubleToLongAndBack) {
@@ -2867,7 +3170,7 @@ TEST(DocumentInPlace, DoubleToLongAndBack) {
     mmb::DamageVector damages;
     const char* source = NULL;
 
-    x.setValueLong(value2);
+    x.setValueLong(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // We changed the type, so we get an extra damage event.
     ASSERT_EQUALS(2U, damages.size());
@@ -2890,10 +3193,10 @@ TEST(DocumentComparison, SimpleComparison) {
         mongo::fromjson("{ a : 'a', b : ['b', 'b', 'b'], c : { one : 1.0 } }");
 
     const mmb::Document doc1(obj.getOwned());
-    ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj));
+    ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj, nullptr));
     const mmb::Document doc2(obj.getOwned());
-    ASSERT_EQUALS(0, doc1.compareWith(doc2));
-    ASSERT_EQUALS(0, doc2.compareWith(doc1));
+    ASSERT_EQUALS(0, doc1.compareWith(doc2, nullptr));
+    ASSERT_EQUALS(0, doc2.compareWith(doc1, nullptr));
 }
 
 TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
@@ -2911,10 +3214,10 @@ TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
     ASSERT_OK(b0.remove());
     ASSERT_OK(b.pushBack(b0));
     // Ensure that it compares correctly against the source object.
-    ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj));
+    ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj, nullptr));
     // Ensure that it compares correctly against a pristine document.
-    ASSERT_EQUALS(0, doc1.compareWith(doc1Copy));
-    ASSERT_EQUALS(0, doc1Copy.compareWith(doc1));
+    ASSERT_EQUALS(0, doc1.compareWith(doc1Copy, nullptr));
+    ASSERT_EQUALS(0, doc1Copy.compareWith(doc1, nullptr));
 
     // Perform an operation on 'c' that doesn't change the serialized value, but
     // deserializeds the node.
@@ -2927,14 +3230,114 @@ TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
     ASSERT_OK(c1.remove());
     ASSERT_OK(c.pushBack(c1));
     // Ensure that it compares correctly against the source object
-    ASSERT_EQUALS(0, doc2.compareWithBSONObj(obj));
+    ASSERT_EQUALS(0, doc2.compareWithBSONObj(obj, nullptr));
     // Ensure that it compares correctly against a pristine document.
-    ASSERT_EQUALS(0, doc2.compareWith(doc2Copy));
-    ASSERT_EQUALS(0, doc2Copy.compareWith(doc2));
+    ASSERT_EQUALS(0, doc2.compareWith(doc2Copy, nullptr));
+    ASSERT_EQUALS(0, doc2Copy.compareWith(doc2, nullptr));
 
     // Ensure that the two deserialized documents compare with each other correctly.
-    ASSERT_EQUALS(0, doc1.compareWith(doc2));
-    ASSERT_EQUALS(0, doc2.compareWith(doc1));
+    ASSERT_EQUALS(0, doc1.compareWith(doc2, nullptr));
+    ASSERT_EQUALS(0, doc2.compareWith(doc1, nullptr));
+}
+
+TEST(DocumentComparison, DocumentCompareWithRespectsCollation) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
+    const mmb::Document doc2(mongo::fromjson("{a: 'bar'}"));
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, doc1.compareWith(doc2, nullptr, true));
+    ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
+}
+
+TEST(DocumentComparison, DocumentCompareWithBSONObjRespectsCollation) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
+    const mongo::BSONObj doc2 = mongo::fromjson("{a: 'bar'}");
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, doc1.compareWithBSONObj(doc2, nullptr, true));
+    ASSERT_EQ(0, doc1.compareWithBSONObj(doc2, &collator, true));
+}
+
+TEST(DocumentComparison, ElementCompareWithElementRespectsCollator) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
+    const mmb::Document doc2(mongo::fromjson("{a: 'bar'}"));
+    const mmb::ConstElement element1 = doc1.root().leftChild();
+    const mmb::ConstElement element2 = doc2.root().leftChild();
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, element1.compareWithElement(element2, nullptr, true));
+    ASSERT_EQ(0, element1.compareWithElement(element2, &collator, true));
+}
+
+TEST(DocumentComparison, ElementCompareWithBSONElementRespectsCollator) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
+    const mongo::BSONObj doc2 = mongo::fromjson("{a: 'bar'}");
+    const mmb::ConstElement element1 = doc1.root().leftChild();
+    const mongo::BSONElement element2 = doc2["a"];
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, element1.compareWithBSONElement(element2, nullptr, true));
+    ASSERT_EQ(0, element1.compareWithBSONElement(element2, &collator, true));
+}
+
+TEST(DocumentComparison, ElementCompareWithBSONObjRespectsCollator) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{b: {c: 'foo'}}"));
+    const mongo::BSONObj doc2 = mongo::fromjson("{c: 'bar'}");
+    const mmb::ConstElement element1 = doc1.root().leftChild();
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, element1.compareWithBSONObj(doc2, nullptr, true));
+    ASSERT_EQ(0, element1.compareWithBSONObj(doc2, &collator, true));
+}
+
+TEST(DocumentComparison, DocumentCompareWithRespectsCollationRecursively) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: [{b: 'foo'}, {b: 'bar'}]}"));
+    const mmb::Document doc2(mongo::fromjson("{a: [{b: 'notFoo'}, {b: 'notBar'}]}"));
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, doc1.compareWith(doc2, nullptr, true));
+    ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
+}
+
+TEST(DocumentComparison, DocumentCompareWithRespectsCollationWithDeserializedElement) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    mmb::Document doc1(mongo::fromjson("{a: ['foo', 'foo']}"));
+    mmb::Document doc2(mongo::fromjson("{a: ['bar', 'bar']}"));
+
+    // With the always equal collator, the documents should start out comparing equal.
+    ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
+    ASSERT_EQ(0, doc2.compareWith(doc1, &collator, true));
+
+    // They should still be equal after causing deserialization of one of the leaf elements of
+    // 'doc1'.
+    {
+        mmb::Element elementA = doc1.root()["a"];
+        ASSERT_TRUE(elementA.ok());
+        mmb::Element elementA0 = elementA[0];
+        ASSERT_TRUE(elementA0.ok());
+        ASSERT_OK(elementA0.remove());
+        ASSERT_OK(elementA.pushBack(elementA0));
+        ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
+        ASSERT_EQ(0, doc2.compareWith(doc1, &collator, true));
+    }
+
+    // And they should remain equal after doing the same to 'doc2'.
+    {
+        mmb::Element elementA = doc2.root()["a"];
+        ASSERT_TRUE(elementA.ok());
+        mmb::Element elementA0 = elementA[0];
+        ASSERT_TRUE(elementA0.ok());
+        ASSERT_OK(elementA0.remove());
+        ASSERT_OK(elementA.pushBack(elementA0));
+        ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
+        ASSERT_EQ(0, doc2.compareWith(doc1, &collator, true));
+    }
 }
 
 TEST(UnorderedEqualityChecker, Identical) {

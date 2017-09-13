@@ -29,6 +29,9 @@
 #pragma once
 
 #include "mongo/base/data_type_validated.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/server_options.h"
 
 // We do not use the rpc namespace here so we can specialize Validator.
 namespace mongo {
@@ -41,8 +44,18 @@ class Status;
  */
 template <>
 struct Validator<BSONObj> {
-    static Status validateLoad(const char* ptr, size_t length);
+    inline static BSONVersion enabledBSONVersion() {
+        // The enabled BSON version is always the latest BSON version if no new BSON types have been
+        // added during the release. Otherwise, the BSON version returned should be controlled
+        // through the featureCompatibilityVersion.
+        return BSONVersion::kLatest;
+    }
+
+    inline static Status validateLoad(const char* ptr, size_t length) {
+        return serverGlobalParams.objcheck ? validateBSON(ptr, length, enabledBSONVersion())
+                                           : Status::OK();
+    }
+
     static Status validateStore(const BSONObj& toStore);
 };
-
 }  // namespace mongo

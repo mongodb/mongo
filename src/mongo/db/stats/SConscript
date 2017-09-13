@@ -2,10 +2,34 @@
 
 Import("env")
 
+env = env.Clone()
+
+env.Library(
+    target='timer_stats',
+    source=[
+        'timer_stats.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+    ],
+)
+
+env.CppUnitTest(
+    target='timer_stats_test',
+    source=[
+        'timer_stats_test.cpp',
+    ],
+    LIBDEPS=[
+        'timer_stats',
+    ],
+)
+
 env.Library(
     target='top',
     source=[
         'top.cpp',
+        'operation_latency_histogram.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
@@ -22,11 +46,60 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='operation_latency_histogram_test',
+    source=[
+        'operation_latency_histogram_test.cpp'
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/stats/top',
+        ])
+
 env.Library(
     target='counters',
     source=[
         'counters.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+    ],
+)
+
+env.Library(
+    target='fill_locker_info',
+    source=[
+        'fill_locker_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager'
+    ],
+)
+
+env.CppUnitTest(
+    target='fill_locker_info_test',
+    source=[
+        'fill_locker_info_test.cpp',
+    ],
+    LIBDEPS=[
+        'fill_locker_info',
+    ],
+)
+
+env.Library(
+    target='serveronly',
+    source=[
+        "latency_server_status_section.cpp",
+        "lock_server_status_section.cpp",
+        'storage_stats.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        'fill_locker_info',
+        'top',
     ],
 )

@@ -33,9 +33,9 @@
 
 #include <iostream>
 
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage/paths.h"
+#include "mongo/db/client.h"
 #include "mongo/db/storage/mmap_v1/compress.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/queue.h"
@@ -43,6 +43,7 @@
 #include "mongo/util/text.h"
 #include "mongo/util/thread_safe_string.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace BasicTests {
 
@@ -61,15 +62,12 @@ public:
     void run() {
         int first = 0;
         int second = 0;
-        int third = 0;
         for (int i = 0; i < 128; ++i) {
             incRarely(first);
             incRarely2(second);
-            ONCE++ third;
         }
         ASSERT_EQUALS(1, first);
         ASSERT_EQUALS(1, second);
-        ASSERT_EQUALS(1, third);
     }
 
 private:
@@ -215,7 +213,7 @@ public:
         ASSERT_EQUALS("999", sb.str());
     }
 };
-}
+}  // namespace stringbuildertests
 
 class sleeptest {
 public:

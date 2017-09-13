@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 
@@ -195,7 +196,7 @@ public:
     Config(const std::string& _dbname, const BSONObj& cmdObj);
 
     std::string dbname;
-    std::string ns;
+    NamespaceString nss;
 
     // options
     bool verbose;
@@ -206,6 +207,7 @@ public:
 
     BSONObj filter;
     BSONObj sort;
+    BSONObj collation;
     long long limit;
 
     // functions
@@ -218,8 +220,8 @@ public:
     BSONObj scopeSetup;
 
     // output tables
-    std::string incLong;
-    std::string tempNamespace;
+    NamespaceString incLong;
+    NamespaceString tempNamespace;
 
     enum OutputType {
         REPLACE,  // atomically replace the collection
@@ -230,7 +232,7 @@ public:
     struct OutputOptions {
         std::string outDB;
         std::string collectionName;
-        std::string finalNamespace;
+        NamespaceString finalNamespace;
         // if true, no lock during output operation
         bool outNonAtomic;
         OutputType outType;
@@ -248,6 +250,9 @@ public:
     // true when called from mongos to do phase-1 of M/R
     bool shardedFirstPass;
 
+    // if the output collection is sharded, we must be told what UUID to use for it
+    boost::optional<UUID> finalOutputCollUUID;
+
     static AtomicUInt32 JOB_NUMBER;
 };  // end MRsetup
 
@@ -258,17 +263,15 @@ public:
 class State {
 public:
     /**
-     * txn must outlive this State.
+     * opCtx must outlive this State.
      */
-    State(OperationContext* txn, const Config& c);
+    State(OperationContext* opCtx, const Config& c);
     ~State();
 
     void init();
 
     // ---- prep  -----
     bool sourceExists();
-
-    long long incomingDocuments();
 
     // ---- map stage ----
 
@@ -305,7 +308,7 @@ public:
 
     void finalReduce(BSONList& values);
 
-    void finalReduce(CurOp* op, ProgressMeterHolder& pm);
+    void finalReduce(OperationContext* opCtx, CurOp* op, ProgressMeterHolder& pm);
 
     // ------- cleanup/data positioning ----------
 
@@ -317,10 +320,11 @@ public:
     /**
        @return number objects in collection
      */
-    long long postProcessCollection(OperationContext* txn, CurOp* op, ProgressMeterHolder& pm);
-    long long postProcessCollectionNonAtomic(OperationContext* txn,
+    long long postProcessCollection(OperationContext* opCtx, CurOp* op, ProgressMeterHolder& pm);
+    long long postProcessCollectionNonAtomic(OperationContext* opCtx,
                                              CurOp* op,
-                                             ProgressMeterHolder& pm);
+                                             ProgressMeterHolder& pm,
+                                             bool callerHoldsGlobalLock);
 
     /**
      * if INMEMORY will append
@@ -333,7 +337,7 @@ public:
     /**
      * inserts with correct replication semantics
      */
-    void insert(const std::string& ns, const BSONObj& o);
+    void insert(const NamespaceString& nss, const BSONObj& o);
 
     // ------ simple accessors -----
 
@@ -372,7 +376,9 @@ public:
     void switchMode(bool jsMode);
     void bailFromJS();
 
-    Collection* getCollectionOrUassert(Database* db, StringData ns);
+    static Collection* getCollectionOrUassert(OperationContext* opCtx,
+                                              Database* db,
+                                              const NamespaceString& nss);
 
     const Config& _config;
     DBDirectClient _db;
@@ -387,7 +393,7 @@ protected:
      */
     int _add(InMemory* im, const BSONObj& a);
 
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     std::unique_ptr<Scope> _scope;
     bool _onDisk;  // if the end result of this map reduce is disk or not
 
@@ -411,5 +417,11 @@ void addPrivilegesRequiredForMapReduce(Command* commandTemplate,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out);
+
+/**
+ * Returns true if the provided mapReduce command has an 'out' parameter.
+ */
+bool mrSupportsWriteConcern(const BSONObj& cmd);
+
 }  // end mr namespace
 }

@@ -31,6 +31,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
 #include <wiredtiger.h>
 
 #include "mongo/bson/bsonobj.h"
@@ -53,18 +55,27 @@ namespace {
 int MAGIC = 123123;
 }
 
-WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri)
+WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn,
+                                           const std::string& storageUri,
+                                           bool logSizeStorerTable,
+                                           bool readOnly)
     : _session(conn) {
     WT_SESSION* session = _session.getSession();
-    int ret = session->open_cursor(session, storageUri.c_str(), NULL, "overwrite=true", &_cursor);
-    if (ret == ENOENT) {
-        // Need to create table.
-        std::string config =
-            WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig(storageUri);
+
+    std::string config = WiredTigerCustomizationHooks::get(getGlobalServiceContext())
+                             ->getTableCreateConfig(storageUri);
+    if (!readOnly) {
         invariantWTOK(session->create(session, storageUri.c_str(), config.c_str()));
-        ret = session->open_cursor(session, storageUri.c_str(), NULL, "overwrite=true", &_cursor);
+        const bool keepOldLoggingSettings = true;
+        if (keepOldLoggingSettings) {
+            logSizeStorerTable = true;
+        }
+        uassertStatusOK(
+            WiredTigerUtil::setTableLogging(session, storageUri.c_str(), logSizeStorerTable));
     }
-    invariantWTOK(ret);
+
+    invariantWTOK(
+        session->open_cursor(session, storageUri.c_str(), NULL, "overwrite=true", &_cursor));
 
     _magic = MAGIC;
 }
@@ -154,7 +165,7 @@ void WiredTigerSizeStorer::fillCache() {
             std::string uriKey(reinterpret_cast<const char*>(key.data), key.size);
             BSONObj data(reinterpret_cast<const char*>(value.data));
 
-            LOG(2) << "WiredTigerSizeStorer::loadFrom " << uriKey << " -> " << data;
+            LOG(2) << "WiredTigerSizeStorer::loadFrom " << uriKey << " -> " << redact(data);
 
             Entry& e = m[uriKey];
             e.numRecords = data["numRecords"].safeNumberLong();
@@ -214,7 +225,7 @@ void WiredTigerSizeStorer::syncCache(bool syncToDisk) {
             data = b.obj();
         }
 
-        LOG(2) << "WiredTigerSizeStorer::storeInto " << uriKey << " -> " << data;
+        LOG(2) << "WiredTigerSizeStorer::storeInto " << uriKey << " -> " << redact(data);
 
         WiredTigerItem key(uriKey.c_str(), uriKey.size());
         WiredTigerItem value(data.objdata(), data.objsize());

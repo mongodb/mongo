@@ -6,7 +6,7 @@
  * Repeatedly creates a new role on a database, and subsequently
  * drops it from the database.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropRoles
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
 var $config = (function() {
 
@@ -30,15 +30,9 @@ var $config = (function() {
             var roleName = uniqueRoleName(this.prefix, this.tid, this.num++);
             db.createRole({
                 role: roleName,
-                privileges: [
-                    {
-                        resource: { db: db.getName(), collection: collName },
-                        actions: ['remove']
-                    }
-                ],
-                roles: [
-                    { role: 'read', db: db.getName() }
-                ]
+                privileges:
+                    [{resource: {db: db.getName(), collection: collName}, actions: ['remove']}],
+                roles: [{role: 'read', db: db.getName()}]
             });
 
             var res = db.getRole(roleName);
@@ -47,28 +41,15 @@ var $config = (function() {
             assertAlways(!res.isBuiltin, 'role should be user-defined');
 
             assertAlways(db.dropRole(roleName));
-            assertAlways.isnull(db.getRole(roleName),
-                                "role '" + roleName + "' should not exist");
+            assertAlways.isnull(db.getRole(roleName), "role '" + roleName + "' should not exist");
         }
 
-        return {
-            init: init,
-            createAndDropRole: createAndDropRole
-        };
+        return {init: init, createAndDropRole: createAndDropRole};
 
     })();
 
-    var transitions = {
-        init: { createAndDropRole: 1 },
-        createAndDropRole: { createAndDropRole: 1 }
-    };
+    var transitions = {init: {createAndDropRole: 1}, createAndDropRole: {createAndDropRole: 1}};
 
-    return {
-        threadCount: 10,
-        iterations: 20,
-        data: data,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 10, iterations: 20, data: data, states: states, transitions: transitions};
 
 })();

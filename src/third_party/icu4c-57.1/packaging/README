@@ -1,0 +1,13 @@
+Copyright (C) 2000-2003, International Business Machines
+Corporation and others.  All Rights Reserved.
+
+This directory contains information, input files and scripts for
+packaging ICU using specific packaging tools. We assume that the
+packager is familiar with the tools and procedures needed to build a
+package for a given packaging method (for example, how to use
+dpkg-buildpackage(1) on Debian GNU/Linux, or rpm(8) on distributions that
+use RPM packages).
+
+Please read the file PACKAGES if you are interested in packaging ICU
+yourself. It describes what the different packages should be, and what
+their contents are.

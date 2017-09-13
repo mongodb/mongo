@@ -38,6 +38,8 @@
 #include "mongo/crypto/mechanism_scram.h"
 
 namespace mongo {
+
+class SCRAMSHA1ClientCache;
 /**
  *  Client side authentication session for SASL PLAIN.
  */
@@ -48,9 +50,8 @@ public:
     /**
      * Implements the client side of a SASL PLAIN mechanism session.
      **/
-    explicit SaslSCRAMSHA1ClientConversation(SaslClientSession* saslClientSession);
-
-    virtual ~SaslSCRAMSHA1ClientConversation();
+    SaslSCRAMSHA1ClientConversation(SaslClientSession* saslClientSession,
+                                    SCRAMSHA1ClientCache* clientCache);
 
     /**
      * Takes one step in a SCRAM-SHA-1 conversation.
@@ -79,7 +80,10 @@ private:
 
     int _step;
     std::string _authMessage;
-    unsigned char _saltedPassword[scram::hashSize];
+
+    // Secrets and secrets cache
+    scram::SCRAMSecrets _credentials;
+    SCRAMSHA1ClientCache* const _clientCache;
 
     // client and server nonce concatenated
     std::string _clientNonce;

@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <set>
 #include <boost/optional/optional.hpp>
+#include <set>
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
@@ -86,7 +86,20 @@ typedef std::string PlanID;
  *   This is done by QueryPlanner::tagAccordingToCache.
  */
 struct PlanCacheIndexTree {
-    PlanCacheIndexTree() : entry(nullptr), index_pos(0) {}
+
+    /**
+     * An OrPushdown is the cached version of an OrPushdownTag::Destination. It indicates that this
+     * node is a predicate that can be used inside of a sibling indexed OR, to tighten index bounds
+     * or satisfy the first field in the index.
+     */
+    struct OrPushdown {
+        std::string indexName;
+        size_t position;
+        bool canCombineBounds;
+        std::deque<size_t> route;
+    };
+
+    PlanCacheIndexTree() : entry(nullptr), index_pos(0), canCombineBounds(true) {}
 
     ~PlanCacheIndexTree() {
         for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
@@ -118,6 +131,13 @@ struct PlanCacheIndexTree {
     std::unique_ptr<IndexEntry> entry;
 
     size_t index_pos;
+
+    // The value for this member is taken from the IndexTag of the corresponding match expression
+    // and is used to ensure that bounds are correctly intersected and/or compounded when a query is
+    // planned from the plan cache.
+    bool canCombineBounds;
+
+    std::vector<OrPushdown> orPushdowns;
 };
 
 /**
@@ -196,6 +216,7 @@ public:
     BSONObj query;
     BSONObj sort;
     BSONObj projection;
+    BSONObj collation;
 
     // The number of work cycles taken to decide on a winning plan when the plan was first
     // cached.
@@ -245,6 +266,7 @@ public:
     BSONObj query;
     BSONObj sort;
     BSONObj projection;
+    BSONObj collation;
 
     //
     // Performance stats
@@ -381,12 +403,6 @@ public:
     size_t size() const;
 
     /**
-     *  You must notify the cache if you are doing writes, as query plan utility will change.
-     *  Cache is flushed after every 1000 notifications.
-     */
-    void notifyOfWriteOp();
-
-    /**
      * Updates internal state kept about the collection's indexes.  Must be called when the set
      * of indexes on the associated collection have changed.
      *
@@ -403,10 +419,6 @@ private:
 
     // Protects _cache.
     mutable stdx::mutex _cacheMutex;
-
-    // Counter for write notifications since initialization or last clear() invocation.  Starts
-    // at 0.
-    AtomicInt32 _writeOperations;
 
     // Full namespace of collection.
     std::string _ns;

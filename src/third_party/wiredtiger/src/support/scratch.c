@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -17,7 +17,7 @@ int
 __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	size_t offset;
-	int copy_data;
+	bool copy_data;
 
 	/*
 	 * Maintain the existing data: there are 3 cases:
@@ -30,10 +30,10 @@ __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 	 */
 	if (WT_DATA_IN_ITEM(buf)) {
 		offset = WT_PTRDIFF(buf->data, buf->mem);
-		copy_data = 0;
+		copy_data = false;
 	} else {
 		offset = 0;
-		copy_data = buf->size ? 1 : 0;
+		copy_data = buf->size > 0;
 	}
 
 	/*
@@ -45,7 +45,7 @@ __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 			WT_RET(__wt_realloc_aligned(
 			    session, &buf->memsize, size, &buf->mem));
 		else
-			WT_RET(__wt_realloc(
+			WT_RET(__wt_realloc_noclear(
 			    session, &buf->memsize, size, &buf->mem));
 	}
 
@@ -69,13 +69,16 @@ int
 __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
+	WT_DECL_RET;
 	va_list ap;
 	size_t len;
 
 	for (;;) {
 		va_start(ap, fmt);
-		len = (size_t)vsnprintf(buf->mem, buf->memsize, fmt, ap);
+		ret = __wt_vsnprintf_len_set(
+		    buf->mem, buf->memsize, &len, fmt, ap);
 		va_end(ap);
+		WT_RET(ret);
 
 		/* Check if there was enough space. */
 		if (len < buf->memsize) {
@@ -100,6 +103,7 @@ int
 __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
+	WT_DECL_RET;
 	va_list ap;
 	size_t len, space;
 	char *p;
@@ -117,8 +121,9 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 		p = (char *)((uint8_t *)buf->mem + buf->size);
 		WT_ASSERT(session, buf->memsize >= buf->size);
 		space = buf->memsize - buf->size;
-		len = (size_t)vsnprintf(p, (size_t)space, fmt, ap);
+		ret = __wt_vsnprintf_len_set(p, space, &len, fmt, ap);
 		va_end(ap);
+		WT_RET(ret);
 
 		/* Check if there was enough space. */
 		if (len < space) {
@@ -132,6 +137,64 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 		 */
 		WT_RET(__wt_buf_extend(session, buf, buf->size + len + 1));
 	}
+}
+
+/*
+ * __wt_buf_set_printable --
+ *	Set the contents of the buffer to a printable representation of a
+ * byte string.
+ */
+const char *
+__wt_buf_set_printable(
+    WT_SESSION_IMPL *session, const void *p, size_t size, WT_ITEM *buf)
+{
+	if (__wt_raw_to_esc_hex(session, p, size, buf)) {
+		buf->data = "[Error]";
+		buf->size = strlen("[Error]");
+	}
+	return (buf->data);
+}
+
+/*
+ * __wt_buf_set_size --
+ *	Set the contents of the buffer to a printable representation of a
+ * byte size.
+ */
+const char *
+__wt_buf_set_size(
+    WT_SESSION_IMPL *session, uint64_t size, bool exact, WT_ITEM *buf)
+{
+	WT_DECL_RET;
+
+	if (size >= WT_EXABYTE)
+		ret = __wt_buf_fmt(session, buf,
+		    "%" PRIu64 "EB", size / WT_EXABYTE);
+	else if (size >= WT_PETABYTE)
+		ret = __wt_buf_fmt(session, buf,
+		    "%" PRIu64 "PB", size / WT_PETABYTE);
+	else if (size >= WT_TERABYTE)
+		ret = __wt_buf_fmt(session, buf,
+		    "%" PRIu64 "TB", size / WT_TERABYTE);
+	else if (size >= WT_GIGABYTE)
+		ret = __wt_buf_fmt(session, buf,
+		    "%" PRIu64 "GB", size / WT_GIGABYTE);
+	else if (size >= WT_MEGABYTE)
+		ret = __wt_buf_fmt(session, buf,
+		    "%" PRIu64 "MB", size / WT_MEGABYTE);
+	else if (size >= WT_KILOBYTE)
+		ret = __wt_buf_fmt(session, buf,
+		    "%" PRIu64 "KB", size / WT_KILOBYTE);
+	else
+		ret = __wt_buf_fmt(session, buf, "%" PRIu64 "B", size);
+
+	if (ret == 0 && exact && size >= WT_KILOBYTE)
+		ret = __wt_buf_catfmt(session, buf, " (%" PRIu64 ")", size);
+
+	if (ret != 0) {
+		buf->data = "[Error]";
+		buf->size = strlen("[Error]");
+	}
+	return (buf->data);
 }
 
 /*

@@ -28,14 +28,17 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class LockpingsType;
 class LocksType;
+class OperationContext;
 class Status;
 template <typename T>
 class StatusWith;
@@ -44,13 +47,17 @@ class StatusWith;
  * Interface for the distributed lock operations.
  */
 class DistLockCatalog {
+    MONGO_DISALLOW_COPYING(DistLockCatalog);
+
 public:
+    static const WriteConcernOptions kLocalWriteConcern;
+    static const WriteConcernOptions kMajorityWriteConcern;
+
     /**
      * Simple data structure for storing server local time and election id.
      */
     struct ServerInfo {
     public:
-        ServerInfo();  // TODO: SERVER-18007
         ServerInfo(Date_t time, OID electionId);
 
         // The local time of the server at the time this was created.
@@ -66,13 +73,13 @@ public:
      * Returns the ping document of the specified processID.
      * Common status errors include socket errors.
      */
-    virtual StatusWith<LockpingsType> getPing(StringData processID) = 0;
+    virtual StatusWith<LockpingsType> getPing(OperationContext* opCtx, StringData processID) = 0;
 
     /**
      * Updates the ping document. Creates a new entry if it does not exists.
      * Common status errors include socket errors.
      */
-    virtual Status ping(StringData processID, Date_t ping) = 0;
+    virtual Status ping(OperationContext* opCtx, StringData processID, Date_t ping) = 0;
 
     /**
      * Attempts to update the owner of a lock identified by lockID to lockSessionID.
@@ -90,12 +97,15 @@ public:
      *
      * Common status errors include socket and duplicate key errors.
      */
-    virtual StatusWith<LocksType> grabLock(StringData lockID,
-                                           const OID& lockSessionID,
-                                           StringData who,
-                                           StringData processId,
-                                           Date_t time,
-                                           StringData why) = 0;
+    virtual StatusWith<LocksType> grabLock(
+        OperationContext* opCtx,
+        StringData lockID,
+        const OID& lockSessionID,
+        StringData who,
+        StringData processId,
+        Date_t time,
+        StringData why,
+        const WriteConcernOptions& writeConcern = kMajorityWriteConcern) = 0;
 
     /**
      * Attempts to forcefully transfer the ownership of a lock from currentHolderTS
@@ -112,7 +122,8 @@ public:
      *
      * Common status errors include socket errors.
      */
-    virtual StatusWith<LocksType> overtakeLock(StringData lockID,
+    virtual StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
+                                               StringData lockID,
                                                const OID& lockSessionID,
                                                const OID& currentHolderTS,
                                                StringData who,
@@ -121,34 +132,55 @@ public:
                                                StringData why) = 0;
 
     /**
-     * Attempts to set the state of the lock document with lockSessionID to unlocked.
-     * Common status errors include socket errors.
+     * Attempts to set the state of the lock document with lockSessionID to unlocked. Returns OK,
+     * if at the end of this call it is determined that the lock is definitely not owned by the
+     * specified session (i.e., it is not owned at all or if it is owned by a different session).
+     * Otherwise, it returns an error status. Common errors include socket errors.
      */
-    virtual Status unlock(const OID& lockSessionID) = 0;
+    virtual Status unlock(OperationContext* opCtx, const OID& lockSessionID) = 0;
+
+    /**
+     * Same as unlock() above except that it unlocks the lock document that matches "lockSessionID"
+     * AND "name", rather than just "lockSessionID". This is necessary if multiple documents have
+     * been locked with the same lockSessionID.
+     */
+    virtual Status unlock(OperationContext* opCtx, const OID& lockSessionID, StringData name) = 0;
+
+    /**
+     * Unlocks all distributed locks with the given owning process ID.  Does not provide any
+     * indication as to how many locks were actually unlocked.  So long as the update command runs
+     * successfully, returns OK, otherwise returns an error status.
+     */
+    virtual Status unlockAll(OperationContext* opCtx, const std::string& processID) = 0;
 
     /**
      * Get some information from the config server primary.
      * Common status errors include socket errors.
      */
-    virtual StatusWith<ServerInfo> getServerInfo() = 0;
+    virtual StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) = 0;
 
     /**
      * Returns the lock document.
      * Returns LockNotFound if lock document doesn't exist.
      * Common status errors include socket errors.
      */
-    virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) = 0;
+    virtual StatusWith<LocksType> getLockByTS(OperationContext* opCtx,
+                                              const OID& lockSessionID) = 0;
 
     /**
      * Returns the lock document.
      * Common status errors include socket errors.
      */
-    virtual StatusWith<LocksType> getLockByName(StringData name) = 0;
+    virtual StatusWith<LocksType> getLockByName(OperationContext* opCtx, StringData name) = 0;
 
     /**
      * Attempts to delete the ping document corresponding to the given processId.
      * Common status errors include socket errors.
      */
-    virtual Status stopPing(StringData processId) = 0;
+    virtual Status stopPing(OperationContext* opCtx, StringData processId) = 0;
+
+protected:
+    DistLockCatalog();
 };
-}
+
+}  // namespace mongo

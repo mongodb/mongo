@@ -1,30 +1,34 @@
-/*
+/**
  * Regression test for SERVER-4892.
  *
  * Verify that a client can delete cursors that it creates, when mongod is running with "auth"
  * enabled.
+ *
+ * This test requires users to persist across a restart.
+ * @tags: [requires_persistence]
  */
 
 var baseName = 'jstests_auth_server4892';
 var dbpath = MongoRunner.dataPath + baseName;
-var port = allocatePorts( 1 )[ 0 ];
-var mongod_common_args = [
-    '--port', port, '--dbpath', dbpath, '--bind_ip', '127.0.0.1', '--nohttpinterface' ];
+resetDbpath(dbpath);
+var mongodCommonArgs = {
+    dbpath: dbpath,
+    noCleanData: true,
+};
 
 /*
  * Start an instance of mongod, pass it as a parameter to operation(), then stop the instance of
  * mongod before unwinding or returning out of with_mongod().
  *
- * extra_mongod_args are extra arguments to pass on the mongod command line, in an Array.
+ * 'extraMongodArgs' are extra arguments to pass on the mongod command line, as an object.
  */
-function with_mongod( extra_mongod_args, operation ) {
-    var mongod = startMongoProgram.apply(
-        null, ['mongod'].concat( mongod_common_args, extra_mongod_args ) );
+function withMongod(extraMongodArgs, operation) {
+    var mongod = MongoRunner.runMongod(Object.merge(mongodCommonArgs, extraMongodArgs));
 
     try {
-        operation( mongod );
+        operation(mongod);
     } finally {
-        MongoRunner.stopMongod( port );
+        MongoRunner.stopMongod(mongod);
     }
 }
 
@@ -33,52 +37,47 @@ function with_mongod( extra_mongod_args, operation ) {
  * cursors on the server.
  */
 function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
-    var conn = new Mongo( mongod.host );
-    var db = mongod.getDB( 'admin' );
-    db.auth( 'admin', 'admin' );
-    var actualNumLiveCursors = db.serverStatus().cursors.totalOpen;
-    assert( actualNumLiveCursors == expectedNumLiveCursors,
-          "actual num live cursors (" + actualNumLiveCursors + ") != exptected ("
-          + expectedNumLiveCursors + ")");
+    var conn = new Mongo(mongod.host);
+    var db = mongod.getDB('admin');
+    db.auth('admin', 'admin');
+    var actualNumLiveCursors = db.serverStatus().metrics.cursor.open.total;
+    assert(actualNumLiveCursors == expectedNumLiveCursors,
+           "actual num live cursors (" + actualNumLiveCursors + ") != exptected (" +
+               expectedNumLiveCursors + ")");
 }
 
-resetDbpath( dbpath );
-
-with_mongod( ['--noauth'], function setupTest( mongod ) {
+withMongod({noauth: ""}, function setupTest(mongod) {
     var admin, somedb, conn;
-    conn = new Mongo( mongod.host );
-    admin = conn.getDB( 'admin' );
-    somedb = conn.getDB( 'somedb' );
+    conn = new Mongo(mongod.host);
+    admin = conn.getDB('admin');
+    somedb = conn.getDB('somedb');
     admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
     admin.auth('admin', 'admin');
     somedb.createUser({user: 'frim', pwd: 'fram', roles: jsTest.basicUserRoles});
     somedb.data.drop();
     for (var i = 0; i < 10; ++i) {
-        assert.writeOK(somedb.data.insert( { val: i } ));
+        assert.writeOK(somedb.data.insert({val: i}));
     }
     admin.logout();
-} );
-
-with_mongod( ['--auth'], function runTest( mongod ) {
-    var conn = new Mongo( mongod.host );
-    var somedb = conn.getDB( 'somedb' );
-    somedb.auth('frim', 'fram');
-
-    expectNumLiveCursors( mongod, 0 );
-
-    var cursor = somedb.data.find({}, ['_id']).batchSize(1);
-    cursor.next();
-    expectNumLiveCursors( mongod, 1 );
-
-    cursor = null;
-    // NOTE(schwerin): We assume that after setting cursor = null, there are no remaining references
-    // to the cursor, and that gc() will deterministically garbage collect it.
-    gc();
-
-  // NOTE(schwerin): dbKillCursors gets piggybacked on subsequent messages on the connection, so we
-  // have to force a message to the server.
-    somedb.data.findOne();
-
-    expectNumLiveCursors( mongod, 0 );
 });
 
+withMongod({auth: ""}, function runTest(mongod) {
+    var conn = new Mongo(mongod.host);
+    var somedb = conn.getDB('somedb');
+    somedb.auth('frim', 'fram');
+
+    expectNumLiveCursors(mongod, 0);
+
+    var cursor = somedb.data.find({}, {'_id': 1}).batchSize(1);
+    cursor.next();
+    expectNumLiveCursors(mongod, 1);
+
+    cursor.close();
+
+    // NOTE(schwerin): dbKillCursors gets piggybacked on subsequent messages on the
+    // connection, so we
+    // have to force a message to the server.
+    somedb.data.findOne();
+
+    expectNumLiveCursors(mongod, 0);
+});

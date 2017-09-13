@@ -28,10 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/s/query/cluster_find.h"
 
 namespace mongo {
+namespace {
 
 /**
  * Implements the explain command on mongos.
@@ -45,13 +48,13 @@ namespace mongo {
  * support a new-style explain, then the entire explain will fail (i.e. new-style
  * explains cannot be used in multiversion clusters).
  */
-class ClusterExplainCmd : public Command {
+class ClusterExplainCmd : public BasicCommand {
     MONGO_DISALLOW_COPYING(ClusterExplainCmd);
 
 public:
-    ClusterExplainCmd() : Command("explain") {}
+    ClusterExplainCmd() : BasicCommand("explain") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -61,6 +64,7 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
+
     virtual bool slaveOverrideOk() const {
         return true;
     }
@@ -82,9 +86,9 @@ public:
      * the command that you are explaining. The auth check is performed recursively
      * on the nested command.
      */
-    virtual Status checkAuthForCommand(ClientBasic* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+    virtual Status checkAuthForOperation(OperationContext* opCtx,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj) {
         if (Object != cmdObj.firstElement().type()) {
             return Status(ErrorCodes::BadValue, "explain command requires a nested object");
         }
@@ -98,35 +102,57 @@ public:
             return Status(ErrorCodes::CommandNotFound, ss);
         }
 
-        return commToExplain->checkAuthForCommand(client, dbname, explainObj);
+        return commToExplain->checkAuthForRequest(
+            opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(explainObj)));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbName,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
+                     const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        ExplainCommon::Verbosity verbosity;
-        Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);
-        if (!parseStatus.isOK()) {
-            return appendCommandStatus(result, parseStatus);
+        auto verbosity = ExplainOptions::parseCmdBSON(cmdObj);
+        if (!verbosity.isOK()) {
+            return appendCommandStatus(result, verbosity.getStatus());
         }
 
-        // This is the nested command which we are explaining.
-        BSONObj explainObj = cmdObj.firstElement().Obj();
+        // This is the nested command which we are explaining. We need to propagate generic
+        // arguments into the inner command since it is what is passed to the virtual
+        // Command::explain() method.
+        const BSONObj explainObj = ([&] {
+            const auto innerObj = cmdObj.firstElement().Obj();
+            if (auto innerDb = innerObj["$db"]) {
+                uassert(ErrorCodes::InvalidNamespace,
+                        str::stream() << "Mismatched $db in explain command. Expected " << dbName
+                                      << " but got "
+                                      << innerDb.checkAndGetStringData(),
+                        innerDb.checkAndGetStringData() == dbName);
+            }
+
+            BSONObjBuilder bob;
+            bob.appendElements(innerObj);
+            for (auto outerElem : cmdObj) {
+                // If the argument is in both the inner and outer command, we currently let the
+                // inner version take precedence.
+                const auto name = outerElem.fieldNameStringData();
+                if (Command::isGenericArgument(name) && !innerObj.hasField(name)) {
+                    bob.append(outerElem);
+                }
+            }
+            return bob.obj();
+        }());
 
         const std::string cmdName = explainObj.firstElementFieldName();
         Command* commToExplain = Command::findCommand(cmdName);
-        if (NULL == commToExplain) {
-            mongoutils::str::stream ss;
-            ss << "Explain failed due to unknown command: " << cmdName;
-            Status explainStatus(ErrorCodes::CommandNotFound, ss);
-            return appendCommandStatus(result, explainStatus);
+        if (!commToExplain) {
+            return appendCommandStatus(
+                result,
+                Status{ErrorCodes::CommandNotFound,
+                       str::stream() << "Explain failed due to unknown command: " << cmdName});
         }
 
         // Actually call the nested command's explain(...) method.
-        Status explainStatus = commToExplain->explain(txn, dbName, explainObj, verbosity, &result);
+        Status explainStatus =
+            commToExplain->explain(opCtx, dbName, explainObj, verbosity.getValue(), &result);
         if (!explainStatus.isOK()) {
             return appendCommandStatus(result, explainStatus);
         }
@@ -136,4 +162,5 @@ public:
 
 } cmdExplainCluster;
 
+}  // namespace
 }  // namespace mongo

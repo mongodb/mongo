@@ -70,6 +70,8 @@ public:
      *   findAndModify: <collection-name>,
      *   query: <document>,
      *   sort: <document>,
+     *   collation: <document>,
+     *   arrayFilters: <array>,
      *   remove: <boolean>,
      *   update: <document>,
      *   new: <boolean>,
@@ -93,6 +95,8 @@ public:
     BSONObj getFields() const;
     BSONObj getUpdateObj() const;
     BSONObj getSort() const;
+    BSONObj getCollation() const;
+    const std::vector<BSONObj>& getArrayFilters() const;
     bool shouldReturnNew() const;
     bool isUpsert() const;
     bool isRemove() const;
@@ -129,6 +133,17 @@ public:
     void setSort(BSONObj sort);
 
     /**
+     * Sets the collation for the query, which is used for all string comparisons.
+     */
+    void setCollation(BSONObj collation);
+
+    /**
+     * Sets the array filters for the update, which determine which array elements should be
+     * modified.
+     */
+    void setArrayFilters(const std::vector<BSONObj>& arrayFilters);
+
+    /**
      * Sets the write concern for this request.
      */
     void setWriteConcern(WriteConcernOptions writeConcern);
@@ -149,6 +164,8 @@ private:
     boost::optional<bool> _isUpsert;
     boost::optional<BSONObj> _fieldProjection;
     boost::optional<BSONObj> _sort;
+    boost::optional<BSONObj> _collation;
+    boost::optional<std::vector<BSONObj>> _arrayFilters;
     boost::optional<bool> _shouldReturnNew;
     boost::optional<WriteConcernOptions> _writeConcern;
 

@@ -36,7 +36,7 @@ namespace mongo {
 class CanonicalQuery;
 class Collection;
 class OperationContext;
-class RecordCursor;
+class SeekableRecordCursor;
 
 class WorkingSetCommon {
 public:
@@ -45,45 +45,45 @@ public:
      * Requires either a valid BSONObj or valid RecordId.
      * Returns true if the fetch and invalidate succeeded, false otherwise.
      */
-    static bool fetchAndInvalidateLoc(OperationContext* txn,
-                                      WorkingSetMember* member,
-                                      const Collection* collection);
+    static bool fetchAndInvalidateRecordId(OperationContext* opCtx,
+                                           WorkingSetMember* member,
+                                           const Collection* collection);
 
     /**
-     * This must be called as part of "saveState" operations after all nodes in the tree save
-     * their state.
+     * This must be called as part of "saveState" operations after all nodes in the tree save their
+     * state.
      *
-     * Iterates over 'workingSet' and converts all LOC_AND_UNOWNED_OBJ members to
-     * LOC_AND_OWNED_OBJ by calling getOwned on their obj. Also sets the isSuspicious flag on
-     * all nodes in LOC_AND_IDX state.
+     * Iterates over WorkingSetIDs in 'workingSet' which are "sensitive to yield". These are ids
+     * that have transitioned into the RID_AND_IDX state since the previous yield.
+     *
+     * The RID_AND_IDX members are tagged as suspicious so that they can be handled properly in case
+     * the document keyed by the index key is deleted or updated during the yield.
      */
     static void prepareForSnapshotChange(WorkingSet* workingSet);
 
     /**
-     * Retrieves the document corresponding to 'member' from 'collection', and sets the state of
-     * 'member' appropriately.
+     * Transitions the WorkingSetMember with WorkingSetID 'id' from the RID_AND_IDX state to the
+     * RID_AND_OBJ state by fetching a document. Does the fetch using 'cursor'.
      *
      * If false is returned, the document should not be considered for the result set. It is the
-     * caller's responsibility to free 'member' in this case.
+     * caller's responsibility to free 'id' in this case.
      *
      * WriteConflict exceptions may be thrown. When they are, 'member' will be unmodified.
      */
-    static bool fetch(OperationContext* txn,
-                      WorkingSetMember* member,
-                      unowned_ptr<RecordCursor> cursor);
+    static bool fetch(OperationContext* opCtx,
+                      WorkingSet* workingSet,
+                      WorkingSetID id,
+                      unowned_ptr<SeekableRecordCursor> cursor);
 
-    static bool fetchIfUnfetched(OperationContext* txn,
-                                 WorkingSetMember* member,
-                                 unowned_ptr<RecordCursor> cursor) {
+    static bool fetchIfUnfetched(OperationContext* opCtx,
+                                 WorkingSet* workingSet,
+                                 WorkingSetID id,
+                                 unowned_ptr<SeekableRecordCursor> cursor) {
+        WorkingSetMember* member = workingSet->get(id);
         if (member->hasObj())
             return true;
-        return fetch(txn, member, cursor);
+        return fetch(opCtx, workingSet, id, cursor);
     }
-
-    /**
-     * Initialize the fields in 'dest' from 'src', creating copies of owned objects as needed.
-     */
-    static void initFrom(WorkingSetMember* dest, const WorkingSetMember& src);
 
     /**
      * Build a BSONObj which represents a Status to return in a WorkingSet.

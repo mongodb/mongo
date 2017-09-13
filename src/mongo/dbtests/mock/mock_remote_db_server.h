@@ -148,17 +148,7 @@ public:
     //
     // DBClientBase methods
     //
-    bool runCommand(InstanceID id,
-                    const std::string& dbname,
-                    const mongo::BSONObj& cmdObj,
-                    mongo::BSONObj& info,
-                    int options = 0);
-
-    rpc::UniqueReply runCommandWithMetadata(InstanceID id,
-                                            StringData database,
-                                            StringData commandName,
-                                            const BSONObj& metadata,
-                                            const BSONObj& commandArgs);
+    rpc::UniqueReply runCommand(InstanceID id, const OpMsgRequest& request);
 
     mongo::BSONArray query(InstanceID id,
                            const std::string& ns,

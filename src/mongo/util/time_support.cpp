@@ -29,31 +29,23 @@
 
 #include "mongo/util/time_support.h"
 
+#include <cstdint>
 #include <cstdio>
-#include <string>
 #include <iostream>
-#include <boost/thread/tss.hpp>
+#include <string>
 
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 #ifdef _WIN32
-#include <boost/date_time/filetime_functions.hpp>
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/timer.h"
-
-// NOTE(schwerin): MSVC's _snprintf is not a drop-in replacement for C99's snprintf().  In
-// particular, when the target buffer is too small, behaviors differ.  Consult the documentation
-// from MSDN and form the BSD or Linux man pages before using.
-#if _MSC_VER < 1900
-#define snprintf _snprintf
-#endif
+#include <boost/date_time/filetime_functions.hpp>
 #endif
 
 #ifdef __sun
@@ -64,65 +56,6 @@ extern "C" time_t timegm(struct tm* const tmp);
 
 namespace mongo {
 
-namespace {
-template <typename Stream>
-Stream& streamPut(Stream& os, Microseconds us) {
-    return os << us.count() << "\xce\xbcs";
-}
-
-template <typename Stream>
-Stream& streamPut(Stream& os, Milliseconds ms) {
-    return os << ms.count() << "ms";
-}
-
-template <typename Stream>
-Stream& streamPut(Stream& os, Seconds s) {
-    return os << s.count() << 's';
-}
-}  // namespace
-
-std::ostream& operator<<(std::ostream& os, Microseconds us) {
-    return streamPut(os, us);
-}
-
-std::ostream& operator<<(std::ostream& os, Milliseconds ms) {
-    return streamPut(os, ms);
-}
-std::ostream& operator<<(std::ostream& os, Seconds s) {
-    return streamPut(os, s);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Microseconds us) {
-    return streamPut(os, us);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Milliseconds ms) {
-    return streamPut(os, ms);
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Seconds s) {
-    return streamPut(os, s);
-}
-
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
-                                                       Microseconds);
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
-                                                       Milliseconds);
-template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&, Seconds);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Microseconds);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Milliseconds);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Seconds);
-
-Date_t Date_t::max() {
-    return fromMillisSinceEpoch(std::numeric_limits<long long>::max());
-}
-
 Date_t Date_t::now() {
     return fromMillisSinceEpoch(curTimeMillis64());
 }
@@ -131,7 +64,7 @@ Date_t::Date_t(stdx::chrono::system_clock::time_point tp)
     : millis(durationCount<Milliseconds>(tp - stdx::chrono::system_clock::from_time_t(0))) {}
 
 stdx::chrono::system_clock::time_point Date_t::toSystemTimePoint() const {
-    return stdx::chrono::system_clock::from_time_t(0) + toDurationSinceEpoch();
+    return stdx::chrono::system_clock::from_time_t(0) + toDurationSinceEpoch().toSystemDuration();
 }
 
 bool Date_t::isFormattable() const {
@@ -148,7 +81,7 @@ bool Date_t::isFormattable() const {
 
 // jsTime_virtual_skew is just for testing. a test command manipulates it.
 long long jsTime_virtual_skew = 0;
-boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
+thread_local long long jsTime_virtual_thread_skew = 0;
 
 using std::string;
 
@@ -190,6 +123,10 @@ string terseCurrentTime(bool colonsOk) {
     char buf[32];
     fassert(16226, strftime(buf, sizeof(buf), fmt, &t) == 19);
     return buf;
+}
+
+string terseUTCCurrentTime() {
+    return terseCurrentTime(false) + "Z";
 }
 
 #define MONGO_ISO_DATE_FMT_NO_TZ "%Y-%m-%dT%H:%M:%S"
@@ -437,7 +374,7 @@ Status parseMillisFromToken(StringData millisStr, int* resultMillis) {
             millisMagnitude = 100;
         }
 
-        *resultMillis = *resultMillis* millisMagnitude;
+        *resultMillis = *resultMillis * millisMagnitude;
 
         if (*resultMillis < 0 || *resultMillis > 1000) {
             StringBuilder sb;
@@ -775,44 +712,15 @@ bool toPointInTime(const string& str, boost::posix_time::ptime* timeOfDay) {
     return true;
 }
 
-#if defined(_WIN32)
 void sleepsecs(int s) {
-    stdx::this_thread::sleep_for(Seconds(s));
+    stdx::this_thread::sleep_for(Seconds(s).toSystemDuration());
 }
 
 void sleepmillis(long long s) {
-    stdx::this_thread::sleep_for(Milliseconds(s));
+    stdx::this_thread::sleep_for(Milliseconds(s).toSystemDuration());
 }
 void sleepmicros(long long s) {
-    stdx::this_thread::sleep_for(Microseconds(s));
-}
-#else
-void sleepsecs(int s) {
-    struct timespec t;
-    t.tv_sec = s;
-    t.tv_nsec = 0;
-    if (nanosleep(&t, 0)) {
-        std::cout << "nanosleep failed" << std::endl;
-    }
-}
-void sleepmicros(long long s) {
-    if (s <= 0)
-        return;
-    struct timespec t;
-    t.tv_sec = (int)(s / 1000000);
-    t.tv_nsec = 1000 * (s % 1000000);
-    struct timespec out;
-    if (nanosleep(&t, &out)) {
-        std::cout << "nanosleep failed" << std::endl;
-    }
-}
-void sleepmillis(long long s) {
-    sleepmicros(s * 1000);
-}
-#endif
-
-void sleepFor(const Milliseconds& time) {
-    sleepmillis(time.count());
+    stdx::this_thread::sleep_for(Microseconds(s).toSystemDuration());
 }
 
 void Backoff::nextSleepMillis() {
@@ -861,9 +769,6 @@ int Backoff::getNextSleepMillis(int lastSleepMillis,
     return lastSleepMillis;
 }
 
-extern long long jsTime_virtual_skew;
-extern boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
-
 // DO NOT TOUCH except for testing
 void jsTimeVirtualSkew(long long skew) {
     jsTime_virtual_skew = skew;
@@ -873,13 +778,11 @@ long long getJSTimeVirtualSkew() {
 }
 
 void jsTimeVirtualThreadSkew(long long skew) {
-    jsTime_virtual_thread_skew.reset(new long long(skew));
+    jsTime_virtual_thread_skew = skew;
 }
+
 long long getJSTimeVirtualThreadSkew() {
-    if (jsTime_virtual_thread_skew.get()) {
-        return *(jsTime_virtual_thread_skew.get());
-    } else
-        return 0;
+    return jsTime_virtual_thread_skew;
 }
 
 /** Date_t is milliseconds since epoch */
@@ -913,8 +816,8 @@ static unsigned long long resyncInterval = 0;
 static SimpleMutex _curTimeMicros64ReadMutex;
 static SimpleMutex _curTimeMicros64ResyncMutex;
 
-typedef WINBASEAPI VOID(WINAPI* pGetSystemTimePreciseAsFileTime)(_Out_ LPFILETIME
-                                                                     lpSystemTimeAsFileTime);
+typedef WINBASEAPI VOID(WINAPI* pGetSystemTimePreciseAsFileTime)(
+    _Out_ LPFILETIME lpSystemTimeAsFileTime);
 
 static pGetSystemTimePreciseAsFileTime GetSystemTimePreciseAsFileTimeFunc;
 

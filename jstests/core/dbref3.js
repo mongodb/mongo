@@ -9,11 +9,11 @@ t.drop();
 // true cases
 t.insert({sub: {$ref: "foo", $id: "bar"}, dbref: true});
 t.insert({sub: {$ref: "foo", $id: "bar", $db: "baz"}, dbref: true});
-t.insert({sub: {$ref: "foo", $id: "bar", db: "baz"}, dbref: true}); // out of spec but accepted
+t.insert({sub: {$ref: "foo", $id: "bar", db: "baz"}, dbref: true});  // out of spec but accepted
 t.insert({sub: {$ref: "foo", $id: ObjectId()}, dbref: true});
 t.insert({sub: {$ref: "foo", $id: 1}, dbref: true});
 
-t.insert({sub: {$ref: 123/*not a string*/, $id: "bar"}, dbref: false});
+t.insert({sub: {$ref: 123 /*not a string*/, $id: "bar"}, dbref: false});
 t.insert({sub: {$id: "bar", $ref: "foo"}, dbref: false});
 t.insert({sub: {$ref: "foo"}, dbref: false});
 t.insert({sub: {$id: "foo"}, dbref: false});
@@ -42,4 +42,4 @@ assert.eq(1, distinctDBs.length);
 t.insert({sub: {$ref: "foo", $id: [{x: 1, y: 1}, {x: 2, y: 2}, {x: 3, y: 3}]}});
 var k = t.findOne({'sub.$id': {$elemMatch: {x: 2}}}, {_id: 0, 'sub.$id.$': 1});
 print('k = ' + tojson(k));
-assert.eq({sub: {$id: [{x: 2, y:2}]}}, k);
+assert.eq({sub: {$id: [{x: 2, y: 2}]}}, k);

@@ -25,18 +25,28 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 /**
  * Unit tests of the AuthorizationSession type.
  */
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/bson/bson_depth.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_for_test.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
 
@@ -55,7 +65,7 @@ public:
         _findsShouldFail = enable;
     }
 
-    virtual Status findOne(OperationContext* txn,
+    virtual Status findOne(OperationContext* opCtx,
                            const NamespaceString& collectionName,
                            const BSONObj& query,
                            BSONObj* result) {
@@ -63,7 +73,7 @@ public:
             return Status(ErrorCodes::UnknownError,
                           "findOne on admin.system.users set to fail in mock.");
         }
-        return AuthzManagerExternalStateMock::findOne(txn, collectionName, query, result);
+        return AuthzManagerExternalStateMock::findOne(opCtx, collectionName, query, result);
     }
 
 private:
@@ -73,29 +83,47 @@ private:
 class AuthorizationSessionTest : public ::mongo::unittest::Test {
 public:
     FailureCapableAuthzManagerExternalStateMock* managerState;
-    OperationContextNoop _txn;
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session;
+    ServiceContextNoop serviceContext;
+    ServiceContext::UniqueClient client;
+    ServiceContext::UniqueOperationContext _opCtx;
     AuthzSessionExternalStateMock* sessionState;
-    std::unique_ptr<AuthorizationManager> authzManager;
-    std::unique_ptr<AuthorizationSession> authzSession;
+    AuthorizationManager* authzManager;
+    std::unique_ptr<AuthorizationSessionForTest> authzSession;
 
     void setUp() {
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k36);
+        session = transportLayer.createSession();
+        client = serviceContext.makeClient("testClient", session);
+        RestrictionEnvironment::set(
+            session, stdx::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
+        _opCtx = client->makeOperationContext();
         auto localManagerState = stdx::make_unique<FailureCapableAuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
         managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-        authzManager = stdx::make_unique<AuthorizationManager>(std::move(localManagerState));
-        auto localSessionState =
-            stdx::make_unique<AuthzSessionExternalStateMock>(authzManager.get());
+        auto uniqueAuthzManager =
+            stdx::make_unique<AuthorizationManager>(std::move(localManagerState));
+        authzManager = uniqueAuthzManager.get();
+        AuthorizationManager::set(&serviceContext, std::move(uniqueAuthzManager));
+        auto localSessionState = stdx::make_unique<AuthzSessionExternalStateMock>(authzManager);
         sessionState = localSessionState.get();
-        authzSession = stdx::make_unique<AuthorizationSession>(std::move(localSessionState));
+        authzSession = stdx::make_unique<AuthorizationSessionForTest>(std::move(localSessionState));
         authzManager->setAuthEnabled(true);
     }
 };
 
+const NamespaceString testFooNss("test.foo");
+const NamespaceString testBarNss("test.bar");
+const NamespaceString testQuxNss("test.qux");
+
 const ResourcePattern testDBResource(ResourcePattern::forDatabaseName("test"));
 const ResourcePattern otherDBResource(ResourcePattern::forDatabaseName("other"));
 const ResourcePattern adminDBResource(ResourcePattern::forDatabaseName("admin"));
-const ResourcePattern testFooCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("test.foo")));
+const ResourcePattern testFooCollResource(ResourcePattern::forExactNamespace(testFooNss));
+const ResourcePattern testBarCollResource(ResourcePattern::forExactNamespace(testBarNss));
+const ResourcePattern testQuxCollResource(ResourcePattern::forExactNamespace(testQuxNss));
 const ResourcePattern otherFooCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("other.foo")));
 const ResourcePattern thirdFooCollResource(
@@ -120,6 +148,8 @@ const ResourcePattern otherProfileCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("other.system.profile")));
 const ResourcePattern thirdProfileCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("third.system.profile")));
+const ResourcePattern testSystemNamespacesResource(
+    ResourcePattern::forExactNamespace(NamespaceString("test.system.namespaces")));
 
 TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     // Check that disabling auth checks works
@@ -134,16 +164,18 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
 
     // Check that you can't authorize a user that doesn't exist.
     ASSERT_EQUALS(ErrorCodes::UserNotFound,
-                  authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
+                  authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     // Add a user with readWrite and dbAdmin on the test DB
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
                                                          << "test"
-                                                         << "credentials" << BSON("MONGODB-CR"
-                                                                                  << "a") << "roles"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
                                                                             << "db"
@@ -153,7 +185,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
                                                                                << "db"
                                                                                << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
@@ -164,19 +196,21 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
 
     // Add an admin user with readWriteAnyDatabase
     ASSERT_OK(
-        managerState->insertPrivilegeDocument(&_txn,
+        managerState->insertPrivilegeDocument(_opCtx.get(),
                                               BSON("user"
                                                    << "admin"
                                                    << "db"
                                                    << "admin"
-                                                   << "credentials" << BSON("MONGODB-CR"
-                                                                            << "a") << "roles"
+                                                   << "credentials"
+                                                   << BSON("MONGODB-CR"
+                                                           << "a")
+                                                   << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "readWriteAnyDatabase"
                                                                       << "db"
                                                                       << "admin"))),
                                               BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("admin", "admin")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "admin")));
 
     ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
         ResourcePattern::forExactNamespace(NamespaceString("anydb.somecollection")),
@@ -209,13 +243,15 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
 
 TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
     // Add a user with doubled-up readWrite and single dbAdmin on the test DB
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
                                                          << "test"
-                                                         << "credentials" << BSON("MONGODB-CR"
-                                                                                  << "a") << "roles"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
                                                                             << "db"
@@ -229,7 +265,7 @@ TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
                                                                                << "db"
                                                                                << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
@@ -240,13 +276,15 @@ TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
 }
 
 TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "rw"
                                                          << "db"
                                                          << "test"
-                                                         << "credentials" << BSON("MONGODB-CR"
-                                                                                  << "a") << "roles"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
                                                                             << "db"
@@ -256,26 +294,30 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                                                << "db"
                                                                                << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "useradmin"
                                                          << "db"
                                                          << "test"
-                                                         << "credentials" << BSON("MONGODB-CR"
-                                                                                  << "a") << "roles"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "userAdmin"
                                                                             << "db"
                                                                             << "test"))),
                                                     BSONObj()));
     ASSERT_OK(
-        managerState->insertPrivilegeDocument(&_txn,
+        managerState->insertPrivilegeDocument(_opCtx.get(),
                                               BSON("user"
                                                    << "rwany"
                                                    << "db"
                                                    << "test"
-                                                   << "credentials" << BSON("MONGODB-CR"
-                                                                            << "a") << "roles"
+                                                   << "credentials"
+                                                   << BSON("MONGODB-CR"
+                                                           << "a")
+                                                   << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "readWriteAnyDatabase"
                                                                       << "db"
@@ -286,20 +328,22 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                                          << "admin"))),
                                               BSONObj()));
     ASSERT_OK(
-        managerState->insertPrivilegeDocument(&_txn,
+        managerState->insertPrivilegeDocument(_opCtx.get(),
                                               BSON("user"
                                                    << "useradminany"
                                                    << "db"
                                                    << "test"
-                                                   << "credentials" << BSON("MONGODB-CR"
-                                                                            << "a") << "roles"
+                                                   << "credentials"
+                                                   << BSON("MONGODB-CR"
+                                                           << "a")
+                                                   << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "userAdminAnyDatabase"
                                                                       << "db"
                                                                       << "admin"))),
                                               BSONObj()));
 
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("rwany", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("rwany", "test")));
 
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
@@ -319,7 +363,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
 
     // Logging in as useradminany@test implicitly logs out rwany@test.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("useradminany", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("useradminany", "test")));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
     ASSERT_TRUE(
@@ -338,7 +382,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
 
     // Logging in as rw@test implicitly logs out useradminany@test.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("rw", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("rw", "test")));
 
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
@@ -359,7 +403,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
 
 
     // Logging in as useradmin@test implicitly logs out rw@test.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("useradmin", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("useradmin", "test")));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
     ASSERT_FALSE(
@@ -380,19 +424,21 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
 
 TEST_F(AuthorizationSessionTest, InvalidateUser) {
     // Add a readWrite user
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
                                                          << "test"
-                                                         << "credentials" << BSON("MONGODB-CR"
-                                                                                  << "a") << "roles"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
                                                                             << "db"
                                                                             << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -404,15 +450,22 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
 
     // Change the user to be read-only
     int ignored;
-    managerState->remove(
-        &_txn, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored);
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+    managerState
+        ->remove(_opCtx.get(),
+                 AuthorizationManager::usersCollectionNamespace,
+                 BSONObj(),
+                 BSONObj(),
+                 &ignored)
+        .transitional_ignore();
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
                                                          << "test"
-                                                         << "credentials" << BSON("MONGODB-CR"
-                                                                                  << "a") << "roles"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "read"
                                                                             << "db"
@@ -421,7 +474,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
 
     // Make sure that invalidating the user causes the session to reload its privileges.
     authzManager->invalidateUserByName(user->getName());
-    authzSession->startRequest(&_txn);  // Refreshes cached data for invalid users
+    authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_FALSE(
@@ -431,11 +484,16 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
     ASSERT(user->isValid());
 
     // Delete the user.
-    managerState->remove(
-        &_txn, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored);
+    managerState
+        ->remove(_opCtx.get(),
+                 AuthorizationManager::usersCollectionNamespace,
+                 BSONObj(),
+                 BSONObj(),
+                 &ignored)
+        .transitional_ignore();
     // Make sure that invalidating the user causes the session to reload its privileges.
     authzManager->invalidateUserByName(user->getName());
-    authzSession->startRequest(&_txn);  // Refreshes cached data for invalid users
+    authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_FALSE(
@@ -445,19 +503,21 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
 
 TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Add a readWrite user
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
                                                          << "test"
-                                                         << "credentials" << BSON("MONGODB-CR"
-                                                                                  << "a") << "roles"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
                                                                             << "db"
                                                                             << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -470,15 +530,22 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Change the user to be read-only
     int ignored;
     managerState->setFindsShouldFail(true);
-    managerState->remove(
-        &_txn, AuthorizationManager::usersCollectionNamespace, BSONObj(), BSONObj(), &ignored);
-    ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+    managerState
+        ->remove(_opCtx.get(),
+                 AuthorizationManager::usersCollectionNamespace,
+                 BSONObj(),
+                 BSONObj(),
+                 &ignored)
+        .transitional_ignore();
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
                                                     BSON("user"
                                                          << "spencer"
                                                          << "db"
                                                          << "test"
-                                                         << "credentials" << BSON("MONGODB-CR"
-                                                                                  << "a") << "roles"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "read"
                                                                             << "db"
@@ -489,7 +556,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // document lookup to fail, the authz session should continue to use its known out-of-date
     // privilege data.
     authzManager->invalidateUserByName(user->getName());
-    authzSession->startRequest(&_txn);  // Refreshes cached data for invalid users
+    authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_TRUE(
@@ -498,11 +565,717 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Once we configure document lookup to succeed again, authorization checks should
     // observe the new values.
     managerState->setFindsShouldFail(false);
-    authzSession->startRequest(&_txn);  // Refreshes cached data for invalid users
+    authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
+}
+
+TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRestrictions) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(
+        _opCtx.get(),
+        BSON("user"
+             << "spencer"
+             << "db"
+             << "test"
+             << "credentials"
+             << BSON("MONGODB-CR"
+                     << "a")
+             << "roles"
+             << BSON_ARRAY(BSON("role"
+                                << "readWrite"
+                                << "db"
+                                << "test"))
+             << "authenticationRestrictions"
+             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("192.168.0.0/24"
+                                                             << "192.168.2.10")
+                                               << "serverAddress"
+                                               << BSON_ARRAY("192.168.0.2"))
+                           << BSON("clientSource" << BSON_ARRAY("2001:DB8::1") << "serverAddress"
+                                                  << BSON_ARRAY("2001:DB8::2"))
+                           << BSON("clientSource" << BSON_ARRAY("127.0.0.1"
+                                                                << "::1")
+                                                  << "serverAddress"
+                                                  << BSON_ARRAY("127.0.0.1"
+                                                                << "::1")))),
+        BSONObj()));
+
+
+    auto assertWorks = [this](StringData clientSource, StringData serverAddress) {
+        RestrictionEnvironment::set(
+            session,
+            stdx::make_unique<RestrictionEnvironment>(SockAddr(clientSource, 5555, AF_UNSPEC),
+                                                      SockAddr(serverAddress, 27017, AF_UNSPEC)));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    };
+
+    auto assertFails = [this](StringData clientSource, StringData serverAddress) {
+        RestrictionEnvironment::set(
+            session,
+            stdx::make_unique<RestrictionEnvironment>(SockAddr(clientSource, 5555, AF_UNSPEC),
+                                                      SockAddr(serverAddress, 27017, AF_UNSPEC)));
+        ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    };
+
+    // The empty RestrictionEnvironment will cause addAndAuthorizeUser to fail.
+    ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+
+    // A clientSource from the 192.168.0.0/24 block will succeed in connecting to a server
+    // listening on 192.168.0.2.
+    assertWorks("192.168.0.6", "192.168.0.2");
+    assertWorks("192.168.0.12", "192.168.0.2");
+
+    // A client connecting from the explicitly whitelisted addresses can connect to a
+    // server listening on 192.168.0.2
+    assertWorks("192.168.2.10", "192.168.0.2");
+
+    // A client from either of these sources must connect to the server via the serverAddress
+    // expressed in the restriction.
+    assertFails("192.168.0.12", "127.0.0.1");
+    assertFails("192.168.2.10", "127.0.0.1");
+    assertFails("192.168.0.12", "192.168.1.3");
+    assertFails("192.168.2.10", "192.168.1.3");
+
+    // A client outside of these two sources cannot connect to the server.
+    assertFails("192.168.1.12", "192.168.0.2");
+    assertFails("192.168.1.10", "192.168.0.2");
+
+
+    // An IPv6 client from the correct address may use the IPv6 restriction to connect to the
+    // server.
+    assertWorks("2001:DB8::1", "2001:DB8::2");
+    assertFails("2001:DB8::1", "2001:DB8::3");
+    assertFails("2001:DB8::2", "2001:DB8::1");
+
+    // A localhost client can connect to a localhost server, using the second addressRestriction
+    assertWorks("127.0.0.1", "127.0.0.1");
+    assertWorks("::1", "::1");
+    assertWorks("::1", "127.0.0.1");  // Silly case
+    assertWorks("127.0.0.1", "::1");  // Silly case
+    assertFails("192.168.0.6", "127.0.0.1");
+    assertFails("127.0.0.1", "192.168.0.2");
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthForAggregateFailsIfPipelineIsNotAnArray) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONObj cmdObjIntPipeline = BSON("aggregate" << testFooNss.coll() << "pipeline" << 7);
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjIntPipeline, false));
+
+    BSONObj cmdObjObjPipeline = BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONObj());
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjObjPipeline, false));
+
+    BSONObj cmdObjNoPipeline = BSON("aggregate" << testFooNss.coll());
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjNoPipeline, false));
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthForAggregateFailsIfPipelineFirstStageIsNotAnObject) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONObj cmdObjFirstStageInt =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << BSON_ARRAY(7));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjFirstStageInt, false));
+
+    BSONObj cmdObjFirstStageArray =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << BSON_ARRAY(BSONArray()));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjFirstStageArray, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateEmptyPipelineWithoutFindAction) {
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONArray() << "cursor"
+                                      << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateEmptyPipelineWithFindAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONArray() << "cursor"
+                                      << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateWithoutFindActionIfFirstStageNotIndexOrCollStats) {
+    authzSession->assumePrivilegesForDB(
+        Privilege(testFooCollResource, {ActionType::indexStats, ActionType::collStats}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
+                                                        << BSON("$indexStats" << BSONObj()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateWithFindActionIfPipelineContainsIndexOrCollStats) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+    BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
+                                                        << BSON("$indexStats" << BSONObj()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCollStatsWithoutCollStatsAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateCollStatsWithCollStatsAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::collStats}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateIndexStatsWithoutIndexStatsAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateIndexStatsWithIndexStatsAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::indexStats}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMongoD) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMongoS) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, true));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoD) {
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoS) {
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, true));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMongoD) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMongoS) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, true));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoD) {
+    authzSession->assumePrivilegesForDB(
+        Privilege(ResourcePattern::forClusterResource(), {ActionType::inprog}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoS) {
+    authzSession->assumePrivilegesForDB(
+        Privilege(ResourcePattern::forClusterResource(), {ActionType::inprog}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, true));
+}
+
+TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMongoD) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline =
+        BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false << "allUsers" << true)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMongoS) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline =
+        BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false << "allUsers" << true)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, true));
+}
+
+TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotValid) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out"
+                                         << ""));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_THROWS_CODE(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false).ignore(),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateOutWithoutInsertAndRemoveOnTargetNamespace) {
+    // We only have find on the aggregation namespace.
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+
+    // We have insert but not remove on the $out namespace.
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::insert})});
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+
+    // We have remove but not insert on the $out namespace.
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::remove})});
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNamespace) {
+    authzSession->assumePrivilegesForDB(
+        {Privilege(testFooCollResource, {ActionType::find}),
+         Privilege(testBarCollResource, {ActionType::insert, ActionType::remove})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+
+    BSONObj cmdObjNoBypassDocumentValidation = BSON(
+        "aggregate" << testFooNss.coll() << "pipeline" << pipeline << "bypassDocumentValidation"
+                    << false
+                    << "cursor"
+                    << BSONObj());
+    ASSERT_OK(
+        authzSession->checkAuthForAggregate(testFooNss, cmdObjNoBypassDocumentValidation, false));
+}
+
+TEST_F(AuthorizationSessionTest,
+       CannotAggregateOutBypassingValidationWithoutBypassDocumentValidationOnTargetNamespace) {
+    authzSession->assumePrivilegesForDB(
+        {Privilege(testFooCollResource, {ActionType::find}),
+         Privilege(testBarCollResource, {ActionType::insert, ActionType::remove})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
+                         << "bypassDocumentValidation"
+                         << true);
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest,
+       CanAggregateOutBypassingValidationWithBypassDocumentValidationOnTargetNamespace) {
+    authzSession->assumePrivilegesForDB(
+        {Privilege(testFooCollResource, {ActionType::find}),
+         Privilege(
+             testBarCollResource,
+             {ActionType::insert, ActionType::remove, ActionType::bypassDocumentValidation})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
+                         << "bypassDocumentValidation"
+                         << true);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnJoinedNamespace) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testBarNss.coll())));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnJoinedNamespace) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testBarNss.coll())));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+
+TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnNestedJoinedNamespace) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find})});
+
+    BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testQuxNss.coll())));
+    BSONArray pipeline = BSON_ARRAY(
+        BSON("$lookup" << BSON("from" << testBarNss.coll() << "pipeline" << nestedPipeline)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnNestedJoinedNamespace) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find}),
+                                         Privilege(testQuxCollResource, {ActionType::find})});
+
+    BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testQuxNss.coll())));
+    BSONArray pipeline = BSON_ARRAY(
+        BSON("$lookup" << BSON("from" << testBarNss.coll() << "pipeline" << nestedPipeline)));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthForAggregateWithDeeplyNestedLookup) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    // Recursively adds nested $lookup stages to 'pipelineBob', building a pipeline with
+    // 'levelsToGo' deep $lookup stages.
+    stdx::function<void(BSONArrayBuilder*, int)> addNestedPipeline;
+    addNestedPipeline = [&addNestedPipeline](BSONArrayBuilder* pipelineBob, int levelsToGo) {
+        if (levelsToGo == 0) {
+            return;
+        }
+
+        BSONObjBuilder objectBob(pipelineBob->subobjStart());
+        BSONObjBuilder lookupBob(objectBob.subobjStart("$lookup"));
+        lookupBob << "from" << testFooNss.coll() << "as"
+                  << "as";
+        BSONArrayBuilder subPipelineBob(lookupBob.subarrayStart("pipeline"));
+        addNestedPipeline(&subPipelineBob, --levelsToGo);
+        subPipelineBob.doneFast();
+        lookupBob.doneFast();
+        objectBob.doneFast();
+    };
+
+    // checkAuthForAggregate() should succeed for an aggregate command that has a deeply nested
+    // $lookup sub-pipeline chain. Each nested $lookup stage adds 3 to the depth of the command
+    // object. We set 'maxLookupDepth' depth to allow for a command object that is at or just under
+    // max BSONDepth.
+    const uint32_t aggregateCommandDepth = 1;
+    const uint32_t lookupDepth = 3;
+    const uint32_t maxLookupDepth =
+        (BSONDepth::getMaxAllowableDepth() - aggregateCommandDepth) / lookupDepth;
+
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder << "aggregate" << testFooNss.coll();
+    BSONArrayBuilder pipelineBuilder(cmdBuilder.subarrayStart("pipeline"));
+    addNestedPipeline(&pipelineBuilder, maxLookupDepth);
+    pipelineBuilder.doneFast();
+    cmdBuilder << "cursor" << BSONObj();
+
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdBuilder.obj(), false));
+}
+
+
+TEST_F(AuthorizationSessionTest, CannotAggregateGraphLookupWithoutFindOnJoinedNamespace) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << testBarNss.coll())));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateGraphLookupWithFindOnJoinedNamespace) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << testBarNss.coll())));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest,
+       CannotAggregateFacetWithLookupAndGraphLookupWithoutFindOnJoinedNamespaces) {
+    // We only have find on the aggregation namespace.
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline =
+        BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
+                            "[{$graphLookup: {from: 'qux'}}]}}"));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+
+    // We have find on the $lookup namespace but not on the $graphLookup namespace.
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find})});
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+
+    // We have find on the $graphLookup namespace but not on the $lookup namespace.
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testQuxCollResource, {ActionType::find})});
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest,
+       CanAggregateFacetWithLookupAndGraphLookupWithFindOnJoinedNamespaces) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find}),
+                                         Privilege(testQuxCollResource, {ActionType::find})});
+
+    BSONArray pipeline =
+        BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
+                            "[{$graphLookup: {from: 'qux'}}]}}"));
+    BSONObj cmdObj =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false));
+}
+
+TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsCoauthorizedWithEmptyUserSet) {
+    std::vector<UserName> userSet;
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsNotCoauthorizedWithNonemptyUserSet) {
+    std::vector<UserName> userSet;
+    userSet.emplace_back("spencer", "test");
+    ASSERT_FALSE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest,
+       UnauthorizedSessionIsCoauthorizedWithNonemptyUserSetWhenAuthIsDisabled) {
+    authzManager->setAuthEnabled(false);
+    std::vector<UserName> userSet;
+    userSet.emplace_back("spencer", "test");
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithEmptyUserSet) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    std::vector<UserName> userSet;
+    ASSERT_FALSE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest,
+       AuthorizedSessionIsCoauthorizedWithEmptyUserSetWhenAuthIsDisabled) {
+    authzManager->setAuthEnabled(false);
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    std::vector<UserName> userSet;
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedWithIntersectingUserSet) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "admin"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "test")));
+    std::vector<UserName> userSet;
+    userSet.emplace_back("admin", "test");
+    userSet.emplace_back("tess", "test");
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithNonintersectingUserSet) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "admin"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "test")));
+    std::vector<UserName> userSet;
+    userSet.emplace_back("tess", "test");
+    ASSERT_FALSE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest,
+       AuthorizedSessionIsCoauthorizedWithNonintersectingUserSetWhenAuthIsDisabled) {
+    authzManager->setAuthEnabled(false);
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "admin"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "test")));
+    std::vector<UserName> userSet;
+    userSet.emplace_back("tess", "test");
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, CannotListCollectionsWithoutListCollectionsPrivilege) {
+    // With no privileges, there is not authorization to list collections
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
+}
+
+TEST_F(AuthorizationSessionTest, CanListCollectionsWithLegacySystemNamespacesAccess) {
+    // Deprecated: permissions for the find action on test.system.namespaces allows us to list
+    // collections in the test database.
+    authzSession->assumePrivilegesForDB(
+        Privilege(testSystemNamespacesResource, {ActionType::find}));
+
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
+}
+
+TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege) {
+    // The listCollections privilege authorizes the list collections command.
+    authzSession->assumePrivilegesForDB(Privilege(testDBResource, {ActionType::listCollections}));
+
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
 }
 
 }  // namespace

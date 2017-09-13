@@ -94,30 +94,14 @@ URL_ROOT = os.environ.get('BUILDLOGGER_URL', 'http://buildlogs.mongodb.org/')
 TIMEOUT_SECONDS = 10
 socket.setdefaulttimeout(TIMEOUT_SECONDS)
 
-digest_handler = urllib2.HTTPDigestAuthHandler()
-digest_handler.add_password(
+auth_handler = urllib2.HTTPBasicAuthHandler()
+auth_handler.add_password(
     realm='buildlogs',
     uri=URL_ROOT,
     user=username,
     passwd=password)
 
-# This version of HTTPErrorProcessor is copied from
-# Python 2.7, and allows REST response codes (e.g.
-# "201 Created") which are treated as errors by
-# older versions.
-class HTTPErrorProcessor(urllib2.HTTPErrorProcessor):
-    def http_response(self, request, response):
-        code, msg, hdrs = response.code, response.msg, response.info()
-
-        # According to RFC 2616, "2xx" code indicates that the client's
-        # request was successfully received, understood, and accepted.
-        if not (200 <= code < 300):
-            response = self.parent.error(
-                'http', request, response, code, msg, hdrs)
-
-        return response
-
-url_opener = urllib2.build_opener(digest_handler, HTTPErrorProcessor())
+url_opener = urllib2.build_opener(auth_handler, urllib2.HTTPErrorProcessor())
 
 def url(endpoint):
     if not endpoint.endswith('/'):
@@ -237,6 +221,12 @@ def run_and_echo(command):
     webapp is unavailable, etc
     """
     proc = subprocess.Popen(command)
+
+    # We write the pid of the spawned process as the first line of buildlogger.py's stdout because
+    # smoke.py expects to use it to terminate processes individually if already running inside a job
+    # object.
+    sys.stdout.write("[buildlogger.py] pid: %d\n" % (proc.pid))
+    sys.stdout.flush()
 
     def handle_sigterm(signum, frame):
         try:
@@ -414,6 +404,12 @@ def loop_and_callback(command, callback):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
+
+    # We write the pid of the spawned process as the first line of buildlogger.py's stdout because
+    # smoke.py expects to use it to terminate processes individually if already running inside a job
+    # object.
+    sys.stdout.write("[buildlogger.py] pid: %d\n" % (proc.pid))
+    sys.stdout.flush()
 
     def handle_sigterm(signum, frame):
         try:

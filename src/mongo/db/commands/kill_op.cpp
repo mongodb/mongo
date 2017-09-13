@@ -39,17 +39,19 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-class KillOpCommand : public Command {
+class KillOpCommand : public BasicCommand {
 public:
-    KillOpCommand() : Command("killOp") {}
+    KillOpCommand() : BasicCommand("killOp") {}
 
-    bool isWriteCommandForConfigServer() const final {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -61,31 +63,87 @@ public:
         return true;
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) final {
-        bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-            ResourcePattern::forClusterResource(), ActionType::killop);
-        return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
-    }
-
-    bool run(OperationContext* txn,
-             const std::string& db,
-             BSONObj& cmdObj,
-             int options,
-             std::string& errmsg,
-             BSONObjBuilder& result) final {
+    static long long parseOpId(const BSONObj& cmdObj) {
         long long op;
         uassertStatusOK(bsonExtractIntegerField(cmdObj, "op", &op));
 
-        log() << "going to kill op: " << op;
-        result.append("info", "attempting to kill op");
+        // Internally opid is an unsigned 32-bit int, but as BSON only has signed integer types,
+        // we wrap values exceeding 2,147,483,647 to negative numbers. The following undoes this
+        // transformation, so users can use killOp on the (negative) opid they received.
+        if (op >= std::numeric_limits<int>::min() && op < 0)
+            op += 1ull << 32;
 
         uassert(26823,
                 str::stream() << "invalid op : " << op,
                 (op >= 0) && (op <= std::numeric_limits<unsigned int>::max()));
 
-        getGlobalServiceContext()->killOperation(static_cast<unsigned int>(op));
+
+        return op;
+    }
+
+    static StatusWith<std::tuple<stdx::unique_lock<Client>, OperationContext*>> _findOp(
+        Client* client, unsigned int opId) {
+        AuthorizationSession* authzSession = AuthorizationSession::get(client);
+
+        for (ServiceContext::LockedClientsCursor cursor(client->getServiceContext());
+             Client* opClient = cursor.next();) {
+            stdx::unique_lock<Client> lk(*opClient);
+
+            OperationContext* opCtx = opClient->getOperationContext();
+            if (opCtx && opCtx->getOpID() == opId) {
+                if (authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(), ActionType::killop) ||
+                    authzSession->isCoauthorizedWithClient(opClient)) {
+                    return {std::make_tuple(std::move(lk), opCtx)};
+                }
+                break;
+            }
+        }
+
+        return Status(ErrorCodes::NoSuchKey, str::stream() << "Could not access opID: " << opId);
+    }
+
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        AuthorizationSession* authzSession = AuthorizationSession::get(client);
+
+        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::killop)) {
+            // If we have administrative permission to run killop, we don't need to traverse the
+            // Client list to figure out if we own the operation which will be terminated.
+            return Status::OK();
+        }
+
+        bool isAuthenticated =
+            AuthorizationSession::get(client)->getAuthenticatedUserNames().more();
+        if (isAuthenticated) {
+            long long opId = parseOpId(cmdObj);
+            auto swLkAndOp = _findOp(client, opId);
+            if (swLkAndOp.isOK()) {
+                // We were able to find the Operation, and we were authorized to interact with it.
+                return Status::OK();
+            }
+        }
+        return Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& db,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final {
+        long long opId = parseOpId(cmdObj);
+
+        log() << "going to kill op: " << opId;
+        result.append("info", "attempting to kill op");
+        auto swLkAndOp = _findOp(opCtx->getClient(), opId);
+        if (swLkAndOp.isOK()) {
+            stdx::unique_lock<Client> lk;
+            OperationContext* opCtxToKill;
+            std::tie(lk, opCtxToKill) = std::move(swLkAndOp.getValue());
+            opCtx->getServiceContext()->killOperation(opCtxToKill);
+        }
+
         return true;
     }
 } killOpCmd;

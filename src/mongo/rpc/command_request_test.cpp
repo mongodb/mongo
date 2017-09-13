@@ -36,8 +36,8 @@
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/command_request_builder.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/message.h"
 
 namespace {
 
@@ -61,61 +61,98 @@ TEST(CommandRequest, ParseAllFields) {
     auto database = std::string{"ookokokokok"};
     writeString(database);
 
-    auto commandName = std::string{"abababa"};
+    auto commandName = std::string{"baz"};
     writeString(commandName);
-
-    BSONObjBuilder metadataBob{};
-    metadataBob.append("foo", "bar");
-    auto metadata = metadataBob.done();
-    writeObj(metadata);
 
     BSONObjBuilder commandArgsBob{};
     commandArgsBob.append("baz", "garply");
     auto commandArgs = commandArgsBob.done();
     writeObj(commandArgs);
 
-    BSONObjBuilder inputDoc1Bob{};
-    inputDoc1Bob.append("meep", "boop").append("meow", "chirp");
-    auto inputDoc1 = inputDoc1Bob.done();
-    writeObj(inputDoc1);
-
-    BSONObjBuilder inputDoc2Bob{};
-    inputDoc1Bob.append("bleep", "bop").append("woof", "squeak");
-    auto inputDoc2 = inputDoc2Bob.done();
-    writeObj(inputDoc2);
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    writeObj(metadata);
 
     Message toSend;
     toSend.setData(dbCommand, opCommandData.data(), opCommandData.size());
 
-    rpc::CommandRequest opCmd{&toSend};
+    auto opCmd = rpc::ParsedOpCommand::parse(toSend);
 
-    ASSERT_EQUALS(opCmd.getCommandName(), commandName);
-    ASSERT_EQUALS(opCmd.getDatabase(), database);
-    ASSERT_EQUALS(opCmd.getMetadata(), metadata);
-    ASSERT_EQUALS(opCmd.getCommandArgs(), commandArgs);
-
-    auto inputDocRange = opCmd.getInputDocs();
-    auto inputDocRangeIter = inputDocRange.begin();
-
-    ASSERT_EQUALS(*inputDocRangeIter, inputDoc1);
-    // can't use assert equals since we don't have an op to print the iter.
-    ASSERT_FALSE(inputDocRangeIter == inputDocRange.end());
-    ++inputDocRangeIter;
-    ASSERT_EQUALS(*inputDocRangeIter, inputDoc2);
-    ASSERT_FALSE(inputDocRangeIter == inputDocRange.end());
-    ++inputDocRangeIter;
-
-    ASSERT_TRUE(inputDocRangeIter == inputDocRange.end());
+    ASSERT_EQUALS(opCmd.body.firstElementFieldName(), commandName);
+    ASSERT_EQUALS(opCmd.database, database);
+    ASSERT_BSONOBJ_EQ(opCmd.metadata, metadata);
+    ASSERT_BSONOBJ_EQ(opCmd.body, commandArgs);
 }
 
-TEST(CommandRequest, InvalidNSThrows) {
-    rpc::CommandRequestBuilder crb;
-    crb.setDatabase("foo////!!!!<><><>");
-    crb.setCommandName("foo");
-    crb.setMetadata(BSONObj());
-    crb.setCommandArgs(BSON("ping" << 1));
-    auto msg = crb.done();
-    ASSERT_THROWS(rpc::CommandRequest{msg.get()}, AssertionException);
+TEST(CommandRequest, EmptyCommandObjThrows) {
+    std::vector<char> opCommandData;
+
+    using std::begin;
+    using std::end;
+
+    auto writeString = [&opCommandData](const std::string& str) {
+        opCommandData.insert(end(opCommandData), begin(str), end(str));
+        opCommandData.push_back('\0');
+    };
+
+    auto writeObj = [&opCommandData](const BSONObj& obj) {
+        opCommandData.insert(end(opCommandData), obj.objdata(), obj.objdata() + obj.objsize());
+    };
+
+    auto database = std::string{"someDb"};
+    writeString(database);
+
+    auto commandName = std::string{"baz"};
+    writeString(commandName);
+
+    auto commandArgs = BSONObj();
+    writeObj(commandArgs);
+
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    writeObj(metadata);
+
+    Message msg;
+    msg.setData(dbCommand, opCommandData.data(), opCommandData.size());
+
+    ASSERT_THROWS_CODE(rpc::ParsedOpCommand::parse(msg), AssertionException, 39950);
+}
+
+TEST(CommandRequest, MismatchBetweenCommandNamesThrows) {
+    std::vector<char> opCommandData;
+
+    using std::begin;
+    using std::end;
+
+    auto writeString = [&opCommandData](const std::string& str) {
+        opCommandData.insert(end(opCommandData), begin(str), end(str));
+        opCommandData.push_back('\0');
+    };
+
+    auto writeObj = [&opCommandData](const BSONObj& obj) {
+        opCommandData.insert(end(opCommandData), obj.objdata(), obj.objdata() + obj.objsize());
+    };
+
+    auto database = std::string{"someDb"};
+    writeString(database);
+
+    auto commandName = std::string{"fakeName"};
+    writeString(commandName);
+
+    auto commandArgs = BSON("realName" << 1);
+    writeObj(commandArgs);
+
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    writeObj(metadata);
+
+    Message msg;
+    msg.setData(dbCommand, opCommandData.data(), opCommandData.size());
+
+    ASSERT_THROWS_CODE(rpc::ParsedOpCommand::parse(msg), AssertionException, 39950);
 }
 
 }  // namespace

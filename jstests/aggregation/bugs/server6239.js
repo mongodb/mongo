@@ -10,7 +10,7 @@ var num = 54312;
 db.s6239.drop();
 
 // Populate db
-db.s6239.save({date:new Date(millis), num: num});
+db.s6239.save({date: new Date(millis), num: num});
 
 function test(expression, expected) {
     var res = db.s6239.aggregate({$project: {out: expression}});

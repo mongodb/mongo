@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because the explain output from a mongod when run
+// against a sharded collection is wrapped in a "shards" object with keys for each shard.
+// @tags: [assumes_unsharded_collection]
+
 // Tests for the .explain() shell helper, which provides syntactic sugar for the explain command.
 
 var t = db.jstests_explain_helpers;
@@ -175,10 +179,8 @@ assert.commandWorked(explain);
 // .snapshot()
 explain = t.explain().find().snapshot().finish();
 assert.commandWorked(explain);
-assert(isIxscan(explain.queryPlanner.winningPlan));
 explain = t.find().snapshot().explain();
 assert.commandWorked(explain);
-assert(isIxscan(explain.queryPlanner.winningPlan));
 
 // .next()
 explain = t.explain().find().next();
@@ -193,7 +195,7 @@ assert(!explainQuery.hasNext());
 
 // .forEach()
 var results = [];
-t.explain().find().forEach(function (res) {
+t.explain().find().forEach(function(res) {
     results.push(res);
 });
 assert.eq(1, results.length);
@@ -255,12 +257,38 @@ assert.commandWorked(explain);
 assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT"));
 assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT_SCAN"));
 
+// Explainable count with hint.
+assert.commandWorked(t.ensureIndex({c: 1}, {sparse: true}));
+explain = t.explain().count({c: {$exists: false}}, {hint: "c_1"});
+assert.commandWorked(explain);
+assert(planHasStage(explain.queryPlanner.winningPlan, "IXSCAN"));
+assert.eq(getPlanStage(explain.queryPlanner.winningPlan, "IXSCAN").indexName, "c_1");
+assert.commandWorked(t.dropIndex({c: 1}));
+
 //
 // .group()
 //
 
-explain = t.explain().group({key: "a", initial: {}, reduce: function() { } });
+explain = t.explain().group({key: "a", initial: {}, reduce: function() {}});
 assert.commandWorked(explain);
+
+//
+// .distinct()
+//
+
+explain = t.explain().distinct('_id');
+assert.commandWorked(explain);
+assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
+assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+
+explain = t.explain().distinct('a');
+assert.commandWorked(explain);
+assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
+assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+
+explain = t.explain().distinct('b');
+assert.commandWorked(explain);
+assert(planHasStage(explain.queryPlanner.winningPlan, "COLLSCAN"));
 
 //
 // .remove()
@@ -377,8 +405,8 @@ assert.eq(1, explain.executionStats.totalDocsExamined);
 assert.eq(10, t.count());
 
 // findAndModify with upsert flag set that should do an insert.
-explain = t.explain("executionStats").findAndModify(
-    {query: {a: 15}, update: {$set: {b: 3}}, upsert: true});
+explain = t.explain("executionStats")
+              .findAndModify({query: {a: 15}, update: {$set: {b: 3}}, upsert: true});
 assert.commandWorked(explain);
 stage = explain.executionStats.executionStages;
 if ("SINGLE_SHARD" === stage.stage) {
@@ -419,7 +447,7 @@ assert.throws(function() {
 
 // Missing "initial" for explaining a group.
 assert.throws(function() {
-    t.explain().group({key: "a", reduce: function() { } });
+    t.explain().group({key: "a", reduce: function() {}});
 });
 
 // Can't specify both remove and update in a findAndModify

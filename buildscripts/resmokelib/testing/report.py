@@ -5,10 +5,12 @@ and timing information for the report.json file.
 
 from __future__ import absolute_import
 
+import copy
+import threading
 import time
 import unittest
 
-from .. import config
+from .. import config as _config
 from .. import logging
 
 
@@ -17,30 +19,18 @@ class TestReport(unittest.TestResult):
     Records test status and timing information.
     """
 
-    def __init__(self, logger, logging_config, build_id=None, build_config=None):
+    def __init__(self, job_logger):
         """
         Initializes the TestReport with the buildlogger configuration.
         """
 
         unittest.TestResult.__init__(self)
 
-        self.logger = logger
-        self.logging_config = logging_config
-        self.build_id = build_id
-        self.build_config = build_config
+        self.job_logger = job_logger
 
-        self.start_times = {}
-        self.end_times = {}
-        self.statuses = {}
-        self.return_codes = {}
-        self.urls = {}
+        self._lock = threading.Lock()
 
-        self.num_succeeded = 0
-        self.num_failed = 0
-        self.num_errored = 0
-
-        self.__dynamic_tests = set()
-        self.__original_loggers = {}
+        self.reset()
 
     @classmethod
     def combine(cls, *reports):
@@ -53,44 +43,44 @@ class TestReport(unittest.TestResult):
         dynamically add a #dbhash# test case.
         """
 
-        combined_report = cls(logging.loggers.EXECUTOR, {})
+        # TestReports that are used when running tests need a JobLogger but combined reports don't
+        # use the logger.
+        combined_report = cls(logging.loggers.EXECUTOR_LOGGER)
         combining_time = time.time()
 
         for report in reports:
             if not isinstance(report, TestReport):
                 raise TypeError("reports must be a list of TestReport instances")
 
-            for test_id in report.start_times:
-                if combined_report.statuses.get(test_id, "pass") != "pass":
-                    # 'combined_report' already has a failure recorded for this test, so just keep
-                    # the information about that one.
-                    continue
+            with report._lock:
+                for test_info in report.test_infos:
+                    # If the user triggers a KeyboardInterrupt exception while a test is running,
+                    # then it is possible for 'test_info' to be modified by a job thread later on.
+                    # We make a shallow copy in order to ensure 'num_interrupted' is consistent with
+                    # the actual number of tests that have status equal to "timeout".
+                    test_info = copy.copy(test_info)
 
-                combined_report.start_times[test_id] = report.start_times[test_id]
-                combined_report.end_times[test_id] = report.end_times.get(test_id, combining_time)
+                    # TestReport.addXX() may not have been called.
+                    if test_info.status is None or test_info.return_code is None:
+                        # Mark the test as having timed out if it was interrupted. It might have
+                        # passed if the suite ran to completion, but we wouldn't know for sure.
+                        test_info.status = "timeout"
+                        test_info.return_code = -2
 
-                # If a StopExecution exception is triggered while running the tests, then it is
-                # possible for dynamic tests not to have called TestReport.stopTest() yet.
-                if test_id in report.__dynamic_tests:
-                    # Mark a dynamic test as having failed if it was interrupted. It might have
-                    # passed if the suite ran to completion, but we wouldn't know for sure.
-                    combined_report.statuses[test_id] = report.statuses.get(test_id, "fail")
-                    combined_report.return_codes[test_id] = report.return_codes.get(test_id, -2)
-                else:
-                    # A non-dynamic test should always have a status and return code, so it is a
-                    # resmoke.py error if it does not.
-                    combined_report.statuses[test_id] = report.statuses.get(test_id, "error")
-                    combined_report.return_codes[test_id] = report.return_codes.get(test_id, 2)
+                    # TestReport.stopTest() may not have been called.
+                    if test_info.end_time is None:
+                        # Use the current time as the time that the test finished running.
+                        test_info.end_time = combining_time
 
-                if test_id in report.urls:
-                    combined_report.urls[test_id] = report.urls[test_id]
+                    combined_report.test_infos.append(test_info)
 
-            combined_report.__dynamic_tests.update(report.__dynamic_tests)
+                combined_report.num_dynamic += report.num_dynamic
 
         # Recompute number of success, failures, and errors.
         combined_report.num_succeeded = len(combined_report.get_successful())
         combined_report.num_failed = len(combined_report.get_failed())
         combined_report.num_errored = len(combined_report.get_errored())
+        combined_report.num_interrupted = len(combined_report.get_interrupted())
 
         return combined_report
 
@@ -101,43 +91,30 @@ class TestReport(unittest.TestResult):
 
         unittest.TestResult.startTest(self, test)
 
-        self.start_times[test.id()] = time.time()
+        test_info = _TestInfo(test.id(), dynamic)
+        test_info.start_time = time.time()
 
         basename = test.basename()
         if dynamic:
             command = "(dynamic test case)"
-            self.__dynamic_tests.add(test.id())
         else:
             command = test.as_command()
-        self.logger.info("Running %s...\n%s", basename, command)
+        self.job_logger.info("Running %s...\n%s", basename, command)
 
-        test_id = logging.buildlogger.new_test_id(self.build_id,
-                                                  self.build_config,
-                                                  basename,
-                                                  command)
-
-        if self.build_id is not None:
-            endpoint = logging.buildlogger.APPEND_TEST_LOGS_ENDPOINT % {
-                "build_id": self.build_id,
-                "test_id": test_id,
-            }
-
-            self.urls[test.id()] = "%s/%s/" % (config.BUILDLOGGER_URL.rstrip("/"),
-                                               endpoint.strip("/"))
-            self.logger.info("Writing output of %s to %s.",
-                             test.shortDescription(), self.urls[test.id()])
+        with self._lock:
+            self.test_infos.append(test_info)
+            if dynamic:
+                self.num_dynamic += 1
 
         # Set up the test-specific logger.
-        logger_name = "%s:%s" % (test.logger.name, test.short_name())
-        logger = logging.loggers.new_logger(logger_name, parent=test.logger)
-        logging.config.apply_buildlogger_test_handler(logger,
-                                                      self.logging_config,
-                                                      build_id=self.build_id,
-                                                      build_config=self.build_config,
-                                                      test_id=test_id)
+        test_logger = self.job_logger.new_test_logger(test.short_name(), test.basename(),
+                                                      command, test.logger)
+        test_info.url_endpoint = test_logger.url_endpoint
 
-        self.__original_loggers[test.id()] = test.logger
-        test.logger = logger
+        # TestReport.combine() doesn't access the '__original_loggers' attribute, so we don't bother
+        # protecting it with the lock.
+        self.__original_loggers[test_info.test_id] = test.logger
+        test.logger = test_logger
 
     def stopTest(self, test):
         """
@@ -145,16 +122,25 @@ class TestReport(unittest.TestResult):
         """
 
         unittest.TestResult.stopTest(self, test)
-        self.end_times[test.id()] = time.time()
 
-        time_taken = self.end_times[test.id()] - self.start_times[test.id()]
-        self.logger.info("%s ran in %0.2f seconds.", test.basename(), time_taken)
+        with self._lock:
+            test_info = self._find_test_info(test)
+            test_info.end_time = time.time()
+
+        time_taken = test_info.end_time - test_info.start_time
+        self.job_logger.info("%s ran in %0.2f seconds.", test.basename(), time_taken)
 
         # Asynchronously closes the buildlogger test handler to avoid having too many threads open
         # on 32-bit systems.
-        logging.flush.close_later(test.logger)
+        for handler in test.logger.handlers:
+            # We ignore the cancellation token returned by close_later() since we always want the
+            # logs to eventually get flushed.
+            logging.flush.close_later(handler)
 
         # Restore the original logger for the test.
+        #
+        # TestReport.combine() doesn't access the '__original_loggers' attribute, so we don't bother
+        # protecting it with the lock.
         test.logger = self.__original_loggers.pop(test.id())
 
     def addError(self, test, err):
@@ -164,25 +150,32 @@ class TestReport(unittest.TestResult):
         """
 
         unittest.TestResult.addError(self, test, err)
-        self.num_errored += 1
-        self.statuses[test.id()] = "error"
-        self.return_codes[test.id()] = test.return_code
+
+        with self._lock:
+            self.num_errored += 1
+
+            test_info = self._find_test_info(test)
+            test_info.status = "error"
+            test_info.return_code = test.return_code
 
     def setError(self, test):
         """
         Used to change the outcome of an existing test to an error.
         """
 
-        if test.id() not in self.start_times or test.id() not in self.end_times:
-            raise ValueError("setError called on a test that has not completed.")
+        with self._lock:
+            test_info = self._find_test_info(test)
+            if test_info.end_time is None:
+                raise ValueError("stopTest was not called on %s" % (test.basename()))
 
-        self.statuses[test.id()] = "error"
-        self.return_codes[test.id()] = 2
+            test_info.status = "error"
+            test_info.return_code = 2
 
         # Recompute number of success, failures, and errors.
         self.num_succeeded = len(self.get_successful())
         self.num_failed = len(self.get_failed())
         self.num_errored = len(self.get_errored())
+        self.num_interrupted = len(self.get_interrupted())
 
     def addFailure(self, test, err):
         """
@@ -191,25 +184,32 @@ class TestReport(unittest.TestResult):
         """
 
         unittest.TestResult.addFailure(self, test, err)
-        self.num_failed += 1
-        self.statuses[test.id()] = "fail"
-        self.return_codes[test.id()] = test.return_code
+
+        with self._lock:
+            self.num_failed += 1
+
+            test_info = self._find_test_info(test)
+            test_info.status = "fail"
+            test_info.return_code = test.return_code
 
     def setFailure(self, test, return_code=1):
         """
         Used to change the outcome of an existing test to a failure.
         """
 
-        if test.id() not in self.start_times or test.id() not in self.end_times:
-            raise ValueError("setFailure called on a test that has not completed.")
+        with self._lock:
+            test_info = self._find_test_info(test)
+            if test_info.end_time is None:
+                raise ValueError("stopTest was not called on %s" % (test.basename()))
 
-        self.statuses[test.id()] = "fail"
-        self.return_codes[test.id()] = return_code
+            test_info.status = "fail"
+            test_info.return_code = return_code
 
         # Recompute number of success, failures, and errors.
         self.num_succeeded = len(self.get_successful())
         self.num_failed = len(self.get_failed())
         self.num_errored = len(self.get_errored())
+        self.num_interrupted = len(self.get_interrupted())
 
     def addSuccess(self, test):
         """
@@ -217,75 +217,191 @@ class TestReport(unittest.TestResult):
         """
 
         unittest.TestResult.addSuccess(self, test)
-        self.num_succeeded += 1
-        self.statuses[test.id()] = "pass"
-        self.return_codes[test.id()] = test.return_code
+
+        with self._lock:
+            self.num_succeeded += 1
+
+            test_info = self._find_test_info(test)
+            test_info.status = "pass"
+            test_info.return_code = test.return_code
 
     def wasSuccessful(self):
         """
         Returns true if all tests executed successfully.
         """
-        return self.num_failed == self.num_errored == 0
 
-    def num_dynamic(self):
-        """
-        Returns the number of tests for which startTest(dynamic=True)
-        was called.
-        """
-        return len(self.__dynamic_tests)
+        with self._lock:
+            return self.num_failed == self.num_errored == self.num_interrupted == 0
 
     def get_successful(self):
         """
-        Returns the ids of the tests that executed successfully.
+        Returns the status and timing information of the tests that
+        executed successfully.
         """
-        return [test_id for test_id in self.statuses if self.statuses[test_id] == "pass"]
+
+        with self._lock:
+            return [test_info for test_info in self.test_infos if test_info.status == "pass"]
 
     def get_failed(self):
         """
-        Returns the ids of the tests that raised a failureException
-        during their execution.
+        Returns the status and timing information of the tests that
+        raised a failureException during their execution.
         """
-        return [test_id for test_id in self.statuses if self.statuses[test_id] == "fail"]
+
+        with self._lock:
+            return [test_info for test_info in self.test_infos
+                    if test_info.status in ("fail", "silentfail")]
 
     def get_errored(self):
         """
-        Returns the ids of the tests that raised a non-failureException
-        during their execution.
+        Returns the status and timing information of the tests that
+        raised a non-failureException during their execution.
         """
-        return [test_id for test_id in self.statuses if self.statuses[test_id] == "error"]
 
-    def as_dict(self):
+        with self._lock:
+            return [test_info for test_info in self.test_infos if test_info.status == "error"]
+
+    def get_interrupted(self):
+        """
+        Returns the status and timing information of the tests that had
+        their execution interrupted.
+        """
+
+        with self._lock:
+            return [test_info for test_info in self.test_infos if test_info.status == "timeout"]
+
+    def as_dict(self, convert_failures=False):
         """
         Return the test result information as a dictionary.
 
         Used to create the report.json file.
+
+        If 'convert_failures' is true, then "error" and "fail" test statuses are replaced with
+        _config.REPORT_FAILURE_STATUS in the returned dictionary.
         """
 
         results = []
-        for test_id in self.start_times:
-            # Don't distinguish between failures and errors.
-            status = "pass" if self.statuses[test_id] == "pass" else "fail"
-            start_time = self.start_times[test_id]
-            end_time = self.end_times[test_id]
+        with self._lock:
+            for test_info in self.test_infos:
+                status = test_info.status
+                if convert_failures:
+                    if status == "error" or status == "fail":
+                        # Don't distinguish between failures and errors.
+                        if test_info.dynamic:
+                            # Dynamic tests are used for data consistency checks, so the failures
+                            # are not silenced.
+                            status = "fail"
+                        else:
+                            status = _config.REPORT_FAILURE_STATUS
+                    elif status == "timeout":
+                        # Until EVG-1536 is completed, we shouldn't distinguish between failures and
+                        # interrupted tests in the report.json file. In Evergreen, the behavior to
+                        # sort tests with the "timeout" test status after tests with the "pass" test
+                        # status effectively hides interrupted tests from the test results sidebar
+                        # unless sorting by the time taken.
+                        status = "fail"
 
-            result = {
-                "test_file": test_id,
-                "status": status,
-                "start": start_time,
-                "end": end_time,
-                "elapsed": end_time - start_time,
+                result = {
+                    "test_file": test_info.test_id,
+                    "status": status,
+                    "exit_code": test_info.return_code,
+                    "start": test_info.start_time,
+                    "end": test_info.end_time,
+                    "elapsed": test_info.end_time - test_info.start_time,
+                }
+
+                if test_info.url_endpoint is not None:
+                    result["url"] = test_info.url_endpoint
+                    result["url_raw"] = test_info.url_endpoint + "?raw=1"
+
+                results.append(result)
+
+            return {
+                "results": results,
+                "failures": self.num_failed + self.num_errored + self.num_interrupted,
             }
 
-            return_code = self.return_codes[test_id]
-            if return_code is not None:
-                result["exit_code"] = return_code
+    @classmethod
+    def from_dict(cls, report_dict):
+        """
+        Returns the test report instance copied from a dict (generated in as_dict).
 
-            if test_id in self.urls:
-                result["url"] = self.urls[test_id]
+        Used when combining reports instances.
+        """
 
-            results.append(result)
+        report = cls(logging.loggers.EXECUTOR_LOGGER)
+        for result in report_dict["results"]:
+            # By convention, dynamic tests are named "<basename>:<hook name>".
+            is_dynamic = ":" in result["test_file"]
+            test_info = _TestInfo(result["test_file"], is_dynamic)
+            test_info.url_endpoint = result.get("url")
+            test_info.status = result["status"]
+            test_info.return_code = result["exit_code"]
+            test_info.start_time = result["start"]
+            test_info.end_time = result["end"]
+            report.test_infos.append(test_info)
 
-        return {
-            "results": results,
-            "failures": self.num_failed + self.num_errored,
-        }
+            if is_dynamic:
+                report.num_dynamic += 1
+
+        # Update cached values for number of successful and failed tests.
+        report.num_failed = len(report.get_failed())
+        report.num_errored = len(report.get_errored())
+        report.num_interrupted = len(report.get_interrupted())
+        report.num_succeeded = len(report.get_successful())
+
+        return report
+
+    def reset(self):
+        """
+        Resets the test report back to its initial state.
+        """
+
+        with self._lock:
+            self.test_infos = []
+
+            self.num_dynamic = 0
+            self.num_succeeded = 0
+            self.num_failed = 0
+            self.num_errored = 0
+            self.num_interrupted = 0
+
+        # TestReport.combine() doesn't access the '__original_loggers' attribute, so we don't bother
+        # protecting it with the lock.
+        self.__original_loggers = {}
+
+    def _find_test_info(self, test):
+        """
+        Returns the status and timing information associated with
+        'test'.
+        """
+
+        test_id = test.id()
+
+        # Search the list backwards to efficiently find the status and timing information of a test
+        # that was recently started.
+        for test_info in reversed(self.test_infos):
+            if test_info.test_id == test_id:
+                return test_info
+
+        raise ValueError("Details for %s not found in the report" % (test.basename()))
+
+
+class _TestInfo(object):
+    """
+    Holder for the test status and timing information.
+    """
+
+    def __init__(self, test_id, dynamic):
+        """
+        Initializes the _TestInfo instance.
+        """
+
+        self.test_id = test_id
+        self.dynamic = dynamic
+
+        self.start_time = None
+        self.end_time = None
+        self.status = None
+        self.return_code = None
+        self.url_endpoint = None

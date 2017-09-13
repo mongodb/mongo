@@ -1,0 +1,70 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/sharding/*.js
+  exclude_files:
+  # Doesn't use ShardingTest so won't actually be run in a mixed version configuration
+  - jstests/sharding/config_version_rollback.js
+  # Behavior change to addShard
+  - jstests/sharding/addshard_idempotent.js
+  # SERVER-27597: Reenable when 3.4.6 becomes last-stable
+  - jstests/sharding/migration_critical_section_concurrency.js
+  # shardCollection was made to be retriable in 3.6, so this test was changed in 3.6 to expect
+  # successive shardCollections to succeed, but a 3.4 mongos will not provide this retriability
+  - jstests/sharding/shard_collection_basic.js
+  # SERVER-29066: Remove when 3.4.5 becomes 'last-stable'
+  - jstests/sharding/findandmodify1.js
+  # 3.6 mongods have improved covering behavior for queries on shard key index. Un-blacklist when
+  # 3.6 becomes 'last-stable'.
+  - jstests/sharding/covered_shard_key_indexes.js
+  # Enable when 3.6 becomes last-stable.
+  - jstests/sharding/views.js
+  - jstests/sharding/view_rewrite.js
+  - jstests/sharding/explain_agg_read_pref.js
+  # New feature in v3.6 mongos
+  - jstests/sharding/logical_time_metadata.js
+  # New feature in v3.6 mongos and mongod.
+  - jstests/sharding/logical_time_api.js
+  - jstests/sharding/operation_time_api.js
+  - jstests/sharding/after_cluster_time.js
+  - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
+  - jstests/sharding/key_rotation.js
+  - jstests/sharding/kill_sessions.js
+  - jstests/sharding/advance_logical_time_with_valid_signature.js
+  - jstests/sharding/refresh_sessions.js
+  - jstests/sharding/safe_secondary_reads_drop_recreate.js
+  - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
+  - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
+  - jstests/sharding/secondary_shard_versioning.js
+  - jstests/sharding/session_info_in_oplog.js
+  - jstests/sharding/enable_sharding_basic.js
+  - jstests/sharding/retryable_writes.js
+  - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
+  - jstests/sharding/uuid_propagated_to_recipient_shard_on_recvChunkStart.js
+  - jstests/sharding/uuid_propagated_to_shards_on_setFCV_3_6.js
+  # New feature in v3.6 mongo shell.
+  - jstests/sharding/causal_consistency_shell_support.js
+  - jstests/sharding/keys_rotation_interval_sec.js
+  # Changes to currentOp format in 3.6.
+  - jstests/sharding/features3.js
+  - jstests/sharding/migration_ignore_interrupts_3.js
+  - jstests/sharding/migration_ignore_interrupts_4.js
+  - jstests/sharding/mongos_query_comment.js
+  - jstests/sharding/sharded_profile.js
+  # SERVER-19318: added new $currentOp agg stage in 3.6
+  - jstests/sharding/aggregation_currentop.js
+  - jstests/sharding/read_pref_cmd.js
+  # SERVER-30444: Add a maxChunkSize field to the serverStatus command response
+  - jstests/sharding/server_status.js
+  # SERVER-20392: Reenable when backported to 3.4 and released as last-stable.
+  - jstests/sharding/shard_existing_coll_chunk_count.js
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          mongosBinVersion: 'last-stable'
+          shardMixedBinVersions: true
+      nodb: ''

@@ -91,17 +91,20 @@ TEST_F(LogTestUnadornedEncoder, DetachAppender) {
     MessageLogDomain domain;
 
     // Appending to the domain before attaching the appender does not affect the appender.
-    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "1"));
+    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "1"))
+        .transitional_ignore();
     ASSERT_EQUALS(0, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
     // Appending to the domain after attaching the appender does affect the appender.
     MessageLogDomain::AppenderHandle handle = domain.attachAppender(std::move(countAppender));
-    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "2"));
+    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "2"))
+        .transitional_ignore();
     countAppender = domain.detachAppender(handle);
     ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
     // Appending to the domain after detaching the appender does not affect the appender.
-    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "3"));
+    domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "3"))
+        .transitional_ignore();
     ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 }
 
@@ -376,15 +379,16 @@ void testEncodedLogLine(const MessageEventEphemeral& event, const std::string& e
     std::string s = os.str();
     if (s.find(expectedSubstring) == std::string::npos) {
         FAIL(str::stream() << "encoded log line does not contain substring \"" << expectedSubstring
-                           << "\". log line: " << s);
+                           << "\". log line: "
+                           << s);
     }
 }
 
 // Log severity should always be logged as a single capital letter.
 TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogSeverity) {
     Date_t d = Date_t::now();
-    StringData ctx("WHAT", StringData::LiteralTag());
-    StringData msg("HUH", StringData::LiteralTag());
+    const auto ctx = "WHAT"_sd;
+    const auto msg = "HUH"_sd;
     // Severe is indicated by (F)atal.
     testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Severe(), ctx, msg), " F ");
     testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Error(), ctx, msg), " E ");
@@ -406,8 +410,8 @@ TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogSeverity) {
 // Non-default log component short name should always be logged.
 TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogComponent) {
     Date_t d = Date_t::now();
-    StringData ctx("WHAT", StringData::LiteralTag());
-    StringData msg("HUH", StringData::LiteralTag());
+    const auto ctx = "WHAT"_sd;
+    const auto msg = "HUH"_sd;
     for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
         LogComponent component = static_cast<LogComponent::Value>(i);
         testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Info(), component, ctx, msg),

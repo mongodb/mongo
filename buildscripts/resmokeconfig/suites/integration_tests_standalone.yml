@@ -1,0 +1,16 @@
+test_kind: cpp_integration_test
+
+selector:
+  root: build/integration_tests.txt
+
+executor:
+  config: {}
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

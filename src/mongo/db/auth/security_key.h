@@ -31,6 +31,9 @@
 #include <string>
 
 namespace mongo {
+template <class T>
+class StatusWith;
+
 /**
  * This method checks the validity of filename as a security key, hashes its
  * contents, and stores it in the internalSecurity variable.  Prints an

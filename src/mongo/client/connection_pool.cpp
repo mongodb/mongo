@@ -31,21 +31,34 @@
 #include "mongo/client/connection_pool.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
 
 namespace mongo {
 namespace {
 
 const Date_t kNeverTooStale = Date_t::max();
 
-const Minutes kCleanUpInterval(5);  // Note: Must be larger than kMaxConnectionAge below)
-const Seconds kMaxConnectionAge(30);
+// TODO: Workaround for SERVER-19092. To be lowered back to 5 min / 30 sec once the bug is fixed
+const Hours kCleanUpInterval(1);  // Note: Must be larger than kMaxConnectionAge below)
+const Minutes kMaxConnectionAge(30);
 
 }  // namespace
 
-ConnectionPool::ConnectionPool(int messagingPortTags) : _messagingPortTags(messagingPortTags) {}
+ConnectionPool::ConnectionPool(int messagingPortTags,
+                               std::unique_ptr<executor::NetworkConnectionHook> hook)
+    : _messagingPortTags(messagingPortTags),
+      _lastCleanUpTime(Date_t::now()),
+      _hook(std::move(hook)) {}
+
+ConnectionPool::ConnectionPool(int messagingPortTags)
+    : ConnectionPool(messagingPortTags, nullptr) {}
 
 ConnectionPool::~ConnectionPool() {
     cleanUpOlderThan(Date_t::max());
@@ -56,10 +69,7 @@ ConnectionPool::~ConnectionPool() {
 
 void ConnectionPool::cleanUpOlderThan(Date_t now) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _cleanUpOlderThan_inlock(now);
-}
 
-void ConnectionPool::_cleanUpOlderThan_inlock(Date_t now) {
     HostConnectionMap::iterator hostConns = _connections.begin();
     while (hostConns != _connections.end()) {
         _cleanUpOlderThan_inlock(now, &hostConns->second);
@@ -123,9 +133,10 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     _cleanUpStaleHosts_inlock(now);
 
     for (HostConnectionMap::iterator hostConns;
-         ((hostConns = _connections.find(target)) != _connections.end());) {
+         (hostConns = _connections.find(target)) != _connections.end();) {
         // Clean up the requested host to remove stale/unused connections
         _cleanUpOlderThan_inlock(now, &hostConns->second);
+
         if (hostConns->second.empty()) {
             // prevent host from causing unnecessary cleanups
             _lastUsedHosts[hostConns->first] = kNeverTooStale;
@@ -137,12 +148,13 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
 
         const ConnectionList::iterator candidate = _inUseConnections.begin();
         lk.unlock();
+
         try {
             if (candidate->conn->isStillConnected()) {
                 // setSoTimeout takes a double representing the number of seconds for send and
-                // receive timeouts.  Thus, we must take count() and divide by
+                // receive timeouts.  Thus, we must express 'timeout' in milliseconds and divide by
                 // 1000.0 to get the number of seconds with a fractional part.
-                candidate->conn->setSoTimeout(timeout.count() / 1000.0);
+                candidate->conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
                 return candidate;
             }
         } catch (...) {
@@ -157,24 +169,49 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
 
     // No idle connection in the pool; make a new one.
     lk.unlock();
-    std::unique_ptr<DBClientConnection> conn(new DBClientConnection);
+
+    std::unique_ptr<DBClientConnection> conn;
+    if (_hook) {
+        conn.reset(new DBClientConnection(
+            false,  // auto reconnect
+            0,      // socket timeout
+            {},     // MongoURI
+            [this, target](const executor::RemoteCommandResponse& isMasterReply) {
+                return _hook->validateHost(target, isMasterReply);
+            }));
+    } else {
+        conn.reset(new DBClientConnection());
+    }
 
     // setSoTimeout takes a double representing the number of seconds for send and receive
-    // timeouts.  Thus, we must take count() and divide by 1000.0 to get the number
-    // of seconds with a fractional part.
-    conn->setSoTimeout(timeout.count() / 1000.0);
-    std::string errmsg;
-    uassert(28640,
-            str::stream() << "Failed attempt to connect to " << target.toString() << "; " << errmsg,
-            conn->connect(target, errmsg));
+    // timeouts.  Thus, we must express 'timeout' in milliseconds and divide by 1000.0 to get
+    // the number of seconds with a fractional part.
+    conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
 
-    conn->port().tag |= _messagingPortTags;
+    uassertStatusOK(conn->connect(target, StringData()));
+    conn->port().setTag(conn->port().getTag() | _messagingPortTags);
 
-    if (getGlobalAuthorizationManager()->isAuthEnabled()) {
-        uassert(ErrorCodes::AuthenticationFailed,
-                "Missing credentials for authenticating as internal user",
-                isInternalAuthSet());
-        conn->auth(getInternalUserAuthParamsWithFallback());
+    if (isInternalAuthSet()) {
+        conn->auth(getInternalUserAuthParams());
+    }
+
+    if (_hook) {
+        auto postConnectRequest = uassertStatusOK(_hook->makeRequest(target));
+
+        // We might not have a postConnectRequest
+        if (postConnectRequest != boost::none) {
+            auto start = Date_t::now();
+            auto reply =
+                conn->runCommand(OpMsgRequest::fromDBAndBody(postConnectRequest->dbname,
+                                                             postConnectRequest->cmdObj,
+                                                             postConnectRequest->metadata));
+
+            auto rcr = executor::RemoteCommandResponse(reply->getCommandReply().getOwned(),
+                                                       reply->getMetadata().getOwned(),
+                                                       Date_t::now() - start);
+
+            uassertStatusOK(_hook->handleReply(target, std::move(rcr)));
+        }
     }
 
     lk.lock();
@@ -190,6 +227,7 @@ void ConnectionPool::releaseConnection(ConnectionList::iterator iter, const Date
 
     ConnectionList& hostConns = _connections[iter->conn->getServerHostAndPort()];
     _cleanUpOlderThan_inlock(now, &hostConns);
+
     hostConns.splice(hostConns.begin(), _inUseConnections, iter);
     _lastUsedHosts[iter->conn->getServerHostAndPort()] = now;
 }
@@ -220,6 +258,18 @@ ConnectionPool::ConnectionPtr::~ConnectionPtr() {
     if (_pool) {
         _pool->destroyConnection(_connInfo);
     }
+}
+
+ConnectionPool::ConnectionPtr::ConnectionPtr(ConnectionPtr&& other)
+    : _pool(std::move(other._pool)), _connInfo(std::move(other._connInfo)) {
+    other._pool = nullptr;
+}
+
+ConnectionPool::ConnectionPtr& ConnectionPool::ConnectionPtr::operator=(ConnectionPtr&& other) {
+    _pool = std::move(other._pool);
+    _connInfo = std::move(other._connInfo);
+    other._pool = nullptr;
+    return *this;
 }
 
 void ConnectionPool::ConnectionPtr::done(Date_t now) {

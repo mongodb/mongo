@@ -50,7 +50,7 @@ public:
     Status add(moe::OptionSection* options);
     Status store(const moe::Environment& params, const std::vector<std::string>& args);
 
-    size_t cacheSizeGB;
+    double cacheSizeGB;
     size_t checkpointDelaySecs;
     size_t statisticsLogDelaySecs;
     std::string journalCompressor;

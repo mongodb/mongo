@@ -5,7 +5,6 @@
  * $config.data.getIndexSpec(), at the end of the workload setup.
  */
 function indexedNoindex($config, $super) {
-
     $config.setup = function(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 

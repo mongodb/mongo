@@ -31,6 +31,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -59,6 +61,11 @@ public:
     virtual const OplogInterface& getOplog() const = 0;
 
     /**
+     * Returns rollback sync source HostAndPort.
+     */
+    virtual const HostAndPort& getSource() const = 0;
+
+    /**
      * Returns rollback ID.
      */
     virtual int getRollbackId() const = 0;
@@ -69,18 +76,34 @@ public:
     virtual BSONObj getLastOperation() const = 0;
 
     /**
-     * Fetch a single document from the sync source.
+     * Fetch a single document from the sync source using the namespace.
      */
     virtual BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const = 0;
 
     /**
+     * Fetch a single document from the sync source using the UUID. Returns the namespace matching
+     * the UUID on the sync source as well.
+     */
+    virtual std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+                                                              UUID uuid,
+                                                              const BSONObj& filter) const = 0;
+
+    /**
      * Clones a single collection from the sync source.
      */
-    virtual void copyCollectionFromRemote(OperationContext* txn,
+    virtual void copyCollectionFromRemote(OperationContext* opCtx,
                                           const NamespaceString& nss) const = 0;
 
     /**
-     * Returns collection info.
+     * Finds and returns collection info using the UUID.
+     */
+    virtual StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
+                                                        const UUID& uuid) const = 0;
+
+    /**
+     * Finds and returns collection info using the namespace.
+     * TODO: After MongoDB 3.6 is released, we will remove this function as it is only
+     * necessary for rollback with no uuid oplogs. See SERVER-29766.
      */
     virtual StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const = 0;
 };

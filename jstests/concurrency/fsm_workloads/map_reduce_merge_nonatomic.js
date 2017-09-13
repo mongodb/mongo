@@ -13,9 +13,9 @@
  *
  * Specifies nonAtomic=true.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/map_reduce_inline.js'); // for $config
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropDatabases
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropDatabases
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -30,7 +30,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        this.outDBName = uniqueDBName(prefix, this.tid);
+        this.outDBName = db.getName() + uniqueDBName(prefix, this.tid);
         var outDB = db.getSiblingDB(this.outDBName);
         assertAlways.commandWorked(outDB.createCollection(collName));
     };
@@ -43,11 +43,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         var options = {
             finalize: this.finalizer,
-            out: {
-                merge: collName,
-                db: this.outDBName,
-                nonAtomic: true
-            }
+            out: {merge: collName, db: this.outDBName, nonAtomic: true}
         };
 
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);
@@ -55,7 +51,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + prefix + '\\d+$');
+        var pattern = new RegExp('^' + db.getName() + prefix + '\\d+$');
         dropDatabases(db, pattern);
     };
 

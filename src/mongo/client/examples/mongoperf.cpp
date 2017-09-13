@@ -52,6 +52,7 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -172,7 +173,13 @@ void go() {
         recSizeKB = 4;
     verify(recSizeKB <= 64000 && recSizeKB > 0);
 
-    MemoryMappedFile f;
+    auto opCtx = cc().makeOperationContext();
+    MemoryMappedFile f(opCtx.get());
+    ON_BLOCK_EXIT([&f, &opCtx] {
+        LockMongoFilesExclusive lock(opCtx.get());
+        f.close(opCtx.get());
+    });
+
     cout << "creating test file size:";
     len = options["fileSizeMB"].numberLong();
     if (len == 0)
@@ -209,13 +216,14 @@ void go() {
     if (o["mmf"].trueValue()) {
         delete lf;
         lf = 0;
-        mmfFile = new MemoryMappedFile();
-        mmf = (char*)mmfFile->map(fname);
+        mmfFile = new MemoryMappedFile(opCtx.get());
+        mmf = (char*)mmfFile->map(opCtx.get(), fname);
         verify(mmf);
 
         syncDelaySecs = options["syncDelay"].numberInt();
         if (syncDelaySecs) {
             stdx::thread t(syncThread);
+            t.detach();
         }
     }
 
@@ -241,6 +249,7 @@ void go() {
                 while (nthr < wthr && nthr < d) {
                     nthr++;
                     stdx::thread w(workerThread);
+                    w.detach();
                 }
                 cout << "new thread, total running : " << nthr << endl;
                 d *= 2;

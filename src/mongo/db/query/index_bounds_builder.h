@@ -28,13 +28,15 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
 
 namespace mongo {
+
+class CollatorInterface;
 
 /**
  * Translates expressions over fields into bounds on an index.
@@ -73,8 +75,8 @@ public:
      *
      * If 'expr' is elemMatch, the index tag is affixed to a child.
      *
-     * The expression must be a predicate over one field.  That is, expr->isLeaf() or
-     * expr->isArray() must be true, and expr->isLogical() must be false.
+     * The expression must be a predicate over one field.  That is, expression category must be
+     * kLeaf or kArrayMatching.
      */
     static void translate(const MatchExpression* expr,
                           const BSONElement& elt,
@@ -106,15 +108,14 @@ public:
      * Make a range interval from the provided object.
      * The object must have exactly two fields.  The first field is the start, the second the
      * end.
-     * The two inclusive flags indicate whether or not the start/end fields are included in the
+     * The BoundInclusion indicates whether or not the start/end fields are included in the
      * interval (closed interval if included, open if not).
      */
-    static Interval makeRangeInterval(const BSONObj& obj, bool startInclusive, bool endInclusive);
+    static Interval makeRangeInterval(const BSONObj& obj, BoundInclusion boundInclusion);
 
     static Interval makeRangeInterval(const std::string& start,
                                       const std::string& end,
-                                      bool startInclusive,
-                                      bool endInclusive);
+                                      BoundInclusion boundInclusion);
 
     /**
      * Make a point interval from the provided object.
@@ -125,10 +126,11 @@ public:
     static Interval makePointInterval(double d);
 
     /**
-     * Since we have no BSONValue we must make an object that's a copy of a piece of another
-     * object.
+     * Wraps 'elt' in a BSONObj with an empty field name and returns the result. If 'elt' is a
+     * string, and 'collator' is non-null, the result contains the collator-generated comparison key
+     * rather than the original string.
      */
-    static BSONObj objFromElement(const BSONElement& elt);
+    static BSONObj objFromElement(const BSONElement& elt, const CollatorInterface* collator);
 
     /**
      * Swap start/end in the provided interval.
@@ -136,16 +138,14 @@ public:
     static void reverseInterval(Interval* ival);
 
     /**
-     * Copied almost verbatim from db/queryutil.cpp.
+     * Returns a std::string that when used as a matcher, would match a superset of regex. Used to
+     * optimize queries in some simple regex cases that start with '^'.
      *
-     *  returns a std::string that when used as a matcher, would match a super set of regex()
-     *
-     *  returns "" for complex regular expressions
-     *
-     *  used to optimize queries in some simple regex cases that start with '^'
+     * Returns "" for complex regular expressions that cannot use tight index bounds.
      */
     static std::string simpleRegex(const char* regex,
                                    const char* flags,
+                                   const IndexEntry& index,
                                    BoundsTightness* tightnessOut);
 
     /**
@@ -154,10 +154,12 @@ public:
     static Interval allValues();
 
     static void translateRegex(const RegexMatchExpression* rme,
+                               const IndexEntry& index,
                                OrderedIntervalList* oil,
                                BoundsTightness* tightnessOut);
 
     static void translateEquality(const BSONElement& data,
+                                  const IndexEntry& index,
                                   bool isHashed,
                                   OrderedIntervalList* oil,
                                   BoundsTightness* tightnessOut);

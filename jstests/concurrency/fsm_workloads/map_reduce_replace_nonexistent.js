@@ -10,9 +10,9 @@
  * Uses the "replace" action to write the results to a nonexistent
  * output collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/map_reduce_inline.js'); // for $config
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -32,8 +32,8 @@ var $config = extendWorkload($config, function($config, $super) {
 
         var options = {
             finalize: this.finalizer,
-            out: { replace: outCollName },
-            query: { key: { $exists: true }, value: { $exists: true } }
+            out: {replace: outCollName},
+            query: {key: {$exists: true}, value: {$exists: true}}
         };
 
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);

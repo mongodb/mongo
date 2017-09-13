@@ -4,7 +4,7 @@
 var t = db.server9547;
 t.drop();
 
-for (var i=0; i<10; i++) {
+for (var i = 0; i < 10; i++) {
     t.save({a: i});
 }
 
@@ -16,6 +16,5 @@ assert.eq(4, t.find({}).max({a: 4}).toArray().length, "no order");
 // Ascending order is fine.
 assert.eq(4, t.find({}).max({a: 4}).sort({a: 1}).toArray().length, "ascending");
 
-// Descending order is still broken.
-// This should really return the same # of results but doesn't.
-assert.eq(5, t.find({}).max({a: 4}).sort({a: -1}).toArray().length, "descending");
+// Descending order is fine.
+assert.eq(4, t.find({}).max({a: 4}).sort({a: -1}).toArray().length, "descending");

@@ -6,7 +6,6 @@ from __future__ import absolute_import
 
 import os.path
 
-import pymongo
 import yaml
 
 
@@ -61,19 +60,11 @@ def dump_yaml(value):
     # Use block (indented) style for formatting YAML.
     return yaml.safe_dump(value, default_flow_style=False).rstrip()
 
-
-def new_mongo_client(port, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000):
+def load_yaml(value):
     """
-    Returns a pymongo.MongoClient connected on 'port' with a read
-    preference of 'read_preference'.
-
-    The PyMongo driver will wait up to 'timeout_millis' milliseconds
-    before concluding that the server is unavailable.
+    Attempts to parse 'value' as YAML.
     """
-
-    kwargs = {"connectTimeoutMS": timeout_millis}
-    if pymongo.version_tuple[0] >= 3:
-        kwargs["serverSelectionTimeoutMS"] = timeout_millis
-        kwargs["connect"] = True
-
-    return pymongo.MongoClient(port=port, read_preference=read_preference, **kwargs)
+    try:
+        return yaml.safe_load(value)
+    except yaml.YAMLError as err:
+        raise ValueError("Attempted to parse invalid YAML value '%s': %s" % (value, err))

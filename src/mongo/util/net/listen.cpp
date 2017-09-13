@@ -34,14 +34,21 @@
 
 #include "mongo/util/net/listen.h"
 
+#include <memory>
+#include <vector>
 
+#include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
-#include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 
 #ifndef _WIN32
@@ -52,14 +59,14 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
 #ifdef __OpenBSD__
 #include <sys/uio.h>
 #endif
@@ -74,25 +81,26 @@
 
 namespace mongo {
 
+namespace {
+const auto getListener = ServiceContext::declareDecoration<Listener*>();
+}  // namespace
+
 using std::shared_ptr;
-using std::endl;
 using std::string;
 using std::vector;
 
 // ----- Listener -------
 
-const Listener* Listener::_timeTracker;
-
 vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
     vector<SockAddr> out;
     if (*ips == '\0') {
-        out.push_back(SockAddr("0.0.0.0", port));  // IPv4 all
+        out.push_back(SockAddr("127.0.0.1", port, AF_INET));  // IPv4 localhost
 
         if (IPv6Enabled())
-            out.push_back(SockAddr("::", port));  // IPv6 all
+            out.push_back(SockAddr("::1", port, AF_INET6));  // IPv6 localhost
 #ifndef _WIN32
         if (useUnixSockets)
-            out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port));  // Unix socket
+            out.push_back(SockAddr(makeUnixSockPath(port), port, AF_UNIX));  // Unix socket
 #endif
         return out;
     }
@@ -108,36 +116,54 @@ vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
             ips = "";
         }
 
-        SockAddr sa(ip.c_str(), port);
+        SockAddr sa(ip.c_str(), port, IPv6Enabled() ? AF_UNSPEC : AF_INET);
         out.push_back(sa);
 
 #ifndef _WIN32
         if (sa.isValid() && useUnixSockets &&
             (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0"))  // only IPv4
-            out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port));
+            out.push_back(SockAddr(makeUnixSockPath(port), port, AF_INET));
 #endif
     }
     return out;
 }
 
-Listener::Listener(const string& name, const string& ip, int port, bool logConnect)
+Listener* Listener::get(ServiceContext* ctx) {
+    return getListener(ctx);
+}
+
+Listener::Listener(const string& name,
+                   const string& ip,
+                   int port,
+                   ServiceContext* ctx,
+                   bool setAsServiceCtxDecoration,
+                   bool logConnect)
     : _port(port),
       _name(name),
       _ip(ip),
       _setupSocketsSuccessful(false),
       _logConnect(logConnect),
-      _elapsedTime(0) {
+      _ready(false),
+      _ctx(ctx),
+      _setAsServiceCtxDecoration(setAsServiceCtxDecoration) {
 #ifdef MONGO_CONFIG_SSL
     _ssl = getSSLManager();
 #endif
+    if (setAsServiceCtxDecoration) {
+        auto& listener = getListener(ctx);
+        invariant(!listener);
+        listener = this;
+    }
 }
 
 Listener::~Listener() {
-    if (_timeTracker == this)
-        _timeTracker = 0;
+    if (_setAsServiceCtxDecoration) {
+        auto& listener = getListener(_ctx);
+        listener = nullptr;
+    }
 }
 
-void Listener::setupSockets() {
+bool Listener::setupSockets() {
     checkTicketNumbers();
 
 #if !defined(_WIN32)
@@ -151,8 +177,8 @@ void Listener::setupSockets() {
         const SockAddr& me = *it;
 
         if (!me.isValid()) {
-            error() << "listen(): socket is invalid." << endl;
-            return;
+            error() << "listen(): socket is invalid.";
+            return _setupSocketsSuccessful;
         }
 
         SOCKET sock = ::socket(me.getType(), SOCK_STREAM, 0);
@@ -182,17 +208,17 @@ void Listener::setupSockets() {
         {
             const int one = 1;
             if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0)
-                log() << "Failed to set socket opt, SO_REUSEADDR" << endl;
+                log() << "Failed to set socket opt, SO_REUSEADDR";
         }
 #endif
 
         if (::bind(sock, me.raw(), me.addressSize) != 0) {
             int x = errno;
             error() << "listen(): bind() failed " << errnoWithDescription(x)
-                    << " for socket: " << me.toString() << endl;
+                    << " for socket: " << me.toString();
             if (x == EADDRINUSE)
-                error() << "  addr already in use" << endl;
-            return;
+                error() << "  addr already in use";
+            return _setupSocketsSuccessful;
         }
 
 #if !defined(_WIN32)
@@ -211,6 +237,7 @@ void Listener::setupSockets() {
     }
 
     _setupSocketsSuccessful = true;
+    return _setupSocketsSuccessful;
 }
 
 
@@ -222,8 +249,8 @@ void Listener::initAndListen() {
 
     SOCKET maxfd = 0;  // needed for select()
     for (unsigned i = 0; i < _socks.size(); i++) {
-        if (::listen(_socks[i], 128) != 0) {
-            error() << "listen(): listen() failed " << errnoWithDescription() << endl;
+        if (::listen(_socks[i], serverGlobalParams.listenBacklog) != 0) {
+            error() << "listen(): listen() failed " << errnoWithDescription();
             return;
         }
 
@@ -254,7 +281,9 @@ void Listener::initAndListen() {
     }
 
     struct timeval maxSelectTime;
-    while (!inShutdown()) {
+    // The check against _finished allows us to actually stop the listener by signalling it through
+    // the _finished flag.
+    while (!globalInShutdownDeprecated() && !_finished.load()) {
         fd_set fds[1];
         FD_ZERO(fds);
 
@@ -263,36 +292,26 @@ void Listener::initAndListen() {
         }
 
         maxSelectTime.tv_sec = 0;
-        maxSelectTime.tv_usec = 10000;
-        const int ret = select(maxfd + 1, fds, NULL, NULL, &maxSelectTime);
+        maxSelectTime.tv_usec = 250000;
+        const int ret = [&] {
+            MONGO_IDLE_THREAD_BLOCK;
+            return select(maxfd + 1, fds, nullptr, nullptr, &maxSelectTime);
+        }();
 
         if (ret == 0) {
-#if defined(__linux__)
-            _elapsedTime += (10000 - maxSelectTime.tv_usec) / 1000;
-#else
-            _elapsedTime += 10;
-#endif
             continue;
-        }
-
-        if (ret < 0) {
+        } else if (ret < 0) {
             int x = errno;
 #ifdef EINTR
             if (x == EINTR) {
-                log() << "select() signal caught, continuing" << endl;
+                log() << "select() signal caught, continuing";
                 continue;
             }
 #endif
-            if (!inShutdown())
-                log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x) << endl;
+            if (!globalInShutdownDeprecated())
+                log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x);
             return;
         }
-
-#if defined(__linux__)
-        _elapsedTime += std::max(ret, (int)((10000 - maxSelectTime.tv_usec) / 1000));
-#else
-        _elapsedTime += ret;  // assume 1ms to grab connection. very rough
-#endif
 
         for (vector<SOCKET>::iterator it = _socks.begin(), end = _socks.end(); it != end; ++it) {
             if (!(FD_ISSET(*it, fds)))
@@ -302,27 +321,37 @@ void Listener::initAndListen() {
             if (s < 0) {
                 int x = errno;  // so no global issues
                 if (x == EBADF) {
-                    log() << "Port " << _port << " is no longer valid" << endl;
+                    log() << "Port " << _port << " is no longer valid";
                     return;
                 } else if (x == ECONNABORTED) {
-                    log() << "Connection on port " << _port << " aborted" << endl;
+                    log() << "Connection on port " << _port << " aborted";
                     continue;
                 }
-                if (x == 0 && inShutdown()) {
+                if (x == 0 && globalInShutdownDeprecated()) {
                     return;  // socket closed
                 }
-                if (!inShutdown()) {
-                    log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x)
-                          << endl;
+                if (!globalInShutdownDeprecated()) {
+                    log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x);
                     if (x == EMFILE || x == ENFILE) {
                         // Connection still in listen queue but we can't accept it yet
                         error() << "Out of file descriptors. Waiting one second before trying to "
-                                   "accept more connections." << warnings;
+                                   "accept more connections."
+                                << warnings;
                         sleepsecs(1);
                     }
                 }
                 continue;
             }
+
+            long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
+
+            if (_logConnect && !serverGlobalParams.quiet.load()) {
+                int conns = globalTicketHolder.used() + 1;
+                const char* word = (conns == 1 ? " connection" : " connections");
+                log() << "connection accepted from " << from.toString() << " #"
+                      << myConnectionNumber << " (" << conns << word << " now open)";
+            }
+
             if (from.getType() != AF_UNIX)
                 disableNagle(s);
 
@@ -332,22 +361,13 @@ void Listener::initAndListen() {
             setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
 #endif
 
-            long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
-
-            if (_logConnect && !serverGlobalParams.quiet) {
-                int conns = globalTicketHolder.used() + 1;
-                const char* word = (conns == 1 ? " connection" : " connections");
-                log() << "connection accepted from " << from.toString() << " #"
-                      << myConnectionNumber << " (" << conns << word << " now open)" << endl;
-            }
-
             std::shared_ptr<Socket> pnewSock(new Socket(s, from));
 #ifdef MONGO_CONFIG_SSL
             if (_ssl) {
                 pnewSock->secureAccepted(_ssl);
             }
 #endif
-            accepted(pnewSock, myConnectionNumber);
+            _accepted(pnewSock, myConnectionNumber);
         }
     }
 }
@@ -371,7 +391,7 @@ static void disableNonblockingMode(SOCKET socket) {
                                 NULL);
     if (status == SOCKET_ERROR) {
         const int mongo_errno = WSAGetLastError();
-        error() << "Windows WSAIoctl returned " << errnoWithDescription(mongo_errno) << endl;
+        error() << "Windows WSAIoctl returned " << errnoWithDescription(mongo_errno);
         fassertFailed(16726);
     }
 }
@@ -385,8 +405,7 @@ public:
         _socketEventHandle = WSACreateEvent();
         if (_socketEventHandle == WSA_INVALID_EVENT) {
             const int mongo_errno = WSAGetLastError();
-            error() << "Windows WSACreateEvent returned " << errnoWithDescription(mongo_errno)
-                    << endl;
+            error() << "Windows WSACreateEvent returned " << errnoWithDescription(mongo_errno);
             fassertFailed(16728);
         }
     }
@@ -394,8 +413,7 @@ public:
         BOOL bstatus = WSACloseEvent(_socketEventHandle);
         if (bstatus == FALSE) {
             const int mongo_errno = WSAGetLastError();
-            error() << "Windows WSACloseEvent returned " << errnoWithDescription(mongo_errno)
-                    << endl;
+            error() << "Windows WSACloseEvent returned " << errnoWithDescription(mongo_errno);
             fassertFailed(16725);
         }
     }
@@ -410,8 +428,8 @@ void Listener::initAndListen() {
     }
 
     for (unsigned i = 0; i < _socks.size(); i++) {
-        if (::listen(_socks[i], 128) != 0) {
-            error() << "listen(): listen() failed " << errnoWithDescription() << endl;
+        if (::listen(_socks[i], serverGlobalParams.listenBacklog) != 0) {
+            error() << "listen(): listen() failed " << errnoWithDescription();
             return;
         }
 
@@ -431,33 +449,35 @@ void Listener::initAndListen() {
         _readyCondition.notify_all();
     }
 
-    OwnedPointerVector<EventHolder> eventHolders;
+    std::vector<std::unique_ptr<EventHolder>> eventHolders;
     std::unique_ptr<WSAEVENT[]> events(new WSAEVENT[_socks.size()]);
 
 
     // Populate events array with an event for each socket we are watching
     for (size_t count = 0; count < _socks.size(); ++count) {
-        EventHolder* ev(new EventHolder);
-        eventHolders.mutableVector().push_back(ev);
-        events[count] = ev->get();
+        auto ev = stdx::make_unique<EventHolder>();
+        eventHolders.push_back(std::move(ev));
+        events[count] = eventHolders.back()->get();
     }
 
-    while (!inShutdown()) {
+    // The check against _finished allows us to actually stop the listener by signalling it through
+    // the _finished flag.
+    while (!globalInShutdownDeprecated() && !_finished.load()) {
         // Turn on listening for accept-ready sockets
         for (size_t count = 0; count < _socks.size(); ++count) {
             int status = WSAEventSelect(_socks[count], events[count], FD_ACCEPT | FD_CLOSE);
             if (status == SOCKET_ERROR) {
                 const int mongo_errno = WSAGetLastError();
 
-                // During shutdown, we may fail to listen on the socket if it has already
-                // been closed
-                if (inShutdown()) {
-                    return;
+                // We may fail to listen on the socket if it has
+                // already been closed. If we are not in shutdown,
+                // that is possibly interesting, so log an error.
+                if (!globalInShutdownDeprecated()) {
+                    error() << "Windows WSAEventSelect returned "
+                            << errnoWithDescription(mongo_errno);
                 }
 
-                error() << "Windows WSAEventSelect returned " << errnoWithDescription(mongo_errno)
-                        << endl;
-                fassertFailed(16727);
+                return;
             }
         }
 
@@ -465,20 +485,17 @@ void Listener::initAndListen() {
         DWORD result = WSAWaitForMultipleEvents(_socks.size(),
                                                 events.get(),
                                                 FALSE,   // don't wait for all the events
-                                                10,      // timeout, in ms
+                                                250,     // timeout, in ms
                                                 FALSE);  // do not allow I/O interruptions
-        if (result == WSA_WAIT_FAILED) {
-            const int mongo_errno = WSAGetLastError();
-            error() << "Windows WSAWaitForMultipleEvents returned "
-                    << errnoWithDescription(mongo_errno) << endl;
-            fassertFailed(16723);
-        }
 
         if (result == WSA_WAIT_TIMEOUT) {
-            _elapsedTime += 10;
             continue;
+        } else if (result == WSA_WAIT_FAILED) {
+            const int mongo_errno = WSAGetLastError();
+            error() << "Windows WSAWaitForMultipleEvents returned "
+                    << errnoWithDescription(mongo_errno);
+            fassertFailed(16723);
         }
-        _elapsedTime += 1;  // assume 1ms to grab connection. very rough
 
         // Determine which socket is ready
         DWORD eventIndex = result - WSA_WAIT_EVENT_0;
@@ -487,32 +504,31 @@ void Listener::initAndListen() {
         int status = WSAEnumNetworkEvents(_socks[eventIndex], events[eventIndex], &networkEvents);
         if (status == SOCKET_ERROR) {
             const int mongo_errno = WSAGetLastError();
-            error() << "Windows WSAEnumNetworkEvents returned " << errnoWithDescription(mongo_errno)
-                    << endl;
+            error() << "Windows WSAEnumNetworkEvents returned "
+                    << errnoWithDescription(mongo_errno);
             continue;
         }
 
         if (networkEvents.lNetworkEvents & FD_CLOSE) {
-            log() << "listen socket closed" << endl;
+            log() << "listen socket closed";
             break;
         }
 
         if (!(networkEvents.lNetworkEvents & FD_ACCEPT)) {
-            error() << "Unexpected network event: " << networkEvents.lNetworkEvents << endl;
+            error() << "Unexpected network event: " << networkEvents.lNetworkEvents;
             continue;
         }
 
         int iec = networkEvents.iErrorCode[FD_ACCEPT_BIT];
         if (iec != 0) {
-            error() << "Windows socket accept did not work:" << errnoWithDescription(iec) << endl;
+            error() << "Windows socket accept did not work:" << errnoWithDescription(iec);
             continue;
         }
 
         status = WSAEventSelect(_socks[eventIndex], NULL, 0);
         if (status == SOCKET_ERROR) {
             const int mongo_errno = WSAGetLastError();
-            error() << "Windows WSAEventSelect returned " << errnoWithDescription(mongo_errno)
-                    << endl;
+            error() << "Windows WSAEventSelect returned " << errnoWithDescription(mongo_errno);
             continue;
         }
 
@@ -523,38 +539,39 @@ void Listener::initAndListen() {
         if (s < 0) {
             int x = errno;  // so no global issues
             if (x == EBADF) {
-                log() << "Port " << _port << " is no longer valid" << endl;
+                log() << "Port " << _port << " is no longer valid";
                 continue;
             } else if (x == ECONNABORTED) {
-                log() << "Listener on port " << _port << " aborted" << endl;
+                log() << "Listener on port " << _port << " aborted";
                 continue;
             }
-            if (x == 0 && inShutdown()) {
+            if (x == 0 && globalInShutdownDeprecated()) {
                 return;  // socket closed
             }
-            if (!inShutdown()) {
-                log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x)
-                      << endl;
+            if (!globalInShutdownDeprecated()) {
+                log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x);
                 if (x == EMFILE || x == ENFILE) {
                     // Connection still in listen queue but we can't accept it yet
                     error() << "Out of file descriptors. Waiting one second before"
-                               " trying to accept more connections." << warnings;
+                               " trying to accept more connections."
+                            << warnings;
                     sleepsecs(1);
                 }
             }
             continue;
         }
-        if (from.getType() != AF_UNIX)
-            disableNagle(s);
 
         long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
-        if (_logConnect && !serverGlobalParams.quiet) {
+        if (_logConnect && !serverGlobalParams.quiet.load()) {
             int conns = globalTicketHolder.used() + 1;
             const char* word = (conns == 1 ? " connection" : " connections");
             log() << "connection accepted from " << from.toString() << " #" << myConnectionNumber
-                  << " (" << conns << word << " now open)" << endl;
+                  << " (" << conns << word << " now open)";
         }
+
+        if (from.getType() != AF_UNIX)
+            disableNagle(s);
 
         std::shared_ptr<Socket> pnewSock(new Socket(s, from));
 #ifdef MONGO_CONFIG_SSL
@@ -562,14 +579,14 @@ void Listener::initAndListen() {
             pnewSock->secureAccepted(_ssl);
         }
 #endif
-        accepted(pnewSock, myConnectionNumber);
+        _accepted(pnewSock, myConnectionNumber);
     }
 }
 #endif
 
 void Listener::_logListen(int port, bool ssl) {
     log() << _name << (_name.size() ? " " : "") << "waiting for connections on port " << port
-          << (ssl ? " ssl" : "") << endl;
+          << (ssl ? " ssl" : "");
 }
 
 void Listener::waitUntilListening() const {
@@ -579,14 +596,11 @@ void Listener::waitUntilListening() const {
     }
 }
 
-void Listener::accepted(std::shared_ptr<Socket> psocket, long long connectionId) {
-    MessagingPort* port = new MessagingPort(psocket);
+void Listener::_accepted(const std::shared_ptr<Socket>& psocket, long long connectionId) {
+    std::unique_ptr<AbstractMessagingPort> port;
+    port = stdx::make_unique<MessagingPort>(psocket);
     port->setConnectionId(connectionId);
-    acceptedMP(port);
-}
-
-void Listener::acceptedMP(MessagingPort* mp) {
-    verify(!"You must overwrite one of the accepted methods");
+    accepted(std::move(port));
 }
 
 // ----- ListeningSockets -------
@@ -609,8 +623,7 @@ int getMaxConnections() {
     int max = (int)(limit.rlim_cur * .8);
 
     LOG(1) << "fd limit"
-           << " hard:" << limit.rlim_max << " soft:" << limit.rlim_cur << " max conn: " << max
-           << endl;
+           << " hard:" << limit.rlim_max << " soft:" << limit.rlim_cur << " max conn: " << max;
 
     return max;
 #endif
@@ -623,16 +636,19 @@ void Listener::checkTicketNumbers() {
         if (current < want) {
             // they want fewer than they can handle
             // which is fine
-            LOG(1) << " only allowing " << current << " connections" << endl;
+            LOG(1) << " only allowing " << current << " connections";
             return;
         }
         if (current > want) {
-            log() << " --maxConns too high, can only handle " << want << endl;
+            log() << " --maxConns too high, can only handle " << want;
         }
     }
-    globalTicketHolder.resize(want);
+    globalTicketHolder.resize(want).transitional_ignore();
 }
 
+void Listener::shutdown() {
+    _finished.store(true);
+}
 
 TicketHolder Listener::globalTicketHolder(DEFAULT_MAX_CONN);
 AtomicInt64 Listener::globalConnectionNumber;
@@ -651,14 +667,14 @@ void ListeningSockets::closeAll() {
 
     for (std::set<int>::iterator i = sockets->begin(); i != sockets->end(); i++) {
         int sock = *i;
-        log() << "closing listening socket: " << sock << std::endl;
+        log() << "closing listening socket: " << sock;
         closesocket(sock);
     }
     delete sockets;
 
     for (std::set<std::string>::iterator i = paths->begin(); i != paths->end(); i++) {
         std::string path = *i;
-        log() << "removing socket file: " << path << std::endl;
+        log() << "removing socket file: " << path;
         ::remove(path.c_str());
     }
     delete paths;

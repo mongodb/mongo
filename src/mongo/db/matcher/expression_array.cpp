@@ -35,39 +35,13 @@
 
 namespace mongo {
 
-Status ArrayMatchingMatchExpression::initPath(StringData path) {
-    _path = path;
-    Status s = _elementPath.init(_path);
-    _elementPath.setTraverseLeafArray(false);
-    return s;
-}
-
-bool ArrayMatchingMatchExpression::matches(const MatchableDocument* doc,
-                                           MatchDetails* details) const {
-    MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
-
-    while (cursor->more()) {
-        ElementIterator::Context e = cursor->next();
-        if (e.element().type() != Array)
-            continue;
-
-        bool amIRoot = e.arrayOffset().eoo();
-
-        if (!matchesArray(e.element().Obj(), amIRoot ? details : NULL))
-            continue;
-
-        if (!amIRoot && details && details->needRecord() && !e.arrayOffset().eoo()) {
-            details->setElemMatchKey(e.arrayOffset().fieldName());
-        }
-        return true;
-    }
-    return false;
-}
-
-bool ArrayMatchingMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    if (e.type() != Array)
+bool ArrayMatchingMatchExpression::matchesSingleElement(const BSONElement& elt,
+                                                        MatchDetails* details) const {
+    if (elt.type() != BSONType::Array) {
         return false;
-    return matchesArray(e.Obj(), NULL);
+    }
+
+    return matchesArray(elt.embeddedObject(), details);
 }
 
 
@@ -78,7 +52,7 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
     const ArrayMatchingMatchExpression* realOther =
         static_cast<const ArrayMatchingMatchExpression*>(other);
 
-    if (_path != realOther->_path)
+    if (path() != realOther->path())
         return false;
 
     if (numChildren() != realOther->numChildren())
@@ -95,7 +69,7 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
 
 Status ElemMatchObjectMatchExpression::init(StringData path, MatchExpression* sub) {
     _sub.reset(sub);
-    return initPath(path);
+    return setPath(path);
 }
 
 bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
@@ -128,14 +102,10 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int level
     _sub->debugString(debug, level + 1);
 }
 
-void ElemMatchObjectMatchExpression::toBSON(BSONObjBuilder* out) const {
+void ElemMatchObjectMatchExpression::serialize(BSONObjBuilder* out) const {
     BSONObjBuilder subBob;
-    _sub->toBSON(&subBob);
-    if (path().empty()) {
-        out->append("$elemMatch", subBob.obj());
-    } else {
-        out->append(path(), BSON("$elemMatch" << subBob.obj()));
-    }
+    _sub->serialize(&subBob);
+    out->append(path(), BSON("$elemMatch" << subBob.obj()));
 }
 
 
@@ -148,13 +118,13 @@ ElemMatchValueMatchExpression::~ElemMatchValueMatchExpression() {
 }
 
 Status ElemMatchValueMatchExpression::init(StringData path, MatchExpression* sub) {
-    init(path);
+    init(path).transitional_ignore();
     add(sub);
     return Status::OK();
 }
 
 Status ElemMatchValueMatchExpression::init(StringData path) {
-    return initPath(path);
+    return setPath(path);
 }
 
 
@@ -202,16 +172,16 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int level)
     }
 }
 
-void ElemMatchValueMatchExpression::toBSON(BSONObjBuilder* out) const {
+void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
     BSONObjBuilder emBob;
+
     for (unsigned i = 0; i < _subs.size(); i++) {
-        _subs[i]->toBSON(&emBob);
+        BSONObjBuilder predicate;
+        _subs[i]->serialize(&predicate);
+        BSONObj predObj = predicate.obj();
+        emBob.appendElements(predObj.firstElement().embeddedObject());
     }
-    if (path().empty()) {
-        out->append("$elemMatch", emBob.obj());
-    } else {
-        out->append(path(), BSON("$elemMatch" << emBob.obj()));
-    }
+    out->append(path(), BSON("$elemMatch" << emBob.obj()));
 }
 
 
@@ -219,7 +189,7 @@ void ElemMatchValueMatchExpression::toBSON(BSONObjBuilder* out) const {
 
 Status SizeMatchExpression::init(StringData path, int size) {
     _size = size;
-    return initPath(path);
+    return setPath(path);
 }
 
 bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* details) const {
@@ -239,7 +209,7 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int level) const {
     }
 }
 
-void SizeMatchExpression::toBSON(BSONObjBuilder* out) const {
+void SizeMatchExpression::serialize(BSONObjBuilder* out) const {
     out->append(path(), BSON("$size" << _size));
 }
 
