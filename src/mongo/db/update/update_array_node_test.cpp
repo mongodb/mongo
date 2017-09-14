@@ -632,7 +632,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateFromReplication) {
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     addIndexedPath("a");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_TRUE(result.noop);

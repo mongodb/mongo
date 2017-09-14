@@ -39,6 +39,8 @@ const char kSet[] = "$set";
 const char kUnset[] = "$unset";
 }  // namespace
 
+constexpr StringData LogBuilder::kUpdateSemanticsFieldName;
+
 inline Status LogBuilder::addToSection(Element newElt, Element* section, const char* sectionName) {
     // If we don't already have this section, try to create it now.
     if (!section->ok()) {
@@ -128,6 +130,26 @@ Status LogBuilder::addToUnsets(StringData path) {
     return addToSection(logElement, &_unsetAccumulator, kUnset);
 }
 
+Status LogBuilder::setUpdateSemantics(UpdateSemantics updateSemantics) {
+    if (hasObjectReplacement()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "LogBuilder: Invalid attempt to add a $v entry to a log with an existing "
+                      "object replacement");
+    }
+
+    if (_updateSemantics.ok()) {
+        return Status(ErrorCodes::IllegalOperation, "LogBuilder: Invalid attempt to set $v twice.");
+    }
+
+    mutablebson::Document& doc = _logRoot.getDocument();
+    _updateSemantics =
+        doc.makeElementInt(kUpdateSemanticsFieldName, static_cast<int>(updateSemantics));
+
+    dassert(_logRoot[kUpdateSemanticsFieldName] == doc.end());
+
+    return _logRoot.pushFront(_updateSemantics);
+}
+
 Status LogBuilder::getReplacementObject(Element* outElt) {
     // If the replacement accumulator is not ok, we must have started a $set or $unset
     // already, so an object replacement is not permitted.
@@ -142,6 +164,12 @@ Status LogBuilder::getReplacementObject(Element* outElt) {
         return Status(ErrorCodes::IllegalOperation,
                       "LogBuilder: Invalid attempt to acquire the replacement object "
                       "in a log with existing object replacement data");
+
+    if (_updateSemantics.ok()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "LogBuilder: Invalid attempt to acquire the replacement object in a log with "
+                      "an update semantics value");
+    }
 
     // OK to enqueue object replacement items.
     *outElt = _objectReplacementAccumulator;

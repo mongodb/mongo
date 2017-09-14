@@ -133,9 +133,9 @@ Status ModifierSet::prepare(mutablebson::Element root,
     // proceed.
     if (status.code() == ErrorCodes::NonExistentPath) {
         _preparedState->elemFound = root.getDocument().end();
-    } else if (_modOptions.fromReplication && status.code() == ErrorCodes::PathNotViable) {
-        // If we are coming from replication and it is an invalid path,
-        // then push on indicating that we had a blocking element, which we stopped at
+    } else if (_modOptions.fromOplogApplication && status.code() == ErrorCodes::PathNotViable) {
+        // If we are applying an oplog entry and it is an invalid path, then push on indicating that
+        // we had a blocking element, which we stopped at
         _preparedState->elemIsBlocking = true;
     } else if (!status.isOK()) {
         return status;
@@ -211,7 +211,7 @@ Status ModifierSet::apply() const {
     }
 
     // Remove the blocking element, if we are from replication applier. See comment below.
-    if (_modOptions.fromReplication && !destExists && _preparedState->elemFound.ok() &&
+    if (_modOptions.fromOplogApplication && !destExists && _preparedState->elemFound.ok() &&
         _preparedState->elemIsBlocking && (!(_preparedState->elemFound.isType(Array)) ||
                                            !(_preparedState->elemFound.isType(Object)))) {
         /**

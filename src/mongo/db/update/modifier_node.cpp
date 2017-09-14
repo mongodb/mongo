@@ -230,10 +230,10 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
             // {$set: {a: 0}}
             // Setting 'a.b' will fail the second time, but we must still set 'c'.
             // (There are modifiers besides $set that use this code path, but they are not used for
-            // replication, so we are not concerned with their behavior when "fromReplication" is
-            // true.)
+            // replication, so we are not concerned with their behavior when "fromOplogApplication"
+            // is true.)
             if (statusWithFirstCreatedElem.getStatus().code() == ErrorCodes::PathNotViable &&
-                applyParams.fromReplication) {
+                applyParams.fromOplogApplication) {
                 return ApplyResult::noopResult();
             }
             uassertStatusOK(statusWithFirstCreatedElem);

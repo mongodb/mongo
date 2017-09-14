@@ -273,7 +273,7 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);

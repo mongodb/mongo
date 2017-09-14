@@ -1087,6 +1087,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 request.setQuery(b.done());
                 request.setUpdates(o);
                 request.setUpsert();
+                request.setFromOplogApplication(true);
                 UpdateLifecycleImpl updateLifecycle(requestNss);
                 request.setLifecycle(&updateLifecycle);
 
@@ -1117,6 +1118,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         request.setQuery(updateCriteria);
         request.setUpdates(o);
         request.setUpsert(upsert);
+        request.setFromOplogApplication(true);
         UpdateLifecycleImpl updateLifecycle(requestNss);
         request.setLifecycle(&updateLifecycle);
 

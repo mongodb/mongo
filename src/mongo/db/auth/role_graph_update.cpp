@@ -203,6 +203,7 @@ Status handleOplogUpdate(OperationContext* opCtx,
         return status;
 
     UpdateDriver::Options updateOptions;
+    updateOptions.modOptions.fromOplogApplication = true;
     UpdateDriver driver(updateOptions);
 
     // Oplog updates do not have array filters.

@@ -169,8 +169,8 @@ public:
  */
 struct ModifierInterface::Options {
     Options() = default;
-    Options(bool repl, bool ofs, const CollatorInterface* collator)
-        : fromReplication(repl), enforceOkForStorage(ofs), collator(collator) {}
+    Options(bool fromOpLog, bool ofs, const CollatorInterface* collator)
+        : fromOplogApplication(fromOpLog), enforceOkForStorage(ofs), collator(collator) {}
 
     static Options normal(const CollatorInterface* collator = nullptr) {
         return Options(false, true, collator);
@@ -179,7 +179,7 @@ struct ModifierInterface::Options {
         return Options(true, false, collator);
     }
 
-    bool fromReplication = false;
+    bool fromOplogApplication = false;
     bool enforceOkForStorage = true;
     const CollatorInterface* collator = nullptr;
 };

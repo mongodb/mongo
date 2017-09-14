@@ -171,7 +171,7 @@ TEST_F(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
@@ -804,7 +804,7 @@ TEST_F(SetNodeTest, SingleFieldFromReplication) {
     setPathToCreate("1.b");
     setPathTaken("a");
     addIndexedPath("a.1.b");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
@@ -822,7 +822,7 @@ TEST_F(SetNodeTest, SingleFieldNoIdFromReplication) {
     setPathToCreate("1.b");
     setPathTaken("a");
     addIndexedPath("a.1.b");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
@@ -840,7 +840,7 @@ TEST_F(SetNodeTest, NestedFieldFromReplication) {
     setPathToCreate("1.b");
     setPathTaken("a.a");
     addIndexedPath("a.a.1.b");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]["a"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
@@ -858,7 +858,7 @@ TEST_F(SetNodeTest, DoubleNestedFieldFromReplication) {
     setPathToCreate("d");
     setPathTaken("a.b.c");
     addIndexedPath("a.b.c.d");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
@@ -876,7 +876,7 @@ TEST_F(SetNodeTest, NestedFieldNoIdFromReplication) {
     setPathToCreate("1.b");
     setPathTaken("a.a");
     addIndexedPath("a.a.1.b");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]["a"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
@@ -894,7 +894,7 @@ TEST_F(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
     setPathToCreate("b");
     setPathTaken("a.0");
     addIndexedPath("a.1.b");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]["0"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
@@ -929,7 +929,7 @@ TEST_F(SetNodeTest, Set6FromRepl) {
     mutablebson::Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
     setPathTaken("r.a");
     addIndexedPath("r.a");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["r"]["a"]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);

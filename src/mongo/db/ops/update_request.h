@@ -62,6 +62,7 @@ public:
           _upsert(false),
           _multi(false),
           _fromMigration(false),
+          _fromOplogApplication(false),
           _lifecycle(NULL),
           _isExplain(false),
           _returnDocs(ReturnDocOption::RETURN_NONE),
@@ -154,6 +155,14 @@ public:
         return _fromMigration;
     }
 
+    inline void setFromOplogApplication(bool value = true) {
+        _fromOplogApplication = value;
+    }
+
+    bool isFromOplogApplication() const {
+        return _fromOplogApplication;
+    }
+
     inline void setLifecycle(UpdateLifecycle* value) {
         _lifecycle = value;
     }
@@ -226,6 +235,7 @@ public:
         builder << " upsert: " << _upsert;
         builder << " multi: " << _multi;
         builder << " fromMigration: " << _fromMigration;
+        builder << " fromOplogApplication: " << _fromOplogApplication;
         builder << " isExplain: " << _isExplain;
         return builder.str();
     }
@@ -268,6 +278,9 @@ private:
 
     // True if this update is on behalf of a chunk migration.
     bool _fromMigration;
+
+    // True if this update was triggered by the application of an oplog entry.
+    bool _fromOplogApplication;
 
     // The lifecycle data, and events used during the update request.
     UpdateLifecycle* _lifecycle;

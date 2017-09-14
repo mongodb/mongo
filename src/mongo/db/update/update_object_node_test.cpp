@@ -2114,7 +2114,7 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     addIndexedPath("a");
-    setFromReplication(true);
+    setFromOplogApplication(true);
     auto result = root.apply(getApplyParams(doc.root()));
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
