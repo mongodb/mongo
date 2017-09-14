@@ -1,0 +1,56 @@
+{
+  "tests": [
+    {
+      "description": "Unrecognized option keys are ignored",
+      "uri": "mongodb://example.com/?foo=bar",
+      "valid": true,
+      "warning": true,
+      "hosts": [
+        {
+          "type": "hostname",
+          "host": "example.com",
+          "port": null
+        }
+      ],
+      "auth": null,
+      "options": {
+        "foo": "bar"
+      }
+    },
+    {
+      "description": "Unsupported option values are ignored",
+      "uri": "mongodb://example.com/?fsync=ifPossible",
+      "valid": true,
+      "warning": true,
+      "hosts": [
+        {
+          "type": "hostname",
+          "host": "example.com",
+          "port": null
+        }
+      ],
+      "auth": null,
+      "options": {
+        "fsync": "ifPossible"
+      }
+    },
+    {
+      "description": "Deprecated (or unknown) options are ignored if replacement exists",
+      "uri": "mongodb://example.com/?wtimeout=5&wtimeoutMS=10",
+      "valid": true,
+      "warning": true,
+      "hosts": [
+        {
+          "type": "hostname",
+          "host": "example.com",
+          "port": null
+        }
+      ],
+      "auth": null,
+      "options": {
+        "wtimeoutMS": 10, 
+        "wtimeout": 5
+      }
+    }
+  ]
+}
