@@ -28,10 +28,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/mongo_uri.h"
+#include <fstream>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/filesystem/operations.hpp>
 
 namespace {
 using mongo::MongoURI;
@@ -60,15 +66,76 @@ const URITestCase validCases[] = {
 
     {"mongodb://user@127.0.0.1", "user", "", kMaster, "", 1, 0, ""},
 
-    {"mongodb://127.0.0.1/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
-
     {"mongodb://localhost/?foo=bar", "", "", kMaster, "", 1, 1, ""},
+
+    {"mongodb://localhost,/?foo=bar", "", "", kMaster, "", 1, 1, ""},
 
     {"mongodb://user:pwd@127.0.0.1:1234", "user", "pwd", kMaster, "", 1, 0, ""},
 
     {"mongodb://user@127.0.0.1:1234", "user", "", kMaster, "", 1, 0, ""},
 
     {"mongodb://127.0.0.1:1234/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
+
+    {"mongodb://127.0.0.1/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
+
+    {"mongodb://user:pwd@127.0.0.1,/dbName?foo=a&c=b", "user", "pwd", kMaster, "", 1, 2, "dbName"},
+
+    {"mongodb://user:pwd@127.0.0.1,127.0.0.2/dbname?a=b&replicaSet=replName",
+     "user",
+     "pwd",
+     kSet,
+     "replName",
+     2,
+     2,
+     "dbname"},
+
+    {"mongodb://needs%20encoding%25%23!%3C%3E:pwd@127.0.0.1,127.0.0.2/"
+     "dbname?a=b&replicaSet=replName",
+     "needs encoding%#!<>",
+     "pwd",
+     kSet,
+     "replName",
+     2,
+     2,
+     "dbname"},
+
+    {"mongodb://needs%20encoding%25%23!%3C%3E:pwd@127.0.0.1,127.0.0.2/"
+     "db@name?a=b&replicaSet=replName",
+     "needs encoding%#!<>",
+     "pwd",
+     kSet,
+     "replName",
+     2,
+     2,
+     "db@name"},
+
+    {"mongodb://user:needs%20encoding%25%23!%3C%3E@127.0.0.1,127.0.0.2/"
+     "dbname?a=b&replicaSet=replName",
+     "user",
+     "needs encoding%#!<>",
+     kSet,
+     "replName",
+     2,
+     2,
+     "dbname"},
+
+    {"mongodb://user:pwd@127.0.0.1,127.0.0.2/dbname?a=b&replicaSet=needs%20encoding%25%23!%3C%3E",
+     "user",
+     "pwd",
+     kSet,
+     "needs encoding%#!<>",
+     2,
+     2,
+     "dbname"},
+
+    {"mongodb://user:pwd@127.0.0.1,127.0.0.2/needsencoding%40hello?a=b&replicaSet=replName",
+     "user",
+     "pwd",
+     kSet,
+     "replName",
+     2,
+     2,
+     "needsencoding@hello"},
 
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/?replicaSet=replName",
      "user",
@@ -259,21 +326,27 @@ const URITestCase validCases[] = {
      1,
      2,
      ""},
-    {"mongodb:///tmp/mongodb-27017.sock", "", "", kMaster, "", 1, 0, ""},
 
-    {"mongodb:///tmp/mongodb-27017.sock,/tmp/mongodb-27018.sock/?replicaSet=replName",
+    {"mongodb://%2Ftmp%2Fmongodb-27017.sock", "", "", kMaster, "", 1, 0, ""},
+
+    {"mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/?replicaSet=replName",
      "",
      "",
      kSet,
      "replName",
      2,
      1,
-     ""}};
+     ""},
+};
 
 const InvalidURITestCase invalidCases[] = {
 
     // No host.
     {"mongodb://"},
+    {"mongodb://usr:pwd@/dbname?a=b"},
+
+    // Username and password must be encoded (cannot have ':' or '@')
+    {"mongodb://usr:pwd:@127.0.0.1/dbName?foo=a&c=b"},
 
     // Needs a "/" after the hosts and before the options.
     {"mongodb://localhost:27017,localhost:27018?replicaSet=missingSlash"},
@@ -282,32 +355,105 @@ const InvalidURITestCase invalidCases[] = {
     {"mongodb://localhost:27017localhost:27018"},
 
     // Domain sockets have to end in ".sock".
-    {"mongodb:///notareal/domainsock"},
+    {"mongodb://%2Fnotareal%2Fdomainsock"},
+
+    // Database name cannot contain slash ("/"), backslash ("\"), space (" "), double-quote ("""),
+    // or dollar sign ("$")
+    {"mongodb://usr:pwd@localhost:27017/db$name?a=b"},
+    {"mongodb://usr:pwd@localhost:27017/db/name?a=b"},
+    {"mongodb://usr:pwd@localhost:27017/db\\name?a=b"},
+    {"mongodb://usr:pwd@localhost:27017/db name?a=b"},
+    {"mongodb://usr:pwd@localhost:27017/db\"name?a=b"},
+
+    // Options must have a key
+    {"mongodb://usr:pwd@localhost:27017/dbname?=b"},
+
+    // Cannot skip a key value pair
+    {"mongodb://usr:pwd@localhost:27017/dbname?a=b&&b=c"},
+
+    // Multiple Unix domain sockets and auth DB resembling a socket (relative path)
+    {"mongodb://rel%2Fmongodb-27017.sock,rel%2Fmongodb-27018.sock/admin.sock?replicaSet=replName"},
+
+    // Multiple Unix domain sockets with auth DB resembling a path (relative path)
+    {"mongodb://rel%2Fmongodb-27017.sock,rel%2Fmongodb-27018.sock/admin.shoe?replicaSet=replName"},
+
+    // Multiple Unix domain sockets and auth DB resembling a socket (absolute path)
+    {"mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/"
+     "admin.sock?replicaSet=replName"},
+
+    // Multiple Unix domain sockets with auth DB resembling a path (absolute path)
+    {"mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/"
+     "admin.shoe?replicaSet=replName"},
+
+    // Missing value in key value pair for options
+    {"mongodb://127.0.0.1:1234/dbName?foo=a&c=b&d"},
+    {"mongodb://127.0.0.1:1234/dbName?foo=a&c=b&d="},
+    {"mongodb://127.0.0.1:1234/dbName?foo=a&h=&c=b&d=6"},
+    {"mongodb://127.0.0.1:1234/dbName?foo=a&h&c=b&d=6"},
+
+    // Missing a hostname, or unparsable hostname(s)
+    {"mongodb://,/dbName"},
+    {"mongodb://user:pwd@,/dbName"},
+    {"mongodb://localhost:1234:5678/dbName"},
 
     // Options can't have multiple question marks. Only one.
     {"mongodb://localhost:27017/?foo=a?c=b&d=e?asdf=foo"},
+
+    // Missing a key in key value pair for options
+    {"mongodb://127.0.0.1:1234/dbName?foo=a&=d&c=b"},
+
+    // Missing an entire key-value pair
+    {"mongodb://127.0.0.1:1234/dbName?foo=a&&c=b"},
 };
+
+// Helper Method to take a filename for a json file and return the array of tests inside of it
+mongo::BSONObj getBsonFromJsonFile(std::string fileName) {
+    boost::filesystem::path directoryPath = boost::filesystem::current_path();
+    boost::filesystem::path filePath(directoryPath / "src" / "mongo" / "client" /
+                                     "mongo_uri_tests" / fileName);
+    std::string filename(filePath.string());
+    std::ifstream infile(filename.c_str());
+    std::string data((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
+    mongo::BSONObj obj = mongo::fromjson(data);
+    ASSERT_TRUE(obj.valid(mongo::BSONVersion::kLatest));
+    ASSERT_TRUE(obj.hasField("tests"));
+    mongo::BSONObj arr = obj.getField("tests").embeddedObject().getOwned();
+    ASSERT_TRUE(arr.couldBeArray());
+    return arr;
+}
+
+// Helper method to take a BSONElement and either extract its string or return an empty string
+std::string returnStringFromElementOrNull(mongo::BSONElement element) {
+    ASSERT_TRUE(!element.eoo());
+    if (element.type() == mongo::jstNULL) {
+        return std::string();
+    }
+    ASSERT_EQ(element.type(), mongo::String);
+    return element.String();
+}
+
+// Helper method to take a valid test case, parse() it, and assure the output is correct
+void testValidURIFormat(URITestCase testCase) {
+    mongo::unittest::log() << "Testing URI: " << testCase.URI << '\n';
+    std::string errMsg;
+    const auto cs_status = MongoURI::parse(testCase.URI);
+    ASSERT_OK(cs_status);
+    auto result = cs_status.getValue();
+    ASSERT_EQ(testCase.uname, result.getUser());
+    ASSERT_EQ(testCase.password, result.getPassword());
+    ASSERT_EQ(testCase.type, result.type());
+    ASSERT_EQ(testCase.setname, result.getSetName());
+    ASSERT_EQ(testCase.numservers, result.getServers().size());
+    ASSERT_EQ(testCase.numOptions, result.getOptions().size());
+    ASSERT_EQ(testCase.database, result.getDatabase());
+}
 
 TEST(MongoURI, GoodTrickyURIs) {
     const size_t numCases = sizeof(validCases) / sizeof(validCases[0]);
 
     for (size_t i = 0; i != numCases; ++i) {
         const URITestCase testCase = validCases[i];
-        mongo::unittest::log() << "Testing URI: " << testCase.URI << '\n';
-        std::string errMsg;
-        auto cs_status = MongoURI::parse(testCase.URI);
-        if (!cs_status.getStatus().toString().empty()) {
-            mongo::unittest::log() << "error with uri: " << cs_status.getStatus().toString();
-        }
-        ASSERT_TRUE(cs_status.isOK());
-        auto result = cs_status.getValue();
-        ASSERT_EQ(testCase.uname, result.getUser());
-        ASSERT_EQ(testCase.password, result.getPassword());
-        ASSERT_EQ(testCase.type, result.type());
-        ASSERT_EQ(testCase.setname, result.getSetName());
-        ASSERT_EQ(testCase.numservers, result.getServers().size());
-        ASSERT_EQ(testCase.numOptions, result.getOptions().size());
-        ASSERT_EQ(testCase.database, result.getDatabase());
+        testValidURIFormat(testCase);
     }
 }
 
@@ -318,7 +464,7 @@ TEST(MongoURI, InvalidURIs) {
         const InvalidURITestCase testCase = invalidCases[i];
         mongo::unittest::log() << "Testing URI: " << testCase.URI << '\n';
         auto cs_status = MongoURI::parse(testCase.URI);
-        ASSERT_FALSE(cs_status.isOK());
+        ASSERT_NOT_OK(cs_status);
     }
 }
 
@@ -355,6 +501,102 @@ TEST(MongoURI, CloneURIForServer) {
     ASSERT_EQ(clonedURI.getServers().size(), static_cast<std::size_t>(1));
     auto& clonedURIOptions = clonedURI.getOptions();
     ASSERT_EQ(clonedURIOptions.at("ssl"), "true");
+}
+
+/**
+ * These tests come from the Mongo Uri Specifications for the drivers found at:
+ * https://github.com/mongodb/specifications/tree/master/source/connection-string/tests
+ * They have been slighly altered as the Drivers specification is slighly different
+ * from the server specification.
+ */
+TEST(MongoURI, specTests) {
+    const std::string files[] = {
+        "mongo-uri-valid-auth.json",
+        "mongo-uri-options.json",
+        "mongo-uri-unix-sockets-absolute.json",
+        "mongo-uri-unix-sockets-relative.json",
+        "mongo-uri-warnings.json",
+        "mongo-uri-host-identifiers.json",
+        "mongo-uri-invalid.json",
+    };
+
+    for (const auto& file : files) {
+        const auto testBson = getBsonFromJsonFile(file);
+
+        for (const auto& testElement : testBson) {
+            ASSERT_EQ(testElement.type(), mongo::Object);
+            const auto test = testElement.Obj();
+
+            // First extract the valid field and the uri field
+            const auto validDoc = test.getField("valid");
+            ASSERT_FALSE(validDoc.eoo());
+            ASSERT_TRUE(validDoc.isBoolean());
+            const auto valid = validDoc.Bool();
+
+            const auto uriDoc = test.getField("uri");
+            ASSERT_FALSE(uriDoc.eoo());
+            ASSERT_EQ(uriDoc.type(), mongo::String);
+            const auto uri = uriDoc.String();
+
+            if (!valid) {
+                // This uri string is invalid --> parse the uri and ensure it fails
+                const InvalidURITestCase testCase = {uri};
+                mongo::unittest::log() << "Testing URI: " << testCase.URI << '\n';
+                auto cs_status = MongoURI::parse(testCase.URI);
+                ASSERT_NOT_OK(cs_status);
+            } else {
+                // This uri is valid -- > parse the remaining necessary fields
+
+                // parse the auth options
+                std::string database, username, password;
+
+                const auto auth = test.getField("auth");
+                ASSERT_FALSE(auth.eoo());
+                if (auth.type() != mongo::jstNULL) {
+                    ASSERT_EQ(auth.type(), mongo::Object);
+                    const auto authObj = auth.embeddedObject();
+                    database = returnStringFromElementOrNull(authObj.getField("db"));
+                    username = returnStringFromElementOrNull(authObj.getField("username"));
+                    password = returnStringFromElementOrNull(authObj.getField("password"));
+                }
+
+                // parse the hosts
+                const auto hosts = test.getField("hosts");
+                ASSERT_FALSE(hosts.eoo());
+                ASSERT_EQ(hosts.type(), mongo::Array);
+                const auto numHosts = static_cast<size_t>(hosts.Obj().nFields());
+
+                // parse the options
+                mongo::ConnectionString::ConnectionType connectionType = kMaster;
+                size_t numOptions = 0;
+                std::string setName;
+                const auto optionsElement = test.getField("options");
+                ASSERT_FALSE(optionsElement.eoo());
+                if (optionsElement.type() != mongo::jstNULL) {
+                    ASSERT_EQ(optionsElement.type(), mongo::Object);
+                    const auto optionsObj = optionsElement.Obj();
+                    numOptions = optionsObj.nFields();
+                    const auto replsetElement = optionsObj.getField("replicaSet");
+                    if (!replsetElement.eoo()) {
+                        ASSERT_EQ(replsetElement.type(), mongo::String);
+                        setName = replsetElement.String();
+                        connectionType = kSet;
+                    }
+                }
+
+                // Create the URITestCase abnd
+                const URITestCase testCase = {uri,
+                                              username,
+                                              password,
+                                              connectionType,
+                                              setName,
+                                              numHosts,
+                                              numOptions,
+                                              database};
+                testValidURIFormat(testCase);
+            }
+        }
+    }
 }
 
 }  // namespace

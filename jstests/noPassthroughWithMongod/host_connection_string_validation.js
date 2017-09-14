@@ -89,8 +89,8 @@
         print("Testing " + (isGood ? "good" : "bad") + " connection string " + i + "...");
         print("    * testing " + connectionString);
         testHost(connectionString, isGood);
-        print("    * testing mongodb://" + connectionString);
-        testHost("mongodb://" + connectionString, isGood);
+        print("    * testing mongodb://" + encodeURIComponent(connectionString));
+        testHost("mongodb://" + encodeURIComponent(connectionString), isGood);
     }
 
     var i;

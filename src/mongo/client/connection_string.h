@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -157,6 +159,10 @@ public:
         return _string < other._string;
     }
 
+
+    friend std::ostream& operator<<(std::ostream&, const ConnectionString&);
+    friend StringBuilder& operator<<(StringBuilder&, const ConnectionString&);
+
 private:
     /**
      * Creates a SET connection string with the specified set name and servers.
@@ -179,4 +185,15 @@ private:
     static stdx::mutex _connectHookMutex;
     static ConnectionHook* _connectHook;
 };
+
+inline std::ostream& operator<<(std::ostream& ss, const ConnectionString& cs) {
+    ss << cs._string;
+    return ss;
+}
+
+inline StringBuilder& operator<<(StringBuilder& sb, const ConnectionString& cs) {
+    sb << cs._string;
+    return sb;
+}
+
 }  // namespace mongo

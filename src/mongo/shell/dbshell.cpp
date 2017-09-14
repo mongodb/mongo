@@ -43,6 +43,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/log_process_details.h"
@@ -241,8 +242,8 @@ string getURIFromArgs(const std::string& url, const std::string& host, const std
         }
         // If there's a slash in the host field, then it's the replica set name, not a database name
         stringstream ss;
-        ss << "mongodb://" << host.substr(slashPos + 1)
-           << "/?replicaSet=" << host.substr(0, slashPos);
+        ss << "mongodb://" << uriEncode(host.substr(slashPos + 1))
+           << "/?replicaSet=" << uriEncode(host.substr(0, slashPos));
         return ss.str();
     }
 
@@ -250,10 +251,11 @@ string getURIFromArgs(const std::string& url, const std::string& host, const std
     if (host.size() == 0) {
         ss << "mongodb://127.0.0.1";
     } else {
-        if (!str::startsWith(host, "mongodb://")) {
-            ss << "mongodb://";
+        if (str::startsWith(host, "mongodb://")) {
+            ss << host;
+        } else {
+            ss << "mongodb://" << uriEncode(host);
         }
-        ss << host;
     }
 
     if (!hostEndsInSock) {
@@ -270,7 +272,7 @@ string getURIFromArgs(const std::string& url, const std::string& host, const std
         }
     }
 
-    ss << "/" << url;
+    ss << "/" << uriEncode(url);
     return ss.str();
 }
 

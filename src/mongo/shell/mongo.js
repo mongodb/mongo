@@ -234,6 +234,9 @@ connect = function(url, user, pass) {
     if (!url.startsWith("mongodb://")) {
         const colon = url.lastIndexOf(":");
         const slash = url.lastIndexOf("/");
+        if (url.split("/").length > 1) {
+            url = url.substring(0, slash).replace(/\//g, "%2F") + url.substring(slash);
+        }
         if (slash == 0) {
             throw Error("Failed to parse mongodb:// URL: " + url);
         }
