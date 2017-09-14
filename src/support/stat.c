@@ -1003,7 +1003,13 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: transaction range of IDs currently pinned by a checkpoint",
 	"transaction: transaction range of IDs currently pinned by named snapshots",
 	"transaction: transaction sync calls",
+	"transaction: transactions commit timestamp queue inserts to head",
+	"transaction: transactions commit timestamp queue inserts total",
+	"transaction: transactions commit timestamp queue length",
 	"transaction: transactions committed",
+	"transaction: transactions read timestamp queue inserts to head",
+	"transaction: transactions read timestamp queue inserts total",
+	"transaction: transactions read timestamp queue length",
 	"transaction: transactions rolled back",
 	"transaction: update conflicts",
 };
@@ -1326,7 +1332,13 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing txn_pinned_checkpoint_range */
 		/* not clearing txn_pinned_snapshot_range */
 	stats->txn_sync = 0;
+	stats->txn_commit_queue_head = 0;
+	stats->txn_commit_queue_inserts = 0;
+	stats->txn_commit_queue_len = 0;
 	stats->txn_commit = 0;
+	stats->txn_read_queue_head = 0;
+	stats->txn_read_queue_inserts = 0;
+	stats->txn_read_queue_len = 0;
 	stats->txn_rollback = 0;
 	stats->txn_update_conflict = 0;
 }
@@ -1750,7 +1762,16 @@ __wt_stat_connection_aggregate(
 	to->txn_pinned_snapshot_range +=
 	    WT_STAT_READ(from, txn_pinned_snapshot_range);
 	to->txn_sync += WT_STAT_READ(from, txn_sync);
+	to->txn_commit_queue_head +=
+	    WT_STAT_READ(from, txn_commit_queue_head);
+	to->txn_commit_queue_inserts +=
+	    WT_STAT_READ(from, txn_commit_queue_inserts);
+	to->txn_commit_queue_len += WT_STAT_READ(from, txn_commit_queue_len);
 	to->txn_commit += WT_STAT_READ(from, txn_commit);
+	to->txn_read_queue_head += WT_STAT_READ(from, txn_read_queue_head);
+	to->txn_read_queue_inserts +=
+	    WT_STAT_READ(from, txn_read_queue_inserts);
+	to->txn_read_queue_len += WT_STAT_READ(from, txn_read_queue_len);
 	to->txn_rollback += WT_STAT_READ(from, txn_rollback);
 	to->txn_update_conflict += WT_STAT_READ(from, txn_update_conflict);
 }

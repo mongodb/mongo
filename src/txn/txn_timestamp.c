@@ -585,12 +585,15 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 	    __wt_timestamp_cmp(&prev->first_commit_timestamp, &ts) > 0;
 	    prev = TAILQ_PREV(prev, __wt_txn_cts_qh, commit_timestampq))
 		;
-	if (prev == NULL)
+	if (prev == NULL) {
 		TAILQ_INSERT_HEAD(
 		    &txn_global->commit_timestamph, txn, commit_timestampq);
-	else
+		WT_STAT_CONN_INCR(session, txn_commit_queue_head);
+	} else
 		TAILQ_INSERT_AFTER(&txn_global->commit_timestamph,
 		    prev, txn, commit_timestampq);
+	++txn_global->commit_timestampq_len;
+	WT_STAT_CONN_INCR(session, txn_commit_queue_inserts);
 	__wt_writeunlock(session, &txn_global->commit_timestamp_rwlock);
 	F_SET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_PUBLIC_TS_COMMIT);
 }
@@ -613,6 +616,7 @@ __wt_txn_clear_commit_timestamp(WT_SESSION_IMPL *session)
 
 	__wt_writelock(session, &txn_global->commit_timestamp_rwlock);
 	TAILQ_REMOVE(&txn_global->commit_timestamph, txn, commit_timestampq);
+	--txn_global->commit_timestampq_len;
 	__wt_writeunlock(session, &txn_global->commit_timestamp_rwlock);
 	F_CLR(txn, WT_TXN_PUBLIC_TS_COMMIT);
 }
@@ -639,12 +643,15 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session)
 	    &prev->read_timestamp, &txn->read_timestamp) > 0;
 	    prev = TAILQ_PREV(prev, __wt_txn_rts_qh, read_timestampq))
 		;
-	if (prev == NULL)
+	if (prev == NULL) {
 		TAILQ_INSERT_HEAD(
 		    &txn_global->read_timestamph, txn, read_timestampq);
-	else
+		WT_STAT_CONN_INCR(session, txn_read_queue_head);
+	 } else
 		TAILQ_INSERT_AFTER(
 		    &txn_global->read_timestamph, prev, txn, read_timestampq);
+	++txn_global->read_timestampq_len;
+	WT_STAT_CONN_INCR(session, txn_read_queue_inserts);
 	__wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
 	F_SET(txn, WT_TXN_HAS_TS_READ | WT_TXN_PUBLIC_TS_READ);
 }
@@ -667,6 +674,7 @@ __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
 
 	__wt_writelock(session, &txn_global->read_timestamp_rwlock);
 	TAILQ_REMOVE(&txn_global->read_timestamph, txn, read_timestampq);
+	--txn_global->read_timestampq_len;
 	__wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
 	F_CLR(txn, WT_TXN_PUBLIC_TS_READ);
 }
