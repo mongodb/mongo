@@ -35,6 +35,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/session_txn_record.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
@@ -88,12 +89,14 @@ public:
      * in the write's WUOW. Updates the on-disk state of the session to match the specified
      * transaction/timestamp and keeps the cached state in sync.
      *
+     * Must only be called with the session checked-out.
+     *
      * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
     void onWriteOpCompletedOnPrimary(OperationContext* opCtx,
                                      TxnNumber txnNumber,
                                      std::vector<StmtId> stmtIdsWritten,
-                                     Timestamp newLastWriteTs);
+                                     Timestamp lastStmtIdWriteTs);
 
     /**
      * Called after a replication batch has been applied on a secondary node. Keeps the session
@@ -124,6 +127,8 @@ public:
      * exists. If an actual oplog entry is returned, this means the specified write statement has
      * already executed and shouldn't be performed again.
      *
+     * Must only be called with the session checked-out.
+     *
      * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
     boost::optional<repl::OplogEntry> checkStatementExecuted(OperationContext* opCtx,
@@ -137,6 +142,10 @@ private:
 
     void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const;
 
+    boost::optional<Timestamp> _checkStatementExecuted(WithLock,
+                                                       TxnNumber txnNumber,
+                                                       StmtId stmtId) const;
+
     UpdateRequest _makeUpdateRequest(WithLock,
                                      TxnNumber newTxnNumber,
                                      Timestamp newLastWriteTs) const;
@@ -144,7 +153,7 @@ private:
     void _registerUpdateCacheOnCommit(OperationContext* opCtx,
                                       TxnNumber newTxnNumber,
                                       std::vector<StmtId> stmtIdsWritten,
-                                      Timestamp newLastWriteTs);
+                                      Timestamp lastStmtIdWriteTs);
 
     const LogicalSessionId _sessionId;
 
@@ -165,6 +174,12 @@ private:
     // the last written txn record. When it is > than that in the last written txn record, this
     // means a new transaction has begun on the session, but it hasn't yet performed any writes.
     TxnNumber _activeTxnNumber{kUninitializedTxnNumber};
+
+    // For the active txn, tracks which statement ids have been committed and at which oplog
+    // timestamp. Used for fast retryability check and retrieving the previous write's data without
+    // having to scan through the oplog.
+    using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, Timestamp>;
+    CommittedStatementTimestampMap _activeTxnCommittedStatements;
 };
 
 }  // namespace mongo

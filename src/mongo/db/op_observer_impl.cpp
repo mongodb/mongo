@@ -71,9 +71,9 @@ bool isMasterSlave() {
 void onWriteOpCompleted(OperationContext* opCtx,
                         const NamespaceString& nss,
                         std::vector<StmtId> stmtIdsWritten,
-                        const repl::OpTime& lastTxnWriteOpTime) {
-    const auto lastWriteTs = lastTxnWriteOpTime.getTimestamp();
-    if (lastWriteTs.isNull())
+                        const repl::OpTime& lastStmtIdWriteOpTime) {
+    const auto lastStmtIdWriteTs = lastStmtIdWriteOpTime.getTimestamp();
+    if (lastStmtIdWriteTs.isNull())
         return;
 
     if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
@@ -85,7 +85,7 @@ void onWriteOpCompleted(OperationContext* opCtx,
         SessionCatalog::get(opCtx)->resetSessions();
     } else if (opCtx->getTxnNumber()) {
         OperationContextSession::get(opCtx)->onWriteOpCompletedOnPrimary(
-            opCtx, *opCtx->getTxnNumber(), std::move(stmtIdsWritten), lastWriteTs);
+            opCtx, *opCtx->getTxnNumber(), std::move(stmtIdsWritten), lastStmtIdWriteTs);
     }
 }
 
@@ -235,7 +235,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator end,
                                bool fromMigrate) {
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
-    const auto opTime = repl::logInsertOps(opCtx, nss, uuid, session, begin, end, fromMigrate);
+    const auto lastOpTime = repl::logInsertOps(opCtx, nss, uuid, session, begin, end, fromMigrate);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
 
@@ -262,7 +262,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         return stmt.stmtId;
     });
 
-    onWriteOpCompleted(opCtx, nss, stmtIdsWritten, opTime);
+    onWriteOpCompleted(opCtx, nss, stmtIdsWritten, lastOpTime);
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {

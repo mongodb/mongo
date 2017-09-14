@@ -104,6 +104,8 @@ boost::optional<UUID> SessionCatalog::getTransactionTableUUID(OperationContext* 
 }
 
 void SessionCatalog::onStepUp(OperationContext* opCtx) {
+    resetSessions();
+
     DBDirectClient client(opCtx);
 
     const size_t initialExtentSize = 0;
