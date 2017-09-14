@@ -27,6 +27,8 @@
         const cmdResponse = assert.commandWorked(
             db.runCommand({aggregate: collection.getName(), pipeline: pipeline, cursor: {}}));
         assert.neq(cmdResponse.cursor.firstBatch.length, 0);
+        assert.commandWorked(
+            db.runCommand({killCursors: collection.getName(), cursors: [cmdResponse.cursor.id]}));
         return cmdResponse.cursor.firstBatch[cmdResponse.cursor.firstBatch.length - 1];
     }
 
@@ -78,6 +80,7 @@
         db.runCommand({aggregate: coll.getName(), pipeline: [{$changeStream: {}}], cursor: {}}));
     assert.writeOK(coll.insert({_id: "dummy"}));
     const firstChange = getOneDoc(res.cursor);
+    assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [res.cursor.id]}));
 
     jsTestLog("Testing change streams without 'fullDocument' specified");
     // Test that not specifying 'fullDocument' does include a 'fullDocument' in the result for an
@@ -264,6 +267,8 @@
     latestChange = getOneDoc(res.cursor);
     assert.eq(latestChange.operationType, "invalidate");
     assert(!latestChange.hasOwnProperty("fullDocument"));
+    assert.commandWorked(
+        db.runCommand({killCursors: db.collInvalidate.getName(), cursors: [res.cursor.id]}));
 
     // TODO(russotto): Can just use "coll" here once read majority is working.
     // For now, using the old collection results in us reading stale data sometimes.
@@ -307,4 +312,5 @@
     }));
     assert.eq(res.cursor.nextBatch.length, 1);
     assert.docEq(res.cursor.nextBatch[0]["fullDocument"], {_id: "getMoreEnabled", updated: true});
+    assert.commandWorked(db.runCommand({killCursors: coll2.getName(), cursors: [res.cursor.id]}));
 }());

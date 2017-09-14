@@ -137,6 +137,8 @@ eventFn();`,
         awaitDataCursorId: changeCursorId,
         event: () => assert.writeOK(db.unrelated_collection.insert({_id: "unrelated change"}))
     });
+    assert.commandWorked(
+        db.runCommand({killCursors: changesCollection.getName(), cursors: [changeCursorId]}));
 
     // Test that changes ignored by filtering in later stages of the pipeline will not cause the
     // cursor to return before the getMore has exceeded maxTimeMS.
@@ -155,4 +157,6 @@ eventFn();`,
         awaitDataCursorId: res.cursor.id,
         event: () => assert.writeOK(db.changes.insert({_id: "should not appear"}))
     });
+    assert.commandWorked(
+        db.runCommand({killCursors: changesCollection.getName(), cursors: [res.cursor.id]}));
 }());
