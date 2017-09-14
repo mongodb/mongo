@@ -780,13 +780,10 @@ SortedDataInterface* WiredTigerKVEngine::getGroupedSortedDataInterface(Operation
 }
 
 Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
-    _drop(ident);
-    return Status::OK();
-}
-
-bool WiredTigerKVEngine::_drop(StringData ident) {
     string uri = _uri(ident);
 
+    WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get(opCtx);
+    ru->getSessionNoTxn(opCtx)->closeAllCursors(uri);
     _sessionCache->closeAllCursors(uri);
 
     WiredTigerSession session(_conn);
@@ -797,7 +794,7 @@ bool WiredTigerKVEngine::_drop(StringData ident) {
 
     if (ret == 0) {
         // yay, it worked
-        return true;
+        return Status::OK();
     }
 
     if (ret == EBUSY) {
@@ -807,11 +804,11 @@ bool WiredTigerKVEngine::_drop(StringData ident) {
             _identToDrop.push_front(uri);
         }
         _sessionCache->closeCursorsForQueuedDrops();
-        return false;
+        return Status::OK();
     }
 
     invariantWTOK(ret);
-    return false;
+    return Status::OK();
 }
 
 std::list<WiredTigerCachedCursor> WiredTigerKVEngine::filterCursorsWithQueuedDrops(

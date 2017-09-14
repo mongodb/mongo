@@ -234,7 +234,6 @@ private:
     bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 
     std::string _uri(StringData ident) const;
-    bool _drop(StringData ident);
 
     void _setOldestTimestamp(SnapshotName oldestTimestamp);
 
