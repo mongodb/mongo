@@ -47,7 +47,6 @@ variables:
   - ubuntu1204
   - ubuntu1404
   - debian71
-  - solaris-64-bit
   - osx-107
   - osx-107-ssl
 
@@ -3973,54 +3972,6 @@ buildvariants:
   - name: tool_WT
   - name: push
 
-
-###########################################
-#          Solaris buildvariants          #
-###########################################
-
-- name: solaris-64-bit
-  display_name: Solaris 64-bit
-  modules:
-  - mongo-tools
-  run_on:
-  - solaris
-  expansions:
-    push_path: sunos5
-    push_bucket: downloads.mongodb.org
-    push_name: sunos5
-    push_arch: x86_64
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    tooltags: -gccgoflags "-lsocket -lnsl"
-    compile_flags: --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --static-libstdc++ --64 -j$(kstat cpu | sort -u | grep -c "^module") --release OBJCOPY=/opt/mongodbtoolchain/bin/objcopy
-    test_flags: --continue-on-failure
-  tasks:
-  - name: compile
-  - name: aggregation
-  - name: auth
-  - name: dbtest
-  - name: disk
-  - name: durability
-  - name: failpoints
-  - name: jsCore
-  - name: jsCore_compatibility
-  - name: jsCore_small_oplog
-  - name: mmap
-  - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
-  - name: parallel_compatibility
-  - name: concurrency
-  - name: concurrency_compatibility
-  - name: replicasets
-  - name: replication
-  - name: sharding
-  - name: slow1
-  - name: slow2
-  - name: tool
-  - name: push
-    distros:
-    - rhel70
 
 ###########################################
 #          Debian buildvariants           #
