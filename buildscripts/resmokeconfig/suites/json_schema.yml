@@ -4,25 +4,15 @@ selector:
   roots:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/**/*.json
   exclude_files:
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/additionalItems.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/allOf.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/anyOf.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/default.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/definitions.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/dependencies.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/enum.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/items.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/not.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/oneOf.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/optional/bignum.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/optional/ecmascript-regex.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/optional/format.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/optional/zeroTerminatedFloats.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/patternProperties.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/properties.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/ref.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/refRemote.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/type.json
 
 executor:
   config:

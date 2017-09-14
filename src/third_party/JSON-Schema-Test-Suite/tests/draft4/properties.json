@@ -1,9 +1,10 @@
 [
     {
         "description": "object properties validation",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
             "properties": {
-                "foo": {"type": "integer"},
+                "foo": {"type": "number"},
                 "bar": {"type": "string"}
             }
         },
@@ -49,8 +50,10 @@
                 "bar": {"type": "array"}
             },
             "patternProperties": {"f.o": {"minItems": 2}},
-            "additionalProperties": {"type": "integer"}
+            "additionalProperties": {"type": "number"}
         },
+        "banFromTopLevel": true,
+        "note": "Cannot run this schema at the top-level because it is unaware of the _id field.",
         "tests": [
             {
                 "description": "property validates property",

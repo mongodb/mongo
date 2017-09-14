@@ -2,6 +2,8 @@
     {
         "description": "maxProperties validation",
         "schema": {"maxProperties": 2},
+        "banFromTopLevel": true,
+        "note": "Cannot run this schema at the top-level because it is unaware of the _id field.",
         "tests": [
             {
                 "description": "shorter is valid",

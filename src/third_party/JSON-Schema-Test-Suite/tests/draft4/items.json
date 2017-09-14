@@ -1,8 +1,9 @@
 [
     {
         "description": "a schema given for items",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
-            "items": {"type": "integer"}
+            "items": {"type": "number"}
         },
         "tests": [
             {
@@ -32,9 +33,10 @@
     },
     {
         "description": "an array of schemas for items",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
             "items": [
-                {"type": "integer"},
+                {"type": "number"},
                 {"type": "string"}
             ]
         },

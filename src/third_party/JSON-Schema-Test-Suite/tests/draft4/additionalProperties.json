@@ -7,6 +7,8 @@
             "patternProperties": { "^v": {} },
             "additionalProperties": false
         },
+        "banFromTopLevel": true,
+        "note": "Cannot run this schema at the top-level because it is unaware of the _id field.",
         "tests": [
             {
                 "description": "no additional properties is valid",
@@ -47,6 +49,8 @@
             "properties": {"foo": {}, "bar": {}},
             "additionalProperties": {"type": "boolean"}
         },
+        "banFromTopLevel": true,
+        "note": "Cannot run this schema at the top-level because it is unaware of the _id field.",
         "tests": [
             {
                 "description": "no additional properties is valid",
@@ -71,6 +75,8 @@
         "schema": {
             "additionalProperties": {"type": "boolean"}
         },
+        "banFromTopLevel": true,
+        "note": "Cannot run this schema at the top-level because it is unaware of the _id field.",
         "tests": [
             {
                 "description": "an additional valid property is valid",

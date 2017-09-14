@@ -82,12 +82,13 @@
     },
     {
         "description": "multiple dependencies subschema",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
             "dependencies": {
                 "bar": {
                     "properties": {
-                        "foo": {"type": "integer"},
-                        "bar": {"type": "integer"}
+                        "foo": {"type": "number"},
+                        "bar": {"type": "number"}
                     }
                 }
             }
