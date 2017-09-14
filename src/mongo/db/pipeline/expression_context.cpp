@@ -43,35 +43,40 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregationRequest& request,
                                      std::unique_ptr<CollatorInterface> collator,
                                      StringMap<ResolvedNamespace> resolvedNamespaces)
-    : explain(request.getExplain()),
-      fromMongos(request.isFromMongos()),
-      needsMerge(request.needsMerge()),
-      allowDiskUse(request.shouldAllowDiskUse()),
-      bypassDocumentValidation(request.shouldBypassDocumentValidation()),
-      from34Mongos(request.isFrom34Mongos()),
-      ns(request.getNamespaceString()),
-      opCtx(opCtx),
-      collation(request.getCollation()),
+    : ExpressionContext(opCtx, collator.get()) {
+    explain = request.getExplain();
+    fromMongos = request.isFromMongos();
+    needsMerge = request.needsMerge();
+    allowDiskUse = request.shouldAllowDiskUse();
+    bypassDocumentValidation = request.shouldBypassDocumentValidation();
+    from34Mongos = request.isFrom34Mongos();
+    ns = request.getNamespaceString();
+    collation = request.getCollation();
+    _ownedCollator = std::move(collator);
+    _resolvedNamespaces = std::move(resolvedNamespaces);
+}
+ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator)
+    : opCtx(opCtx),
       variablesParseState(variables.useIdGenerator()),
-      _collator(std::move(collator)),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()),
-      _resolvedNamespaces(std::move(resolvedNamespaces)) {}
+      _collator(collator),
+      _documentComparator(_collator),
+      _valueComparator(_collator) {}
 
 void ExpressionContext::checkForInterrupt() {
     // This check could be expensive, at least in relative terms, so don't check every time.
     if (--_interruptCounter == 0) {
+        invariant(opCtx);
         opCtx->checkForInterrupt();
         _interruptCounter = kInterruptCheckPeriod;
     }
 }
 
-void ExpressionContext::setCollator(std::unique_ptr<CollatorInterface> coll) {
-    _collator = std::move(coll);
+void ExpressionContext::setCollator(const CollatorInterface* collator) {
+    _collator = collator;
 
     // Document/Value comparisons must be aware of the collation.
-    _documentComparator = DocumentComparator(_collator.get());
-    _valueComparator = ValueComparator(_collator.get());
+    _documentComparator = DocumentComparator(_collator);
+    _valueComparator = ValueComparator(_collator);
 }
 
 intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns,
@@ -92,8 +97,10 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns,
     expCtx->opCtx = opCtx;
 
     expCtx->collation = collation;
-    if (_collator) {
-        expCtx->setCollator(_collator->clone());
+    if (_ownedCollator) {
+        expCtx->setCollator(_ownedCollator->clone());
+    } else if (_collator) {
+        expCtx->setCollator(_collator);
     }
 
     expCtx->_resolvedNamespaces = _resolvedNamespaces;

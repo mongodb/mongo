@@ -186,7 +186,7 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
                                   request,
                                   CollatorInterface::cloneCollator(viewDef.defaultCollator()),
                                   std::move(resolvedNamespaces));
-        auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), expCtx);
+        auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
         if (!pipelineStatus.isOK()) {
             uassert(40255,
                     str::stream() << "Invalid pipeline for view " << viewDef.name().ns() << "; "

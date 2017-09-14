@@ -70,14 +70,22 @@ public:
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces);
 
     /**
+     * Constructs an ExpressionContext to be used for MatchExpression parsing outside of the context
+     * of aggregation.
+     */
+    ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator);
+
+    /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
      * this aggregation pipeline has been interrupted.
      */
     void checkForInterrupt();
 
     const CollatorInterface* getCollator() const {
-        return _collator.get();
+        return _collator;
     }
+
+    void setCollator(const CollatorInterface* collator);
 
     const DocumentComparator& getDocumentComparator() const {
         return _documentComparator;
@@ -148,15 +156,23 @@ protected:
         : ns(std::move(nss)), variablesParseState(variables.useIdGenerator()) {}
 
     /**
-     * Sets '_collator' and resets '_documentComparator' and '_valueComparator'.
+     * Sets '_ownedCollator' and resets '_collator', 'documentComparator' and 'valueComparator'.
      *
-     * Use with caution - it is illegal to change the collation once a Pipeline has been parsed with
-     * this ExpressionContext.
+     * Use with caution - '_ownedCollator' is used in the context of a Pipeline, and it is illegal
+     * to change the collation once a Pipeline has been parsed with this ExpressionContext.
      */
-    void setCollator(std::unique_ptr<CollatorInterface> collator);
+    void setCollator(std::unique_ptr<CollatorInterface> collator) {
+        _ownedCollator = std::move(collator);
+        setCollator(_ownedCollator.get());
+    }
 
-    // Collator used for comparisons.
-    std::unique_ptr<CollatorInterface> _collator;
+    // Collator used for comparisons. This is owned in the context of a Pipeline.
+    // TODO SERVER-31294: Move ownership of an aggregation's collator elsewhere.
+    std::unique_ptr<CollatorInterface> _ownedCollator;
+
+    // Collator used for comparisons. If '_ownedCollator' is non-null, then this must point to the
+    // same collator object.
+    const CollatorInterface* _collator = nullptr;
 
     // Used for all comparisons of Document/Value during execution of the aggregation operation.
     // Must not be changed after parsing a Pipeline with this ExpressionContext.

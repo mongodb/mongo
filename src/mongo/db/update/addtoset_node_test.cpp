@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
@@ -47,16 +48,16 @@ using mongo::mutablebson::countChildren;
 
 DEATH_TEST(AddToSetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$addToSet: {}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    node.init(update["$addToSet"].embeddedObject().firstElement(), collator).transitional_ignore();
+    node.init(update["$addToSet"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
 TEST(AddToSetNodeTest, InitFailsIfEachIsNotArray) {
     auto update = fromjson("{$addToSet: {a: {$each: {}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    auto result = node.init(update["$addToSet"]["a"], collator);
+    auto result = node.init(update["$addToSet"]["a"], expCtx);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
     ASSERT_EQ(result.reason(),
@@ -65,9 +66,9 @@ TEST(AddToSetNodeTest, InitFailsIfEachIsNotArray) {
 
 TEST(AddToSetNodeTest, InitFailsIfThereAreFieldsAfterEach) {
     auto update = fromjson("{$addToSet: {a: {$each: [], bad: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    auto result = node.init(update["$addToSet"]["a"], collator);
+    auto result = node.init(update["$addToSet"]["a"], expCtx);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.code(), ErrorCodes::BadValue);
     ASSERT_EQ(result.reason(),
@@ -76,37 +77,37 @@ TEST(AddToSetNodeTest, InitFailsIfThereAreFieldsAfterEach) {
 
 TEST(AddToSetNodeTest, InitSucceedsWithFailsBeforeEach) {
     auto update = fromjson("{$addToSet: {a: {other: 1, $each: []}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 }
 
 TEST(AddToSetNodeTest, InitSucceedsWithObject) {
     auto update = fromjson("{$addToSet: {a: {}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 }
 
 TEST(AddToSetNodeTest, InitSucceedsWithArray) {
     auto update = fromjson("{$addToSet: {a: []}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 }
 
 TEST(AddToSetNodeTest, InitSucceedsWithScaler) {
     auto update = fromjson("{$addToSet: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 }
 
 TEST_F(AddToSetNodeTest, ApplyFailsOnNonArray) {
     auto update = fromjson("{$addToSet: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2}"));
     setPathTaken("a");
@@ -119,9 +120,9 @@ TEST_F(AddToSetNodeTest, ApplyFailsOnNonArray) {
 
 TEST_F(AddToSetNodeTest, ApplyNonEach) {
     auto update = fromjson("{$addToSet: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -136,9 +137,9 @@ TEST_F(AddToSetNodeTest, ApplyNonEach) {
 
 TEST_F(AddToSetNodeTest, ApplyNonEachArray) {
     auto update = fromjson("{$addToSet: {a: [1]}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -153,9 +154,9 @@ TEST_F(AddToSetNodeTest, ApplyNonEachArray) {
 
 TEST_F(AddToSetNodeTest, ApplyEach) {
     auto update = fromjson("{$addToSet: {a: {$each: [1, 2]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -170,9 +171,9 @@ TEST_F(AddToSetNodeTest, ApplyEach) {
 
 TEST_F(AddToSetNodeTest, ApplyToEmptyArray) {
     auto update = fromjson("{$addToSet: {a: {$each: [1, 2]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -187,9 +188,9 @@ TEST_F(AddToSetNodeTest, ApplyToEmptyArray) {
 
 TEST_F(AddToSetNodeTest, ApplyDeduplicateElementsToAdd) {
     auto update = fromjson("{$addToSet: {a: {$each: [1, 1]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -204,9 +205,9 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicateElementsToAdd) {
 
 TEST_F(AddToSetNodeTest, ApplyDoNotAddExistingElements) {
     auto update = fromjson("{$addToSet: {a: {$each: [0, 1]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -221,9 +222,9 @@ TEST_F(AddToSetNodeTest, ApplyDoNotAddExistingElements) {
 
 TEST_F(AddToSetNodeTest, ApplyDoNotDeduplicateExistingElements) {
     auto update = fromjson("{$addToSet: {a: {$each: [1]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 0]}"));
     setPathTaken("a");
@@ -238,9 +239,9 @@ TEST_F(AddToSetNodeTest, ApplyDoNotDeduplicateExistingElements) {
 
 TEST_F(AddToSetNodeTest, ApplyNoElementsToAdd) {
     auto update = fromjson("{$addToSet: {a: {$each: []}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -255,9 +256,9 @@ TEST_F(AddToSetNodeTest, ApplyNoElementsToAdd) {
 
 TEST_F(AddToSetNodeTest, ApplyNoNonDuplicateElementsToAdd) {
     auto update = fromjson("{$addToSet: {a: {$each: [0]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -272,9 +273,9 @@ TEST_F(AddToSetNodeTest, ApplyNoNonDuplicateElementsToAdd) {
 
 TEST_F(AddToSetNodeTest, ApplyCreateArray) {
     auto update = fromjson("{$addToSet: {a: {$each: [0, 1]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -289,9 +290,9 @@ TEST_F(AddToSetNodeTest, ApplyCreateArray) {
 
 TEST_F(AddToSetNodeTest, ApplyCreateEmptyArrayIsNotNoop) {
     auto update = fromjson("{$addToSet: {a: {$each: []}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -306,9 +307,11 @@ TEST_F(AddToSetNodeTest, ApplyCreateEmptyArrayIsNotNoop) {
 
 TEST_F(AddToSetNodeTest, ApplyDeduplicationOfElementsToAddRespectsCollation) {
     auto update = fromjson("{$addToSet: {a: {$each: ['abc', 'ABC', 'def', 'abc']}}}");
-    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], &collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -323,9 +326,11 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicationOfElementsToAddRespectsCollation) {
 
 TEST_F(AddToSetNodeTest, ApplyComparisonToExistingElementsRespectsCollation) {
     auto update = fromjson("{$addToSet: {a: {$each: ['abc', 'def']}}}");
-    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], &collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: ['ABC']}"));
     setPathTaken("a");
@@ -340,9 +345,9 @@ TEST_F(AddToSetNodeTest, ApplyComparisonToExistingElementsRespectsCollation) {
 
 TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
     auto update = fromjson("{$addToSet: {a: {$each: ['abc', 'ABC', 'def', 'abc']}}}");
-    const CollatorInterface* binaryComparisonCollator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], binaryComparisonCollator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     const CollatorInterfaceMock caseInsensitiveCollator(
         CollatorInterfaceMock::MockType::kToLowerString);
@@ -361,18 +366,19 @@ TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
 
 DEATH_TEST(AddToSetNodeTest, CannotSetCollatorIfCollatorIsNonNull, "Invariant failure !_collator") {
     auto update = fromjson("{$addToSet: {a: 1}}");
-    const CollatorInterfaceMock caseInsensitiveCollator(
-        CollatorInterfaceMock::MockType::kToLowerString);
+    CollatorInterfaceMock caseInsensitiveCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&caseInsensitiveCollator);
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], &caseInsensitiveCollator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
     node.setCollator(&caseInsensitiveCollator);
 }
 
 DEATH_TEST(AddToSetNodeTest, CannotSetCollatorTwice, "Invariant failure !_collator") {
     auto update = fromjson("{$addToSet: {a: 1}}");
-    const CollatorInterface* binaryComparisonCollator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], binaryComparisonCollator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     const CollatorInterfaceMock caseInsensitiveCollator(
         CollatorInterfaceMock::MockType::kToLowerString);
@@ -382,9 +388,9 @@ DEATH_TEST(AddToSetNodeTest, CannotSetCollatorTwice, "Invariant failure !_collat
 
 TEST_F(AddToSetNodeTest, ApplyNestedArray) {
     auto update = fromjson("{ $addToSet : { 'a.1' : 1 } }");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a.1"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a.1"], expCtx));
 
     mutablebson::Document doc(fromjson("{ _id : 1, a : [ 1, [ ] ] }"));
     setPathTaken("a.1");
@@ -399,9 +405,9 @@ TEST_F(AddToSetNodeTest, ApplyNestedArray) {
 
 TEST_F(AddToSetNodeTest, ApplyIndexesNotAffected) {
     auto update = fromjson("{$addToSet: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -415,9 +421,9 @@ TEST_F(AddToSetNodeTest, ApplyIndexesNotAffected) {
 
 TEST_F(AddToSetNodeTest, ApplyNoIndexDataOrLogBuilder) {
     auto update = fromjson("{$addToSet: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], collator));
+    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");

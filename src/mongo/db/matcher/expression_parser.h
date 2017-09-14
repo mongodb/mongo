@@ -44,7 +44,6 @@
 
 namespace mongo {
 
-class CollatorInterface;
 class OperationContext;
 
 enum class PathAcceptingKeyword {
@@ -123,18 +122,13 @@ public:
      */
     static StatusWithMatchExpression parse(
         const BSONObj& obj,
-        const CollatorInterface* collator,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
         AllowedFeatureSet allowedFeatures = kDefaultSpecialFeatures) {
-        // A non-null ExpressionContext is required for parsing $expr.
-        if (!expCtx) {
-            invariant((allowedFeatures & AllowedFeatures::kExpr) == 0u);
-        }
-
+        invariant(expCtx.get());
         const bool topLevelCall = true;
         return MatchExpressionParser(&extensionsCallback)
-            ._parse(obj, collator, expCtx, allowedFeatures, topLevelCall);
+            ._parse(obj, expCtx, allowedFeatures, topLevelCall);
     }
 
     /**
@@ -185,14 +179,10 @@ private:
     /**
      * Parse 'obj' and return either a MatchExpression or an error.
      *
-     * 'collator' is the collator that constructed collation-aware MatchExpressions will use.  It
-     * must outlive the returned MatchExpression and any clones made of it.
-     *
      * 'topLevel' indicates whether or not the we are at the top level of the tree across recursive
      * class to this function. This is used to apply special logic at the top level.
      */
     StatusWithMatchExpression _parse(const BSONObj& obj,
-                                     const CollatorInterface* collator,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      AllowedFeatureSet allowedFeatures,
                                      bool topLevel);
@@ -205,7 +195,6 @@ private:
     Status _parseSub(const char* name,
                      const BSONObj& obj,
                      AndMatchExpression* root,
-                     const CollatorInterface* collator,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      AllowedFeatureSet allowedFeatures,
                      bool topLevel);
@@ -219,7 +208,6 @@ private:
                                              const AndMatchExpression* andSoFar,
                                              const char* name,
                                              const BSONElement& e,
-                                             const CollatorInterface* collator,
                                              const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              AllowedFeatureSet allowedFeatures,
                                              bool topLevel);
@@ -228,7 +216,6 @@ private:
         const char* name,
         ComparisonMatchExpression* cmp,
         const BSONElement& e,
-        const CollatorInterface* collator,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         AllowedFeatureSet allowedFeatures);
 
@@ -240,7 +227,6 @@ private:
 
     Status _parseInExpression(InMatchExpression* entries,
                               const BSONObj& theArray,
-                              const CollatorInterface* collator,
                               const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     template <class T>
@@ -259,14 +245,12 @@ private:
 
     StatusWithMatchExpression _parseElemMatch(const char* name,
                                               const BSONElement& e,
-                                              const CollatorInterface* collator,
                                               const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               AllowedFeatureSet allowedFeatures,
                                               bool topLevel);
 
     StatusWithMatchExpression _parseAll(const char* name,
                                         const BSONElement& e,
-                                        const CollatorInterface* collator,
                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         AllowedFeatureSet allowedFeatures,
                                         bool topLevel);
@@ -275,14 +259,12 @@ private:
 
     Status _parseTreeList(const BSONObj& arr,
                           ListOfMatchExpression* out,
-                          const CollatorInterface* collator,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           AllowedFeatureSet allowedFeatures,
                           bool topLevel);
 
     StatusWithMatchExpression _parseNot(const char* name,
                                         const BSONElement& e,
-                                        const CollatorInterface* collator,
                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         AllowedFeatureSet allowedFeatures,
                                         bool topLevel);
@@ -307,7 +289,6 @@ private:
     StatusWithMatchExpression _parseInternalSchemaFixedArityArgument(
         StringData name,
         const BSONElement& elem,
-        const CollatorInterface* collator,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         AllowedFeatureSet allowedFeatures);
 
@@ -331,10 +312,12 @@ private:
      * Parses 'elem' into an InternalSchemaMatchArrayIndexMatchExpression.
      */
     StatusWithMatchExpression _parseInternalSchemaMatchArrayIndex(
-        const char* path, const BSONElement& elem, const CollatorInterface* collator);
+        const char* path,
+        const BSONElement& elem,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     StatusWithMatchExpression _parseInternalSchemaAllowedProperties(
-        const BSONElement& elem, const CollatorInterface* collator);
+        const BSONElement& elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     // Performs parsing for the match extensions. We do not own this pointer - it has to live
     // as long as the parser is active.

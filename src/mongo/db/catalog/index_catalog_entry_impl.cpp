@@ -127,8 +127,10 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
     if (BSONElement filterElement = _descriptor->getInfoElement("partialFilterExpression")) {
         invariant(filterElement.isABSONObj());
         BSONObj filter = filterElement.Obj();
+        boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContext(opCtx, _collator.get()));
         StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(filter, _collator.get());
+            MatchExpressionParser::parse(filter, std::move(expCtx));
         // this should be checked in create, so can blow up here
         invariantOK(statusWithMatcher.getStatus());
         _filterExpression = std::move(statusWithMatcher.getValue());

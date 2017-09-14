@@ -42,7 +42,7 @@ namespace mongo {
  */
 class PullNode final : public ArrayCullingNode {
 public:
-    Status init(BSONElement modExpr, const CollatorInterface* collator) final;
+    Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) final;
 
     std::unique_ptr<UpdateNode> clone() const final {
         return stdx::make_unique<PullNode>(*this);

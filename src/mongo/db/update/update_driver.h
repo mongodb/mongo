@@ -218,7 +218,8 @@ struct UpdateDriver::Options {
     bool logOp;
     ModifierInterface::Options modOptions;
 
-    Options() : logOp(false), modOptions() {}
+    explicit Options(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : logOp(false), modOptions(ModifierInterface::Options::normal(expCtx)) {}
 };
 
 }  // namespace mongo

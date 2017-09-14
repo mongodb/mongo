@@ -662,7 +662,7 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
     invariant(!proj.isEmpty());
 
     ParsedProjection* rawParsedProj;
-    Status ppStatus = ParsedProjection::make(proj.getOwned(), cq->root(), &rawParsedProj);
+    Status ppStatus = ParsedProjection::make(opCtx, proj.getOwned(), cq->root(), &rawParsedProj);
     if (!ppStatus.isOK()) {
         return ppStatus;
     }

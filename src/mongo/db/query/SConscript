@@ -73,7 +73,6 @@ env.Library(
         "internal_plans",
         "query_common",
         "query_planner",
-        "query_planner_test_lib",
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/database',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
@@ -279,7 +278,6 @@ env.Library(
     ],
     LIBDEPS=[
         "query_planner_test_lib",
-        "query_test_service_context",
         "$BUILD_DIR/mongo/unittest/unittest",
     ],
 )
@@ -292,6 +290,7 @@ env.Library(
     LIBDEPS=[
         "collation/collator_factory_mock",
         "query_planner",
+        "query_test_service_context",
     ],
 )
 
@@ -325,6 +324,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "collation/collator_interface_mock",
         "index_bounds",
+        "query_test_service_context",
     ],
 )
 
@@ -366,6 +366,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "query_planner",
+        "query_test_service_context",
     ],
 )
 
@@ -388,6 +389,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "collation/collator_interface_mock",
         "query_planner",
+        "query_test_service_context",
     ],
 )
 
@@ -409,6 +411,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "collation/collator_interface_mock",
         "query_planner",
+        "query_test_service_context",
     ],
 )
 
@@ -435,6 +438,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "collation/collator_factory_mock",
         "query_planner",
+        "query_test_service_context",
     ],
 )
 

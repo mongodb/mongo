@@ -45,7 +45,8 @@ public:
      * Returns Status::OK() if it's a valid spec.
      * Returns a Status indicating how it's invalid otherwise.
      */
-    static Status make(const BSONObj& spec,
+    static Status make(OperationContext* opCtx,
+                       const BSONObj& spec,
                        const MatchExpression* const query,
                        ParsedProjection** out);
 

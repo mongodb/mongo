@@ -156,9 +156,9 @@ env.CppUnitTest(
         'document_source',
         'document_source_facet',
         'document_source_lookup',
+        'document_source_mock',
         'document_value_test_util',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
@@ -250,7 +250,6 @@ docSourceEnv.Library(
         'document_source_list_sessions.cpp',
         'document_source_match.cpp',
         'document_source_merge_cursors.cpp',
-        'document_source_mock.cpp',
         'document_source_out.cpp',
         'document_source_project.cpp',
         'document_source_redact.cpp',
@@ -288,6 +287,17 @@ docSourceEnv.Library(
         'granularity_rounder',
         'parsed_aggregation_projection',
     ],
+)
+
+env.Library(
+    target='document_source_mock',
+    source=[
+        'document_source_mock.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        'document_source',
+    ]
 )
 
 env.Library(
@@ -353,10 +363,10 @@ env.CppUnitTest(
     source='document_source_facet_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/is_mongos',
         'document_source_facet',
+        'document_source_mock',
         'document_value_test_util',
     ],
 )
@@ -369,6 +379,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/is_mongos',
         'document_source_facet',
+        'document_source_mock',
         'document_value_test_util',
     ],
 )
@@ -389,6 +400,7 @@ env.CppUnitTest(
     source='accumulator_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'accumulator',
         'document_value_test_util',
         ],
@@ -403,13 +415,13 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/is_mongos',
         'document_value_test_util',
         'document_source_lookup',
+        'document_source_mock',
         'pipeline',
         ],
     )
@@ -446,6 +458,7 @@ env.CppUnitTest(
     target='parsed_exclusion_projection_test',
     source='parsed_exclusion_projection_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'document_value_test_util',
         'parsed_aggregation_projection',
     ],
@@ -455,6 +468,7 @@ env.CppUnitTest(
     target='parsed_aggregation_projection_test',
     source='parsed_aggregation_projection_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'parsed_aggregation_projection',
     ],
 )
@@ -463,6 +477,7 @@ env.CppUnitTest(
     target='parsed_inclusion_projection_test',
     source='parsed_inclusion_projection_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'document_value_test_util',
         'parsed_aggregation_projection',
     ],
@@ -475,6 +490,7 @@ env.CppUnitTest(
         'granularity_rounder_preferred_numbers_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'document_value_test_util',
         'granularity_rounder',
     ],
@@ -484,6 +500,7 @@ env.CppUnitTest(
     target='parsed_add_fields_test',
     source='parsed_add_fields_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'document_value_test_util',
         'parsed_aggregation_projection',
     ],

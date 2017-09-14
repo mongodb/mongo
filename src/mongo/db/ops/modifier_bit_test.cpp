@@ -36,6 +36,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
@@ -44,6 +45,7 @@ namespace {
 
 using mongo::BSONObj;
 using mongo::Decimal128;
+using mongo::ExpressionContextForTest;
 using mongo::LogBuilder;
 using mongo::ModifierBit;
 using mongo::ModifierInterface;
@@ -61,7 +63,7 @@ public:
 
     explicit Mod(BSONObj modObj) : _modObj(modObj), _mod() {
         ASSERT_OK(_mod.init(_modObj["$bit"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+                            ModifierInterface::Options::normal(new ExpressionContextForTest())));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -89,50 +91,51 @@ private:
 TEST(Init, FailToInitWithInvalidValue) {
     BSONObj modObj;
     ModifierBit mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     // Double is an invalid $bit argument
     modObj = fromjson("{ $bit : { a : 0 } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // String is an invalid $bit argument
     modObj = fromjson("{ $bit : { a : '' } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // Array is an invalid $bit argument
     modObj = fromjson("{ $bit : { a : [] } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // An empty document is an invalid $bit argument.
     modObj = fromjson("{$bit: {a: {}}}");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // An object with value not in ('and', 'or') is an invalid $bit argument
     modObj = fromjson("{ $bit : { a : { foo : 4 } } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // The argument to the sub-operator must be numeric
     modObj = fromjson("{ $bit : { a : { or : [] } } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     modObj = fromjson("{ $bit : { a : { or : 'foo' } } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // The argument to the sub-operator must be integral
     modObj = fromjson("{ $bit : { a : { or : 1.0 } } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // The argument to the sub-operator must be integral
     modObj = fromjson("{ $bit : { a : { or : NumberDecimal(\"1.0\") } } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, ParsesAndInt) {

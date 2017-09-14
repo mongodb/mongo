@@ -521,7 +521,7 @@ DEATH_TEST_F(DocumentSourceMatchTest,
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a.b" << 1 << "b.c" << 1);
     const auto matchExpression =
-        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx->getCollator()));
+        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx));
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
@@ -531,7 +531,7 @@ DEATH_TEST_F(DocumentSourceMatchTest,
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("a.b" << 1)));
     const auto matchExpression =
-        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx->getCollator()));
+        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx));
     BSONObjBuilder out;
     matchExpression->serialize(&out);
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
@@ -546,7 +546,7 @@ DEATH_TEST_F(DocumentSourceMatchTest,
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("$gt" << 0)));
     const auto matchExpression =
-        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx->getCollator()));
+        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx));
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
@@ -554,7 +554,7 @@ TEST_F(DocumentSourceMatchTest, ShouldMatchCorrectlyAfterDescendingMatch) {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a.b" << 1 << "a.c" << 1 << "a.d" << 1);
     const auto matchExpression =
-        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx->getCollator()));
+        unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx));
 
     const auto descendedMatch =
         DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);

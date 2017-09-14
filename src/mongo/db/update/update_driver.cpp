@@ -107,7 +107,7 @@ modifiertable::ModifierType validateMod(BSONElement mod) {
 bool parseUpdateExpression(
     BSONObj updateExpr,
     UpdateObjectNode* root,
-    const CollatorInterface* collator,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters) {
     bool positional = false;
     std::set<std::string> foundIdentifiers;
@@ -127,7 +127,7 @@ bool parseUpdateExpression(
         auto modType = validateMod(mod);
         for (auto&& field : mod.Obj()) {
             auto statusWithPositional = UpdateObjectNode::parseAndMerge(
-                root, modType, field, collator, arrayFilters, foundIdentifiers);
+                root, modType, field, expCtx, arrayFilters, foundIdentifiers);
             uassertStatusOK(statusWithPositional);
             positional = positional || statusWithPositional.getValue();
         }
@@ -239,7 +239,7 @@ Status UpdateDriver::parse(
         case UpdateSemantics::kUpdateNode: {
             auto root = stdx::make_unique<UpdateObjectNode>();
             _positional =
-                parseUpdateExpression(updateExpr, root.get(), _modOptions.collator, arrayFilters);
+                parseUpdateExpression(updateExpr, root.get(), _modOptions.expCtx, arrayFilters);
             _root = std::move(root);
             break;
         }
@@ -555,7 +555,7 @@ void UpdateDriver::setCollator(const CollatorInterface* collator) {
         mod->setCollator(collator);
     }
 
-    _modOptions.collator = collator;
+    _modOptions.expCtx->setCollator(collator);
 }
 
 void UpdateDriver::clear() {

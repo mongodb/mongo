@@ -147,8 +147,14 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     }
 
     // Make MatchExpression.
+    boost::intrusive_ptr<ExpressionContext> newExpCtx;
+    if (!expCtx.get()) {
+        newExpCtx.reset(new ExpressionContext(opCtx, collator.get()));
+    } else {
+        newExpCtx = expCtx;
+    }
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-        qr->getFilter(), collator.get(), expCtx, extensionsCallback, allowedFeatures);
+        qr->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);
     if (!statusWithMatcher.isOK()) {
         return statusWithMatcher.getStatus();
     }
@@ -158,7 +164,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
     Status initStatus =
-        cq->init(std::move(qr),
+        cq->init(opCtx,
+                 std::move(qr),
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
                  me.release(),
                  std::move(collator));
@@ -192,7 +199,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
-    Status initStatus = cq->init(std::move(qr),
+    Status initStatus = cq->init(opCtx,
+                                 std::move(qr),
                                  baseQuery.canHaveNoopMatchNodes(),
                                  root->shallowClone().release(),
                                  std::move(collator));
@@ -203,7 +211,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     return std::move(cq);
 }
 
-Status CanonicalQuery::init(std::unique_ptr<QueryRequest> qr,
+Status CanonicalQuery::init(OperationContext* opCtx,
+                            std::unique_ptr<QueryRequest> qr,
                             bool canHaveNoopMatchNodes,
                             MatchExpression* root,
                             std::unique_ptr<CollatorInterface> collator) {
@@ -226,7 +235,7 @@ Status CanonicalQuery::init(std::unique_ptr<QueryRequest> qr,
     // Validate the projection if there is one.
     if (!_qr->getProj().isEmpty()) {
         ParsedProjection* pp;
-        Status projStatus = ParsedProjection::make(_qr->getProj(), _root.get(), &pp);
+        Status projStatus = ParsedProjection::make(opCtx, _qr->getProj(), _root.get(), &pp);
         if (!projStatus.isOK()) {
             return projStatus;
         }

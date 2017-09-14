@@ -179,7 +179,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     UpdateObjectNode* root,
     modifiertable::ModifierType type,
     BSONElement modExpr,
-    const CollatorInterface* collator,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
     std::set<std::string>& foundIdentifiers) {
     FieldRef fieldRef;
@@ -194,7 +194,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
         auto status = parseAndMerge(root,
                                     modifiertable::ModifierType::MOD_CONFLICT_PLACEHOLDER,
                                     modExpr,
-                                    collator,
+                                    expCtx,
                                     arrayFilters,
                                     foundIdentifiers);
         if (!status.isOK()) {
@@ -243,7 +243,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     // Construct and initialize the leaf node.
     auto leaf = modifiertable::makeUpdateLeafNode(type);
     invariant(leaf);
-    status = leaf->init(modExpr, collator);
+    status = leaf->init(modExpr, expCtx);
     if (!status.isOK()) {
         return status;
     }

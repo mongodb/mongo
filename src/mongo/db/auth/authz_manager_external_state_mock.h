@@ -112,11 +112,13 @@ private:
     typedef std::vector<BSONObj> BSONObjCollection;
     typedef std::map<NamespaceString, BSONObjCollection> NamespaceDocumentMap;
 
-    Status _findOneIter(const NamespaceString& collectionName,
+    Status _findOneIter(OperationContext* opCtx,
+                        const NamespaceString& collectionName,
                         const BSONObj& query,
                         BSONObjCollection::iterator* result);
 
-    Status _queryVector(const NamespaceString& collectionName,
+    Status _queryVector(OperationContext* opCtx,
+                        const NamespaceString& collectionName,
                         const BSONObj& query,
                         std::vector<BSONObjCollection::iterator>* result);
 

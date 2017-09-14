@@ -60,7 +60,7 @@ struct ModifierSet::PreparedState {
 };
 
 ModifierSet::ModifierSet(ModifierSet::ModifierSetMode mode)
-    : _fieldRef(), _posDollar(0), _setMode(mode), _val(), _modOptions() {}
+    : _fieldRef(), _posDollar(0), _setMode(mode), _val() {}
 
 ModifierSet::~ModifierSet() {}
 
@@ -100,7 +100,7 @@ Status ModifierSet::init(const BSONElement& modExpr, const Options& opts, bool* 
         return Status(ErrorCodes::BadValue, "cannot $set an empty value");
 
     _val = modExpr;
-    _modOptions = opts;
+    _fromOplogApplication = opts.fromOplogApplication;
 
     return Status::OK();
 }
@@ -133,7 +133,7 @@ Status ModifierSet::prepare(mutablebson::Element root,
     // proceed.
     if (status.code() == ErrorCodes::NonExistentPath) {
         _preparedState->elemFound = root.getDocument().end();
-    } else if (_modOptions.fromOplogApplication && status.code() == ErrorCodes::PathNotViable) {
+    } else if (_fromOplogApplication && status.code() == ErrorCodes::PathNotViable) {
         // If we are applying an oplog entry and it is an invalid path, then push on indicating that
         // we had a blocking element, which we stopped at
         _preparedState->elemIsBlocking = true;
@@ -211,7 +211,7 @@ Status ModifierSet::apply() const {
     }
 
     // Remove the blocking element, if we are from replication applier. See comment below.
-    if (_modOptions.fromOplogApplication && !destExists && _preparedState->elemFound.ok() &&
+    if (_fromOplogApplication && !destExists && _preparedState->elemFound.ok() &&
         _preparedState->elemIsBlocking && (!(_preparedState->elemFound.isType(Array)) ||
                                            !(_preparedState->elemFound.isType(Object)))) {
         /**

@@ -189,7 +189,8 @@ public:
             OldClientWriteContext ctx(&_opCtx, nss.ns());
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
-            UpdateDriver driver((UpdateDriver::Options()));
+            const CollatorInterface* collator = nullptr;
+            UpdateDriver driver((UpdateDriver::Options(new ExpressionContext(&_opCtx, collator))));
             Collection* collection = ctx.getCollection();
 
             // Collection should be empty.
@@ -259,7 +260,8 @@ public:
 
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
-            UpdateDriver driver((UpdateDriver::Options()));
+            const CollatorInterface* collator = nullptr;
+            UpdateDriver driver((UpdateDriver::Options(new ExpressionContext(&_opCtx, collator))));
             Database* db = ctx.db();
             Collection* coll = db->getCollection(&_opCtx, nss);
 
@@ -377,7 +379,8 @@ public:
         Collection* coll = ctx.getCollection();
         UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
-        UpdateDriver driver((UpdateDriver::Options()));
+        const CollatorInterface* collator = nullptr;
+        UpdateDriver driver((UpdateDriver::Options(new ExpressionContext(&_opCtx, collator))));
         const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = make_unique<WorkingSet>();
@@ -467,7 +470,8 @@ public:
         Collection* coll = ctx.getCollection();
         UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
-        UpdateDriver driver((UpdateDriver::Options()));
+        const CollatorInterface* collator = nullptr;
+        UpdateDriver driver((UpdateDriver::Options(new ExpressionContext(&_opCtx, collator))));
         const int targetDocIndex = 10;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = make_unique<WorkingSet>();
@@ -553,7 +557,8 @@ public:
         Collection* coll = ctx.getCollection();
         UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
-        UpdateDriver driver((UpdateDriver::Options()));
+        const CollatorInterface* collator = nullptr;
+        UpdateDriver driver((UpdateDriver::Options(new ExpressionContext(&_opCtx, collator))));
         const BSONObj query = BSONObj();
         const auto ws = make_unique<WorkingSet>();
         const unique_ptr<CanonicalQuery> cq(canonicalize(query));

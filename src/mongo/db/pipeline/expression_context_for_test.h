@@ -29,31 +29,31 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/query_test_service_context.h"
 
 namespace mongo {
 
 /**
- * An ExpressionContext that can have state like the collation and resolved namespace map
- * manipulated after construction. In contrast, a regular ExpressionContext requires the collation
- * and resolved namespaces to be provided on construction and does not allow them to be subsequently
+ * An ExpressionContext with a default OperationContext that can have state (like the resolved
+ * namespace map) manipulated after construction. In contrast, a regular ExpressionContext requires
+ * the resolved namespaces to be provided on construction and does not allow them to be subsequently
  * mutated.
  */
 class ExpressionContextForTest : public ExpressionContext {
 public:
-    ExpressionContextForTest() : ExpressionContext(NamespaceString{"test"_sd, "namespace"_sd}) {}
+    ExpressionContextForTest()
+        : ExpressionContextForTest(NamespaceString{"test"_sd, "namespace"_sd}) {}
 
-    ExpressionContextForTest(NamespaceString nss) : ExpressionContext(std::move(nss)) {}
+    ExpressionContextForTest(NamespaceString nss)
+        : ExpressionContext(std::move(nss)), _testOpCtx(_serviceContext.makeOperationContext()) {
+        TimeZoneDatabase::set(_serviceContext.getServiceContext(),
+                              stdx::make_unique<TimeZoneDatabase>());
+        opCtx = _testOpCtx.get();
+    }
 
     ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
         : ExpressionContext(opCtx, request, nullptr, {}) {}
-
-    /**
-     * Changes the collation used by this ExpressionContext. Must not be changed after parsing a
-     * Pipeline with this ExpressionContext.
-     */
-    void setCollator(std::unique_ptr<CollatorInterface> collator) {
-        ExpressionContext::setCollator(std::move(collator));
-    }
 
     /**
      * Sets the resolved definition for an involved namespace.
@@ -61,6 +61,10 @@ public:
     void setResolvedNamespace(const NamespaceString& nss, ResolvedNamespace resolvedNamespace) {
         _resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
     }
+
+private:
+    QueryTestServiceContext _serviceContext;
+    ServiceContext::UniqueOperationContext _testOpCtx;
 };
 
 }  // namespace mongo

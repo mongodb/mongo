@@ -34,6 +34,7 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/unittest/unittest.h"
@@ -54,8 +55,8 @@ using std::vector;
  * Utility function to create MatchExpression
  */
 unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, std::move(expCtx));
     ASSERT_TRUE(status.isOK());
     return std::move(status.getValue());
 }

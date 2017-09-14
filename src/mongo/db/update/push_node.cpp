@@ -82,7 +82,7 @@ Status checkSortClause(const BSONObj& sortObject) {
 
 }  // namespace
 
-Status PushNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
     if (modExpr.type() == BSONType::Object && modExpr[kEachClauseName]) {
@@ -148,14 +148,14 @@ Status PushNode::init(BSONElement modExpr, const CollatorInterface* collator) {
                 auto status = checkSortClause(sortClause.embeddedObject());
 
                 if (status.isOK()) {
-                    _sort = PatternElementCmp(sortClause.embeddedObject(), collator);
+                    _sort = PatternElementCmp(sortClause.embeddedObject(), expCtx->getCollator());
                 } else {
                     return status;
                 }
             } else if (sortClause.isNumber()) {
                 double orderVal = sortClause.Number();
                 if (orderVal == -1 || orderVal == 1) {
-                    _sort = PatternElementCmp(BSON("" << orderVal), collator);
+                    _sort = PatternElementCmp(BSON("" << orderVal), expCtx->getCollator());
                 } else {
                     return Status(ErrorCodes::BadValue,
                                   "The $sort element value must be either 1 or -1");

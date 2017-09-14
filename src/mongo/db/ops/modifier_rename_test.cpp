@@ -37,13 +37,13 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 using mutablebson::ConstElement;
-using mutablebson::Document;
 using mutablebson::Element;
 
 /** Helper to build and manipulate the mod. */
@@ -54,7 +54,7 @@ public:
     explicit Mod(BSONObj modObj) {
         _modObj = modObj;
         ASSERT_OK(_mod.init(_modObj["$rename"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+                            ModifierInterface::Options::normal(new ExpressionContextForTest())));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -86,55 +86,57 @@ private:
  */
 TEST(InvalidInit, FromDbTests) {
     ModifierRename mod;
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'a.$':'b'}").firstElement(), ModifierInterface::Options::normal()));
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'a':'b.$'}").firstElement(), ModifierInterface::Options::normal()));
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'.b':'a'}").firstElement(), ModifierInterface::Options::normal()));
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'b.':'a'}").firstElement(), ModifierInterface::Options::normal()));
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'b':'.a'}").firstElement(), ModifierInterface::Options::normal()));
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'b':'a.'}").firstElement(), ModifierInterface::Options::normal()));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(mod.init(fromjson("{'a.$':'b'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
+    ASSERT_NOT_OK(mod.init(fromjson("{'a':'b.$'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
+    ASSERT_NOT_OK(mod.init(fromjson("{'.b':'a'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
+    ASSERT_NOT_OK(mod.init(fromjson("{'b.':'a'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
+    ASSERT_NOT_OK(mod.init(fromjson("{'b':'.a'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
+    ASSERT_NOT_OK(mod.init(fromjson("{'b':'a.'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(InvalidInit, ToFieldCannotContainEmbeddedNullByte) {
     ModifierRename mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     {
         const auto embeddedNull = "a\0b"_sd;
         ASSERT_NOT_OK(mod.init(BSON("a" << embeddedNull).firstElement(),
-                               ModifierInterface::Options::normal()));
+                               ModifierInterface::Options::normal(expCtx)));
     }
 
     {
         const auto singleNullByte = "\0"_sd;
         ASSERT_NOT_OK(mod.init(BSON("a" << singleNullByte).firstElement(),
-                               ModifierInterface::Options::normal()));
+                               ModifierInterface::Options::normal(expCtx)));
     }
 
     {
         const auto leadingNullByte = "\0bbbb"_sd;
         ASSERT_NOT_OK(mod.init(BSON("a" << leadingNullByte).firstElement(),
-                               ModifierInterface::Options::normal()));
+                               ModifierInterface::Options::normal(expCtx)));
     }
 
     {
         const auto trailingNullByte = "bbbb\0"_sd;
         ASSERT_NOT_OK(mod.init(BSON("a" << trailingNullByte).firstElement(),
-                               ModifierInterface::Options::normal()));
+                               ModifierInterface::Options::normal(expCtx)));
     }
 }
 
 TEST(MissingFrom, InitPrepLog) {
-    Document doc(fromjson("{a: 2}"));
+    mutablebson::Document doc(fromjson("{a: 2}"));
     Mod setMod(fromjson("{$rename: {'b':'a'}}"));
 
     ModifierInterface::ExecInfo execInfo;
     ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -142,14 +144,14 @@ TEST(MissingFrom, InitPrepLog) {
 }
 
 TEST(MissingFromDotted, InitPrepLog) {
-    Document doc(fromjson("{a: {r:2}}"));
+    mutablebson::Document doc(fromjson("{a: {r:2}}"));
     Mod setMod(fromjson("{$rename: {'a.b':'a.c'}}"));
 
     ModifierInterface::ExecInfo execInfo;
     ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
     ASSERT_TRUE(execInfo.noOp);
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -157,30 +159,33 @@ TEST(MissingFromDotted, InitPrepLog) {
 }
 
 TEST(BasicInit, DifferentRoots) {
-    Document doc(fromjson("{a: 2}"));
+    mutablebson::Document doc(fromjson("{a: 2}"));
     Mod setMod(fromjson("{$rename: {'a':'f.g'}}"));
 }
 
 TEST(MoveOnSamePath, MoveUp) {
     ModifierRename mod;
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'b.a':'b'}").firstElement(), ModifierInterface::Options::normal()));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(mod.init(fromjson("{'b.a':'b'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(MoveOnSamePath, MoveDown) {
     ModifierRename mod;
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'b':'b.a'}").firstElement(), ModifierInterface::Options::normal()));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(mod.init(fromjson("{'b':'b.a'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(MoveOnSamePath, MoveToSelf) {
     ModifierRename mod;
-    ASSERT_NOT_OK(
-        mod.init(fromjson("{'b.a':'b.a'}").firstElement(), ModifierInterface::Options::normal()));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(mod.init(fromjson("{'b.a':'b.a'}").firstElement(),
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(MissingTo, SimpleNumberAtRoot) {
-    Document doc(fromjson("{a: 2}"));
+    mutablebson::Document doc(fromjson("{a: 2}"));
     Mod setMod(fromjson("{$rename: {'a':'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -194,7 +199,7 @@ TEST(MissingTo, SimpleNumberAtRoot) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{b:2}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'b': 2}, $unset: {'a': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -202,7 +207,7 @@ TEST(MissingTo, SimpleNumberAtRoot) {
 }
 
 TEST(SimpleReplace, SameLevel) {
-    Document doc(fromjson("{a: 2, b: 1}"));
+    mutablebson::Document doc(fromjson("{a: 2, b: 1}"));
     Mod setMod(fromjson("{$rename: {'a':'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -216,7 +221,7 @@ TEST(SimpleReplace, SameLevel) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{b:2}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'b': 2}, $unset: {'a': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -224,7 +229,7 @@ TEST(SimpleReplace, SameLevel) {
 }
 
 TEST(SimpleReplace, FromDottedElement) {
-    Document doc(fromjson("{a: {c: {d: 6}}, b: 1}"));
+    mutablebson::Document doc(fromjson("{a: {c: {d: 6}}, b: 1}"));
     Mod setMod(fromjson("{$rename: {'a.c':'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -238,7 +243,7 @@ TEST(SimpleReplace, FromDottedElement) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{a: {}, b:{ d: 6}}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'b': {d: 6}}, $unset: {'a.c': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -246,7 +251,7 @@ TEST(SimpleReplace, FromDottedElement) {
 }
 
 TEST(SimpleReplace, RenameToExistingFieldDoesNotReorderFields) {
-    Document doc(fromjson("{a: 1, b: 2, c: 3}"));
+    mutablebson::Document doc(fromjson("{a: 1, b: 2, c: 3}"));
     Mod setMod(fromjson("{$rename: {a: 'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -259,7 +264,7 @@ TEST(SimpleReplace, RenameToExistingFieldDoesNotReorderFields) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{b: 1, c: 3}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set: {b: 1}, $unset: {a: true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -267,7 +272,7 @@ TEST(SimpleReplace, RenameToExistingFieldDoesNotReorderFields) {
 }
 
 TEST(SimpleReplace, RenameToExistingNestedFieldDoesNotReorderFields) {
-    Document doc(fromjson("{a: {b: {c: 1, d: 2}}, b: 3, c: {d: 4}}"));
+    mutablebson::Document doc(fromjson("{a: {b: {c: 1, d: 2}}, b: 3, c: {d: 4}}"));
     Mod setMod(fromjson("{$rename: {'c.d': 'a.b.c'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -280,7 +285,7 @@ TEST(SimpleReplace, RenameToExistingNestedFieldDoesNotReorderFields) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{a: {b: {c: 4, d: 2}}, b: 3, c: {}}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set: {'a.b.c': 4}, $unset: {'c.d': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -288,7 +293,7 @@ TEST(SimpleReplace, RenameToExistingNestedFieldDoesNotReorderFields) {
 }
 
 TEST(DottedTo, MissingCompleteTo) {
-    Document doc(fromjson("{a: 2, b: 1, c: {}}"));
+    mutablebson::Document doc(fromjson("{a: 2, b: 1, c: {}}"));
     Mod setMod(fromjson("{$rename: {'a':'c.r.d'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -302,7 +307,7 @@ TEST(DottedTo, MissingCompleteTo) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{b:1, c: { r: { d: 2}}}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'c.r.d': 2}, $unset: {'a': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -310,7 +315,7 @@ TEST(DottedTo, MissingCompleteTo) {
 }
 
 TEST(DottedTo, ToIsCompletelyMissing) {
-    Document doc(fromjson("{a: 2}"));
+    mutablebson::Document doc(fromjson("{a: 2}"));
     Mod setMod(fromjson("{$rename: {'a':'b.c.d'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -324,7 +329,7 @@ TEST(DottedTo, ToIsCompletelyMissing) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{b: {c: {d: 2}}}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'b.c.d': 2}, $unset: {'a': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -332,7 +337,7 @@ TEST(DottedTo, ToIsCompletelyMissing) {
 }
 
 TEST(FromArrayOfEmbeddedDocs, ToMissingDottedField) {
-    Document doc(fromjson("{a: [ {a:2, b:1} ] }"));
+    mutablebson::Document doc(fromjson("{a: [ {a:2, b:1} ] }"));
     Mod setMod(fromjson("{$rename: {'a':'b.c.d'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -346,7 +351,7 @@ TEST(FromArrayOfEmbeddedDocs, ToMissingDottedField) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{b: {c: {d: [ {a:2, b:1} ]}}}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'b.c.d': [ {a:2, b:1} ]}, $unset: {'a': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -354,7 +359,7 @@ TEST(FromArrayOfEmbeddedDocs, ToMissingDottedField) {
 }
 
 TEST(FromArrayOfEmbeddedDocs, ToArray) {
-    Document doc(fromjson("{a: [ {a:2, b:1} ] }"));
+    mutablebson::Document doc(fromjson("{a: [ {a:2, b:1} ] }"));
     Mod setMod(fromjson("{$rename: {'a.a':'a.b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -362,7 +367,7 @@ TEST(FromArrayOfEmbeddedDocs, ToArray) {
 }
 
 TEST(Arrays, MoveInto) {
-    Document doc(fromjson("{a: [1, 2], b:2}"));
+    mutablebson::Document doc(fromjson("{a: [1, 2], b:2}"));
     Mod setMod(fromjson("{$rename: {'b':'a.2'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -370,7 +375,7 @@ TEST(Arrays, MoveInto) {
 }
 
 TEST(Arrays, MoveOut) {
-    Document doc(fromjson("{a: [1, 2]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 2]}"));
     Mod setMod(fromjson("{$rename: {'a.0':'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -378,7 +383,7 @@ TEST(Arrays, MoveOut) {
 }
 
 TEST(Arrays, MoveNonexistantEmbeddedFieldOut) {
-    Document doc(fromjson("{a: [{a:1}, {b:2}]}"));
+    mutablebson::Document doc(fromjson("{a: [{a:1}, {b:2}]}"));
     Mod setMod(fromjson("{$rename: {'a.a':'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -386,7 +391,7 @@ TEST(Arrays, MoveNonexistantEmbeddedFieldOut) {
 }
 
 TEST(Arrays, MoveEmbeddedFieldOutWithElementNumber) {
-    Document doc(fromjson("{a: [{a:1}, {b:2}]}"));
+    mutablebson::Document doc(fromjson("{a: [{a:1}, {b:2}]}"));
     Mod setMod(fromjson("{$rename: {'a.0.a':'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -394,7 +399,7 @@ TEST(Arrays, MoveEmbeddedFieldOutWithElementNumber) {
 }
 
 TEST(Arrays, ReplaceArrayField) {
-    Document doc(fromjson("{a: 2, b: []}"));
+    mutablebson::Document doc(fromjson("{a: 2, b: []}"));
     Mod setMod(fromjson("{$rename: {'a':'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -408,7 +413,7 @@ TEST(Arrays, ReplaceArrayField) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{b:2}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'b': 2}, $unset: {'a': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -417,7 +422,7 @@ TEST(Arrays, ReplaceArrayField) {
 
 
 TEST(Arrays, ReplaceWithArrayField) {
-    Document doc(fromjson("{a: [], b: 2}"));
+    mutablebson::Document doc(fromjson("{a: [], b: 2}"));
     Mod setMod(fromjson("{$rename: {'a':'b'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -431,7 +436,7 @@ TEST(Arrays, ReplaceWithArrayField) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{b:[]}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'b': []}, $unset: {'a': true}}");
     ASSERT_OK(setMod.log(&logBuilder));
@@ -439,7 +444,7 @@ TEST(Arrays, ReplaceWithArrayField) {
 }
 
 TEST(LegacyData, CanRenameFromInvalidFieldName) {
-    Document doc(fromjson("{$a: 2}"));
+    mutablebson::Document doc(fromjson("{$a: 2}"));
     Mod setMod(fromjson("{$rename: {'$a':'a'}}"));
 
     ModifierInterface::ExecInfo execInfo;
@@ -453,7 +458,7 @@ TEST(LegacyData, CanRenameFromInvalidFieldName) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(doc, fromjson("{a:2}"));
 
-    Document logDoc;
+    mutablebson::Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     BSONObj logObj = fromjson("{$set:{ 'a': 2}, $unset: {'$a': true}}");
     ASSERT_OK(setMod.log(&logBuilder));

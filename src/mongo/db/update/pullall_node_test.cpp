@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
@@ -47,45 +48,45 @@ using mongo::mutablebson::countChildren;
 
 TEST(PullAllNodeTest, InitWithIntFails) {
     auto update = fromjson("{$pullAll: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    auto status = node.init(update["$pullAll"]["a"], collator);
+    auto status = node.init(update["$pullAll"]["a"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PullAllNodeTest, InitWithStringFails) {
     auto update = fromjson("{$pullAll: {a: 'test'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    auto status = node.init(update["$pullAll"]["a"], collator);
+    auto status = node.init(update["$pullAll"]["a"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PullAllNodeTest, InitWithObjectFails) {
     auto update = fromjson("{$pullAll: {a: {}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    auto status = node.init(update["$pullAll"]["a"], collator);
+    auto status = node.init(update["$pullAll"]["a"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PullAllNodeTest, InitWithBoolFails) {
     auto update = fromjson("{$pullAll: {a: true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    auto status = node.init(update["$pullAll"]["a"], collator);
+    auto status = node.init(update["$pullAll"]["a"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST_F(PullAllNodeTest, TargetNotFound) {
     auto update = fromjson("{$pullAll : {b: [1]}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["b"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathToCreate("b");
@@ -100,9 +101,9 @@ TEST_F(PullAllNodeTest, TargetNotFound) {
 
 TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
     auto update = fromjson("{$pullAll : {'a.2': [1]}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a.2"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a.2"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 2]}"));
     setPathToCreate("2");
@@ -118,9 +119,9 @@ TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
 
 TEST_F(PullAllNodeTest, ApplyToNonArrayFails) {
     auto update = fromjson("{$pullAll : {'a.0': [1, 2]}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a.0"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a.0"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 2]}"));
     setPathTaken("a.0");
@@ -133,9 +134,9 @@ TEST_F(PullAllNodeTest, ApplyToNonArrayFails) {
 
 TEST_F(PullAllNodeTest, ApplyWithSingleNumber) {
     auto update = fromjson("{$pullAll : {a: [1]}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
@@ -150,9 +151,9 @@ TEST_F(PullAllNodeTest, ApplyWithSingleNumber) {
 
 TEST_F(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
     auto update = fromjson("{$pullAll : {a: [1]}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
@@ -166,9 +167,9 @@ TEST_F(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
 
 TEST_F(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
     auto update = fromjson("{$pullAll : {a: ['r']}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
@@ -183,9 +184,9 @@ TEST_F(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
 
 TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
     auto update = fromjson("{$pullAll : {a: [1, 'a']}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
@@ -200,9 +201,9 @@ TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
     auto update = fromjson("{$pullAll : {a: [1, 'a', {r: 1, b: 2}]}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
@@ -217,9 +218,9 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
     auto update = fromjson("{$pullAll : {a: [{r: 1, b: 2}, 1, 'a']}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
@@ -234,9 +235,9 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
     auto update = fromjson("{$pullAll : {a: [2, 3, 1, 'r', {r: 1, b: 2}, 'a']}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"));
     setPathTaken("a");
@@ -252,8 +253,10 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
 TEST_F(PullAllNodeTest, ApplyWithCollator) {
     auto update = fromjson("{$pullAll : {a: ['FOO', 'BAR']}}");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], &collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));
     setPathTaken("a");
@@ -268,9 +271,9 @@ TEST_F(PullAllNodeTest, ApplyWithCollator) {
 
 TEST_F(PullAllNodeTest, ApplyAfterSetCollator) {
     auto update = fromjson("{$pullAll : {a: ['FOO', 'BAR']}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
-    ASSERT_OK(node.init(update["$pullAll"]["a"], collator));
+    ASSERT_OK(node.init(update["$pullAll"]["a"], expCtx));
 
     // First without a collator.
     mutablebson::Document doc(fromjson("{a: ['foo', 'bar', 'baz']}"));

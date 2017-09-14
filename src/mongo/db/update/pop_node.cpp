@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-Status PopNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status PopNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto popVal = MatchExpressionParser::parseIntegerElementToLong(modExpr);
     if (!popVal.isOK()) {
         return popVal.getStatus();

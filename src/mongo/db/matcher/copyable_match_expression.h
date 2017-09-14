@@ -51,41 +51,23 @@ public:
      * encounter an error.
      */
     CopyableMatchExpression(BSONObj matchAST,
-                            const CollatorInterface* collator,
-                            const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
+                            const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             std::unique_ptr<const ExtensionsCallback> extensionsCallback =
                                 stdx::make_unique<ExtensionsCallbackNoop>(),
                             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                                 MatchExpressionParser::kDefaultSpecialFeatures)
         : _matchAST(matchAST), _extensionsCallback(std::move(extensionsCallback)) {
-        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(
-            _matchAST, collator, expCtx, *_extensionsCallback, allowedFeatures);
+        StatusWithMatchExpression parseResult =
+            MatchExpressionParser::parse(_matchAST, expCtx, *_extensionsCallback, allowedFeatures);
         uassertStatusOK(parseResult.getStatus());
         _matchExpr = std::move(parseResult.getValue());
     }
 
     /**
-     * Semantically, this behaves as if the client called setCollator() on the underlying
-     * MatchExpression (which is impossible, because it's const).
-     *
-     * Behind the scenes, it actually makes a new MatchExpression with the new collator. That way,
-     * if there other CopyableMatchExpression objects referencing this MatchExpression, they don't
-     * see the change in collator.
+     * Sets the collator on the underlying MatchExpression and all clones(!).
      */
-    void setCollator(const CollatorInterface* collator,
-                     const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr) {
-        // We can allow all features because any features that were allowed in the original
-        // MatchExpression construction should be allowed now.
-        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-            MatchExpressionParser::kAllowAllSpecialFeatures;
-        if (!expCtx) {
-            allowedFeatures = allowedFeatures & ~MatchExpressionParser::AllowedFeatures::kExpr;
-        }
-
-        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(
-            _matchAST, collator, expCtx, *_extensionsCallback, allowedFeatures);
-        invariantOK(parseResult.getStatus());
-        _matchExpr = std::move(parseResult.getValue());
+    void setCollator(const CollatorInterface* collator) {
+        _matchExpr->setCollator(collator);
     }
 
     /**
@@ -107,7 +89,7 @@ public:
 private:
     BSONObj _matchAST;
     std::shared_ptr<const ExtensionsCallback> _extensionsCallback;
-    std::shared_ptr<const MatchExpression> _matchExpr;
+    std::shared_ptr<MatchExpression> _matchExpr;
 };
 
 }  // namespace mongo

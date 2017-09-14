@@ -190,7 +190,8 @@ private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}
 
-    Status init(std::unique_ptr<QueryRequest> qr,
+    Status init(OperationContext* opCtx,
+                std::unique_ptr<QueryRequest> qr,
                 bool canHaveNoopMatchNodes,
                 MatchExpression* root,
                 std::unique_ptr<CollatorInterface> collator);

@@ -1013,9 +1013,10 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
             // the secondary or on a backup instance, as indicated by !validateFeaturesAsMaster.
             allowedFeatures |= MatchExpressionParser::kJSONSchema;
         }
+        boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContext(opCtx, collator.get()));
         auto statusWithMatcher = MatchExpressionParser::parse(collectionOptions.validator,
-                                                              collator.get(),
-                                                              nullptr,
+                                                              std::move(expCtx),
                                                               ExtensionsCallbackNoop(),
                                                               allowedFeatures);
 

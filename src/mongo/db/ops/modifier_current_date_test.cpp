@@ -36,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/stdx/memory.h"
@@ -44,6 +45,7 @@
 namespace {
 
 using mongo::BSONObj;
+using mongo::ExpressionContextForTest;
 using mongo::LogBuilder;
 using mongo::ModifierCurrentDate;
 using mongo::ModifierInterface;
@@ -101,7 +103,7 @@ public:
 
     explicit Mod(BSONObj modObj) : _modObj(modObj), _mod() {
         ASSERT_OK(_mod.init(_modObj["$currentDate"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+                            ModifierInterface::Options::normal(new ExpressionContextForTest())));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -128,68 +130,70 @@ private:
 TEST_F(Init, ValidValues) {
     BSONObj modObj;
     ModifierCurrentDate mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     modObj = fromjson("{ $currentDate : { a : true } }");
     ASSERT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 
     modObj = fromjson("{ $currentDate : { a : {$type : 'timestamp' } } }");
     ASSERT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 
     modObj = fromjson("{ $currentDate : { a : {$type : 'date' } } }");
     ASSERT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST_F(Init, FailToInitWithInvalidValue) {
     BSONObj modObj;
     ModifierCurrentDate mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     // String is an invalid $currentDate argument
     modObj = fromjson("{ $currentDate : { a : 'Oct 11, 2001' } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // Array is an invalid $currentDate argument
     modObj = fromjson("{ $currentDate : { a : [] } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // Number is an invalid $currentDate argument
     modObj = fromjson("{ $currentDate : { a : 1 } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // Regex is an invalid $currentDate argument
     modObj = fromjson("{ $currentDate : { a : /1/ } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // An object with missing $type field is an invalid $currentDate argument
     modObj = fromjson("{ $currentDate : { a : { foo : 4 } } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // An object with extra fields, including the $type field is bad
     modObj = fromjson("{ $currentDate : { a : { $type: 'date', foo : 4 } } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // An object with extra fields, including the $type field is bad
     modObj = fromjson("{ $currentDate : { a : { foo: 4, $type : 'date' } } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // An object with non-date/timestamp $type field is an invalid $currentDate argument
     modObj = fromjson("{ $currentDate : { a : { $type : 4 } } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // An object with non-date/timestamp $type field is an invalid $currentDate argument
     modObj = fromjson("{ $currentDate : { a : { $type : 'foo' } } }");
     ASSERT_NOT_OK(mod.init(modObj["$currentDate"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST_F(BoolInput, EmptyStartDoc) {

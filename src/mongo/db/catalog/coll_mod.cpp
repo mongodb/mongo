@@ -180,7 +180,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 // instances, as indicated by !validateFeaturesAsMaster.
                 allowedFeatures |= MatchExpressionParser::kJSONSchema;
             }
-            auto statusW = coll->parseValidator(e.Obj(), allowedFeatures);
+            auto statusW = coll->parseValidator(opCtx, e.Obj(), allowedFeatures);
             if (!statusW.isOK()) {
                 if (statusW.getStatus().code() == ErrorCodes::JSONSchemaNotAllowed) {
                     // The default error message for disallowed $jsonSchema is not descriptive

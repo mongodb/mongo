@@ -31,6 +31,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 #include <memory>
 
@@ -47,12 +48,17 @@ using namespace mongo;
 //
 
 unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(query, collator);
+    const boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx.get(), collator));
+    StatusWithMatchExpression statusWithMatcher =
+        MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT(statusWithMatcher.isOK());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
     ParsedProjection* out = NULL;
-    Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
+    Status status = ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.get(), &out);
     if (!status.isOK()) {
         FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj << " (query: "
                                        << query
@@ -76,12 +82,17 @@ unique_ptr<ParsedProjection> createParsedProjection(const char* queryStr, const 
 void assertInvalidProjection(const char* queryStr, const char* projStr) {
     BSONObj query = fromjson(queryStr);
     BSONObj projObj = fromjson(projStr);
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(query, collator);
+    const boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx.get(), collator));
+    StatusWithMatchExpression statusWithMatcher =
+        MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT(statusWithMatcher.isOK());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
     ParsedProjection* out = NULL;
-    Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
+    Status status = ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.get(), &out);
     std::unique_ptr<ParsedProjection> destroy(out);
     ASSERT(!status.isOK());
 }
@@ -199,18 +210,20 @@ TEST(ParsedProjectionTest, ValidPositionalOperatorProjections) {
 // to achieve the same effect.
 // Projection parser should handle this the same way as an empty path.
 TEST(ParsedProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
     unique_ptr<MatchExpression> queryMatchExpr(new AlwaysFalseMatchExpression());
     ASSERT(NULL == queryMatchExpr->path().rawData());
 
     ParsedProjection* out = NULL;
     BSONObj projObj = fromjson("{'a.$': 1}");
-    Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
+    Status status = ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.get(), &out);
     ASSERT(!status.isOK());
     std::unique_ptr<ParsedProjection> destroy(out);
 
     // Projecting onto empty field should fail.
     BSONObj emptyFieldProjObj = fromjson("{'.$': 1}");
-    status = ParsedProjection::make(emptyFieldProjObj, queryMatchExpr.get(), &out);
+    status = ParsedProjection::make(opCtx.get(), emptyFieldProjObj, queryMatchExpr.get(), &out);
     ASSERT(!status.isOK());
 }
 

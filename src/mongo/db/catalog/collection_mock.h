@@ -221,7 +221,9 @@ public:
     }
 
     StatusWithMatchExpression parseValidator(
-        const BSONObj& validator, MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
+        OperationContext* opCtx,
+        const BSONObj& validator,
+        MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
         std::abort();
     }
 

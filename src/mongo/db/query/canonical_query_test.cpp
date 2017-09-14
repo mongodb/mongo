@@ -54,12 +54,10 @@ static const NamespaceString nss("testdb.testcoll");
  * and return the MatchExpression*.
  */
 MatchExpression* parseMatchExpression(const BSONObj& obj) {
-    const CollatorInterface* collator = nullptr;
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj,
-                                     collator,
-                                     expCtx,
+                                     std::move(expCtx),
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!status.isOK()) {

@@ -99,7 +99,7 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
 
     _exprElt = modExpr;
 
-    _collator = opts.collator;
+    _collator = opts.expCtx->getCollator();
 
     // If the element in the mod is actually an object or a regular expression, we need to
     // build a matcher, instead of just doing an equality comparision.
@@ -123,7 +123,7 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
 
         // Build the matcher around the object we built above. Currently, we do not allow $pull
         // operations to contain $text/$where/$geoNear/$near/$nearSphere/$expr clauses.
-        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(_exprObj, _collator);
+        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(_exprObj, opts.expCtx);
         if (!parseResult.isOK()) {
             return parseResult.getStatus();
         }

@@ -545,7 +545,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             // We don't need to keep ahold of the MatchExpression, but we do need to ensure that
             // the specified object is parseable and does not contain extensions.
             auto parsedMatchExpression =
-                MatchExpressionParser::parse(argument.embeddedObject(), nullptr);
+                MatchExpressionParser::parse(argument.embeddedObject(), expCtx);
 
             uassert(40186,
                     str::stream()

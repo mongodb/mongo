@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -46,44 +47,44 @@ using mongo::mutablebson::countChildren;
 
 DEATH_TEST(ArithmeticNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$inc: {}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    node.init(update["$inc"].embeddedObject().firstElement(), collator).transitional_ignore();
+    node.init(update["$inc"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
 TEST(ArithmeticNodeTest, InitSucceedsForNumberIntElement) {
     auto update = fromjson("{$inc: {a: NumberInt(5)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 }
 
 TEST(ArithmeticNodeTest, InitSucceedsForNumberLongElement) {
     auto update = fromjson("{$inc: {a: NumberLong(5)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 }
 
 TEST(ArithmeticNodeTest, InitSucceedsForDoubleElement) {
     auto update = fromjson("{$inc: {a: 5.1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 }
 
 TEST(ArithmeticNodeTest, InitSucceedsForDecimalElement) {
     auto update = fromjson("{$inc: {a: NumberDecimal(\"5.1\")}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 }
 
 TEST(ArithmeticNodeTest, InitFailsForNonNumericElement) {
     auto update = fromjson("{$inc: {a: 'foo'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    Status result = node.init(update["$inc"]["a"], collator);
+    Status result = node.init(update["$inc"]["a"], expCtx);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
     ASSERT_EQ(result.reason(), "Cannot increment with non-numeric argument: {a: \"foo\"}");
@@ -91,9 +92,9 @@ TEST(ArithmeticNodeTest, InitFailsForNonNumericElement) {
 
 TEST(ArithmeticNodeTest, InitFailsForObjectElement) {
     auto update = fromjson("{$mul: {a: {b: 6}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    Status result = node.init(update["$mul"]["a"], collator);
+    Status result = node.init(update["$mul"]["a"], expCtx);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
     ASSERT_EQ(result.reason(), "Cannot multiply with non-numeric argument: {a: { b: 6 }}");
@@ -101,9 +102,9 @@ TEST(ArithmeticNodeTest, InitFailsForObjectElement) {
 
 TEST(ArithmeticNodeTest, InitFailsForArrayElement) {
     auto update = fromjson("{$mul: {a: []}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    Status result = node.init(update["$mul"]["a"], collator);
+    Status result = node.init(update["$mul"]["a"], expCtx);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
     ASSERT_EQ(result.reason(), "Cannot multiply with non-numeric argument: {a: []}");
@@ -111,9 +112,9 @@ TEST(ArithmeticNodeTest, InitFailsForArrayElement) {
 
 TEST_F(ArithmeticNodeTest, ApplyIncNoOp) {
     auto update = fromjson("{$inc: {a: 0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -128,9 +129,9 @@ TEST_F(ArithmeticNodeTest, ApplyIncNoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyMulNoOp) {
     auto update = fromjson("{$mul: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    ASSERT_OK(node.init(update["$mul"]["a"], collator));
+    ASSERT_OK(node.init(update["$mul"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -145,9 +146,9 @@ TEST_F(ArithmeticNodeTest, ApplyMulNoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyRoundingNoOp) {
     auto update = fromjson("{$inc: {a: 1.0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 6.022e23}"));
     setPathTaken("a");
@@ -162,9 +163,9 @@ TEST_F(ArithmeticNodeTest, ApplyRoundingNoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyEmptyPathToCreate) {
     auto update = fromjson("{$inc: {a: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -179,9 +180,9 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyPathToCreate) {
 
 TEST_F(ArithmeticNodeTest, ApplyCreatePath) {
     auto update = fromjson("{$inc: {'a.b.c': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {d: 5}}"));
     setPathToCreate("b.c");
@@ -197,9 +198,9 @@ TEST_F(ArithmeticNodeTest, ApplyCreatePath) {
 
 TEST_F(ArithmeticNodeTest, ApplyExtendPath) {
     auto update = fromjson("{$inc: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {c: 1}}"));
     setPathToCreate("b");
@@ -214,9 +215,9 @@ TEST_F(ArithmeticNodeTest, ApplyExtendPath) {
 
 TEST_F(ArithmeticNodeTest, ApplyCreatePathFromRoot) {
     auto update = fromjson("{$inc: {'a.b': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{c: 5}"));
     setPathToCreate("a.b");
@@ -231,9 +232,9 @@ TEST_F(ArithmeticNodeTest, ApplyCreatePathFromRoot) {
 
 TEST_F(ArithmeticNodeTest, ApplyPositional) {
     auto update = fromjson("{$inc: {'a.$': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.$"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.$"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
     setPathTaken("a.1");
@@ -249,9 +250,9 @@ TEST_F(ArithmeticNodeTest, ApplyPositional) {
 
 TEST_F(ArithmeticNodeTest, ApplyNonViablePathToInc) {
     auto update = fromjson("{$inc: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
@@ -265,9 +266,9 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathToInc) {
 
 TEST_F(ArithmeticNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     auto update = fromjson("{$inc: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
@@ -284,9 +285,9 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyNoIndexDataNoLogBuilder) {
     auto update = fromjson("{$inc: {a: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -300,9 +301,9 @@ TEST_F(ArithmeticNodeTest, ApplyNoIndexDataNoLogBuilder) {
 
 TEST_F(ArithmeticNodeTest, ApplyDoesNotAffectIndexes) {
     auto update = fromjson("{$inc: {a: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -316,9 +317,9 @@ TEST_F(ArithmeticNodeTest, ApplyDoesNotAffectIndexes) {
 
 TEST_F(ArithmeticNodeTest, IncTypePromotionIsNotANoOp) {
     auto update = fromjson("{$inc: {a: NumberLong(0)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: NumberInt(2)}"));
     setPathTaken("a");
@@ -332,9 +333,9 @@ TEST_F(ArithmeticNodeTest, IncTypePromotionIsNotANoOp) {
 
 TEST_F(ArithmeticNodeTest, MulTypePromotionIsNotANoOp) {
     auto update = fromjson("{$mul: {a: NumberLong(1)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    ASSERT_OK(node.init(update["$mul"]["a"], collator));
+    ASSERT_OK(node.init(update["$mul"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: NumberInt(2)}"));
     setPathTaken("a");
@@ -348,9 +349,9 @@ TEST_F(ArithmeticNodeTest, MulTypePromotionIsNotANoOp) {
 
 TEST_F(ArithmeticNodeTest, TypePromotionFromIntToDecimalIsNotANoOp) {
     auto update = fromjson("{$inc: {a: NumberDecimal(\"0.0\")}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: NumberInt(5)}"));
     setPathTaken("a");
@@ -365,9 +366,9 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromIntToDecimalIsNotANoOp) {
 
 TEST_F(ArithmeticNodeTest, TypePromotionFromLongToDecimalIsNotANoOp) {
     auto update = fromjson("{$inc: {a: NumberDecimal(\"0.0\")}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: NumberLong(5)}"));
     setPathTaken("a");
@@ -382,9 +383,9 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromLongToDecimalIsNotANoOp) {
 
 TEST_F(ArithmeticNodeTest, TypePromotionFromDoubleToDecimalIsNotANoOp) {
     auto update = fromjson("{$inc: {a: NumberDecimal(\"0.0\")}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5.25}"));
     setPathTaken("a");
@@ -399,9 +400,9 @@ TEST_F(ArithmeticNodeTest, TypePromotionFromDoubleToDecimalIsNotANoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyPromoteToFloatingPoint) {
     auto update = fromjson("{$inc: {a: 0.2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: NumberLong(1)}"));
     setPathTaken("a");
@@ -415,9 +416,9 @@ TEST_F(ArithmeticNodeTest, ApplyPromoteToFloatingPoint) {
 
 TEST_F(ArithmeticNodeTest, IncrementedDecimalStaysDecimal) {
     auto update = fromjson("{$inc: {a: 5.25}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: NumberDecimal(\"6.25\")}"));
     setPathTaken("a");
@@ -432,9 +433,9 @@ TEST_F(ArithmeticNodeTest, IncrementedDecimalStaysDecimal) {
 
 TEST_F(ArithmeticNodeTest, OverflowIntToLong) {
     auto update = fromjson("{$inc: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     const int initialValue = std::numeric_limits<int>::max();
     mutablebson::Document doc(BSON("a" << initialValue));
@@ -451,9 +452,9 @@ TEST_F(ArithmeticNodeTest, OverflowIntToLong) {
 
 TEST_F(ArithmeticNodeTest, UnderflowIntToLong) {
     auto update = fromjson("{$inc: {a: -1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     const int initialValue = std::numeric_limits<int>::min();
     mutablebson::Document doc(BSON("a" << initialValue));
@@ -470,9 +471,9 @@ TEST_F(ArithmeticNodeTest, UnderflowIntToLong) {
 
 TEST_F(ArithmeticNodeTest, IncModeCanBeReused) {
     auto update = fromjson("{$inc: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc1(fromjson("{a: 1}"));
     mutablebson::Document doc2(fromjson("{a: 2}"));
@@ -496,9 +497,9 @@ TEST_F(ArithmeticNodeTest, IncModeCanBeReused) {
 
 TEST_F(ArithmeticNodeTest, CreatedNumberHasSameTypeAsInc) {
     auto update = fromjson("{$inc: {a: NumberLong(5)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{b: 6}"));
     setPathToCreate("a");
@@ -512,9 +513,9 @@ TEST_F(ArithmeticNodeTest, CreatedNumberHasSameTypeAsInc) {
 
 TEST_F(ArithmeticNodeTest, CreatedNumberHasSameTypeAsMul) {
     auto update = fromjson("{$mul: {a: NumberLong(5)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    ASSERT_OK(node.init(update["$mul"]["a"], collator));
+    ASSERT_OK(node.init(update["$mul"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{b: 6}"));
     setPathToCreate("a");
@@ -528,9 +529,9 @@ TEST_F(ArithmeticNodeTest, CreatedNumberHasSameTypeAsMul) {
 
 TEST_F(ArithmeticNodeTest, ApplyEmptyDocument) {
     auto update = fromjson("{$inc: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -544,9 +545,9 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyDocument) {
 
 TEST_F(ArithmeticNodeTest, ApplyIncToObjectFails) {
     auto update = fromjson("{$inc: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: {b: 1}}"));
     setPathTaken("a");
@@ -560,9 +561,9 @@ TEST_F(ArithmeticNodeTest, ApplyIncToObjectFails) {
 
 TEST_F(ArithmeticNodeTest, ApplyIncToArrayFails) {
     auto update = fromjson("{$inc: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: []}"));
     setPathTaken("a");
@@ -576,9 +577,9 @@ TEST_F(ArithmeticNodeTest, ApplyIncToArrayFails) {
 
 TEST_F(ArithmeticNodeTest, ApplyIncToStringFails) {
     auto update = fromjson("{$inc: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: \"foo\"}"));
     setPathTaken("a");
@@ -592,9 +593,9 @@ TEST_F(ArithmeticNodeTest, ApplyIncToStringFails) {
 
 TEST_F(ArithmeticNodeTest, OverflowingOperationFails) {
     auto update = fromjson("{$mul: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    ASSERT_OK(node.init(update["$mul"]["a"], collator));
+    ASSERT_OK(node.init(update["$mul"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: NumberLong(9223372036854775807)}"));
     setPathTaken("a");
@@ -609,9 +610,9 @@ TEST_F(ArithmeticNodeTest, OverflowingOperationFails) {
 
 TEST_F(ArithmeticNodeTest, ApplyNewPath) {
     auto update = fromjson("{$inc: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{b: 1}"));
     setPathToCreate("a");
@@ -625,9 +626,9 @@ TEST_F(ArithmeticNodeTest, ApplyNewPath) {
 
 TEST_F(ArithmeticNodeTest, ApplyEmptyIndexData) {
     auto update = fromjson("{$inc: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -640,9 +641,9 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyIndexData) {
 
 TEST_F(ArithmeticNodeTest, ApplyNoOpDottedPath) {
     auto update = fromjson("{$inc: {'a.b': 0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a.b");
@@ -656,9 +657,9 @@ TEST_F(ArithmeticNodeTest, ApplyNoOpDottedPath) {
 
 TEST_F(ArithmeticNodeTest, TypePromotionOnDottedPathIsNotANoOp) {
     auto update = fromjson("{$inc: {'a.b': NumberLong(0)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: NumberInt(2)}}"));
     setPathTaken("a.b");
@@ -672,9 +673,9 @@ TEST_F(ArithmeticNodeTest, TypePromotionOnDottedPathIsNotANoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyPathNotViableArray) {
     auto update = fromjson("{$inc: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a:[{b:1}]}"));
     setPathToCreate("b");
@@ -687,9 +688,9 @@ TEST_F(ArithmeticNodeTest, ApplyPathNotViableArray) {
 
 TEST_F(ArithmeticNodeTest, ApplyInPlaceDottedPath) {
     auto update = fromjson("{$inc: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a.b");
@@ -703,9 +704,9 @@ TEST_F(ArithmeticNodeTest, ApplyInPlaceDottedPath) {
 
 TEST_F(ArithmeticNodeTest, ApplyPromotionDottedPath) {
     auto update = fromjson("{$inc: {'a.b': NumberLong(2)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: NumberInt(3)}}"));
     setPathTaken("a.b");
@@ -719,9 +720,9 @@ TEST_F(ArithmeticNodeTest, ApplyPromotionDottedPath) {
 
 TEST_F(ArithmeticNodeTest, ApplyDottedPathEmptyDoc) {
     auto update = fromjson("{$inc: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a.b");
@@ -735,9 +736,9 @@ TEST_F(ArithmeticNodeTest, ApplyDottedPathEmptyDoc) {
 
 TEST_F(ArithmeticNodeTest, ApplyFieldWithDot) {
     auto update = fromjson("{$inc: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{'a.b':4}"));
     setPathToCreate("a.b");
@@ -751,9 +752,9 @@ TEST_F(ArithmeticNodeTest, ApplyFieldWithDot) {
 
 TEST_F(ArithmeticNodeTest, ApplyNoOpArrayIndex) {
     auto update = fromjson("{$inc: {'a.2.b': 0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
     setPathTaken("a.2.b");
@@ -767,9 +768,9 @@ TEST_F(ArithmeticNodeTest, ApplyNoOpArrayIndex) {
 
 TEST_F(ArithmeticNodeTest, TypePromotionInArrayIsNotANoOp) {
     auto update = fromjson("{$set: {'a.2.b': NumberLong(0)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(
         fromjson("{a: [{b: NumberInt(0)},{b: NumberInt(1)},{b: NumberInt(2)}]}"));
@@ -784,9 +785,9 @@ TEST_F(ArithmeticNodeTest, TypePromotionInArrayIsNotANoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyNonViablePathThroughArray) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathToCreate("2.b");
@@ -799,9 +800,9 @@ TEST_F(ArithmeticNodeTest, ApplyNonViablePathThroughArray) {
 
 TEST_F(ArithmeticNodeTest, ApplyInPlaceArrayIndex) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
     setPathTaken("a.2.b");
@@ -815,9 +816,9 @@ TEST_F(ArithmeticNodeTest, ApplyInPlaceArrayIndex) {
 
 TEST_F(ArithmeticNodeTest, ApplyAppendArray) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
     setPathToCreate("2.b");
@@ -832,9 +833,9 @@ TEST_F(ArithmeticNodeTest, ApplyAppendArray) {
 
 TEST_F(ArithmeticNodeTest, ApplyPaddingArray) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     setPathToCreate("2.b");
@@ -849,9 +850,9 @@ TEST_F(ArithmeticNodeTest, ApplyPaddingArray) {
 
 TEST_F(ArithmeticNodeTest, ApplyNumericObject) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 0}}"));
     setPathToCreate("2.b");
@@ -866,9 +867,9 @@ TEST_F(ArithmeticNodeTest, ApplyNumericObject) {
 
 TEST_F(ArithmeticNodeTest, ApplyNumericField) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {'2': {b: 1}}}"));
     setPathTaken("a.2.b");
@@ -882,9 +883,9 @@ TEST_F(ArithmeticNodeTest, ApplyNumericField) {
 
 TEST_F(ArithmeticNodeTest, ApplyExtendNumericField) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {'2': {c: 1}}}"));
     setPathToCreate("b");
@@ -899,9 +900,9 @@ TEST_F(ArithmeticNodeTest, ApplyExtendNumericField) {
 
 TEST_F(ArithmeticNodeTest, ApplyNumericFieldToEmptyObject) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
@@ -916,9 +917,9 @@ TEST_F(ArithmeticNodeTest, ApplyNumericFieldToEmptyObject) {
 
 TEST_F(ArithmeticNodeTest, ApplyEmptyArray) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
@@ -933,9 +934,9 @@ TEST_F(ArithmeticNodeTest, ApplyEmptyArray) {
 
 TEST_F(ArithmeticNodeTest, ApplyLogDottedPath) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b:0}, {b:1}]}"));
     setPathToCreate("2.b");
@@ -949,9 +950,9 @@ TEST_F(ArithmeticNodeTest, ApplyLogDottedPath) {
 
 TEST_F(ArithmeticNodeTest, LogEmptyArray) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
@@ -965,9 +966,9 @@ TEST_F(ArithmeticNodeTest, LogEmptyArray) {
 
 TEST_F(ArithmeticNodeTest, LogEmptyObject) {
     auto update = fromjson("{$inc: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
-    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
@@ -981,9 +982,9 @@ TEST_F(ArithmeticNodeTest, LogEmptyObject) {
 
 TEST_F(ArithmeticNodeTest, ApplyDeserializedDocNotNoOp) {
     auto update = fromjson("{$mul: {b: NumberInt(1)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    ASSERT_OK(node.init(update["$mul"]["b"], collator));
+    ASSERT_OK(node.init(update["$mul"]["b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     // De-serialize the int.
@@ -1000,9 +1001,9 @@ TEST_F(ArithmeticNodeTest, ApplyDeserializedDocNotNoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNoOp) {
     auto update = fromjson("{$mul: {a: NumberInt(1)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    ASSERT_OK(node.init(update["$mul"]["a"], collator));
+    ASSERT_OK(node.init(update["$mul"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     // De-serialize the int.
@@ -1019,9 +1020,9 @@ TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNoOp) {
 
 TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNestedNoop) {
     auto update = fromjson("{$mul: {'a.b': NumberInt(1)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    ASSERT_OK(node.init(update["$mul"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$mul"]["a.b"], expCtx));
 
     mutablebson::Document doc{BSONObj()};
     // De-serialize the int.
@@ -1038,9 +1039,9 @@ TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNestedNoop) {
 
 TEST_F(ArithmeticNodeTest, ApplyToDeserializedDocNestedNotNoop) {
     auto update = fromjson("{$mul: {'a.b': 3}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
-    ASSERT_OK(node.init(update["$mul"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$mul"]["a.b"], expCtx));
 
     mutablebson::Document doc{BSONObj()};
     // De-serialize the int.

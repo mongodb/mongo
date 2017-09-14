@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -48,8 +49,8 @@ TEST(InternalSchemaXorOp, MatchesNothingWhenHasNoClauses) {
 
 TEST(InternalSchemaXorOp, MatchesSingleClause) {
     BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: { $ne: 5 }}]}");
-    const CollatorInterface* collator = nullptr;
-    auto expr = MatchExpressionParser::parse(matchPredicate, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
 
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 4)));
@@ -59,11 +60,11 @@ TEST(InternalSchemaXorOp, MatchesSingleClause) {
 }
 
 TEST(InternalSchemaXorOp, MatchesThreeClauses) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BSONObj matchPredicate =
         fromjson("{$_internalSchemaXor: [{a: { $gt: 10 }}, {a: { $lt: 0 }}, {b: 0}]}");
 
-    auto expr = MatchExpressionParser::parse(matchPredicate, collator);
+    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
 
     ASSERT_OK(expr.getStatus());
     ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << -1)));
@@ -77,11 +78,11 @@ TEST(InternalSchemaXorOp, MatchesThreeClauses) {
 }
 
 TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: 1}, {b: 2}]}");
 
-    auto expr = MatchExpressionParser::parse(matchPredicate, collator);
+    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT_OK(expr.getStatus());

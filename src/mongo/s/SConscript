@@ -305,6 +305,7 @@ env.CppUnitTest(
         'chunk_manager_query_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_test_fixture',
         'coreshard',
     ]

@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/conflict_placeholder_node.h"
 #include "mongo/db/update/rename_node.h"
@@ -49,14 +50,14 @@ using mongo::mutablebson::Element;
 
 TEST(UpdateObjectNodeTest, InvalidPathFailsToParse) {
     auto update = fromjson("{$set: {'': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"][""],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -66,42 +67,42 @@ TEST(UpdateObjectNodeTest, InvalidPathFailsToParse) {
 
 TEST(UpdateObjectNodeTest, ValidIncPathParsesSuccessfully) {
     auto update = fromjson("{$inc: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_INC,
                                               update["$inc"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidMulPathParsesSuccessfully) {
     auto update = fromjson("{$mul: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_MUL,
                                               update["$mul"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidRenamePathParsesSuccessfully) {
     auto update = fromjson("{$rename: {'a.b': 'c.d'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_RENAME,
                                               update["$rename"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -122,140 +123,140 @@ TEST(UpdateObjectNodeTest, ValidRenamePathParsesSuccessfully) {
 
 TEST(UpdateObjectNodeTest, ValidSetPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidUnsetPathParsesSuccessfully) {
     auto update = fromjson("{$unset: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_UNSET,
                                               update["$unset"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidAddToSetPathParsesSuccessfully) {
     auto update = fromjson("{$addToSet: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_ADD_TO_SET,
                                               update["$addToSet"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidPopPathParsesSuccessfully) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_POP,
                                               update["$pop"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidMaxPathParsesSuccessfully) {
     auto update = fromjson("{$max: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_MAX,
                                               update["$max"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidMinPathParsesSuccessfully) {
     auto update = fromjson("{$min: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_MIN,
                                               update["$min"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidCurrentDatePathParsesSuccessfully) {
     auto update = fromjson("{$currentDate: {'a.b': true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_CURRENTDATE,
                                               update["$currentDate"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidSetOnInsertPathParsesSuccessfully) {
     auto update = fromjson("{$setOnInsert: {'a.b': true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET_ON_INSERT,
                                               update["$setOnInsert"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ValidPushParsesSuccessfully) {
     auto update = fromjson("{$push: {'a.b': {$each: [0, 1], $sort: 1, $position: 0, $slice: 10}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_PUSH,
                                               update["$push"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
     auto update = fromjson("{$set: {'a.$.b.$': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$.b.$"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -266,14 +267,14 @@ TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
 
 TEST(UpdateObjectNodeTest, ParsingSetsPositionalTrue) {
     auto update = fromjson("{$set: {'a.$.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$.b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_OK(result);
@@ -282,14 +283,14 @@ TEST(UpdateObjectNodeTest, ParsingSetsPositionalTrue) {
 
 TEST(UpdateObjectNodeTest, ParsingSetsPositionalFalse) {
     auto update = fromjson("{$set: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_OK(result);
@@ -298,14 +299,14 @@ TEST(UpdateObjectNodeTest, ParsingSetsPositionalFalse) {
 
 TEST(UpdateObjectNodeTest, PositionalElementFirstPositionFailsToParse) {
     auto update = fromjson("{$set: {'$': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["$"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -316,20 +317,20 @@ TEST(UpdateObjectNodeTest, PositionalElementFirstPositionFailsToParse) {
 
 TEST(UpdateObjectNodeTest, TwoModifiersOnSameFieldFailToParse) {
     auto update = fromjson("{$set: {a: 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -339,40 +340,40 @@ TEST(UpdateObjectNodeTest, TwoModifiersOnSameFieldFailToParse) {
 
 TEST(UpdateObjectNodeTest, TwoModifiersOnDifferentFieldsParseSuccessfully) {
     auto update = fromjson("{$set: {a: 5, b: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, TwoModifiersWithSameDottedPathFailToParse) {
     auto update = fromjson("{$set: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -383,20 +384,20 @@ TEST(UpdateObjectNodeTest, TwoModifiersWithSameDottedPathFailToParse) {
 
 TEST(UpdateObjectNodeTest, FirstModifierPrefixOfSecondFailToParse) {
     auto update = fromjson("{$set: {a: 5, 'a.b': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -407,20 +408,20 @@ TEST(UpdateObjectNodeTest, FirstModifierPrefixOfSecondFailToParse) {
 
 TEST(UpdateObjectNodeTest, FirstModifierDottedPrefixOfSecondFailsToParse) {
     auto update = fromjson("{$set: {'a.b': 5, 'a.b.c': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.b.c"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -431,20 +432,20 @@ TEST(UpdateObjectNodeTest, FirstModifierDottedPrefixOfSecondFailsToParse) {
 
 TEST(UpdateObjectNodeTest, SecondModifierPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.b': 5, a: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -454,20 +455,20 @@ TEST(UpdateObjectNodeTest, SecondModifierPrefixOfFirstFailsToParse) {
 
 TEST(UpdateObjectNodeTest, SecondModifierDottedPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.b': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -478,80 +479,80 @@ TEST(UpdateObjectNodeTest, SecondModifierDottedPrefixOfFirstFailsToParse) {
 
 TEST(UpdateObjectNodeTest, ModifiersWithCommonPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5, 'a.c': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ModifiersWithCommonDottedPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.b.d': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, ModifiersWithCommonPrefixDottedSuffixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.d.e': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.d.e"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, TwoModifiersOnSamePositionalFieldFailToParse) {
     auto update = fromjson("{$set: {'a.$': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -562,60 +563,60 @@ TEST(UpdateObjectNodeTest, TwoModifiersOnSamePositionalFieldFailToParse) {
 
 TEST(UpdateObjectNodeTest, PositionalFieldsWithDifferentPrefixesParseSuccessfully) {
     auto update = fromjson("{$set: {'a.$': 5, 'b.$': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["b.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, PositionalAndNonpositionalFieldWithCommonPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.$': 5, 'a.0': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.0"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, TwoModifiersWithSamePositionalDottedPathFailToParse) {
     auto update = fromjson("{$set: {'a.$.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$.b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -626,20 +627,20 @@ TEST(UpdateObjectNodeTest, TwoModifiersWithSamePositionalDottedPathFailToParse) 
 
 TEST(UpdateObjectNodeTest, FirstModifierPositionalPrefixOfSecondFailsToParse) {
     auto update = fromjson("{$set: {'a.$': 5, 'a.$.b': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$.b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -650,20 +651,20 @@ TEST(UpdateObjectNodeTest, FirstModifierPositionalPrefixOfSecondFailsToParse) {
 
 TEST(UpdateObjectNodeTest, SecondModifierPositionalPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.$.b': 5, 'a.$': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -674,54 +675,54 @@ TEST(UpdateObjectNodeTest, SecondModifierPositionalPrefixOfFirstFailsToParse) {
 
 TEST(UpdateObjectNodeTest, FirstModifierFieldPrefixOfSecondParsesSuccessfully) {
     auto update = fromjson("{$set: {'a': 5, 'ab': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["ab"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, SecondModifierFieldPrefixOfSecondParsesSuccessfully) {
     auto update = fromjson("{$set: {'ab': 5, 'a': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["ab"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 }
 
 TEST(UpdateObjectNodeTest, IdentifierWithoutArrayFilterFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i]': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$[i]"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -732,14 +733,14 @@ TEST(UpdateObjectNodeTest, IdentifierWithoutArrayFilterFailsToParse) {
 
 TEST(UpdateObjectNodeTest, IdentifierInMiddleOfPathWithoutArrayFilterFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i].b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$[i].b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -750,14 +751,14 @@ TEST(UpdateObjectNodeTest, IdentifierInMiddleOfPathWithoutArrayFilterFailsToPars
 
 TEST(UpdateObjectNodeTest, EmptyIdentifierParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[]': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_TRUE(foundIdentifiers.empty());
@@ -765,14 +766,14 @@ TEST(UpdateObjectNodeTest, EmptyIdentifierParsesSuccessfully) {
 
 TEST(UpdateObjectNodeTest, EmptyIdentifierInMiddleOfPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[].b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[].b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_TRUE(foundIdentifiers.empty());
@@ -781,15 +782,15 @@ TEST(UpdateObjectNodeTest, EmptyIdentifierInMiddleOfPathParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, IdentifierWithArrayFilterParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[i]': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 1U);
@@ -799,15 +800,15 @@ TEST(UpdateObjectNodeTest, IdentifierWithArrayFilterParsesSuccessfully) {
 TEST(UpdateObjectNodeTest, IdentifierWithArrayFilterInMiddleOfPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[i].b': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[i].b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 1U);
@@ -817,15 +818,15 @@ TEST(UpdateObjectNodeTest, IdentifierWithArrayFilterInMiddleOfPathParsesSuccessf
 TEST(UpdateObjectNodeTest, IdentifierInFirstPositionFailsToParse) {
     auto update = fromjson("{$set: {'$[i]': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["$[i]"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -838,15 +839,15 @@ TEST(UpdateObjectNodeTest, IdentifierInFirstPositionFailsToParse) {
 TEST(UpdateObjectNodeTest, IdentifierInFirstPositionWithSuffixFailsToParse) {
     auto update = fromjson("{$set: {'$[i].a': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["$[i].a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -859,15 +860,15 @@ TEST(UpdateObjectNodeTest, IdentifierInFirstPositionWithSuffixFailsToParse) {
 TEST(UpdateObjectNodeTest, CreateObjectNodeInSamePositionAsArrayNodeFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i]': 5, 'a.0': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 1U);
@@ -875,7 +876,7 @@ TEST(UpdateObjectNodeTest, CreateObjectNodeInSamePositionAsArrayNodeFailsToParse
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.0"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -887,21 +888,21 @@ TEST(UpdateObjectNodeTest, CreateObjectNodeInSamePositionAsArrayNodeFailsToParse
 TEST(UpdateObjectNodeTest, CreateArrayNodeInSamePositionAsObjectNodeFailsToParse) {
     auto update = fromjson("{$set: {'a.0': 5, 'a.$[i]': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.0"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$[i]"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -913,15 +914,15 @@ TEST(UpdateObjectNodeTest, CreateArrayNodeInSamePositionAsObjectNodeFailsToParse
 TEST(UpdateObjectNodeTest, CreateLeafNodeInSamePositionAsArrayNodeFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i]': 5, a: 6}}");
     auto arrayFilter = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 1U);
@@ -929,7 +930,7 @@ TEST(UpdateObjectNodeTest, CreateLeafNodeInSamePositionAsArrayNodeFailsToParse) 
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -940,21 +941,21 @@ TEST(UpdateObjectNodeTest, CreateLeafNodeInSamePositionAsArrayNodeFailsToParse) 
 TEST(UpdateObjectNodeTest, CreateArrayNodeInSamePositionAsLeafNodeFailsToParse) {
     auto update = fromjson("{$set: {a: 5, 'a.$[i]': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$[i]"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -967,16 +968,16 @@ TEST(UpdateObjectNodeTest, CreateTwoChildrenOfArrayNodeParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[i]': 5, 'a.$[j]': 6}}");
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
-    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, expCtx));
+    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 1U);
@@ -984,7 +985,7 @@ TEST(UpdateObjectNodeTest, CreateTwoChildrenOfArrayNodeParsesSuccessfully) {
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[j]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 2U);
@@ -996,15 +997,15 @@ TEST(UpdateObjectNodeTest, ConflictAtArrayNodeChildFailsToParse) {
     auto update1 = fromjson("{$set: {'a.$[i]': 5}}");
     auto update2 = fromjson("{$set: {'a.$[i]': 6}}");
     auto arrayFilterI = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update1["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 1U);
@@ -1012,7 +1013,7 @@ TEST(UpdateObjectNodeTest, ConflictAtArrayNodeChildFailsToParse) {
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update2["$set"]["a.$[i]"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -1024,15 +1025,15 @@ TEST(UpdateObjectNodeTest, ConflictAtArrayNodeChildFailsToParse) {
 TEST(UpdateObjectNodeTest, ConflictThroughArrayNodeChildFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i].b': 5, 'a.$[i].b.c': 6}}");
     auto arrayFilterI = fromjson("{i: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[i].b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 1U);
@@ -1040,7 +1041,7 @@ TEST(UpdateObjectNodeTest, ConflictThroughArrayNodeChildFailsToParse) {
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_SET,
                                                   update["$set"]["a.$[i].b.c"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -1053,16 +1054,16 @@ TEST(UpdateObjectNodeTest, NoConflictDueToDifferentArrayNodeChildrenParsesSucces
     auto update = fromjson("{$set: {'a.$[i].b': 5, 'a.$[j].b.c': 6}}");
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
-    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, expCtx));
+    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[i].b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 1U);
@@ -1070,7 +1071,7 @@ TEST(UpdateObjectNodeTest, NoConflictDueToDifferentArrayNodeChildrenParsesSucces
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[j].b.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 2U);
@@ -1082,16 +1083,16 @@ TEST(UpdateObjectNodeTest, MultipleArrayNodesAlongPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[i].$[j].$[i]': 5}}");
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
-    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, expCtx));
+    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.$[i].$[j].$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_EQ(foundIdentifiers.size(), 2U);
@@ -1121,20 +1122,20 @@ TEST(UpdateObjectNodeTest, DistinctFieldsMergeCorrectly) {
     auto setUpdate1 = fromjson("{$set: {'a': 5}}");
     auto setUpdate2 = fromjson("{$set: {'ab': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["ab"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1151,20 +1152,20 @@ TEST(UpdateObjectNodeTest, NestedMergeSucceeds) {
     auto setUpdate1 = fromjson("{$set: {'a.c': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.d': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1187,20 +1188,20 @@ TEST(UpdateObjectNodeTest, DoublyNestedMergeSucceeds) {
     auto setUpdate1 = fromjson("{$set: {'a.b.c': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.b.d': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.b.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.b.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1229,20 +1230,20 @@ TEST(UpdateObjectNodeTest, FieldAndPositionalMergeCorrectly) {
     auto setUpdate1 = fromjson("{$set: {'a.b': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1266,20 +1267,20 @@ TEST(UpdateObjectNodeTest, MergeThroughPositionalSucceeds) {
     auto setUpdate1 = fromjson("{$set: {'a.$.b': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$.c': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1308,20 +1309,20 @@ TEST(UpdateObjectNodeTest, TopLevelConflictFails) {
     auto setUpdate1 = fromjson("{$set: {'a': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1337,20 +1338,20 @@ TEST(UpdateObjectNodeTest, NestedConflictFails) {
     auto setUpdate1 = fromjson("{$set: {'a.b': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1366,20 +1367,20 @@ TEST(UpdateObjectNodeTest, LeftPrefixMergeFails) {
     auto setUpdate1 = fromjson("{$set: {'a.b': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.b.c': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.b.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1395,20 +1396,20 @@ TEST(UpdateObjectNodeTest, RightPrefixMergeFails) {
     auto setUpdate1 = fromjson("{$set: {'a.b.c': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.b.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1424,20 +1425,20 @@ TEST(UpdateObjectNodeTest, LeftPrefixMergeThroughPositionalFails) {
     auto setUpdate1 = fromjson("{$set: {'a.$.c': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$.c.d': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$.c.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1453,20 +1454,20 @@ TEST(UpdateObjectNodeTest, RightPrefixMergeThroughPositionalFails) {
     auto setUpdate1 = fromjson("{$set: {'a.$.c.d': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$.c': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$.c.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1482,20 +1483,20 @@ TEST(UpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
     auto setUpdate1 = fromjson("{$set: {'a.$': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1513,25 +1514,25 @@ DEATH_TEST(UpdateObjectNodeTest,
     auto setUpdate1 = fromjson("{$set: {'a.$[i]': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$[j]': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilterI = fromjson("{i: 0}");
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters1;
-    arrayFilters1["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
+    arrayFilters1["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, expCtx));
     auto arrayFilterJ = fromjson("{j: 0}");
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters2;
-    arrayFilters2["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
+    arrayFilters2["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters1,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$[j]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters2,
                                               foundIdentifiers));
 
@@ -1542,22 +1543,22 @@ TEST(UpdateObjectNodeTest, MergingArrayNodeWithObjectNodeFails) {
     auto setUpdate1 = fromjson("{$set: {'a.$[i]': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilter = fromjson("{i: 0}");
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1573,22 +1574,22 @@ TEST(UpdateObjectNodeTest, MergingArrayNodeWithLeafNodeFails) {
     auto setUpdate1 = fromjson("{$set: {'a.$[i]': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilter = fromjson("{i: 0}");
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1604,24 +1605,24 @@ TEST(UpdateObjectNodeTest, MergingTwoArrayNodesSucceeds) {
     auto setUpdate1 = fromjson("{$set: {'a.$[i]': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$[j]': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, collator));
-    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterI, expCtx));
+    arrayFilters["j"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilterJ, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$[i]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$[j]"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1644,22 +1645,22 @@ TEST(UpdateObjectNodeTest, MergeConflictThroughArrayNodesFails) {
     auto setUpdate1 = fromjson("{$set: {'a.$[i].b.c': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$[i].b': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilter = fromjson("{i: 0}");
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$[i].b.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$[i].b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1675,22 +1676,22 @@ TEST(UpdateObjectNodeTest, NoMergeConflictThroughArrayNodesSucceeds) {
     auto setUpdate1 = fromjson("{$set: {'a.$[i].b': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$[i].c': 6}}");
     FieldRef fakeFieldRef("root");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilter = fromjson("{i: 0}");
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, collator));
+    arrayFilters["i"] = uassertStatusOK(ExpressionWithPlaceholder::parse(arrayFilter, expCtx));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate1["$set"]["a.$[i].b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot2,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate2["$set"]["a.$[i].c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1717,14 +1718,14 @@ TEST(UpdateObjectNodeTest, NoMergeConflictThroughArrayNodesSucceeds) {
 
 TEST_F(UpdateObjectNodeTest, ApplyCreateField) {
     auto setUpdate = fromjson("{$set: {b: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1740,14 +1741,14 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateField) {
 
 TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
     auto setUpdate = fromjson("{$set: {a: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1763,32 +1764,32 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
 
 TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7, d: 8}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1804,32 +1805,32 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
 
 TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b.e"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1846,32 +1847,32 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
 
 TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b.e"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1888,26 +1889,26 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
 
 TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b.c.d': 6, 'a.b.c.e': 7, 'a.f': 8}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.b.c.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.b.c.e"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.f"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1924,38 +1925,38 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
 
 TEST_F(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
     auto setUpdate = fromjson("{$set: {a: 5, d: 6, c: 7, b: 8, z: 9}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["z"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -1972,19 +1973,21 @@ TEST_F(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
 TEST_F(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
     auto setUpdate = fromjson("{$set: {abc: 5, cba: 6}}");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["abc"],
-                                              &collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["cba"],
-                                              &collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2000,26 +2003,26 @@ TEST_F(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
 
 TEST_F(UpdateObjectNodeTest, ApplyNoop) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2037,26 +2040,26 @@ TEST_F(UpdateObjectNodeTest, ApplyNoop) {
 
 TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2074,14 +2077,14 @@ TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
 
 TEST_F(UpdateObjectNodeTest, ApplyBlockingElement) {
     auto setUpdate = fromjson("{$set: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2095,20 +2098,20 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElement) {
 
 TEST_F(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
     auto setUpdate = fromjson("{$set: {'a.b': 5, b: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2125,14 +2128,14 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
 
 TEST_F(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
     auto setUpdate = fromjson("{$set: {'a.$': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2147,20 +2150,20 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
 
 TEST_F(UpdateObjectNodeTest, ApplyMergePositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.0.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.$.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2177,32 +2180,32 @@ TEST_F(UpdateObjectNodeTest, ApplyMergePositionalChild) {
 
 TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.2': 5, 'a.1.b': 6, 'a.0': 7, 'a.$.c': 8}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.2"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.1.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.0"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.$.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2220,20 +2223,20 @@ TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
 
 TEST_F(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0': 5, 'a.$': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.0"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2248,26 +2251,26 @@ TEST_F(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
 
 TEST_F(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0': 5, 'a.2': 6, 'a.$': 7}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.0"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.2"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2284,26 +2287,26 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
 
 TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
     auto setUpdate = fromjson("{$set: {'a.$': 5, 'a.0': 6, 'a.1': 7}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.$"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.0"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.1"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2320,20 +2323,20 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
 
 TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.0.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.$.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2361,26 +2364,26 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
 
 TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6, 'a.1.d': 7}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.0.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.$.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.1.d"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2415,14 +2418,14 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
  */
 TEST_F(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
     auto setUpdate = fromjson("{$set: {'a.02': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.02"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2444,20 +2447,20 @@ TEST_F(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
  */
 TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
     auto setUpdate = fromjson("{$set: {'a.2': 2, 'a.10': 10}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.2"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.10"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2475,14 +2478,14 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
 
 TEST_F(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
     auto setUpdate = fromjson("{$set: {'a.b': 3}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               setUpdate["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2496,20 +2499,20 @@ TEST_F(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
 
 TEST_F(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}, $pop: {'a.c': -1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a.b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_POP,
                                               update["$pop"]["a.c"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
 
@@ -2523,7 +2526,7 @@ TEST_F(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully
 }
 
 TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
 
@@ -2535,7 +2538,7 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
         auto result = UpdateObjectNode::parseAndMerge(&root,
                                                       modifiertable::ModifierType::MOD_RENAME,
                                                       update["$rename"]["a.b"],
-                                                      collator,
+                                                      expCtx,
                                                       arrayFilters,
                                                       foundIdentifiers);
         ASSERT_NOT_OK(result);
@@ -2550,7 +2553,7 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
         auto result = UpdateObjectNode::parseAndMerge(&root,
                                                       modifiertable::ModifierType::MOD_RENAME,
                                                       update["$rename"]["a.b"],
-                                                      collator,
+                                                      expCtx,
                                                       arrayFilters,
                                                       foundIdentifiers);
         ASSERT_NOT_OK(result);
@@ -2565,7 +2568,7 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
         auto result = UpdateObjectNode::parseAndMerge(&root,
                                                       modifiertable::ModifierType::MOD_RENAME,
                                                       update["$rename"]["a.b"],
-                                                      collator,
+                                                      expCtx,
                                                       arrayFilters,
                                                       foundIdentifiers);
         ASSERT_NOT_OK(result);
@@ -2580,7 +2583,7 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
         auto result = UpdateObjectNode::parseAndMerge(&root,
                                                       modifiertable::ModifierType::MOD_RENAME,
                                                       update["$rename"]["a.b"],
-                                                      collator,
+                                                      expCtx,
                                                       arrayFilters,
                                                       foundIdentifiers);
         ASSERT_NOT_OK(result);
@@ -2590,14 +2593,14 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
 
 TEST(ParseRenameTest, RenameToNonUpdatablePathFails) {
     auto update = fromjson("{$rename: {'a': 'b.'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_RENAME,
                                                   update["$rename"]["a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -2608,14 +2611,14 @@ TEST(ParseRenameTest, RenameToNonUpdatablePathFails) {
 
 TEST(ParseRenameTest, RenameFromNonUpdatablePathFails) {
     auto update = fromjson("{$rename: {'.a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_RENAME,
                                                   update["$rename"][".a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -2626,14 +2629,14 @@ TEST(ParseRenameTest, RenameFromNonUpdatablePathFails) {
 
 TEST(ParseRenameTest, RenameToNonStringPathFails) {
     auto update = fromjson("{$rename: {'a': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_RENAME,
                                                   update["$rename"]["a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -2650,14 +2653,14 @@ TEST(ParseRenameTest, RenameToNonStringPathFails) {
  */
 TEST(ParseRenameTest, RenameWithSameNameFails) {
     auto update = fromjson("{$rename: {'a': 'a'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_RENAME,
                                                   update["$rename"]["a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -2668,14 +2671,14 @@ TEST(ParseRenameTest, RenameWithSameNameFails) {
 
 TEST(ParseRenameTest, RenameUpwardFails) {
     auto update = fromjson("{$rename: {'b.a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_RENAME,
                                                   update["$rename"]["b.a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -2686,14 +2689,14 @@ TEST(ParseRenameTest, RenameUpwardFails) {
 
 TEST(ParseRenameTest, RenameDownwardFails) {
     auto update = fromjson("{$rename: {'b': 'b.a'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_RENAME,
                                                   update["$rename"]["b"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -2704,20 +2707,20 @@ TEST(ParseRenameTest, RenameDownwardFails) {
 
 TEST(ParseRenameTest, ConflictWithRenameSourceFailsToParse) {
     auto update = fromjson("{$set: {a: 5}, $rename: {a: 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["a"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_RENAME,
                                                   update["$rename"]["a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);
@@ -2727,20 +2730,20 @@ TEST(ParseRenameTest, ConflictWithRenameSourceFailsToParse) {
 
 TEST(ParseRenameTest, ConflictWithRenameDestinationFailsToParse) {
     auto update = fromjson("{$set: {b: 5}, $rename: {a: 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
                                               modifiertable::ModifierType::MOD_SET,
                                               update["$set"]["b"],
-                                              collator,
+                                              expCtx,
                                               arrayFilters,
                                               foundIdentifiers));
     auto result = UpdateObjectNode::parseAndMerge(&root,
                                                   modifiertable::ModifierType::MOD_RENAME,
                                                   update["$rename"]["a"],
-                                                  collator,
+                                                  expCtx,
                                                   arrayFilters,
                                                   foundIdentifiers);
     ASSERT_NOT_OK(result);

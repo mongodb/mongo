@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-Status UnsetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status UnsetNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // Note that we don't need to store modExpr, because $unset does not do anything with its value.
     invariant(modExpr.ok());
     return Status::OK();

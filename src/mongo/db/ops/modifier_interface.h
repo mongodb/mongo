@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 
@@ -168,20 +169,19 @@ public:
  * Options used to control Modifier behavior
  */
 struct ModifierInterface::Options {
-    Options() = default;
-    Options(bool fromOpLog, bool ofs, const CollatorInterface* collator)
-        : fromOplogApplication(fromOpLog), enforceOkForStorage(ofs), collator(collator) {}
+    Options(bool fromOpLog, bool ofs, boost::intrusive_ptr<ExpressionContext> expCtx)
+        : fromOplogApplication(fromOpLog), enforceOkForStorage(ofs), expCtx(std::move(expCtx)) {}
 
-    static Options normal(const CollatorInterface* collator = nullptr) {
-        return Options(false, true, collator);
+    static Options normal(boost::intrusive_ptr<ExpressionContext> expCtx) {
+        return Options(false, true, std::move(expCtx));
     }
-    static Options fromRepl(const CollatorInterface* collator = nullptr) {
-        return Options(true, false, collator);
+    static Options fromRepl(boost::intrusive_ptr<ExpressionContext> expCtx) {
+        return Options(true, false, std::move(expCtx));
     }
 
     bool fromOplogApplication = false;
     bool enforceOkForStorage = true;
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContext> expCtx;
 };
 
 struct ModifierInterface::ExecInfo {

@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -46,86 +47,86 @@ using mongo::mutablebson::countChildren;
 
 DEATH_TEST(CurrentDateNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$currentDate: {}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;
-    node.init(update["$currentDate"].embeddedObject().firstElement(), collator).ignore();
+    node.init(update["$currentDate"].embeddedObject().firstElement(), expCtx).ignore();
 }
 
 TEST(CurrentDateNodeTest, InitWithNonBoolNonObjectFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: 0}}");
     CurrentDateNode node;
-    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithTrueSucceeds) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: true}}");
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithFalseSucceeds) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: false}}");
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithoutTypeFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {}}}");
     CurrentDateNode node;
-    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithNonStringTypeFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 1}}}");
     CurrentDateNode node;
-    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithBadValueTypeFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'bad'}}}");
     CurrentDateNode node;
-    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithTypeDateSucceeds) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'date'}}}");
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithTypeTimestampSucceeds) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'timestamp'}}}");
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithExtraFieldBeforeFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$bad: 1, $type: 'date'}}}");
     CurrentDateNode node;
-    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST(CurrentDateNodeTest, InitWithExtraFieldAfterFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'date', $bad: 1}}}");
     CurrentDateNode node;
-    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
 TEST_F(CurrentDateNodeTest, ApplyTrue) {
     auto update = fromjson("{$currentDate: {a: true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
@@ -147,9 +148,9 @@ TEST_F(CurrentDateNodeTest, ApplyTrue) {
 
 TEST_F(CurrentDateNodeTest, ApplyFalse) {
     auto update = fromjson("{$currentDate: {a: false}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
@@ -171,9 +172,9 @@ TEST_F(CurrentDateNodeTest, ApplyFalse) {
 
 TEST_F(CurrentDateNodeTest, ApplyDate) {
     auto update = fromjson("{$currentDate: {a: {$type: 'date'}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
@@ -195,9 +196,9 @@ TEST_F(CurrentDateNodeTest, ApplyDate) {
 
 TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
     auto update = fromjson("{$currentDate: {a: {$type: 'timestamp'}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
@@ -219,9 +220,9 @@ TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
 
 TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
     auto update = fromjson("{$currentDate: {a: true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -243,9 +244,9 @@ TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
 
 TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
     auto update = fromjson("{$currentDate: {a: true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
@@ -267,9 +268,9 @@ TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
 
 TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
     auto update = fromjson("{$currentDate: {a: true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;
-    ASSERT_OK(node.init(update["$currentDate"]["a"], collator));
+    ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");

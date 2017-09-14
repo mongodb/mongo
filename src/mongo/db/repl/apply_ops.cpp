@@ -309,7 +309,8 @@ Status _checkPrecondition(OperationContext* opCtx,
 
         // applyOps does not allow any extensions, such as $text, $where, $geoNear, $near,
         // $nearSphere, or $expr.
-        Matcher matcher(preCondition["res"].Obj(), collator);
+        boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
+        Matcher matcher(preCondition["res"].Obj(), std::move(expCtx));
         if (!matcher.matches(realres)) {
             result->append("got", realres);
             result->append("whatFailed", preCondition);

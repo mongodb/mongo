@@ -325,8 +325,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorStillUsableAfterTimeout)
     collScanParams.collection = readLock.getCollection();
     collScanParams.tailable = true;
     auto filter = BSON("a" << 1);
-    auto matchExpression =
-        uassertStatusOK(MatchExpressionParser::parse(filter, ctx()->getCollator()));
+    auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
@@ -364,8 +363,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     CollectionScanParams collScanParams;
     collScanParams.collection = readLock.getCollection();
     auto filter = BSON("a" << 1);
-    auto matchExpression =
-        uassertStatusOK(MatchExpressionParser::parse(filter, ctx()->getCollator()));
+    auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
@@ -405,8 +403,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     collScanParams.collection = readLock.getCollection();
     collScanParams.tailable = true;
     auto filter = BSON("a" << 1);
-    auto matchExpression =
-        uassertStatusOK(MatchExpressionParser::parse(filter, ctx()->getCollator()));
+    auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
@@ -444,8 +441,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     CollectionScanParams collScanParams;
     collScanParams.collection = readLock.getCollection();
     auto filter = BSON("a" << 1);
-    auto matchExpression =
-        uassertStatusOK(MatchExpressionParser::parse(filter, ctx()->getCollator()));
+    auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);

@@ -31,6 +31,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -92,26 +93,28 @@ TEST(InternalSchemaRootDocEqMatchExpression, EquivalentReturnsCorrectResults) {
              {$_internalSchemaRootDocEq: {
                  b: 1, c: 1
              }})");
-    Matcher rootDocEq(query, nullptr);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher rootDocEq(query, expCtx);
 
     query = fromjson(R"(
              {$_internalSchemaRootDocEq: {
                  c: 1, b: 1
              }})");
-    Matcher exprEq(query, nullptr);
+    Matcher exprEq(query, expCtx);
     ASSERT_TRUE(rootDocEq.getMatchExpression()->equivalent(exprEq.getMatchExpression()));
 
     query = fromjson(R"(
              {$_internalSchemaRootDocEq: {
                  c: 1
              }})");
-    Matcher exprNotEq(query, nullptr);
+    Matcher exprNotEq(query, expCtx);
     ASSERT_FALSE(rootDocEq.getMatchExpression()->equivalent(exprNotEq.getMatchExpression()));
 }
 
 TEST(InternalSchemaRootDocEqMatchExpression, EquivalentToClone) {
     auto query = fromjson("{$_internalSchemaRootDocEq: {a:1, b: {c: 1, d: [1]}}}");
-    Matcher rootDocEq(query, nullptr);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher rootDocEq(query, expCtx);
     auto clone = rootDocEq.getMatchExpression()->shallowClone();
     ASSERT_TRUE(rootDocEq.getMatchExpression()->equivalent(clone.get()));
 }

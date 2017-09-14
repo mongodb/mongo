@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -46,23 +47,23 @@ using mongo::mutablebson::countChildren;
 
 DEATH_TEST(SetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$set: {}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    node.init(update["$set"].embeddedObject().firstElement(), collator).transitional_ignore();
+    node.init(update["$set"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
 TEST(SetNodeTest, InitSucceedsForNonemptyElement) {
     auto update = fromjson("{$set: {a: 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 }
 
 TEST_F(SetNodeTest, ApplyNoOp) {
     auto update = fromjson("{$set: {a: 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -77,9 +78,9 @@ TEST_F(SetNodeTest, ApplyNoOp) {
 
 TEST_F(SetNodeTest, ApplyEmptyPathToCreate) {
     auto update = fromjson("{$set: {a: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -94,9 +95,9 @@ TEST_F(SetNodeTest, ApplyEmptyPathToCreate) {
 
 TEST_F(SetNodeTest, ApplyCreatePath) {
     auto update = fromjson("{$set: {'a.b.c': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {d: 5}}"));
     setPathToCreate("b.c");
@@ -112,9 +113,9 @@ TEST_F(SetNodeTest, ApplyCreatePath) {
 
 TEST_F(SetNodeTest, ApplyCreatePathFromRoot) {
     auto update = fromjson("{$set: {'a.b': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{c: 5}"));
     setPathToCreate("a.b");
@@ -129,9 +130,9 @@ TEST_F(SetNodeTest, ApplyCreatePathFromRoot) {
 
 TEST_F(SetNodeTest, ApplyPositional) {
     auto update = fromjson("{$set: {'a.$': 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.$"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.$"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
     setPathTaken("a.1");
@@ -147,9 +148,9 @@ TEST_F(SetNodeTest, ApplyPositional) {
 
 TEST_F(SetNodeTest, ApplyNonViablePathToCreate) {
     auto update = fromjson("{$set: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
@@ -163,9 +164,9 @@ TEST_F(SetNodeTest, ApplyNonViablePathToCreate) {
 
 TEST_F(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     auto update = fromjson("{$set: {'a.b': 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
@@ -182,9 +183,9 @@ TEST_F(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
 
 TEST_F(SetNodeTest, ApplyNoIndexDataNoLogBuilder) {
     auto update = fromjson("{$set: {a: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -198,9 +199,9 @@ TEST_F(SetNodeTest, ApplyNoIndexDataNoLogBuilder) {
 
 TEST_F(SetNodeTest, ApplyDoesNotAffectIndexes) {
     auto update = fromjson("{$set: {a: 6}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -214,9 +215,9 @@ TEST_F(SetNodeTest, ApplyDoesNotAffectIndexes) {
 
 TEST_F(SetNodeTest, TypeChangeIsNotANoop) {
     auto update = fromjson("{$set: {a: NumberLong(2)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: NumberInt(2)}"));
     setPathTaken("a");
@@ -231,9 +232,9 @@ TEST_F(SetNodeTest, TypeChangeIsNotANoop) {
 TEST_F(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
     // Apply an op that would be a no-op.
     auto update = fromjson("{$set: {a: {b : NumberInt(2)}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: { b: NumberInt(0)}}"));
     // Apply a mutation to the document that will make it non-serialized.
@@ -250,9 +251,9 @@ TEST_F(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
 
 TEST_F(SetNodeTest, ApplyEmptyDocument) {
     auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -266,9 +267,9 @@ TEST_F(SetNodeTest, ApplyEmptyDocument) {
 
 TEST_F(SetNodeTest, ApplyInPlace) {
     auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -282,9 +283,9 @@ TEST_F(SetNodeTest, ApplyInPlace) {
 
 TEST_F(SetNodeTest, ApplyOverridePath) {
     auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a");
@@ -298,9 +299,9 @@ TEST_F(SetNodeTest, ApplyOverridePath) {
 
 TEST_F(SetNodeTest, ApplyChangeType) {
     auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 'str'}"));
     setPathTaken("a");
@@ -314,9 +315,9 @@ TEST_F(SetNodeTest, ApplyChangeType) {
 
 TEST_F(SetNodeTest, ApplyNewPath) {
     auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{b: 1}"));
     setPathToCreate("a");
@@ -330,9 +331,9 @@ TEST_F(SetNodeTest, ApplyNewPath) {
 
 TEST_F(SetNodeTest, ApplyLog) {
     auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -345,9 +346,9 @@ TEST_F(SetNodeTest, ApplyLog) {
 
 TEST_F(SetNodeTest, ApplyNoOpDottedPath) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a.b");
@@ -361,9 +362,9 @@ TEST_F(SetNodeTest, ApplyNoOpDottedPath) {
 
 TEST_F(SetNodeTest, TypeChangeOnDottedPathIsNotANoOp) {
     auto update = fromjson("{$set: {'a.b': NumberInt(2)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: NumberLong(2)}}"));
     setPathTaken("a.b");
@@ -377,9 +378,9 @@ TEST_F(SetNodeTest, TypeChangeOnDottedPathIsNotANoOp) {
 
 TEST_F(SetNodeTest, ApplyPathNotViable) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a:1}"));
     setPathToCreate("b");
@@ -392,9 +393,9 @@ TEST_F(SetNodeTest, ApplyPathNotViable) {
 
 TEST_F(SetNodeTest, ApplyPathNotViableArrray) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a:[{b:1}]}"));
     setPathToCreate("b");
@@ -407,9 +408,9 @@ TEST_F(SetNodeTest, ApplyPathNotViableArrray) {
 
 TEST_F(SetNodeTest, ApplyInPlaceDottedPath) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a.b");
@@ -423,9 +424,9 @@ TEST_F(SetNodeTest, ApplyInPlaceDottedPath) {
 
 TEST_F(SetNodeTest, ApplyChangeTypeDottedPath) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 'str'}}"));
     setPathTaken("a.b");
@@ -439,9 +440,9 @@ TEST_F(SetNodeTest, ApplyChangeTypeDottedPath) {
 
 TEST_F(SetNodeTest, ApplyChangePath) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 1}}}"));
     setPathTaken("a.b");
@@ -455,9 +456,9 @@ TEST_F(SetNodeTest, ApplyChangePath) {
 
 TEST_F(SetNodeTest, ApplyExtendPath) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {c: 1}}"));
     setPathToCreate("b");
@@ -472,9 +473,9 @@ TEST_F(SetNodeTest, ApplyExtendPath) {
 
 TEST_F(SetNodeTest, ApplyNewDottedPath) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{c: 1}"));
     setPathToCreate("a.b");
@@ -488,9 +489,9 @@ TEST_F(SetNodeTest, ApplyNewDottedPath) {
 
 TEST_F(SetNodeTest, ApplyEmptyDoc) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a.b");
@@ -504,9 +505,9 @@ TEST_F(SetNodeTest, ApplyEmptyDoc) {
 
 TEST_F(SetNodeTest, ApplyFieldWithDot) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{'a.b':4}"));
     setPathToCreate("a.b");
@@ -520,9 +521,9 @@ TEST_F(SetNodeTest, ApplyFieldWithDot) {
 
 TEST_F(SetNodeTest, ApplyNoOpArrayIndex) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
     setPathTaken("a.2.b");
@@ -536,9 +537,9 @@ TEST_F(SetNodeTest, ApplyNoOpArrayIndex) {
 
 TEST_F(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
     auto update = fromjson("{$set: {'a.2.b': NumberInt(2)}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2.0}]}"));
     setPathTaken("a.2.b");
@@ -552,9 +553,9 @@ TEST_F(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
 
 TEST_F(SetNodeTest, ApplyNonViablePath) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathToCreate("2.b");
@@ -567,9 +568,9 @@ TEST_F(SetNodeTest, ApplyNonViablePath) {
 
 TEST_F(SetNodeTest, ApplyInPlaceArrayIndex) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
     setPathTaken("a.2.b");
@@ -583,9 +584,9 @@ TEST_F(SetNodeTest, ApplyInPlaceArrayIndex) {
 
 TEST_F(SetNodeTest, ApplyNormalArray) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
     setPathToCreate("2.b");
@@ -600,9 +601,9 @@ TEST_F(SetNodeTest, ApplyNormalArray) {
 
 TEST_F(SetNodeTest, ApplyPaddingArray) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     setPathToCreate("2.b");
@@ -617,9 +618,9 @@ TEST_F(SetNodeTest, ApplyPaddingArray) {
 
 TEST_F(SetNodeTest, ApplyNumericObject) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 0}}"));
     setPathToCreate("2.b");
@@ -634,9 +635,9 @@ TEST_F(SetNodeTest, ApplyNumericObject) {
 
 TEST_F(SetNodeTest, ApplyNumericField) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {'2': {b: 1}}}"));
     setPathTaken("a.2.b");
@@ -650,9 +651,9 @@ TEST_F(SetNodeTest, ApplyNumericField) {
 
 TEST_F(SetNodeTest, ApplyExtendNumericField) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {'2': {c: 1}}}"));
     setPathToCreate("b");
@@ -667,9 +668,9 @@ TEST_F(SetNodeTest, ApplyExtendNumericField) {
 
 TEST_F(SetNodeTest, ApplyEmptyObject) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
@@ -684,9 +685,9 @@ TEST_F(SetNodeTest, ApplyEmptyObject) {
 
 TEST_F(SetNodeTest, ApplyEmptyArray) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
@@ -701,9 +702,9 @@ TEST_F(SetNodeTest, ApplyEmptyArray) {
 
 TEST_F(SetNodeTest, ApplyLogDottedPath) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b:0}, {b:1}]}"));
     setPathToCreate("2.b");
@@ -717,9 +718,9 @@ TEST_F(SetNodeTest, ApplyLogDottedPath) {
 
 TEST_F(SetNodeTest, LogEmptyArray) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
@@ -733,9 +734,9 @@ TEST_F(SetNodeTest, LogEmptyArray) {
 
 TEST_F(SetNodeTest, LogEmptyObject) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
@@ -749,9 +750,9 @@ TEST_F(SetNodeTest, LogEmptyObject) {
 
 TEST_F(SetNodeTest, ApplyNoOpComplex) {
     auto update = fromjson("{$set: {'a.1.b': {c: 1, d: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"));
     setPathTaken("a.1.b");
@@ -765,9 +766,9 @@ TEST_F(SetNodeTest, ApplyNoOpComplex) {
 
 TEST_F(SetNodeTest, ApplySameStructure) {
     auto update = fromjson("{$set: {'a.1.b': {c: 1, d: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, xxx: 1}}]}}"));
     setPathTaken("a.1.b");
@@ -781,9 +782,9 @@ TEST_F(SetNodeTest, ApplySameStructure) {
 
 TEST_F(SetNodeTest, NonViablePathWithoutRepl) {
     auto update = fromjson("{$set: {'a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathToCreate("1.b");
@@ -796,9 +797,9 @@ TEST_F(SetNodeTest, NonViablePathWithoutRepl) {
 
 TEST_F(SetNodeTest, SingleFieldFromReplication) {
     auto update = fromjson("{$set: {'a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id:1, a: 1}"));
     setPathToCreate("1.b");
@@ -814,9 +815,9 @@ TEST_F(SetNodeTest, SingleFieldFromReplication) {
 
 TEST_F(SetNodeTest, SingleFieldNoIdFromReplication) {
     auto update = fromjson("{$set: {'a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathToCreate("1.b");
@@ -832,9 +833,9 @@ TEST_F(SetNodeTest, SingleFieldNoIdFromReplication) {
 
 TEST_F(SetNodeTest, NestedFieldFromReplication) {
     auto update = fromjson("{$set: {'a.a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.a.1.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id:1, a: {a: 1}}"));
     setPathToCreate("1.b");
@@ -850,9 +851,9 @@ TEST_F(SetNodeTest, NestedFieldFromReplication) {
 
 TEST_F(SetNodeTest, DoubleNestedFieldFromReplication) {
     auto update = fromjson("{$set: {'a.b.c.d': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b.c.d"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b.c.d"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id:1, a: {b: {c: 1}}}"));
     setPathToCreate("d");
@@ -868,9 +869,9 @@ TEST_F(SetNodeTest, DoubleNestedFieldFromReplication) {
 
 TEST_F(SetNodeTest, NestedFieldNoIdFromReplication) {
     auto update = fromjson("{$set: {'a.a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.a.1.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {a: 1}}"));
     setPathToCreate("1.b");
@@ -886,9 +887,9 @@ TEST_F(SetNodeTest, NestedFieldNoIdFromReplication) {
 
 TEST_F(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
     auto update = fromjson("{$set: {'a.0.b': [0,2]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.0.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.0.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 0, a: [1, {b: [1]}]}"));
     setPathToCreate("b");
@@ -904,9 +905,9 @@ TEST_F(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
 
 TEST_F(SetNodeTest, Set6) {
     auto update = fromjson("{$set: {'r.a': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["r.a"], collator));
+    ASSERT_OK(node.init(update["$set"]["r.a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
     setPathTaken("r.a");
@@ -922,9 +923,9 @@ TEST_F(SetNodeTest, Set6) {
 
 TEST_F(SetNodeTest, Set6FromRepl) {
     auto update = fromjson("{$set: { 'r.a': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["r.a"], collator));
+    ASSERT_OK(node.init(update["$set"]["r.a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
     setPathTaken("r.a");
@@ -944,9 +945,9 @@ TEST_F(SetNodeTest, ApplySetModToEphemeralDocument) {
     // latent debug only defect in mutable BSON, so this is more a test of mutable than
     // $set.
     auto update = fromjson("{ $set: { x: { a: 100, b: 2 }}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["x"], collator));
+    ASSERT_OK(node.init(update["$set"]["x"], expCtx));
 
     mutablebson::Document doc;
     Element x = doc.makeElementObject("x");
@@ -965,9 +966,9 @@ TEST_F(SetNodeTest, ApplySetModToEphemeralDocument) {
 
 TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
     auto update = fromjson("{$set: {a: {$bad: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -980,9 +981,9 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
 
 TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtStartOfPath) {
     auto update = fromjson("{$set: {'$bad.a': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["$bad.a"], collator));
+    ASSERT_OK(node.init(update["$set"]["$bad.a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("$bad.a");
@@ -995,9 +996,9 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtStartOfPath) {
 
 TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInMiddleOfPath) {
     auto update = fromjson("{$set: {'a.$bad.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.$bad.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.$bad.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a.$bad.b");
@@ -1010,9 +1011,9 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInMiddleOfPath) {
 
 TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtEndOfPath) {
     auto update = fromjson("{$set: {'a.$bad': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.$bad"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.$bad"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a.$bad");
@@ -1025,9 +1026,9 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtEndOfPath) {
 
 TEST_F(SetNodeTest, ApplyCanCreateDollarPrefixedFieldNameWhenValidateForStorageIsFalse) {
     auto update = fromjson("{$set: {$bad: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["$bad"], collator));
+    ASSERT_OK(node.init(update["$set"]["$bad"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("$bad");
@@ -1044,9 +1045,9 @@ TEST_F(SetNodeTest, ApplyCanCreateDollarPrefixedFieldNameWhenValidateForStorageI
 
 TEST_F(SetNodeTest, ApplyCannotOverwriteImmutablePath) {
     auto update = fromjson("{$set: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a.b");
@@ -1060,9 +1061,9 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCanPerformNoopOnImmutablePath) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a.b");
@@ -1079,9 +1080,9 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToRemoveImmutablePath) {
     auto update = fromjson("{$set: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
@@ -1095,9 +1096,9 @@ TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToRemoveImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToModifyImmutablePath) {
     auto update = fromjson("{$set: {a: {b: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
@@ -1111,9 +1112,9 @@ TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToModifyImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCanPerformNoopOnPrefixOfImmutablePath) {
     auto update = fromjson("{$set: {a: {b: 2}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
@@ -1130,9 +1131,9 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnPrefixOfImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCanOverwritePrefixToCreateImmutablePath) {
     auto update = fromjson("{$set: {a: {b: 2}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -1149,9 +1150,9 @@ TEST_F(SetNodeTest, ApplyCanOverwritePrefixToCreateImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCanOverwritePrefixOfImmutablePathIfNoopOnImmutablePath) {
     auto update = fromjson("{$set: {a: {b: 2, c: 3}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
@@ -1168,9 +1169,9 @@ TEST_F(SetNodeTest, ApplyCanOverwritePrefixOfImmutablePathIfNoopOnImmutablePath)
 
 TEST_F(SetNodeTest, ApplyCannotOverwriteSuffixOfImmutablePath) {
     auto update = fromjson("{$set: {'a.b.c': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 2}}}"));
     setPathTaken("a.b.c");
@@ -1184,9 +1185,9 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteSuffixOfImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCanPerformNoopOnSuffixOfImmutablePath) {
     auto update = fromjson("{$set: {'a.b.c': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 2}}}"));
     setPathTaken("a.b.c");
@@ -1203,9 +1204,9 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnSuffixOfImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCannotCreateFieldAtEndOfImmutablePath) {
     auto update = fromjson("{$set: {'a.b.c': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {}}}"));
     setPathToCreate("c");
@@ -1220,9 +1221,9 @@ TEST_F(SetNodeTest, ApplyCannotCreateFieldAtEndOfImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCannotCreateFieldBeyondEndOfImmutablePath) {
     auto update = fromjson("{$set: {'a.b.c': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {}}}"));
     setPathToCreate("c");
@@ -1237,9 +1238,9 @@ TEST_F(SetNodeTest, ApplyCannotCreateFieldBeyondEndOfImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCanCreateImmutablePath) {
     auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("b");
@@ -1257,9 +1258,9 @@ TEST_F(SetNodeTest, ApplyCanCreateImmutablePath) {
 
 TEST_F(SetNodeTest, ApplyCanCreatePrefixOfImmutablePath) {
     auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -1276,9 +1277,9 @@ TEST_F(SetNodeTest, ApplyCanCreatePrefixOfImmutablePath) {
 
 TEST_F(SetNodeTest, ApplySetOnInsertIsNoopWhenInsertIsFalse) {
     auto update = fromjson("{$setOnInsert: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node(UpdateNode::Context::kInsertOnly);
-    ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
+    ASSERT_OK(node.init(update["$setOnInsert"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -1293,9 +1294,9 @@ TEST_F(SetNodeTest, ApplySetOnInsertIsNoopWhenInsertIsFalse) {
 
 TEST_F(SetNodeTest, ApplySetOnInsertIsAppliedWhenInsertIsTrue) {
     auto update = fromjson("{$setOnInsert: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node(UpdateNode::Context::kInsertOnly);
-    ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
+    ASSERT_OK(node.init(update["$setOnInsert"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -1311,9 +1312,9 @@ TEST_F(SetNodeTest, ApplySetOnInsertIsAppliedWhenInsertIsTrue) {
 
 TEST_F(SetNodeTest, ApplySetOnInsertExistingPath) {
     auto update = fromjson("{$setOnInsert: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node(UpdateNode::Context::kInsertOnly);
-    ASSERT_OK(node.init(update["$setOnInsert"]["a"], collator));
+    ASSERT_OK(node.init(update["$setOnInsert"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");

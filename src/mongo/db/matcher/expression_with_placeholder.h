@@ -51,7 +51,7 @@ public:
      * ownership of 'rawFilter'.
      */
     static StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parse(
-        BSONObj rawFilter, const CollatorInterface* collator);
+        BSONObj rawFilter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Construct a new ExpressionWithPlaceholder. 'filter' must point to a valid MatchExpression.

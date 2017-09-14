@@ -41,7 +41,10 @@
 namespace mongo {
 
 ParsedUpdate::ParsedUpdate(OperationContext* opCtx, const UpdateRequest* request)
-    : _opCtx(opCtx), _request(request), _driver(UpdateDriver::Options()), _canonicalQuery() {}
+    : _opCtx(opCtx),
+      _request(request),
+      _driver(UpdateDriver::Options(new ExpressionContext(opCtx, nullptr))),
+      _canonicalQuery() {}
 
 Status ParsedUpdate::parseRequest() {
     // It is invalid to request that the UpdateStage return the prior or newly-updated version
@@ -112,11 +115,11 @@ Status ParsedUpdate::parseQueryToCQ() {
         qr->setLimit(1);
     }
 
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(_opCtx,
                                      std::move(qr),
-                                     expCtx,
+                                     std::move(expCtx),
                                      extensionsCallback,
                                      MatchExpressionParser::kAllowAllSpecialFeatures &
                                          ~MatchExpressionParser::AllowedFeatures::kExpr);
@@ -138,8 +141,9 @@ Status ParsedUpdate::parseUpdate() {
         !(_request->isFromOplogApplication() || ns.isConfigDB() || _request->isFromMigration());
 
     _driver.setLogOp(true);
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(_opCtx, _collator.get()));
     _driver.setModOptions(ModifierInterface::Options(
-        _request->isFromOplogApplication(), shouldValidate, _collator.get()));
+        _request->isFromOplogApplication(), shouldValidate, std::move(expCtx)));
 
     return _driver.parse(_request->getUpdates(), _arrayFilters, _request->isMulti());
 }
@@ -156,7 +160,10 @@ Status ParsedUpdate::parseArrayFilters() {
     }
 
     for (auto rawArrayFilter : _request->getArrayFilters()) {
-        auto arrayFilterStatus = ExpressionWithPlaceholder::parse(rawArrayFilter, _collator.get());
+        boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContext(_opCtx, _collator.get()));
+        auto arrayFilterStatus =
+            ExpressionWithPlaceholder::parse(rawArrayFilter, std::move(expCtx));
         if (!arrayFilterStatus.isOK()) {
             return Status(arrayFilterStatus.getStatus().code(),
                           str::stream() << "Error parsing array filter: "

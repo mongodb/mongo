@@ -34,6 +34,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -685,11 +686,17 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesSimpleBoundsStringFieldWhen
 
 std::unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query,
                                                          const BSONObj& projObj) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
     const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression queryMatchExpr = MatchExpressionParser::parse(query, collator);
+    const boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx.get(), collator));
+    StatusWithMatchExpression queryMatchExpr =
+        MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT(queryMatchExpr.isOK());
     ParsedProjection* out = nullptr;
-    Status status = ParsedProjection::make(projObj, queryMatchExpr.getValue().get(), &out);
+    Status status =
+        ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.getValue().get(), &out);
     if (!status.isOK()) {
         FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj << " (query: "
                                        << query

@@ -160,7 +160,8 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
       _collator(parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation)),
       _validatorDoc(_details->getCollectionOptions(opCtx).validator.getOwned()),
       _validator(
-          uassertStatusOK(parseValidator(_validatorDoc,
+          uassertStatusOK(parseValidator(opCtx,
+                                         _validatorDoc,
                                          MatchExpressionParser::kAllowAllSpecialFeatures &
                                              ~MatchExpressionParser::AllowedFeatures::kExpr))),
       _validationAction(uassertStatusOK(
@@ -268,7 +269,9 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
 }
 
 StatusWithMatchExpression CollectionImpl::parseValidator(
-    const BSONObj& validator, MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
+    OperationContext* opCtx,
+    const BSONObj& validator,
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
     if (validator.isEmpty())
         return {nullptr};
 
@@ -285,8 +288,9 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
                               << " database"};
     }
 
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, _collator.get()));
     auto statusWithMatcher = MatchExpressionParser::parse(
-        validator, _collator.get(), nullptr, ExtensionsCallbackNoop(), allowedFeatures);
+        validator, std::move(expCtx), ExtensionsCallbackNoop(), allowedFeatures);
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 
@@ -894,7 +898,8 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
 
     // Note that, by the time we reach this, we should have already done a pre-parse that checks for
     // banned features, so we don't need to include that check again.
-    auto statusWithMatcher = parseValidator(validatorDoc,
+    auto statusWithMatcher = parseValidator(opCtx,
+                                            validatorDoc,
                                             MatchExpressionParser::kAllowAllSpecialFeatures &
                                                 ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!statusWithMatcher.isOK())

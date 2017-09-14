@@ -41,8 +41,8 @@ namespace mongo {
  */
 class PullNode::ObjectMatcher final : public PullNode::ElementMatcher {
 public:
-    ObjectMatcher(BSONObj matchCondition, const CollatorInterface* collator)
-        : _matchExpr(matchCondition, collator) {}
+    ObjectMatcher(BSONObj matchCondition, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : _matchExpr(matchCondition, expCtx) {}
 
     std::unique_ptr<ElementMatcher> clone() const final {
         return stdx::make_unique<ObjectMatcher>(*this);
@@ -73,8 +73,9 @@ private:
  */
 class PullNode::WrappedObjectMatcher final : public PullNode::ElementMatcher {
 public:
-    WrappedObjectMatcher(BSONElement matchCondition, const CollatorInterface* collator)
-        : _matchExpr(matchCondition.wrap(""), collator) {}
+    WrappedObjectMatcher(BSONElement matchCondition,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : _matchExpr(matchCondition.wrap(""), expCtx) {}
 
     std::unique_ptr<ElementMatcher> clone() const final {
         return stdx::make_unique<WrappedObjectMatcher>(*this);
@@ -119,18 +120,18 @@ private:
     const CollatorInterface* _collator;
 };
 
-Status PullNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status PullNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
     try {
         if (modExpr.type() == mongo::Object &&
             !MatchExpressionParser::parsePathAcceptingKeyword(
                 modExpr.embeddedObject().firstElement())) {
-            _matcher = stdx::make_unique<ObjectMatcher>(modExpr.embeddedObject(), collator);
+            _matcher = stdx::make_unique<ObjectMatcher>(modExpr.embeddedObject(), expCtx);
         } else if (modExpr.type() == mongo::Object || modExpr.type() == mongo::RegEx) {
-            _matcher = stdx::make_unique<WrappedObjectMatcher>(modExpr, collator);
+            _matcher = stdx::make_unique<WrappedObjectMatcher>(modExpr, expCtx);
         } else {
-            _matcher = stdx::make_unique<EqualityMatcher>(modExpr, collator);
+            _matcher = stdx::make_unique<EqualityMatcher>(modExpr, expCtx->getCollator());
         }
     } catch (AssertionException& exception) {
         return exception.toStatus();
