@@ -38,25 +38,15 @@ var workerThread = (function() {
                 }
 
                 if (typeof args.sessionOptions !== 'undefined') {
-                    // TODO SERVER-30912: the shardCollection command hangs when run under a
-                    // session, so for now we don't start a session to enable testing of causal
-                    // consistency.
-                    myDB = new Mongo(args.host).getDB(args.dbName);
+                    myDB = new Mongo(args.host)
+                               .startSession(args.sessionOptions)
+                               .getDatabase(args.dbName);
 
                     if (args.sessionOptions.causallyConsistentReads) {
                         // TODO SERVER-30679: We manually enable causal consistency on the
                         // connection object so that "afterClusterTime" is injected into the
                         // readConcern of any command requests through this connection.
                         myDB.getMongo().setCausalConsistency();
-                    }
-
-                    if (args.sessionOptions.readPreference) {
-                        // TODO SERVER-30912: The shardCollection command hangs when run under a
-                        // session so for now we don't start a session and instead set the read
-                        // preference directly on the connection to test doing reads from
-                        // secondaries. This can be removed once this ticket is resolved.
-                        myDB.getMongo().setReadPref(args.sessionOptions.readPreference.mode,
-                                                    args.sessionOptions.readPreference.tags);
                     }
                 } else {
                     myDB = new Mongo(args.host).getDB(args.dbName);
