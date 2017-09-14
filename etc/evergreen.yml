@@ -6264,7 +6264,7 @@ buildvariants:
     tooltags: "-tags ssl"
     gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
     python: python2.7
     num_jobs_available: 1
     build_mongoreplay: true
@@ -6398,7 +6398,7 @@ buildvariants:
     num_jobs_available: 1
     gorootvars: CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
+    compile_flags: --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     python: python2.7
     build_mongoreplay: true
   tasks:
@@ -6444,7 +6444,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
     python: python2.7
     num_jobs_available: 1
     build_mongoreplay: true
