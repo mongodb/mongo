@@ -8,7 +8,13 @@
 function assertSchemaMatch(coll, schema, doc, valid) {
     coll.drop();
     assert.writeOK(coll.insert(doc));
-    const count = coll.find({$jsonSchema: schema}).itcount();
-    const errmsg = valid ? " should have matched the schema " : " unexpectedly matched the schema ";
-    assert.eq(count, valid ? 1 : 0, "Document " + tojson(doc) + errmsg + tojson(schema));
+    let count = coll.find({$jsonSchema: schema}).itcount();
+    const errmsg = "Document " + tojson(doc) +
+        (valid ? " should have matched the schema " : " unexpectedly matched the schema ") +
+        tojson(schema);
+    assert.eq(count, valid ? 1 : 0, errmsg);
+
+    // Repeat the same query in an aggregation $match stage.
+    count = coll.aggregate([{$match: {$jsonSchema: schema}}]).itcount();
+    assert.eq(count, valid ? 1 : 0, errmsg + " in a $match stage");
 }

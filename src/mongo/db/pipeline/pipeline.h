@@ -33,6 +33,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/value.h"
@@ -95,6 +96,14 @@ public:
 
         bool _dismissed = false;
     };
+
+    /**
+     * List of supported match expression features in a pipeline.
+     */
+    static constexpr MatchExpressionParser::AllowedFeatureSet kAllowedMatcherFeatures =
+        MatchExpressionParser::AllowedFeatures::kText |
+        MatchExpressionParser::AllowedFeatures::kExpr |
+        MatchExpressionParser::AllowedFeatures::kJSONSchema;
 
     /**
      * Parses a Pipeline from a vector of BSONObjs. Returns a non-OK status if it failed to parse.

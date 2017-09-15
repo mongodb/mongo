@@ -307,6 +307,87 @@ TEST_F(DocumentSourceMatchTest,
     ASSERT_EQUALS(false, dependencies.getNeedTextScore());
 }
 
+TEST_F(DocumentSourceMatchTest,
+       ShouldAddWholeDocumentAsDependencyOfClausesWithInternalSchemaRootDocEq) {
+    auto query = fromjson("{$_internalSchemaRootDocEq: {a: 1}}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(0U, dependencies.fields.size());
+    ASSERT_EQUALS(true, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest, ShouldAddCorrectDependenciesForClausesWithInternalSchemaType) {
+    auto query = fromjson("{a: {$_internalSchemaType: 1}}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(1U, dependencies.fields.size());
+    ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest, ShouldAddCorrectDependenciesForClausesWithInternalSchemaCond) {
+    auto query = fromjson("{$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(3U, dependencies.fields.size());
+    ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("b"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("c"));
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest, ShouldAddCorrectDependenciesForClausesWithInternalSchemaXor) {
+    auto query = fromjson("{$_internalSchemaXor: [{a: 1}, {b: 1}, {c: 1}]}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(3U, dependencies.fields.size());
+    ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("b"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("c"));
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest, ShouldAddCorrectDependenciesForClausesWithEmptyJSONSchema) {
+    DepsTracker dependencies;
+    auto query = fromjson("{$jsonSchema: {}}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(0U, dependencies.fields.size());
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest, ShouldAddCorrectDependenciesForClausesWithJSONSchemaProperties) {
+    DepsTracker dependencies;
+    auto query = fromjson("{$jsonSchema: {properties: {a: {type: 'number'}}}}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(1U, dependencies.fields.size());
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(DocumentSourceMatchTest, ShouldAddCorrectDependenciesForMultiplePredicatesWithJSONSchema) {
+    DepsTracker dependencies;
+    auto query = fromjson("{$jsonSchema: {properties: {a: {type: 'number'}}}, b: 1}");
+    auto match = DocumentSourceMatch::create(query, getExpCtx());
+    ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+    ASSERT_EQUALS(2U, dependencies.fields.size());
+    ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("b"));
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
 TEST_F(DocumentSourceMatchTest, ShouldAddOuterFieldToDependenciesIfElemMatchContainsNoFieldNames) {
     auto match =
         DocumentSourceMatch::create(fromjson("{a: {$elemMatch: {$gt: 1, $lt: 5}}}"), getExpCtx());
@@ -509,6 +590,26 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateElemMatchPredicate) {
     auto next = match->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", matchingVector}}));
+
+    // The rest should not match.
+    ASSERT_TRUE(match->getNext().isEOF());
+    ASSERT_TRUE(match->getNext().isEOF());
+    ASSERT_TRUE(match->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
+    const auto match = DocumentSourceMatch::create(
+        fromjson("{$jsonSchema: {properties: {a: {type: 'number'}}}}"), getExpCtx());
+
+    const auto mock = DocumentSourceMock::create(
+        {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{0, 1}}}}}});
+
+    match->setSource(mock.get());
+
+    // The first result should match.
+    auto next = match->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", 1}}));
 
     // The rest should not match.
     ASSERT_TRUE(match->getNext().isEOF());

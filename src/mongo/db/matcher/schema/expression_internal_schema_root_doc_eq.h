@@ -87,6 +87,11 @@ public:
         return MatchCategory::kOther;
     }
 
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final {
+        deps->needWholeDocument = true;
+    }
+
 private:
     UnorderedFieldsBSONObjComparator _objCmp;
     BSONObj _rhsObj;

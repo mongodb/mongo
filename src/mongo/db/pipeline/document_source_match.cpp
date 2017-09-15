@@ -499,13 +499,12 @@ DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
       _isTextQuery(isTextQuery(query)),
       _dependencies(_isTextQuery ? DepsTracker::MetadataAvailable::kTextScore
                                  : DepsTracker::MetadataAvailable::kNoMetadata) {
-    StatusWithMatchExpression status = uassertStatusOK(
-        MatchExpressionParser::parse(_predicate,
-                                     pExpCtx->getCollator(),
-                                     pExpCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::AllowedFeatures::kText |
-                                         MatchExpressionParser::AllowedFeatures::kExpr));
+    StatusWithMatchExpression status =
+        uassertStatusOK(MatchExpressionParser::parse(_predicate,
+                                                     pExpCtx->getCollator(),
+                                                     pExpCtx,
+                                                     ExtensionsCallbackNoop(),
+                                                     Pipeline::kAllowedMatcherFeatures));
 
     _expression = std::move(status.getValue());
     getDependencies(&_dependencies);

@@ -451,12 +451,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
 
     const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &nss);
 
-    auto cq = CanonicalQuery::canonicalize(opCtx,
-                                           std::move(qr),
-                                           pExpCtx,
-                                           extensionsCallback,
-                                           MatchExpressionParser::AllowedFeatures::kText |
-                                               MatchExpressionParser::AllowedFeatures::kExpr);
+    auto cq = CanonicalQuery::canonicalize(
+        opCtx, std::move(qr), pExpCtx, extensionsCallback, Pipeline::kAllowedMatcherFeatures);
 
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of

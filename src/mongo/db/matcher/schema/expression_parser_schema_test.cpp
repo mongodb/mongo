@@ -516,28 +516,28 @@ TEST(MatchExpressionParserSchemaTest, MatchArrayIndexParsesSuccessfully) {
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithNegativeIndex) {
     BSONObj matchPredicate =
-        fromjson("{$_internalSchemaAllElemMatchFromIndex: [-2, {a: { $lt: 0 }}]}");
+        fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [-2, {a: { $lt: 0 }}]}}");
     auto expr = MatchExpressionParser::parse(matchPredicate, kSimpleCollator);
-    ASSERT_NOT_OK(expr.getStatus());
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithNonObjectExpression) {
-    BSONObj matchPredicate = fromjson("{$_internalSchemaAllElemMatchFromIndex: [-2, 4]}");
+    BSONObj matchPredicate = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [-2, 4]}}");
     auto expr = MatchExpressionParser::parse(matchPredicate, kSimpleCollator);
-    ASSERT_NOT_OK(expr.getStatus());
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithInvalidExpression) {
     BSONObj matchPredicate =
-        fromjson("{$_internalSchemaAllElemMatchFromIndex: [-2, {$fakeExpression: 4}]}");
+        fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [-2, {$fakeExpression: 4}]}}");
     auto expr = MatchExpressionParser::parse(matchPredicate, kSimpleCollator);
-    ASSERT_NOT_OK(expr.getStatus());
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithEmptyArray) {
-    BSONObj matchPredicate = fromjson("{$_internalSchemaAllElemMatchFromIndex: []}");
+    BSONObj matchPredicate = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: []}}");
     auto expr = MatchExpressionParser::parse(matchPredicate, kSimpleCollator);
-    ASSERT_NOT_OK(expr.getStatus());
+    ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, ParsesCorreclyWithValidInput) {
