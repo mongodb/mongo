@@ -334,11 +334,13 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     b.append("op", opstr);
     b.append("ns", nss.ns());
     if (uuid &&
-        repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
-            repl::ReplicationCoordinator::modeMasterSlave)
+        ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+            ReplicationCoordinator::modeMasterSlave)
         uuid->appendToBuilder(&b, "ui");
+
     if (fromMigrate)
         b.appendBool("fromMigrate", true);
+
     if (o2)
         b.append("o2", *o2);
 
@@ -559,6 +561,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
     return sz;
 #endif
 }
+
 }  // namespace
 
 void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName, bool isReplSet) {
@@ -605,8 +608,9 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
         WriteUnitOfWork uow(opCtx);
         invariant(ctx.db()->createCollection(opCtx, oplogCollectionName, options));
         acquireOplogCollectionForLogging(opCtx);
-        if (!isReplSet)
-            getGlobalServiceContext()->getOpObserver()->onOpMessage(opCtx, BSONObj());
+        if (!isReplSet) {
+            opCtx->getServiceContext()->getOpObserver()->onOpMessage(opCtx, BSONObj());
+        }
         uow.commit();
     });
 

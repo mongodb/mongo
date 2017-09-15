@@ -31,7 +31,7 @@
 #include "mongo/db/op_observer_impl.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
@@ -44,7 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
@@ -55,9 +55,11 @@
 namespace mongo {
 namespace {
 
-// Return whether we're a master using master-slave replication.
-bool isMasterSlave() {
-    return repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+/**
+ * Returns whether we're a master using master-slave replication.
+ */
+bool isMasterSlave(OperationContext* opCtx) {
+    return repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
         repl::ReplicationCoordinator::modeMasterSlave;
 }
 
@@ -70,6 +72,7 @@ bool isMasterSlave() {
  */
 void onWriteOpCompleted(OperationContext* opCtx,
                         const NamespaceString& nss,
+                        Session* session,
                         std::vector<StmtId> stmtIdsWritten,
                         const repl::OpTime& lastStmtIdWriteOpTime) {
     const auto lastStmtIdWriteTs = lastStmtIdWriteOpTime.getTimestamp();
@@ -83,10 +86,40 @@ void onWriteOpCompleted(OperationContext* opCtx,
                               << "  cannot be performed using a transaction or on a session.",
                 !opCtx->getLogicalSessionId());
         SessionCatalog::get(opCtx)->resetSessions();
-    } else if (opCtx->getTxnNumber()) {
-        OperationContextSession::get(opCtx)->onWriteOpCompletedOnPrimary(
+    } else if (session) {
+        session->onWriteOpCompletedOnPrimary(
             opCtx, *opCtx->getTxnNumber(), std::move(stmtIdsWritten), lastStmtIdWriteTs);
     }
+}
+
+/**
+ * Given a raw collMod command object and associated collection metadata, create and return the
+ * object for the 'o' field of a collMod oplog entry. For TTL index updates, we make sure the oplog
+ * entry always stores the index name, instead of a key pattern.
+ */
+BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
+                          const CollectionOptions& oldCollOptions,
+                          boost::optional<TTLCollModInfo> ttlInfo) {
+    BSONObjBuilder cmdObjBuilder;
+    std::string ttlIndexFieldName = "index";
+
+    // Add all fields from the original collMod command.
+    for (auto elem : collModCmd) {
+        // We normalize all TTL collMod oplog entry objects to use the index name, even if the
+        // command used an index key pattern.
+        if (elem.fieldNameStringData() == ttlIndexFieldName && ttlInfo) {
+            BSONObjBuilder ttlIndexObjBuilder;
+            ttlIndexObjBuilder.append("name", ttlInfo->indexName);
+            ttlIndexObjBuilder.append("expireAfterSeconds",
+                                      durationCount<Seconds>(ttlInfo->expireAfterSeconds));
+
+            cmdObjBuilder.append(ttlIndexFieldName, ttlIndexObjBuilder.obj());
+        } else {
+            cmdObjBuilder.append(elem);
+        }
+    }
+
+    return cmdObjBuilder.obj();
 }
 
 /**
@@ -188,8 +221,9 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    OptionalCollectionUUID uuid,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
-    NamespaceString systemIndexes{nss.getSystemIndexesCollection()};
-    if (uuid && !isMasterSlave()) {
+    const NamespaceString systemIndexes{nss.getSystemIndexesCollection()};
+
+    if (uuid && !isMasterSlave(opCtx)) {
         BSONObjBuilder builder;
         builder.append("createIndexes", nss.coll());
 
@@ -197,6 +231,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
             if (e.fieldNameStringData() != "ns"_sd)
                 builder.append(e);
         }
+
         repl::logOp(opCtx,
                     "c",
                     nss.getCommandNS(),
@@ -219,6 +254,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                     kUninitializedStmtId,
                     {});
     }
+
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "i", systemIndexes, indexDoc, nullptr);
 
@@ -262,7 +298,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         return stmt.stmtId;
     });
 
-    onWriteOpCompleted(opCtx, nss, stmtIdsWritten, lastOpTime);
+    onWriteOpCompleted(opCtx, nss, session, stmtIdsWritten, lastOpTime);
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
@@ -290,7 +326,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updatedDoc);
     }
 
-    onWriteOpCompleted(opCtx, args.nss, std::vector<StmtId>{args.stmtId}, opTime);
+    onWriteOpCompleted(opCtx, args.nss, session, std::vector<StmtId>{args.stmtId}, opTime);
 }
 
 auto OpObserverImpl::aboutToDelete(OperationContext* opCtx,
@@ -332,7 +368,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         FeatureCompatibilityVersion::onDelete(opCtx, deleteState.documentKey);
     }
 
-    onWriteOpCompleted(opCtx, nss, std::vector<StmtId>{stmtId}, opTime);
+    onWriteOpCompleted(opCtx, nss, session, std::vector<StmtId>{stmtId}, opTime);
 }
 
 void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
@@ -349,7 +385,8 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
                                         const BSONObj& idIndex) {
-    const NamespaceString dbName = collectionName.getCommandNS();
+    const auto cmdNss = collectionName.getCommandNS();
+
     BSONObjBuilder b;
     b.append("create", collectionName.coll().toString());
     {
@@ -369,15 +406,16 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
         }
     }
 
-    BSONObj cmdObj = b.obj();
+    const auto cmdObj = b.done();
 
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
         repl::logOp(
-            opCtx, "c", dbName, options.uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
+            opCtx, "c", cmdNss, options.uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
     }
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", dbName, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     if (options.uuid) {
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
@@ -388,49 +426,16 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
     }
 }
 
-namespace {
-/**
- * Given a raw collMod command object and associated collection metadata, create and return the
- * object for the 'o' field of a collMod oplog entry. For TTL index updates, we make sure the oplog
- * entry always stores the index name, instead of a key pattern.
- */
-BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
-                          const CollectionOptions& oldCollOptions,
-                          boost::optional<TTLCollModInfo> ttlInfo) {
-    BSONObjBuilder cmdObjBuilder;
-    std::string ttlIndexFieldName = "index";
-
-    // Add all fields from the original collMod command.
-    for (auto elem : collModCmd) {
-        // We normalize all TTL collMod oplog entry objects to use the index name, even if the
-        // command used an index key pattern.
-        if (elem.fieldNameStringData() == ttlIndexFieldName && ttlInfo) {
-            BSONObjBuilder ttlIndexObjBuilder;
-            ttlIndexObjBuilder.append("name", ttlInfo->indexName);
-            ttlIndexObjBuilder.append("expireAfterSeconds",
-                                      durationCount<Seconds>(ttlInfo->expireAfterSeconds));
-
-            cmdObjBuilder.append(ttlIndexFieldName, ttlIndexObjBuilder.obj());
-        } else {
-            cmdObjBuilder.append(elem);
-        }
-    }
-
-    return cmdObjBuilder.obj();
-}
-}
-
 void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                const NamespaceString& nss,
                                OptionalCollectionUUID uuid,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
                                boost::optional<TTLCollModInfo> ttlInfo) {
-
-    const NamespaceString cmdNss = nss.getCommandNS();
+    const auto cmdNss = nss.getCommandNS();
 
     // Create the 'o' field object.
-    BSONObj cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, ttlInfo);
+    const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, ttlInfo);
 
     // Create the 'o2' field object. We save the old collection metadata and TTL expiration.
     BSONObjBuilder o2Builder;
@@ -440,18 +445,18 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         o2Builder.append("expireAfterSeconds_old", oldExpireAfterSeconds);
     }
 
-    const BSONObj o2Obj = o2Builder.obj();
+    const auto o2Obj = o2Builder.done();
 
     if (!nss.isSystemDotProfile()) {
         // do not replicate system.profile modifications
         repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, &o2Obj, false, {}, kUninitializedStmtId, {});
     }
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
-    // Make sure the UUID values in the Collection metadata, the Collection object,
-    // and the UUID catalog are all present and equal if uuid exists and do not exist
-    // if uuid does not exist.
+    // Make sure the UUID values in the Collection metadata, the Collection object, and the UUID
+    // catalog are all present and equal if uuid exists and do not exist if uuid does not exist.
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     Database* db = dbHolder().get(opCtx, nss.db());
     // Some unit tests call the op observer on an unregistered Database.
@@ -471,8 +476,8 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
-    BSONObj cmdObj = BSON("dropDatabase" << 1);
     const NamespaceString cmdNss{dbName, "$cmd"};
+    const auto cmdObj = BSON("dropDatabase" << 1);
 
     repl::logOp(opCtx, "c", cmdNss, {}, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
 
@@ -482,20 +487,21 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
 
     NamespaceUUIDCache::get(opCtx).evictNamespacesInDatabase(dbName);
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               OptionalCollectionUUID uuid) {
-    const NamespaceString dbName = collectionName.getCommandNS();
-    BSONObj cmdObj = BSON("drop" << collectionName.coll().toString());
+    const auto cmdNss = collectionName.getCommandNS();
+    const auto cmdObj = BSON("drop" << collectionName.coll());
 
     repl::OpTime dropOpTime;
     if (!collectionName.isSystemDotProfile()) {
-        // do not replicate system.profile modifications
+        // Do not replicate system.profile modifications
         dropOpTime = repl::logOp(
-            opCtx, "c", dbName, uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
+            opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
     }
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
@@ -506,7 +512,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         FeatureCompatibilityVersion::onDropCollection(opCtx);
     }
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", dbName, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     auto css = CollectionShardingState::get(opCtx, collectionName);
     css->onDropCollection(opCtx, collectionName);
@@ -528,12 +535,13 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                                  OptionalCollectionUUID uuid,
                                  const std::string& indexName,
                                  const BSONObj& indexInfo) {
-    BSONObj cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
-    auto commandNS = nss.getCommandNS();
-    repl::logOp(
-        opCtx, "c", commandNS, uuid, cmdObj, &indexInfo, false, {}, kUninitializedStmtId, {});
+    const auto cmdNss = nss.getCommandNS();
+    const auto cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", commandNS, cmdObj, &indexInfo);
+    repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, &indexInfo, false, {}, kUninitializedStmtId, {});
+
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
 }
 
 repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
@@ -543,19 +551,21 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
                                                 bool dropTarget,
                                                 OptionalCollectionUUID dropTargetUUID,
                                                 bool stayTemp) {
-    const NamespaceString cmdNss = fromCollection.getCommandNS();
+    const auto cmdNss = fromCollection.getCommandNS();
+
     BSONObjBuilder builder;
     builder.append("renameCollection", fromCollection.ns());
     builder.append("to", toCollection.ns());
     builder.append("stayTemp", stayTemp);
-    if (dropTargetUUID && enableCollectionUUIDs && !isMasterSlave()) {
+    if (dropTargetUUID && enableCollectionUUIDs && !isMasterSlave(opCtx)) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
     } else {
         builder.append("dropTarget", dropTarget);
     }
-    BSONObj cmdObj = builder.done();
 
-    auto renameOpTime =
+    const auto cmdObj = builder.done();
+
+    const auto renameOpTime =
         repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
 
     if (fromCollection.isSystemDotViews())
@@ -563,7 +573,8 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
     if (toCollection.isSystemDotViews())
         DurableViewCatalog::onExternalChange(opCtx, toCollection);
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     // Evict namespace entry from the namespace/uuid cache if it exists.
     NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
@@ -571,7 +582,6 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
     cache.evictNamespace(toCollection);
     opCtx->recoveryUnit()->onRollback(
         [&cache, toCollection]() { cache.evictNamespace(toCollection); });
-
 
     // Finally update the UUID Catalog.
     if (uuid) {
@@ -594,21 +604,23 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
     const NamespaceString cmdNss{dbName, "$cmd"};
     repl::logOp(opCtx, "c", cmdNss, {}, applyOpCmd, nullptr, false, {}, kUninitializedStmtId, {});
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
 }
 
 void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,
                                    OptionalCollectionUUID uuid) {
-    const NamespaceString cmdNss = collectionName.getCommandNS();
-    BSONObj cmdObj = BSON("emptycapped" << collectionName.coll());
+    const auto cmdNss = collectionName.getCommandNS();
+    const auto cmdObj = BSON("emptycapped" << collectionName.coll());
 
     if (!collectionName.isSystemDotProfile()) {
-        // do not replicate system.profile modifications
+        // Do not replicate system.profile modifications
         repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
     }
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 }  // namespace mongo
