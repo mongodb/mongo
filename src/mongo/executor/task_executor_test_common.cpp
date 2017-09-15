@@ -330,14 +330,22 @@ COMMON_EXECUTOR_TEST(ScheduleWorkAt) {
     Status status1 = getDetectableErrorStatus();
     Status status2 = getDetectableErrorStatus();
     Status status3 = getDetectableErrorStatus();
+    Status status4 = getDetectableErrorStatus();
+
     const Date_t now = net->now();
     const TaskExecutor::CallbackHandle cb1 = unittest::assertGet(executor.scheduleWorkAt(
         now + Milliseconds(100), stdx::bind(setStatus, stdx::placeholders::_1, &status1)));
+    const TaskExecutor::CallbackHandle cb4 = unittest::assertGet(executor.scheduleWorkAt(
+        now - Milliseconds(50), stdx::bind(setStatus, stdx::placeholders::_1, &status4)));
     unittest::assertGet(executor.scheduleWorkAt(
         now + Milliseconds(5000), stdx::bind(setStatus, stdx::placeholders::_1, &status3)));
     const TaskExecutor::CallbackHandle cb2 = unittest::assertGet(executor.scheduleWorkAt(
         now + Milliseconds(200),
         stdx::bind(setStatusAndShutdown, stdx::placeholders::_1, &status2)));
+
+    executor.wait(cb4);
+    ASSERT_OK(status4);
+
     const Date_t startTime = net->now();
     net->enterNetwork();
     net->runUntil(startTime + Milliseconds(200));

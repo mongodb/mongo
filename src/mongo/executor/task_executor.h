@@ -200,6 +200,8 @@ public:
     /**
      * Schedules "work" to be run by the executor no sooner than "when".
      *
+     * If "when" is <= now(), then it schedules the "work" to be run ASAP.
+     *
      * Returns a handle for waiting on or canceling the callback, or
      * ErrorCodes::ShutdownInProgress.
      *
