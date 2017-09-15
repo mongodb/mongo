@@ -224,9 +224,6 @@ wts_ops(int lastrun)
 			abort();
 		}
 	}
-	for (i = 0; i < g.c_threads; ++i)
-		free(tinfo_list[i]);
-	free(tinfo_list);
 
 	/* Wait for the other threads. */
 	g.workers_finished = 1;
@@ -247,6 +244,10 @@ wts_ops(int lastrun)
 		    "=============== thread ops stop ===============");
 		testutil_check(session->close(session, NULL));
 	}
+
+	for (i = 0; i < g.c_threads; ++i)
+		free(tinfo_list[i]);
+	free(tinfo_list);
 }
 
 /*
