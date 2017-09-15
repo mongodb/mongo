@@ -249,6 +249,21 @@ TEST_F(ReplicationExecutorTest, ScheduleCallbackAtNow) {
     executor.waitForEvent(finishEvent);
 }
 
+TEST_F(ReplicationExecutorTest, ScheduleCallbackInPast) {
+    launchExecutorThread();
+    getNet()->exitNetwork();
+
+    ReplicationExecutor& executor = getReplExecutor();
+    auto finishEvent = assertGet(executor.makeEvent());
+    auto fn = [&executor, finishEvent](const ReplicationExecutor::CallbackArgs& cbData) {
+        ASSERT_OK(cbData.status);
+        executor.signalEvent(finishEvent);
+    };
+
+    auto cb = executor.scheduleWorkAt(getNet()->now() - Milliseconds(1000), fn);
+    executor.waitForEvent(finishEvent);
+}
+
 TEST_F(ReplicationExecutorTest, ScheduleCallbackAtAFutureTime) {
     launchExecutorThread();
     getNet()->exitNetwork();
