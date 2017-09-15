@@ -111,10 +111,10 @@ NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
 void UUIDCatalog::registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
 
-    if (coll && !_catalog.count(uuid)) {
-        // Invalidate this database's ordering, since we're adding a new UUID.
-        _orderedCollections.erase(coll->ns().db());
+    // Invalidate this database's ordering, since we're adding a new UUID.
+    _orderedCollections.erase(coll->ns().db());
 
+    if (coll && !_catalog.count(uuid)) {
         std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
         LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
         invariant(_catalog.insert(entry).second == true);
@@ -143,7 +143,7 @@ boost::optional<CollectionUUID> UUIDCatalog::prev(const StringData& db, Collecti
     auto current = std::lower_bound(ordering.cbegin(), ordering.cend(), uuid);
 
     // If the element does not appear, or is the first element.
-    if (current == ordering.cend() || *current != uuid || current == ordering.cbegin()) {
+    if (*current != uuid || current == ordering.cbegin()) {
         return boost::none;
     }
 
@@ -155,7 +155,7 @@ boost::optional<CollectionUUID> UUIDCatalog::next(const StringData& db, Collecti
     const auto& ordering = _getOrdering_inlock(db, lock);
     auto current = std::lower_bound(ordering.cbegin(), ordering.cend(), uuid);
 
-    if (current == ordering.cend() || *current != uuid || current + 1 == ordering.cend()) {
+    if (*current != uuid || current + 1 == ordering.cend()) {
         return boost::none;
     }
 
