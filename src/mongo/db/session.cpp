@@ -323,7 +323,6 @@ UpdateRequest Session::_makeUpdateRequest(WithLock,
                                           TxnNumber newTxnNumber,
                                           Timestamp newLastWriteTs) const {
     UpdateRequest updateRequest(NamespaceString::kSessionTransactionsTableNamespace);
-    updateRequest.setUpsert(true);
 
     if (_lastWrittenSessionRecord) {
         updateRequest.setQuery(_lastWrittenSessionRecord->toBSON());
@@ -343,6 +342,7 @@ UpdateRequest Session::_makeUpdateRequest(WithLock,
 
         updateRequest.setQuery(updateBSON);
         updateRequest.setUpdates(updateBSON);
+        updateRequest.setUpsert(true);
     }
 
     return updateRequest;
