@@ -31,15 +31,15 @@
 #include <map>
 
 #include "mongo/base/init.h"
-#include "mongo/executor/task_executor_test_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_interface_mock.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/executor/task_executor_test_common.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -226,6 +226,21 @@ TEST_F(ReplicationExecutorTest, ScheduleCallbackAtNow) {
     };
 
     auto cb = executor.scheduleWorkAt(getNet()->now(), fn);
+    executor.waitForEvent(finishEvent);
+}
+
+TEST_F(ReplicationExecutorTest, ScheduleCallbackInPast) {
+    launchExecutorThread();
+    getNet()->exitNetwork();
+
+    ReplicationExecutor& executor = getReplExecutor();
+    auto finishEvent = assertGet(executor.makeEvent());
+    auto fn = [&executor, finishEvent](const ReplicationExecutor::CallbackArgs& cbData) {
+        ASSERT_OK(cbData.status);
+        executor.signalEvent(finishEvent);
+    };
+
+    auto cb = executor.scheduleWorkAt(getNet()->now() - Milliseconds(1000), fn);
     executor.waitForEvent(finishEvent);
 }
 

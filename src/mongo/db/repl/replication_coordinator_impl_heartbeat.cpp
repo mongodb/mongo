@@ -720,19 +720,25 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(
     }
 
     auto nextTimeout = earliestDate + _rsConfig.getElectionTimeoutPeriod();
-    if (nextTimeout > _replExecutor.now()) {
-        LOG(3) << "scheduling next check at " << nextTimeout;
-        auto cbh = _replExecutor.scheduleWorkAt(
-            nextTimeout,
-            stdx::bind(
-                &ReplicationCoordinatorImpl::_handleLivenessTimeout, this, stdx::placeholders::_1));
-        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
-        }
-        fassert(22002, cbh.getStatus());
-        _handleLivenessTimeoutCbh = cbh.getValue();
-        _earliestMemberId = earliestMemberId;
+    LOG(3) << "scheduling next check at " << nextTimeout;
+
+    // It is possible we will schedule the next timeout in the past.
+    // ReplicationExecutor::scheduleWorkAt() schedules its work immediately if it's given a
+    // time <= now().
+    // If we missed the timeout, it means that on our last check the earliest live member was
+    // just barely fresh and it has become stale since then. We must schedule another liveness
+    // check to continue conducting liveness checks and be able to step down from primary if we
+    // lose contact with a majority of nodes.
+    auto cbh = _replExecutor.scheduleWorkAt(
+        nextTimeout,
+        stdx::bind(
+            &ReplicationCoordinatorImpl::_handleLivenessTimeout, this, stdx::placeholders::_1));
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
     }
+    fassert(22002, cbh.getStatus());
+    _handleLivenessTimeoutCbh = cbh.getValue();
+    _earliestMemberId = earliestMemberId;
 }
 
 void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId) {
