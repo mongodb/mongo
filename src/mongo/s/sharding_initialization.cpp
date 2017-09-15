@@ -193,6 +193,30 @@ Status initializeGlobalShardingState(OperationContext* txn,
         ? Milliseconds(ShardingTaskExecutorPoolRefreshTimeoutMS)
         : ConnectionPool::kDefaultRefreshTimeout;
 
+    if (connPoolOptions.refreshRequirement <= connPoolOptions.refreshTimeout) {
+        auto newRefreshTimeout = connPoolOptions.refreshRequirement - Milliseconds(1);
+        warning() << "ShardingTaskExecutorPoolRefreshRequirementMS ("
+                  << connPoolOptions.refreshRequirement
+                  << ") set below ShardingTaskExecutorPoolRefreshTimeoutMS ("
+                  << connPoolOptions.refreshTimeout
+                  << "). Adjusting ShardingTaskExecutorPoolRefreshTimeoutMS to "
+                  << newRefreshTimeout;
+        connPoolOptions.refreshTimeout = newRefreshTimeout;
+    }
+
+    if (connPoolOptions.hostTimeout <=
+        connPoolOptions.refreshRequirement + connPoolOptions.refreshTimeout) {
+        auto newHostTimeout =
+            connPoolOptions.refreshRequirement + connPoolOptions.refreshTimeout + Milliseconds(1);
+        warning() << "ShardingTaskExecutorPoolHostTimeoutMS (" << connPoolOptions.hostTimeout
+                  << ") set below ShardingTaskExecutorPoolRefreshRequirementMS ("
+                  << connPoolOptions.refreshRequirement
+                  << ") + ShardingTaskExecutorPoolRefreshTimeoutMS ("
+                  << connPoolOptions.refreshTimeout
+                  << "). Adjusting ShardingTaskExecutorPoolHostTimeoutMS to " << newHostTimeout;
+        connPoolOptions.hostTimeout = newHostTimeout;
+    }
+
     auto network =
         executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),
