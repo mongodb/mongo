@@ -1,11 +1,12 @@
 (function() {
+    'use strict';
 
     var st =
         new ShardingTest({name: 'migrateBig_balancer', shards: 2, other: {enableBalancer: true}});
     var mongos = st.s;
 
     var admin = mongos.getDB("admin");
-    db = mongos.getDB("test");
+    var db = mongos.getDB("test");
     var coll = db.getCollection("stuff");
 
     assert.commandWorked(admin.runCommand({enablesharding: coll.getDB().getName()}));
@@ -18,7 +19,7 @@
     for (var i = 0; i < nsq; i++)
         data += data;
 
-    dataObj = {};
+    var dataObj = {};
     for (var i = 0; i < n; i++)
         dataObj["data-" + i] = data;
 
@@ -30,19 +31,16 @@
 
     assert.eq(40, coll.count(), "prep1");
 
-    printjson(coll.stats());
-
-    admin.printShardingStatus();
-
-    admin.runCommand({shardcollection: "" + coll, key: {_id: 1}});
+    assert.commandWorked(admin.runCommand({shardcollection: "" + coll, key: {_id: 1}}));
+    st.printShardingStatus();
 
     assert.lt(
         5, mongos.getDB("config").chunks.find({ns: "test.stuff"}).count(), "not enough chunks");
 
     assert.soon(function() {
         // On *extremely* slow or variable systems, we've seen migrations fail in the critical
-        // section and
-        // kill the server.  Do an explicit check for this. SERVER-8781
+        // section and kill the server. Do an explicit check for this. SERVER-8781
+        //
         // TODO: Remove once we can better specify what systems to run what tests on.
         try {
             assert.commandWorked(st.shard0.getDB("admin").runCommand({ping: 1}));
@@ -53,7 +51,7 @@
             throw e;
         }
 
-        res = mongos.getDB("config").chunks.group({
+        var res = mongos.getDB("config").chunks.group({
             cond: {ns: "test.stuff"},
             key: {shard: 1},
             reduce: function(doc, out) {
@@ -68,5 +66,4 @@
     }, "never migrated", 10 * 60 * 1000, 1000);
 
     st.stop();
-
 })();
