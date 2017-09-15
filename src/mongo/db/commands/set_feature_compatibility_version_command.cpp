@@ -43,12 +43,16 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/exit.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
 namespace {
 
+MONGO_FP_DECLARE(featureCompatibilityDowngrade);
+MONGO_FP_DECLARE(featureCompatibilityUpgrade);
 /**
  * Sets the minimum allowed version for the cluster. If it is 3.4, then the node should not use 3.6
  * features.
@@ -104,6 +108,7 @@ public:
             existingVersion == FeatureCompatibilityVersionCommandParser::kVersion34;
     }
 
+
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
@@ -129,10 +134,22 @@ public:
             existingVersion = version;
         }
 
+        // For reproducing failure after adding UUIDs and before upgrade FCV document.
+        if (MONGO_FAIL_POINT(featureCompatibilityUpgrade)) {
+            exitCleanly(EXIT_CLEAN);
+        }
+
         FeatureCompatibilityVersion::set(opCtx, version);
 
-        // If version and existingVersion are still not equal, we must be downgrading.
-        if (version != existingVersion) {
+        // For reproducing failure after downgrading FCV document, and before removing UUIDs.
+        if (MONGO_FAIL_POINT(featureCompatibilityDowngrade)) {
+            serverGlobalParams.featureCompatibility.isSchemaVersion36.store(false);
+            exitCleanly(EXIT_CLEAN);
+        }
+
+        // Always perform a downgrade when setting the FCV to 3.4, in case of a crash after writing
+        // the document and before completing the upgrade.
+        if (version == FeatureCompatibilityVersionCommandParser::kVersion34) {
             serverGlobalParams.featureCompatibility.isSchemaVersion36.store(false);
             updateUUIDSchemaVersion(opCtx, /*upgrade*/ false);
         }
