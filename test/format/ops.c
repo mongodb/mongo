@@ -163,8 +163,8 @@ wts_ops(int lastrun)
 	if (!SINGLETHREADED && g.c_long_running_txn)
 		testutil_check(__wt_thread_create(NULL, &lrt_tid, lrt, NULL));
 	if (g.c_txn_timestamps)
-		testutil_check(
-		    __wt_thread_create(NULL, &timestamp_tid, timestamp, NULL));
+		testutil_check(__wt_thread_create(
+		    NULL, &timestamp_tid, timestamp, tinfo_list));
 
 	/* Spin on the threads, calculating the totals. */
 	for (;;) {
@@ -468,20 +468,15 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 	char config_buf[64];
 
 	if (g.c_txn_timestamps) {
-		/*
-		 * There can be multiple threads doing transactions
-		 * simultaneously requiring us to do some co-ordination so that
-		 * a thread doesn't try to commit with a timestamp older than
-		 * the oldest_timestamp just bumped by another thread.
-		 */
-		testutil_check(pthread_rwlock_rdlock(&g.commit_ts_lock));
 		ts = __wt_atomic_addv64(&g.timestamp, 1);
 		testutil_check(__wt_snprintf(
 		    config_buf, sizeof(config_buf),
 		    "commit_timestamp=%" PRIx64, ts));
 		testutil_check(
 		    session->commit_transaction(session, config_buf));
-		testutil_check(pthread_rwlock_unlock(&g.commit_ts_lock));
+
+		/* After the commit, update our last timestamp. */
+		tinfo->timestamp = ts;
 	} else
 		testutil_check(session->commit_transaction(session, NULL));
 	++tinfo->commit;

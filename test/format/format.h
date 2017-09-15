@@ -137,9 +137,6 @@ typedef struct {
 
 	pthread_rwlock_t death_lock;		/* Single-thread failure */
 
-	/* Synchronize setting commit timestamp. */
-	pthread_rwlock_t commit_ts_lock;
-
 	char *uri;				/* Object name */
 
 	char *config_open;			/* Command-line configuration */
@@ -264,8 +261,10 @@ typedef struct {
 	uint64_t rollback;
 	uint64_t deadlock;
 
-	int       id;				/* simple thread ID */
+	int	    id;				/* simple thread ID */
 	wt_thread_t tid;			/* thread ID */
+
+	uint64_t timestamp;			/* last committed timestamp */
 
 	int quit;				/* thread should quit */
 
