@@ -87,48 +87,58 @@ static bool is2DIndex(const BSONObj& pattern) {
 string optionString(size_t options) {
     mongoutils::str::stream ss;
 
-    // These options are all currently mutually exclusive.
     if (QueryPlannerParams::DEFAULT == options) {
         ss << "DEFAULT ";
     }
-    if (options & QueryPlannerParams::NO_TABLE_SCAN) {
-        ss << "NO_TABLE_SCAN ";
-    }
-    if (options & QueryPlannerParams::INCLUDE_COLLSCAN) {
-        ss << "INCLUDE_COLLSCAN ";
-    }
-    if (options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        ss << "INCLUDE_SHARD_FILTER ";
-    }
-    if (options & QueryPlannerParams::NO_BLOCKING_SORT) {
-        ss << "NO_BLOCKING_SORT ";
-    }
-    if (options & QueryPlannerParams::INDEX_INTERSECTION) {
-        ss << "INDEX_INTERSECTION ";
-    }
-    if (options & QueryPlannerParams::KEEP_MUTATIONS) {
-        ss << "KEEP_MUTATIONS ";
-    }
-    if (options & QueryPlannerParams::IS_COUNT) {
-        ss << "IS_COUNT ";
-    }
-    if (options & QueryPlannerParams::SPLIT_LIMITED_SORT) {
-        ss << "SPLIT_LIMITED_SORT ";
-    }
-    if (options & QueryPlannerParams::CANNOT_TRIM_IXISECT) {
-        ss << "CANNOT_TRIM_IXISECT ";
-    }
-    if (options & QueryPlannerParams::SNAPSHOT_USE_ID) {
-        ss << "SNAPSHOT_USE_ID ";
-    }
-    if (options & QueryPlannerParams::NO_UNCOVERED_PROJECTIONS) {
-        ss << "NO_UNCOVERED_PROJECTIONS ";
-    }
-    if (options & QueryPlannerParams::GENERATE_COVERED_IXSCANS) {
-        ss << "GENERATE_COVERED_IXSCANS ";
-    }
-    if (options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS) {
-        ss << "TRACK_LATEST_OPLOG_TS ";
+    while (options) {
+        // The expression (x & (x - 1)) yields x with the lowest bit cleared.  Then the exclusive-or
+        // of the result with the original yields the lowest bit by itself.
+        size_t new_options = options & (options - 1);
+        QueryPlannerParams::Options opt = QueryPlannerParams::Options(new_options ^ options);
+        options = new_options;
+        switch (opt) {
+            case QueryPlannerParams::NO_TABLE_SCAN:
+                ss << "NO_TABLE_SCAN ";
+                break;
+            case QueryPlannerParams::INCLUDE_COLLSCAN:
+                ss << "INCLUDE_COLLSCAN ";
+                break;
+            case QueryPlannerParams::INCLUDE_SHARD_FILTER:
+                ss << "INCLUDE_SHARD_FILTER ";
+                break;
+            case QueryPlannerParams::NO_BLOCKING_SORT:
+                ss << "NO_BLOCKING_SORT ";
+                break;
+            case QueryPlannerParams::INDEX_INTERSECTION:
+                ss << "INDEX_INTERSECTION ";
+                break;
+            case QueryPlannerParams::KEEP_MUTATIONS:
+                ss << "KEEP_MUTATIONS ";
+                break;
+            case QueryPlannerParams::IS_COUNT:
+                ss << "IS_COUNT ";
+                break;
+            case QueryPlannerParams::SPLIT_LIMITED_SORT:
+                ss << "SPLIT_LIMITED_SORT ";
+                break;
+            case QueryPlannerParams::CANNOT_TRIM_IXISECT:
+                ss << "CANNOT_TRIM_IXISECT ";
+                break;
+            case QueryPlannerParams::SNAPSHOT_USE_ID:
+                ss << "SNAPSHOT_USE_ID ";
+                break;
+            case QueryPlannerParams::NO_UNCOVERED_PROJECTIONS:
+                ss << "NO_UNCOVERED_PROJECTIONS ";
+                break;
+            case QueryPlannerParams::GENERATE_COVERED_IXSCANS:
+                ss << "GENERATE_COVERED_IXSCANS ";
+                break;
+            case QueryPlannerParams::TRACK_LATEST_OPLOG_TS:
+                ss << "TRACK_LATEST_OPLOG_TS ";
+            case QueryPlannerParams::DEFAULT:
+                MONGO_UNREACHABLE;
+                break;
+        }
     }
 
     return ss;
