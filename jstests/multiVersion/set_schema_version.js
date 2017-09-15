@@ -52,15 +52,14 @@
         checkFCV(adminDB, version);
     };
 
-    let insertDataForConn =
-        function(conn, dbs) {
+    let insertDataForConn = function(conn, dbs) {
         for (let i = 0; i < 20; i++) {
             let doc = {id: i, a: "foo", conn: conn.name};
             for (let j in dbs) {
                 assert.writeOK(conn.getDB(dbs[j]).foo.insert(doc));
             }
         }
-    }
+    };
 
     // Create and clear dbpath
     let sharedDbPath = MongoRunner.dataPath + "set_schema_version";
