@@ -216,6 +216,7 @@ jsTestOptions = function() {
             setParametersMongos: TestData.setParametersMongos,
             storageEngine: TestData.storageEngine,
             storageEngineCacheSizeGB: TestData.storageEngineCacheSizeGB,
+            transportLayer: TestData.transportLayer,
             wiredTigerEngineConfigString: TestData.wiredTigerEngineConfigString,
             wiredTigerCollectionConfigString: TestData.wiredTigerCollectionConfigString,
             wiredTigerIndexConfigString: TestData.wiredTigerIndexConfigString,

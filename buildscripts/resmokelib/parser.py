@@ -50,6 +50,7 @@ DEST_TO_CONFIG = {
     "storage_engine_cache_size": "storageEngineCacheSizeGB",
     "tag_file": "tagFile",
     "task_id": "taskId",
+    "transport_layer": "transportLayer",
     "wt_coll_config": "wiredTigerCollectionConfigString",
     "wt_engine_config": "wiredTigerEngineConfigString",
     "wt_index_config": "wiredTigerIndexConfigString"
@@ -194,6 +195,9 @@ def parse_command_line():
     parser.add_option("--serviceExecutor", dest="service_executor", metavar="EXECUTOR",
                       help="The service executor used by jstests")
 
+    parser.add_option("--transportLayer", dest="transport_layer", metavar="TRANSPORT",
+                      help="The transport layer used by jstests")
+
     parser.add_option("--shellReadMode", type="choice", action="store", dest="shell_read_mode",
                       choices=("commands", "compatibility", "legacy"), metavar="READ_MODE",
                       help="The read mode used by the mongo shell.")
@@ -319,6 +323,7 @@ def update_config_vars(values):
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
     _config.TAG_FILE = config.pop("tagFile")
     _config.TASK_ID = config.pop("taskId")
+    _config.TRANSPORT_LAYER = config.pop("transportLayer")
     _config.WT_COLL_CONFIG = config.pop("wiredTigerCollectionConfigString")
     _config.WT_ENGINE_CONFIG = config.pop("wiredTigerEngineConfigString")
     _config.WT_INDEX_CONFIG = config.pop("wiredTigerIndexConfigString")

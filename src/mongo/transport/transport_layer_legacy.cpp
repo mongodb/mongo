@@ -203,7 +203,9 @@ void TransportLayerLegacy::_closeConnection(Connection* conn) {
 void TransportLayerLegacy::shutdown() {
     _running.store(false);
     _listener->shutdown();
-    _listenerThread.join();
+    if (_listenerThread.joinable()) {
+        _listenerThread.join();
+    }
 }
 
 void TransportLayerLegacy::_destroy(LegacySession& session) {

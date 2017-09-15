@@ -5997,6 +5997,143 @@ buildvariants:
     - windows-64-vs2015-large
   - name: jsCore
 
+- name: windows-64-2k8-ssl-legacy-transportlayer
+  display_name: SSL Windows 2008R2 Legacy Transport
+  run_on:
+  - windows-64-vs2015-small
+  batchtime: 1440 # 1 day
+  expansions:
+    platform_decompress: unzip
+    exe: ".exe"
+    gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
+    tooltags: "-tags ssl"
+    push_path: win32
+    push_bucket: downloads.mongodb.org
+    push_name: win32
+    push_arch: x86_64-2008plus-ssl
+    multiversion_platform_arch: windows/x86_64-2008plus-ssl
+    msi_target: msi
+    content_type: application/zip
+    compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    python: python
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    ext: zip
+    use_scons_cache: true
+    test_flags: --transportLayer=legacy
+  tasks:
+  - name: compile
+    distros:
+    - windows-64-vs2015-large
+  - name: compile_all
+    distros:
+    - windows-64-vs2015-large
+  - name: aggregation
+  - name: aggregation_WT
+  - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
+  - name: auth
+  - name: auth_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_WT
+  - name: dbtest
+  - name: dbtest_WT
+  - name: disk
+  - name: disk_WT
+  - name: durability
+  - name: failpoints
+  - name: gle_auth
+  - name: gle_auth_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_compatibility
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
+  - name: jsonSchema
+  - name: generational_jstestfuzz
+  - name: generational_jstestfuzz_WT
+  - name: jstestfuzz
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
+  - name: jstestfuzz_sharded_WT
+  - name: master_slave
+  - name: master_slave_WT
+  - name: master_slave_jscore_passthrough
+  - name: master_slave_jscore_passthrough_WT
+  - name: mmap
+  - name: mongosTest
+  - name: multiversion
+  - name: multiversion_WT
+  - name: multiversion_auth
+  - name: multiversion_multistorage_engine
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: parallel
+  - name: parallel_WT
+  - name: parallel_compatibility
+  - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
+  - name: read_concern_majority_passthrough_WT
+  - name: replica_sets
+  - name: replica_sets_WT
+  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_WT
+  - name: serial_run
+  - name: serial_run_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_WT
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_op_query_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_last_stable_mongos_and_mixed_shards
+    distros:
+    - windows-64-vs2015-large
+  - name: slow1
+  - name: slow1_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: tool_WT
+
 - name: enterprise-windows-64-2k8-inmem
   display_name: Enterprise Windows 2008R2 (inMemory)
   modules:
@@ -9820,6 +9957,154 @@ buildvariants:
 #  - name: replica_sets_WT_ese
 #  - name: replica_sets_auth
 #  - name: replica_sets_pv0
+  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_WT
+  - name: replica_sets_initsync_jscore_passthrough
+  - name: replica_sets_initsync_jscore_passthrough_WT
+  - name: replica_sets_initsync_static_jscore_passthrough
+  - name: replica_sets_initsync_static_jscore_passthrough_WT
+  - name: replica_sets_resync_static_jscore_passthrough
+  - name: replica_sets_resync_static_jscore_passthrough_WT
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  - name: master_slave
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
+  - name: master_slave_jscore_passthrough_WT
+  - name: sasl
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding
+  - name: sharding_WT
+  - name: sharding_WT_ese
+  - name: sharding_auth
+  - name: sharding_auth_audit_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_op_query_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_op_query_WT
+  - name: slow1
+  - name: slow1_WT
+  - name: serial_run
+  - name: serial_run_WT
+  - name: snmp
+  - name: snmp_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: tool_WT
+
+- name: ubuntu1604-debug-legacy-transportlayer
+  display_name: "Enterprise SSL Ubuntu 16.04 DEBUG Legacy Transport"
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1604-build
+  stepback: true
+  batchtime: 1440 # 1 day
+  expansions:
+    tooltags: "-tags 'ssl'"
+    # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
+    variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    build_mongoreplay: false
+    hang_analyzer_dump_core: false
+    use_scons_cache: true
+    test_flags: --transportLayer=legacy
+  tasks:
+  - name: compile
+  - name: compile_all
+  - name: aggregation
+  - name: aggregation_WT
+  - name: aggregation_WT_ese
+  - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough_WT
+  - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
+  - name: audit
+  - name: audit_WT
+  - name: auth
+  - name: auth_WT
+  - name: auth_audit
+  - name: auth_audit_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
+  - name: sharded_causally_consistent_jscore_passthrough_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_WT
+  - name: dbtest
+  - name: dbtest_WT
+  - name: disk
+  - name: disk_WT
+  - name: dur_jscore_passthrough
+  - name: durability
+  - name: ese_WT
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
+  - name: integration_tests_replset
+  - name: integration_tests_sharded
+  - name: integration_tests_standalone
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_WT_ese
+  - name: jsCore_inMem
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
+  - name: jsCore_minimum_batch_size_WT
+  - name: jsCore_op_query
+  - name: jsCore_op_query_WT
+  - name: mmap
+  - name: mongosTest
+  - name: multiversion
+  - name: multiversion_auth
+  - name: multiversion_WT
+  - name: multiversion_multistorage_engine
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: parallel
+  - name: parallel_WT
+  - name: parallel_compatibility
+  - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
+  - name: read_concern_majority_passthrough_WT
+  - name: read_only
+  - name: read_only_WT
+  - name: read_only_sharded
+  - name: read_only_sharded_WT
+  - name: replica_sets
+  - name: replica_sets_WT
+  - name: replica_sets_WT_ese
+  - name: replica_sets_auth
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   - name: replica_sets_initsync_jscore_passthrough

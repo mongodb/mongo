@@ -64,6 +64,7 @@ DEFAULTS = {
     "storageEngineCacheSizeGB": None,
     "tagFile": None,
     "taskId": None,
+    "transportLayer": None,
     "wiredTigerCollectionConfigString": None,
     "wiredTigerEngineConfigString": None,
     "wiredTigerIndexConfigString": None
@@ -178,6 +179,9 @@ TAG_FILE = None
 # If set, then the Evergreen task Id value will be transmitted to logkeeper when creating builds and
 # tests.
 TASK_ID = None
+
+# IF set, then mongod/mongos's started by resmoke.py will use the specified transport layer
+TRANSPORT_LAYER = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # WiredTiger collection configuration settings.

@@ -1064,6 +1064,12 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
 
+                if (jsTest.options().transportLayer) {
+                    if (!argArrayContains("--transportLayer")) {
+                        argArray.push(...["--transportLayer", jsTest.options().transportLayer]);
+                    }
+                }
+
                 // Disable background cache refreshing to avoid races in tests
                 argArray.push(...['--setParameter', "disableLogicalSessionCacheRefresh=true"]);
             }
