@@ -521,6 +521,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
                                                const write_ops::UpdateOpEntry& op) {
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot use (or request) retryable writes with multi=true",
+            !(opCtx->getTxnNumber() && op.getMulti()));
+
     globalOpCounters.gotUpdate();
     auto& curOp = *CurOp::get(opCtx);
     {
@@ -663,6 +667,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
                                                const write_ops::DeleteOpEntry& op) {
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot use (or request) retryable writes with limit=0",
+            !(opCtx->getTxnNumber() && op.getMulti()));
+
     globalOpCounters.gotDelete();
     auto& curOp = *CurOp::get(opCtx);
     {

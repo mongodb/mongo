@@ -180,10 +180,10 @@
         {
           delete: "foo",
           deletes: [
-              {q: {_id: 10}, limit: 0},
-              {q: {_id: 20}, limit: 0},
-              {q: {_id: 30}, limit: 0},
-              {q: {_id: 40}, limit: 0}
+              {q: {_id: 10}, limit: 1},
+              {q: {_id: 20}, limit: 1},
+              {q: {_id: 30}, limit: 1},
+              {q: {_id: 40}, limit: 1}
           ],
           ordered: true,
           lsid: {id: UUID()},

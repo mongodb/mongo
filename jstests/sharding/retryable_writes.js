@@ -295,6 +295,54 @@
         assert.eq(1, collContents[1].y);
     }
 
+    function runMultiTests(mainConn, priConn) {
+        // Test the behavior of retryable writes with multi=true / limit=0
+        var lsid = {id: UUID()};
+        var testDb = mainConn.getDB('test_multi');
+
+        // Only the update statements with multi=true in a batch fail.
+        var cmd = {
+            update: 'user',
+            updates: [{q: {x: 1}, u: {y: 1}}, {q: {x: 2}, u: {z: 1}, multi: true}],
+            ordered: true,
+            lsid: lsid,
+            txnNumber: NumberLong(1),
+        };
+        var res = assert.commandWorked(testDb.runCommand(cmd));
+        assert.eq(1,
+                  res.writeErrors.length,
+                  'expected only one write error, received: ' + tojson(res.writeErrors));
+        assert.eq(1,
+                  res.writeErrors[0].index,
+                  'expected the update at index 1 to fail, not the update at index: ' +
+                      res.writeErrors[0].index);
+        assert.eq(ErrorCodes.InvalidOptions,
+                  res.writeErrors[0].code,
+                  'expected to fail with code ' + ErrorCodes.InvalidOptions + ', received: ' +
+                      res.writeErrors[0].code);
+
+        // Only the delete statements with limit=0 in a batch fail.
+        cmd = {
+            delete: 'user',
+            deletes: [{q: {x: 1}, limit: 1}, {q: {y: 1}, limit: 0}],
+            ordered: false,
+            lsid: lsid,
+            txnNumber: NumberLong(1),
+        };
+        res = assert.commandWorked(testDb.runCommand(cmd));
+        assert.eq(1,
+                  res.writeErrors.length,
+                  'expected only one write error, received: ' + tojson(res.writeErrors));
+        assert.eq(1,
+                  res.writeErrors[0].index,
+                  'expected the delete at index 1 to fail, not the delete at index: ' +
+                      res.writeErrors[0].index);
+        assert.eq(ErrorCodes.InvalidOptions,
+                  res.writeErrors[0].code,
+                  'expected to fail with code ' + ErrorCodes.InvalidOptions + ', received: ' +
+                      res.writeErrors[0].code);
+    }
+
     // Tests for replica set
     var replTest = new ReplSetTest({nodes: 1});
     replTest.startSet();
@@ -304,6 +352,7 @@
 
     runTests(priConn, priConn);
     runFailpointTests(priConn, priConn);
+    runMultiTests(priConn, priConn);
 
     replTest.stopSet();
 
@@ -312,6 +361,7 @@
 
     runTests(st.s0, st.rs0.getPrimary());
     runFailpointTests(st.s0, st.rs0.getPrimary());
+    runMultiTests(st.s0, st.rs0.getPrimary());
 
     st.stop();
 })();
