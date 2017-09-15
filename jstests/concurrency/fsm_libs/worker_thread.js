@@ -49,15 +49,6 @@ var workerThread = (function() {
                         // readConcern of any command requests through this connection.
                         myDB.getMongo().setCausalConsistency();
                     }
-
-                    if (args.sessionOptions.readPreference) {
-                        // TODO SERVER-30912: The shardCollection command hangs when run under a
-                        // session so for now we don't start a session and instead set the read
-                        // preference directly on the connection to test doing reads from
-                        // secondaries. This can be removed once this ticket is resolved.
-                        myDB.getMongo().setReadPref(args.sessionOptions.readPreference.mode,
-                                                    args.sessionOptions.readPreference.tags);
-                    }
                 } else {
                     myDB = new Mongo(args.host).getDB(args.dbName);
                 }
