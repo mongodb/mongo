@@ -509,7 +509,7 @@ timestamp(void *arg)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	TINFO *tinfo_list, *tinfo;
+	TINFO **tinfo_list, *tinfo;
 	time_t last, now;
 	uint64_t oldest_timestamp, usecs;
 	uint32_t i;
@@ -529,10 +529,12 @@ timestamp(void *arg)
 	while (!g.workers_finished) {
 		/* Find the lowest committed timestamp. */
 		oldest_timestamp = UINT64_MAX;
-		for (tinfo = tinfo_list, i = 0; i < g.c_threads; ++tinfo, ++i)
+		for (i = 0; i < g.c_threads; ++i) {
+			tinfo = tinfo_list[i];
 			if (tinfo->timestamp != 0 &&
 			    tinfo->timestamp < oldest_timestamp)
 				oldest_timestamp = tinfo->timestamp;
+		}
 
 		/*
 		 * Don't get more than 100 transactions or more than 15 seconds
