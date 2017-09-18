@@ -165,12 +165,6 @@ repl::OplogEntry parseOplog(const BSONObj& oplogBSON) {
                           << redact(oplogBSON),
             oplogEntry.getStatementId());
 
-    uassert(ErrorCodes::UnsupportedFormat,
-            str::stream() << "oplog with opTime " << oplogEntry.getTimestamp().toString()
-                          << " does not have o2: "
-                          << redact(oplogBSON),
-            oplogEntry.getObject2());
-
     return oplogEntry;
 }
 
@@ -223,7 +217,9 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
         //     findAndModify operation. In this case, o field contains the relevant info
         //     and o2 will be empty.
 
-        object2 = oplogEntry.getObject2().value();
+        if (oplogEntry.getObject2()) {
+            object2 = *oplogEntry.getObject2();
+        }
 
         if (object2.isEmpty()) {
             result.isPrePostImage = true;

@@ -158,7 +158,13 @@ public:
         auto innerOplog = extractInnerOplog(oplogToCheck);
         ASSERT_TRUE(innerOplog.getOpType() == originalOplog.getOpType());
         ASSERT_BSONOBJ_EQ(originalOplog.getObject(), innerOplog.getObject());
-        ASSERT_BSONOBJ_EQ(*originalOplog.getObject2(), *innerOplog.getObject2());
+
+        if (originalOplog.getObject2()) {
+            ASSERT_TRUE(innerOplog.getObject2());
+            ASSERT_BSONOBJ_EQ(*originalOplog.getObject2(), *innerOplog.getObject2());
+        } else {
+            ASSERT_FALSE(innerOplog.getObject2());
+        }
     }
 
 private:
