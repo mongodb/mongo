@@ -17,25 +17,25 @@
 
     // Sync cache to collection and ensure it arrived.
     assert.commandWorked(admin.runCommand({refreshLogicalSessionCacheNow: 1}));
-    var resultArray;
+    var resultArrayMine;
     assert.soon(function() {
-        resultArray = listSessions().toArray();
+        const resultArray = listSessions().toArray();
         if (resultArray.length < 1) {
             return false;
         }
-        const resultArrayMine = resultArray
-                                    .map(function(sess) {
-                                        return sess._id.id;
-                                    })
-                                    .filter(function(id) {
-                                        return 0 == bsonWoCompare({x: id}, {x: myid});
-                                    });
+        resultArrayMine = resultArray
+                              .map(function(sess) {
+                                  return sess._id;
+                              })
+                              .filter(function(id) {
+                                  return 0 == bsonWoCompare({x: id.id}, {x: myid});
+                              });
         return resultArrayMine.length == 1;
     }, "Failed to locate session in collection");
 
     // Try asking for the session by username.
     const myusername = (function() {
-        if (0 == bsonWoCompare({x: resultArray[0]._id.uid}, {x: computeSHA256Block("")})) {
+        if (0 == bsonWoCompare({x: resultArrayMine[0].uid}, {x: computeSHA256Block("")})) {
             // Code for "we're running in no-auth mode"
             return {user: "", db: ""};
         }
@@ -50,8 +50,15 @@
     function listMySessions() {
         return config.system.sessions.aggregate([{'$listSessions': {users: [myusername]}}]);
     }
-    const myArray = listMySessions().toArray();
-    assert.eq(resultArray.length, myArray.length);
+    const myArray = listMySessions()
+                        .toArray()
+                        .map(function(sess) {
+                            return sess._id;
+                        })
+                        .filter(function(id) {
+                            return 0 == bsonWoCompare({x: id.id}, {x: myid});
+                        });
+    assert.eq(0, bsonWoCompare(myArray, resultArrayMine));
 
     // Make sure pipelining other collections fail.
     assertErrorCode(admin.system.collections, pipeline, ErrorCodes.InvalidNamespace);

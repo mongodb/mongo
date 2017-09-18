@@ -41,6 +41,13 @@
     function listMyLocalSessions() {
         return admin.aggregate([{'$listLocalSessions': {users: [myusername]}}]);
     }
-    const myArray = assert.doesNotThrow(listMyLocalSessions).toArray();
-    assert.eq(myArray.length, resultArray.length);
+    const myArray = assert.doesNotThrow(listMyLocalSessions)
+                        .toArray()
+                        .map(function(sess) {
+                            return sess._id.id;
+                        })
+                        .filter(function(id) {
+                            return 0 == bsonWoCompare({x: id}, {x: myid});
+                        });
+    assert.eq(0, bsonWoCompare(myArray, resultArrayMine));
 })();
