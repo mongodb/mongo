@@ -12,8 +12,6 @@ selector:
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/dependencies.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/enum.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/items.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/maxItems.json
-  - src/third_party/JSON-Schema-Test-Suite/tests/draft4/minItems.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/not.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/oneOf.json
   - src/third_party/JSON-Schema-Test-Suite/tests/draft4/optional/bignum.json

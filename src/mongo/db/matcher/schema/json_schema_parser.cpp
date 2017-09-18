@@ -26,6 +26,8 @@
  * then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/schema/json_schema_parser.h"
@@ -40,6 +42,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
@@ -49,7 +52,9 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/logger/log_component_settings.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -837,6 +842,180 @@ StatusWithMatchExpression parseDependencies(StringData path,
     return {std::move(andExpr)};
 }
 
+StatusWithMatchExpression parseUniqueItems(BSONElement uniqueItemsElt,
+                                           StringData path,
+                                           InternalSchemaTypeExpression* typeExpr) {
+    if (!uniqueItemsElt.isBoolean()) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "$jsonSchema keyword '" << kSchemaUniqueItemsKeyword
+                              << "' must be a boolean"};
+    } else if (path.empty()) {
+        return {stdx::make_unique<AlwaysTrueMatchExpression>()};
+    } else if (uniqueItemsElt.boolean()) {
+        auto uniqueItemsExpr = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>();
+        auto status = uniqueItemsExpr->init(path);
+        if (!status.isOK()) {
+            return status;
+        }
+        return makeRestriction(BSONType::Array, path, std::move(uniqueItemsExpr), typeExpr);
+    }
+
+    return {stdx::make_unique<AlwaysTrueMatchExpression>()};
+}
+
+/**
+ * Parses 'itemsElt' into a match expression and adds it to 'andExpr'. On success, returns the index
+ * from which the "additionalItems" schema should be enforced, if needed.
+ */
+StatusWith<boost::optional<long long>> parseItems(StringData path,
+                                                  BSONElement itemsElt,
+                                                  bool ignoreUnknownKeywords,
+                                                  InternalSchemaTypeExpression* typeExpr,
+                                                  AndMatchExpression* andExpr) {
+    boost::optional<long long> startIndexForAdditionalItems;
+    if (itemsElt.type() == BSONType::Array) {
+        // When "items" is an array, generate match expressions for each subschema for each position
+        // in the array, which are bundled together in an AndMatchExpression.
+        auto andExprForSubschemas = stdx::make_unique<AndMatchExpression>();
+        auto index = 0LL;
+        for (auto subschema : itemsElt.embeddedObject()) {
+            if (subschema.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "$jsonSchema keyword '" << kSchemaItemsKeyword
+                                      << "' requires that each element of the array is an "
+                                         "object, but found a "
+                                      << subschema.type()};
+            }
+
+            // We want to make an ExpressionWithPlaceholder for $_internalSchemaMatchArrayIndex,
+            // so we use our default placeholder as the path.
+            auto parsedSubschema =
+                _parse(kNamePlaceholder, subschema.embeddedObject(), ignoreUnknownKeywords);
+            if (!parsedSubschema.isOK()) {
+                return parsedSubschema.getStatus();
+            }
+            auto exprWithPlaceholder = stdx::make_unique<ExpressionWithPlaceholder>(
+                kNamePlaceholder.toString(), std::move(parsedSubschema.getValue()));
+            auto matchArrayIndex =
+                stdx::make_unique<InternalSchemaMatchArrayIndexMatchExpression>();
+            invariantOK(matchArrayIndex->init(path, index, std::move(exprWithPlaceholder)));
+            andExprForSubschemas->add(matchArrayIndex.release());
+            ++index;
+        }
+        startIndexForAdditionalItems = index;
+
+        if (path.empty()) {
+            andExpr->add(stdx::make_unique<AlwaysTrueMatchExpression>().release());
+        } else {
+            andExpr->add(
+                makeRestriction(BSONType::Array, path, std::move(andExprForSubschemas), typeExpr)
+                    .release());
+        }
+    } else if (itemsElt.type() == BSONType::Object) {
+        // When "items" is an object, generate a single AllElemMatchFromIndex that applies to every
+        // element in the array to match. The parsed expression is intended for an
+        // ExpressionWithPlaceholder, so we use the default placeholder as the path.
+        auto nestedItemsSchema =
+            _parse(kNamePlaceholder, itemsElt.embeddedObject(), ignoreUnknownKeywords);
+        if (!nestedItemsSchema.isOK()) {
+            return nestedItemsSchema.getStatus();
+        }
+        auto exprWithPlaceholder = stdx::make_unique<ExpressionWithPlaceholder>(
+            kNamePlaceholder.toString(), std::move(nestedItemsSchema.getValue()));
+
+        if (path.empty()) {
+            andExpr->add(stdx::make_unique<AlwaysTrueMatchExpression>().release());
+        } else {
+            auto allElemMatch =
+                stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>();
+            constexpr auto startIndexForItems = 0LL;
+            invariantOK(
+                allElemMatch->init(path, startIndexForItems, std::move(exprWithPlaceholder)));
+            andExpr->add(makeRestriction(BSONType::Array, path, std::move(allElemMatch), typeExpr)
+                             .release());
+        }
+    } else {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "$jsonSchema keyword '" << kSchemaItemsKeyword
+                              << "' must be an array or an object, not "
+                              << itemsElt.type()};
+    }
+
+    return startIndexForAdditionalItems;
+}
+
+Status parseAdditionalItems(StringData path,
+                            BSONElement additionalItemsElt,
+                            boost::optional<long long> startIndexForAdditionalItems,
+                            bool ignoreUnknownKeywords,
+                            InternalSchemaTypeExpression* typeExpr,
+                            AndMatchExpression* andExpr) {
+    std::unique_ptr<ExpressionWithPlaceholder> otherwiseExpr;
+    if (additionalItemsElt.type() == BSONType::Bool) {
+        const auto emptyPlaceholder = boost::none;
+        if (additionalItemsElt.boolean()) {
+            otherwiseExpr = stdx::make_unique<ExpressionWithPlaceholder>(
+                emptyPlaceholder, stdx::make_unique<AlwaysTrueMatchExpression>());
+        } else {
+            otherwiseExpr = stdx::make_unique<ExpressionWithPlaceholder>(
+                emptyPlaceholder, stdx::make_unique<AlwaysFalseMatchExpression>());
+        }
+    } else if (additionalItemsElt.type() == BSONType::Object) {
+        auto parsedOtherwiseExpr =
+            _parse(kNamePlaceholder, additionalItemsElt.embeddedObject(), ignoreUnknownKeywords);
+        if (!parsedOtherwiseExpr.isOK()) {
+            return parsedOtherwiseExpr.getStatus();
+        }
+        otherwiseExpr = stdx::make_unique<ExpressionWithPlaceholder>(
+            kNamePlaceholder.toString(), std::move(parsedOtherwiseExpr.getValue()));
+    } else {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "$jsonSchema keyword '" << kSchemaAdditionalItemsKeyword
+                              << "' must be either an object or a boolean, but got a "
+                              << additionalItemsElt.type()};
+    }
+
+    // Only generate a match expression if needed.
+    if (startIndexForAdditionalItems) {
+        if (path.empty()) {
+            andExpr->add(stdx::make_unique<AlwaysTrueMatchExpression>().release());
+        } else {
+            auto allElemMatch =
+                stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>();
+            invariantOK(
+                allElemMatch->init(path, *startIndexForAdditionalItems, std::move(otherwiseExpr)));
+            andExpr->add(makeRestriction(BSONType::Array, path, std::move(allElemMatch), typeExpr)
+                             .release());
+        }
+    }
+    return Status::OK();
+}
+
+Status parseItemsAndAdditionalItems(StringMap<BSONElement>* keywordMap,
+                                    StringData path,
+                                    bool ignoreUnknownKeywords,
+                                    InternalSchemaTypeExpression* typeExpr,
+                                    AndMatchExpression* andExpr) {
+    boost::optional<long long> startIndexForAdditionalItems;
+    if (auto itemsElt = keywordMap->get(kSchemaItemsKeyword)) {
+        auto index = parseItems(path, itemsElt, ignoreUnknownKeywords, typeExpr, andExpr);
+        if (!index.isOK()) {
+            return index.getStatus();
+        }
+        startIndexForAdditionalItems = index.getValue();
+    }
+
+    if (auto additionalItemsElt = keywordMap->get(kSchemaAdditionalItemsKeyword)) {
+        return parseAdditionalItems(path,
+                                    additionalItemsElt,
+                                    startIndexForAdditionalItems,
+                                    ignoreUnknownKeywords,
+                                    typeExpr,
+                                    andExpr);
+    }
+    return Status::OK();
+}
+
 /**
  * Parses the logical keywords in 'keywordMap' to their equivalent match expressions
  * and, on success, adds the results to 'andExpr'.
@@ -916,6 +1095,7 @@ Status translateLogicalKeywords(StringMap<BSONElement>* keywordMap,
  */
 Status translateArrayKeywords(StringMap<BSONElement>* keywordMap,
                               StringData path,
+                              bool ignoreUnknownKeywords,
                               InternalSchemaTypeExpression* typeExpr,
                               AndMatchExpression* andExpr) {
     if (auto minItemsElt = keywordMap->get(kSchemaMinItemsKeyword)) {
@@ -937,25 +1117,14 @@ Status translateArrayKeywords(StringMap<BSONElement>* keywordMap,
     }
 
     if (auto uniqueItemsElt = keywordMap->get(kSchemaUniqueItemsKeyword)) {
-        if (!uniqueItemsElt.isBoolean()) {
-            return {ErrorCodes::TypeMismatch,
-                    str::stream() << "$jsonSchema keyword '" << kSchemaUniqueItemsKeyword
-                                  << "' must be a boolean"};
-        } else if (path.empty()) {
-            andExpr->add(stdx::make_unique<AlwaysTrueMatchExpression>().release());
-        } else if (uniqueItemsElt.boolean()) {
-            auto uniqueItemsExpr = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>();
-            auto status = uniqueItemsExpr->init(path);
-            if (!status.isOK()) {
-                return status;
-            }
-            andExpr->add(
-                makeRestriction(BSONType::Array, path, std::move(uniqueItemsExpr), typeExpr)
-                    .release());
+        auto uniqueItemsExpr = parseUniqueItems(uniqueItemsElt, path, typeExpr);
+        if (!uniqueItemsExpr.isOK()) {
+            return uniqueItemsExpr.getStatus();
         }
+        andExpr->add(uniqueItemsExpr.getValue().release());
     }
 
-    return Status::OK();
+    return parseItemsAndAdditionalItems(keywordMap, path, ignoreUnknownKeywords, typeExpr, andExpr);
 }
 
 /**
@@ -1185,6 +1354,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
     // Map from JSON Schema keyword to the corresponding element from 'schema', or to an empty
     // BSONElement if the JSON Schema keyword is not specified.
     StringMap<BSONElement> keywordMap{
+        {kSchemaAdditionalItemsKeyword, {}},
         {kSchemaAdditionalPropertiesKeyword, {}},
         {kSchemaAllOfKeyword, {}},
         {kSchemaAnyOfKeyword, {}},
@@ -1193,6 +1363,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
         {kSchemaDescriptionKeyword, {}},
         {kSchemaExclusiveMaximumKeyword, {}},
         {kSchemaExclusiveMinimumKeyword, {}},
+        {kSchemaItemsKeyword, {}},
         {kSchemaMaxItemsKeyword, {}},
         {kSchemaMaxLengthKeyword, {}},
         {kSchemaMaxPropertiesKeyword, {}},
@@ -1278,7 +1449,8 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
         return translationStatus;
     }
 
-    translationStatus = translateArrayKeywords(&keywordMap, path, typeExpr.get(), andExpr.get());
+    translationStatus = translateArrayKeywords(
+        &keywordMap, path, ignoreUnknownKeywords, typeExpr.get(), andExpr.get());
     if (!translationStatus.isOK()) {
         return translationStatus;
     }
@@ -1316,7 +1488,12 @@ constexpr StringData JSONSchemaParser::kSchemaTypeObject;
 constexpr StringData JSONSchemaParser::kSchemaTypeString;
 
 StatusWithMatchExpression JSONSchemaParser::parse(BSONObj schema, bool ignoreUnknownKeywords) {
-    return _parse(StringData{}, schema, ignoreUnknownKeywords);
-}
+    LOG(5) << "Parsing JSON Schema: " << schema.jsonString();
 
+    auto translation = _parse(""_sd, schema, ignoreUnknownKeywords);
+    if (shouldLog(logger::LogSeverity::Debug(5)) && translation.isOK()) {
+        LOG(5) << "Translated schema match expression: " << translation.getValue()->toString();
+    }
+    return translation;
+}
 }  // namespace mongo

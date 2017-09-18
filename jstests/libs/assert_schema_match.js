@@ -9,5 +9,6 @@ function assertSchemaMatch(coll, schema, doc, valid) {
     coll.drop();
     assert.writeOK(coll.insert(doc));
     const count = coll.find({$jsonSchema: schema}).itcount();
-    assert.eq(count, valid ? 1 : 0);
+    const errmsg = valid ? " should have matched the schema " : " unexpectedly matched the schema ";
+    assert.eq(count, valid ? 1 : 0, "Document " + tojson(doc) + errmsg + tojson(schema));
 }
