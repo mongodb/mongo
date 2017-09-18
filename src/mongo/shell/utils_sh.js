@@ -500,6 +500,18 @@ sh.getRecentMigrations = function(configDB) {
     return result;
 };
 
+sh._shardingStatusStr = function(indent, s) {
+    // convert from logical indentation to actual num of chars
+    if (indent == 0) {
+        indent = 0;
+    } else if (indent == 1) {
+        indent = 2;
+    } else {
+        indent = (indent - 1) * 8;
+    }
+    return indentStr(indent, s) + "\n";
+};
+
 function printShardingStatus(configDB, verbose) {
     // configDB is a DB object that contains the sharding metadata of interest.
     // Defaults to the db named "config" on the current connection.
@@ -514,15 +526,15 @@ function printShardingStatus(configDB, verbose) {
     }
 
     var raw = "";
-    var output = function(s) {
-        raw += s + "\n";
+    var output = function(indent, s) {
+        raw += sh._shardingStatusStr(indent, s);
     };
-    output("--- Sharding Status --- ");
-    output("  sharding version: " + tojson(configDB.getCollection("version").findOne()));
+    output(0, "--- Sharding Status --- ");
+    output(1, "sharding version: " + tojson(configDB.getCollection("version").findOne()));
 
-    output("  shards:");
+    output(1, "shards:");
     configDB.shards.find().sort({_id: 1}).forEach(function(z) {
-        output("\t" + tojsononeline(z));
+        output(2, tojsononeline(z));
     });
 
     // (most recently) active mongoses
@@ -540,9 +552,9 @@ function printShardingStatus(configDB, verbose) {
         }
     }
 
-    output("  " + mongosAdjective + " mongoses:");
+    output(1, mongosAdjective + " mongoses:");
     if (mostRecentMongosTime === null) {
-        output("\tnone");
+        output(2, "none");
     } else {
         var recentMongosQuery = {
             ping: {
@@ -556,7 +568,7 @@ function printShardingStatus(configDB, verbose) {
 
         if (verbose) {
             configDB.mongos.find(recentMongosQuery).sort({ping: -1}).forEach(function(z) {
-                output("\t" + tojsononeline(z));
+                output(2, tojsononeline(z));
             });
         } else {
             configDB.mongos
@@ -566,37 +578,43 @@ function printShardingStatus(configDB, verbose) {
                     {$sort: {num: -1}}
                 ])
                 .forEach(function(z) {
-                    output("\t" + tojson(z._id) + " : " + z.num);
+                    output(2, tojson(z._id) + " : " + z.num);
                 });
         }
     }
 
-    output(" autosplit:");
+    output(1, "autosplit:");
 
     // Is autosplit currently enabled
-    output("\tCurrently enabled: " + (sh.getShouldAutoSplit(configDB) ? "yes" : "no"));
+    output(2, "Currently enabled: " + (sh.getShouldAutoSplit(configDB) ? "yes" : "no"));
 
-    output("  balancer:");
+    output(1, "balancer:");
 
     // Is the balancer currently enabled
-    output("\tCurrently enabled:  " + (sh.getBalancerState(configDB) ? "yes" : "no"));
+    output(2, "Currently enabled:  " + (sh.getBalancerState(configDB) ? "yes" : "no"));
 
     // Is the balancer currently active
-    output("\tCurrently running:  " + (sh.isBalancerRunning(configDB) ? "yes" : "no"));
+    var balancerRunning = "unknown";
+    var balancerStatus = configDB.adminCommand({balancerStatus: 1});
+    if (balancerStatus.code != ErrorCodes.CommandNotFound) {
+        balancerRunning = balancerStatus.inBalancerRound ? "yes" : "no";
+    }
+    output(2, "Currently running:  " + balancerRunning);
 
     // Output the balancer window
     var balSettings = sh.getBalancerWindow(configDB);
     if (balSettings) {
-        output("\t\tBalancer active window is set between " + balSettings.start + " and " +
-               balSettings.stop + " server local time");
+        output(3,
+               "Balancer active window is set between " + balSettings.start + " and " +
+                   balSettings.stop + " server local time");
     }
 
     // Output the list of active migrations
     var activeMigrations = sh.getActiveMigrations(configDB);
     if (activeMigrations.length > 0) {
-        output("\tCollections with active migrations: ");
+        output(2, "Collections with active migrations: ");
         activeMigrations.forEach(function(migration) {
-            output("\t\t" + migration._id + " started at " + migration.when);
+            output(3, migration._id + " started at " + migration.when);
         });
     }
 
@@ -617,31 +635,32 @@ function printShardingStatus(configDB, verbose) {
         // Review config.actionlog for errors
         var actionReport = sh.getRecentFailedRounds(configDB);
         // Always print the number of failed rounds
-        output("\tFailed balancer rounds in last 5 attempts:  " + actionReport.count);
+        output(2, "Failed balancer rounds in last 5 attempts:  " + actionReport.count);
 
         // Only print the errors if there are any
         if (actionReport.count > 0) {
-            output("\tLast reported error:  " + actionReport.lastErr);
-            output("\tTime of Reported error:  " + actionReport.lastTime);
+            output(2, "Last reported error:  " + actionReport.lastErr);
+            output(2, "Time of Reported error:  " + actionReport.lastTime);
         }
 
-        output("\tMigration Results for the last 24 hours: ");
+        output(2, "Migration Results for the last 24 hours: ");
         var migrations = sh.getRecentMigrations(configDB);
         if (migrations.length > 0) {
             migrations.forEach(function(x) {
                 if (x._id === "Success") {
-                    output("\t\t" + x.count + " : " + x._id);
+                    output(3, x.count + " : " + x._id);
                 } else {
-                    output("\t\t" + x.count + " : Failed with error '" + x._id + "', from " +
-                           x.from + " to " + x.to);
+                    output(3,
+                           x.count + " : Failed with error '" + x._id + "', from " + x.from +
+                               " to " + x.to);
                 }
             });
         } else {
-            output("\t\tNo recent migrations");
+            output(3, "No recent migrations");
         }
     }
 
-    output("  databases:");
+    output(1, "databases:");
     configDB.databases.find().sort({name: 1}).forEach(function(db) {
         var truthy = function(value) {
             return !!value;
@@ -657,20 +676,22 @@ function printShardingStatus(configDB, verbose) {
             return s;
         };
 
-        output("\t" + tojsononeline(db, "", true));
+        output(2, tojsononeline(db, "", true));
 
         if (db.partitioned) {
             configDB.collections.find({_id: new RegExp("^" + RegExp.escape(db._id) + "\\.")})
                 .sort({_id: 1})
                 .forEach(function(coll) {
                     if (!coll.dropped) {
-                        output("\t\t" + coll._id);
-                        output("\t\t\tshard key: " + tojson(coll.key));
-                        output("\t\t\tunique: " + truthy(coll.unique) +
-                               nonBooleanNote("unique", coll.unique));
-                        output("\t\t\tbalancing: " + !truthy(coll.noBalance) +
-                               nonBooleanNote("noBalance", coll.noBalance));
-                        output("\t\t\tchunks:");
+                        output(3, coll._id);
+                        output(4, "shard key: " + tojson(coll.key));
+                        output(4,
+                               "unique: " + truthy(coll.unique) +
+                                   nonBooleanNote("unique", coll.unique));
+                        output(4,
+                               "balancing: " + !truthy(coll.noBalance) +
+                                   nonBooleanNote("noBalance", coll.noBalance));
+                        output(4, "chunks:");
 
                         res = configDB.chunks
                                   .aggregate({$match: {ns: coll._id}},
@@ -681,26 +702,29 @@ function printShardingStatus(configDB, verbose) {
                         var totalChunks = 0;
                         res.forEach(function(z) {
                             totalChunks += z.nChunks;
-                            output("\t\t\t\t" + z.shard + "\t" + z.nChunks);
+                            output(5, z.shard + "\t" + z.nChunks);
                         });
 
                         if (totalChunks < 20 || verbose) {
                             configDB.chunks.find({"ns": coll._id})
                                 .sort({min: 1})
                                 .forEach(function(chunk) {
-                                    output("\t\t\t" + tojson(chunk.min) + " -->> " +
-                                           tojson(chunk.max) + " on : " + chunk.shard + " " +
-                                           tojson(chunk.lastmod) + " " +
-                                           (chunk.jumbo ? "jumbo " : ""));
+                                    output(4,
+                                           tojson(chunk.min) + " -->> " + tojson(chunk.max) +
+                                               " on : " + chunk.shard + " " +
+                                               tojson(chunk.lastmod) + " " +
+                                               (chunk.jumbo ? "jumbo " : ""));
                                 });
                         } else {
                             output(
-                                "\t\t\ttoo many chunks to print, use verbose if you want to force print");
+                                4,
+                                "too many chunks to print, use verbose if you want to force print");
                         }
 
                         configDB.tags.find({ns: coll._id}).sort({min: 1}).forEach(function(tag) {
-                            output("\t\t\t tag: " + tag.tag + "  " + tojson(tag.min) + " -->> " +
-                                   tojson(tag.max));
+                            output(4,
+                                   " tag: " + tag.tag + "  " + tojson(tag.min) + " -->> " +
+                                       tojson(tag.max));
                         });
                     }
                 });
@@ -723,29 +747,29 @@ function printShardingSizes(configDB) {
     }
 
     var raw = "";
-    var output = function(s) {
-        raw += s + "\n";
+    var output = function(indent, s) {
+        raw += sh._shardingStatusStr(indent, s);
     };
-    output("--- Sharding Status --- ");
-    output("  sharding version: " + tojson(configDB.getCollection("version").findOne()));
+    output(0, "--- Sharding Sizes --- ");
+    output(1, "sharding version: " + tojson(configDB.getCollection("version").findOne()));
 
-    output("  shards:");
+    output(1, "shards:");
     var shards = {};
     configDB.shards.find().forEach(function(z) {
         shards[z._id] = new Mongo(z.host);
-        output("      " + tojson(z));
+        output(2, tojson(z));
     });
 
     var saveDB = db;
-    output("  databases:");
+    output(1, "databases:");
     configDB.databases.find().sort({name: 1}).forEach(function(db) {
-        output("\t" + tojson(db, "", true));
+        output(2, tojson(db, "", true));
 
         if (db.partitioned) {
             configDB.collections.find({_id: new RegExp("^" + RegExp.escape(db._id) + "\.")})
                 .sort({_id: 1})
                 .forEach(function(coll) {
-                    output("\t\t" + coll._id + " chunks:");
+                    output(3, coll._id + " chunks:");
                     configDB.chunks.find({"ns": coll._id}).sort({min: 1}).forEach(function(chunk) {
                         var mydb = shards[chunk.shard].getDB(db._id);
                         var out = mydb.runCommand({
@@ -757,8 +781,9 @@ function printShardingSizes(configDB) {
                         delete out.millis;
                         delete out.ok;
 
-                        output("\t\t\t" + tojson(chunk.min) + " -->> " + tojson(chunk.max) +
-                               " on : " + chunk.shard + " " + tojson(out));
+                        output(4,
+                               tojson(chunk.min) + " -->> " + tojson(chunk.max) + " on : " +
+                                   chunk.shard + " " + tojson(out));
 
                     });
                 });
