@@ -279,16 +279,19 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     if (entry->getKillPending()) {
         return cursorNotFoundStatus(nss, cursorId);
     }
+
+    const auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, entry->getLsid());
+    if (!cursorPrivilegeStatus.isOK()) {
+        return cursorPrivilegeStatus;
+    }
+
     std::unique_ptr<ClusterClientCursor> cursor = entry->releaseCursor();
     if (!cursor) {
         return cursorInUseStatus(nss, cursorId);
     }
-
-    const auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, cursor->getLsid());
-
-    if (!cursorPrivilegeStatus.isOK()) {
-        return cursorPrivilegeStatus;
-    }
+    // Note: due to SERVER-31138, despite putting this in a unique_ptr, it's actually not safe to
+    // return before the end of this function.  Be careful to avoid any early returns/throws after
+    // this point.
 
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).
