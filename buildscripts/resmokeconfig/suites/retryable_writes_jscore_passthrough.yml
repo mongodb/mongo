@@ -37,13 +37,6 @@ executor:
   # validating the entire contents of the collection.
   - class: CheckReplOplogs
   - class: CheckReplDBHash
-    shell_options:
-      global_vars:
-        TestData:
-          # TODO SERVER-30325: We temporarily ignore any dbhash mismatches from the
-          # "config.transactions" collection.
-          excludedDBsFromDBHash:
-          - config
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
