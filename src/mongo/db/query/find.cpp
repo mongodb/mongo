@@ -327,7 +327,7 @@ Message getMore(OperationContext* opCtx,
             cursorid = 0;
             resultFlags = ResultFlag_CursorNotFound;
         } else {
-            invariant(ccPin == ErrorCodes::QueryPlanKilled);
+            invariant(ccPin == ErrorCodes::QueryPlanKilled || ccPin == ErrorCodes::Unauthorized);
             uassertStatusOK(ccPin.getStatus());
         }
     } else {
