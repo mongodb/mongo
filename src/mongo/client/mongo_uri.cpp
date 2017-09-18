@@ -59,9 +59,10 @@ const mongo::StringData kURIPrefix{"mongodb://"};
  * Encode data elements in a way which will allow them to be embedded
  * into a mongodb:// URI safely.
  */
-void mongo::uriEncode(std::ostream& ss, StringData toEncode) {
+void mongo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthrough) {
     for (const auto& c : toEncode) {
-        if ((c == '-') || (c == '_') || (c == '.') || (c == '~') || isalnum(c)) {
+        if ((c == '-') || (c == '_') || (c == '.') || (c == '~') || isalnum(c) ||
+            (passthrough.find(c) != std::string::npos)) {
             ss << c;
         } else {
             // Encoding anything not included in section 2.3 "Unreserved characters"

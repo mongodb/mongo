@@ -47,11 +47,13 @@ namespace mongo {
 /**
  * Encode a string for embedding in a URI.
  * Replaces reserved bytes with %xx sequences.
+ *
+ * Optionally allows passthrough characters to remain unescaped.
  */
-void uriEncode(std::ostream& ss, StringData str);
-inline std::string uriEncode(StringData str) {
+void uriEncode(std::ostream& ss, StringData str, StringData passthrough = ""_sd);
+inline std::string uriEncode(StringData str, StringData passthrough = ""_sd) {
     std::ostringstream ss;
-    uriEncode(ss, str);
+    uriEncode(ss, str, passthrough);
     return ss.str();
 }
 

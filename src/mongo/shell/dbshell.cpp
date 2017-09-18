@@ -217,63 +217,151 @@ void setupSignals() {
     signal(SIGINT, quitNicely);
 }
 
-string getURIFromArgs(const std::string& url, const std::string& host, const std::string& port) {
-    if (host.size() == 0 && port.size() == 0) {
-        return url.size() == 0 ? kDefaultMongoURL.toString() : url;
+string getURIFromArgs(const std::string& arg, const std::string& host, const std::string& port) {
+    if (host.empty() && arg.empty() && port.empty()) {
+        // Nothing provided, just play the default.
+        return kDefaultMongoURL.toString();
     }
 
-    // The name URL is misleading; really it's just a positional argument that wasn't a file. The
-    // check for "/" means "this 'URL' is probably a real URL and not the db name (e.g.)".
-    if (url.find("/") != string::npos) {
-        cerr << "if a full URI is provided, you cannot also specify host or port" << endl;
+    if (str::startsWith(arg, "mongodb://") && host.empty() && port.empty()) {
+        // mongo mongodb://blah
+        return arg;
+    }
+    if (str::startsWith(host, "mongodb://") && arg.empty() && port.empty()) {
+        // mongo --host mongodb://blah
+        return host;
+    }
+
+    // We expect a positional arg to be a plain dbname or plain hostname at this point
+    // since we have separate host/port args.
+    if ((arg.find('/') != string::npos) && (host.size() || port.size())) {
+        cerr << "If a full URI is provided, you cannot also specify --host or --port" << endl;
         quickExit(-1);
     }
 
-    bool hostEndsInSock = str::endsWith(host, ".sock");
-    const auto hostHasPort = (host.find(":") != std::string::npos);
+    const auto parseDbHost = [port](const std::string& db, const std::string& host) -> std::string {
+        // Parse --host as a connection string.
+        // e.g. rs0/host0:27000,host1:27001
+        const auto slashPos = host.find('/');
+        const auto hasReplSet = (slashPos > 0) && (slashPos != std::string::npos);
 
-    // If host looks like a full URI (i.e. has a slash and isn't a unix socket) and the other fields
-    // are empty, then just return host.
-    std::string::size_type slashPos;
-    if (url.size() == 0 && port.size() == 0 &&
-        (!hostEndsInSock && ((slashPos = host.find("/")) != string::npos))) {
-        if (str::startsWith(host, "mongodb://")) {
-            return host;
-        }
-        // If there's a slash in the host field, then it's the replica set name, not a database name
-        stringstream ss;
-        ss << "mongodb://" << uriEncode(host.substr(slashPos + 1))
-           << "/?replicaSet=" << uriEncode(host.substr(0, slashPos));
-        return ss.str();
-    }
+        std::ostringstream ss;
+        ss << "mongodb://";
 
-    stringstream ss;
-    if (host.size() == 0) {
-        ss << "mongodb://127.0.0.1";
-    } else {
-        if (str::startsWith(host, "mongodb://")) {
-            ss << host;
-        } else {
-            ss << "mongodb://" << uriEncode(host);
-        }
-    }
-
-    if (!hostEndsInSock) {
-        if (port.size() > 0) {
-            if (hostHasPort) {
-                std::cerr << "Cannot specify a port in --host and also with --port" << std::endl;
-                quickExit(-1);
+        // Handle each sub-element of the connection string individually.
+        // Comma separated list of host elements.
+        // Each host element may be:
+        // * /unix/domain.sock
+        // * hostname
+        // * hostname:port
+        // If --port is specified and port is included in connection string,
+        // then they must match exactly.
+        auto start = hasReplSet ? slashPos + 1 : 0;
+        while (start < host.size()) {
+            // Encode each host component.
+            auto end = host.find(',', start);
+            if (end == std::string::npos) {
+                end = host.size();
             }
-            ss << ":" << port;
-        } else if (!hostHasPort || str::endsWith(host, "]")) {
-            // Default the port to 27017 if the host did not provide one (i.e. the host has no
-            // colons or ends in ']' like an IPv6 address).
-            ss << ":27017";
+            if ((end - start) == 0) {
+                // Ignore empty components.
+                start = end + 1;
+                continue;
+            }
+
+            const auto hostElem = host.substr(start, end - start);
+            if ((hostElem.find('/') != std::string::npos) && str::endsWith(hostElem, ".sock")) {
+                // Unix domain socket, ignore --port.
+                ss << uriEncode(hostElem);
+
+            } else {
+                auto colon = hostElem.find(':');
+                if ((colon != std::string::npos) &&
+                    (hostElem.find(':', colon + 1) != std::string::npos)) {
+                    // Looks like an IPv6 numeric address.
+                    const auto close = hostElem.find(']');
+                    if ((hostElem[0] == '[') && (close != std::string::npos)) {
+                        // Encapsulated already.
+                        ss << '[' << uriEncode(hostElem.substr(1, close - 1), ":") << ']';
+                        colon = hostElem.find(':', close + 1);
+                    } else {
+                        // Not encapsulated yet.
+                        ss << '[' << uriEncode(hostElem, ":") << ']';
+                        colon = std::string::npos;
+                    }
+                } else if (colon != std::string::npos) {
+                    // Not IPv6 numeric, but does have a port.
+                    ss << uriEncode(hostElem.substr(0, colon));
+                } else {
+                    // Raw hostname/IPv4 without port.
+                    ss << uriEncode(hostElem);
+                }
+
+                if (colon != std::string::npos) {
+                    // Have a port in our host element, verify it.
+                    const auto myport = hostElem.substr(colon + 1);
+                    if (port.size() && (port != myport)) {
+                        cerr << "connection string bears different port than provided by --port"
+                             << endl;
+                        quickExit(-1);
+                    }
+                    ss << ':' << uriEncode(myport);
+                } else if (port.size()) {
+                    ss << ':' << uriEncode(port);
+                } else {
+                    ss << ":27017";
+                }
+            }
+            start = end + 1;
+            if (start < host.size()) {
+                ss << ',';
+            }
         }
+
+        ss << '/' << uriEncode(db);
+
+        if (hasReplSet) {
+            // Remap included replica set name to URI option
+            ss << "?replicaSet=" << uriEncode(host.substr(0, slashPos));
+        }
+
+        return ss.str();
+    };
+
+    if (host.size()) {
+        // --host provided, treat it as the connect string and get db from positional arg.
+        return parseDbHost(arg, host);
+    } else if (arg.size()) {
+        // --host missing, but we have a potential db/host positional arg.
+        const auto slashPos = arg.find('/');
+        if (slashPos != std::string::npos) {
+            // db/host pair.
+            return parseDbHost(arg.substr(0, slashPos), arg.substr(slashPos + 1));
+        }
+
+        // Compatability formats.
+        // * Any arg with a dot is assumed to be a hostname or IPv4 numeric address.
+        // * Any arg with a colon followed by a digit assumed to be host or IP followed by port.
+        // * Anything else is assumed to be a db.
+
+        if (arg.find('.') != std::string::npos) {
+            // Assume IPv4 or hostnameish.
+            return parseDbHost("test", arg);
+        }
+
+        const auto colonPos = arg.find(':');
+        if ((colonPos != std::string::npos) && ((colonPos + 1) < arg.size()) &&
+            isdigit(arg[colonPos + 1])) {
+            // Assume IPv4 or hostname with port.
+            return parseDbHost("test", arg);
+        }
+
+        // db, assume localhost.
+        return parseDbHost(arg, "127.0.0.1");
     }
 
-    ss << "/" << uriEncode(url);
-    return ss.str();
+    // --host empty, position arg empty, fallback on localhost without a dbname.
+    return parseDbHost("", "127.0.0.1");
 }
 
 static string OpSymbols = "~!%^&*-+=|:,<>/?.";
