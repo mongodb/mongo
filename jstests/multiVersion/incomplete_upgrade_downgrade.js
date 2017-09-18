@@ -91,6 +91,8 @@
     MongoRunner.validateCollectionsCallback = function() {};
     MongoRunner.stopMongod(conn);
 
+    clearRawMongoProgramOutput();
+
     // Start mongod again with the same dbpath
     conn = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
     assert.neq(null, conn, "mongod was unable to start up");
@@ -98,6 +100,13 @@
 
     // FeatureCompatibility document should be 3.4.
     checkFCV(adminDB, "3.4");
+
+    // Verify startup warnings
+    let msg1 = "WARNING: Using featureCompatibilityVersion 3.4, but the collection";
+    let msg2 = "use the setFeatureCompatibilityVersion command to resume";
+    assert.soon(function() {
+        return rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2);
+    }, "Mongod should have printed startup warning about collections having UUIDs in FCV 3.4");
 
     // Check that collections still have UUIDs.
     checkCollectionUUIDs(adminDB, /* uuidsExpected */ true);
@@ -127,10 +136,17 @@
     // Verify mongod stopped cleanly
     MongoRunner.stopMongod(conn);
 
+    clearRawMongoProgramOutput();
+
     // Start mongod again with the same dbpath
     conn = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
     assert.neq(null, conn, "mongod was unable to start up");
     adminDB = conn.getDB("admin");
+
+    // Verify startup warnings
+    assert.soon(function() {
+        return rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2);
+    }, "Mongod should have printed startup warning about collections having UUIDs in FCV 3.4");
 
     // Check that collections have UUIDs.
     checkCollectionUUIDs(adminDB, /* uuidsExpected */ true);
