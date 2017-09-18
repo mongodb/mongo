@@ -84,7 +84,9 @@ struct WithLock {
     void operator=(WithLock const&) = delete;
     void operator=(WithLock&&) = delete;
 
-    // No (accidentally) moving a unique_lock<> in.
+    // No moving a lock_guard<> or unique_lock<> in.
+    template <typename Mutex>
+    WithLock(stdx::lock_guard<Mutex>&&) = delete;
     template <typename Mutex>
     WithLock(stdx::unique_lock<Mutex>&&) = delete;
 };
