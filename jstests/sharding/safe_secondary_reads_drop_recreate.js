@@ -132,7 +132,6 @@
         dbHash: {skip: "does not return user data"},
         dbStats: {skip: "does not return user data"},
         delete: {skip: "primary only"},
-        diagLogging: {skip: "does not return user data"},
         distinct: {
             setUp: function(mongosConn) {
                 assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));

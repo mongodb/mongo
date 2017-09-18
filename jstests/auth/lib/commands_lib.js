@@ -2246,20 +2246,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "diagLogging",
-          command: {diagLogging: 1},
-          skipSharded: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: roles_hostManager,
-                privileges: [{resource: {cluster: true}, actions: ["diagLogging"]}]
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
           testname: "distinct",
           command: {distinct: "coll", key: "a", query: {}},
           testcases: [

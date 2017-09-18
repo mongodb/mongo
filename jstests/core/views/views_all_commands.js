@@ -180,7 +180,6 @@
         },
         dbStats: {skip: "TODO(SERVER-25948)"},
         delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
-        diagLogging: {skip: isUnrelated},
         distinct: {command: {distinct: "view", key: "_id"}},
         driverOIDTest: {skip: isUnrelated},
         drop: {command: {drop: "view"}},

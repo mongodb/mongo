@@ -44,7 +44,6 @@
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/diag_log.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
@@ -106,18 +105,6 @@ const StringMap<int> cmdWhitelist = {{"delete", 1},
                                      {"insert", 1},
                                      {"refreshLogicalSessionCacheNow", 1},
                                      {"update", 1}};
-
-inline void opread(const Message& m) {
-    if (_diaglog.getLevel() & 2) {
-        _diaglog.readop(m.singleData().view2ptr(), m.header().getLen());
-    }
-}
-
-inline void opwrite(const Message& m) {
-    if (_diaglog.getLevel() & 1) {
-        _diaglog.writeop(m.singleData().view2ptr(), m.header().getLen());
-    }
-}
 
 void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
@@ -1081,17 +1068,9 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
     if (op == dbQuery) {
         if (nsString.isCommand()) {
             isCommand = true;
-            opwrite(m);
-        } else {
-            opread(m);
         }
-    } else if (op == dbGetMore) {
-        opread(m);
     } else if (op == dbCommand || op == dbMsg) {
         isCommand = true;
-        opwrite(m);
-    } else {
-        opwrite(m);
     }
 
     CurOp& currentOp = *CurOp::get(opCtx);
