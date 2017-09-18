@@ -10,7 +10,7 @@ download:
 
 clean: release-php-clean
 	-rm -rf code
-	-rm -f timezonedb.idx.php timezonedb.dta timezonedb.idx version-info.txt timezonedb-201*.tgz timezonedb.tgz timezonedb.zip timezonedb-201*.zip
+	-rm -f timezonedb.idx.php timezonedb.dta timezonedb.idx version-info.txt timezonedb-201*.tgz timezonedb.tgz timezonedb*.zip
 
 tzdb: download
 	-@rm -rf code
@@ -35,15 +35,16 @@ timezonedb.dta: code/zone.tab
 
 timezonedb.idx: timezonedb.idx.php timezonedb.dta
 
-timezonedb.zip: code/zone.tab
-	@echo -n "Making archive..."
-	-@cd code/data; zip --quiet -r ../../timezonedb.zip .
-	cp timezonedb.zip timezonedb-$(VERSION).zip
-	@echo " done"
-
 version-info.txt:
 	find . -name tzdata*.tar.gz | sed 's/.*20/20/' | sed 's/\.tar.*//' > version-info.txt
 	find . -name tzdata*.tar.gz | php -r "preg_match('@([0-9]{4})([a-z])@', file_get_contents('php://stdin'), \$$a); echo \$$a[1], '.', ord(\$$a[2]) - ord('a') + 1;" >> version-info.txt
+
+timezonedb.zip: code/zone.tab version-info.txt
+	@echo -n "Making archive..."
+	-@mkdir code/timezonedb-$(VERSION); cp -r code/data/. code/timezonedb-$(VERSION)/; cp version-info.txt code/timezonedb-$(VERSION)/
+	-@cd code; zip --quiet -r ../timezonedb.zip timezonedb-$(VERSION)
+	cp timezonedb.zip timezonedb-$(VERSION).zip
+	@echo " done"
 
 timezonedb.h: timezonedb.idx version-info.txt create_dot_h_file.php
 	php create_dot_h_file.php
