@@ -214,11 +214,21 @@ function startParallelShell(jsCode, port, noConnect) {
     var args = [shellPath];
 
     if (typeof db == "object") {
-        var hostAndPort = db.getMongo().host.split(':');
-        var host = hostAndPort[0];
-        args.push("--host", host);
-        if (!port && hostAndPort.length >= 2) {
-            var port = hostAndPort[1];
+        if (!port) {
+            // If no port override specified, just passthrough connect string.
+            args.push("--host", db.getMongo().host);
+        } else {
+            // Strip port numbers from connect string.
+            const uri = new MongoURI(db.getMongo().host);
+            var connString = uri.servers
+                                 .map(function(server) {
+                                     return server.host;
+                                 })
+                                 .join(',');
+            if (uri.setName.length > 0) {
+                connString = uri.setName + '/' + connString;
+            }
+            args.push("--host", connString);
         }
     }
     if (port) {
