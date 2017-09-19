@@ -875,6 +875,9 @@ Status _syncRollback(OperationContext* opCtx,
     }
 
     log() << "Rollback common point is " << how.commonPoint;
+    invariant(!replCoord->isV1ElectionProtocol() ||
+              how.commonPoint >= replCoord->getLastCommittedOpTime());
+
     try {
         ON_BLOCK_EXIT([&] {
             auto status = replicationProcess->incrementRollbackID(opCtx);

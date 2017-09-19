@@ -627,6 +627,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     }
 
     log() << "Starting rollback due to " << redact(fetcherReturnStatus);
+    log() << "Replication commit point: " << _replCoord->getLastCommittedOpTime();
 
     // TODO: change this to call into the Applier directly to block until the applier is
     // drained.

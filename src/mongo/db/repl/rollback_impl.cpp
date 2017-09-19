@@ -191,6 +191,11 @@ StatusWith<Timestamp> RollbackImpl::_findCommonPoint() {
     if (!commonPointSW.isOK()) {
         return commonPointSW.getStatus();
     }
+
+    log() << "Rollback common point is " << commonPointSW.getValue().first;
+    invariant(!_replicationCoordinator->isV1ElectionProtocol() ||
+              commonPointSW.getValue().first >= _replicationCoordinator->getLastCommittedOpTime());
+
     return commonPointSW.getValue().first.getTimestamp();
 }
 

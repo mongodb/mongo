@@ -547,7 +547,7 @@ TEST_F(OplogFetcherTest,
     ASSERT_EQUALS(
         ErrorCodes::OplogStartMissing,
         processSingleBatch(
-            {makeCursorResponse(0, {makeNoopOplogEntry(lastFetched.opTime, lastFetched.value + 1)}),
+            {makeCursorResponse(0, {makeNoopOplogEntry(remoteNewerOpTime, lastFetched.value + 1)}),
              metadataObj,
              Milliseconds(0)})
             ->getStatus());

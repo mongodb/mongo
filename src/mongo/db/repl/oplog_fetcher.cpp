@@ -205,15 +205,22 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
     auto opTime = opTimeResult.getValue();
     long long hash = o["h"].numberLong();
     if (opTime != lastFetched.opTime || hash != lastFetched.value) {
-        return Status(ErrorCodes::OplogStartMissing,
-                      str::stream() << "our last op time fetched: " << lastFetched.opTime.toString()
-                                    << ". source's GTE: "
-                                    << opTime.toString()
-                                    << " hashes: ("
-                                    << lastFetched.value
-                                    << "/"
-                                    << hash
-                                    << ")");
+        std::string message = str::stream()
+            << "Our last op time fetched: " << lastFetched.opTime.toString()
+            << ". source's GTE: " << opTime.toString() << " hashes: (" << lastFetched.value << "/"
+            << hash << ")";
+
+        // In PV1, if the hashes do not match, the optimes should not either since optimes uniquely
+        // identify oplog entries. In that case we fail before we potentially corrupt data. This
+        // should never happen.
+        if (opTime.getTerm() != OpTime::kUninitializedTerm && hash != lastFetched.value &&
+            opTime == lastFetched.opTime) {
+            severe() << "Hashes do not match but OpTimes do. " << message
+                     << ". Source's GTE doc: " << redact(o);
+            fassertFailedNoTrace(40634);
+        }
+
+        return Status(ErrorCodes::OplogStartMissing, message);
     }
     return Status::OK();
 }
