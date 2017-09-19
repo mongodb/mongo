@@ -105,13 +105,16 @@ public:
                            ExplainOptions::Verbosity verbosity,
                            BSONObjBuilder* out) const {
         const bool isExplain = true;
-        auto request = CountRequest::parseFromBSON(dbname, cmdObj, isExplain);
+        Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
+        auto nss = parseNsOrUUID(opCtx, dbname, cmdObj);
+        auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
         if (!request.isOK()) {
             return request.getStatus();
         }
 
         // Acquire the db read lock.
-        AutoGetCollectionOrViewForReadCommand ctx(opCtx, request.getValue().getNs());
+        AutoGetCollectionOrViewForReadCommand ctx(
+            opCtx, request.getValue().getNs(), std::move(dbLock));
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {
@@ -160,12 +163,15 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         const bool isExplain = false;
-        auto request = CountRequest::parseFromBSON(dbname, cmdObj, isExplain);
+        Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
+        auto nss = parseNsOrUUID(opCtx, dbname, cmdObj);
+        auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
         if (!request.isOK()) {
             return appendCommandStatus(result, request.getStatus());
         }
 
-        AutoGetCollectionOrViewForReadCommand ctx(opCtx, request.getValue().getNs());
+        AutoGetCollectionOrViewForReadCommand ctx(
+            opCtx, request.getValue().getNs(), std::move(dbLock));
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {

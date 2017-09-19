@@ -166,7 +166,7 @@ public:
 
             // Rewrite the count command as an aggregation.
 
-            auto countRequest = CountRequest::parseFromBSON(dbname, cmdObj, false);
+            auto countRequest = CountRequest::parseFromBSON(nss, cmdObj, false);
             if (!countRequest.isOK()) {
                 return appendCommandStatus(result, countRequest.getStatus());
             }
@@ -293,7 +293,7 @@ public:
                                   << ErrorCodes::errorString(swShardResponses.getStatus().code()),
                     !viewDefinition.isEmpty());
 
-            auto countRequest = CountRequest::parseFromBSON(dbname, cmdObj, true);
+            auto countRequest = CountRequest::parseFromBSON(nss, cmdObj, true);
             if (!countRequest.isOK()) {
                 return countRequest.getStatus();
             }

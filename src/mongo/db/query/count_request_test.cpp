@@ -44,7 +44,7 @@ static const NamespaceString testns("TestDB.TestColl");
 TEST(CountRequest, ParseDefaults) {
     const bool isExplain = false;
     const auto countRequestStatus =
-        CountRequest::parseFromBSON("TestDB",
+        CountRequest::parseFromBSON(testns,
                                     BSON("count"
                                          << "TestColl"
                                          << "query"
@@ -72,7 +72,7 @@ TEST(CountRequest, ParseDefaults) {
 TEST(CountRequest, ParseComplete) {
     const bool isExplain = false;
     const auto countRequestStatus =
-        CountRequest::parseFromBSON("TestDB",
+        CountRequest::parseFromBSON(testns,
                                     BSON("count"
                                          << "TestColl"
                                          << "query"
@@ -118,7 +118,7 @@ TEST(CountRequest, ParseComplete) {
 TEST(CountRequest, ParseWithExplain) {
     const bool isExplain = true;
     const auto countRequestStatus =
-        CountRequest::parseFromBSON("TestDB",
+        CountRequest::parseFromBSON(testns,
                                     BSON("count"
                                          << "TestColl"
                                          << "query"
@@ -142,7 +142,7 @@ TEST(CountRequest, ParseWithExplain) {
 
 TEST(CountRequest, ParseNegativeLimit) {
     const auto countRequestStatus =
-        CountRequest::parseFromBSON("TestDB",
+        CountRequest::parseFromBSON(testns,
                                     BSON("count"
                                          << "TestColl"
                                          << "query"
@@ -170,18 +170,10 @@ TEST(CountRequest, ParseNegativeLimit) {
     ASSERT_BSONOBJ_EQ(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
 }
 
-TEST(CountRequest, FailParseMissingNS) {
-    const bool isExplain = false;
-    const auto countRequestStatus = CountRequest::parseFromBSON(
-        "TestDB", BSON("query" << BSON("a" << BSON("$gte" << 11))), isExplain);
-
-    ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::InvalidNamespace);
-}
-
 TEST(CountRequest, FailParseBadSkipValue) {
     const bool isExplain = false;
     const auto countRequestStatus =
-        CountRequest::parseFromBSON("TestDB",
+        CountRequest::parseFromBSON(testns,
                                     BSON("count"
                                          << "TestColl"
                                          << "query"
@@ -196,7 +188,7 @@ TEST(CountRequest, FailParseBadSkipValue) {
 TEST(CountRequest, FailParseBadCollationValue) {
     const bool isExplain = false;
     const auto countRequestStatus =
-        CountRequest::parseFromBSON("TestDB",
+        CountRequest::parseFromBSON(testns,
                                     BSON("count"
                                          << "TestColl"
                                          << "query"

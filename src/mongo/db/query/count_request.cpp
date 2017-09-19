@@ -59,19 +59,12 @@ void CountRequest::setCollation(BSONObj collation) {
     _collation = collation.getOwned();
 }
 
-StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
+StatusWith<CountRequest> CountRequest::parseFromBSON(const NamespaceString& nss,
                                                      const BSONObj& cmdObj,
                                                      bool isExplain) {
-    BSONElement firstElt = cmdObj.firstElement();
-    const std::string coll = (firstElt.type() == BSONType::String) ? firstElt.str() : "";
-
-    NamespaceString nss(dbname, coll);
-    if (!nss.isValid()) {
-        return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
-    }
 
     // We don't validate that "query" is a nested object due to SERVER-15456.
-    CountRequest request(std::move(nss), cmdObj.getObjectField(kQueryField));
+    CountRequest request(nss, cmdObj.getObjectField(kQueryField));
 
     // Limit
     if (cmdObj[kLimitField].isNumber()) {

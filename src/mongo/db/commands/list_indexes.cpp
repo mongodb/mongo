@@ -100,7 +100,7 @@ public:
 
         // Check for the listIndexes ActionType on the database, or find on system.indexes for pre
         // 3.0 systems.
-        const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString ns(parseNsOrUUID(client->getOperationContext(), dbname, cmdObj));
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns),
                                                            ActionType::listIndexes) ||
             authzSession->isAuthorizedForActionsOnResource(
