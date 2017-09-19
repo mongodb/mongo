@@ -2776,6 +2776,19 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
     const ReplSetConfig oldConfig = _rsConfig;
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
+
+    // Warn if this config has protocol version 0
+    if (newConfig.getProtocolVersion() == 0 &&
+        (!oldConfig.isInitialized() || oldConfig.getProtocolVersion() == 1)) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: This replica set was configured with protocol version 0."
+              << startupWarningsLog;
+        log() << "**          This protocol version is deprecated and subject to be removed "
+              << startupWarningsLog;
+        log() << "**          in a future version." << startupWarningsLog;
+    }
+
+
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
