@@ -391,6 +391,17 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
         warned = true;
     }
 
+    // Check if --nojournal
+    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    if (isReplSet && storageParams.engine == "wiredTiger" && !storageParams.dur) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: Running wiredTiger with the --nojournal option in a replica set"
+              << startupWarningsLog;
+        log() << "**          is deprecated and subject to be removed in a future version."
+              << startupWarningsLog;
+        warned = true;
+    }
+
     if (warned) {
         log() << startupWarningsLog;
     }
