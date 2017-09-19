@@ -112,8 +112,7 @@ public:
             str::stream() << "invalid db name specified: " << dbname,
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
-        if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kConfigDb ||
-            dbname == NamespaceString::kLocalDb) {
+        if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kLocalDb) {
             return appendCommandStatus(result,
                                        {ErrorCodes::InvalidOptions,
                                         str::stream() << "can't shard " + dbname + " database"});

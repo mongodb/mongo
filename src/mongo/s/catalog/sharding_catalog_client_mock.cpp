@@ -208,11 +208,6 @@ DistLockManager* ShardingCatalogClientMock::getDistLockManager() {
     return _distLockManager.get();
 }
 
-Status ShardingCatalogClientMock::appendInfoForConfigServerDatabases(
-    OperationContext* opCtx, const BSONObj& listDatabasesCmd, BSONArrayBuilder* builder) {
-    return Status::OK();
-}
-
 StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewKeys(
     OperationContext* opCtx,
     StringData purpose,

@@ -42,6 +42,7 @@ selector:
   - jstests/sharding/secondary_shard_version_protocol_with_causal_consistency.js
   - jstests/sharding/secondary_shard_version_protocol_with_fcv.js
   - jstests/sharding/session_info_in_oplog.js
+  - jstests/sharding/shard_config_db_collections.js
   - jstests/sharding/enable_sharding_basic.js
   - jstests/sharding/retryable_writes.js
   - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
@@ -57,6 +58,8 @@ selector:
   - jstests/sharding/migration_ignore_interrupts_4.js
   - jstests/sharding/mongos_query_comment.js
   - jstests/sharding/sharded_profile.js
+  # Changes to cluster listDatabases format in 3.6.
+  - jstests/sharding/listDatabases.js
   # SERVER-19318: added new $currentOp agg stage in 3.6
   - jstests/sharding/aggregation_currentop.js
   - jstests/sharding/read_pref_cmd.js

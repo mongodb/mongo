@@ -15,9 +15,6 @@
     assert.commandFailedWithCode(st.s0.getDB('test').runCommand({enableSharding: 'db'}),
                                  ErrorCodes.Unauthorized);
 
-    // Can't shard 'config' database.
-    assert.commandFailed(st.s0.adminCommand({enableSharding: 'config'}));
-
     // Can't shard 'local' database.
     assert.commandFailed(st.s0.adminCommand({enableSharding: 'local'}));
 

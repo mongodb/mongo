@@ -44,6 +44,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/sessions_collection.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
@@ -151,7 +152,9 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
             !shardKeyPattern.isHashedPattern() || !request->getUnique());
 
     // Ensure the namespace is valid.
-    uassert(ErrorCodes::IllegalOperation, "can't shard system namespaces", !nss.isSystem());
+    uassert(ErrorCodes::IllegalOperation,
+            "can't shard system namespaces",
+            !nss.isSystem() || nss.ns() == SessionsCollection::kSessionsFullNS);
 
     // Ensure the collation is valid. Currently we only allow the simple collation.
     bool simpleCollationSpecified = false;
@@ -782,8 +785,42 @@ public:
         Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
         const int numShards = shardIds.size();
 
-        auto primaryShard = uassertStatusOK(
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbType.getPrimary()));
+        // Handle collections in the config db separately.
+        if (nss.db() == NamespaceString::kConfigDb) {
+            // Only whitelisted collections in config may be sharded
+            // (unless we are in test mode)
+            uassert(ErrorCodes::IllegalOperation,
+                    "only special collections in the config db may be sharded",
+                    nss.ns() == SessionsCollection::kSessionsFullNS ||
+                        Command::testCommandsEnabled);
+
+            auto configShard = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbType.getPrimary()));
+            ScopedDbConnection configConn(configShard->getConnString());
+            ON_BLOCK_EXIT([&configConn] { configConn.done(); });
+
+            // If this is a collection on the config db, it must be empty to be sharded,
+            // otherwise we might end up with chunks on the config servers.
+            uassert(ErrorCodes::IllegalOperation,
+                    "collections in the config db must be empty to be sharded",
+                    configConn->count(nss.ns()) == 0);
+        }
+
+        // For the config db, pick a new host shard for this collection, otherwise
+        // make a connection to the real primary shard for this database.
+        auto primaryShardId = [&]() {
+            if (nss.db() == NamespaceString::kConfigDb) {
+                uassert(ErrorCodes::IllegalOperation,
+                        "cannot shard collections in config before there are shards",
+                        numShards > 0);
+                return shardIds[0];
+            } else {
+                return dbType.getPrimary();
+            }
+        }();
+
+        auto primaryShard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
         ScopedDbConnection conn(primaryShard->getConnString());
         ON_BLOCK_EXIT([&conn] { conn.done(); });
 
@@ -843,7 +880,8 @@ public:
                                         *request.getCollation(),
                                         request.getUnique(),
                                         initSplits,
-                                        distributeInitialChunks);
+                                        distributeInitialChunks,
+                                        primaryShardId);
         result << "collectionsharded" << nss.ns();
         if (uuid) {
             result << "collectionUUID" << *uuid;

@@ -167,10 +167,6 @@ public:
 
     DistLockManager* getDistLockManager() override;
 
-    Status appendInfoForConfigServerDatabases(OperationContext* opCtx,
-                                              const BSONObj& listDatabasesCmd,
-                                              BSONArrayBuilder* builder) override;
-
     /**
      * Runs a read command against the config server with majority read concern.
      */

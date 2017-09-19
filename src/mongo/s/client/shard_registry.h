@@ -141,6 +141,11 @@ class ShardRegistry {
 
 public:
     /**
+     * A ShardId for the config servers.
+     */
+    static const ShardId kConfigServerShardId;
+
+    /**
      * Instantiates a new shard registry.
      *
      * @param shardFactory Makes shards

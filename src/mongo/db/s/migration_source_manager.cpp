@@ -122,6 +122,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         _collectionMetadata = CollectionShardingState::get(opCtx, getNss())->getMetadata();
         _keyPattern = _collectionMetadata->getKeyPattern();
+
+        uassert(ErrorCodes::InvalidOptions,
+                "cannot move chunks for a collection that doesn't exist",
+                autoColl.getCollection());
+
         if (autoColl.getCollection()->uuid()) {
             _collectionUuid = autoColl.getCollection()->uuid().value();
         }

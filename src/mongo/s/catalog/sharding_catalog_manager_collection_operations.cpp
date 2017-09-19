@@ -122,8 +122,13 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
                 0));
         }
 
-        // Since docs already exist for the collection, must use primary shard
-        shardIds.push_back(primaryShardId);
+        // If docs already exist for the collection, must use primary shard,
+        // otherwise defer to passed-in distribution option.
+        if (numObjects == 0 && distributeInitialChunks) {
+            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+        } else {
+            shardIds.push_back(primaryShardId);
+        }
     } else {
         // Make sure points are unique and ordered
         auto orderedPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
@@ -221,15 +226,11 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                              const BSONObj& defaultCollation,
                                              bool unique,
                                              const vector<BSONObj>& initPoints,
-                                             const bool distributeInitialChunks) {
+                                             const bool distributeInitialChunks,
+                                             const ShardId& dbPrimaryShardId) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-    auto dbEntry =
-        uassertStatusOK(catalogClient->getDatabase(
-                            opCtx, nsToDatabase(ns), repl::ReadConcernLevel::kLocalReadConcern))
-            .value;
-    auto dbPrimaryShardId = dbEntry.getPrimary();
     const auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
 
     // Fail if there are partially written chunks from a previous failed shardCollection.
@@ -285,6 +286,9 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
             opCtx, ns, coll, true /*upsert*/));
     }
 
+    auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
+    invariant(!shard->isConfig());
+
     // Tell the primary mongod to refresh its data
     // TODO:  Think the real fix here is for mongos to just
     //        assume that all collections are sharded, when we get there
@@ -295,8 +299,6 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
         NamespaceString(ns),
         collVersion,
         true);
-
-    auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
 
     auto ssvResponse =
         shard->runCommandWithFixedRetryAttempts(opCtx,

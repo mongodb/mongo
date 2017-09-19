@@ -661,7 +661,16 @@ function printShardingStatus(configDB, verbose) {
     }
 
     output(1, "databases:");
-    configDB.databases.find().sort({name: 1}).forEach(function(db) {
+
+    var databases = configDB.databases.find().sort({name: 1}).toArray();
+
+    // Special case the config db, since it doesn't have a record in config.databases.
+    databases.push({"_id": "config", "primary": "config", "partitioned": true});
+    databases.sort(function(a, b) {
+        return a["_id"] > b["_id"];
+    });
+
+    databases.forEach(function(db) {
         var truthy = function(value) {
             return !!value;
         };

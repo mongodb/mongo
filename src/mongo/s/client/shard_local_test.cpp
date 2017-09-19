@@ -40,6 +40,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -83,7 +84,7 @@ void ShardLocalTest::setUp() {
     Client::initThreadIfNotAlready();
     _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    _shardLocal = stdx::make_unique<ShardLocal>(ShardId("config"));
+    _shardLocal = stdx::make_unique<ShardLocal>(ShardRegistry::kConfigServerShardId);
     const repl::ReplSettings replSettings = {};
     repl::setGlobalReplicationCoordinator(
         new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings));

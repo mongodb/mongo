@@ -145,10 +145,6 @@ public:
 
     DistLockManager* getDistLockManager() override;
 
-    Status appendInfoForConfigServerDatabases(OperationContext* opCtx,
-                                              const BSONObj& listDatabasesCmd,
-                                              BSONArrayBuilder* builder) override;
-
     StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
         OperationContext* opCtx,
         StringData purpose,

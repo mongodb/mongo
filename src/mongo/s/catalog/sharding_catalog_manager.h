@@ -254,7 +254,8 @@ public:
                          const BSONObj& defaultCollation,
                          bool unique,
                          const std::vector<BSONObj>& initPoints,
-                         const bool distributeInitialChunks);
+                         const bool distributeInitialChunks,
+                         const ShardId& dbPrimaryShardId);
 
     //
     // Shard Operations
