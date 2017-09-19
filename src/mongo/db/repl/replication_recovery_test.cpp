@@ -163,7 +163,8 @@ void _setUpOplog(OperationContext* opCtx, StorageInterface* storage, std::vector
     ASSERT_OK(storage->createCollection(opCtx, oplogNs, _createOplogCollectionOptions()));
 
     for (int ts : timestamps) {
-        ASSERT_OK(storage->insertDocument(opCtx, oplogNs, _makeOplogEntry(ts)));
+        ASSERT_OK(storage->insertDocument(
+            opCtx, oplogNs, _makeOplogEntry(ts), OpTime::kUninitializedTerm));
     }
 }
 

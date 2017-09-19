@@ -66,7 +66,8 @@ public:
 
     Status insertDocument(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          const TimestampedBSONObj& doc) override;
+                          const TimestampedBSONObj& doc,
+                          long long term) override;
 
     Status insertDocuments(OperationContext* opCtx,
                            const NamespaceString& nss,

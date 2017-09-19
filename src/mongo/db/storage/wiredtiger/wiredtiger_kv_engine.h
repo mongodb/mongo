@@ -235,7 +235,9 @@ private:
 
     std::string _uri(StringData ident) const;
 
+    // Not threadsafe; callers must be serialized.
     void _setOldestTimestamp(SnapshotName oldestTimestamp);
+    SnapshotName _previousSetOldestTimestamp;
 
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;

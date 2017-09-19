@@ -1032,15 +1032,22 @@ void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
             return;
         }
     }
+    auto timestampToSet = _previousSetOldestTimestamp;
+    _previousSetOldestTimestamp = oldestTimestamp;
+    if (timestampToSet == SnapshotName()) {
+        // Nothing to set yet.
+        return;
+    }
+
     char oldestTSConfigString["oldest_timestamp="_sd.size() + (8 * 2) /* 16 hexadecimal digits */ +
                               1 /* trailing null */];
     auto size = std::snprintf(oldestTSConfigString,
                               sizeof(oldestTSConfigString),
                               "oldest_timestamp=%llx",
-                              static_cast<unsigned long long>(oldestTimestamp.asU64()));
+                              static_cast<unsigned long long>(timestampToSet.asU64()));
     invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
     invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
-    LOG(2) << "oldest_timestamp set to " << oldestTimestamp.asU64();
+    LOG(2) << "oldest_timestamp set to " << timestampToSet.asU64();
 }
 
 void WiredTigerKVEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp) {

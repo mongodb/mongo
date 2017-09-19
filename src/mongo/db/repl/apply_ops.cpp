@@ -137,8 +137,10 @@ Status _applyOps(OperationContext* opCtx,
 
             auto db = dbHolder().get(opCtx, nss.ns());
             if (!db) {
+                // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
+                // within an active WriteUnitOfWork.
                 throw DBException(
-                    ErrorCodes::NamespaceNotFound,
+                    ErrorCodes::AtomicityFailure,
                     "cannot create a database in atomic applyOps mode; will retry without "
                     "atomicity");
             }
@@ -151,7 +153,7 @@ Status _applyOps(OperationContext* opCtx,
             auto collection = db->getCollection(opCtx, nss);
             if (!collection && !nss.isSystemDotIndexes() && (*opType == 'i' || *opType == 'u')) {
                 throw DBException(
-                    ErrorCodes::NamespaceNotFound,
+                    ErrorCodes::AtomicityFailure,
                     str::stream()
                         << "cannot apply insert or update operation on a non-existent namespace "
                         << nss.ns()
@@ -159,7 +161,15 @@ Status _applyOps(OperationContext* opCtx,
                         << redact(opObj));
             }
 
+            // Cannot specify timestamp values in an atomic applyOps.
+            if (opObj.hasField("ts")) {
+                throw DBException(ErrorCodes::AtomicityFailure,
+                                  "cannot apply an op with a timestamp in atomic applyOps mode; "
+                                  "will retry without atomicity");
+            }
+
             OldClientContext ctx(opCtx, nss.ns());
+
             status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
             if (!status.isOK())
                 return status;
@@ -363,6 +373,7 @@ Status applyOps(OperationContext* opCtx,
 
     // Perform write ops atomically
     invariant(globalWriteLock);
+
     try {
         writeConflictRetry(opCtx, "applyOps", dbName, [&] {
             BSONObjBuilder intermediateResult;
@@ -400,9 +411,8 @@ Status applyOps(OperationContext* opCtx,
             result->appendElements(intermediateResult.obj());
         });
     } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::NamespaceNotFound) {
-            // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
-            // within an active WriteUnitOfWork.
+        if (ex.code() == ErrorCodes::AtomicityFailure) {
+            // Retry in non-atomic mode.
             return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied);
         }
         BSONArrayBuilder ab;

@@ -113,7 +113,8 @@ TEST_F(ReplicationProcessTest,
                                                 ReplicationProcess::kRollbackProgressNamespace,
                                                 TimestampedBSONObj{BSON("_id"
                                                                         << "not progress"),
-                                                                   SnapshotName(0)}));
+                                                                   SnapshotName()},
+                                                OpTime::kUninitializedTerm));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, replicationProcess.getRollbackProgress(opCtx.get()));
 }
 
@@ -126,8 +127,10 @@ TEST_F(ReplicationProcessTest, GetRollbackProgressReturnsBadStatusIfApplyUntilFi
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));
-    ASSERT_OK(_storageInterface->insertDocument(
-        opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, doc));
+    ASSERT_OK(_storageInterface->insertDocument(opCtx.get(),
+                                                ReplicationProcess::kRollbackProgressNamespace,
+                                                doc,
+                                                OpTime::kUninitializedTerm));
 
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
@@ -149,8 +152,10 @@ TEST_F(ReplicationProcessTest,
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));
-    ASSERT_OK(_storageInterface->insertDocument(
-        opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, doc));
+    ASSERT_OK(_storageInterface->insertDocument(opCtx.get(),
+                                                ReplicationProcess::kRollbackProgressNamespace,
+                                                doc,
+                                                OpTime::kUninitializedTerm));
 
     ReplicationProcess replicationProcess(
         _storageInterface.get(),
@@ -170,8 +175,10 @@ TEST_F(ReplicationProcessTest,
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));
-    ASSERT_OK(_storageInterface->insertDocument(
-        opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, doc));
+    ASSERT_OK(_storageInterface->insertDocument(opCtx.get(),
+                                                ReplicationProcess::kRollbackProgressNamespace,
+                                                doc,
+                                                OpTime::kUninitializedTerm));
 
     ReplicationProcess replicationProcess(
         _storageInterface.get(),

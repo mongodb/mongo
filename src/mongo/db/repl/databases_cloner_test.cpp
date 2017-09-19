@@ -146,8 +146,10 @@ protected:
             _storageInterfaceWorkDone.createOplogCalled = true;
             return Status::OK();
         };
-        _storageInterface.insertDocumentFn = [this](
-            OperationContext* opCtx, const NamespaceString& nss, const TimestampedBSONObj& doc) {
+        _storageInterface.insertDocumentFn = [this](OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const TimestampedBSONObj& doc,
+                                                    long long term) {
             ++_storageInterfaceWorkDone.documentsInsertedCount;
             return Status::OK();
         };

@@ -490,8 +490,9 @@ void scheduleWritesToOplog(OperationContext* opCtx,
             for (size_t i = begin; i < end; i++) {
                 // Add as unowned BSON to avoid unnecessary ref-count bumps.
                 // 'ops' will outlive 'docs' so the BSON lifetime will be guaranteed.
-                docs.emplace_back(
-                    InsertStatement{ops[i].raw, SnapshotName(ops[i].getOpTime().getTimestamp())});
+                docs.emplace_back(InsertStatement{ops[i].raw,
+                                                  SnapshotName(ops[i].getOpTime().getTimestamp()),
+                                                  ops[i].getOpTime().getTerm()});
             }
 
             fassertStatusOK(40141,
@@ -1214,23 +1215,55 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
 
             if (isGroup) {
                 // Since we found more than one document, create grouped insert of many docs.
+                // We are going to group many 'i' ops into one big 'i' op, with array fields for
+                // 'ts', 't', and 'o', corresponding to each individual op.
+                // For example:
+                // { ts: Timestamp(1,1), t:1, ns: "test.foo", op:"i", o: {_id:1} }
+                // { ts: Timestamp(1,2), t:1, ns: "test.foo", op:"i", o: {_id:2} }
+                // become:
+                // { ts: [Timestamp(1, 1), Timestamp(1, 2)],
+                //    t: [1, 1],
+                //    o: [{_id: 1}, {_id: 2}],
+                //   ns: "test.foo",
+                //   op: "i" }
                 BSONObjBuilder groupedInsertBuilder;
-                // Generate an op object of all elements except for "o", since we need to
-                // make the "o" field an array of all the o's.
+
+                // Populate the "ts" field with an array of all the grouped inserts' timestamps.
+                BSONArrayBuilder tsArrayBuilder(groupedInsertBuilder.subarrayStart("ts"));
+                for (auto groupingIterator = oplogEntriesIterator;
+                     groupingIterator != endOfGroupableOpsIterator;
+                     ++groupingIterator) {
+                    tsArrayBuilder.append((*groupingIterator)->getTimestamp());
+                }
+                tsArrayBuilder.done();
+
+                // Populate the "t" (term) field with an array of all the grouped inserts' terms.
+                BSONArrayBuilder tArrayBuilder(groupedInsertBuilder.subarrayStart("t"));
+                for (auto groupingIterator = oplogEntriesIterator;
+                     groupingIterator != endOfGroupableOpsIterator;
+                     ++groupingIterator) {
+                    tArrayBuilder.append(
+                        static_cast<long long>((*groupingIterator)->getTerm().get()));
+                }
+                tArrayBuilder.done();
+
+                // Generate an op object of all elements except for "ts", "t", and "o", since we
+                // need to make those fields arrays of all the ts's, t's, and o's.
                 for (auto elem : entry->raw) {
-                    if (elem.fieldNameStringData() != "o") {
+                    if (elem.fieldNameStringData() != "o" && elem.fieldNameStringData() != "ts" &&
+                        elem.fieldNameStringData() != "t") {
                         groupedInsertBuilder.append(elem);
                     }
                 }
 
                 // Populate the "o" field with an array of all the grouped inserts.
-                BSONArrayBuilder insertArrayBuilder(groupedInsertBuilder.subarrayStart("o"));
+                BSONArrayBuilder oArrayBuilder(groupedInsertBuilder.subarrayStart("o"));
                 for (auto groupingIterator = oplogEntriesIterator;
                      groupingIterator != endOfGroupableOpsIterator;
                      ++groupingIterator) {
-                    insertArrayBuilder.append((*groupingIterator)->getObject());
+                    oArrayBuilder.append((*groupingIterator)->getObject());
                 }
-                insertArrayBuilder.done();
+                oArrayBuilder.done();
 
                 try {
                     // Apply the group of inserts.

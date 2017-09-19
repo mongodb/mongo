@@ -351,7 +351,6 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     }
 
     appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
-
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
 }  // end anon namespace
@@ -936,25 +935,22 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
     OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
 
-    std::array<StringData, 7> names = {"ts", "o", "ui", "ns", "op", "b", "o2"};
-    std::array<BSONElement, 7> fields;
+    std::array<StringData, 8> names = {"ts", "t", "o", "ui", "ns", "op", "b", "o2"};
+    std::array<BSONElement, 8> fields;
     op.getFields(names, &fields);
     BSONElement& fieldTs = fields[0];
-    BSONElement& fieldO = fields[1];
-    BSONElement& fieldUI = fields[2];
-    BSONElement& fieldNs = fields[3];
-    BSONElement& fieldOp = fields[4];
-    BSONElement& fieldB = fields[5];
-    BSONElement& fieldO2 = fields[6];
+    BSONElement& fieldT = fields[1];
+    BSONElement& fieldO = fields[2];
+    BSONElement& fieldUI = fields[3];
+    BSONElement& fieldNs = fields[4];
+    BSONElement& fieldOp = fields[5];
+    BSONElement& fieldB = fields[6];
+    BSONElement& fieldO2 = fields[7];
 
     BSONObj o;
     if (fieldO.isABSONObj())
         o = fieldO.embeddedObject();
 
-    SnapshotName timestamp;
-    if (fieldTs.ok()) {
-        timestamp = SnapshotName(fieldTs.timestamp());
-    }
     // operation type -- see logOp() comments for types
     const char* opType = fieldOp.valuestrsafe();
 
@@ -1020,16 +1016,55 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
         if (fieldO.type() == Array) {
             // Batched inserts.
-            std::vector<InsertStatement> insertObjs;
-            for (auto elem : fieldO.Obj()) {
-                // Note: we don't care about statement ids here since the secondaries don't create
-                // their own oplog entries.
-                insertObjs.emplace_back(elem.Obj(), timestamp);
-            }
+
+            // Cannot apply an array insert with applyOps command.  No support for wiping out
+            // the provided timestamps and using new ones for oplog.
+            uassert(ErrorCodes::OperationFailed,
+                    "Cannot apply an array insert with applyOps",
+                    !opCtx->writesAreReplicated());
+
+            uassert(ErrorCodes::BadValue,
+                    "Expected array for field 'ts'",
+                    fieldTs.ok() && fieldTs.type() == Array);
+            uassert(ErrorCodes::BadValue,
+                    "Expected array for field 't'",
+                    fieldT.ok() && fieldT.type() == Array);
+
             uassert(ErrorCodes::OperationFailed,
                     str::stream() << "Failed to apply insert due to empty array element: "
                                   << op.toString(),
-                    !insertObjs.empty());
+                    !fieldO.Obj().isEmpty() && !fieldTs.Obj().isEmpty() && !fieldT.Obj().isEmpty());
+
+            std::vector<InsertStatement> insertObjs;
+            auto fieldOIt = fieldO.Obj().begin();
+            auto fieldTsIt = fieldTs.Obj().begin();
+            auto fieldTIt = fieldT.Obj().begin();
+
+            while (true) {
+                auto oElem = fieldOIt.next();
+                auto tsElem = fieldTsIt.next();
+                auto tElem = fieldTIt.next();
+
+                // Note: we don't care about statement ids here since the secondaries don't create
+                // their own oplog entries.
+                insertObjs.emplace_back(
+                    oElem.Obj(), SnapshotName(tsElem.timestamp()), tElem.Long());
+                if (!fieldOIt.more()) {
+                    // Make sure arrays are the same length.
+                    uassert(ErrorCodes::OperationFailed,
+                            str::stream()
+                                << "Failed to apply insert due to invalid array elements: "
+                                << op.toString(),
+                            !fieldTsIt.more());
+                    break;
+                }
+                // Make sure arrays are the same length.
+                uassert(ErrorCodes::OperationFailed,
+                        str::stream() << "Failed to apply insert due to invalid array elements: "
+                                      << op.toString(),
+                        fieldTsIt.more());
+            }
+
             WriteUnitOfWork wuow(opCtx);
             OpDebug* const nullOpDebug = nullptr;
             Status status = collection->insertDocuments(
@@ -1066,10 +1101,25 @@ Status applyOperation_inlock(OperationContext* opCtx,
             bool needToDoUpsert = haveWrappingWriteUnitOfWork;
 
             if (!needToDoUpsert) {
+                SnapshotName timestamp;
+                long long term = OpTime::kUninitializedTerm;
+
                 WriteUnitOfWork wuow(opCtx);
+
+                // Do not use supplied timestamps if running through applyOps, as that would allow
+                // a user to dictate what timestamps appear in the oplog.
+                if (!opCtx->writesAreReplicated()) {
+                    if (fieldTs.ok()) {
+                        timestamp = SnapshotName(fieldTs.timestamp());
+                    }
+                    if (fieldT.ok()) {
+                        term = fieldT.Long();
+                    }
+                }
+
                 OpDebug* const nullOpDebug = nullptr;
                 auto status = collection->insertDocument(
-                    opCtx, InsertStatement(o, timestamp), nullOpDebug, true);
+                    opCtx, InsertStatement(o, timestamp, term), nullOpDebug, true);
                 if (status.isOK()) {
                     wuow.commit();
                 } else if (status == ErrorCodes::DuplicateKey) {

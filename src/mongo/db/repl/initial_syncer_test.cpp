@@ -242,8 +242,10 @@ protected:
             _storageInterfaceWorkDone.truncateCalled = true;
             return Status::OK();
         };
-        _storageInterface->insertDocumentFn = [this](
-            OperationContext* opCtx, const NamespaceString& nss, const TimestampedBSONObj& doc) {
+        _storageInterface->insertDocumentFn = [this](OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     const TimestampedBSONObj& doc,
+                                                     long long term) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             ++_storageInterfaceWorkDone.documentsInsertedCount;
             return Status::OK();
@@ -2053,12 +2055,17 @@ TEST_F(
 
     NamespaceString insertDocumentNss;
     TimestampedBSONObj insertDocumentDoc;
-    _storageInterface->insertDocumentFn = [&insertDocumentDoc, &insertDocumentNss](
-        OperationContext*, const NamespaceString& nss, const TimestampedBSONObj& doc) {
-        insertDocumentNss = nss;
-        insertDocumentDoc = doc;
-        return Status(ErrorCodes::OperationFailed, "failed to insert oplog entry");
-    };
+    long long insertDocumentTerm;
+    _storageInterface->insertDocumentFn =
+        [&insertDocumentDoc, &insertDocumentNss, &insertDocumentTerm](OperationContext*,
+                                                                      const NamespaceString& nss,
+                                                                      const TimestampedBSONObj& doc,
+                                                                      long long term) {
+            insertDocumentNss = nss;
+            insertDocumentDoc = doc;
+            insertDocumentTerm = term;
+            return Status(ErrorCodes::OperationFailed, "failed to insert oplog entry");
+        };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
@@ -2112,10 +2119,17 @@ TEST_F(
 
     NamespaceString insertDocumentNss;
     TimestampedBSONObj insertDocumentDoc;
-    _storageInterface->insertDocumentFn = [initialSyncer, &insertDocumentDoc, &insertDocumentNss](
-        OperationContext*, const NamespaceString& nss, const TimestampedBSONObj& doc) {
+    long long insertDocumentTerm;
+    _storageInterface->insertDocumentFn = [initialSyncer,
+                                           &insertDocumentDoc,
+                                           &insertDocumentNss,
+                                           &insertDocumentTerm](OperationContext*,
+                                                                const NamespaceString& nss,
+                                                                const TimestampedBSONObj& doc,
+                                                                long long term) {
         insertDocumentNss = nss;
         insertDocumentDoc = doc;
+        insertDocumentTerm = term;
         initialSyncer->shutdown().transitional_ignore();
         return Status::OK();
     };
