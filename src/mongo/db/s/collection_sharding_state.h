@@ -49,6 +49,7 @@ struct ChunkVersion;
 class CollectionMetadata;
 class MigrationSourceManager;
 class OperationContext;
+class Timestamp;
 
 /**
  * Contains all sharding-related runtime state for a given collection. One such object is assigned
@@ -223,12 +224,17 @@ public:
      *
      * The global exclusive lock is expected to be held by the caller of any of these functions.
      */
-    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc);
+    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc, const Timestamp& oplogTs);
     void onUpdateOp(OperationContext* opCtx,
                     const BSONObj& query,
                     const BSONObj& update,
-                    const BSONObj& updatedDoc);
-    void onDeleteOp(OperationContext* opCtx, const DeleteState& deleteState);
+                    const BSONObj& updatedDoc,
+                    const Timestamp& oplogTs,
+                    const Timestamp& prePostImageTs);
+    void onDeleteOp(OperationContext* opCtx,
+                    const DeleteState& deleteState,
+                    const Timestamp& oplogTs,
+                    const Timestamp& preImageTs);
     void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName);
 
 private:
