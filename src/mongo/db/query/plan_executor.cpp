@@ -37,6 +37,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -701,6 +702,14 @@ PlanExecutor::ExecState PlanExecutor::swallowTimeoutIfAwaitData(
                                          WorkingSetCommon::buildMemberStatusObject(yieldError));
     }
     return PlanExecutor::DEAD;
+}
+
+Timestamp PlanExecutor::getLatestOplogTimestamp() {
+    if (auto pipelineProxy = getStageByType(_root.get(), STAGE_PIPELINE_PROXY))
+        return static_cast<PipelineProxyStage*>(pipelineProxy)->getLatestOplogTimestamp();
+    if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN))
+        return static_cast<CollectionScan*>(collectionScan)->getLatestOplogTimestamp();
+    return Timestamp();
 }
 
 //

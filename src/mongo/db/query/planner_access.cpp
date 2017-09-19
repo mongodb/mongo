@@ -151,6 +151,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->filter = query.root()->shallowClone();
     csn->tailable = tailable;
     csn->maxScan = query.getQueryRequest().getMaxScan();
+    csn->shouldTrackLatestOplogTimestamp =
+        params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
 
     // If the hint is {$natural: +-1} this changes the direction of the collection scan.
     if (!query.getQueryRequest().getHint().isEmpty()) {

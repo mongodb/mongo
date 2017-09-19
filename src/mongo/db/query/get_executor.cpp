@@ -513,7 +513,10 @@ mongo::BSONElement extractOplogTsOptime(const mongo::MatchExpression* me) {
 }
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
-    OperationContext* opCtx, Collection* collection, unique_ptr<CanonicalQuery> cq) {
+    OperationContext* opCtx,
+    Collection* collection,
+    unique_ptr<CanonicalQuery> cq,
+    size_t plannerOptions) {
     invariant(collection);
     invariant(cq.get());
 
@@ -586,9 +589,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
 
         // This is normal.  The start of the oplog is the beginning of the collection.
         if (PlanExecutor::IS_EOF == state) {
-            return getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO);
+            return getExecutor(
+                opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, plannerOptions);
         }
-
         // This is not normal.  An error was encountered.
         if (PlanExecutor::ADVANCED != state) {
             return Status(ErrorCodes::InternalError, "quick oplog start location had error...?");
@@ -601,6 +604,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
     params.start = *startLoc;
     params.direction = CollectionScanParams::FORWARD;
     params.tailable = cq->getQueryRequest().isTailable();
+    params.shouldTrackLatestOplogTimestamp =
+        plannerOptions & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
 
     // If the query is just tsExpr, we know that every document in the collection after the first
     // matching one must also match. To avoid wasting time running the match expression on every
@@ -628,7 +633,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     PlanExecutor::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
     if (NULL != collection && canonicalQuery->getQueryRequest().isOplogReplay()) {
-        return getOplogStartHack(opCtx, collection, std::move(canonicalQuery));
+        return getOplogStartHack(opCtx, collection, std::move(canonicalQuery), plannerOptions);
     }
 
     if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, nss.ns())) {

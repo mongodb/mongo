@@ -93,8 +93,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 
     long long batchSize = request.getBatchSize();
 
-    // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
-    BSONArrayBuilder resultsArray;
+    CursorResponseBuilder responseBuilder(true, &result);
     BSONObj next;
     for (int objCount = 0; objCount < batchSize; objCount++) {
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
@@ -112,6 +111,8 @@ bool handleCursorCommand(OperationContext* opCtx,
         }
 
         if (state == PlanExecutor::IS_EOF) {
+            responseBuilder.setLatestOplogTimestamp(
+                cursor->getExecutor()->getLatestOplogTimestamp());
             if (!cursor->isTailable()) {
                 // make it an obvious error to use cursor or executor after this point
                 cursor = nullptr;
@@ -128,12 +129,13 @@ bool handleCursorCommand(OperationContext* opCtx,
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
-        if (!FindCommon::haveSpaceForNext(next, objCount, resultsArray.len())) {
+        if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
             cursor->getExecutor()->enqueue(next);
             break;
         }
 
-        resultsArray.append(next);
+        responseBuilder.setLatestOplogTimestamp(cursor->getExecutor()->getLatestOplogTimestamp());
+        responseBuilder.append(next);
     }
 
     if (cursor) {
@@ -152,7 +154,7 @@ bool handleCursorCommand(OperationContext* opCtx,
     }
 
     const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
-    appendCursorResponseObject(cursorId, nsForCursor.ns(), resultsArray.arr(), &result);
+    responseBuilder.done(cursorId, nsForCursor.ns());
 
     return static_cast<bool>(cursor);
 }

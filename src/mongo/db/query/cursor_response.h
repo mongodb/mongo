@@ -39,7 +39,8 @@
 namespace mongo {
 
 /**
- * Builds the cursor field for a reply to a cursor-generating command in place.
+ * Builds the cursor field and the _latestOplogTimestamp field for a reply to a cursor-generating
+ * command in place.
  */
 class CursorResponseBuilder {
     MONGO_DISALLOW_COPYING(CursorResponseBuilder);
@@ -70,6 +71,10 @@ public:
         _batch.append(obj);
     }
 
+    void setLatestOplogTimestamp(Timestamp ts) {
+        _latestOplogTimestamp = ts;
+    }
+
     /**
      * Call this after successfully appending all fields that will be part of this response.
      * After calling, you may not call any more methods on this object.
@@ -89,6 +94,7 @@ private:
     BSONObjBuilder* const _commandResponse;
     BSONObjBuilder _cursorObject;
     BSONArrayBuilder _batch;
+    Timestamp _latestOplogTimestamp;
 };
 
 /**

@@ -289,6 +289,11 @@ struct CollectionScanNode : public QuerySolutionNode {
     // Should we make a tailable cursor?
     bool tailable;
 
+    // Should we keep track of the timestamp of the latest oplog entry we've seen? This information
+    // is needed to merge cursors from the oplog in order of operation time when reading the oplog
+    // across a sharded cluster.
+    bool shouldTrackLatestOplogTimestamp = false;
+
     int direction;
 
     // maxScan option to .find() limits how many docs we look at.

@@ -127,6 +127,9 @@ string optionString(size_t options) {
     if (options & QueryPlannerParams::GENERATE_COVERED_IXSCANS) {
         ss << "GENERATE_COVERED_IXSCANS ";
     }
+    if (options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS) {
+        ss << "TRACK_LATEST_OPLOG_TS ";
+    }
 
     return ss;
 }

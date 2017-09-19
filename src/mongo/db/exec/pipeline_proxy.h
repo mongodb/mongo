@@ -74,6 +74,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    /**
+     * Pass through the last oplog timestamp from the proxied pipeline.
+     */
+    Timestamp getLatestOplogTimestamp() const;
+
     std::string getPlanSummaryStr() const;
     void getPlanSummaryStats(PlanSummaryStats* statsOut) const;
 

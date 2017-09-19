@@ -127,6 +127,13 @@ public:
         _shouldProduceEmptyDocs = true;
     }
 
+    Timestamp getLatestOplogTimestamp() const {
+        if (_exec) {
+            return _exec->getLatestOplogTimestamp();
+        }
+        return Timestamp();
+    }
+
     const std::string& getPlanSummaryStr() const {
         return _planSummary;
     }

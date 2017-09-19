@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -52,6 +53,11 @@ struct CollectionScanParams {
 
     // Do we want the scan to be 'tailable'?  Only meaningful if the collection is capped.
     bool tailable = false;
+
+    // Should we keep track of the timestamp of the latest oplog entry we've seen? This information
+    // is needed to merge cursors from the oplog in order of operation time when reading the oplog
+    // across a sharded cluster.
+    bool shouldTrackLatestOplogTimestamp = false;
 
     // Once the first matching document is found, assume that all documents after it must match.
     // This is useful for oplog queries where we know we will see records ordered by the ts field.

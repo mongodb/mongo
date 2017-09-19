@@ -85,6 +85,8 @@ public:
 
     static void getPlanSummaryStats(const Pipeline* pipeline, PlanSummaryStats* statsOut);
 
+    static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
+
 private:
     PipelineD();  // does not exist:  prevent instantiation
 

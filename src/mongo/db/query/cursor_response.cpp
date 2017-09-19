@@ -45,6 +45,7 @@ const char kIdField[] = "id";
 const char kNsField[] = "ns";
 const char kBatchField[] = "nextBatch";
 const char kBatchFieldInitial[] = "firstBatch";
+const char kInternalLatestOplogTimestampField[] = "$_internalLatestOplogTimestamp";
 
 }  // namespace
 
@@ -61,6 +62,9 @@ void CursorResponseBuilder::done(CursorId cursorId, StringData cursorNamespace) 
     _cursorObject.append(kIdField, cursorId);
     _cursorObject.append(kNsField, cursorNamespace);
     _cursorObject.doneFast();
+    if (!_latestOplogTimestamp.isNull()) {
+        _commandResponse->append(kInternalLatestOplogTimestampField, _latestOplogTimestamp);
+    }
     _active = false;
 }
 

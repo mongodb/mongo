@@ -627,6 +627,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
     }
 
+    if (expCtx->needsMerge && expCtx->tailableMode == TailableMode::kTailableAndAwaitData) {
+        plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
+    }
+
     const BSONObj emptyProjection;
     const BSONObj metaSortProjection = BSON("$meta"
                                             << "sortKey");
@@ -779,6 +783,14 @@ void PipelineD::addCursorSource(Collection* collection,
     // case the new stage can be absorbed with the first stages of the pipeline.
     pipeline->addInitialSource(pSource);
     pipeline->optimizePipeline();
+}
+
+Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
+    if (auto docSourceCursor =
+            dynamic_cast<DocumentSourceCursor*>(pipeline->_sources.front().get())) {
+        return docSourceCursor->getLatestOplogTimestamp();
+    }
+    return Timestamp();
 }
 
 std::string PipelineD::getPlanSummaryStr(const Pipeline* pPipeline) {
