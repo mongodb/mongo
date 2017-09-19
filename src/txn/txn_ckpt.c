@@ -379,7 +379,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	struct timespec start, last, stop;
-	double current_dirty, delta;
+	double current_dirty, delta, scrub_min;
 	uint64_t bytes_written_last, bytes_written_start, bytes_written_total;
 	uint64_t cache_size, max_write;
 	uint64_t current_us, stepdown_us, total_ms, work_us;
@@ -405,6 +405,25 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	 */
 	if (cache_size < 10 * WT_MEGABYTE)
 		return;
+
+	/*
+	 * Skip scrubbing if it won't perform at-least some minimum amount of
+	 * work. Scrubbing is supposed to bring down the dirty data to eviction
+	 * checkpoint target before the actual checkpoint starts. Do not perform
+	 * scrubbing if the dirty data to scrub is less than a pre-configured
+	 * size. This size is to an extent based on the configured cache size
+	 * without being too large or too small for large cache sizes. For the
+	 * values chosen, for instance, 100 GB cache will require at-least
+	 * 200 MB of dirty data above eviction checkpoint target, which should
+	 * equate to a scrub phase a few seconds long. That said, the value of
+	 * 0.2% and 500 MB are still somewhat arbitrary.
+	 */
+	scrub_min = WT_MIN((0.2 * conn->cache_size) / 100, 500 * WT_MEGABYTE);
+	if (__wt_cache_dirty_leaf_inuse(cache) <
+	    ((cache->eviction_checkpoint_target * conn->cache_size) / 100) +
+	    scrub_min)
+		return;
+
 	stepdown_us = 10000;
 	work_us = 0;
 	progress = false;
