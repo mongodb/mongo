@@ -36,15 +36,13 @@ static void
 salvage(void)
 {
 	WT_CONNECTION *conn;
-	WT_DECL_RET;
 	WT_SESSION *session;
 
 	conn = g.wts_conn;
 	track("salvage", 0ULL, NULL);
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	if ((ret = session->salvage(session, g.uri, "force=true")) != 0)
-		testutil_die(ret, "session.salvage: %s", g.uri);
+	testutil_check(session->salvage(session, g.uri, "force=true"));
 	testutil_check(session->close(session, NULL));
 }
 

@@ -603,8 +603,8 @@ main(int argc, char *argv[])
 	stable_val = 0;
 	memset(val, 0, sizeof(val));
 	while (cur_stable->next(cur_stable) == 0) {
-		cur_stable->get_key(cur_stable, &key);
-		cur_stable->get_value(cur_stable, &val[key]);
+		testutil_check(cur_stable->get_key(cur_stable, &key));
+		testutil_check(cur_stable->get_value(cur_stable, &val[key]));
 		if (val[key] > stable_val)
 			stable_val = val[key];
 

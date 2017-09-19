@@ -60,35 +60,28 @@ write_and_read_new(WT_SESSION *session)
 	WT_ITEM logrec_key, logrec_value;
 	uint64_t txnid;
 	uint32_t fileid, log_file, log_offset, opcount, optype, rectype;
-	int ret;
 	bool saw_msg;
 
 	/*
 	 * Write a log record and force it to disk so we can read it.
 	 */
 	printf("Write log_printf record and verify.\n");
-	if ((ret = session->log_printf(session, "Test Log Record")) != 0)
-		testutil_die(ret, "log_printf");
-	if ((ret = session->log_flush(session, "sync=on")) != 0)
-		testutil_die(ret, "log_flush");
-	if ((ret = session->open_cursor(
-	    session, "log:", NULL, NULL, &logc)) != 0)
-		testutil_die(ret, "open_cursor: log");
-	if ((ret = session->open_cursor(
-	    session, "log:", NULL, NULL, &logc)) != 0)
-		testutil_die(ret, "open_cursor: log");
+	testutil_check(session->log_printf(session, "Test Log Record"));
+	testutil_check(session->log_flush(session, "sync=on"));
+	testutil_check(
+	    session->open_cursor(session, "log:", NULL, NULL, &logc));
+	testutil_check(
+	    session->open_cursor(session, "log:", NULL, NULL, &logc));
 	saw_msg = false;
-	while ((ret = logc->next(logc)) == 0) {
+	while (logc->next(logc) == 0) {
 		/*
 		 * We don't really need to get the key, but in case we want
 		 * the LSN for some message, get it.
 		 */
-		if ((ret = logc->get_key(logc,
-		    &log_file, &log_offset, &opcount)) != 0)
-			testutil_die(errno, "get_key");
-		if ((ret = logc->get_value(logc, &txnid, &rectype,
-		    &optype, &fileid, &logrec_key, &logrec_value)) != 0)
-			testutil_die(errno, "get_value");
+		testutil_check(logc->get_key(
+		    logc, &log_file, &log_offset, &opcount));
+		testutil_check(logc->get_value(logc, &txnid,
+		    &rectype, &optype, &fileid, &logrec_key, &logrec_value));
 		/*
 		 * We should never see a record from us in log file 2.  We wrote
 		 * a record there, but then the record in log file 1 was
@@ -116,8 +109,7 @@ write_and_read_new(WT_SESSION *session)
 			break;
 		}
 	}
-	if ((ret = logc->close(logc)) != 0)
-		testutil_die(ret, "log cursor close");
+	testutil_check(logc->close(logc));
 	if (!saw_msg)
 		testutil_die(EINVAL, "Did not traverse log printf record");
 }
@@ -146,7 +138,6 @@ fill_db(void)
 	WT_LSN lsn, save_lsn;
 	WT_SESSION *session;
 	uint32_t i, max_key, min_key, units, unused;
-	int ret;
 	bool first;
 	char k[K_SIZE], v[V_SIZE];
 
@@ -155,16 +146,11 @@ fill_db(void)
 	 */
 	if (chdir(home) != 0)
 		testutil_die(errno, "chdir: %s", home);
-	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG, &conn)) != 0)
-		testutil_die(ret, "wiredtiger_open");
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "WT_CONNECTION:open_session");
-	if ((ret = session->create(session,
-	    uri, "key_format=S,value_format=S")) != 0)
-		testutil_die(ret, "WT_SESSION.create: %s", uri);
-	if ((ret =
-	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
-		testutil_die(ret, "WT_SESSION.open_cursor: %s", uri);
+	testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG, &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(
+	    session->create(session, uri, "key_format=S,value_format=S"));
+	testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
 	/*
 	 * Keep a separate file with the records we wrote for checking.
@@ -197,27 +183,23 @@ fill_db(void)
 		    (int)(V_SIZE - (strlen("value") + 1)), (int)i));
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
-		if ((ret = cursor->insert(cursor)) != 0)
-			testutil_die(ret, "WT_CURSOR.insert");
+		testutil_check(cursor->insert(cursor));
 
 		/*
 		 * Walking the ever growing log can be slow, so only start
 		 * looking for the cross into log file 2 after a minimum.
 		 */
 		if (i > min_key) {
-			if ((ret = session->open_cursor(
-			    session, "log:", NULL, NULL, &logc)) != 0)
-				testutil_die(ret, "open_cursor: log");
+			testutil_check(session->open_cursor(
+			    session, "log:", NULL, NULL, &logc));
 			if (save_lsn.l.file != 0) {
 				logc->set_key(logc,
 				    save_lsn.l.file, save_lsn.l.offset, 0);
-				if ((ret = logc->search(logc)) != 0)
-					testutil_die(ret, "search");
+				testutil_check(logc->search(logc));
 			}
-			while ((ret = logc->next(logc)) == 0) {
-				if ((ret = logc->get_key(logc,
-				    &lsn.l.file, &lsn.l.offset, &unused)) != 0)
-					testutil_die(ret, "get_key");
+			while (logc->next(logc) == 0) {
+				testutil_check(logc->get_key(
+				    logc, &lsn.l.file, &lsn.l.offset, &unused));
 				/*
 				 * Save the LSN so that we know the offset
 				 * of the last LSN in log file 1 later.
@@ -243,8 +225,7 @@ fill_db(void)
 				}
 			}
 			first = false;
-			if ((ret = logc->close(logc)) != 0)
-				testutil_die(ret, "log cursor close");
+			testutil_check(logc->close(logc));
 		}
 	}
 	if (fclose(fp) != 0)
@@ -263,10 +244,10 @@ main(int argc, char *argv[])
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
+	pid_t pid;
 	uint64_t new_offset, offset;
 	uint32_t count, max_key;
 	int ch, status, ret;
-	pid_t pid;
 	const char *working_dir;
 
 	(void)testutil_set_progname(argv);
@@ -329,16 +310,12 @@ main(int argc, char *argv[])
 	printf("Parent: Log file 1: Key %" PRIu32 " at %" PRIu64 "\n",
 	     max_key, offset);
 	printf("Parent: Truncate mid-record to %" PRIu64 "\n", new_offset);
-	if ((ret = truncate(LOG_FILE_1, (wt_off_t)new_offset)) != 0)
+	if (truncate(LOG_FILE_1, (wt_off_t)new_offset) != 0)
 		testutil_die(errno, "truncate");
 
-	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn)) != 0)
-		testutil_die(ret, "wiredtiger_open");
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "WT_CONNECTION:open_session");
-	if ((ret =
-	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
-		testutil_die(ret, "WT_SESSION.open_cursor: %s", uri);
+	testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
 	/*
 	 * For every key in the saved file, verify that the key exists
@@ -346,7 +323,7 @@ main(int argc, char *argv[])
 	 * expect every key to have been recovered.
 	 */
 	count = 0;
-	while ((ret = cursor->next(cursor)) == 0)
+	while (cursor->next(cursor) == 0)
 		++count;
 	/*
 	 * The max key in the saved file is the key we truncated, but the
@@ -366,7 +343,6 @@ main(int argc, char *argv[])
 	 * read that log record that is beyond the truncated record.
 	 */
 	write_and_read_new(session);
-	if ((ret = conn->close(conn, NULL)) != 0)
-		testutil_die(ret, "WT_CONNECTION:close");
+	testutil_check(conn->close(conn, NULL));
 	return (EXIT_SUCCESS);
 }

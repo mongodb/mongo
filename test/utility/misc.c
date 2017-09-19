@@ -131,7 +131,6 @@ void
 testutil_make_work_dir(const char *dir)
 {
 	size_t len;
-	int ret;
 	char *buf;
 
 	testutil_clean_work_dir(dir);
@@ -143,8 +142,7 @@ testutil_make_work_dir(const char *dir)
 
 	/* mkdir shares syntax between Windows and Linux */
 	testutil_check(__wt_snprintf(buf, len, "%s%s", MKDIR_COMMAND, dir));
-	if ((ret = system(buf)) != 0)
-		testutil_die(ret, "%s", buf);
+	testutil_check(system(buf));
 	free(buf);
 }
 

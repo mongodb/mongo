@@ -81,7 +81,6 @@ thread_run(void *arg)
 	WT_SESSION *session;
 	WT_THREAD_DATA *td;
 	uint64_t i;
-	int ret;
 	size_t lsize;
 	char buf[MAX_VAL], kname[64], lgbuf[8];
 	char large[128*1024];
@@ -117,11 +116,8 @@ thread_run(void *arg)
 	 * cases where the result files end up with partial lines.
 	 */
 	__wt_stream_set_line_buffer(fp);
-	if ((ret = td->conn->open_session(td->conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "WT_CONNECTION:open_session");
-	if ((ret =
-	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
-		testutil_die(ret, "WT_SESSION.open_cursor: %s", uri);
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+	testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 	data.data = buf;
 	data.size = sizeof(buf);
 	/*
@@ -143,8 +139,7 @@ thread_run(void *arg)
 			data.data = buf;
 		}
 		cursor->set_value(cursor, &data);
-		if ((ret = cursor->insert(cursor)) != 0)
-			testutil_die(ret, "WT_CURSOR.insert");
+		testutil_check(cursor->insert(cursor));
 		/*
 		 * Save the key separately for checking later.
 		 */
@@ -168,7 +163,6 @@ fill_db(uint32_t nth)
 	WT_THREAD_DATA *td;
 	wt_thread_t *thr;
 	uint32_t i;
-	int ret;
 	char envconf[512];
 
 	thr = dcalloc(nth, sizeof(*thr));
@@ -182,15 +176,11 @@ fill_db(uint32_t nth)
 	if (compat)
 		strcat(envconf, ENV_CONFIG_COMPAT);
 
-	if ((ret = wiredtiger_open(NULL, NULL, envconf, &conn)) != 0)
-		testutil_die(ret, "wiredtiger_open");
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "WT_CONNECTION:open_session");
-	if ((ret = session->create(session,
-	    uri, "key_format=S,value_format=u")) != 0)
-		testutil_die(ret, "WT_SESSION.create: %s", uri);
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "WT_SESSION:close");
+	testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->create(
+	    session, uri, "key_format=S,value_format=u"));
+	testutil_check(session->close(session, NULL));
 
 	printf("Create %" PRIu32 " writer threads\n", nth);
 	for (i = 0; i < nth; ++i) {
@@ -357,13 +347,9 @@ main(int argc, char *argv[])
 		testutil_die(status, "system: %s", buf);
 
 	printf("Open database, run recovery and verify content\n");
-	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn)) != 0)
-		testutil_die(ret, "wiredtiger_open");
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "WT_CONNECTION:open_session");
-	if ((ret =
-	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
-		testutil_die(ret, "WT_SESSION.open_cursor: %s", uri);
+	testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
 	absent = count = 0;
 	fatal = false;
@@ -423,8 +409,7 @@ main(int argc, char *argv[])
 		if (fclose(fp) != 0)
 			testutil_die(errno, "fclose");
 	}
-	if ((ret = conn->close(conn, NULL)) != 0)
-		testutil_die(ret, "WT_CONNECTION:close");
+	testutil_check(conn->close(conn, NULL));
 	if (fatal)
 		return (EXIT_FAILURE);
 	if (!inmem && absent) {

@@ -106,11 +106,9 @@ setup(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	int ret;
 	char config[512];
 
-	if ((ret = system("rm -f WiredTiger* *.bf")) != 0)
-		testutil_die(ret, "system cleanup call failed");
+	testutil_check(system("rm -f WiredTiger* *.bf"));
 
 	/*
 	 * This test doesn't test public Wired Tiger functionality, it still

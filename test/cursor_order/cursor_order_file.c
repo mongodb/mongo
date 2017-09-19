@@ -38,8 +38,7 @@ file_create(SHARED_CONFIG *cfg, const char *name)
 
 	conn = cfg->conn;
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "conn.session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "key_format=%s,"
@@ -54,8 +53,7 @@ file_create(SHARED_CONFIG *cfg, const char *name)
 		if (ret != EEXIST)
 			testutil_die(ret, "session.create");
 
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }
 
 void
@@ -67,19 +65,16 @@ load(SHARED_CONFIG *cfg, const char *name)
 	WT_SESSION *session;
 	size_t len;
 	uint64_t keyno;
-	int ret;
 	char keybuf[64], valuebuf[64];
 
 	conn = cfg->conn;
 
 	file_create(cfg, name);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "conn.session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	if ((ret =
-	    session->open_cursor(session, name, NULL, "bulk", &cursor)) != 0)
-		testutil_die(ret, "cursor.open");
+	testutil_check(
+	    session->open_cursor(session, name, NULL, "bulk", &cursor));
 
 	value = &_value;
 	for (keyno = 1; keyno <= cfg->nkeys; ++keyno) {
@@ -99,19 +94,15 @@ load(SHARED_CONFIG *cfg, const char *name)
 			value->size = (uint32_t)len;
 			cursor->set_value(cursor, value);
 		}
-		if ((ret = cursor->insert(cursor)) != 0)
-			testutil_die(ret, "cursor.insert");
+		testutil_check(cursor->insert(cursor));
 	}
 
 	/* Setup the starting key range for the workload phase. */
 	cfg->key_range = cfg->nkeys;
-	if ((ret = cursor->close(cursor)) != 0)
-		testutil_die(ret, "cursor.close");
-	if ((ret = session->checkpoint(session, NULL)) != 0)
-		testutil_die(ret, "session.checkpoint");
+	testutil_check(cursor->close(cursor));
+	testutil_check(session->checkpoint(session, NULL));
 
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }
 
 void
@@ -119,16 +110,12 @@ verify(SHARED_CONFIG *cfg, const char *name)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	int ret;
 
 	conn = cfg->conn;
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "conn.session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	if ((ret = session->verify(session, name, NULL)) != 0)
-		testutil_die(ret, "session.create");
+	testutil_check(session->verify(session, name, NULL));
 
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }

@@ -67,13 +67,12 @@ main(int argc, char *argv[])
 		{ NULL,		NULL, NULL }
 	};
 	u_int nthreads;
-	int ch, cnt, ret, runs;
+	int ch, cnt, runs;
 	char *config_open, *working_dir;
 
 	(void)testutil_set_progname(argv);
 
-	if ((ret = pthread_rwlock_init(&single, NULL)) != 0)
-		testutil_die(ret, "pthread_rwlock_init: single");
+	testutil_check(pthread_rwlock_init(&single, NULL));
 
 	nops = 1000;
 	nthreads = 10;
@@ -151,7 +150,6 @@ wt_startup(char *config_open)
 		NULL,
 		NULL	/* Close handler. */
 	};
-	int ret;
 	char config_buf[128];
 
 	testutil_make_work_dir(home);
@@ -161,9 +159,8 @@ wt_startup(char *config_open)
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open));
-	if ((ret = wiredtiger_open(
-	    home, &event_handler, config_buf, &conn)) != 0)
-		testutil_die(ret, "wiredtiger_open");
+	testutil_check(
+	    wiredtiger_open(home, &event_handler, config_buf, &conn));
 }
 
 /*
@@ -173,10 +170,7 @@ wt_startup(char *config_open)
 static void
 wt_shutdown(void)
 {
-	int ret;
-
-	if ((ret = conn->close(conn, NULL)) != 0)
-		testutil_die(ret, "conn.close");
+	testutil_check(conn->close(conn, NULL));
 }
 
 /*
