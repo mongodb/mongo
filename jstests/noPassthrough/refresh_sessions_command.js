@@ -37,13 +37,14 @@
     admin.auth("admin", "admin");
 
     result = admin.runCommand({
-        createRole: 'readAdmin',
-        privileges: [{resource: {db: 'admin', collection: 'system.sessions'}, actions: ['find']}],
+        createRole: 'readSessionsCollection',
+        privileges: [{resource: {db: 'config', collection: 'system.sessions'}, actions: ['find']}],
         roles: []
     });
-    assert.commandWorked(result, "couldn't make readAdmin role");
+    assert.commandWorked(result, "couldn't make readSessionsCollection role");
 
-    admin.createUser({user: 'readAdmin', pwd: 'pwd', roles: ['readAdmin']});
+    admin.createUser(
+        {user: 'readSessionsCollection', pwd: 'pwd', roles: ['readSessionsCollection']});
     admin.logout();
 
     // Test that we cannot run refreshSessions unauthenticated if --auth is on.
@@ -75,10 +76,12 @@
 
     // Test that once we force a refresh, all of these sessions are in the sessions collection.
     admin.logout();
-    admin.auth("readAdmin", "pwd");
+    admin.auth("readSessionsCollection", "pwd");
     result = admin.runCommand({refreshLogicalSessionCacheNow: 1});
     assert.commandWorked(result, "could not force refresh");
-    assert.eq(admin.system.sessions.count(), 3, "should have refreshed all session records");
+
+    var config = conn.getDB("config");
+    assert.eq(config.system.sessions.count(), 3, "should have refreshed all session records");
 
     MongoRunner.stopMongod(conn);
 })();

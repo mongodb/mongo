@@ -37,7 +37,7 @@ namespace mongo {
 
 /**
  * $listSessions: { allUsers: true/false, users: [ {user:"jsmith", db:"test"}, ... ] }
- * Return all sessions in the admin.system.sessions collection
+ * Return all sessions in the config.system.sessions collection
  * or just sessions for the currently logged in user. (Default: false)
  *
  * This is essentially an alias for {$match:{"_id.uid": myid}} or {$match:{}}

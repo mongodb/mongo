@@ -5,7 +5,7 @@
     var startSession = {startSession: 1};
 
     // Start up a replica set.
-    var dbName = "admin";
+    var dbName = "config";
 
     var replTest = new ReplSetTest({name: 'refresh', nodes: 3});
     var nodes = replTest.startSet();
