@@ -45,7 +45,7 @@
 namespace LogicalSessionTests {
 
 namespace {
-constexpr StringData kTestNS = "admin.system.sessions"_sd;
+constexpr StringData kTestNS = "config.system.sessions"_sd;
 
 LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
     auto record = makeLogicalSessionRecordForTest();

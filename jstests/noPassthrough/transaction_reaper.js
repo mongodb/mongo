@@ -92,7 +92,7 @@
     };
 
     Fixture.prototype.assertOutstandingSessions = function(count) {
-        assert.eq(count, this.getDB("admin").system.sessions.count());
+        assert.eq(count, this.getDB("config").system.sessions.count());
     };
 
     Fixture.prototype.refresh = function() {
@@ -119,7 +119,7 @@
         {
             var fixture = new Fixture(new Impl(-1));
             // Remove a session
-            fixture.getDB("admin").system.sessions.remove({});
+            fixture.getDB("config").system.sessions.remove({});
             fixture.assertOutstandingTransactions(nSessions);
             fixture.assertOutstandingSessions(0);
 
@@ -134,7 +134,7 @@
         {
             var fixture = new Fixture(new Impl(30));
             // Remove a session
-            fixture.getDB("admin").system.sessions.remove({});
+            fixture.getDB("config").system.sessions.remove({});
             fixture.assertOutstandingTransactions(nSessions);
             fixture.assertOutstandingSessions(0);
 

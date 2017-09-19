@@ -85,6 +85,7 @@
 
     var conn = MongoRunner.runMongod({nojournal: ""});
     var admin = conn.getDB("admin");
+    var config = conn.getDB("config");
 
     assert.commandWorked(admin.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
 
@@ -102,6 +103,6 @@
 
     admin.runCommand({refreshLogicalSessionCacheNow: 1});
 
-    assert.eq(admin.system.sessions.find().count(), 11);
+    assert.eq(config.system.sessions.find().count(), 11);
 
 })();

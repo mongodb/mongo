@@ -8,6 +8,7 @@
     // Start up a standalone server.
     var conn = MongoRunner.runMongod({nojournal: ""});
     var admin = conn.getDB("admin");
+    var config = conn.getDB("config");
 
     // Trigger an initial refresh, as a sanity check.
     res = admin.runCommand(refresh);
@@ -23,7 +24,7 @@
     res = admin.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
 
-    assert.eq(admin.system.sessions.count(), 20, "refresh should have written 20 session records");
+    assert.eq(config.system.sessions.count(), 20, "refresh should have written 20 session records");
 
     var endSessionsIds = [];
     for (var i = 0; i < 10; i++) {
@@ -35,7 +36,7 @@
     res = admin.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
 
-    assert.eq(admin.system.sessions.count(),
+    assert.eq(config.system.sessions.count(),
               10,
               "endSessions and refresh should result in 10 remaining sessions");
 
@@ -52,7 +53,7 @@
     res = admin.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
 
-    assert.eq(admin.system.sessions.count(),
+    assert.eq(config.system.sessions.count(),
               0,
               "endSessions and refresh should result in 0 remaining sessions");
 
