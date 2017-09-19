@@ -9,16 +9,6 @@ selector:
   - jstests/core/dbadmin.js
   - jstests/core/opcounters_write_cmd.js
   - jstests/core/read_after_optime.js
-  # TODO SERVER-30325: The following tests perform many write operations and cause the Evergreen
-  # task to time out due to performance issues with tracking the transaction's progress.
-  - jstests/core/bulk_insert.js
-  - jstests/core/geo2.js
-  - jstests/core/geo3.js
-  - jstests/core/geo_s2explain.js
-  - jstests/core/geo_s2twofields.js
-  - jstests/core/insert1.js
-  - jstests/core/remove6.js
-  - jstests/core/removea.js
 
 executor:
   config:
