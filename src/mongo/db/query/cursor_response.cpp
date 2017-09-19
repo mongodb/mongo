@@ -102,11 +102,13 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                CursorId cursorId,
                                std::vector<BSONObj> batch,
                                boost::optional<long long> numReturnedSoFar,
+                               boost::optional<Timestamp> latestOplogTimestamp,
                                boost::optional<BSONObj> writeConcernError)
     : _nss(std::move(nss)),
       _cursorId(cursorId),
       _batch(std::move(batch)),
       _numReturnedSoFar(numReturnedSoFar),
+      _latestOplogTimestamp(latestOplogTimestamp),
       _writeConcernError(std::move(writeConcernError)) {}
 
 StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse) {
@@ -179,6 +181,15 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
         doc.shareOwnershipWith(cmdResponse);
     }
 
+    auto latestOplogTimestampElem = cmdResponse[kInternalLatestOplogTimestampField];
+    if (latestOplogTimestampElem && latestOplogTimestampElem.type() != BSONType::bsonTimestamp) {
+        return {
+            ErrorCodes::BadValue,
+            str::stream()
+                << "invalid _internalLatestOplogTimestamp format; expected timestamp but found: "
+                << latestOplogTimestampElem.type()};
+    }
+
     auto writeConcernError = cmdResponse["writeConcernError"];
 
     if (writeConcernError && writeConcernError.type() != BSONType::Object) {
@@ -191,6 +202,8 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
              cursorId,
              std::move(batch),
              boost::none,
+             latestOplogTimestampElem ? latestOplogTimestampElem.timestamp()
+                                      : boost::optional<Timestamp>{},
              writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{}}};
 }
 
@@ -211,6 +224,9 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
 
     cursorBuilder.doneFast();
 
+    if (_latestOplogTimestamp) {
+        builder->append(kInternalLatestOplogTimestampField, *_latestOplogTimestamp);
+    }
     builder->append("ok", 1.0);
 
     if (_writeConcernError) {

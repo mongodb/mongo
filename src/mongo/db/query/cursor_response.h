@@ -141,6 +141,7 @@ public:
                    CursorId cursorId,
                    std::vector<BSONObj> batch,
                    boost::optional<long long> numReturnedSoFar = boost::none,
+                   boost::optional<Timestamp> latestOplogTimestamp = boost::none,
                    boost::optional<BSONObj> writeConcernError = boost::none);
 
     CursorResponse(CursorResponse&& other) = default;
@@ -170,6 +171,10 @@ public:
         return _numReturnedSoFar;
     }
 
+    boost::optional<Timestamp> getLastOplogTimestamp() const {
+        return _latestOplogTimestamp;
+    }
+
     boost::optional<BSONObj> getWriteConcernError() const {
         return _writeConcernError;
     }
@@ -190,6 +195,7 @@ private:
     CursorId _cursorId;
     std::vector<BSONObj> _batch;
     boost::optional<long long> _numReturnedSoFar;
+    boost::optional<Timestamp> _latestOplogTimestamp;
     boost::optional<BSONObj> _writeConcernError;
 };
 
