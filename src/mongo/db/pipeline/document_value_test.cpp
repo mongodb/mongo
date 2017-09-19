@@ -807,7 +807,6 @@ class Regex {
 public:
     void run() {
         Value value = fromBson(fromjson("{'':/abc/}"));
-        ASSERT_EQUALS(string("abc"), value.getRegex());
         ASSERT_EQUALS(RegEx, value.getType());
         assertRoundTrips(value);
     }
@@ -1666,6 +1665,38 @@ private:
     }
 };
 
+class RegexMatches {
+public:
+    void run() {
+        // RegEx matching against Symbol/String
+        Value regexValue = Value(BSONRegEx("[abc][123]", "i"));
+        Value symbolValueMatch(BSONSymbol("b2"));
+        Value symbolValueNoMatch(BSONSymbol("b9"));
+        Value stringValueMatch = Value("C1"_sd);
+        Value stringValueNoMatch = Value("A4"_sd);
+
+        assertNotMatches(regexValue, symbolValueNoMatch);
+        assertNotMatches(regexValue, stringValueNoMatch);
+        assertMatches(regexValue, symbolValueMatch);
+        assertMatches(regexValue, stringValueMatch);
+    }
+
+private:
+    void assertMatches(const Value& a, const Value& b) {
+        mongo::unittest::log() << "testing match of " << b.toString() << " against "
+                               << a.toString();
+        ASSERT_TRUE(ValueComparator().evaluate(a == b));
+        ASSERT_TRUE(ValueComparator().evaluate(b == a));
+    }
+
+    void assertNotMatches(const Value& a, const Value& b) {
+        mongo::unittest::log() << "testing match of " << b.toString() << " against "
+                               << a.toString();
+        ASSERT_FALSE(ValueComparator().evaluate(a == b));
+        ASSERT_FALSE(ValueComparator().evaluate(b == a));
+    }
+};
+
 class SubFields {
 public:
     void run() {
@@ -1808,6 +1839,7 @@ public:
         add<Value::AddToBsonObj>();
         add<Value::AddToBsonArray>();
         add<Value::Compare>();
+        add<Value::RegexMatches>();
         add<Value::SubFields>();
         add<Value::SerializationOfMissingForSorter>();
     }

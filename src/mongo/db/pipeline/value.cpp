@@ -129,18 +129,6 @@ void ValueStorage::putVector(const RCVector* vec) {
     putRefCountable(vec);
 }
 
-void ValueStorage::putRegEx(const BSONRegEx& re) {
-    const size_t patternLen = re.pattern.size();
-    const size_t flagsLen = re.flags.size();
-    const size_t totalLen = patternLen + 1 /*middle NUL*/ + flagsLen;
-
-    // Need to copy since putString doesn't support scatter-gather.
-    std::unique_ptr<char[]> buf(new char[totalLen]);
-    re.pattern.copyTo(buf.get(), true);
-    re.flags.copyTo(buf.get() + patternLen + 1, false);  // no NUL
-    putString(StringData(buf.get(), totalLen));
-}
-
 Document ValueStorage::getDocument() const {
     if (!genericRCPtr)
         return Document();
@@ -358,7 +346,8 @@ BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val)
         case Code:
             return builder << BSONCode(val.getStringData());
         case RegEx:
-            return builder << BSONRegEx(val.getRegex(), val.getRegexFlags());
+            return builder << BSONRegEx(val._storage.getRegex()->pattern,
+                                        val._storage.getRegex()->flags);
 
         case DBRef:
             return builder << BSONDBRef(val._storage.getDBRef()->ns, val._storage.getDBRef()->oid);
@@ -656,8 +645,17 @@ int Value::compare(const Value& rL,
     int ret = lType == rType ? 0  // fast-path common case
                              : cmp(canonicalizeBSONType(lType), canonicalizeBSONType(rType));
 
-    if (ret)
+    if (ret) {
+        // Handle cmp(Regex, String|Symbol) and vice versa
+        if ((lType == RegEx && (rType == Symbol || rType == String)) ||
+            (rType == RegEx && (lType == Symbol || lType == String))) {
+            intrusive_ptr<const RCRegex> regex = (lType == RegEx ? rL : rR)._storage.getRegex();
+            std::string str = (lType == RegEx ? rR : rL).getStringData().toString();
+            pcrecpp::StringPiece data(str.c_str(), str.size());
+            return regex->re.PartialMatch(data) == true ? 0 : ret;
+        }
         return ret;
+    }
 
     switch (lType) {
         // Order of types is the same as in compareElementValues() to make it easier to verify
@@ -802,8 +800,17 @@ int Value::compare(const Value& rL,
             return rL.getStringData().compare(rR.getStringData());
         }
 
-        case RegEx:  // same as String in this impl but keeping order same as compareElementValues
-            return rL.getStringData().compare(rR.getStringData());
+        case RegEx: {  // same as String in this impl but keeping order same as compareElementValues
+
+            intrusive_ptr<const RCRegex> l = rL._storage.getRegex();
+            intrusive_ptr<const RCRegex> r = rR._storage.getRegex();
+
+            ret = l->pattern.compare(r->pattern);
+            if (ret)
+                return ret;
+
+            return l->flags.compare(r->flags);
+        }
 
         case CodeWScope: {
             intrusive_ptr<const RCCodeWScope> l = rL._storage.getCodeWScope();
@@ -928,8 +935,9 @@ void Value::hash_combine(size_t& seed,
         }
 
         case RegEx: {
-            StringData sd = getStringData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            intrusive_ptr<const RCRegex> regex = _storage.getRegex();
+            SimpleStringDataComparator::kInstance.hash_combine(seed, regex->pattern);
+            SimpleStringDataComparator::kInstance.hash_combine(seed, regex->flags);
             break;
         }
 
@@ -1031,7 +1039,6 @@ bool Value::integral() const {
 size_t Value::getApproximateSize() const {
     switch (getType()) {
         case Code:
-        case RegEx:
         case Symbol:
         case BinData:
         case String:
@@ -1051,6 +1058,10 @@ size_t Value::getApproximateSize() const {
             }
             return size;
         }
+
+        case RegEx:
+            return sizeof(Value) + sizeof(RCRegex) + _storage.getRegex()->pattern.size() +
+                _storage.getRegex()->flags.size() + sizeof(pcrecpp::RE);
 
         case CodeWScope:
             return sizeof(Value) + sizeof(RCCodeWScope) + _storage.getCodeWScope()->code.size() +
@@ -1100,7 +1111,8 @@ ostream& operator<<(ostream& out, const Value& val) {
         case String:
             return out << '"' << val.getString() << '"';
         case RegEx:
-            return out << '/' << val.getRegex() << '/' << val.getRegexFlags();
+            return out << '/' << val._storage.getRegex()->pattern << '/'
+                       << val._storage.getRegex()->flags;
         case Symbol:
             return out << "Symbol(\"" << val.getSymbol() << "\")";
         case Code:
@@ -1211,10 +1223,12 @@ void Value::serializeForSorter(BufBuilder& buf) const {
             break;
         }
 
-        case RegEx:
-            buf.appendStr(getRegex(), /*NUL byte*/ true);
-            buf.appendStr(getRegexFlags(), /*NUL byte*/ true);
+        case RegEx: {
+            intrusive_ptr<const RCRegex> regex = _storage.getRegex();
+            buf.appendStr(regex->pattern, /*NUL byte*/ true);
+            buf.appendStr(regex->flags, /*NUL byte*/ true);
             break;
+        }
 
         case Object:
             getDocument().serializeForSorter(buf);

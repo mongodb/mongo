@@ -31,7 +31,6 @@
 #include "mongo/db/matcher/expression_leaf.h"
 
 #include <cmath>
-#include <pcrecpp.h>
 
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/pcrecpp_util.h"
 
 namespace mongo {
 
@@ -202,24 +202,6 @@ void ComparisonMatchExpression::serialize(BSONObjBuilder* out) const {
 
 // ---------------
 
-// TODO: move
-inline pcrecpp::RE_Options flags2options(const char* flags) {
-    pcrecpp::RE_Options options;
-    options.set_utf8(true);
-    while (flags && *flags) {
-        if (*flags == 'i')
-            options.set_caseless(true);
-        else if (*flags == 'm')
-            options.set_multiline(true);
-        else if (*flags == 'x')
-            options.set_extended(true);
-        else if (*flags == 's')
-            options.set_dotall(true);
-        flags++;
-    }
-    return options;
-}
-
 RegexMatchExpression::RegexMatchExpression() : LeafMatchExpression(REGEX) {}
 
 RegexMatchExpression::~RegexMatchExpression() {}
@@ -254,7 +236,7 @@ Status RegexMatchExpression::init(StringData path, StringData regex, StringData 
 
     _regex = regex.toString();
     _flags = options.toString();
-    _re.reset(new pcrecpp::RE(_regex.c_str(), flags2options(_flags.c_str())));
+    _re.reset(new pcrecpp::RE(_regex.c_str(), mongo::flags2options(_flags.c_str())));
 
     if (!_re->error().empty()) {
         return Status(ErrorCodes::BadValue,
