@@ -178,7 +178,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'startup_warnings_mongod',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface'
     ],
 )
 

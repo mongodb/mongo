@@ -28,7 +28,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/service_context.h"
 
 namespace mongo {
 
@@ -57,6 +56,5 @@ public:
 // Checks various startup conditions and logs any necessary warnings that
 // are specific to the mongod process.
 void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
-                              const ServerGlobalParams& serverParams,
-                              ServiceContext* svcCtx);
+                              const ServerGlobalParams& serverParams);
 }  // namespace mongo

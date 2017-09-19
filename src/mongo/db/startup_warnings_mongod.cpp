@@ -38,7 +38,6 @@
 #include <sys/resource.h>
 #endif
 
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage/storage_options.h"
@@ -137,8 +136,7 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
 }
 
 void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
-                              const ServerGlobalParams& serverParams,
-                              ServiceContext* svcCtx) {
+                              const ServerGlobalParams& serverParams) {
     logCommonStartupWarnings(serverParams);
 
     bool warned = false;
@@ -376,18 +374,6 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
         log() << "** NOTE: The ephemeralForTest storage engine is for testing only. "
               << startupWarningsLog;
         log() << "**       Do not use in production." << startupWarningsLog;
-        warned = true;
-    }
-
-    // Check if in master-slave mode
-    auto replCoord = repl::ReplicationCoordinator::get(svcCtx);
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeMasterSlave) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: This node was started in master-slave replication mode."
-              << startupWarningsLog;
-        log() << "**          Master-slave replication is deprecated and subject to be removed "
-              << startupWarningsLog;
-        log() << "**          in a future version." << startupWarningsLog;
         warned = true;
     }
 

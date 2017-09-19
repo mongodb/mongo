@@ -590,7 +590,7 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
-    logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, globalServiceContext);
+    logMongodStartupWarnings(storageGlobalParams, serverGlobalParams);
 
     {
         stringstream ss;
