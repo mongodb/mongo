@@ -228,6 +228,12 @@ private:
          */
         std::shared_ptr<Shard> getShard();
 
+        // Used when merging tailable awaitData cursors in sorted order. In order to return any
+        // result to the client we have to know that no shard will ever return anything that sorts
+        // before it. This object represents a promise from the remote that it will never return a
+        // result with a sort key lower than this.
+        boost::optional<BSONObj> promisedMinSortKey;
+
         // The cursor id for the remote cursor. If a remote cursor is not yet exhausted, this member
         // will be set to a valid non-zero cursor id. If a remote cursor is now exhausted, this
         // member will be set to zero.
@@ -299,6 +305,7 @@ private:
 
     bool _ready(WithLock);
     bool _readySorted(WithLock);
+    bool _readySortedTailable(WithLock);
     bool _readyUnsorted(WithLock);
 
     //
@@ -339,7 +346,7 @@ private:
      * Adds the batch of results to the RemoteCursorData. Returns false if there was an error
      * parsing the batch.
      */
-    bool _addBatchToBuffer(WithLock, size_t remoteIndex, std::vector<BSONObj> const& batch);
+    bool _addBatchToBuffer(WithLock, size_t remoteIndex, const CursorResponse& response);
 
     /**
      * If there is a valid unsignaled event that has been requested via nextReady() and there are
@@ -359,6 +366,11 @@ private:
      * Schedules a killCursors command to be run on all remote hosts that have open cursors.
      */
     void _scheduleKillCursors(WithLock, OperationContext* opCtx);
+
+    /**
+     * Updates 'remote's metadata (e.g. the cursor id) based on information in 'response'.
+     */
+    void updateRemoteMetadata(RemoteCursorData* remote, const CursorResponse& response);
 
     OperationContext* _opCtx;
     executor::TaskExecutor* _executor;

@@ -32,6 +32,7 @@
 
 #include "mongo/s/query/async_results_merger.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
@@ -48,6 +49,30 @@ namespace {
 
 // Maximum number of retries for network and replication notMaster errors (per host).
 const int kMaxNumFailedHostRetryAttempts = 3;
+
+/**
+ * Returns the sort key out of the $sortKey metadata field in 'obj'. This object is of the form
+ * {'': 'firstSortKey', '': 'secondSortKey', ...}.
+ */
+BSONObj extractSortKey(BSONObj obj) {
+    auto key = obj[ClusterClientCursorParams::kSortKeyField];
+    invariant(key.type() == BSONType::Object);
+    return key.Obj();
+}
+
+/**
+ * Returns an int less than 0 if 'leftSortKey' < 'rightSortKey', 0 if the two are equal, and an int
+ * > 0 if 'leftSortKey' > 'rightSortKey' according to the pattern 'sortKeyPattern'.
+ */
+int compareSortKeys(BSONObj leftSortKey, BSONObj rightSortKey, BSONObj sortKeyPattern) {
+    // This does not need to sort with a collator, since mongod has already mapped strings to their
+    // ICU comparison keys as part of the $sortKey meta projection.
+    const bool considerFieldName = false;
+    return leftSortKey.woCompare(rightSortKey, sortKeyPattern, considerFieldName);
+}
+
+const BSONObj kChangeStreamSortSpec =
+    BSON("_id.clusterTime.ts" << 1 << "_id.uuid" << 1 << "_id.documentKey" << 1);
 
 }  // namespace
 
@@ -66,7 +91,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
 
         // We don't check the return value of _addBatchToBuffer here; if there was an error,
         // it will be stored in the remote and the first call to ready() will return true.
-        _addBatchToBuffer(WithLock::withoutLock(), remoteIndex, remote.cursorResponse.getBatch());
+        _addBatchToBuffer(WithLock::withoutLock(), remoteIndex, remote.cursorResponse);
         ++remoteIndex;
     }
 
@@ -152,8 +177,11 @@ bool AsyncResultsMerger::_ready(WithLock lk) {
     return hasSort ? _readySorted(lk) : _readyUnsorted(lk);
 }
 
-bool AsyncResultsMerger::_readySorted(WithLock) {
-    // Tailable cursors cannot have a sort.
+bool AsyncResultsMerger::_readySorted(WithLock lk) {
+    if (_params->tailableMode == TailableMode::kTailableAndAwaitData) {
+        return _readySortedTailable(lk);
+    }
+    // Tailable non-awaitData cursors cannot have a sort.
     invariant(_params->tailableMode == TailableMode::kNormal);
 
     for (const auto& remote : _remotes) {
@@ -162,6 +190,28 @@ bool AsyncResultsMerger::_readySorted(WithLock) {
         }
     }
 
+    return true;
+}
+
+bool AsyncResultsMerger::_readySortedTailable(WithLock) {
+    if (_mergeQueue.empty()) {
+        return false;
+    }
+
+    auto smallestRemote = _mergeQueue.top();
+    auto smallestResult = _remotes[smallestRemote].docBuffer.front();
+    auto keyWeWantToReturn = extractSortKey(*smallestResult.getResult());
+    for (const auto& remote : _remotes) {
+        if (!remote.promisedMinSortKey) {
+            // In order to merge sorted tailable cursors, we need this value to be populated.
+            return false;
+        }
+        if (compareSortKeys(keyWeWantToReturn, *remote.promisedMinSortKey, _params->sort) > 0) {
+            // The key we want to return is not guaranteed to be smaller than future results from
+            // this remote, so we can't yet return it.
+            return false;
+        }
+    }
     return true;
 }
 
@@ -201,8 +251,8 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
 }
 
 ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
-    // Tailable cursors cannot have a sort.
-    invariant(_params->tailableMode == TailableMode::kNormal);
+    // Tailable non-awaitData cursors cannot have a sort.
+    invariant(_params->tailableMode != TailableMode::kTailable);
 
     if (_mergeQueue.empty()) {
         return {};
@@ -374,6 +424,38 @@ StatusWith<CursorResponse> AsyncResultsMerger::_parseCursorResponse(
     return std::move(cursorResponse);
 }
 
+void AsyncResultsMerger::updateRemoteMetadata(RemoteCursorData* remote,
+                                              const CursorResponse& response) {
+    // Update the cursorId; it is sent as '0' when the cursor has been exhausted on the shard.
+    remote->cursorId = response.getCursorId();
+    if (response.getLastOplogTimestamp() && !response.getLastOplogTimestamp()->isNull()) {
+        // We only expect to see this for change streams.
+        invariant(
+            SimpleBSONObjComparator::kInstance.evaluate(_params->sort == kChangeStreamSortSpec));
+
+        // Our new minimum promised sort key is the first key whose timestamp matches the most
+        // recent reported oplog timestamp. It should never be smaller than the previous min sort
+        // key for this remote, if one exists.
+        auto newPromisedMin =
+            BSON("" << *response.getLastOplogTimestamp() << "" << MINKEY << "" << MINKEY);
+        invariant(!remote->promisedMinSortKey ||
+                  compareSortKeys(
+                      *remote->promisedMinSortKey, newPromisedMin, kChangeStreamSortSpec) <= 0);
+
+        // The promised min sort key should never be smaller than any results returned. If the
+        // last entry in the batch is also the most recent entry in the oplog, then its sort key
+        // of {lastOplogTimestamp, uuid, docID} will be greater than the artificial promised min
+        // sort key of {lastOplogTimestamp, MINKEY, MINKEY}.
+        auto maxSortKeyFromResponse =
+            (response.getBatch().empty() ? BSONObj() : extractSortKey(response.getBatch().back()));
+
+        remote->promisedMinSortKey =
+            (compareSortKeys(newPromisedMin, maxSortKeyFromResponse, kChangeStreamSortSpec) < 0
+                 ? maxSortKeyFromResponse.getOwned()
+                 : newPromisedMin.getOwned());
+    }
+}
+
 void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                                               CbData const& cbData,
                                               size_t remoteIndex) {
@@ -448,7 +530,7 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     remote.cursorId = cursorResponse.getCursorId();
 
     // Save the batch in the remote's buffer.
-    if (!_addBatchToBuffer(lk, remoteIndex, cursorResponse.getBatch())) {
+    if (!_addBatchToBuffer(lk, remoteIndex, cursorResponse)) {
         return;
     }
 
@@ -470,9 +552,10 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
 
 bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
                                            size_t remoteIndex,
-                                           std::vector<BSONObj> const& batch) {
+                                           const CursorResponse& response) {
     auto& remote = _remotes[remoteIndex];
-    for (const auto& obj : batch) {
+    updateRemoteMetadata(&remote, response);
+    for (const auto& obj : response.getBatch()) {
         // If there's a sort, we're expecting the remote node to have given us back a sort key.
         if (!_params->sort.isEmpty() &&
             obj[ClusterClientCursorParams::kSortKeyField].type() != BSONType::Object) {
@@ -491,7 +574,7 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
 
     // If we're doing a sorted merge, then we have to make sure to put this remote onto the
     // merge queue.
-    if (!_params->sort.isEmpty() && !batch.empty()) {
+    if (!_params->sort.isEmpty() && !response.getBatch().empty()) {
         _mergeQueue.push(remoteIndex);
     }
     return true;
@@ -611,12 +694,9 @@ bool AsyncResultsMerger::MergingComparator::operator()(const size_t& lhs, const 
     const ClusterQueryResult& leftDoc = _remotes[lhs].docBuffer.front();
     const ClusterQueryResult& rightDoc = _remotes[rhs].docBuffer.front();
 
-    BSONObj leftDocKey = (*leftDoc.getResult())[ClusterClientCursorParams::kSortKeyField].Obj();
-    BSONObj rightDocKey = (*rightDoc.getResult())[ClusterClientCursorParams::kSortKeyField].Obj();
-
-    // This does not need to sort with a collator, since mongod has already mapped strings to their
-    // ICU comparison keys as part of the $sortKey meta projection.
-    return leftDocKey.woCompare(rightDocKey, _sort, false /*considerFieldName*/) > 0;
+    return compareSortKeys(extractSortKey(*leftDoc.getResult()),
+                           extractSortKey(*rightDoc.getResult()),
+                           _sort) > 0;
 }
 
 }  // namespace mongo
