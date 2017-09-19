@@ -29,7 +29,6 @@
 
     assert.commandWorked(db.runCommand({insert: mainCollName, documents: [{fooField: 'FOO'}]}));
     assert.commandWorked(db.runCommand({insert: subCollName, documents: [{fooField: 'BAR'}]}));
-
     // Ensure passing a UUID to find retrieves results from the correct collection.
     let cmd = {find: uuid};
     let res = db.runCommand(cmd);
@@ -40,13 +39,6 @@
     let doc = cursor.next();
     assert.eq(doc.fooField, 'FOO');
     assert(!cursor.hasNext(), 'expected to have exhausted cursor for results ' + tojson(res));
-
-    // Ensure passing a missing UUID to find uasserts that the UUID is not found.
-    const missingUUID = UUID();
-    assert.neq(missingUUID, uuid);
-    cmd = {find: missingUUID};
-    res = db.runCommand(cmd);
-    assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
 
     // Ensure passing a UUID to listIndexes retrieves results from the correct collection.
     cmd = {listIndexes: uuid};

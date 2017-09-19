@@ -78,8 +78,7 @@ public:
 
     /**
      * If _uuid exists for this QueryRequest, use it to update the value of _nss via the
-     * UUIDCatalog associated with opCtx. This should only be called when we hold a DBLock
-     * on the database to which _uuid belongs, if the _uuid is present in the UUIDCatalog.
+     * UUIDCatalog associated with opCtx.
      */
     void refreshNSS(OperationContext* opCtx);
 
