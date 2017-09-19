@@ -59,8 +59,6 @@ selector:
   - jstests/sharding/read_pref_cmd.js
   # SERVER-30444: Add a maxChunkSize field to the serverStatus command response
   - jstests/sharding/server_status.js
-  # SERVER-20392: Reenable when backported to 3.4 and released as last-stable.
-  - jstests/sharding/shard_existing_coll_chunk_count.js
 
 executor:
   config:
