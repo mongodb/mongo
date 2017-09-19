@@ -74,6 +74,9 @@ void DocumentSourceCursor::loadBatch() {
     BSONObj resultObj;
     {
         AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _exec->nss());
+        uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
+                            ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
+
         uassertStatusOK(_exec->restoreState());
 
         int memUsageBytes = 0;
