@@ -41,10 +41,8 @@
     assertSchemaMatch(coll, schema, {a: [{a: 1}, {a: 1}]}, false);
     assertSchemaMatch(coll, schema, {a: [[1, 2], [1, 2]]}, false);
     assertSchemaMatch(coll, schema, {a: [null, null]}, false);
-
-    // TODO (SERVER-30695): uniqueItems should compare objects in a field order-insensitive way when
-    // testing for uniqueness.
-    assertSchemaMatch(coll, schema, {a: [{x: 1, y: 1}, {y: 1, x: 1}]}, true);
+    assertSchemaMatch(coll, schema, {a: [{x: 1, y: 1}, {y: 1, x: 1}]}, false);
+    assertSchemaMatch(coll, schema, {a: [{x: [1, 2], y: "a"}, {y: "a", x: [1, 2]}]}, false);
 
     // Test that {uniqueItems: false} has no effect.
     schema = {properties: {a: {uniqueItems: false}}};
@@ -60,4 +58,6 @@
     assertSchemaMatch(coll, schema, {a: [{a: 1}, {a: 1}]}, true);
     assertSchemaMatch(coll, schema, {a: [[1, 2], [1, 2]]}, true);
     assertSchemaMatch(coll, schema, {a: [null, null]}, true);
+    assertSchemaMatch(coll, schema, {a: [{x: 1, y: 1}, {y: 1, x: 1}]}, true);
+    assertSchemaMatch(coll, schema, {a: [{x: [1, 2], y: "a"}, {y: "a", x: [1, 2]}]}, true);
 }());
