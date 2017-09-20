@@ -19,7 +19,7 @@
         // these synchronization points from this test.
         assert.commandWorked(db.runCommand({
             find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
 
         let res = assert.commandWorked(
@@ -70,7 +70,7 @@
     // these synchronization points from this test.
     assert.commandWorked(db.runCommand({
         find: "foo",
-        readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+        readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
     }));
 
     res =

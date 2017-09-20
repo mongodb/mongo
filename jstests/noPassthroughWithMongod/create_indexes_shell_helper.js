@@ -41,6 +41,9 @@
             getMaxWireVersion: function() {
                 return mongo.getMaxWireVersion();
             },
+            isCausalConsistency: function() {
+                return false;
+            },
         };
 
         db._mongo = mockMongo;

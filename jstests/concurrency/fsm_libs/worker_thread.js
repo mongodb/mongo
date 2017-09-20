@@ -41,13 +41,6 @@ var workerThread = (function() {
                     myDB = new Mongo(args.host)
                                .startSession(args.sessionOptions)
                                .getDatabase(args.dbName);
-
-                    if (args.sessionOptions.causallyConsistentReads) {
-                        // TODO SERVER-30679: We manually enable causal consistency on the
-                        // connection object so that "afterClusterTime" is injected into the
-                        // readConcern of any command requests through this connection.
-                        myDB.getMongo().setCausalConsistency();
-                    }
                 } else {
                     myDB = new Mongo(args.host).getDB(args.dbName);
                 }

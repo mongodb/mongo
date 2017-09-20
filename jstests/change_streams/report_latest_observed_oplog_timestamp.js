@@ -51,7 +51,7 @@
     // synchronization point from this test.
     assert.commandWorked(db.runCommand({
         find: "foo",
-        readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+        readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
     }));
 
     // Look at one batch's worth.

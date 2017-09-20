@@ -10,6 +10,9 @@ var {
         let _readPreference = rawOptions.readPreference;
         let _readConcern = rawOptions.readConcern;
         let _writeConcern = rawOptions.writeConcern;
+        const _initialClusterTime = rawOptions.initialClusterTime;
+        const _initialOperationTime = rawOptions.initialOperationTime;
+        let _causalConsistency = rawOptions.causalConsistency;
         let _retryWrites = rawOptions.retryWrites;
 
         this.getReadPreference = function getReadPreference() {
@@ -39,6 +42,22 @@ var {
             _writeConcern = writeConcern;
         };
 
+        this.getInitialClusterTime = function getInitialClusterTime() {
+            return _initialClusterTime;
+        };
+
+        this.getInitialOperationTime = function getInitialOperationTime() {
+            return _initialOperationTime;
+        };
+
+        this.isCausalConsistency = function isCausalConsistency() {
+            return _causalConsistency;
+        };
+
+        this.setCausalConsistency = function setCausalConsistency(causalConsistency = true) {
+            _causalConsistency = causalConsistency;
+        };
+
         this.shouldRetryWrites = function shouldRetryWrites() {
             return _retryWrites;
         };
@@ -50,6 +69,7 @@ var {
 
     function SessionAwareClient(client) {
         const kWireVersionSupportingLogicalSession = 6;
+        const kWireVersionSupportingCausalConsistency = 6;
 
         this.getReadPreference = function getReadPreference(driverSession) {
             const sessionOptions = driverSession.getOptions();
@@ -83,9 +103,88 @@ var {
                 wireVersion <= client.getMaxWireVersion();
         }
 
+        const kCommandsThatSupportReadConcern = new Set([
+            "aggregate",
+            "count",
+            "distinct",
+            "explain",
+            "find",
+            "geoNear",
+            "geoSearch",
+            "group",
+            "mapReduce",
+            "mapreduce",
+            "parallelCollectionScan",
+        ]);
+
+        function canUseReadConcern(cmdObj) {
+            let cmdName = Object.keys(cmdObj)[0];
+
+            // If the command is in a wrapped form, then we look for the actual command name inside
+            // the query/$query object.
+            let cmdObjUnwrapped = cmdObj;
+            if (cmdName === "query" || cmdName === "$query") {
+                cmdObjUnwrapped = cmdObj[cmdName];
+                cmdName = Object.keys(cmdObjUnwrapped)[0];
+            }
+
+            if (!kCommandsThatSupportReadConcern.has(cmdName)) {
+                return false;
+            }
+
+            if (cmdName === "aggregate" && cmdObjUnwrapped.explain) {
+                // TODO SERVER-30582: Aggregation's explain doesn't support the "readConcern"
+                // option. Note that an aggregation with a $out stage as its last stage still
+                // supports a read concern level of "local".
+                return false;
+            }
+
+            if (cmdName === "explain") {
+                return kCommandsThatSupportReadConcern.has(Object.keys(cmdObjUnwrapped.explain)[0]);
+            }
+
+            return true;
+        }
+
+        function injectAfterClusterTime(cmdObj, operationTime) {
+            cmdObj = Object.assign({}, cmdObj);
+
+            if (operationTime !== undefined) {
+                const cmdName = Object.keys(cmdObj)[0];
+
+                // If the command is in a wrapped form, then we look for the actual command object
+                // inside the query/$query object.
+                let cmdObjUnwrapped = cmdObj;
+                if (cmdName === "query" || cmdName === "$query") {
+                    cmdObj[cmdName] = Object.assign({}, cmdObj[cmdName]);
+                    cmdObjUnwrapped = cmdObj[cmdName];
+                }
+
+                cmdObjUnwrapped.readConcern = Object.assign({}, cmdObjUnwrapped.readConcern);
+                const readConcern = cmdObjUnwrapped.readConcern;
+
+                if (!readConcern.hasOwnProperty("afterClusterTime")) {
+                    readConcern.afterClusterTime = operationTime;
+                }
+            }
+
+            return cmdObj;
+        }
+
         function prepareCommandRequest(driverSession, cmdObj) {
             if (serverSupports(kWireVersionSupportingLogicalSession)) {
                 cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+            }
+
+            if (serverSupports(kWireVersionSupportingCausalConsistency) &&
+                (driverSession.getOptions().isCausalConsistency() ||
+                 client.isCausalConsistency()) &&
+                canUseReadConcern(cmdObj)) {
+                // `driverSession._operationTime` is the smallest time needed for performing a
+                // causally consistent read using the current session. Note that
+                // `client.getClusterTime()` is no smaller than the operation time and would
+                // therefore only be less efficient to wait until.
+                cmdObj = injectAfterClusterTime(cmdObj, driverSession._operationTime);
             }
 
             return cmdObj;
@@ -309,7 +408,11 @@ var {
             }
 
             this._serverSession = implMethods.createServerSession(client);
-            this._operationTime = null;
+            this._operationTime = _options.getInitialOperationTime();
+
+            if (_options.getInitialClusterTime() !== undefined) {
+                client.setClusterTime(_options.getInitialClusterTime());
+            }
 
             this.getClient = function getClient() {
                 return client;
@@ -317,6 +420,14 @@ var {
 
             this.getOptions = function getOptions() {
                 return _options;
+            };
+
+            this.getOperationTime = function getOperationTime() {
+                return this._operationTime;
+            };
+
+            this.getClusterTime = function getClusterTime() {
+                return client.getClusterTime();
             };
 
             this.getDatabase = function getDatabase(dbName) {

@@ -120,4 +120,4 @@ runWorkloadsSerially(
         return !Array.contains(blacklist, file);
     }),
     {sharded: {enabled: true, enableBalancer: true}, replication: {enabled: true}},
-    {sessionOptions: {causallyConsistentReads: true, readPreference: {mode: "secondary"}}});
+    {sessionOptions: {causalConsistency: true, readPreference: {mode: "secondary"}}});

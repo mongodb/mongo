@@ -33,7 +33,7 @@
         // these synchronization points from this test.
         assert.commandWorked(db.runCommand({
             find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
 
         // Waiting for replication assures no previous operations will be included.
@@ -49,7 +49,7 @@
         // TODO: SERVER-29126
         assert.commandWorked(db.runCommand({
             find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
         FixtureHelpers.awaitReplication();
         if (expectedBatch.length == 0)
@@ -293,7 +293,7 @@
         // TODO: SERVER-29126
         assert.commandWorked(db.runCommand({
             find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
         FixtureHelpers.awaitReplication();
         FixtureHelpers.runCommandOnEachPrimary({
@@ -322,7 +322,7 @@
         // TODO: SERVER-29126
         assert.commandWorked(db.runCommand({
             find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
         FixtureHelpers.awaitReplication();
         assert.commandWorked(db.adminCommand(

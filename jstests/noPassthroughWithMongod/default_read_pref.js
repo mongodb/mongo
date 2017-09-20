@@ -27,6 +27,9 @@
             getMaxWireVersion: function() {
                 return mongo.getMaxWireVersion();
             },
+            isCausalConsistency: function() {
+                return false;
+            },
         };
         db._session = new _DummyDriverSession(db._mongo);
 

@@ -21,7 +21,7 @@
         // these synchronization points from this test.
         assert.commandWorked(db.runCommand({
             find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
 
         const cmdResponse = assert.commandWorked(
@@ -44,7 +44,7 @@
         // TODO: SERVER-29126
         assert.commandWorked(db.runCommand({
             find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
         FixtureHelpers.awaitReplication();
         // TODO: SERVER-29126
@@ -54,7 +54,7 @@
         // these synchronization points from this test.
         assert.commandWorked(db.runCommand({
             find: "foo",
-            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+            readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
         FixtureHelpers.runCommandOnEachPrimary({
             dbName: "admin",
@@ -285,7 +285,7 @@
     // these synchronization points from this test.
     assert.commandWorked(db.runCommand({
         find: "foo",
-        readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+        readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
     }));
 
     res = assert.commandWorked(db.runCommand({
@@ -302,7 +302,7 @@
     // these synchronization points from this test.
     assert.commandWorked(db.runCommand({
         find: "foo",
-        readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+        readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
     }));
 
     res = assert.commandWorked(db.runCommand({

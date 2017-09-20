@@ -46,20 +46,24 @@
     // Note: this query will not be registered by the profiler because it errors before reaching the
     // storage level.
     jsTest.log("Do a secondary read from stale mongos with afterClusterTime and level 'available'");
-    assert.commandFailedWithCode(staleMongos.getDB(dbName).runCommand({
+    const staleMongosDB = staleMongos.getDB(dbName);
+    assert.commandFailedWithCode(staleMongosDB.runCommand({
         count: collName,
         query: {x: 1},
         $readPreference: {mode: "secondary"},
-        readConcern: {'afterClusterTime': staleMongos.getOperationTime(), 'level': 'available'}
+        readConcern: {
+            'afterClusterTime': staleMongosDB.getSession().getOperationTime(),
+            'level': 'available'
+        }
     }),
                                  ErrorCodes.InvalidOptions);
 
     jsTest.log("Do a secondary read from stale mongos with afterClusterTime and no level");
-    let res = staleMongos.getDB('test').runCommand({
+    let res = staleMongosDB.runCommand({
         count: collName,
         query: {x: 1},
         $readPreference: {mode: "secondary"},
-        readConcern: {'afterClusterTime': staleMongos.getOperationTime()},
+        readConcern: {'afterClusterTime': staleMongosDB.getSession().getOperationTime()},
     });
     assert(res.ok);
     assert.eq(1, res.n, tojson(res));

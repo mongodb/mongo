@@ -1857,7 +1857,7 @@ var DB;
     (function(hasOwnProperty) {
         DB.prototype.getSession = function() {
             if (!hasOwnProperty.call(this, "_session")) {
-                this._session = new _DummyDriverSession(this.getMongo());
+                this._session = this.getMongo()._getDefaultSession();
             }
             return this._session;
         };
