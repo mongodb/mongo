@@ -59,24 +59,22 @@ void* runFunc(void* ctx) {
 }  // namespace
 
 Status launchServiceWorkerThread(stdx::function<void()> task) {
-    auto ctx = stdx::make_unique<stdx::function<void()>>(std::move(task));
 
     try {
-#ifndef __linux__  // TODO: consider making this ifdef _WIN32
-        stdx::thread(stdx::bind(runFunc, ctx.get())).detach();
-        ctx.release();
+#if defined(_WIN32)
+        stdx::thread(std::move(task)).detach();
 #else
         pthread_attr_t attrs;
         pthread_attr_init(&attrs);
         pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
 
-        static const size_t STACK_SIZE =
+        static const size_t kStackSize =
             1024 * 1024;  // if we change this we need to update the warning
 
         struct rlimit limits;
         invariant(getrlimit(RLIMIT_STACK, &limits) == 0);
-        if (limits.rlim_cur > STACK_SIZE) {
-            size_t stackSizeToSet = STACK_SIZE;
+        if (limits.rlim_cur > kStackSize) {
+            size_t stackSizeToSet = kStackSize;
 #if !__has_feature(address_sanitizer)
             if (kDebugBuild)
                 stackSizeToSet /= 2;
@@ -90,8 +88,8 @@ Status launchServiceWorkerThread(stdx::function<void()> task) {
             warning() << "Stack size set to " << (limits.rlim_cur / 1024) << "KB. We suggest 1MB";
         }
 
-
         pthread_t thread;
+        auto ctx = stdx::make_unique<stdx::function<void()>>(std::move(task));
         int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());
 
         pthread_attr_destroy(&attrs);
@@ -101,8 +99,9 @@ Status launchServiceWorkerThread(stdx::function<void()> task) {
             throw std::system_error(
                 std::make_error_code(std::errc::resource_unavailable_try_again));
         }
+
         ctx.release();
-#endif  // __linux__
+#endif
 
     } catch (...) {
         return {ErrorCodes::InternalError, "failed to create service entry worker thread"};

@@ -168,7 +168,6 @@ private:
         TickSource::Tick executingCurRun;
         CumulativeTickTimer executing;
         int recursionDepth = 0;
-        stdx::thread thread;
     };
 
     using ThreadList = stdx::list<ThreadState>;

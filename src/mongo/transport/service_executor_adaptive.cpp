@@ -35,6 +35,7 @@
 #include <random>
 
 #include "mongo/db/server_parameters.h"
+#include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -357,7 +358,19 @@ void ServiceExecutorAdaptive::_startWorkerThread() {
 
     _threadsPending.addAndFetch(1);
     _threadsRunning.addAndFetch(1);
-    it->thread = stdx::thread(&ServiceExecutorAdaptive::_workerThreadRoutine, this, num, it);
+
+    lk.unlock();
+
+    const auto launchResult =
+        launchServiceWorkerThread([this, num, it] { _workerThreadRoutine(num, it); });
+
+    if (!launchResult.isOK()) {
+        warning() << "Failed to launch new worker thread: " << launchResult;
+        lk.lock();
+        _threadsPending.subtractAndFetch(1);
+        _threadsRunning.subtractAndFetch(1);
+        _threads.erase(it);
+    }
 }
 
 Milliseconds ServiceExecutorAdaptive::_getThreadJitter() const {
@@ -416,7 +429,7 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
         setThreadName(threadName);
     }
 
-    log() << "Starting new database worker thread " << threadId;
+    log() << "Started new database worker thread " << threadId;
 
     // Whether a thread is "pending" reflects whether its had a chance to do any useful work.
     // When a thread is pending, it will only try to run one task through ASIO, and report back
@@ -433,7 +446,6 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
 
         {
             stdx::lock_guard<stdx::mutex> lk(_threadsMutex);
-            state->thread.detach();
             _threads.erase(state);
         }
         _deathCondition.notify_one();
