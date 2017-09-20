@@ -302,9 +302,6 @@ void ClientMetadata::serializePrivate(StringData driverName,
                                       StringData osArchitecture,
                                       StringData osVersion,
                                       BSONObjBuilder* builder) {
-    invariant(!driverName.empty() && !driverVersion.empty() && !osType.empty() && !osName.empty() &&
-              !osArchitecture.empty() && !osVersion.empty());
-
     BSONObjBuilder metaObjBuilder(builder->subobjStart(kMetadataDocumentName));
 
     {
@@ -347,9 +344,6 @@ Status ClientMetadata::serializePrivate(StringData driverName,
                                         StringData osVersion,
                                         StringData appName,
                                         BSONObjBuilder* builder) {
-    invariant(!driverName.empty() && !driverVersion.empty() && !osType.empty() && !osName.empty() &&
-              !osArchitecture.empty() && !osVersion.empty());
-
     if (appName.size() > kMaxApplicationNameByteLength) {
         return Status(ErrorCodes::ClientMetadataAppNameTooLarge,
                       str::stream() << "The '" << kApplication << "." << kName
