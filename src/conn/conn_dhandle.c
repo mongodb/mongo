@@ -223,15 +223,14 @@ __wt_conn_dhandle_close(
 
 		/*
 		 * Mark the handle dead (letting the tree be discarded later) if
-		 * it's not already marked dead, our caller allows it, it's not
-		 * a final close, and it's not a memory-mapped tree. (We can't
-		 * mark memory-mapped tree handles dead because we close the
-		 * underlying file handle to allow the file to be removed and
-		 * memory-mapped trees contain pointers into memory that become
-		 * invalid if the mapping is closed.)
+		 * it's not already marked dead, and it's not a memory-mapped
+		 * tree. (We can't mark memory-mapped tree handles dead because
+		 * we close the underlying file handle to allow the file to be
+		 * removed and memory-mapped trees contain pointers into memory
+		 * that become invalid if the mapping is closed.)
 		 */
 		bm = btree->bm;
-		if (!discard && mark_dead && !final &&
+		if (!discard && mark_dead &&
 		    (bm == NULL || !bm->is_mapped(bm, session)))
 			marked_dead = true;
 
@@ -786,7 +785,7 @@ restart:
 
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, false)));
+		    session, true, F_ISSET(conn, WT_CONN_PANIC))));
 		goto restart;
 	}
 
@@ -812,7 +811,7 @@ restart:
 	WT_TAILQ_SAFE_REMOVE_BEGIN(dhandle, &conn->dhqh, q, dhandle_tmp) {
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, false)));
+		    session, true, F_ISSET(conn, WT_CONN_PANIC))));
 	} WT_TAILQ_SAFE_REMOVE_END
 
 	return (ret);
