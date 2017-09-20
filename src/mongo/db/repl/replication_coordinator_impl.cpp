@@ -108,6 +108,24 @@ const OperationContext::Decoration<bool> alwaysAllowNonLocalWrites =
 
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncAttempts, int, 10);
 
+// Number of seconds between noop writer writes.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(periodicNoopIntervalSecs, int, 10);
+
+MONGO_INITIALIZER(periodicNoopIntervalSecs)(InitializerContext*) {
+    if (periodicNoopIntervalSecs <= 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Periodic noop interval must be greater than 0 seconds: "
+                                    << periodicNoopIntervalSecs);
+    } else if (periodicNoopIntervalSecs > 10) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Periodic noop interval must be less than or equal to 10 seconds: "
+                          << periodicNoopIntervalSecs);
+    }
+    return Status::OK();
+}
+
+
 /**
  * Allows non-local writes despite _canAcceptNonlocalWrites being false on a single OperationContext
  * while in scope.
@@ -159,7 +177,6 @@ BSONObj incrementConfigVersionByRandom(BSONObj config) {
     return builder.obj();
 }
 
-const Seconds kNoopWriterPeriod(10);
 }  // namespace
 
 ReplicationCoordinatorImpl::Waiter::Waiter(OpTime _opTime, const WriteConcernOptions* _writeConcern)
@@ -333,7 +350,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
         return;
     }
 
-    _externalState->setupNoopWriter(kNoopWriterPeriod);
+    _externalState->setupNoopWriter(Seconds(periodicNoopIntervalSecs));
 }
 
 ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() = default;
