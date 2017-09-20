@@ -544,7 +544,9 @@ private:
 };
 
 MONGO_INITIALIZER(RegisterDbCheckCmd)(InitializerContext* context) {
-    new DbCheckCmd();
+    if (Command::testCommandsEnabled) {
+        new DbCheckCmd();
+    }
     return Status::OK();
 }
 }  // namespace
