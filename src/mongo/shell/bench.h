@@ -119,7 +119,7 @@ public:
     void initializeFromBson(const BSONObj& args);
 
     // Create a new connection to the mongo instance specified by this configuration.
-    DBClientBase* createConnection() const;
+    std::unique_ptr<DBClientBase> createConnection() const;
 
     /**
      * Connection std::string describing the host to which to connect.
@@ -197,7 +197,6 @@ class BenchRunEventCounter {
 public:
     /// Constructs a zeroed out counter.
     BenchRunEventCounter();
-    ~BenchRunEventCounter();
 
     /**
      * Zero out the counter.
@@ -297,7 +296,6 @@ class BenchRunStats {
 
 public:
     BenchRunStats();
-    ~BenchRunStats();
 
     void reset();
 
@@ -443,11 +441,13 @@ private:
     /// Predicate, used to decide whether or not it's time to collect statistics
     bool shouldCollectStats() const;
 
-    size_t _id;
+    const size_t _id;
+
     const BenchRunConfig* _config;
     BenchRunState* _brState;
     BenchRunStats _stats;
-    /// Dummy stats to use before observation period.
+
+    // Dummy stats to use before observation period.
     BenchRunStats _statsBlackHole;
     int64_t _randomSeed;
 };

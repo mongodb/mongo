@@ -66,6 +66,8 @@ class TransportLayer;
  * including limitations on the lifetime of registered listeners.
  */
 class KillOpListenerInterface {
+    MONGO_DISALLOW_COPYING(KillOpListenerInterface);
+
 public:
     /**
      * Will be called *after* ops have been told they should die.
@@ -75,20 +77,23 @@ public:
     virtual void interruptAll() = 0;
 
 protected:
+    KillOpListenerInterface() = default;
+
     // Should not delete through a pointer of this type
-    virtual ~KillOpListenerInterface() {}
+    virtual ~KillOpListenerInterface() = default;
 };
 
 class StorageFactoriesIterator {
     MONGO_DISALLOW_COPYING(StorageFactoriesIterator);
 
 public:
-    virtual ~StorageFactoriesIterator() {}
+    virtual ~StorageFactoriesIterator() = default;
+
     virtual bool more() const = 0;
     virtual const StorageEngine::Factory* next() = 0;
 
 protected:
-    StorageFactoriesIterator() {}
+    StorageFactoriesIterator() = default;
 };
 
 /**
@@ -392,35 +397,39 @@ public:
      */
     void notifyStartupComplete();
 
-    //
-    // Global OpObserver.
-    //
-
     /**
      * Set the OpObserver.
      */
-    virtual void setOpObserver(std::unique_ptr<OpObserver> opObserver) = 0;
+    void setOpObserver(std::unique_ptr<OpObserver> opObserver);
 
     /**
      * Return the OpObserver instance we're using.
      */
-    virtual OpObserver* getOpObserver() = 0;
+    OpObserver* getOpObserver() const {
+        return _opObserver.get();
+    }
 
     /**
      * Returns the tick/clock source set in this context.
      */
-    TickSource* getTickSource() const;
+    TickSource* getTickSource() const {
+        return _tickSource.get();
+    }
 
     /**
      * Get a ClockSource implementation that may be less precise than the _preciseClockSource but
      * may be cheaper to call.
      */
-    ClockSource* getFastClockSource() const;
+    ClockSource* getFastClockSource() const {
+        return _fastClockSource.get();
+    }
 
     /**
      * Get a ClockSource implementation that is very precise but may be expensive to call.
      */
-    ClockSource* getPreciseClockSource() const;
+    ClockSource* getPreciseClockSource() const {
+        return _preciseClockSource.get();
+    }
 
     /**
      * Replaces the current tick/clock source with a new one. In other words, the old source will be
@@ -474,13 +483,6 @@ private:
     virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) = 0;
 
     /**
-     * Kills the given operation.
-     *
-     * Caller must own the service context's _mutex.
-     */
-    void _killOperation_inlock(OperationContext* opCtx, ErrorCodes::Error killCode);
-
-    /**
      * The key manager.
      */
     std::shared_ptr<KeysCollectionManager> _keyManager;
@@ -510,6 +512,11 @@ private:
      */
     std::vector<std::unique_ptr<ClientObserver>> _clientObservers;
     ClientSet _clients;
+
+    /**
+     * The registered OpObserver.
+     */
+    std::unique_ptr<OpObserver> _opObserver;
 
     std::unique_ptr<TickSource> _tickSource;
 

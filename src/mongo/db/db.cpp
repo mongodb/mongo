@@ -168,16 +168,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::cout;
-using std::cerr;
-using std::endl;
-using std::list;
-using std::string;
-using std::stringstream;
-using std::vector;
-
 using logger::LogComponent;
+using std::endl;
 
 namespace {
 
@@ -185,13 +177,13 @@ const NamespaceString startupLogCollectionName("local.startup_log");
 const NamespaceString kSystemReplSetCollection("local.system.replset");
 
 #ifdef _WIN32
-ntservice::NtServiceDefaultStrings defaultServiceStrings = {
+const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoDB", L"MongoDB", L"MongoDB Server"};
 #endif
 
 void logStartup(OperationContext* opCtx) {
     BSONObjBuilder toLog;
-    stringstream id;
+    std::stringstream id;
     id << getHostNameCached() << "-" << jsTime().asInt64();
     toLog.append("_id", id.str());
     toLog.append("hostname", getHostNameCached());
@@ -241,12 +233,11 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Databas
         return;
     }
 
-    list<string> collections;
-    db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
+    std::list<std::string> collectionNames;
+    db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collectionNames);
 
-    for (list<string>::iterator i = collections.begin(); i != collections.end(); ++i) {
-        const string& collectionName = *i;
-        NamespaceString ns(collectionName);
+    for (const auto& collectionName : collectionNames) {
+        const NamespaceString ns(collectionName);
 
         if (ns.isDropPendingNamespace()) {
             auto dropOpTime = fassertStatusOK(40459, ns.getDropPendingNamespaceOpTime());
@@ -264,7 +255,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Databas
         if (coll->getIndexCatalog()->findIdIndex(opCtx))
             continue;
 
-        log() << "WARNING: the collection '" << *i << "' lacks a unique index on _id."
+        log() << "WARNING: the collection '" << collectionName << "' lacks a unique index on _id."
               << " This index is needed for replication to function properly" << startupWarningsLog;
         log() << "\t To fix this, you need to create a unique index on _id."
               << " See http://dochub.mongodb.org/core/build-replica-set-indexes"
@@ -307,20 +298,18 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
 void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)";
 
+    auto const storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+
     Lock::GlobalWrite lk(opCtx);
 
-    vector<string> dbNames;
-
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    std::vector<std::string> dbNames;
     storageEngine->listDatabases(&dbNames);
 
     // Repair all databases first, so that we do not try to open them if they are in bad shape
     if (storageGlobalParams.repair) {
         invariant(!storageGlobalParams.readOnly);
-        for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
-            const string dbName = *i;
+        for (const auto& dbName : dbNames) {
             LOG(1) << "    Repairing database: " << dbName;
-
             fassert(18506, repairDatabase(opCtx, storageEngine, dbName));
         }
     }
@@ -376,8 +365,7 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // To print warning later if any database collections have UUIDs in FCV 3.4.
     bool collsHaveUuids = false;
 
-    for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
-        const string dbName = *i;
+    for (const auto& dbName : dbNames) {
         LOG(1) << "    Recovering database: " << dbName;
 
         Database* db = dbHolder().openDb(opCtx, dbName);
@@ -463,7 +451,7 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&index, NULL))) {
             const BSONObj key = index.getObjectField("key");
-            const string plugin = IndexNames::findPluginName(key);
+            const auto plugin = IndexNames::findPluginName(key);
 
             if (db->getDatabaseCatalogEntry()->isOlderThan24(opCtx)) {
                 if (IndexNames::existedBefore24(plugin)) {
@@ -520,18 +508,17 @@ ExitCode _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
     initWireSpec();
-    auto globalServiceContext = checked_cast<ServiceContextMongoD*>(getGlobalServiceContext());
+    auto serviceContext = checked_cast<ServiceContextMongoD*>(getGlobalServiceContext());
 
-    globalServiceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
-    globalServiceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
+    serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
+    serviceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
 
-    DBDirectClientFactory::get(globalServiceContext)
-        .registerImplementation([](OperationContext* opCtx) {
-            return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
-        });
+    DBDirectClientFactory::get(serviceContext).registerImplementation([](OperationContext* opCtx) {
+        return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
+    });
 
     const repl::ReplSettings& replSettings =
-        repl::ReplicationCoordinator::get(globalServiceContext)->getSettings();
+        repl::ReplicationCoordinator::get(serviceContext)->getSettings();
 
     {
         ProcessId pid = ProcessId::getCurrent();
@@ -555,24 +542,26 @@ ExitCode _initAndListen(int listenPort) {
 
     logProcessDetails();
 
-    globalServiceContext->createLockFile();
+    serviceContext->createLockFile();
 
-    globalServiceContext->setServiceEntryPoint(
-        stdx::make_unique<ServiceEntryPointMongod>(globalServiceContext));
+    serviceContext->setServiceEntryPoint(
+        stdx::make_unique<ServiceEntryPointMongod>(serviceContext));
 
-    auto tl = transport::TransportLayerManager::createWithConfig(&serverGlobalParams,
-                                                                 globalServiceContext);
-    auto res = tl->setup();
-    if (!res.isOK()) {
-        error() << "Failed to set up listener: " << res;
-        return EXIT_NET_ERROR;
+    {
+        auto tl =
+            transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
+        auto res = tl->setup();
+        if (!res.isOK()) {
+            error() << "Failed to set up listener: " << res;
+            return EXIT_NET_ERROR;
+        }
+        serviceContext->setTransportLayer(std::move(tl));
     }
-    globalServiceContext->setTransportLayer(std::move(tl));
 
-    globalServiceContext->initializeGlobalStorageEngine();
+    serviceContext->initializeGlobalStorageEngine();
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
-    if (EncryptionHooks::get(getGlobalServiceContext())->restartRequired()) {
+    if (EncryptionHooks::get(serviceContext)->restartRequired()) {
         exitCleanly(EXIT_CLEAN);
     }
 #endif
@@ -592,7 +581,7 @@ ExitCode _initAndListen(int listenPort) {
             }
 
             // Warn if field name matches non-active registered storage engine.
-            if (globalServiceContext->isRegisteredStorageEngine(e.fieldName())) {
+            if (serviceContext->isRegisteredStorageEngine(e.fieldName())) {
                 warning() << "Detected configuration for non-active storage engine "
                           << e.fieldName() << " when current storage engine is "
                           << storageGlobalParams.engine;
@@ -600,7 +589,7 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
-    if (!globalServiceContext->getGlobalStorageEngine()->getSnapshotManager()) {
+    if (!serviceContext->getGlobalStorageEngine()->getSnapshotManager()) {
         if (moe::startupOptionsParsed.count("replication.enableMajorityReadConcern") &&
             moe::startupOptionsParsed["replication.enableMajorityReadConcern"].as<bool>()) {
             // Note: we are intentionally only erroring if the user explicitly requested that we
@@ -615,10 +604,10 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
-    logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, globalServiceContext);
+    logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, serviceContext);
 
     {
-        stringstream ss;
+        std::stringstream ss;
         ss << endl;
         ss << "*********************************************************************" << endl;
         ss << " ERROR: dbpath (" << storageGlobalParams.dbpath << ") does not exist." << endl;
@@ -629,7 +618,7 @@ ExitCode _initAndListen(int listenPort) {
     }
 
     {
-        stringstream ss;
+        std::stringstream ss;
         ss << "repairpath (" << storageGlobalParams.repairpath << ") does not exist";
         uassert(12590, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.repairpath));
     }
@@ -647,7 +636,7 @@ ExitCode _initAndListen(int listenPort) {
         ScriptEngine::setup();
     }
 
-    auto startupOpCtx = globalServiceContext->makeOperationContext(&cc());
+    auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
     repairDatabasesAndCheckVersion(startupOpCtx.get());
 
@@ -659,7 +648,7 @@ ExitCode _initAndListen(int listenPort) {
     // Start up health log writer thread.
     HealthLog::get(startupOpCtx.get()).startup();
 
-    auto const globalAuthzManager = AuthorizationManager::get(globalServiceContext);
+    auto const globalAuthzManager = AuthorizationManager::get(serviceContext);
     uassertStatusOK(globalAuthzManager->initialize(startupOpCtx.get()));
 
     // This is for security on certain platforms (nonce generation)
@@ -712,7 +701,7 @@ ExitCode _initAndListen(int listenPort) {
               << startupWarningsLog;
     }
 
-    SessionCatalog::create(globalServiceContext);
+    SessionCatalog::create(serviceContext);
 
     // This function may take the global lock.
     auto shardingInitialized =
@@ -772,7 +761,7 @@ ExitCode _initAndListen(int listenPort) {
             storageGlobalParams.engine != "devnull") {
             Lock::GlobalWrite lk(startupOpCtx.get());
             FeatureCompatibilityVersion::setIfCleanStartup(
-                startupOpCtx.get(), repl::StorageInterface::get(globalServiceContext));
+                startupOpCtx.get(), repl::StorageInterface::get(serviceContext));
         }
 
         if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave()) ||
@@ -788,10 +777,10 @@ ExitCode _initAndListen(int listenPort) {
     // Set up the periodic runner for background job execution
     auto runner = makePeriodicRunner();
     runner->startup().transitional_ignore();
-    globalServiceContext->setPeriodicRunner(std::move(runner));
+    serviceContext->setPeriodicRunner(std::move(runner));
 
-    SessionKiller::set(globalServiceContext,
-                       std::make_shared<SessionKiller>(globalServiceContext, killSessionsLocal));
+    SessionKiller::set(serviceContext,
+                       std::make_shared<SessionKiller>(serviceContext, killSessionsLocal));
 
     // Set up the logical session cache
     LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
@@ -801,26 +790,26 @@ ExitCode _initAndListen(int listenPort) {
         kind = LogicalSessionCacheServer::kReplicaSet;
     }
 
-    auto sessionCache = makeLogicalSessionCacheD(globalServiceContext, kind);
-    LogicalSessionCache::set(globalServiceContext, std::move(sessionCache));
+    auto sessionCache = makeLogicalSessionCacheD(serviceContext, kind);
+    LogicalSessionCache::set(serviceContext, std::move(sessionCache));
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
     startupOpCtx.reset();
 
-    auto start = globalServiceContext->getTransportLayer()->start();
+    auto start = serviceContext->getTransportLayer()->start();
     if (!start.isOK()) {
         error() << "Failed to start the listener: " << start.toString();
         return EXIT_NET_ERROR;
     }
 
-    start = globalServiceContext->getServiceExecutor()->start();
+    start = serviceContext->getServiceExecutor()->start();
     if (!start.isOK()) {
         error() << "Failed to start the service executor: " << start;
         return EXIT_NET_ERROR;
     }
 
-    globalServiceContext->notifyStartupComplete();
+    serviceContext->notifyStartupComplete();
 
 #ifndef _WIN32
     mongo::signalForkSuccess();
@@ -879,21 +868,21 @@ void startupConfigActions(const std::vector<std::string>& args) {
     // and "dbppath" command.  The "run" command is the same as just running mongod, so just
     // falls through.
     if (moe::startupOptionsParsed.count("command")) {
-        vector<string> command = moe::startupOptionsParsed["command"].as<vector<string>>();
+        const auto command = moe::startupOptionsParsed["command"].as<std::vector<std::string>>();
 
         if (command[0].compare("dbpath") == 0) {
-            cout << storageGlobalParams.dbpath << endl;
+            std::cout << storageGlobalParams.dbpath << endl;
             quickExit(EXIT_SUCCESS);
         }
 
         if (command[0].compare("run") != 0) {
-            cout << "Invalid command: " << command[0] << endl;
+            std::cout << "Invalid command: " << command[0] << endl;
             printMongodHelp(moe::startupOptions);
             quickExit(EXIT_FAILURE);
         }
 
         if (command.size() > 1) {
-            cout << "Too many parameters to 'run' command" << endl;
+            std::cout << "Too many parameters to 'run' command" << endl;
             printMongodHelp(moe::startupOptions);
             quickExit(EXIT_FAILURE);
         }
@@ -912,13 +901,13 @@ void startupConfigActions(const std::vector<std::string>& args) {
         moe::startupOptionsParsed["shutdown"].as<bool>() == true) {
         bool failed = false;
 
-        string name =
+        std::string name =
             (boost::filesystem::path(storageGlobalParams.dbpath) / "mongod.lock").string();
         if (!boost::filesystem::exists(name) || boost::filesystem::file_size(name) == 0)
             failed = true;
 
         pid_t pid;
-        string procPath;
+        std::string procPath;
         if (!failed) {
             try {
                 std::ifstream f(name.c_str());
@@ -927,7 +916,8 @@ void startupConfigActions(const std::vector<std::string>& args) {
                 if (!boost::filesystem::exists(procPath))
                     failed = true;
             } catch (const std::exception& e) {
-                cerr << "Error reading pid from lock file [" << name << "]: " << e.what() << endl;
+                std::cerr << "Error reading pid from lock file [" << name << "]: " << e.what()
+                          << endl;
                 failed = true;
             }
         }
@@ -938,11 +928,11 @@ void startupConfigActions(const std::vector<std::string>& args) {
             quickExit(EXIT_FAILURE);
         }
 
-        cout << "killing process with pid: " << pid << endl;
+        std::cout << "killing process with pid: " << pid << endl;
         int ret = kill(pid, SIGTERM);
         if (ret) {
             int e = errno;
-            cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
+            std::cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
             quickExit(EXIT_FAILURE);
         }
 

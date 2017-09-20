@@ -28,11 +28,9 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
+#include <map>
 
 #include "mongo/db/service_context.h"
-#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
@@ -41,7 +39,7 @@ class StorageEngineLockFile;
 
 class ServiceContextMongoD final : public ServiceContext {
 public:
-    typedef std::map<std::string, const StorageEngine::Factory*> FactoryMap;
+    using FactoryMap = std::map<std::string, const StorageEngine::Factory*>;
 
     ServiceContextMongoD();
 
@@ -62,10 +60,6 @@ public:
 
     StorageFactoriesIterator* makeStorageFactoriesIterator() override;
 
-    void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
-
-    OpObserver* getOpObserver() override;
-
 private:
     std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 
@@ -74,20 +68,18 @@ private:
     // logically owned here, but never deleted by anyone.
     StorageEngine* _storageEngine = nullptr;
 
-    // logically owned here.
-    std::unique_ptr<OpObserver> _opObserver;
-
     // All possible storage engines are registered here through MONGO_INIT.
     FactoryMap _storageFactories;
 };
 
-class StorageFactoriesIteratorMongoD : public StorageFactoriesIterator {
+class StorageFactoriesIteratorMongoD final : public StorageFactoriesIterator {
 public:
     typedef ServiceContextMongoD::FactoryMap::const_iterator FactoryMapIterator;
+
     StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin, const FactoryMapIterator& end);
 
-    virtual bool more() const;
-    virtual const StorageEngine::Factory* next();
+    bool more() const override;
+    const StorageEngine::Factory* next() override;
 
 private:
     FactoryMapIterator _curr;

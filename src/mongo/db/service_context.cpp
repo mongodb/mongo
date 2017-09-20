@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/service_entry_point.h"
@@ -188,17 +189,8 @@ transport::ServiceExecutor* ServiceContext::getServiceExecutor() const {
     return _serviceExecutor.get();
 }
 
-
-TickSource* ServiceContext::getTickSource() const {
-    return _tickSource.get();
-}
-
-ClockSource* ServiceContext::getFastClockSource() const {
-    return _fastClockSource.get();
-}
-
-ClockSource* ServiceContext::getPreciseClockSource() const {
-    return _preciseClockSource.get();
+void ServiceContext::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
+    _opObserver = std::move(opObserver);
 }
 
 void ServiceContext::setTickSource(std::unique_ptr<TickSource> newSource) {

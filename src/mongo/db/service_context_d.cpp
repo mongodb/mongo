@@ -32,22 +32,16 @@
 
 #include "mongo/db/service_context_d.h"
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -72,6 +66,8 @@ MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
 }
 }  // namespace
 
+extern bool _supportsDocLocking;
+
 ServiceContextMongoD::ServiceContextMongoD() = default;
 
 ServiceContextMongoD::~ServiceContextMongoD() = default;
@@ -82,8 +78,6 @@ StorageEngine* ServiceContextMongoD::getGlobalStorageEngine() {
     // with a NULL storage engine.
     return _storageEngine;
 }
-
-extern bool _supportsDocLocking;
 
 void ServiceContextMongoD::createLockFile() {
     try {
@@ -256,9 +250,8 @@ StorageFactoriesIterator* ServiceContextMongoD::makeStorageFactoriesIterator() {
     return new StorageFactoriesIteratorMongoD(_storageFactories.begin(), _storageFactories.end());
 }
 
-StorageFactoriesIteratorMongoD::StorageFactoriesIteratorMongoD(
-    const ServiceContextMongoD::FactoryMap::const_iterator& begin,
-    const ServiceContextMongoD::FactoryMap::const_iterator& end)
+StorageFactoriesIteratorMongoD::StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin,
+                                                               const FactoryMapIterator& end)
     : _curr(begin), _end(end) {}
 
 bool StorageFactoriesIteratorMongoD::more() const {
@@ -282,14 +275,6 @@ std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client
     opCtx->setRecoveryUnit(getGlobalStorageEngine()->newRecoveryUnit(),
                            OperationContext::kNotInUnitOfWork);
     return opCtx;
-}
-
-void ServiceContextMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
-    _opObserver = std::move(opObserver);
-}
-
-OpObserver* ServiceContextMongoD::getOpObserver() {
-    return _opObserver.get();
 }
 
 }  // namespace mongo
