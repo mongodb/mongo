@@ -39,6 +39,7 @@ selector:
   - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
   - jstests/sharding/secondary_shard_versioning.js
   - jstests/sharding/secondary_shard_version_protocol_with_causal_consistency.js
+  - jstests/sharding/secondary_shard_version_protocol_with_fcv.js
   - jstests/sharding/session_info_in_oplog.js
   - jstests/sharding/enable_sharding_basic.js
   - jstests/sharding/retryable_writes.js
