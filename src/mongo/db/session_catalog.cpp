@@ -104,7 +104,7 @@ boost::optional<UUID> SessionCatalog::getTransactionTableUUID(OperationContext* 
 }
 
 void SessionCatalog::onStepUp(OperationContext* opCtx) {
-    invalidateSessions(opCtx, boost::none);
+    resetSessions();
 
     DBDirectClient client(opCtx);
 
@@ -172,35 +172,10 @@ ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
     return ss;
 }
 
-void SessionCatalog::invalidateSessions(OperationContext* opCtx,
-                                        boost::optional<BSONObj> singleSessionDoc) {
-    uassert(40528,
-            str::stream() << "Direct writes against "
-                          << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                          << " cannot be performed using a transaction or on a session.",
-            !opCtx->getLogicalSessionId());
-
-    const auto invalidateSessionFn = [&](WithLock, SessionRuntimeInfoMap::iterator it) {
-        auto& sri = it->second;
-        sri->txnState.invalidate();
-        _txnTable.erase(it);
-    };
-
+void SessionCatalog::resetSessions() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-    if (singleSessionDoc) {
-        const auto lsid = LogicalSessionId::parse(IDLParserErrorContext("lsid"),
-                                                  singleSessionDoc->getField("_id").Obj());
-
-        auto it = _txnTable.find(lsid);
-        if (it != _txnTable.end()) {
-            invalidateSessionFn(lg, it);
-        }
-    } else {
-        auto it = _txnTable.begin();
-        while (it != _txnTable.end()) {
-            invalidateSessionFn(lg, it++);
-        }
+    for (const auto& it : _txnTable) {
+        it.second->txnState.invalidate();
     }
 }
 

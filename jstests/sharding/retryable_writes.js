@@ -344,7 +344,7 @@
     }
 
     // Tests for replica set
-    var replTest = new ReplSetTest({nodes: 2});
+    var replTest = new ReplSetTest({nodes: 1});
     replTest.startSet();
     replTest.initiate();
 

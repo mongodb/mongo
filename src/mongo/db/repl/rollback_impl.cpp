@@ -243,7 +243,7 @@ void RollbackImpl::_resetSessions(OperationContext* opCtx) {
 
     log() << "resetting in-memory state of active sessions";
 
-    SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
+    SessionCatalog::get(opCtx)->resetSessions();
 }
 
 void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {

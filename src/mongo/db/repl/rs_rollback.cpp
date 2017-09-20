@@ -1346,7 +1346,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     // If necessary, clear the memory of existing sessions.
     if (fixUpInfo.refetchTransactionDocs) {
-        SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
+        SessionCatalog::get(opCtx)->resetSessions();
     }
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the
