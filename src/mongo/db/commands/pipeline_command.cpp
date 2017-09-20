@@ -407,10 +407,6 @@ public:
                     return appendCommandStatus(result, resolvedView.getStatus());
                 }
 
-                auto collationSpec = ctx.getView()->defaultCollator()
-                    ? ctx.getView()->defaultCollator()->getSpec().toBSON().getOwned()
-                    : CollationSpec::kSimpleSpec;
-
                 // With the view & collation resolved, we can relinquish locks.
                 ctx.releaseLocksForView();
 
@@ -424,7 +420,6 @@ public:
                 if (!newRequest.isOK()) {
                     return appendCommandStatus(result, newRequest.getStatus());
                 }
-                newRequest.getValue().setCollation(collationSpec);
 
                 bool status = runParsed(
                     txn, origNss, newRequest.getValue(), newCmd.getValue(), errmsg, result);
