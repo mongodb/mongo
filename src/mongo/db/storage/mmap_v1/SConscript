@@ -27,7 +27,6 @@ env.Library(
     source = [ "aligned_builder.cpp",
                "catalog/hashtab.cpp",
                "catalog/index_details.cpp",
-               "catalog/namespace.cpp",
                "catalog/namespace_details.cpp",
                "catalog/namespace_details_collection_entry.cpp",
                "catalog/namespace_details_rsv1_metadata.cpp",
