@@ -32,11 +32,14 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -1416,6 +1419,23 @@ TEST(QueryRequestTest, ParseFromLegacyQueryTooNegativeNToReturn) {
         QueryRequest::fromLegacyQuery(
             nss, queryObj, BSONObj(), 0, std::numeric_limits<int>::min(), QueryOption_Exhaust)
             .getStatus());
+}
+
+TEST(QueryRequestTest, ParseFromUUID) {
+    ServiceContextNoop service;
+    auto client = service.makeClient("test");
+    auto opCtxNoop = client->makeOperationContext();
+    auto opCtx = opCtxNoop.get();
+    // Register a UUID/Collection pair in the UUIDCatalog.
+    const CollectionUUID uuid = UUID::gen();
+    const NamespaceString nss("test.testns");
+    Collection coll(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    catalog.onCreateCollection(opCtx, &coll, uuid);
+    QueryRequest qr(uuid);
+    // Ensure a call to refreshNSS succeeds.
+    qr.refreshNSS(opCtx);
+    ASSERT_EQ(nss, qr.nss());
 }
 
 }  // namespace mongo
