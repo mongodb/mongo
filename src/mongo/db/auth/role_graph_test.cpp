@@ -674,6 +674,7 @@ TEST(RoleGraphTest, getRolesForDatabase) {
 
     // Admin DB
     it = graph.getRolesForDatabase("admin");
+    ASSERT_EQUALS(RoleName("__queryableBackup", "admin"), it.next());
     ASSERT_EQUALS(RoleName("__system", "admin"), it.next());
     ASSERT_EQUALS(RoleName("backup", "admin"), it.next());
     ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), it.next());
