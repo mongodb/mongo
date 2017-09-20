@@ -7,6 +7,7 @@ download:
 	$(eval VERSION := $(shell curl -s -o - https://www.iana.org/time-zones | grep \"version\" | sed 's/.*version">//' | sed 's/<\/span.*//'))
 	curl -s -o tzdata$(VERSION).tar.gz https://www.iana.org/time-zones/repository/releases/tzdata$(VERSION).tar.gz
 	curl -s -o tzcode$(VERSION).tar.gz https://www.iana.org/time-zones/repository/releases/tzcode$(VERSION).tar.gz
+	@echo " done"
 
 clean: release-php-clean
 	-rm -rf code
@@ -35,15 +36,17 @@ timezonedb.dta: code/zone.tab
 
 timezonedb.idx: timezonedb.idx.php timezonedb.dta
 
-version-info.txt:
+version-info.txt: download
 	find . -name tzdata*.tar.gz | sed 's/.*20/20/' | sed 's/\.tar.*//' > version-info.txt
-	find . -name tzdata*.tar.gz | php -r "preg_match('@([0-9]{4})([a-z])@', file_get_contents('php://stdin'), \$$a); echo \$$a[1], '.', ord(\$$a[2]) - ord('a') + 1;" >> version-info.txt
+	find . -name tzdata*.tar.gz | sed -E "s/^.*(20[0-9]{2}).*$$/\1/" | tr -d '\n' >> version-info.txt
+	echo -n "." >> version-info.txt
+	find . -name tzdata*.tar.gz | sed -E "s/^.*20[0-9]{2}(\w).*$$/\1/" | sed "s/\\n//" | od -A n -t d1 -N 1 | awk '{printf "%s", $$1 - 96}' >> version-info.txt
 
 timezonedb.zip: code/zone.tab version-info.txt
 	@echo -n "Making archive..."
 	-@mkdir code/timezonedb-$(VERSION); cp -r code/data/. code/timezonedb-$(VERSION)/; cp version-info.txt code/timezonedb-$(VERSION)/
 	-@cd code; zip --quiet -r ../timezonedb.zip timezonedb-$(VERSION)
-	cp timezonedb.zip timezonedb-$(VERSION).zip
+	@cp timezonedb.zip timezonedb-$(VERSION).zip
 	@echo " done"
 
 timezonedb.h: timezonedb.idx version-info.txt create_dot_h_file.php
