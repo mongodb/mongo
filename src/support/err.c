@@ -494,7 +494,18 @@ __wt_panic(WT_SESSION_IMPL *session)
     WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	F_SET(S2C(session), WT_CONN_PANIC);
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
+	/*
+	 * If the connection has already be marked for panic, just return the
+	 * error.
+	 */
+	if (F_ISSET(conn, WT_CONN_PANIC))
+		return (WT_PANIC);
+
+	F_SET(conn, WT_CONN_PANIC);
 	__wt_err(session, WT_PANIC, "the process must exit and restart");
 
 #if defined(HAVE_DIAGNOSTIC)
