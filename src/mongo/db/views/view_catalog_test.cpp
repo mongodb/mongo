@@ -38,6 +38,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -402,6 +404,42 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
     for (uint32_t i = 0; i < expected.size(); i++) {
         ASSERT(SimpleBSONObjComparator::kInstance.evaluate(expected[i] == result[i]));
     }
+}
+
+TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
+    const NamespaceString view1("db.view1");
+    const NamespaceString view2("db.view2");
+    const NamespaceString viewOn("db.coll");
+    BSONArrayBuilder pipeline1;
+    BSONArrayBuilder pipeline2;
+
+    pipeline1 << BSON("$match" << BSON("foo" << 1));
+    pipeline2 << BSON("$match" << BSON("foo" << 2));
+
+    BSONObj collation = BSON("locale"
+                             << "mock_reverse_string");
+
+    ASSERT_OK(viewCatalog.createView(opCtx.get(), view1, viewOn, pipeline1.arr(), collation));
+    ASSERT_OK(viewCatalog.createView(opCtx.get(), view2, view1, pipeline2.arr(), collation));
+
+    auto resolvedView = viewCatalog.resolveView(opCtx.get(), view2);
+    ASSERT(resolvedView.isOK());
+
+    ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);
+
+    std::vector<BSONObj> expected = {BSON("$match" << BSON("foo" << 1)),
+                                     BSON("$match" << BSON("foo" << 2))};
+    std::vector<BSONObj> result = resolvedView.getValue().getPipeline();
+    ASSERT_EQ(expected.size(), result.size());
+    for (uint32_t i = 0; i < expected.size(); i++) {
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(expected[i] == result[i]));
+    }
+
+    auto expectedCollation =
+        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
+    ASSERT_OK(expectedCollation.getStatus());
+    ASSERT_BSONOBJ_EQ(resolvedView.getValue().getDefaultCollation(),
+                      expectedCollation.getValue()->getSpec().toBSON());
 }
 
 TEST_F(ViewCatalogFixture, InvalidateThenReload) {

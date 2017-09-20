@@ -166,6 +166,7 @@ selector:
   - jstests/core/sort_array.js
   - jstests/core/views/views_aggregation.js
   - jstests/core/views/views_distinct.js
+  - jstests/core/views/views_collation.js
   - jstests/core/views/views_count.js
   - jstests/core/views/views_find.js
   # TODO: SERVER-30582

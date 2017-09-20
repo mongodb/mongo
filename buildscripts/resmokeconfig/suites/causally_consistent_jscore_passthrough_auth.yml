@@ -181,6 +181,7 @@ selector:
   - jstests/core/views/views_aggregation.js
   - jstests/core/views/views_distinct.js
   - jstests/core/views/views_count.js
+  - jstests/core/views/views_collation.js
   - jstests/core/views/views_find.js
   # TODO: SERVER-30582
   - jstests/core/explain_multi_plan.js

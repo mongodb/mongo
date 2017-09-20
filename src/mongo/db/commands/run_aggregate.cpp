@@ -369,16 +369,11 @@ Status runAggregate(OperationContext* opCtx,
                 return resolvedView.getStatus();
             }
 
-            auto collationSpec = ctx->getView()->defaultCollator()
-                ? ctx->getView()->defaultCollator()->getSpec().toBSON().getOwned()
-                : CollationSpec::kSimpleSpec;
-
             // With the view & collation resolved, we can relinquish locks.
             ctx->releaseLocksForView();
 
             // Parse the resolved view into a new aggregation request.
             auto newRequest = resolvedView.getValue().asExpandedViewAggregation(request);
-            newRequest.setCollation(collationSpec);
             auto newCmd = newRequest.serializeToCommandObj().toBson();
 
             auto status = runAggregate(opCtx, origNss, newRequest, newCmd, result);

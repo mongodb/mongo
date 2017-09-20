@@ -4,6 +4,8 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/analyze_plan.js");
+
     let viewsDB = db.getSiblingDB("views_collation");
     assert.commandWorked(viewsDB.dropDatabase());
     assert.commandWorked(viewsDB.runCommand({create: "simpleCollection"}));
@@ -59,6 +61,15 @@
     assert.commandWorked(viewsDB.runCommand({count: "filView"}));
     assert.commandWorked(viewsDB.runCommand({distinct: "filView", key: "x"}));
 
+    // Explain of operations that do not specify a collation succeed.
+    assert.commandWorked(viewsDB.runCommand({aggregate: "filView", pipeline: [], explain: true}));
+    assert.commandWorked(
+        viewsDB.runCommand({explain: {find: "filView"}, verbosity: "allPlansExecution"}));
+    assert.commandWorked(
+        viewsDB.runCommand({explain: {count: "filView"}, verbosity: "allPlansExecution"}));
+    assert.commandWorked(viewsDB.runCommand(
+        {explain: {distinct: "filView", key: "x"}, verbosity: "allPlansExecution"}));
+
     // Operations with a matching collation succeed.
     assert.commandWorked(viewsDB.runCommand(
         {aggregate: "filView", pipeline: [], cursor: {}, collation: {locale: "fil"}}));
@@ -66,6 +77,18 @@
     assert.commandWorked(viewsDB.runCommand({count: "filView", collation: {locale: "fil"}}));
     assert.commandWorked(
         viewsDB.runCommand({distinct: "filView", key: "x", collation: {locale: "fil"}}));
+
+    // Explain of operations with a matching collation succeed.
+    assert.commandWorked(viewsDB.runCommand(
+        {aggregate: "filView", pipeline: [], explain: true, collation: {locale: "fil"}}));
+    assert.commandWorked(viewsDB.runCommand(
+        {explain: {find: "filView", collation: {locale: "fil"}}, verbosity: "allPlansExecution"}));
+    assert.commandWorked(viewsDB.runCommand(
+        {explain: {count: "filView", collation: {locale: "fil"}}, verbosity: "allPlansExecution"}));
+    assert.commandWorked(viewsDB.runCommand({
+        explain: {distinct: "filView", key: "x", collation: {locale: "fil"}},
+        verbosity: "allPlansExecution"
+    }));
 
     // Attempting to override the non-simple default collation of a view fails.
     assert.commandFailedWithCode(
@@ -92,6 +115,46 @@
     assert.commandFailedWithCode(
         viewsDB.runCommand({distinct: "filView", key: "x", collation: {locale: "simple"}}),
         ErrorCodes.OptionNotSupportedOnView);
+
+    // Attempting to override the default collation of a view with explain fails.
+    assert.commandFailedWithCode(
+        viewsDB.runCommand(
+            {aggregate: "filView", pipeline: [], explain: true, collation: {locale: "en"}}),
+        ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(
+        viewsDB.runCommand(
+            {aggregate: "filView", pipeline: [], explain: true, collation: {locale: "simple"}}),
+        ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        explain: {find: "filView", collation: {locale: "fr"}},
+        verbosity: "allPlansExecution"
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        explain: {find: "filView", collation: {locale: "simple"}},
+        verbosity: "allPlansExecution"
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        explain: {count: "filView", collation: {locale: "zh"}},
+        verbosity: "allPlansExecution"
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        explain: {count: "filView", collation: {locale: "simple"}},
+        verbosity: "allPlansExecution"
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        explain: {distinct: "filView", key: "x", collation: {locale: "es"}},
+        verbosity: "allPlansExecution"
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        explain: {distinct: "filView", key: "x", collation: {locale: "simple"}},
+        verbosity: "allPlansExecution"
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
 
     const lookupSimpleView = {
         $lookup: {from: "simpleView", localField: "x", foreignField: "x", as: "result"}
@@ -343,4 +406,56 @@
         ErrorCodes.OptionNotSupportedOnView);
     assert.commandFailedWithCode(viewsDB.runCommand({create: "B", viewOn: "other"}),
                                  ErrorCodes.OptionNotSupportedOnView);
+
+    // Make sure that when an operation does not specify the collation, it correctly uses the
+    // default collation associated with the view. For this, we set up a new backing collection with
+    // a case-insensitive view.
+    assert.commandWorked(viewsDB.runCommand({create: "case_sensitive_coll"}));
+    assert.commandWorked(viewsDB.runCommand({
+        create: "case_insensitive_view",
+        viewOn: "case_sensitive_coll",
+        collation: {locale: "en", strength: 1}
+    }));
+
+    assert.writeOK(viewsDB.case_sensitive_coll.insert({f: "case"}));
+    assert.writeOK(viewsDB.case_sensitive_coll.insert({f: "Case"}));
+    assert.writeOK(viewsDB.case_sensitive_coll.insert({f: "CASE"}));
+
+    let explain, cursorStage;
+
+    // Test that aggregate against a view with a default collation correctly uses the collation.
+    assert.eq(1, viewsDB.case_sensitive_coll.aggregate([{$match: {f: "case"}}]).itcount());
+    assert.eq(3, viewsDB.case_insensitive_view.aggregate([{$match: {f: "case"}}]).itcount());
+    explain = viewsDB.case_insensitive_view.explain().aggregate([{$match: {f: "case"}}]);
+    cursorStage = getAggPlanStage(explain, "$cursor");
+    assert.neq(null, cursorStage, tojson(explain));
+    assert.eq(1, cursorStage.$cursor.queryPlanner.collation.strength, tojson(cursorStage));
+
+    // Test that count against a view with a default collation correctly uses the collation.
+    assert.eq(1, viewsDB.case_sensitive_coll.count({f: "case"}));
+    assert.eq(3, viewsDB.case_insensitive_view.count({f: "case"}));
+    explain = viewsDB.case_insensitive_view.explain().count({f: "case"});
+    cursorStage = getAggPlanStage(explain, "$cursor");
+    assert.neq(null, cursorStage, tojson(explain));
+    assert.eq(1, cursorStage.$cursor.queryPlanner.collation.strength, tojson(cursorStage));
+
+    // Test that distinct against a view with a default collation correctly uses the collation.
+    assert.eq(3, viewsDB.case_sensitive_coll.distinct("f").length);
+    assert.eq(1, viewsDB.case_insensitive_view.distinct("f").length);
+    explain = viewsDB.case_insensitive_view.explain().distinct("f");
+    cursorStage = getAggPlanStage(explain, "$cursor");
+    assert.neq(null, cursorStage, tojson(explain));
+    assert.eq(1, cursorStage.$cursor.queryPlanner.collation.strength, tojson(cursorStage));
+
+    // Test that find against a view with a default collation correctly uses the collation.
+    let findRes = viewsDB.runCommand({find: "case_sensitive_coll", filter: {f: "case"}});
+    assert.commandWorked(findRes);
+    assert.eq(1, findRes.cursor.firstBatch.length);
+    findRes = viewsDB.runCommand({find: "case_insensitive_view", filter: {f: "case"}});
+    assert.commandWorked(findRes);
+    assert.eq(3, findRes.cursor.firstBatch.length);
+    explain = viewsDB.runCommand({explain: {find: "case_insensitive_view", filter: {f: "case"}}});
+    cursorStage = getAggPlanStage(explain, "$cursor");
+    assert.neq(null, cursorStage, tojson(explain));
+    assert.eq(1, cursorStage.$cursor.queryPlanner.collation.strength, tojson(cursorStage));
 }());
