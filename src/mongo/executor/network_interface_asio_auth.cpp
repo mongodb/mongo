@@ -47,10 +47,8 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/quick_exit.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -119,19 +117,9 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
         auto validateStatus =
             rpc::validateWireVersion(WireSpec::instance().outgoing, protocolSet.getValue().version);
         if (!validateStatus.isOK()) {
+            warning() << "remote host has incompatible wire version: " << validateStatus;
 
-            if (WireSpec::instance().isInternalClient) {
-                severe() << "remote host has incompatible wire version: " << validateStatus;
-                severe() << "Please consult the documentation for upgrading this server: "
-                         << "http://dochub.mongodb.org/core/3.6-feature-compatibility";
-
-                // Exit if mongod should be upgraded.
-                quickExit(EXIT_NEED_UPGRADE);
-            } else {
-                warning() << "remote host has incompatible wire version: " << validateStatus;
-
-                return _completeOperation(op, validateStatus);
-            }
+            return _completeOperation(op, validateStatus);
         }
 
         op->connection().setServerProtocols(protocolSet.getValue().protocolSet);
