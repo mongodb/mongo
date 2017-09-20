@@ -46,7 +46,7 @@ namespace mongo {
 
 string askPassword() {
     std::string password;
-    cout << "Enter password: ";
+    cerr << "Enter password: ";
 #ifndef _WIN32
     const int stdinfd = 0;
     termios termio;
@@ -102,7 +102,7 @@ string askPassword() {
         return string();
     }
 #endif
-    cout << "\n";
+    cerr << "\n";
     return password;
 }
 }
