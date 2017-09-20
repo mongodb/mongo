@@ -728,6 +728,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: unmodified pages evicted",
 	"connection: auto adjusting condition resets",
 	"connection: auto adjusting condition wait calls",
+	"connection: detected system time went backwards",
 	"connection: files currently open",
 	"connection: memory allocations",
 	"connection: memory frees",
@@ -1014,6 +1015,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_clean = 0;
 	stats->cond_auto_wait_reset = 0;
 	stats->cond_auto_wait = 0;
+	stats->time_travel = 0;
 		/* not clearing file_open */
 	stats->memory_allocation = 0;
 	stats->memory_free = 0;
@@ -1320,6 +1322,7 @@ __wt_stat_connection_aggregate(
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
 	to->cond_auto_wait_reset += WT_STAT_READ(from, cond_auto_wait_reset);
 	to->cond_auto_wait += WT_STAT_READ(from, cond_auto_wait);
+	to->time_travel += WT_STAT_READ(from, time_travel);
 	to->file_open += WT_STAT_READ(from, file_open);
 	to->memory_allocation += WT_STAT_READ(from, memory_allocation);
 	to->memory_free += WT_STAT_READ(from, memory_free);
