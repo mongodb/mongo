@@ -79,14 +79,7 @@ void onWriteOpCompleted(OperationContext* opCtx,
     if (lastStmtIdWriteTs.isNull())
         return;
 
-    if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
-        uassert(40528,
-                str::stream() << "Direct writes against "
-                              << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                              << "  cannot be performed using a transaction or on a session.",
-                !opCtx->getLogicalSessionId());
-        SessionCatalog::get(opCtx)->resetSessions();
-    } else if (session) {
+    if (session) {
         session->onWriteOpCompletedOnPrimary(
             opCtx, *opCtx->getTxnNumber(), std::move(stmtIdsWritten), lastStmtIdWriteTs);
     }
@@ -291,6 +284,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         for (auto it = begin; it != end; it++) {
             FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, it->doc);
         }
+    } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !lastOpTime.isNull()) {
+        for (auto it = begin; it != end; it++) {
+            SessionCatalog::get(opCtx)->invalidateSessions(opCtx, it->doc);
+        }
     }
 
     std::vector<StmtId> stmtIdsWritten;
@@ -324,6 +321,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         DurableViewCatalog::onExternalChange(opCtx, args.nss);
     } else if (args.nss.ns() == FeatureCompatibilityVersion::kCollection) {
         FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updatedDoc);
+    } else if (args.nss == NamespaceString::kSessionTransactionsTableNamespace &&
+               !opTime.isNull()) {
+        SessionCatalog::get(opCtx)->invalidateSessions(opCtx, args.updatedDoc);
     }
 
     onWriteOpCompleted(opCtx, args.nss, session, std::vector<StmtId>{args.stmtId}, opTime);
@@ -348,7 +348,6 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     }
 
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
-
     const auto opTime =
         replLogDelete(opCtx, nss, uuid, session, stmtId, deleteState, fromMigrate, deletedDoc);
 
@@ -366,6 +365,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         DurableViewCatalog::onExternalChange(opCtx, nss);
     } else if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
         FeatureCompatibilityVersion::onDelete(opCtx, deleteState.documentKey);
+    } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !opTime.isNull()) {
+        SessionCatalog::get(opCtx)->invalidateSessions(opCtx, deleteState.documentKey);
     }
 
     onWriteOpCompleted(opCtx, nss, session, std::vector<StmtId>{stmtId}, opTime);
@@ -483,6 +484,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
 
     if (dbName == FeatureCompatibilityVersion::kDatabase) {
         FeatureCompatibilityVersion::onDropCollection(opCtx);
+    } else if (dbName == NamespaceString::kSessionTransactionsTableNamespace.db()) {
+        SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
     }
 
     NamespaceUUIDCache::get(opCtx).evictNamespacesInDatabase(dbName);
@@ -506,10 +509,10 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, collectionName);
-    }
-
-    if (collectionName.ns() == FeatureCompatibilityVersion::kCollection) {
+    } else if (collectionName.ns() == FeatureCompatibilityVersion::kCollection) {
         FeatureCompatibilityVersion::onDropCollection(opCtx);
+    } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
+        SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())

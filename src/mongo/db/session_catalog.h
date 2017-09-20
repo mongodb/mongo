@@ -112,10 +112,16 @@ public:
     ScopedSession getOrCreateSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
-     * Resets all created sessions and increments their generation, forcing each to be reloaded by
-     * subsequent write commands. Invoked after rollback.
+     * Callback to be invoked when it is suspected that the on-disk session contents might not be in
+     * sync with what is in the sessions cache.
+     *
+     * If no specific document is available, the method will invalidate all sessions. Otherwise if
+     * one is avaiable (which is the case for insert/update/delete), it must contain _id field with
+     * a valid session entry, in which case only that particular session will be invalidated. If the
+     * _id field is missing or doesn't contain a valid serialization of logical session, the method
+     * will throw. This prevents invalid entries from making it in the collection.
      */
-    void resetSessions();
+    void invalidateSessions(OperationContext* opCtx, boost::optional<BSONObj> singleSessionDoc);
 
 private:
     struct SessionRuntimeInfo {
