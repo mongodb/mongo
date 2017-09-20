@@ -495,6 +495,31 @@ void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) cons
     }
 }
 
+std::vector<GenericCursor> ClusterCursorManager::getAllCursors() const {
+    std::vector<GenericCursor> cursors;
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    for (const auto& nsContainerPair : _namespaceToContainerMap) {
+        for (const auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
+            const CursorEntry& entry = cursorIdEntryPair.second;
+
+            if (entry.getKillPending()) {
+                // Don't include sessions for killed cursors.
+                continue;
+            }
+
+            cursors.emplace_back();
+            auto& gc = cursors.back();
+            gc.setId(cursorIdEntryPair.first);
+            gc.setNs(nsContainerPair.first);
+            gc.setLsid(entry.getLsid());
+        }
+    }
+
+    return cursors;
+}
+
 Status ClusterCursorManager::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
     auto eraser = [&](ClusterCursorManager& mgr, CursorId id) {

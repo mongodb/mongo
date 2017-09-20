@@ -41,6 +41,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -81,8 +82,11 @@ class Document;
  * If your stage is actually an alias which needs to return more than one stage (such as
  * $sortByCount), you should use the REGISTER_MULTI_STAGE_ALIAS macro instead.
  */
-#define REGISTER_DOCUMENT_SOURCE(key, liteParser, fullParser)                                \
+#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, ...)             \
     MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                  \
+        if (!__VA_ARGS__) {                                                                  \
+            return Status::OK();                                                             \
+        }                                                                                    \
         auto fullParserWrapper = [](BSONElement stageSpec,                                   \
                                     const boost::intrusive_ptr<ExpressionContext>& expCtx) { \
             return std::list<boost::intrusive_ptr<DocumentSource>>{                          \
@@ -92,6 +96,13 @@ class Document;
         DocumentSource::registerParser("$" #key, fullParserWrapper);                         \
         return Status::OK();                                                                 \
     }
+
+#define REGISTER_DOCUMENT_SOURCE(key, liteParser, fullParser) \
+    REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, true)
+
+#define REGISTER_TEST_DOCUMENT_SOURCE(key, liteParser, fullParser) \
+    REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                        \
+        key, liteParser, fullParser, Command::testCommandsEnabled)
 
 /**
  * Registers a multi-stage alias (such as $sortByCount) to have the single name 'key'. When a stage

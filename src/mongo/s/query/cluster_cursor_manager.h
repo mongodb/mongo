@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/generic_cursor.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/session_killer.h"
@@ -362,6 +363,11 @@ public:
      * Appends sessions that have open cursors in this cursor manager to the given set of lsids.
      */
     void appendActiveSessions(LogicalSessionIdSet* lsids) const;
+
+    /**
+     * Returns a list of GenericCursors for all cursors in the cursor manager.
+     */
+    std::vector<GenericCursor> getAllCursors() const;
 
     Status killCursorsWithMatchingSessions(OperationContext* opCtx,
                                            const SessionKiller::Matcher& matcher);

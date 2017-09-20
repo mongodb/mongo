@@ -663,6 +663,15 @@ var authCommandsLib = {
           skipSharded: true
         },
         {
+          testname: "aggregate_listLocalCursors",
+          command: {aggregate: 1, pipeline: [{$listLocalCursors: {}}], cursor: {}},
+          testcases: [{
+              runOnDb: adminDbName,
+              roles:
+                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, __system: 1}
+          }],
+        },
+        {
           testname: "aggregate_listLocalSessions_allUsers_true",
           command: {aggregate: 1, pipeline: [{$listLocalSessions: {allUsers: true}}], cursor: {}},
           testcases: [{

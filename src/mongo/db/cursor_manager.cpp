@@ -309,6 +309,14 @@ void CursorManager::appendAllActiveSessions(OperationContext* opCtx, LogicalSess
     globalCursorIdCache->visitAllCursorManagers(opCtx, &visitor);
 }
 
+std::vector<GenericCursor> CursorManager::getAllCursors(OperationContext* opCtx) {
+    std::vector<GenericCursor> cursors;
+    auto visitor = [&](CursorManager& mgr) { mgr.appendActiveCursors(&cursors); };
+    globalCursorIdCache->visitAllCursorManagers(opCtx, &visitor);
+
+    return cursors;
+}
+
 Status CursorManager::killCursorsWithMatchingSessions(OperationContext* opCtx,
                                                       const SessionKiller::Matcher& matcher) {
     auto eraser = [&](CursorManager& mgr, CursorId id) {
@@ -551,6 +559,20 @@ void CursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
             if (auto id = cursor->getSessionId()) {
                 lsids->insert(id.value());
             }
+        }
+    }
+}
+
+void CursorManager::appendActiveCursors(std::vector<GenericCursor>* cursors) const {
+    auto allPartitions = _cursorMap->lockAllPartitions();
+    for (auto&& partition : allPartitions) {
+        for (auto&& entry : partition) {
+            auto cursor = entry.second;
+            cursors->emplace_back();
+            auto& gc = cursors->back();
+            gc.setId(cursor->_cursorid);
+            gc.setNs(cursor->nss());
+            gc.setLsid(cursor->getSessionId());
         }
     }
 }
