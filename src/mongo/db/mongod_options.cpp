@@ -40,6 +40,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/db.h"
+#include "mongo/db/diag_log.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
@@ -130,6 +131,12 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceYAMLConfig);
 
     // Diagnostic Options
+
+    general_options
+        .addOptionChaining(
+            "diaglog", "diaglog", moe::Int, "DEPRECATED: 0=off 1=W 2=R 3=both 7=W+some reads")
+        .hidden()
+        .setSources(moe::SourceAllLegacy);
 
     general_options
         .addOptionChaining("operationProfiling.slowOpThresholdMs",
@@ -1068,6 +1075,15 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
     if (params.count("storage.mmapv1.smallFiles")) {
         mmapv1GlobalOptions.smallfiles = params["storage.mmapv1.smallFiles"].as<bool>();
+    }
+    if (params.count("diaglog")) {
+        warning() << "--diaglog is deprecated and will be removed in a future release"
+                  << startupWarningsLog;
+        int x = params["diaglog"].as<int>();
+        if (x < 0 || x > 7) {
+            return Status(ErrorCodes::BadValue, "can't interpret --diaglog setting");
+        }
+        _diaglog.setLevel(x);
     }
 
     if ((params.count("storage.journal.enabled") &&

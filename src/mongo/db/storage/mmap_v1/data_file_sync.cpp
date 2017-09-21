@@ -34,6 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/diag_log.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -65,6 +66,7 @@ void DataFileSync::run() {
     }
     int time_flushing = 0;
     while (!globalInShutdownDeprecated()) {
+        _diaglog.flush();
         if (storageGlobalParams.syncdelay == 0) {
             // in case at some point we add an option to change at runtime
             sleepsecs(5);
