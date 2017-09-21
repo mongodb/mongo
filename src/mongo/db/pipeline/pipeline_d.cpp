@@ -191,7 +191,8 @@ public:
 
     StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const MakePipelineOptions opts) final {
         // 'expCtx' may represent the settings for an aggregation pipeline on a different namespace
         // than the DocumentSource this MongodImplementation is injected into, but both
         // ExpressionContext instances should still have the same OperationContext.
@@ -202,7 +203,26 @@ public:
             return pipeline.getStatus();
         }
 
-        pipeline.getValue()->optimizePipeline();
+        if (opts.optimize) {
+            pipeline.getValue()->optimizePipeline();
+        }
+
+        Status cursorStatus = Status::OK();
+
+        if (opts.attachCursorSource) {
+            cursorStatus = attachCursorSourceToPipeline(expCtx, pipeline.getValue().get());
+        } else if (opts.forceInjectMongod) {
+            PipelineD::injectMongodInterface(pipeline.getValue().get());
+        }
+
+        return cursorStatus.isOK() ? std::move(pipeline) : cursorStatus;
+    }
+
+    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        Pipeline* pipeline) final {
+        invariant(_ctx->opCtx == expCtx->opCtx);
+        invariant(pipeline->getSources().empty() ||
+                  !dynamic_cast<DocumentSourceCursor*>(pipeline->getSources().front().get()));
 
         boost::optional<AutoGetCollectionForReadCommand> autoColl;
         if (expCtx->uuid) {
@@ -226,10 +246,9 @@ public:
         auto css = CollectionShardingState::get(_ctx->opCtx, expCtx->ns);
         uassert(4567, "from collection cannot be sharded", !bool(css->getMetadata()));
 
-        PipelineD::prepareCursorSource(
-            autoColl->getCollection(), expCtx->ns, nullptr, pipeline.getValue().get());
+        PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 
-        return pipeline;
+        return Status::OK();
     }
 
     std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
@@ -460,6 +479,15 @@ BSONObj removeSortKeyMetaProjection(BSONObj projectionObj) {
 }
 }  // namespace
 
+void PipelineD::injectMongodInterface(Pipeline* pipeline) {
+    for (auto&& source : pipeline->_sources) {
+        if (auto needsMongod = dynamic_cast<DocumentSourceNeedsMongod*>(source.get())) {
+            needsMongod->injectMongodInterface(
+                std::make_shared<MongodImplementation>(pipeline->getContext()));
+        }
+    }
+}
+
 void PipelineD::prepareCursorSource(Collection* collection,
                                     const NamespaceString& nss,
                                     const AggregationRequest* aggRequest,
@@ -470,13 +498,7 @@ void PipelineD::prepareCursorSource(Collection* collection,
     Pipeline::SourceContainer& sources = pipeline->_sources;
 
     // Inject a MongodImplementation to sources that need them.
-    for (auto&& source : sources) {
-        DocumentSourceNeedsMongod* needsMongod =
-            dynamic_cast<DocumentSourceNeedsMongod*>(source.get());
-        if (needsMongod) {
-            needsMongod->injectMongodInterface(std::make_shared<MongodImplementation>(expCtx));
-        }
-    }
+    injectMongodInterface(pipeline);
 
     if (!sources.empty() && !sources.front()->constraints().requiresInputDocSource) {
         return;

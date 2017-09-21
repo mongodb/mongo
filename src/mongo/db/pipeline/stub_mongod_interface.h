@@ -93,7 +93,13 @@ public:
 
     StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) override {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const MakePipelineOptions opts) override {
+        MONGO_UNREACHABLE;
+    }
+
+    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        Pipeline* pipeline) override {
         MONGO_UNREACHABLE;
     }
 

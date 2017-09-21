@@ -117,7 +117,7 @@ public:
     double Number() const {
         uassert(13118,
                 str::stream() << "expected " << fieldName()
-                              << " to have a numberic type, but it is a "
+                              << " to have a numeric type, but it is a "
                               << type(),
                 isNumber());
         return number();

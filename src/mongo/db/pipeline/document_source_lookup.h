@@ -32,6 +32,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -126,6 +127,15 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    static boost::intrusive_ptr<DocumentSource> createFromBsonWithCacheSize(
+        BSONElement elem,
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        size_t maxCacheSizeBytes) {
+        auto dsLookup = createFromBson(elem, pExpCtx);
+        static_cast<DocumentSourceLookUp*>(dsLookup.get())->reInitializeCache(maxCacheSizeBytes);
+        return dsLookup;
+    }
+
     /**
      * Builds the BSONObj used to query the foreign collection and wraps it in a $match.
      */
@@ -156,6 +166,10 @@ public:
 
     const VariablesParseState& getVariablesParseState_forTest() {
         return _variablesParseState;
+    }
+
+    std::unique_ptr<Pipeline, Pipeline::Deleter> getSubPipeline_forTest(const Document& inputDoc) {
+        return buildPipeline(inputDoc);
     }
 
 protected:
@@ -229,10 +243,27 @@ private:
     void resolveLetVariables(const Document& localDoc, Variables* variables);
 
     /**
+     * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
+     * cursor and/or cache source as appropriate.
+     */
+    std::unique_ptr<Pipeline, Pipeline::Deleter> buildPipeline(const Document& inputDoc);
+
+    /**
      * The pipeline supplied via the $lookup 'pipeline' argument. This may differ from pipeline that
      * is executed in that it will not include optimizations or resolved views.
      */
     std::string getUserPipelineDefinition();
+
+    /**
+     * Reinitialize the cache with a new max size. May only be called if this DSLookup was created
+     * with pipeline syntax, the cache has not been frozen or abandoned, and no data has been added
+     * to it.
+     */
+    void reInitializeCache(size_t maxCacheSizeBytes) {
+        invariant(wasConstructedWithPipelineSyntax());
+        invariant(!_cache || (_cache->isBuilding() && _cache->sizeBytes() == 0));
+        _cache.emplace(maxCacheSizeBytes);
+    }
 
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
@@ -248,6 +279,12 @@ private:
     // in foreign pipeline execution.
     Variables _variables;
     VariablesParseState _variablesParseState;
+
+    // Caches documents returned by the non-correlated prefix of the $lookup pipeline during the
+    // first iteration, up to a specified size limit in bytes. If this limit is not exceeded by the
+    // time we hit EOF, subsequent iterations of the pipeline will draw from the cache rather than
+    // from a cursor source.
+    boost::optional<SequentialDocumentCache> _cache;
 
     // The ExpressionContext used when performing aggregation pipelines against the '_resolvedNs'
     // namespace.

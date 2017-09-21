@@ -217,7 +217,7 @@ void Pipeline::optimizePipeline() {
     // We could be swapping around stages during this process, so disconnect the pipeline to prevent
     // us from entering a state with dangling pointers.
     unstitch();
-    while (itr != _sources.end() && std::next(itr) != _sources.end()) {
+    while (itr != _sources.end()) {
         invariant((*itr).get());
         itr = (*itr).get()->optimizeAt(itr, &_sources);
     }
@@ -508,19 +508,35 @@ void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
     _sources.push_front(source);
 }
 
+void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
+    if (!_sources.empty()) {
+        source->setSource(_sources.back().get());
+    }
+    _sources.push_back(source);
+}
+
 DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const {
     DepsTracker deps(metadataAvailable);
+    const bool scopeHasVariables = pCtx->variablesParseState.hasDefinedVariables();
+    bool skipFieldsAndMetadataDeps = false;
     bool knowAllFields = false;
     bool knowAllMeta = false;
     for (auto&& source : _sources) {
         DepsTracker localDeps(deps.getMetadataAvailable());
         DocumentSource::GetDepsReturn status = source->getDependencies(&localDeps);
 
-        if (status == DocumentSource::NOT_SUPPORTED) {
+        deps.vars.insert(localDeps.vars.begin(), localDeps.vars.end());
+
+        if ((skipFieldsAndMetadataDeps |= (status == DocumentSource::NOT_SUPPORTED))) {
             // Assume this stage needs everything. We may still know something about our
-            // dependencies if an earlier stage returned either EXHAUSTIVE_FIELDS or
-            // EXHAUSTIVE_META.
-            break;
+            // dependencies if an earlier stage returned EXHAUSTIVE_FIELDS or EXHAUSTIVE_META. If
+            // this scope has variables, we need to keep enumerating the remaining stages but will
+            // skip adding any further field or metadata dependencies.
+            if (scopeHasVariables) {
+                continue;
+            } else {
+                break;
+            }
         }
 
         if (!knowAllFields) {
@@ -540,7 +556,9 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
             knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
         }
 
-        if (knowAllMeta && knowAllFields) {
+        // If there are variables defined at this pipeline's scope, there may be dependencies upon
+        // them in subsequent stages. Keep enumerating.
+        if (knowAllMeta && knowAllFields && !scopeHasVariables) {
             break;
         }
     }

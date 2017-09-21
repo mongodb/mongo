@@ -568,6 +568,19 @@ public:
         enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
         enum class CurrentOpTruncateMode { kNoTruncation, kTruncateOps };
 
+        struct MakePipelineOptions {
+            MakePipelineOptions(){};
+
+            bool optimize = true;
+            bool attachCursorSource = true;
+
+            // Ordinarily, a MongodInterface is injected into the pipeline at the point when the
+            // cursor source is added. If true, 'forceInjectMongod' will inject MongodInterfaces
+            // into the pipeline even if 'attachCursorSource' is false. If 'attachCursorSource' is
+            // true, then the value of 'forceInjectMongod' is irrelevant.
+            bool forceInjectMongod = false;
+        };
+
         virtual ~MongodInterface(){};
 
         /**
@@ -633,16 +646,30 @@ public:
             const std::list<BSONObj>& originalIndexes) = 0;
 
         /**
-         * Parses a Pipeline from a vector of BSONObjs representing DocumentSources and readies it
-         * for execution. The returned pipeline is optimized and has a cursor source prepared.
+         * Parses a Pipeline from a vector of BSONObjs representing DocumentSources. The state of
+         * the returned pipeline will depend upon the supplied MakePipelineOptions:
+         * - The boolean opts.optimize determines whether the pipeline will be optimized.
+         * - If opts.attachCursorSource is false, the pipeline will be returned without attempting
+         * to add an initial cursor source.
+         * - If opts.forceInjectMongod is true, then a MongodInterface will be provided to each
+         * stage which requires one, regardless of whether a cursor source is attached to the
+         * pipeline.
          *
          * This function returns a non-OK status if parsing the pipeline failed.
-         * NamespaceNotFound will be returned if ExpressionContext has a UUID and that UUID doesn't
-         * exist anymore. That should be the only case where NamespaceNotFound gets returned.
          */
         virtual StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
             const std::vector<BSONObj>& rawPipeline,
-            const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            const MakePipelineOptions opts = MakePipelineOptions{}) = 0;
+
+        /**
+         * Attaches a cursor source to the start of a pipeline. Performs no further optimization.
+         * This function asserts if the collection to be aggregated is sharded. NamespaceNotFound
+         * will be returned if ExpressionContext has a UUID and that UUID doesn't exist anymore.
+         * That should be the only case where NamespaceNotFound is returned.
+         */
+        virtual Status attachCursorSourceToPipeline(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) = 0;
 
         /**
          * Returns a vector of owned BSONObjs, each of which contains details of an in-progress

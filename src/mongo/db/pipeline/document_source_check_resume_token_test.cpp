@@ -236,16 +236,28 @@ public:
 
     StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const MakePipelineOptions opts) final {
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
         if (!pipeline.isOK()) {
             return pipeline.getStatus();
         }
 
-        pipeline.getValue()->addInitialSource(DocumentSourceMock::create(_mockResults));
-        pipeline.getValue()->optimizePipeline();
+        if (opts.optimize) {
+            pipeline.getValue()->optimizePipeline();
+        }
+
+        if (opts.attachCursorSource) {
+            uassertStatusOK(attachCursorSourceToPipeline(expCtx, pipeline.getValue().get()));
+        }
 
         return pipeline;
+    }
+
+    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        Pipeline* pipeline) final {
+        pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
+        return Status::OK();
     }
 
 private:

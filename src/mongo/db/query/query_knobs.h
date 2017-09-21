@@ -120,4 +120,6 @@ extern AtomicInt32 internalInsertMaxBatchSize;
 
 extern AtomicInt32 internalDocumentSourceCursorBatchSizeBytes;
 
+extern AtomicInt32 internalDocumentSourceLookupCacheSizeBytes;
+
 }  // namespace mongo

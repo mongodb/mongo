@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/variables.h"
 
 namespace mongo {
 class ParsedDeps;
@@ -58,6 +59,16 @@ struct DepsTracker {
 
     bool hasNoRequirements() const {
         return fields.empty() && !needWholeDocument && !_needTextScore;
+    }
+
+    /**
+     * Returns 'true' if any of the DepsTracker's variables appear in the passed 'ids' set.
+     */
+    bool hasVariableReferenceTo(const std::set<Variables::Id>& ids) const {
+        std::vector<Variables::Id> match;
+        std::set_intersection(
+            vars.begin(), vars.end(), ids.begin(), ids.end(), std::back_inserter(match));
+        return !match.empty();
     }
 
     MetadataAvailable getMetadataAvailable() const {
@@ -91,9 +102,10 @@ struct DepsTracker {
         _needSortKey = needSortKey;
     }
 
-    std::set<std::string> fields;    // The names of needed fields in dotted notation.
-    bool needWholeDocument = false;  // If true, ignore 'fields' and assume the whole document is
-                                     // needed.
+    std::set<std::string> fields;    // Names of needed fields in dotted notation.
+    std::set<Variables::Id> vars;    // IDs of referenced variables.
+    bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
+
 private:
     /**
      * Appends the meta projections for the sort key and/or text score to 'bb' if necessary. Returns

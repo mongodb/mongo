@@ -256,15 +256,19 @@ DocumentSource::StageConstraints DocumentSourceFacet::constraints() const {
 }
 
 DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
+    const bool scopeHasVariables = pExpCtx->variablesParseState.hasDefinedVariables();
     for (auto&& facet : _facets) {
         auto subDepsTracker = facet.pipeline->getDependencies(deps->getMetadataAvailable());
 
         deps->fields.insert(subDepsTracker.fields.begin(), subDepsTracker.fields.end());
+        deps->vars.insert(subDepsTracker.vars.begin(), subDepsTracker.vars.end());
 
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
         deps->setNeedTextScore(deps->getNeedTextScore() || subDepsTracker.getNeedTextScore());
 
-        if (deps->needWholeDocument && deps->getNeedTextScore()) {
+        // If there are variables defined at this stage's scope, there may be dependencies upon
+        // them in subsequent pipelines. Keep enumerating.
+        if (deps->needWholeDocument && deps->getNeedTextScore() && !scopeHasVariables) {
             break;
         }
     }

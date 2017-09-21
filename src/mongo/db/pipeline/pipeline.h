@@ -245,8 +245,10 @@ public:
      */
     std::vector<Value> serialize() const;
 
-    /// The initial source is special since it varies between mongos and mongod.
+    // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
+
+    void addFinalSource(boost::intrusive_ptr<DocumentSource> source);
 
     /**
      * Returns the next result from the pipeline, or boost::none if there are no more results.

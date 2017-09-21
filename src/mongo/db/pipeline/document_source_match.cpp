@@ -64,7 +64,14 @@ Value DocumentSourceMatch::serialize(boost::optional<ExplainOptions::Verbosity> 
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
-    return getQuery().isEmpty() ? nullptr : this;
+    if (getQuery().isEmpty()) {
+        return nullptr;
+    }
+
+    // TODO SERVER-30991: thread optimization down to the MatchExpression.
+    //_expression->optimize();
+
+    return this;
 }
 
 DocumentSource::GetNextResult DocumentSourceMatch::getNext() {
@@ -471,6 +478,9 @@ BSONObj DocumentSourceMatch::getQuery() const {
 }
 
 DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* deps) const {
+    // Get all field or variable dependencies.
+    _expression->addDependencies(deps);
+
     if (isTextQuery()) {
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
         // know what field it will be searching without examining indices.
@@ -479,7 +489,6 @@ DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* 
         return EXHAUSTIVE_FIELDS;
     }
 
-    _expression->addDependencies(deps);
     return SEE_NEXT;
 }
 

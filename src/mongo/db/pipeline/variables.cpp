@@ -154,7 +154,9 @@ Variables::Id VariablesParseState::defineVariable(StringData name) {
             Variables::kBuiltinVarNameToId.find(name) == Variables::kBuiltinVarNameToId.end());
 
     Variables::Id id = _idGenerator->generateId();
-    _variables[name] = id;
+    invariant(id > _lastSeen);
+
+    _variables[name] = _lastSeen = id;
     return id;
 }
 
@@ -175,5 +177,15 @@ Variables::Id VariablesParseState::getVariable(StringData name) const {
     // than CURRENT. If this is CURRENT, then we treat it as equivalent to ROOT.
     uassert(17276, str::stream() << "Use of undefined variable: " << name, name == "CURRENT");
     return Variables::kRootId;
+}
+
+std::set<Variables::Id> VariablesParseState::getDefinedVariableIDs() const {
+    std::set<Variables::Id> ids;
+
+    for (auto&& keyId : _variables) {
+        ids.insert(keyId.second);
+    }
+
+    return ids;
 }
 }
