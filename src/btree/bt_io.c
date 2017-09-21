@@ -222,6 +222,11 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		WT_ASSERT(session, dsk->mem_size == buf->size);
 		ip = buf;
 	}
+
+	/*
+	 * Verify the disk image in diagnostic mode. Return an error instead of
+	 * asserting because the static test suite tests that the error hits.
+	 */
 	WT_ERR(__wt_verify_dsk(session, "[write-check]", ip));
 	__wt_scr_free(session, &ctmp);
 #endif

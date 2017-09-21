@@ -39,6 +39,8 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	WT_STAT_SET(session, stats, btree_maxleafkey, btree->maxleafkey);
 	WT_STAT_SET(session, stats, btree_maxleafpage, btree->maxleafpage);
 	WT_STAT_SET(session, stats, btree_maxleafvalue, btree->maxleafvalue);
+	WT_STAT_SET(session,
+	    stats, rec_multiblock_max, btree->rec_multiblock_max);
 
 	WT_STAT_SET(session, stats, cache_bytes_dirty,
 	    __wt_btree_dirty_inuse(session));
