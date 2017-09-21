@@ -1255,7 +1255,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         args = appendSetParameterArgs(args);
         var progName = args[0];
 
-        if (jsTestOptions().auth) {
+        if (jsTestOptions().auth && progName != 'mongod') {
             args = args.slice(1);
             args.unshift(progName,
                          '-u',

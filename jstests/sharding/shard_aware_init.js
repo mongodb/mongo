@@ -138,6 +138,12 @@
 
     var mongod = MongoRunner.runMongod({shardsvr: ''});
 
+    // This mongod is started with --shardsvr and terminated prior to addShard being called,
+    // hence before the featureCompatibilityVersion document is created, so we need to manually
+    // call setFeatureCompatibilityVersion because SERVER-29452 causes mongod to fail to start up
+    // without such a document.
+    assert.commandWorked(mongod.getDB("admin").runCommand({setFeatureCompatibilityVersion: "3.6"}));
+
     runTest(mongod, st.configRS.getURL());
 
     MongoRunner.stopMongod(mongod);
@@ -145,6 +151,10 @@
     var replTest = new ReplSetTest({nodes: 1});
     replTest.startSet({shardsvr: ''});
     replTest.initiate();
+    // Again, we need to manually call setFeatureCompatibilityVersion because of SERVER-29452.
+    assert.commandWorked(
+        replTest.getPrimary().getDB("admin").runCommand({setFeatureCompatibilityVersion: "3.6"}));
+    replTest.awaitReplication();
 
     runTest(replTest.getPrimary(), st.configRS.getURL());
 

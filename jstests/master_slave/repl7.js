@@ -15,36 +15,38 @@ doTest = function(signal, extraOpts) {
 
     m = rt.start(true);
 
-    for (n = "a"; n != "aaaaa"; n += "a") {
-        m.getDB(n).a.save({x: 1});
+    // Use databases that lexicographically follow "admin" to avoid failing to clone admin, since
+    // as of SERVER-29452 mongod fails to start up without a featureCompatibilityVersion document.
+    for (n = "b"; n != "bbbbb"; n += "b") {
+        m.getDB(n).b.save({x: 1});
     }
 
     s = rt.start(false, extraOpts);
 
     assert.soon(function() {
-        return -1 != getDBNamesNoThrow(s).indexOf("aa");
-    }, "aa timeout", 60000, 1000);
+        return -1 != getDBNamesNoThrow(s).indexOf("bb");
+    }, "bb timeout", 60000, 1000);
 
     rt.stop(false, signal);
 
     s = rt.start(false, extraOpts, signal);
 
     assert.soon(function() {
-        for (n = "a"; n != "aaaaa"; n += "a") {
+        for (n = "b"; n != "bbbbb"; n += "b") {
             if (-1 == getDBNamesNoThrow(s).indexOf(n))
                 return false;
         }
         return true;
-    }, "a-aaaa timeout", 60000, 1000);
+    }, "b-bbbb timeout", 60000, 1000);
 
     assert.soon(function() {
-        for (n = "a"; n != "aaaaa"; n += "a") {
-            if (1 != m.getDB(n).a.find().count()) {
+        for (n = "b"; n != "bbbbb"; n += "b") {
+            if (1 != m.getDB(n).b.find().count()) {
                 return false;
             }
         }
         return true;
-    }, "a-aaaa count timeout");
+    }, "b-bbbb count timeout");
 
     sleep(300);
 

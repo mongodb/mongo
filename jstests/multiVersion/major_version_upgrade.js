@@ -174,6 +174,14 @@
             // We're on the latest version, check bad indexes are still readable.
             validateBadIndexesStandalone(testDB);
         }
+
+        // Make sure a featureCompatibilityVersion document exists during the version.binVersion
+        // === 3.4 iteration and all remaining iterations of "version".
+        if (version.binVersion === "3.4") {
+            let adminDB = conn.getDB("admin");
+            assert.commandWorked(adminDB.runCommand({"setFeatureCompatibilityVersion": "3.4"}));
+        }
+
         // Shutdown the current mongod.
         MongoRunner.stopMongod(conn);
 
@@ -281,6 +289,15 @@
                 null,
                 GetIndexHelpers.findByKeyPattern(testDB[oldVersionCollection].getIndexes(), {b: 1}),
                 `index from ${oldVersionCollection} should be available; nodes: ${tojson(nodes)}`);
+        }
+
+        // Make sure a featureCompatibilityVersion document exists during the version.binVersion
+        // === 3.4 iteration and all remaining iterations of "version".
+        if (version.binVersion === "3.4") {
+            let primaryAdminDB = primary.getDB("admin");
+            assert.commandWorked(
+                primaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
+            rst.awaitReplication();
         }
     }
 

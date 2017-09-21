@@ -48,6 +48,9 @@
     // TEST: Destroying the admin.system.users index and restarting will recreate it, even if
     // admin.system.roles does not exist
     db.dropDatabase();
+    // Restore the featureCompatibilityVersion document since as of SERVER-29452, mongod fails to
+    // startup without such a document.
+    assert.commandWorked(db.runCommand({setFeatureCompatibilityVersion: "3.6"}));
     db.createUser({user: "user", pwd: "pwd", roles: []});
     assert.commandWorked(db.system.users.dropIndexes());
     MongoRunner.stopMongod(conn);
@@ -58,6 +61,9 @@
     // TEST: Destroying the admin.system.roles index and restarting will recreate it, even if
     // admin.system.users does not exist
     db.dropDatabase();
+    // Restore the featureCompatibilityVersion document since as of SERVER-29452, mongod fails to
+    // startup without such a document.
+    assert.commandWorked(db.runCommand({setFeatureCompatibilityVersion: "3.6"}));
     db.createRole({role: "role", privileges: [], roles: []});
     assert.commandWorked(db.system.roles.dropIndexes());
     MongoRunner.stopMongod(conn);
