@@ -33,6 +33,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -231,6 +232,14 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(
+        ErrorCodes::InvalidOptions,
+        str::stream()
+            << "The featureCompatibilityVersion must be 3.6 to use the $changeStream stage. See "
+            << feature_compatibility_version::kDochubLink
+            << ".",
+        serverGlobalParams.featureCompatibility.version.load() !=
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
     // TODO: Add sharding support here (SERVER-29141).
     uassert(
         40470, "The $changeStream stage is not supported on sharded systems.", !expCtx->inMongos);
