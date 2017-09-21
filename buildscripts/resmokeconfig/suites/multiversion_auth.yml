@@ -19,8 +19,6 @@ selector:
   # TODO: SERVER-30161
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
-  # TODO: SERVER-31096
-  - jstests/multiVersion/replicaset_feature_compatibility_fail.js
 
 # Multiversion tests start their own mongod's.
 executor:
