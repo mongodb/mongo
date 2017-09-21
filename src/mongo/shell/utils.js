@@ -257,6 +257,7 @@ jsTestOptions = function() {
                 TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
+            alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,
         });
     }
     return _jsTestOptions;

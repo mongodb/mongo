@@ -11,8 +11,7 @@
 (function() {
     "use strict";
 
-    const retryableWriteCommands =
-        new Set(["delete", "findandmodify", "findAndModify", "insert", "update"]);
+    load("jstests/libs/retryable_writes_util.js");
 
     // Store a session to access ServerSession#canRetryWrites.
     let _serverSession;
@@ -48,7 +47,7 @@
             cmdName = Object.keys(cmdObj)[0];
         }
 
-        const isRetryableWriteCmd = retryableWriteCommands.has(cmdName);
+        const isRetryableWriteCmd = RetryableWritesUtil.isRetryableWriteCmdName(cmdName);
         const canRetryWrites = _serverSession.canRetryWrites(cmdObj);
 
         let numRetries = !jsTest.options().skipRetryOnNetworkError ? 1 : 0;

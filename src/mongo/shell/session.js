@@ -70,6 +70,7 @@ var {
     function SessionAwareClient(client) {
         const kWireVersionSupportingLogicalSession = 6;
         const kWireVersionSupportingCausalConsistency = 6;
+        const kWireVersionSupportingRetryableWrites = 6;
 
         this.getReadPreference = function getReadPreference(driverSession) {
             const sessionOptions = driverSession.getOptions();
@@ -178,6 +179,13 @@ var {
                 // `client.getClusterTime()` is no smaller than the operation time and would
                 // therefore only be less efficient to wait until.
                 cmdObj = injectAfterClusterTime(cmdObj, driverSession._operationTime);
+            }
+
+            if (jsTest.options().alwaysInjectTransactionNumber &&
+                serverSupports(kWireVersionSupportingRetryableWrites) &&
+                driverSession.getOptions().shouldRetryWrites() &&
+                driverSession._serverSession.canRetryWrites(cmdObj)) {
+                cmdObj = driverSession._serverSession.assignTransactionNumber(cmdObj);
             }
 
             return cmdObj;

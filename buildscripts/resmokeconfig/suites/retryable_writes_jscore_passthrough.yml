@@ -10,14 +10,72 @@ selector:
   - jstests/core/opcounters_write_cmd.js
   - jstests/core/read_after_optime.js
 
+  # No-op retries are not ignored by top, the profiler, or opcount.
+  - jstests/core/operation_latency_histogram.js
+  - jstests/core/profile2.js
+  - jstests/core/profile3.js
+  - jstests/core/profile_findandmodify.js
+  - jstests/core/top.js
+  - jstests/core/views/views_stats.js
+
+  # TODO SERVER-31249: getLastError should not be affected by no-op retries.
+  - jstests/core/bulk_legacy_enforce_gle.js
+
+  # TODO SERVER-30532: Add lastErrorObject.upserted to findAndModify no-op retry response.
+  - jstests/core/find_and_modify_server6582.js
+
+  # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
+  - jstests/core/crud_api.js
+  - jstests/core/find_and_modify2.js
+  - jstests/core/find_and_modify_server6865.js
+
+  # TODO SERVER-31243: No-op retry of a findAndModify upsert of a new document should return null
+  # if new=false.
+  - jstests/core/find_and_modify.js
+  - jstests/core/find_and_modify4.js
+  - jstests/core/find_and_modify_empty_coll.js
+  - jstests/core/find_and_modify_empty_update.js
+  - jstests/core/find_and_modify_server6226.js
+
+  # TODO SERVER-31245: Inserts to "system.indexes" bypass the check for retryability.
+  - jstests/core/batch_write_command_insert.js
+
+  # TODO SERVER-31328: Investigate enabling these workloads once performance of retrying completed
+  # inserts and deletes has improved.
+  #
+  # These tests time out because of too many retryable operations:
+  - jstests/core/bulk_insert.js
+  - jstests/core/insert1.js
+  - jstests/core/remove6.js
+  - jstests/core/removea.js
+
+  # TODO SERVER-29843 / SERVER-31328: Investigate enabling these workloads once performance of
+  # retrying completed writes has improved.
+  #
+  # These tests time out on slower machines because of too many retryable operations:
+  - jstests/core/explain3.js
+  - jstests/core/geo2.js
+  - jstests/core/geo3.js
+  - jstests/core/geo_polygon3.js
+  - jstests/core/geo_s2explain.js
+  - jstests/core/geo_s2sparse.js
+  - jstests/core/geo_s2twofields.js
+  - jstests/core/mr1.js
+  - jstests/core/queryoptimizer3.js
+  - jstests/core/remove9.js
+  - jstests/core/removeb.js
+  - jstests/core/splitvector.js
+
 executor:
   config:
     shell_options:
       eval: >-
         testingReplication = true;
         load("jstests/libs/override_methods/enable_sessions.js");
+        load("jstests/libs/override_methods/retry_writes_at_least_once.js");
       global_vars:
         TestData:
+          alwaysInjectTransactionNumber: true
           sessionOptions:
             retryWrites: true
       readMode: commands
