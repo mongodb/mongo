@@ -65,7 +65,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/diag_log.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/index_names.h"
@@ -1038,9 +1037,6 @@ void shutdownTask() {
 
     log(LogComponent::kNetwork) << "shutdown: going to close listening sockets...";
     ListeningSockets::get()->closeAll();
-
-    log(LogComponent::kNetwork) << "shutdown: going to flush diaglog...";
-    _diaglog.flush();
 
     if (serviceContext->getGlobalStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;

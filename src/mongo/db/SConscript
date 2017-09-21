@@ -414,7 +414,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/mmap_v1/mmap_v1_options',
-        'diag_log',
         'repl/repl_settings',
         'server_options',
         'storage/storage_options',
@@ -593,7 +592,6 @@ env.Library(
         'concurrency/lock_manager',
         'curop',
         'curop_metrics',
-        'diag_log',
         'lasterror',
         'ops/write_ops_parsers',
         'rw_concern_d',
@@ -758,16 +756,6 @@ env.Library(
 )
 
 env.Library(
-    target="diag_log",
-    source=[
-        "diag_log.cpp",
-    ],
-    LIBDEPS=[
-        "storage/storage_options",
-    ],
-)
-
-env.Library(
     target="authz_manager_external_state_factory_d",
     source=[
         "authz_manager_external_state_factory_d.cpp",
@@ -819,7 +807,6 @@ env.Library(
         "db_raii",
         "dbdirectclient",
         "dbhelpers",
-        "diag_log",
         "exec/exec",
         "exec/working_set",
         "ftdc/ftdc_mongod",

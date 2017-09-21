@@ -213,7 +213,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::shutdown
         << ActionType::touch
         << ActionType::unlock
-        << ActionType::diagLogging
         << ActionType::flushRouterConfig  // clusterManager gets this also
         << ActionType::fsync
         << ActionType::invalidateUserCache // userAdminAnyDatabase gets this also
