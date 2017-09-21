@@ -199,7 +199,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 			/* Reset the tree's eviction priority (if any). */
 			__wt_evict_priority_clear(session);
 		}
-		if (!marked_dead)
+		if (!marked_dead || final)
 			WT_ERR(__wt_checkpoint_close(session, final));
 	}
 
