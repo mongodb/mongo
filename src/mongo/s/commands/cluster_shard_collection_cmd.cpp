@@ -52,6 +52,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_write.h"
@@ -186,12 +187,17 @@ public:
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
-        auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
-
-        // Ensure sharding is allowed on the database
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "sharding not enabled for db " << nss.db(),
-                dbInfo.shardingEnabled());
+        // Ensure sharding is allowed on the database by reading directly from the config server,
+        // because reading through the cache might produce a stale entry if the "enableSharding" was
+        // called through a different mongos
+        {
+            const auto opTimeWithDbt =
+                uassertStatusOK(catalogClient->getDatabase(opCtx, nss.db().toString()));
+            const auto& dbt = opTimeWithDbt.value;
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "sharding not enabled for db " << nss.db(),
+                    dbt.getSharded());
+        }
 
         auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 
