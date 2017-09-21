@@ -65,6 +65,21 @@ void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {
         opCtx->getServiceContext(),
         stdx::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext()));
 }
+
+class EnsureFCV {
+public:
+    using Version = ServerGlobalParams::FeatureCompatibility::Version;
+    EnsureFCV(Version version)
+        : _origVersion(serverGlobalParams.featureCompatibility.version.load()) {
+        serverGlobalParams.featureCompatibility.version.store(version);
+    }
+    ~EnsureFCV() {
+        serverGlobalParams.featureCompatibility.version.store(_origVersion);
+    }
+
+private:
+    const Version _origVersion;
+};
 }  // namespace
 
 namespace Optimizations {
@@ -979,6 +994,7 @@ TEST(PipelineOptimizationTest, MatchOnMaxLengthShouldMoveAcrossRename) {
 }
 
 TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     QueryTestServiceContext testServiceContext;
     auto opCtx = testServiceContext.makeOperationContext();
 
@@ -1004,6 +1020,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
 }
 
 TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     QueryTestServiceContext testServiceContext;
     auto opCtx = testServiceContext.makeOperationContext();
 
@@ -1482,6 +1499,7 @@ TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidForFacetPipelineRegardles
 }
 
 TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsValidAsFirstStage) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
@@ -1490,6 +1508,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsValidAsFirstStage) {
 }
 
 TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStage) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
                                               fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
@@ -1500,6 +1519,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStage) {
 }
 
 TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStageInFacet) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
                                               fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();

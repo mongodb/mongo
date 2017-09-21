@@ -68,11 +68,34 @@ static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
 static const NamespaceString nss("unittests.change_stream");
 
-using ChangeStreamStageTestNoSetup = AggregationContextFixture;
-
-class ChangeStreamStageTest : public AggregationContextFixture {
+class EnsureFCV {
 public:
-    ChangeStreamStageTest() : AggregationContextFixture(nss) {
+    using Version = ServerGlobalParams::FeatureCompatibility::Version;
+    EnsureFCV(Version version)
+        : _origVersion(serverGlobalParams.featureCompatibility.version.load()) {
+        serverGlobalParams.featureCompatibility.version.store(version);
+    }
+    ~EnsureFCV() {
+        serverGlobalParams.featureCompatibility.version.store(_origVersion);
+    }
+
+private:
+    const Version _origVersion;
+};
+
+class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
+public:
+    ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
+    ChangeStreamStageTestNoSetup(NamespaceString nsString)
+        : AggregationContextFixture(nsString), _ensureFCV(EnsureFCV::Version::k36) {}
+
+private:
+    EnsureFCV _ensureFCV;
+};
+
+class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
+public:
+    ChangeStreamStageTest() : ChangeStreamStageTestNoSetup() {
         repl::ReplicationCoordinator::set(getExpCtx()->opCtx->getServiceContext(),
                                           stdx::make_unique<repl::ReplicationCoordinatorMock>(
                                               getExpCtx()->opCtx->getServiceContext()));
