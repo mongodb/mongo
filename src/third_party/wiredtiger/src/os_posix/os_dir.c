@@ -37,7 +37,13 @@ __wt_posix_directory_list(WT_FILE_SYSTEM *file_system,
 	dirallocsz = 0;
 	entries = NULL;
 
+	/*
+	 * If opendir fails, we should have a NULL pointer with an error value,
+	 * but various static analysis programs remain unconvinced, check both.
+	 */
 	WT_SYSCALL_RETRY(((dirp = opendir(directory)) == NULL ? -1 : 0), ret);
+	if (dirp == NULL && ret == 0)
+		ret = EINVAL;
 	if (ret != 0)
 		WT_RET_MSG(session, ret,
 		    "%s: directory-list: opendir", directory);
