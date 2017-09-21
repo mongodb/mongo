@@ -17,7 +17,7 @@
     const dbName = 'd';
     const primary = rst.getPrimary();
     const primaryDB = primary.getDB(dbName);
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion:"3.4"}));
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
     assert.writeOK(primaryDB['foo'].save({}));
 
