@@ -80,6 +80,7 @@ public:
 
     static void TestParsingNegatives() {
         if (Limits::is_signed) {
+            ASSERT_PARSES(NumberType, "-0", 0);
             ASSERT_PARSES(NumberType, "-10", -10);
             ASSERT_PARSES(NumberType, "-0xff", -0xff);
             ASSERT_PARSES(NumberType, "-077", -077);
@@ -120,6 +121,8 @@ public:
         ASSERT_PARSES_WITH_BASE(NumberType, "15b", 16, 0x15b);
         ASSERT_PARSES_WITH_BASE(NumberType, "77", 8, 077);
         ASSERT_PARSES_WITH_BASE(NumberType, "z", 36, 35);
+        ASSERT_PARSES_WITH_BASE(NumberType, "09", 10, 9);
+        ASSERT_PARSES_WITH_BASE(NumberType, "00000000000z0", 36, 35 * 36);
         ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("1b", 10, &x));
         ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("80", 8, &x));
         ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("0X", 16, &x));
@@ -151,10 +154,21 @@ public:
             ErrorCodes::FailedToParse,
             parseNumberFromString(std::string(str::stream() << Limits::max() << '0'), &ignored));
 
-        if (Limits::is_signed)
+        if (Limits::is_signed) {
+            // Max + 1
+            ASSERT_EQUALS(
+                ErrorCodes::FailedToParse,
+                parseNumberFromString(std::to_string(uint64_t(Limits::max()) + 1), &ignored));
+
+            // Min - 1 (equivalent to -(Max + 2))
+            ASSERT_EQUALS(
+                ErrorCodes::FailedToParse,
+                parseNumberFromString("-" + std::to_string(uint64_t(Limits::max()) + 2), &ignored));
+
             ASSERT_EQUALS(ErrorCodes::FailedToParse,
                           parseNumberFromString(std::string(str::stream() << Limits::min() << '0'),
                                                 &ignored));
+        }
     }
 };
 
@@ -226,6 +240,32 @@ TEST(ParseNumber, UInt8) {
         ASSERT_PARSES(uint8_t, std::string(mongoutils::str::stream() << i), i);
 }
 
+TEST(ParseNumber, TestParsingOverflow) {
+    uint64_t u64;
+    // These both have one too many hex digits and will overflow the multiply. The second overflows
+    // such that the truncated result is still greater than either input and can catch overly
+    // simplistic overflow checks.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  parseNumberFromStringWithBase("0xfffffffffffffffff", 16, &u64));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  parseNumberFromStringWithBase("0x7ffffffffffffffff", 16, &u64));
+
+    // 2**64 exactly. This will overflow the add.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  parseNumberFromStringWithBase("18446744073709551616", 10, &u64));
+
+    uint32_t u32;
+    // Too large when down-converting.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  parseNumberFromStringWithBase("0xfffffffff", 16, &u32));
+
+    int32_t i32;
+    // Too large when down-converting.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        parseNumberFromString(std::to_string(std::numeric_limits<uint32_t>::max()), &i32));
+}
+
 TEST(Double, TestRejectingBadBases) {
     double ignored;
 
@@ -264,6 +304,13 @@ TEST(Double, TestParsingNan) {
     double d = 0;
     ASSERT_OK(parseNumberFromString("NaN", &d));
     ASSERT_TRUE(std::isnan(d));
+}
+
+TEST(Double, TestParsingNegativeZero) {
+    double d = 0;
+    ASSERT_OK(parseNumberFromString("-0.0", &d));
+    ASSERT_EQ(d, -0.0);
+    ASSERT_TRUE(std::signbit(d));
 }
 
 TEST(Double, TestParsingInfinity) {
