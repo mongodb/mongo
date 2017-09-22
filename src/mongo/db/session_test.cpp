@@ -317,51 +317,6 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
         ErrorCodes::ConflictingOperationInProgress);
 }
 
-// TODO: These tests require the storage engine used for testing to support document-level
-// concurrency control
-#if (0)
-TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresOldTransaction) {
-    const auto sessionId = makeLogicalSessionIdForTest();
-    Session session(sessionId);
-    session.refreshFromStorageIfNeeded(opCtx());
-
-    const TxnNumber txnNum = 100;
-    session.beginTxn(opCtx(), txnNum);
-
-    AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
-    WriteUnitOfWork wuow(opCtx());
-
-    {
-        const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime.getTimestamp());
-    }
-
-    // Mimics a different thread starting a newer transaction on the same session
-    const TxnNumber newTxnNum = 200;
-
-    stdx::async(stdx::launch::async, [&sessionId, &session, newTxnNum] {
-        Client::initThreadIfNotAlready();
-        auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-        AutoGetCollection autoColl(sideOpCtx.get(), kNss, MODE_IX);
-        WriteUnitOfWork wuow(sideOpCtx.get());
-        const auto opTime = logOp(sideOpCtx.get(), kNss, sessionId, newTxnNum, 1000);
-        session.onWriteOpCompletedOnPrimary(
-            sideOpCtx.get(), newTxnNum, {1000}, opTime.getTimestamp());
-        wuow.commit();
-    }).get();
-
-    wuow.commit();
-
-    // The newer transaction must win
-    ASSERT(!session.checkStatementExecuted(opCtx(), newTxnNum, 0));
-    ASSERT(session.checkStatementExecuted(opCtx(), newTxnNum, 1000));
-
-    ASSERT_THROWS_CODE(session.checkStatementExecuted(opCtx(), txnNum, 0),
-                       AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
-}
-#endif
-
 TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
