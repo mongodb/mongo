@@ -128,30 +128,33 @@ public:
                 opCtx, writeConcern);
         }
 
+        // Perform an upgrade
         if (version != existingVersion && isFCVUpgrade(version)) {
-            serverGlobalParams.featureCompatibility.isSchemaVersion36.store(true);
+            // Set targetVersion to indicate that an upgrade is in progress, then unset when done.
+            FeatureCompatibilityVersion::setTargetUpgrade(opCtx, version);
             updateUUIDSchemaVersion(opCtx, /*upgrade*/ true);
-            existingVersion = version;
-        }
 
-        // For reproducing failure after adding UUIDs and before upgrade FCV document.
-        if (MONGO_FAIL_POINT(featureCompatibilityUpgrade)) {
-            exitCleanly(EXIT_CLEAN);
-        }
+            // For reproducing failure after adding UUIDs and before upgrade FCV document.
+            if (MONGO_FAIL_POINT(featureCompatibilityUpgrade)) {
+                exitCleanly(EXIT_CLEAN);
+            }
+            // Unsets 'targetVersion' and sets 'version' to new version.
+            FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, version);
 
-        FeatureCompatibilityVersion::set(opCtx, version);
+            // Always perform a downgrade when setting the FCV to 3.4, in case of a crash after
+            // writing the document and before completing the upgrade.
+        } else if (version == FeatureCompatibilityVersionCommandParser::kVersion34) {
+            // Set targetVersion to indicate that a downgrade is in progress, then unset when
+            // complete.
+            FeatureCompatibilityVersion::setTargetDowngrade(opCtx, version);
 
-        // For reproducing failure after downgrading FCV document, and before removing UUIDs.
-        if (MONGO_FAIL_POINT(featureCompatibilityDowngrade)) {
-            serverGlobalParams.featureCompatibility.isSchemaVersion36.store(false);
-            exitCleanly(EXIT_CLEAN);
-        }
+            // For reproducing failure after downgrading FCV document, and before removing UUIDs.
+            if (MONGO_FAIL_POINT(featureCompatibilityDowngrade)) {
+                exitCleanly(EXIT_CLEAN);
+            }
 
-        // Always perform a downgrade when setting the FCV to 3.4, in case of a crash after writing
-        // the document and before completing the upgrade.
-        if (version == FeatureCompatibilityVersionCommandParser::kVersion34) {
-            serverGlobalParams.featureCompatibility.isSchemaVersion36.store(false);
             updateUUIDSchemaVersion(opCtx, /*upgrade*/ false);
+            FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, version);
         }
 
         // Ensure we try reading the keys for signing clusterTime immediately on upgrade to 3.6.

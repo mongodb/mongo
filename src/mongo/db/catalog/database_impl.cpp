@@ -763,7 +763,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     CollectionOptions optionsWithUUID = options;
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
-        serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
+        serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
         optionsWithUUID.uuid.emplace(CollectionUUID::gen());
     }
 
