@@ -5,12 +5,13 @@
 (function() {
     "use strict";
 
-    let checkFCV = function(adminDB, version) {
+    let checkFCV = function(adminDB, version, targetVersion) {
         let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
         assert.commandWorked(res);
         assert.eq(res.featureCompatibilityVersion, version);
-        assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-                  version);
+        let doc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
+        assert.eq(doc.version, version);
+        assert.eq(doc.targetVersion, targetVersion);
     };
 
     let setFCV = function(adminDB, version) {
@@ -34,7 +35,6 @@
 
         databaseList.forEach(function(database) {
             if (excludeLocal && database.name == "local") {
-                jsTest.log("Skipping local");
                 return;
             }
             let currentDatabase = adminDB.getSiblingDB(database.name);
@@ -98,8 +98,8 @@
     assert.neq(null, conn, "mongod was unable to start up");
     adminDB = conn.getDB("admin");
 
-    // FeatureCompatibility document should be 3.4.
-    checkFCV(adminDB, "3.4");
+    // FeatureCompatibility version should be 3.4 and targetVersion should be 3.4.
+    checkFCV(adminDB, "3.4", "3.4");
 
     // Verify startup warnings
     let msg1 = "WARNING: Using featureCompatibilityVersion 3.4, but the collection";
@@ -151,8 +151,8 @@
     // Check that collections have UUIDs.
     checkCollectionUUIDs(adminDB, /* uuidsExpected */ true);
 
-    // The FCV document should not be updated yet.
-    checkFCV(adminDB, "3.4");
+    // The FCV document should not be updated yet, but the targetVersion should be 3.6
+    checkFCV(adminDB, "3.4", "3.6");
 
     // Now that failpoint is not set, resume upgrade.
     setFCV(adminDB, "3.6");

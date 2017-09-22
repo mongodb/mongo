@@ -764,14 +764,18 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     CollectionOptions optionsWithUUID = options;
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
-        serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
+        serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
         auto coordinator = repl::ReplicationCoordinator::get(opCtx);
-        fassert(40643,
-                coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-                    serverGlobalParams.featureCompatibility.version.load() !=
-                        ServerGlobalParams::FeatureCompatibility::Version::k36 ||
-                    coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) ||
-                    nss.isSystemDotProfile());  // system.profile is special as it's not replicated
+        bool okayCreation =
+            (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
+             serverGlobalParams.featureCompatibility.version.load() !=
+                 ServerGlobalParams::FeatureCompatibility::Version::k36 ||
+             coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) ||
+             nss.isSystemDotProfile());  // system.profile is special as it's not replicated
+        if (!okayCreation) {
+            severe() << "Attempt to assign UUID to replicated collection: " << nss.ns();
+            fassertFailed(40643);
+        }
         optionsWithUUID.uuid.emplace(CollectionUUID::gen());
     }
 

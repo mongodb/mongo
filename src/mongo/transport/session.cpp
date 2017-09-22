@@ -43,7 +43,7 @@ AtomicUInt64 sessionIdCounter(0);
 
 }  // namespace
 
-Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kEmptyTagMask) {}
+Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kExternalClientKeepOpen) {}
 
 Ticket Session::sourceMessage(Message* message, Date_t expiration) {
     return getTransportLayer()->sourceMessage(shared_from_this(), message, expiration);

@@ -421,7 +421,7 @@ void State::prepTempCollection() {
             options.setNoIdIndex();
             options.temp = true;
             if (enableCollectionUUIDs &&
-                serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
+                serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
                 options.uuid.emplace(UUID::gen());
             }
             incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
@@ -505,8 +505,7 @@ void State::prepTempCollection() {
 
         CollectionOptions options = finalOptions;
         options.temp = true;
-        if (enableCollectionUUIDs &&
-            serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
+        if (enableCollectionUUIDs && serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
             // If a UUID for the final output collection was sent by mongos (i.e., the final output
             // collection is sharded), use the UUID mongos sent when creating the temp collection.
             // When the temp collection is renamed to the final output collection, the UUID will be
