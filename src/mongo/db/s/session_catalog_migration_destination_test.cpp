@@ -758,6 +758,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
     ASSERT_TRUE(newPreImageOplog.getObject2().value().isEmpty());
 }
 
+#if 0
 TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
     const NamespaceString kNs("a.b");
     const auto sessionId = makeLogicalSessionIdForTest();
@@ -855,6 +856,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     auto session = getSessionWithTxn(opCtx, sessionId, 20);
     ASSERT_EQ(Timestamp(100, 3), session->getLastWriteOpTimeTs(20));
 }
+#endif
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyAfterNetworkError) {
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
@@ -973,6 +975,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWith
     ASSERT_FALSE(sessionMigration.getErrMsg().empty());
 }
 
+#if 0
 TEST_F(SessionCatalogMigrationDestinationTest,
        NewWritesWithSameTxnDuringMigrationShouldBeCorrectlySet) {
     const NamespaceString kNs("a.b");
@@ -1027,7 +1030,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
 
     ASSERT_FALSE(historyIter.hasNext());
 }
-
+#endif
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForConsecutivePreImageOplog) {
     const NamespaceString kNs("a.b");
     const auto sessionId = makeLogicalSessionIdForTest();
