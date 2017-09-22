@@ -54,6 +54,7 @@ selector:
   - jstests/sharding/move_chunk_remove_with_write_retryability.js
   - jstests/sharding/move_chunk_update_with_write_retryability.js
   - jstests/sharding/write_transactions_during_migration.js
+  - jstests/sharding/json_schema.js
   # New feature in v3.6 mongo shell.
   - jstests/sharding/causal_consistency_shell_support.js
   - jstests/sharding/keys_rotation_interval_sec.js
