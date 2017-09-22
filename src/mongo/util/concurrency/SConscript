@@ -66,3 +66,9 @@ env.CppUnitTest(
         '$BUILD_DIR/third_party/shim_boost',
     ],
 )
+
+env.CppUnitTest(
+    target='with_lock_test',
+    source=[
+        'with_lock_test.cpp',
+    ])

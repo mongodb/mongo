@@ -74,11 +74,11 @@ struct WithLock {
         invariant(lock.owns_lock());
     }
 
+    // Add constructors from any other lock types here.
+
     // Pass by value is OK.
     WithLock(WithLock const&) noexcept {}
     WithLock(WithLock&&) noexcept {}
-
-    WithLock() = delete;
 
     // No assigning WithLocks.
     void operator=(WithLock const&) = delete;
@@ -89,6 +89,16 @@ struct WithLock {
     WithLock(stdx::lock_guard<Mutex>&&) = delete;
     template <typename Mutex>
     WithLock(stdx::unique_lock<Mutex>&&) = delete;
+
+    /*
+     * Pass the result of withoutLock() when a lock is not really needed, such as in a constructor.
+     */
+    static WithLock withoutLock() noexcept {
+        return {};
+    }
+
+private:
+    WithLock() noexcept = default;
 };
 
 }  // namespace mongo
