@@ -68,6 +68,9 @@ class dependency(object):
         # In static mode, all dependencies are public
         self.dependency_type = deptype if dynamic else dependency.Public
 
+    def __str__(self):
+        return str(self.target_node)
+
 class DependencyCycleError(SCons.Errors.UserError):
     """Exception representing a cycle discovered in library dependencies."""
 
