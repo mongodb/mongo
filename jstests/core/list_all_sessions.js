@@ -5,10 +5,9 @@
     load('jstests/aggregation/extras/utils.js');
 
     const admin = db.getSiblingDB("admin");
-    const config = db.getSiblingDB("config");
     const pipeline = [{'$listSessions': {allUsers: true}}];
     function listSessions() {
-        return config.system.sessions.aggregate(pipeline);
+        return admin.system.sessions.aggregate(pipeline);
     }
 
     // Start a new session and capture its sessionId.

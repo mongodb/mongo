@@ -7,11 +7,10 @@
     function runListSessionsTest(mongod) {
         assert(mongod);
         const admin = mongod.getDB('admin');
-        const config = mongod.getDB('config');
 
         const pipeline = [{'$listSessions': {}}];
         function listSessions() {
-            return config.system.sessions.aggregate(pipeline);
+            return admin.system.sessions.aggregate(pipeline);
         }
 
         admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
@@ -22,7 +21,7 @@
         admin.logout();
 
         // Fail when not logged in.
-        assertErrorCode(config.system.sessions, pipeline, ErrorCodes.Unauthorized);
+        assertErrorCode(admin.system.sessions, pipeline, ErrorCodes.Unauthorized);
 
         // Start a new session and capture its sessionId.
         assert(admin.auth('user1', 'pass'));
@@ -40,7 +39,7 @@
         // Ask again using explicit UID.
         const user1Pipeline = [{'$listSessions': {users: [{user: "user1", db: "admin"}]}}];
         function listUser1Sessions() {
-            return config.system.sessions.aggregate(user1Pipeline);
+            return admin.system.sessions.aggregate(user1Pipeline);
         }
         const resultArrayMine = listUser1Sessions().toArray();
         assert.eq(bsonWoCompare(resultArray, resultArrayMine), 0);
@@ -53,14 +52,14 @@
         assert.eq(listSessions().toArray().length, 0);
 
         // Ensure users can't view either other's sessions.
-        assertErrorCode(config.system.sessions, user1Pipeline, ErrorCodes.Unauthorized);
+        assertErrorCode(admin.system.sessions, user1Pipeline, ErrorCodes.Unauthorized);
 
         if (true) {
             // TODO SERVER-29141: Support forcing pipelines to run on mongos
             return;
         }
         function listLocalSessions() {
-            return config.aggregate([{'$listLocalSessions': {}}]);
+            return admin.aggregate([{'$listLocalSessions': {}}]);
         }
         assert.eq(listLocalSessions().toArray().length, 0);
     }

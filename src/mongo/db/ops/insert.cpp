@@ -235,6 +235,8 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
         if (db == "admin") {
             if (coll == "system.version")
                 return Status::OK();
+            if (coll == "system.sessions")
+                return Status::OK();
             if (coll == "system.roles")
                 return Status::OK();
             if (coll == "system.new_users")
@@ -242,10 +244,6 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
             if (coll == "system.backup_users")
                 return Status::OK();
             if (coll == "system.keys")
-                return Status::OK();
-        }
-        if (db == "config") {
-            if (coll == "system.sessions")
                 return Status::OK();
         }
         if (db == "local") {

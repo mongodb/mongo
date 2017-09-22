@@ -7,11 +7,10 @@
     function runListAllSessionsTest(mongod) {
         assert(mongod);
         const admin = mongod.getDB("admin");
-        const config = mongod.getDB("config");
 
         const pipeline = [{'$listSessions': {allUsers: true}}];
         function listSessions() {
-            return config.system.sessions.aggregate(pipeline);
+            return admin.system.sessions.aggregate(pipeline);
         }
 
         admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
@@ -20,7 +19,7 @@
         admin.logout();
 
         // Fail if we're not logged in.
-        assertErrorCode(config.system.sessions, pipeline, ErrorCodes.Unauthorized);
+        assertErrorCode(admin.system.sessions, pipeline, ErrorCodes.Unauthorized);
 
         // Start a new session and capture its sessionId.
         assert(admin.auth('user1', 'pass'));
@@ -29,11 +28,11 @@
         assert.commandWorked(admin.runCommand({refreshLogicalSessionCacheNow: 1}));
 
         // Ensure that a normal user can NOT listSessions{allUsers:true} to view their session.
-        assertErrorCode(config.system.sessions, pipeline, ErrorCodes.Unauthorized);
+        assertErrorCode(admin.system.sessions, pipeline, ErrorCodes.Unauthorized);
 
         // Ensure that a normal user can NOT listSessions to view others' sessions.
         const viewAdminPipeline = [{'$listSessions': {users: [{user: 'admin', db: 'admin'}]}}];
-        assertErrorCode(config.system.sessions, viewAdminPipeline, ErrorCodes.Unauthorized);
+        assertErrorCode(admin.system.sessions, viewAdminPipeline, ErrorCodes.Unauthorized);
 
         // Ensure that the cache now contains the session and is visible by admin
         assert(admin.auth('admin', 'pass'));

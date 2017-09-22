@@ -115,8 +115,7 @@ bool NamespaceString::isLegalClientSystemNS() const {
             return true;
         if (ns() == "admin.system.backup_users")
             return true;
-    } else if (db() == "config") {
-        if (ns() == "config.system.sessions")
+        if (ns() == "admin.system.sessions")
             return true;
     }
     if (ns() == "local.system.replset")

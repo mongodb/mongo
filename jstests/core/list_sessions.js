@@ -5,10 +5,9 @@
     load('jstests/aggregation/extras/utils.js');
 
     const admin = db.getSiblingDB('admin');
-    const config = db.getSiblingDB('config');
     const pipeline = [{'$listSessions': {}}];
     function listSessions() {
-        return config.system.sessions.aggregate(pipeline);
+        return admin.system.sessions.aggregate(pipeline);
     }
 
     // Start a new session and capture its sessionId.
@@ -48,7 +47,7 @@
         return {user: authUsers[0].user, db: authUsers[0].db};
     })();
     function listMySessions() {
-        return config.system.sessions.aggregate([{'$listSessions': {users: [myusername]}}]);
+        return admin.system.sessions.aggregate([{'$listSessions': {users: [myusername]}}]);
     }
     const myArray = listMySessions().toArray();
     assert.eq(resultArray.length, myArray.length);

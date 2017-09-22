@@ -8,12 +8,12 @@
 
         function verify(conn, nRecords) {
             conn.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
-            assert.eq(nRecords, conn.getDB("config").system.sessions.find({}).count());
+            assert.eq(nRecords, conn.getDB("admin").system.sessions.find({}).count());
         }
 
         function getLastUse(conn) {
             conn.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
-            return conn.getDB("config").system.sessions.findOne({}).lastUse;
+            return conn.getDB("admin").system.sessions.findOne({}).lastUse;
         }
 
         // initially we have no sessions
