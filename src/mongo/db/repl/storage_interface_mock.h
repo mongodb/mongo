@@ -122,6 +122,9 @@ public:
                                                         BoundInclusion boundInclusion,
                                                         std::size_t limit)>;
     using IsAdminDbValidFn = stdx::function<Status(OperationContext* opCtx)>;
+    using GetCollectionUUIDFn = stdx::function<StatusWith<OptionalCollectionUUID>(
+        OperationContext* opCtx, const NamespaceString& nss)>;
+    using UpgradeUUIDSchemaVersionNonReplicatedFn = stdx::function<Status(OperationContext* opCtx)>;
 
     StorageInterfaceMock() = default;
 
@@ -253,6 +256,15 @@ public:
         return 0;
     }
 
+    StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
+                                                         const NamespaceString& nss) override {
+        return getCollectionUUIDFn(opCtx, nss);
+    }
+
+    Status upgradeUUIDSchemaVersionNonReplicated(OperationContext* opCtx) override {
+        return upgradeUUIDSchemaVersionNonReplicatedFn(opCtx);
+    }
+
     void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
 
     void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
@@ -330,6 +342,15 @@ public:
     IsAdminDbValidFn isAdminDbValidFn = [](OperationContext*) {
         return Status{ErrorCodes::IllegalOperation, "IsAdminDbValidFn not implemented."};
     };
+    GetCollectionUUIDFn getCollectionUUIDFn = [](
+        OperationContext* opCtx, const NamespaceString& nss) -> StatusWith<OptionalCollectionUUID> {
+        return Status{ErrorCodes::IllegalOperation, "GetCollectionUUIDFn not implemented."};
+    };
+    UpgradeUUIDSchemaVersionNonReplicatedFn upgradeUUIDSchemaVersionNonReplicatedFn =
+        [](OperationContext* opCtx) -> Status {
+        return Status{ErrorCodes::IllegalOperation,
+                      "UpgradeUUIDSchemaVersionNonReplicatedFn not implemented."};
+    };
 
 private:
     mutable stdx::mutex _mutex;
@@ -337,6 +358,8 @@ private:
     bool _rbidInitialized = false;
     SnapshotName _stableTimestamp = SnapshotName::min();
     SnapshotName _initialDataTimestamp = SnapshotName::min();
+    OptionalCollectionUUID _uuid;
+    bool _schemaUpgraded;
 };
 
 }  // namespace repl

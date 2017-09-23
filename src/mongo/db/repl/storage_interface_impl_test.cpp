@@ -2283,6 +2283,103 @@ TEST_F(StorageInterfaceImplTest, GetCollectionCountReturnsCollectionCount) {
 }
 
 TEST_F(StorageInterfaceImplTest,
+       GetCollectionUUIDReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.getCollectionUUID(opCtx, nss).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest,
+       GetCollectionUUIDReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.getCollectionUUID(opCtx, wrongColl).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, GetCollectionUUIDReturnsBoostNoneWhenCollectionHasNoUUID) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto uuid = unittest::assertGet(storage.getCollectionUUID(opCtx, nss));
+    ASSERT_EQ(uuid, boost::none);
+}
+
+TEST_F(StorageInterfaceImplTest, GetCollectionUUIDReturnsUUIDIfExists) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+    auto uuid = unittest::assertGet(storage.getCollectionUUID(opCtx, nss));
+    ASSERT_EQ(uuid, options.uuid);
+}
+
+TEST_F(StorageInterfaceImplTest, UpgradeUUIDSchemaVersionNonReplicatedUpgradesLocalCollections) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+
+    // Create a collection on the local database with no UUID.
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto uuid = unittest::assertGet(storage.getCollectionUUID(opCtx, nss));
+    ASSERT_EQ(uuid, boost::none);
+    ASSERT_OK(storage.upgradeUUIDSchemaVersionNonReplicated(opCtx));
+
+    // Ensure a UUID now exists on the collection.
+    uuid = unittest::assertGet(storage.getCollectionUUID(opCtx, nss));
+    ASSERT_NOT_EQUALS(uuid, boost::none);
+}
+
+TEST_F(StorageInterfaceImplTest, UpgradeUUIDSchemaVersionNonReplicatedIgnoresUpgradedCollections) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+
+    // Create a collection on the local database with a UUID.
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+    auto uuid = unittest::assertGet(storage.getCollectionUUID(opCtx, nss));
+    ASSERT_EQ(uuid, options.uuid);
+    ASSERT_OK(storage.upgradeUUIDSchemaVersionNonReplicated(opCtx));
+
+    // Ensure the UUID has not changed after the upgrade.
+    uuid = unittest::assertGet(storage.getCollectionUUID(opCtx, nss));
+    ASSERT_EQUALS(uuid, options.uuid);
+}
+
+TEST_F(StorageInterfaceImplTest, UpgradeUUIDSchemaVersionNonReplicatedUpgradesSystemDotProfile) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    const NamespaceString nss("testdb", "system.profile");
+
+    // Create a system.profile collection with no UUID.
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto uuid = unittest::assertGet(storage.getCollectionUUID(opCtx, nss));
+    ASSERT_EQ(uuid, boost::none);
+
+    // Also create another collection on the same database that will not be assigned a UUID.
+    const NamespaceString noUUIDNss("testdb", "noUUIDCollection");
+    ASSERT_OK(storage.createCollection(opCtx, noUUIDNss, CollectionOptions()));
+    auto noUUID = unittest::assertGet(storage.getCollectionUUID(opCtx, noUUIDNss));
+    ASSERT_EQ(noUUID, boost::none);
+    ASSERT_OK(storage.upgradeUUIDSchemaVersionNonReplicated(opCtx));
+
+    // Ensure a UUID now exists on the system.profile collection but not noUUIDCollection.
+    uuid = unittest::assertGet(storage.getCollectionUUID(opCtx, nss));
+    ASSERT_NOT_EQUALS(uuid, boost::none);
+    noUUID = unittest::assertGet(storage.getCollectionUUID(opCtx, noUUIDNss));
+    ASSERT_EQ(noUUID, boost::none);
+}
+
+TEST_F(StorageInterfaceImplTest,
        GetCollectionSizeReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

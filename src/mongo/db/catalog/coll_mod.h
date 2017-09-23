@@ -37,7 +37,18 @@ class Collection;
 class NamespaceString;
 class OperationContext;
 
+/**
+ * If upgrade is true, adds UUIDs to all collections of all databases. If upgrade is false, removes
+ * UUIDs from all collections of all databases. It updates non-replicated collections by indirectly
+ * calling updateUUIDSchemaVersionNonReplicated().
+ */
 void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade);
+
+/**
+ * If upgrade is true, adds UUIDs to all non-replicated collections of all databases. If upgrade is
+ * false, removes UUIDs from all non-replicated collections of all databases.
+ */
+Status updateUUIDSchemaVersionNonReplicated(OperationContext* opCtx, bool upgrade);
 
 /**
  * Performs the collection modification described in "cmdObj" on the collection "ns".
