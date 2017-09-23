@@ -157,7 +157,7 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     const auto checkInterval = std::min(Milliseconds(250), timeout);
 
     auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
-    std::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
+    stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
     while (timeSpent < timeout &&
            !_shutdownCondition.wait_for(lk, checkInterval.toSystemDuration(), noWorkersLeft)) {
         log(LogComponent::kNetwork) << "shutdown: still waiting on " << numOpenSessions()
