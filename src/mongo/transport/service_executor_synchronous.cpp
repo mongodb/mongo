@@ -133,8 +133,7 @@ Status ServiceExecutorSynchronous::schedule(Task task, ScheduleFlags flags) {
         }
 
         if (_numRunningWorkerThreads.subtractAndFetch(1) == 0) {
-            stdx::unique_lock<stdx::mutex> lock(_shutdownMutex);
-            stdx::notify_all_at_thread_exit(_shutdownCondition, std::move(lock));
+            _shutdownCondition.notify_all();
         }
     });
 
