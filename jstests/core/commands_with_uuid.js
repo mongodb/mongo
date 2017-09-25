@@ -42,12 +42,15 @@
     assert.eq(doc.fooField, 'FOO');
     assert(!cursor.hasNext(), 'expected to have exhausted cursor for results ' + tojson(res));
 
-    // Ensure passing a missing UUID to find uasserts that the UUID is not found.
+    // Ensure passing a missing UUID to commands taking UUIDs uasserts that the UUID is not found.
     const missingUUID = UUID();
-    assert.neq(missingUUID, uuid);
-    cmd = {find: missingUUID};
-    res = db.runCommand(cmd);
-    assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+    for (cmd of[{count: missingUUID},
+                {find: missingUUID},
+                {listIndexes: missingUUID},
+                {parallelCollectionScan: missingUUID, numCursors: 1}]) {
+        assert.commandFailedWithCode(
+            db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
+    }
 
     // Ensure passing a UUID to listIndexes retrieves results from the correct collection.
     cmd = {listIndexes: uuid};

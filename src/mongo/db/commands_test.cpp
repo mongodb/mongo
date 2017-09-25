@@ -113,8 +113,9 @@ TEST_F(ParseNsOrUUID, FailInvalidDbName) {
 
 TEST_F(ParseNsOrUUID, ParseUnknownUUID) {
     auto cmd = BSON("query" << UUID::gen());
-    auto parsedNss = Command::parseNsOrUUID(opCtx, "test.coll", cmd);
-    ASSERT(parsedNss.isEmpty());
+    ASSERT_THROWS_CODE(Command::parseNsOrUUID(opCtx, "test.coll", cmd),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(ParseNsOrUUID, ParseValidColl) {

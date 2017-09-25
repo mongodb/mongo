@@ -121,10 +121,18 @@ NamespaceString Command::parseNsOrUUID(OperationContext* opCtx,
                                        const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
-        StatusWith<UUID> uuidRes = UUID::parse(first);
-        uassertStatusOK(uuidRes);
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        return catalog.lookupNSSByUUID(uuidRes.getValue());
+        UUID uuid = uassertStatusOK(UUID::parse(first));
+        NamespaceString nss = catalog.lookupNSSByUUID(uuid);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "UUID " << uuid << " specified in "
+                              << cmdObj.firstElement().fieldNameStringData()
+                              << " command not found in "
+                              << dbname
+                              << " database",
+                nss.isValid() && nss.db() == dbname);
+
+        return nss;
     } else {
         // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
