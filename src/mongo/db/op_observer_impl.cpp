@@ -177,7 +177,7 @@ repl::OpTime replLogDelete(OperationContext* opCtx,
                            OptionalCollectionUUID uuid,
                            Session* session,
                            StmtId stmtId,
-                           CollectionShardingState::DeleteState deleteState,
+                           const CollectionShardingState::DeleteState& deleteState,
                            bool fromMigrate,
                            const boost::optional<BSONObj>& deletedDoc) {
     OperationSessionInfo sessionInfo;

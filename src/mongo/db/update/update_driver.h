@@ -98,12 +98,6 @@ public:
                                            mutablebson::Document& doc) const;
 
     /**
-     * return a BSONObj with the _id field of the doc passed in, or the doc itself.
-     * If no _id and multi, error.
-     */
-    BSONObj makeOplogEntryQuery(const BSONObj& doc, bool multi) const;
-
-    /**
      * Executes the update over 'doc'. If any modifier is positional, use 'matchedField' (index of
      * the array item matched). If 'doc' allows the modifiers to be applied in place and no index
      * updating is involved, then the modifiers may be applied "in place" over 'doc'.

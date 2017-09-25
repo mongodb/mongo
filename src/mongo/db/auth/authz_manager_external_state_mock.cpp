@@ -203,7 +203,7 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
             return status;
         BSONObj newObj = document.getObject().copy();
         *iter = newObj;
-        BSONObj idQuery = driver.makeOplogEntryQuery(newObj, false);
+        BSONObj idQuery = newObj["_id"_sd].Obj();
 
         if (_authzManager) {
             _authzManager->logOp(opCtx, "u", collectionName, logObj, &idQuery);

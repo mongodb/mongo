@@ -293,7 +293,8 @@ BSONObj ScopedCollectionMetadata::extractDocumentKey(BSONObj const& doc) const {
     if (auto id = doc["_id"_sd]) {
         return key.isEmpty() ? id.wrap() : BSONObjBuilder(std::move(key)).append(id).obj();
     }
-    return key;
+    // For legacy documents that lack an _id, use the document itself as its key.
+    return doc;
 }
 
 ScopedCollectionMetadata::~ScopedCollectionMetadata() {

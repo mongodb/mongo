@@ -320,14 +320,11 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
 }
 
 auto CollectionShardingState::makeDeleteState(BSONObj const& doc) -> DeleteState {
-    BSONObj documentKey = getMetadata().extractDocumentKey(doc).getOwned();
-    invariant(documentKey.hasField("_id"_sd));
-    return {std::move(documentKey),
+    return {getMetadata().extractDocumentKey(doc).getOwned(),
             _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc)};
 }
 
-void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
-                                         const CollectionShardingState::DeleteState& deleteState) {
+void CollectionShardingState::onDeleteOp(OperationContext* opCtx, DeleteState const& deleteState) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
