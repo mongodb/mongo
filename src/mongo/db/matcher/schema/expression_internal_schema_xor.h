@@ -38,7 +38,7 @@ namespace mongo {
  */
 class InternalSchemaXorMatchExpression final : public ListOfMatchExpression {
 public:
-    static constexpr StringData kInternalSchemaXor = "$_internalSchemaXor"_sd;
+    static constexpr StringData kName = "$_internalSchemaXor"_sd;
 
     InternalSchemaXorMatchExpression() : ListOfMatchExpression(INTERNAL_SCHEMA_XOR) {}
 

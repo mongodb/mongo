@@ -106,6 +106,8 @@ private:
 
 class AndMatchExpression : public ListOfMatchExpression {
 public:
+    static constexpr StringData kName = "$and"_sd;
+
     AndMatchExpression() : ListOfMatchExpression(AND) {}
     virtual ~AndMatchExpression() {}
 
@@ -131,6 +133,8 @@ public:
 
 class OrMatchExpression : public ListOfMatchExpression {
 public:
+    static constexpr StringData kName = "$or"_sd;
+
     OrMatchExpression() : ListOfMatchExpression(OR) {}
     virtual ~OrMatchExpression() {}
 
@@ -156,6 +160,8 @@ public:
 
 class NorMatchExpression : public ListOfMatchExpression {
 public:
+    static constexpr StringData kName = "$nor"_sd;
+
     NorMatchExpression() : ListOfMatchExpression(NOR) {}
     virtual ~NorMatchExpression() {}
 

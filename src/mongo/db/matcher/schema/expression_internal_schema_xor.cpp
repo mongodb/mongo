@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
-constexpr StringData InternalSchemaXorMatchExpression::kInternalSchemaXor;
+constexpr StringData InternalSchemaXorMatchExpression::kName;
 
 bool InternalSchemaXorMatchExpression::matches(const MatchableDocument* doc,
                                                MatchDetails* details) const {
@@ -67,12 +67,12 @@ bool InternalSchemaXorMatchExpression::matchesSingleElement(const BSONElement& e
 
 void InternalSchemaXorMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
-    debug << kInternalSchemaXor + "\n";
+    debug << kName + "\n";
     _debugList(debug, level);
 }
 
 void InternalSchemaXorMatchExpression::serialize(BSONObjBuilder* out) const {
-    BSONArrayBuilder arrBob(out->subarrayStart(kInternalSchemaXor));
+    BSONArrayBuilder arrBob(out->subarrayStart(kName));
     _listToBSON(&arrBob);
 }
 }  //  namespace mongo

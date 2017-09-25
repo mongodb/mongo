@@ -36,7 +36,6 @@ env.Library(
         'expression_geo.cpp',
         'expression_leaf.cpp',
         'expression_parser.cpp',
-        'expression_parser_tree.cpp',
         'expression_text_base.cpp',
         'expression_text_noop.cpp',
         'expression_tree.cpp',
