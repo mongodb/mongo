@@ -45,8 +45,10 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
-            return stdx::make_unique<LiteParsed>();
+            return stdx::make_unique<LiteParsed>(request.getNamespaceString());
         }
+
+        explicit LiteParsed(NamespaceString nss) : _nss(std::move(nss)) {}
 
         bool isChangeStream() const final {
             return true;
@@ -58,10 +60,13 @@ public:
             return stdx::unordered_set<NamespaceString>();
         }
 
-        // TODO SERVER-29138: Add required privileges.
+        ActionSet actions{ActionType::changeStream, ActionType::find};
         PrivilegeVector requiredPrivileges(bool isMongos) const final {
-            return {};
+            return {Privilege(ResourcePattern::forExactNamespace(_nss), actions)};
         }
+
+    private:
+        const NamespaceString _nss;
     };
 
     class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {

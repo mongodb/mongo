@@ -115,6 +115,7 @@ void operator+=(ActionSet& target, const ActionSet& source) {
 MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
     // Read role
     readRoleActions
+        << ActionType::changeStream
         << ActionType::collStats
         << ActionType::dbHash
         << ActionType::dbStats
