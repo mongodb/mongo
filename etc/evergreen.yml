@@ -1073,7 +1073,7 @@ functions:
       script: |
         set -o errexit
 
-        if [ ! -z "${private_key_remote|''}" ] && [ ! -z "${private_key_file|''}" ] ; then
+        if [ ! -z "${private_key_remote}" ] && [ ! -z "${private_key_file}" ] ; then
           mkdir -p ~/.ssh
           echo -n "${private_key_remote}" > ${private_key_file}
           chmod 0600 ${private_key_file}
