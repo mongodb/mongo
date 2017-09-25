@@ -143,6 +143,43 @@ variables:
   - func: "run jstestfuzz"
   - *run_jstestfuzz_tests
 
+# Templates used by powercycle
+- &powercycle_remote_credentials
+  private_key_file: $(${posix_workdir})/powercycle.pem
+  private_key_remote: ${kitchen_private_key}
+  aws_key_remote: ${kitchen_aws_key}
+  aws_secret_remote: ${kitchen_aws_secret}
+
+# TODO: Remove psutil from virtualenv_requirements when BUILD-3083 is done
+- &powercycle_ec2_instance
+  aws_ec2_yml: aws_ec2.yml
+  remote_dir: powercycle
+  ssh_identity: -i ${private_key_file}
+  ssh_key_id: ${kitchen_ssh_key_id}
+  virtualenv_dir: venv_powercycle
+  virtualenv_requirements: psutil
+
+- &powercycle_expansions
+  params:
+     updates:
+     - key: backup_path_after
+       value: /data/afterrecovery
+     - key: backup_path_before
+       value: /data/beforerecovery
+     - key: db_path
+       value: /data/db
+     - key: log_path
+       value: ${remote_dir}/mongod.log
+
+- &powercycle_test
+  ec2_artifacts: ${log_path} ${backup_path_after} ${backup_path_before}
+  program_options: --logLevel debug --backupPathBefore  ${backup_path_before} --backupPathAfter ${backup_path_after}
+  connection_options: --sshUserHost ${ip_address} --sshConnection \"${ssh_identity} ${ssh_connection_options}\"
+  test_options: --testLoops 25 --seedDocNum 10000 --rsync --validate remote --canary remote
+  crash_options: --crashMethod internal --crashWaitTime 30 --jitterForCrashWaitTime 5
+  mongodb_options: --rootDir ${remote_dir}-${task_id} --mongodbBinDir ${remote_dir}
+  mongod_options: --dbPath ${db_path} --logPath ${log_path}
+  mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1\"
 
 #######################################
 #            Functions                #
@@ -874,6 +911,58 @@ functions:
             ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_transport_test"
         fi
 
+  "run powercycle test" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        set -o errexit
+
+        ${activate_virtualenv}
+        if [ ! -z "${virtualenv_requirements}" ]; then
+          easy_install ${virtualenv_requirements}
+        fi
+
+        ${set_sudo}
+        if [ ! -z $sudo ]; then
+          remote_sudo="--remoteSudo"
+        fi
+
+        # The virtaulenv bin_dir is different for Linux and Windows
+        bin_dir=$(find $VIRTUAL_ENV -name activate | sed -e "s,$VIRTUAL_ENV,,;s,activate,,;s,/,,g")
+        cmds="source ${virtualenv_dir|venv}/$bin_dir/activate"
+        cmds="$cmds; python -u"
+        # The remote python operates in a virtualenv
+        remote_python="--remotePython \"$cmds\""
+
+        start_time=$(date +%s)
+        status="\"pass\""
+        failures=0
+
+        set +o errexit
+        eval python -u pytests/powertest.py \
+          "${connection_options} \
+          ${program_options}     \
+          $remote_sudo           \
+          $remote_python         \
+          ${test_options}        \
+          ${crash_options}       \
+          ${mongodb_options}     \
+          ${mongod_options}      \
+          ${mongod_extra_options}"
+        exit_code=$?
+
+        # Create report.json
+        end_time=$(date +%s)
+        elapsed_secs=$((end_time-start_time))
+        if [ $exit_code -ne 0 ]; then
+          status="\"fail\""
+          failures=1
+        fi
+        echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > report.json
+        exit $exit_code
+
   "do multiversion setup" :
     command: shell.exec
     params:
@@ -910,10 +999,9 @@ functions:
     command: shell.exec
     params:
       script: |
-        set -o errexit
         set -o verbose
 
-        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws
+        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto
 
   "kill processes" :
     command: shell.exec
@@ -978,17 +1066,20 @@ functions:
           kill_process "$process"
         done
 
-  "set up kitchen credentials":
+  "set up remote credentials":
     command: shell.exec
     params:
       silent: true
       script: |
         set -o errexit
 
-        mkdir -p ~/.ssh ~/.aws
-        echo -n "${kitchen_private_key}" > ~/.ssh/kitchen.pem
-        chmod 0600 ~/.ssh/kitchen.pem
+        if [ ! -z "${private_key_remote|''}" ] && [ ! -z "${private_key_file|''}" ] ; then
+          mkdir -p ~/.ssh
+          echo -n "${private_key_remote}" > ${private_key_file}
+          chmod 0600 ${private_key_file}
+        fi
 
+        mkdir -p ~/.aws
         cat <<EOF > ~/.aws/config
         [default]
         region = us-east-1
@@ -996,8 +1087,13 @@ functions:
 
         cat <<EOF > ~/.aws/credentials
         [default]
-        aws_access_key_id = ${kitchen_aws_key}
-        aws_secret_access_key = ${kitchen_aws_secret}
+        aws_access_key_id = ${aws_key_remote}
+        aws_secret_access_key = ${aws_secret_remote}
+        EOF
+
+        cat <<EOF > ~/.boto
+        [Boto]
+        https_validate_certificates = False
         EOF
 
   "run kitchen":
@@ -1053,12 +1149,14 @@ functions:
         else
           exit 0
         fi
+
   "set up EC2 instance":
     - command: shell.exec
       params:
         working_dir: src
         script: |
 
+          set -o errexit
           ${activate_virtualenv}
           easy_install --upgrade boto3
 
@@ -1077,14 +1175,15 @@ functions:
         shell: bash
         working_dir: src
         script: |
+          set -o errexit
           # Copy mount_data_drive.sh script to remote host.
-          ssh_options="${ssh_credentials} ${ssh_options}"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-            --verbose                      \
-            --userHost $USER@${ip_address} \
-            --operation "copy_to"          \
-            --sshOptions "$ssh_options"    \
-            --retries ${ssh_retries|0}     \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --operation "copy_to"                            \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
             --file buildscripts/mount_data_drive.sh
 
     - command: shell.exec
@@ -1092,6 +1191,7 @@ functions:
         shell: bash
         working_dir: src
         script: |
+          set -o errexit
           # Mount /data on the attached drive(s), more than 1 indicates a RAID set.
           ${set_sudo}
           script_opts="-d '${device_names}'"
@@ -1113,11 +1213,11 @@ functions:
             set_permission="setfacl -s user::rwx,group::rwx,other::rwx $data_db"
           fi
           cmds="$sudo bash mount_data_drive.sh $script_opts; $set_permission; ls -ld $data_db; df; mount"
-          ssh_options="${ssh_credentials} ${ssh_options}"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-            --verbose                      \
-            --userHost $USER@${ip_address} \
-            --sshOptions "$ssh_options"    \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}     \
             --commands "$cmds"
 
@@ -1126,12 +1226,13 @@ functions:
         shell: bash
         working_dir: src
         script: |
+          set -o errexit
           # Create remote_dir, if specified as expansion macro and is not '.' (pwd).
           if [[ -z "${remote_dir|}" || ${remote_dir} == "." ]]; then
             exit 0
           fi
           ${set_sudo}
-          ssh_options="${ssh_credentials} ${ssh_options}"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           group=$(id -Gn $USER | cut -f1 -d ' ') || true
           user_group="$USER:$group"
           set_permission="chmod 777 ${remote_dir}"
@@ -1140,9 +1241,10 @@ functions:
           fi
           cmds="$sudo mkdir -p ${remote_dir}; $sudo chown $user_group ${remote_dir}; $set_permission; ls -ld ${remote_dir}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-            --userHost $USER@${ip_address} \
-            --sshOptions "$ssh_options"    \
-            --retries ${ssh_retries|0}     \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
             --commands "$cmds"
 
     - command: shell.exec
@@ -1150,12 +1252,14 @@ functions:
         shell: bash
         working_dir: src
         script: |
+          set -o errexit
           # Copy buildscripts, mongoDB executables and debug symbols to the remote host.
           file_param="--file buildscripts"
           mongo_executables="mongo mongod mongos"
-          file_extensions="${exe} .debug .dSYM .pdb"
+          file_extensions=".debug .dSYM .pdb"
           for executable in $mongo_executables
           do
+            file_param="$file_param --file $executable${exe}"
             for extension in $file_extensions
             do
               file=$executable$extension
@@ -1164,21 +1268,82 @@ functions:
               fi
             done
           done
-          ssh_options="${ssh_credentials} ${ssh_options}"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-            --userHost $USER@${ip_address} \
-            --operation "copy_to"          \
-            --sshOptions "$ssh_options"    \
-            --retries ${ssh_retries|0}     \
-            $file_param                    \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --operation "copy_to"                            \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            $file_param                                      \
             --remoteDir ${remote_dir}
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          set -o errexit
+          # Setup virtualenv and install python modules on remote, if required
+          if [ ! -z "${virtualenv_requirements}" ]; then
+            cmds="python_loc=\$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})"
+            cmds="$cmds; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=\$(cygpath -w \$python_loc); fi"
+            cmds="$cmds; virtualenv --python \$python_loc --system-site-packages ${virtualenv_dir|venv}"
+            cmds="$cmds; activate=\$(find ${virtualenv_dir|venv} -name 'activate')"
+            cmds="$cmds; source \$activate"
+            cmds="$cmds; easy_install ${virtualenv_requirements}"
+            ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+            ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+              --verbose                                        \
+              --userHost $USER@${ip_address}                   \
+              --sshConnectionOptions "$ssh_connection_options" \
+              --retries ${ssh_retries|0}                       \
+              --commands "$cmds"
+          fi
+
+  "copy EC2 artifacts":
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          # Tar/zip artifacts on remote host.
+          if [ -z "${ec2_artifacts}" ]; then
+            exit 0
+          fi
+          cmd="${tar|tar} czvf ec2_artifacts.tgz ${ec2_artifacts}"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --commands "$cmd"
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          # Copy remote artifacts.
+          if [ -z "${ec2_artifacts}" ]; then
+            exit 0
+          fi
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --operation "copy_from"                          \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --file ec2_artifacts.tgz
 
   "cleanup EC2 instance":
     command: shell.exec
     params:
       working_dir: src
       script: |
-        if [ -z ${aws_ec2_yml} ]; then
+        if [ -z ${instance_id} ]; then
           exit 0
         fi
         ${activate_virtualenv}
@@ -1202,10 +1367,12 @@ pre:
               . ./venv/bin/activate
             fi
           fi
-        # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
-        # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
-       - key: ssh_options
-         value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o ConnectionAttempts=10
+       - key: posix_workdir
+         value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
+       # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
+       # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
+       - key: ssh_connection_options
+         value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=20 -o ConnectionAttempts=20
        - key: ssh_retries
          value: "10"
        - key: set_sudo
@@ -1223,16 +1390,6 @@ pre:
           # Set errexit "on", if previously enabled.
           if [ $errexit_on -eq 0 ]; then
             set -o errexit
-          fi
-       - key: virtualenv
-         value: |
-          # check if virtualenv is set up
-          if [ -d "venv" ]; then
-            if [ "Windows_NT" = "$OS" ]; then
-              . ./venv/Scripts/activate
-            else
-              . ./venv/bin/activate
-            fi
           fi
   - command: shell.exec
     params:
@@ -1260,7 +1417,9 @@ post:
     params:
       file_location: src/report.json
 
+  - func: "copy EC2 artifacts"
   - func: "cleanup EC2 instance"
+
   - func: "kill processes"
   # Print out any Out of Memory killed process messages.
   - command: shell.exec
@@ -1325,6 +1484,19 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: FTDC Diagnostic Data - Execution ${execution}
+      optional: true
+
+  # Archive remote EC2 artifacts.
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/ec2_artifacts.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/remote_ec2/remote_ec2_artifacts-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Remote EC2 Artifacts - Execution ${execution}
       optional: true
 
   # Process and save coverage data.
@@ -1613,7 +1785,7 @@ timeout:
         PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option
 
         # Call hang_analyzer.py script for tasks that are running remote mongo processes
-        # The file ${aws_ec2_yml} will define the remote's ${ip_address} and ${remote_dir}.
+        # The file ${aws_ec2_yml} will define the remote's ${ip_address}.
         # Any task which uses remote processes will have previously loaded this file to set these
         # expansions macros.
         if [ -f ${aws_ec2_yml|""} ]; then
@@ -1621,25 +1793,25 @@ timeout:
           if [ "Windows_NT" = "$OS" ]; then
             core_ext=mdmp
           fi
-          ssh_options="${ssh_credentials} ${ssh_options}"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           # buildscripts must be installed in ${remote_dir} on the remote host.
           remote_dir=${remote_dir|.}
           cmds="PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-            --verbose                      \
-            --userHost $USER@${ip_address} \
-            --sshOptions "$ssh_options"    \
-            --retries ${ssh_retries}       \
-            --commands "$cmds"             \
-            --commandDir ${remote_dir}
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries}                         \
+            --commands "$cmds"                               \
+            --commandDir $remote_dir
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-            --verbose                          \
-            --userHost $USER@${ip_address}     \
-            --operation "copy_from"            \
-            --sshOptions "$ssh_options"        \
-            --retries ${ssh_retries}           \
-            --file "${remote_dir}/debugger*.*" \
-            --file "${remote_dir}/*.$core_ext"
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --operation "copy_from"                          \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries}                         \
+            --file "$remote_dir/debugger*.*"                 \
+            --file "$remote_dir/*.$core_ext"
         fi
 
 #######################################
@@ -1741,6 +1913,7 @@ tasks:
           - "src/mongo/db/modules/enterprise/docs/**"
           - "*.exe"
           - "jstests/**"
+          - "pytests/**"
           - "./test*"
           - "./dbtest*"
           - "./mongobridge*"
@@ -3797,6 +3970,44 @@ tasks:
       resmoke_args: --suites=json_schema --storageEngine=wiredTiger
       run_multiple_jobs: false
 
+- name: powercycle
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up virtualenv"
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    vars:
+      <<: *powercycle_test
+      mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine mmapv1\"
+
+- name: powercycle_WT
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up virtualenv"
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    vars:
+      <<: *powercycle_test
+      mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+
 - name: idl_tests
   depends_on:
   - name: compile
@@ -3809,7 +4020,12 @@ tasks:
   - name: compile
   commands:
     - func: "fetch artifacts"
-    - func: "set up kitchen credentials"
+    - func: "set up remote credentials"
+      vars:
+        private_key_file: ~/.ssh/kitchen.pem
+        private_key_remote: ${kitchen_private_key}
+        aws_key_remote: ${kitchen_aws_key}
+        aws_secret_remote: ${kitchen_aws_secret}
     - func: "run kitchen"
 
 - name: push
@@ -3837,25 +4053,16 @@ tasks:
         build_variants: [ linux-64, windows-64-2k8-ssl ]
     - *apply_compile_expansions
     - func: "fetch debugsymbols archive"
+    - func: "set up remote credentials"
+      vars:
+        aws_key_remote: ${repo_aws_key}
+        aws_secret_remote: ${repo_aws_secret}
     - command: shell.exec
       params:
         working_dir: src
         silent: true
         script: |
           set -o errexit
-
-          mkdir -p ~/.aws
-
-          cat <<EOF > ~/.aws/config
-          [default]
-          region = us-east-1
-          EOF
-
-          cat <<EOF > ~/.aws/credentials
-          [default]
-          aws_access_key_id = ${repo_aws_key}
-          aws_secret_access_key = ${repo_aws_secret}
-          EOF
 
           cat <<EOF > notary_env.sh
           export NOTARY_TOKEN=${signing_auth_token_36}
@@ -5027,6 +5234,8 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: powercycle
+  - name: powercycle_WT
   - name: package
     distros:
     - ubuntu1604-packer
