@@ -42,6 +42,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -160,8 +161,7 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
             if (!refreshNotification) {
                 refreshNotification = (collEntry.refreshCompletionNotification =
                                            std::make_shared<Notification<Status>>());
-                _scheduleCollectionRefresh_inlock(
-                    dbEntry, std::move(collEntry.routingInfo), nss, 1);
+                _scheduleCollectionRefresh(ul, dbEntry, std::move(collEntry.routingInfo), nss, 1);
             }
 
             // Wait on the notification outside of the mutex
@@ -313,18 +313,18 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
                dbDesc.getPrimary(), dbDesc.getSharded(), std::move(collectionEntries)});
 }
 
-void CatalogCache::_scheduleCollectionRefresh_inlock(
-    std::shared_ptr<DatabaseInfoEntry> dbEntry,
-    std::shared_ptr<ChunkManager> existingRoutingInfo,
-    const NamespaceString& nss,
-    int refreshAttempt) {
+void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
+                                              std::shared_ptr<DatabaseInfoEntry> dbEntry,
+                                              std::shared_ptr<ChunkManager> existingRoutingInfo,
+                                              NamespaceString const& nss,
+                                              int refreshAttempt) {
     Timer t;
 
     const ChunkVersion startingCollectionVersion =
         (existingRoutingInfo ? existingRoutingInfo->getVersion() : ChunkVersion::UNSHARDED());
 
-    const auto refreshFailed_inlock =
-        [ this, t, dbEntry, nss, refreshAttempt ](const Status& status) noexcept {
+    const auto refreshFailed =
+        [ this, t, dbEntry, nss, refreshAttempt ](WithLock lk, const Status& status) noexcept {
         log() << "Refresh for collection " << nss << " took " << t.millis() << " ms and failed"
               << causedBy(redact(status));
 
@@ -337,7 +337,7 @@ void CatalogCache::_scheduleCollectionRefresh_inlock(
         // refresh again
         if (status == ErrorCodes::ConflictingOperationInProgress &&
             refreshAttempt < kMaxInconsistentRoutingInfoRefreshAttempts) {
-            _scheduleCollectionRefresh_inlock(dbEntry, nullptr, nss, refreshAttempt + 1);
+            _scheduleCollectionRefresh(lk, dbEntry, nullptr, nss, refreshAttempt + 1);
         } else {
             // Leave needsRefresh to true so that any subsequent get attempts will kick off
             // another round of refresh
@@ -346,17 +346,16 @@ void CatalogCache::_scheduleCollectionRefresh_inlock(
         }
     };
 
-    const auto refreshCallback =
-        [ this, t, dbEntry, nss, existingRoutingInfo, refreshFailed_inlock ](
-            OperationContext * opCtx,
-            StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
+    const auto refreshCallback = [ this, t, dbEntry, nss, existingRoutingInfo, refreshFailed ](
+        OperationContext * opCtx,
+        StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
         std::shared_ptr<ChunkManager> newRoutingInfo;
         try {
             newRoutingInfo = refreshCollectionRoutingInfo(
                 opCtx, nss, std::move(existingRoutingInfo), std::move(swCollAndChunks));
         } catch (const DBException& ex) {
             stdx::lock_guard<stdx::mutex> lg(_mutex);
-            refreshFailed_inlock(ex.toStatus());
+            refreshFailed(lg, ex.toStatus());
             return;
         }
 
@@ -397,7 +396,7 @@ void CatalogCache::_scheduleCollectionRefresh_inlock(
         invariant(status != ErrorCodes::ConflictingOperationInProgress);
 
         stdx::lock_guard<stdx::mutex> lg(_mutex);
-        refreshFailed_inlock(status);
+        refreshFailed(lg, status);
     }
 }
 

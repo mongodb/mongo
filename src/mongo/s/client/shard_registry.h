@@ -40,6 +40,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 
@@ -54,6 +55,9 @@ class ShardType;
 
 class ShardRegistryData {
 public:
+    /**
+     * Reads shards docs from the catalog client and fills in maps.
+     */
     ShardRegistryData(OperationContext* opCtx, ShardFactory* shardFactory);
     ShardRegistryData() = default;
     ~ShardRegistryData() = default;
@@ -100,22 +104,18 @@ public:
 
 private:
     /**
-     * Reads shards docs from the catalog client and fills in maps.
-     */
-    void _init(OperationContext* opCtx, ShardFactory* factory);
-
-    /**
      * Creates a shard based on the specified information and puts it into the lookup maps.
      * if useOriginalCS = true it will use the ConnectionSring used for shard creation to update
      * lookup maps. Otherwise the current connection string from the Shard's RemoteCommandTargeter
      * will be used.
      */
-    void _addShard_inlock(const std::shared_ptr<Shard>&, bool useOriginalCS);
-    std::shared_ptr<Shard> _findByShardId_inlock(const ShardId&) const;
-    void _rebuildShard_inlock(const ConnectionString& newConnString, ShardFactory* factory);
+    void _addShard(WithLock, std::shared_ptr<Shard> const&, bool useOriginalCS);
+    auto _findByShardId(WithLock, ShardId const&) const -> std::shared_ptr<Shard>;
+    void _rebuildShard(WithLock, ConnectionString const& newConnString, ShardFactory* factory);
 
     // Protects the lookup maps below.
     mutable stdx::mutex _mutex;
+
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
 
     // Map of both shardName -> Shard and hostName -> Shard

@@ -57,6 +57,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -367,10 +368,6 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
 ////////////// ShardRegistryData //////////////////
 
 ShardRegistryData::ShardRegistryData(OperationContext* opCtx, ShardFactory* shardFactory) {
-    _init(opCtx, shardFactory);
-}
-
-void ShardRegistryData::_init(OperationContext* opCtx, ShardFactory* shardFactory) {
     auto shardsStatus =
         grid.catalogClient()->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
 
@@ -412,7 +409,7 @@ void ShardRegistryData::_init(OperationContext* opCtx, ShardFactory* shardFactor
         auto shard = shardFactory->createShard(std::move(std::get<0>(shardInfo)),
                                                std::move(std::get<1>(shardInfo)));
 
-        _addShard_inlock(std::move(shard), false);
+        _addShard(WithLock::withoutLock(), std::move(shard), false);
     }
 }
 
@@ -432,7 +429,7 @@ shared_ptr<Shard> ShardRegistryData::getConfigShard() const {
 void ShardRegistryData::addConfigShard(std::shared_ptr<Shard> shard) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _configShard = shard;
-    _addShard_inlock(shard, true);
+    _addShard(lk, shard, true);
 }
 
 shared_ptr<Shard> ShardRegistryData::findByRSName(const string& name) const {
@@ -448,10 +445,10 @@ shared_ptr<Shard> ShardRegistryData::findByHostAndPort(const HostAndPort& hostAn
 
 shared_ptr<Shard> ShardRegistryData::findByShardId(const ShardId& shardId) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _findByShardId_inlock(shardId);
+    return _findByShardId(lk, shardId);
 }
 
-shared_ptr<Shard> ShardRegistryData::_findByShardId_inlock(const ShardId& shardId) const {
+shared_ptr<Shard> ShardRegistryData::_findByShardId(WithLock, ShardId const& shardId) const {
     auto i = _lookup.find(shardId);
     return (i != _lookup.end()) ? i->second : nullptr;
 }
@@ -505,28 +502,31 @@ void ShardRegistryData::rebuildShardIfExists(const ConnectionString& newConnStri
         return;
     }
 
-    _rebuildShard_inlock(newConnString, factory);
+    _rebuildShard(updateConnStringLock, newConnString, factory);
 }
 
 
-void ShardRegistryData::_rebuildShard_inlock(const ConnectionString& newConnString,
-                                             ShardFactory* factory) {
+void ShardRegistryData::_rebuildShard(WithLock lk,
+                                      ConnectionString const& newConnString,
+                                      ShardFactory* factory) {
     auto it = _rsLookup.find(newConnString.getSetName());
     invariant(it->second);
     auto shard = factory->createShard(it->second->getId(), newConnString);
-    _addShard_inlock(shard, true);
+    _addShard(lk, shard, true);
     if (shard->isConfig()) {
         _configShard = shard;
     }
 }
 
-void ShardRegistryData::_addShard_inlock(const std::shared_ptr<Shard>& shard, bool useOriginalCS) {
+void ShardRegistryData::_addShard(WithLock lk,
+                                  std::shared_ptr<Shard> const& shard,
+                                  bool useOriginalCS) {
     const ShardId shardId = shard->getId();
 
     const ConnectionString connString =
         useOriginalCS ? shard->originalConnString() : shard->getConnString();
 
-    auto currentShard = _findByShardId_inlock(shardId);
+    auto currentShard = _findByShardId(lk, shardId);
     if (currentShard) {
         auto oldConnString = currentShard->originalConnString();
 

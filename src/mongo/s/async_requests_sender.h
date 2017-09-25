@@ -41,6 +41,7 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -227,7 +228,7 @@ private:
      *
      * On failure to schedule a request, signals the notification.
      */
-    void _scheduleRequests_inlock();
+    void _scheduleRequests(WithLock);
 
     /**
      * Helper to schedule a command to a remote.
@@ -237,7 +238,7 @@ private:
      *
      * Returns success if the command was scheduled successfully.
      */
-    Status _scheduleRequest_inlock(size_t remoteIndex);
+    Status _scheduleRequest(WithLock, size_t remoteIndex);
 
     /**
      * The callback for a remote command.
@@ -276,7 +277,6 @@ private:
     Status _interruptStatus = Status::OK();
 
     // Must be acquired before accessing the below data members.
-    // Must also be held when calling any of the '_inlock()' helper functions.
     stdx::mutex _mutex;
 
     // Data tracking the state of our communication with each of the remote nodes.

@@ -39,6 +39,7 @@
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -413,7 +414,7 @@ private:
      *
      * Not thread-safe.
      */
-    CursorEntry* getEntry_inlock(const NamespaceString& nss, CursorId cursorId);
+    CursorEntry* _getEntry(WithLock, NamespaceString const& nss, CursorId cursorId);
 
     /**
      * De-registers the given cursor, and returns an owned pointer to the underlying
@@ -424,8 +425,9 @@ private:
      *
      * Not thread-safe.
      */
-    StatusWith<std::unique_ptr<ClusterClientCursor>> detachCursor_inlock(const NamespaceString& nss,
-                                                                         CursorId cursorId);
+    StatusWith<std::unique_ptr<ClusterClientCursor>> _detachCursor(WithLock,
+                                                                   NamespaceString const& nss,
+                                                                   CursorId cursorId);
 
     /**
      * CursorEntry is a moveable, non-copyable container for a single cursor.
