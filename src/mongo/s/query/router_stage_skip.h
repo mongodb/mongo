@@ -41,7 +41,7 @@ public:
                     std::unique_ptr<RouterExecStage> child,
                     long long skip);
 
-    StatusWith<ClusterQueryResult> next() final;
+    StatusWith<ClusterQueryResult> next(ExecContext) final;
 
 private:
     long long _skip;

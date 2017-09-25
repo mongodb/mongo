@@ -236,7 +236,7 @@ ClusterQueryResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
             ClusterQueryResult front = _remotes[_gettingFromRemote].docBuffer.front();
             _remotes[_gettingFromRemote].docBuffer.pop();
 
-            if (_params->tailableMode != TailableMode::kNormal &&
+            if (_params->tailableMode == TailableMode::kTailable &&
                 !_remotes[_gettingFromRemote].hasNext()) {
                 // The cursor is tailable and we're about to return the last buffered result. This
                 // means that the next value returned should be boost::none to indicate the end of
@@ -453,23 +453,19 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     }
 
     // If the cursor is tailable and we just received an empty batch, the next return value should
-    // be boost::none in order to indicate the end of the batch.
+    // be boost::none in order to indicate the end of the batch. We do not ask for the next batch if
+    // the cursor is tailable, as batches received from remote tailable cursors should be passed
+    // through to the client as-is.
     // (Note: tailable cursors are only valid on unsharded collections, so the end of the batch from
     // one shard means the end of the overall batch).
-    if (_params->tailableMode != TailableMode::kNormal && !remote.hasNext()) {
+    if (_params->tailableMode == TailableMode::kTailable && !remote.hasNext()) {
+        invariant(_remotes.size() == 1);
         _eofNext = true;
+    } else if (!remote.hasNext() && !remote.exhausted()) {
+        // If this is normal or tailable-awaitData cursor and we still don't have anything buffered
+        // after receiving this batch, we can schedule work to retrieve the next batch right away.
+        remote.status = _askForNextBatch(lk, remoteIndex);
     }
-
-    // If even after receiving this batch we still don't have anything buffered (i.e. the batchSize
-    // was zero), then can schedule work to retrieve the next batch right away.
-    //
-    // We do not ask for the next batch if the cursor is tailable, as batches received from remote
-    // tailable cursors should be passed through to the client without asking for more batches.
-    if (_params->tailableMode != TailableMode::kNormal || remote.hasNext() || remote.exhausted()) {
-        return;
-    }
-
-    remote.status = _askForNextBatch(lk, remoteIndex);
 }
 
 bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,

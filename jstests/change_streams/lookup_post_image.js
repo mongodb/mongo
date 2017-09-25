@@ -56,20 +56,16 @@
             find: "foo",
             readConcern: {level: "local", afterClusterTime: db.getSession().getOperationTime()}
         }));
-        FixtureHelpers.runCommandOnEachPrimary({
-            dbName: "admin",
-            cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}
-        });
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
         let res = assert.commandWorked(db.runCommand({
             getMore: cursor.id,
             collection: getCollectionNameFromFullNamespace(cursor.ns),
             batchSize: 1
         }));
         assert.eq(res.cursor.nextBatch.length, 1);
-        FixtureHelpers.runCommandOnEachPrimary({
-            dbName: "admin",
-            cmdObj: {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}
-        });
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
         return res.cursor.nextBatch[0];
     }
 
@@ -191,6 +187,8 @@
     // cursors cannot be established after a collection drop.
     assert.writeOK(coll.insert({_id: "fullDocument is lookup 2"}));
     assert.writeOK(coll.update({_id: "fullDocument is lookup 2"}, {$set: {updated: true}}));
+
+    // Open a $changeStream cursor with batchSize 0, so that no oplog entries are retrieved yet.
     res = assert.commandWorked(db.runCommand({
         aggregate: coll.getName(),
         pipeline: [
@@ -200,7 +198,7 @@
         cursor: {batchSize: 0}
     }));
     assert.neq(res.cursor.id, 0);
-    // Save another stream to test lookup after the collecton gets recreated.
+    // Save another stream to test post-image lookup after the collection is recreated.
     const resBeforeDrop = assert.commandWorked(db.runCommand({
         aggregate: coll.getName(),
         pipeline: [
@@ -211,18 +209,20 @@
     }));
     assert.neq(resBeforeDrop.cursor.id, 0);
 
+    // Drop the collection and wait until two-phase drop finishes.
     coll.drop();
-    // Wait until two-phase drop finishes.
     assert.soon(function() {
         return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(db, coll.getName());
     });
 
+    // Check the next $changeStream entry; this is the test document inserted above. The collection
+    // has been dropped, so our attempt to look up the post-image results in a null document.
     latestChange = getOneDoc(res.cursor);
     assert.eq(latestChange.operationType, "update");
     assert(latestChange.hasOwnProperty("fullDocument"));
     assert.eq(latestChange.fullDocument, null);
 
-    // Test establishing new cursors with resume token on dropped collections failes.
+    // Test establishing new cursors with resume token on dropped collections fails.
     res = db.runCommand({
         aggregate: coll.getName(),
         pipeline: [
@@ -241,6 +241,8 @@
     // different UUID.
     assert.commandWorked(db.createCollection(coll.getName()));
     assert.writeOK(coll.insert({_id: "fullDocument is lookup 2"}));
+
+    // Confirm that the next entry's post-image is null since new collection has a different UUID.
     latestChange = getOneDoc(resBeforeDrop.cursor);
     assert.eq(latestChange.operationType, "update");
     assert(latestChange.hasOwnProperty("fullDocument"));

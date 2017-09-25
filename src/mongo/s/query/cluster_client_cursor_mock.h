@@ -47,7 +47,7 @@ public:
 
     ~ClusterClientCursorMock();
 
-    StatusWith<ClusterQueryResult> next() final;
+    StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext) final;
 
     void kill(OperationContext* opCtx) final;
 
@@ -56,6 +56,8 @@ public:
     void detachFromOperationContext() final {}
 
     bool isTailable() const final;
+
+    bool isTailableAndAwaitData() const final;
 
     UserNameIterator getAuthenticatedUsers() const final;
 

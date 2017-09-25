@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/s/query/cluster_query_result.h"
+#include "mongo/s/query/router_exec_stage.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -66,7 +67,7 @@ public:
      *
      * A non-ok status is returned in case of any error.
      */
-    virtual StatusWith<ClusterQueryResult> next() = 0;
+    virtual StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext) = 0;
 
     /**
      * Must be called before destruction to abandon a not-yet-exhausted cursor. If next() has
@@ -88,9 +89,14 @@ public:
     virtual void detachFromOperationContext() = 0;
 
     /**
-     * Returns whether or not this cursor is tailing a capped collection on a shard.
+     * Returns whether or not this cursor is tailable.
      */
     virtual bool isTailable() const = 0;
+
+    /**
+     * Returns whether or not this cursor is tailable and awaitData.
+     */
+    virtual bool isTailableAndAwaitData() const = 0;
 
     /**
      * Returns the set of authenticated users when this cursor was created.

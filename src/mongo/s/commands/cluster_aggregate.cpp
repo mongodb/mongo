@@ -348,7 +348,7 @@ BSONObj establishMergingMongosCursor(
     CursorResponseBuilder responseBuilder(true, &cursorResponse);
 
     for (long long objCount = 0; objCount < request.getBatchSize(); ++objCount) {
-        auto next = uassertStatusOK(ccc->next());
+        auto next = uassertStatusOK(ccc->next(RouterExecStage::ExecContext::kInitialFind));
 
         // Check whether we have exhausted the pipeline's results.
         if (next.isEOF()) {

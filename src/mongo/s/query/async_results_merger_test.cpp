@@ -1418,35 +1418,46 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
 
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
-    ASSERT_TRUE(arm->ready());
-    ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
+    ASSERT_FALSE(arm->ready());
+
+    readyEvent = unittest::assertGet(arm->nextEvent());
 
     ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
 
-    ASSERT_FALSE(arm->ready());
-    readyEvent = unittest::assertGet(arm->nextEvent());
-    ASSERT_FALSE(arm->ready());
-
-    // Pending getMore request should include maxTimeMS.
+    // Pending getMore request should already have been scheduled without the maxTimeMS.
     BSONObj expectedCmdObj = BSON("getMore" << CursorId(123) << "collection"
-                                            << "testcoll"
-                                            << "maxTimeMS"
-                                            << 789);
+                                            << "testcoll");
     ASSERT_BSONOBJ_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+
+    ASSERT_FALSE(arm->ready());
 
     responses.clear();
     std::vector<BSONObj> batch2 = {fromjson("{_id: 2}")};
-    responses.emplace_back(_nss, CursorId(0), batch2);
+    responses.emplace_back(_nss, CursorId(123), batch2);
     scheduleNetworkResponses(std::move(responses),
                              CursorResponse::ResponseType::SubsequentResponse);
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
-    ASSERT_TRUE(arm->ready());
-    ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
-}
+    ASSERT_FALSE(arm->ready());
 
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // The next getMore request should include the maxTimeMS.
+    expectedCmdObj = BSON("getMore" << CursorId(123) << "collection"
+                                    << "testcoll"
+                                    << "maxTimeMS"
+                                    << 789);
+    ASSERT_BSONOBJ_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+
+    // Clean up.
+    responses.clear();
+    std::vector<BSONObj> batch3 = {fromjson("{_id: 3}")};
+    responses.emplace_back(_nss, CursorId(0), batch3);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+}
 
 TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutTailableCantHaveMaxTime) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");

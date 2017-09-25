@@ -68,10 +68,6 @@ namespace {
 
 MONGO_FP_DECLARE(rsStopGetMoreCmd);
 
-// Failpoint for making getMore not wait for an awaitdata cursor. Allows us to avoid waiting during
-// tests.
-MONGO_FP_DECLARE(disableAwaitDataForGetMoreCmd);
-
 /**
  * A command for running getMore() against an existing cursor registered with a CursorManager.
  * Used to generate the next batch of results for a ClientCursor.

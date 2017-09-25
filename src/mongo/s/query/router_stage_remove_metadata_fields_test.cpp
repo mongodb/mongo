@@ -60,44 +60,44 @@ TEST(RouterStageRemoveMetadataFieldsTest, RemovesMetaDataFields) {
     auto sortKeyStage = stdx::make_unique<RouterStageRemoveMetadataFields>(
         opCtx, std::move(mockStage), Document::allMetadataFieldNames);
 
-    auto firstResult = sortKeyStage->next();
+    auto firstResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 4 << "b" << 3));
 
-    auto secondResult = sortKeyStage->next();
+    auto secondResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(),
                       BSON("c" << BSON("d"
                                        << "foo")));
 
-    auto thirdResult = sortKeyStage->next();
+    auto thirdResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 3));
 
-    auto fourthResult = sortKeyStage->next();
+    auto fourthResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*fourthResult.getValue().getResult(), BSON("a" << 3));
 
-    auto fifthResult = sortKeyStage->next();
+    auto fifthResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(fifthResult.getStatus());
     ASSERT(fifthResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*fifthResult.getValue().getResult(), BSON("a" << 3));
 
-    auto sixthResult = sortKeyStage->next();
+    auto sixthResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(sixthResult.getStatus());
     ASSERT(sixthResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*sixthResult.getValue().getResult(), BSONObj());
 
-    auto seventhResult = sortKeyStage->next();
+    auto seventhResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(seventhResult.getStatus());
     ASSERT(seventhResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*seventhResult.getValue().getResult(), BSONObj());
 
-    auto eighthResult = sortKeyStage->next();
+    auto eighthResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(eighthResult.getStatus());
     ASSERT(eighthResult.getValue().isEOF());
 }
@@ -110,12 +110,12 @@ TEST(RouterStageRemoveMetadataFieldsTest, PropagatesError) {
     auto sortKeyStage = stdx::make_unique<RouterStageRemoveMetadataFields>(
         opCtx, std::move(mockStage), std::vector<StringData>{"$sortKey"_sd});
 
-    auto firstResult = sortKeyStage->next();
+    auto firstResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSONObj());
 
-    auto secondResult = sortKeyStage->next();
+    auto secondResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_NOT_OK(secondResult.getStatus());
     ASSERT_EQ(secondResult.getStatus(), ErrorCodes::BadValue);
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
@@ -130,21 +130,21 @@ TEST(RouterStageRemoveMetadataFieldsTest, ToleratesMidStreamEOF) {
     auto sortKeyStage = stdx::make_unique<RouterStageRemoveMetadataFields>(
         opCtx, std::move(mockStage), std::vector<StringData>{"$sortKey"_sd});
 
-    auto firstResult = sortKeyStage->next();
+    auto firstResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1 << "b" << 1));
 
-    auto secondResult = sortKeyStage->next();
+    auto secondResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().isEOF());
 
-    auto thirdResult = sortKeyStage->next();
+    auto thirdResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 2 << "b" << 2));
 
-    auto fourthResult = sortKeyStage->next();
+    auto fourthResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().isEOF());
 }
@@ -159,19 +159,19 @@ TEST(RouterStageRemoveMetadataFieldsTest, RemotesExhausted) {
         opCtx, std::move(mockStage), std::vector<StringData>{"$sortKey"_sd});
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
-    auto firstResult = sortKeyStage->next();
+    auto firstResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1 << "b" << 1));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
-    auto secondResult = sortKeyStage->next();
+    auto secondResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2 << "b" << 2));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
-    auto thirdResult = sortKeyStage->next();
+    auto thirdResult = sortKeyStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
     ASSERT_TRUE(sortKeyStage->remotesExhausted());

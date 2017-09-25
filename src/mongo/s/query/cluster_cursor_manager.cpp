@@ -113,9 +113,10 @@ ClusterCursorManager::PinnedCursor& ClusterCursorManager::PinnedCursor::operator
     return *this;
 }
 
-StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next() {
+StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next(
+    RouterExecStage::ExecContext execContext) {
     invariant(_cursor);
-    return _cursor->next();
+    return _cursor->next(execContext);
 }
 
 void ClusterCursorManager::PinnedCursor::reattachToOperationContext(OperationContext* opCtx) {
@@ -131,6 +132,11 @@ void ClusterCursorManager::PinnedCursor::detachFromOperationContext() {
 bool ClusterCursorManager::PinnedCursor::isTailable() const {
     invariant(_cursor);
     return _cursor->isTailable();
+}
+
+bool ClusterCursorManager::PinnedCursor::isTailableAndAwaitData() const {
+    invariant(_cursor);
+    return _cursor->isTailableAndAwaitData();
 }
 
 UserNameIterator ClusterCursorManager::PinnedCursor::getAuthenticatedUsers() const {

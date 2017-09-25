@@ -14,7 +14,8 @@
      * Note that 'event' will not have access to any local variables, since it will be executed in a
      * different scope.
      */
-    function runGetMoreInParallelWithEvent({collection, awaitDataCursorId, maxTimeMS, event}) {
+    function runGetMoreInParallelWithEvent(
+        {collection, awaitDataCursorId, identifyingComment, maxTimeMS, event}) {
         // In some extreme cases, the parallel shell can take longer to start up than it takes for
         // the getMore to run. To prevent this from happening, the main thread waits for an insert
         // into "sentinel", to signal that the parallel shell has started and is waiting for the
@@ -29,8 +30,11 @@ assert.writeOK(db.getCollection("${ shellSentinelCollection.getName() }").insert
 
 // Wait for the getMore to appear in currentOp.
 assert.soon(function() {
-    return db.currentOp({op: "getmore", "command.collection": "${collection.getName()}"})
-               .inprog.length === 1;
+    return db.currentOp({
+                 op: "getmore",
+                 "command.collection": "${collection.getName()}",
+                 "originatingCommand.comment": "${identifyingComment}",
+             }).inprog.length === 1;
 });
 
 const eventFn = ${ event.toString() };
@@ -56,10 +60,12 @@ eventFn();`,
      * @param [NumberLong] awaitDataCursorId - the id of the cursor to use in the getMore command.
      * @param [Function] event - the event that should be run during the getMore.
      */
-    function assertEventDoesNotWakeCursor({collection, awaitDataCursorId, event}) {
+    function assertEventDoesNotWakeCursor(
+        {collection, awaitDataCursorId, identifyingComment, event}) {
         const {result, elapsedMs} = runGetMoreInParallelWithEvent({
             collection: collection,
             awaitDataCursorId: awaitDataCursorId,
+            identifyingComment: identifyingComment,
             maxTimeMS: 1000,
             event: event,
         });
@@ -79,7 +85,7 @@ eventFn();`,
      * @param [NumberLong] awaitDataCursorId - the id of the cursor to use in the getMore command.
      * @param [Function] event - the event that should be run during the getMore.
      */
-    function assertEventWakesCursor({collection, awaitDataCursorId, event}) {
+    function assertEventWakesCursor({collection, awaitDataCursorId, identifyingComment, event}) {
         // Run the original event, then (while still in the parallel shell) assert that the getMore
         // finishes soon after. This will be run in a parallel shell, which will not have a variable
         // 'event' in scope, so we'll have to stringify it here.
@@ -88,6 +94,7 @@ eventFn();`,
         const {result, elapsedMs} = runGetMoreInParallelWithEvent({
             collection: collection,
             awaitDataCursorId: awaitDataCursorId,
+            identifyingComment: identifyingComment,
             maxTimeMS: thirtyMinutes,
             event: event,
         });
@@ -102,11 +109,13 @@ eventFn();`,
     assert.commandWorked(db.createCollection(changesCollection.getName()));
 
     // Start a change stream cursor.
+    const wholeCollectionStreamComment = "change stream on entire collection";
     let res = assert.commandWorked(db.runCommand({
         aggregate: changesCollection.getName(),
         // Project out the timestamp, since that's subject to change unpredictably.
         pipeline: [{$changeStream: {}}, {$project: {"_id.clusterTime": 0}}],
-        cursor: {}
+        cursor: {},
+        comment: wholeCollectionStreamComment
     }));
     const changeCursorId = res.cursor.id;
     assert.neq(changeCursorId, 0);
@@ -117,6 +126,7 @@ eventFn();`,
     const getMoreResponse = assertEventWakesCursor({
         collection: changesCollection,
         awaitDataCursorId: changeCursorId,
+        identifyingComment: wholeCollectionStreamComment,
         event: () => assert.writeOK(db.changes.insert({_id: "wake up"}))
     });
     assert.eq(getMoreResponse.cursor.nextBatch.length, 1);
@@ -135,6 +145,7 @@ eventFn();`,
     assertEventDoesNotWakeCursor({
         collection: changesCollection,
         awaitDataCursorId: changeCursorId,
+        identifyingComment: wholeCollectionStreamComment,
         event: () => assert.writeOK(db.unrelated_collection.insert({_id: "unrelated change"}))
     });
     assert.commandWorked(
@@ -142,12 +153,14 @@ eventFn();`,
 
     // Test that changes ignored by filtering in later stages of the pipeline will not cause the
     // cursor to return before the getMore has exceeded maxTimeMS.
+    const noInvalidatesComment = "change stream filtering invalidate entries";
     res = assert.commandWorked(db.runCommand({
         aggregate: changesCollection.getName(),
         // This pipeline filters changes to only invalidates, so regular inserts should not cause
         // the awaitData to end early.
         pipeline: [{$changeStream: {}}, {$match: {operationType: "invalidate"}}],
-        cursor: {}
+        cursor: {},
+        comment: noInvalidatesComment
     }));
     assert.eq(
         res.cursor.firstBatch.length, 0, "did not expect any invalidations on changes collection");
@@ -155,6 +168,7 @@ eventFn();`,
     assertEventDoesNotWakeCursor({
         collection: changesCollection,
         awaitDataCursorId: res.cursor.id,
+        identifyingComment: noInvalidatesComment,
         event: () => assert.writeOK(db.changes.insert({_id: "should not appear"}))
     });
     assert.commandWorked(

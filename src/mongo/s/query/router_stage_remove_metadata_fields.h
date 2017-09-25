@@ -43,7 +43,7 @@ public:
                                     std::unique_ptr<RouterExecStage> child,
                                     std::vector<StringData> fieldsToRemove);
 
-    StatusWith<ClusterQueryResult> next() final;
+    StatusWith<ClusterQueryResult> next(ExecContext) final;
 
 private:
     // Use a StringMap so we can look up by StringData - avoiding a string allocation on each field

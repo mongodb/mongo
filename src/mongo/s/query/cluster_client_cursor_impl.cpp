@@ -80,7 +80,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock
                                                  boost::optional<LogicalSessionId> lsid)
     : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {}
 
-StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
+StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(
+    RouterExecStage::ExecContext execContext) {
     // First return stashed results, if there are any.
     if (!_stash.empty()) {
         auto front = std::move(_stash.front());
@@ -89,7 +90,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
         return {front};
     }
 
-    auto next = _root->next();
+    auto next = _root->next(execContext);
     if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
     }
@@ -110,6 +111,10 @@ void ClusterClientCursorImpl::detachFromOperationContext() {
 
 bool ClusterClientCursorImpl::isTailable() const {
     return _params.tailableMode != TailableMode::kNormal;
+}
+
+bool ClusterClientCursorImpl::isTailableAndAwaitData() const {
+    return _params.tailableMode == TailableMode::kTailableAndAwaitData;
 }
 
 UserNameIterator ClusterClientCursorImpl::getAuthenticatedUsers() const {

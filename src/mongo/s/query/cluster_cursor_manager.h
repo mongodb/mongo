@@ -157,7 +157,7 @@ public:
          *
          * Can block.
          */
-        StatusWith<ClusterQueryResult> next();
+        StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext);
 
         /**
          * Sets the operation context for the cursor. Must be called before the first call to
@@ -175,6 +175,13 @@ public:
          * called after returnCursor() is called.  A cursor must be owned.
          */
         bool isTailable() const;
+
+        /**
+         * Returns whether or not the underlying cursor is tailing a capped collection and was
+         * created with the 'awaitData' flag set.  Cannot be called after returnCursor() is called.
+         * A cursor must be owned.
+         */
+        bool isTailableAndAwaitData() const;
 
         /**
          * Returns the set of authenticated users when this cursor was created. Cannot be called

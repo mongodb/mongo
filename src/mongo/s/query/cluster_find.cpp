@@ -274,7 +274,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
     int bytesBuffered = 0;
 
     while (!FindCommon::enoughForFirstBatch(query.getQueryRequest(), results->size())) {
-        auto next = ccc->next();
+        auto next = ccc->next(RouterExecStage::ExecContext::kInitialFind);
 
         if (!next.isOK()) {
             return next.getStatus();
@@ -421,11 +421,18 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                               << " was not created by the authenticated user"};
     }
 
-    if (request.awaitDataTimeout) {
-        auto status = pinnedCursor.getValue().setAwaitDataTimeout(*request.awaitDataTimeout);
-        if (!status.isOK()) {
-            return status;
+    if (pinnedCursor.getValue().isTailableAndAwaitData()) {
+        // Default to 1-second timeout for tailable awaitData cursors. If an explicit maxTimeMS has
+        // been specified, do not apply it to the opCtx, since its deadline will already have been
+        // set during command processing.
+        auto timeout = request.awaitDataTimeout.value_or(Milliseconds{1000});
+        if (!request.awaitDataTimeout) {
+            opCtx->setDeadlineAfterNowBy(timeout);
         }
+        invariant(pinnedCursor.getValue().setAwaitDataTimeout(timeout).isOK());
+    } else if (request.awaitDataTimeout) {
+        return {ErrorCodes::BadValue,
+                "maxTimeMS can only be used with getMore for tailable, awaitData cursors"};
     }
 
     std::vector<BSONObj> batch;
@@ -437,7 +444,10 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     pinnedCursor.getValue().reattachToOperationContext(opCtx);
 
     while (!FindCommon::enoughForGetMore(batchSize, batch.size())) {
-        auto next = pinnedCursor.getValue().next();
+        auto context = batch.empty()
+            ? RouterExecStage::ExecContext::kGetMoreNoResultsYet
+            : RouterExecStage::ExecContext::kGetMoreWithAtLeastOneResultInBatch;
+        auto next = pinnedCursor.getValue().next(context);
         if (!next.isOK()) {
             return next.getStatus();
         }
