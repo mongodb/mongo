@@ -91,7 +91,8 @@ struct WithLock {
     WithLock(stdx::unique_lock<Mutex>&&) = delete;
 
     /*
-     * Pass the result of withoutLock() when a lock is not really needed, such as in a constructor.
+     * Produces a WithLock without benefit of any actual lock, for use in cases where a lock is not
+     * really needed, such as in many (but not all!) constructors.
      */
     static WithLock withoutLock() noexcept {
         return {};
