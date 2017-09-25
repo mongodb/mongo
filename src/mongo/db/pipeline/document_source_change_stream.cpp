@@ -334,10 +334,10 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     NamespaceString nss(ns.getString());
     Value id = input.getNestedField("o._id");
     // Non-replace updates have the _id in field "o2".
-    Value documentId = id.missing() ? input.getNestedField("o2._id") : id;
     StringData operationType;
     Value fullDocument;
     Value updateDescription;
+    Value documentKey;
 
     // Deal with CRUD operations and commands.
     auto opType = repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op);
@@ -345,10 +345,12 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         case repl::OpTypeEnum::kInsert: {
             operationType = kInsertOpType;
             fullDocument = input[repl::OplogEntry::kObjectFieldName];
+            documentKey = Value(Document{{kIdField, id}});
             break;
         }
         case repl::OpTypeEnum::kDelete: {
             operationType = kDeleteOpType;
+            documentKey = input[repl::OplogEntry::kObjectFieldName];
             break;
         }
         case repl::OpTypeEnum::kUpdate: {
@@ -376,19 +378,20 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
                 operationType = kReplaceOpType;
                 fullDocument = input[repl::OplogEntry::kObjectFieldName];
             }
+            documentKey = input[repl::OplogEntry::kObject2FieldName];
             break;
         }
         case repl::OpTypeEnum::kCommand: {
             operationType = kInvalidateOpType;
             // Make sure the result doesn't have a document id.
-            documentId = Value();
+            documentKey = Value();
             break;
         }
         case repl::OpTypeEnum::kNoop: {
             operationType = kRetryNeededOpType;
             // Generate a fake document Id for RetryNeeded operation so that we can resume after
             // this operation.
-            documentId = input[repl::OplogEntry::kObject2FieldName];
+            documentKey = Value(Document{{kIdField, input[repl::OplogEntry::kObject2FieldName]}});
             break;
         }
         default: { MONGO_UNREACHABLE; }
@@ -396,13 +399,6 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
 
     // UUID should always be present except for invalidate entries.
     invariant(operationType == kInvalidateOpType || !uuid.missing());
-
-    // Construct the result document.
-    Value documentKey;
-    if (!documentId.missing()) {
-        documentKey = Value(Document{{kIdField, documentId}});
-    }
-    // Note that 'documentKey' might be missing, in which case it will not appear in the output.
     Document resumeToken{{kClusterTimeField, Document{{kTimestampField, ts}}},
                          {kUuidField, uuid},
                          {kDocumentKeyField, documentKey}};
