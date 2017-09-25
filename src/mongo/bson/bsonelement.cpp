@@ -45,6 +45,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace str = mongoutils::str;
@@ -850,18 +851,33 @@ void BSONElement::toString(
             s << "ObjectId('";
             s << __oid() << "')";
             break;
-        case BinData:
-            s << "BinData(" << binDataType() << ", ";
-            {
-                int len;
-                const char* data = binDataClean(len);
-                if (!full && len > 80) {
-                    s << toHex(data, 70) << "...)";
-                } else {
-                    s << toHex(data, len) << ")";
-                }
+        case BinData: {
+            int len;
+            const char* data = binDataClean(len);
+            // If the BinData is a correctly sized newUUID, display it as such.
+            if (binDataType() == newUUID && len == 16) {
+                // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
+                s << "UUID(\"";
+                s << toHexLower(&data[0], 4);
+                s << "-";
+                s << toHexLower(&data[4], 2);
+                s << "-";
+                s << toHexLower(&data[6], 2);
+                s << "-";
+                s << toHexLower(&data[8], 2);
+                s << "-";
+                s << toHexLower(&data[10], 6);
+                s << "\")";
+                break;
             }
-            break;
+            s << "BinData(" << binDataType() << ", ";
+            if (!full && len > 80) {
+                s << toHex(data, 70) << "...)";
+            } else {
+                s << toHex(data, len) << ")";
+            }
+        } break;
+
         case bsonTimestamp:
             s << "Timestamp " << timestampTime().toMillisSinceEpoch() << "|" << timestampInc();
             break;

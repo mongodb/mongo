@@ -65,6 +65,17 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target='bsonelement_test',
+    source=[
+        'bsonelement_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/uuid',
+    ],
+)
+
+env.CppUnitTest(
     target='oid_test',
     source=[
         'oid_test.cpp',
