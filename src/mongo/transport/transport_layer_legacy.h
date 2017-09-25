@@ -157,8 +157,6 @@ private:
 
         TransportLayerLegacy* _tl;
 
-        TagMask _tags;
-
         std::unique_ptr<Connection> _connection;
     };
 

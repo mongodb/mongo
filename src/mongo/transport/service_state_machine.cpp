@@ -429,11 +429,22 @@ void ServiceStateMachine::scheduleNext(ServiceExecutor::ScheduleFlags flags) {
     _scheduleFunc([this] { runNext(); }, flags);
 }
 
+void ServiceStateMachine::terminate() {
+    if (state() == State::Ended)
+        return;
+
+    _session()->getTransportLayer()->end(_session());
+}
+
 void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask tags) {
     if (state() == State::Ended)
         return;
 
-    if (_session()->getTags() & tags) {
+    auto sessionTags = _session()->getTags();
+
+    // If terminateIfTagsDontMatch gets called when we still are 'pending' where no tags have been
+    // set, then skip the termination check.
+    if ((sessionTags & tags) || (sessionTags & transport::Session::kPending)) {
         log() << "Skip closing connection for connection # " << _session()->id();
         return;
     }
@@ -453,7 +464,7 @@ ServiceStateMachine::State ServiceStateMachine::state() {
 void ServiceStateMachine::_terminateAndLogIfError(Status status) {
     if (!status.isOK()) {
         warning(logger::LogComponent::kExecutor) << "Terminating session due to error: " << status;
-        terminateIfTagsDontMatch(transport::Session::kEmptyTagMask);
+        terminate();
     }
 }
 

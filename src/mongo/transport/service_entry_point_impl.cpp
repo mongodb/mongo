@@ -146,8 +146,13 @@ void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
 bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     using logger::LogComponent;
 
-    // Request that all sessions end.
-    endAllSessions(transport::Session::kEmptyTagMask);
+    stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
+
+    // Request that all sessions end, while holding the _sesionsMutex, loop over all the current
+    // connections and terminate them
+    for (auto& ssm : _sessions) {
+        ssm->terminate();
+    }
 
     // Close all sockets and then wait for the number of active connections to reach zero with a
     // condition_variable that notifies in the session cleanup hook. If we haven't closed drained
@@ -157,7 +162,6 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     const auto checkInterval = std::min(Milliseconds(250), timeout);
 
     auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
-    stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
     while (timeSpent < timeout &&
            !_shutdownCondition.wait_for(lk, checkInterval.toSystemDuration(), noWorkersLeft)) {
         log(LogComponent::kNetwork) << "shutdown: still waiting on " << numOpenSessions()

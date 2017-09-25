@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/transport/ticket.h"
 #include "mongo/util/decorable.h"
@@ -72,6 +73,7 @@ public:
     static constexpr TagMask kInternalClient = 2;
     static constexpr TagMask kLatestVersionInternalClientKeepOpen = 4;
     static constexpr TagMask kExternalClientKeepOpen = 8;
+    static constexpr TagMask kPending = 1 << 31;
 
     /**
      * Destroys a session, calling end() for this session in its TransportLayer.
@@ -136,7 +138,7 @@ protected:
 private:
     const Id _id;
 
-    TagMask _tags;
+    AtomicWord<TagMask> _tags;
 };
 
 }  // namespace transport

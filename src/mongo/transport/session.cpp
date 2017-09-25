@@ -43,7 +43,7 @@ AtomicUInt64 sessionIdCounter(0);
 
 }  // namespace
 
-Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kExternalClientKeepOpen) {}
+Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kPending) {}
 
 Ticket Session::sourceMessage(Message* message, Date_t expiration) {
     return getTransportLayer()->sourceMessage(shared_from_this(), message, expiration);
@@ -54,11 +54,13 @@ Ticket Session::sinkMessage(const Message& message, Date_t expiration) {
 }
 
 void Session::replaceTags(TagMask tags) {
-    _tags = tags;
+    // Don't allow explicit assignment of the pending tag, it's only used to describe a new session
+    // until the tags gets assigned.
+    _tags.store(tags & ~kPending);
 }
 
 Session::TagMask Session::getTags() const {
-    return _tags;
+    return _tags.load();
 }
 
 }  // namespace transport

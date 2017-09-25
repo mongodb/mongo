@@ -296,8 +296,7 @@ void FeatureCompatibilityVersion::_validateVersion(StringData version) {
 void FeatureCompatibilityVersion::_closeConnectionsBelowVersion(
     OperationContext* opCtx, FeatureCompatibilityVersionInfo versionInfo) {
 
-    // Close  all internal connections to versions lower than 3.6. Keep open in-progress connections
-    // that haven't sent isMaster yet.
+    // Close all internal connections to versions lower than 3.6.
     if (versionInfo.version == ServerGlobalParams::FeatureCompatibility::Version::k36 ||
         versionInfo.targetVersion == ServerGlobalParams::FeatureCompatibility::Version::k36) {
         opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(

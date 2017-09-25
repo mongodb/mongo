@@ -119,7 +119,16 @@ public:
     State state();
 
     /*
+     * Terminates the associated transport Session, regardless of tags.
+     *
+     * This will not block on the session terminating cleaning itself up, it returns immediately.
+     */
+    void terminate();
+
+    /*
      * Terminates the associated transport Session if its tags don't match the supplied tags.
+     * If the session is in a pending state, before any tags have been set, it will not be
+     * terminated.
      *
      * This will not block on the session terminating cleaning itself up, it returns immediately.
      */

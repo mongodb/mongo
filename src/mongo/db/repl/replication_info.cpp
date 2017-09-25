@@ -288,10 +288,7 @@ public:
         if (internalClientElement) {
             auto session = opCtx->getClient()->session();
             if (session) {
-                // Unset kExternalClientKeepOpen, which is the default for new connections.
-                session->replaceTags(
-                    (session->getTags() & ~transport::Session::kExternalClientKeepOpen) |
-                    transport::Session::kInternalClient);
+                session->replaceTags(session->getTags() | transport::Session::kInternalClient);
             }
 
             uassert(ErrorCodes::TypeMismatch,
@@ -340,6 +337,12 @@ public:
             uassert(ErrorCodes::BadValue,
                     "Missing required field 'maxWireVersion' of 'internalClient'",
                     foundMaxWireVersion);
+        } else {
+            auto session = opCtx->getClient()->session();
+            if (session && !(session->getTags() & transport::Session::kInternalClient)) {
+                session->replaceTags(session->getTags() |
+                                     transport::Session::kExternalClientKeepOpen);
+            }
         }
 
         appendReplicationInfo(opCtx, result, 0);

@@ -83,7 +83,6 @@ TransportLayerLegacy::LegacySession::LegacySession(std::unique_ptr<AbstractMessa
     : _remote(amp->remoteAddr()),
       _local(amp->localAddr()),
       _tl(tl),
-      _tags(kEmptyTagMask),
       _connection(stdx::make_unique<Connection>(std::move(amp))) {}
 
 TransportLayerLegacy::LegacySession::~LegacySession() {
