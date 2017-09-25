@@ -364,16 +364,8 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
         if (!_isValid)
             return;
 
-        if (newTxnNumber < _activeTxnNumber)
-            return;
-
-        // This call is necessary in order to advance the txn number and reset the cached state in
-        // the case where just before the storage transaction commits, the cache entry gets
-        // invalidated and immediately refreshed while there were no writes for newTxnNumber yet. In
-        // this case _activeTxnNumber will be less than newTxnNumber and we will fail to update the
-        // cache even though the write was successful.
-        _beginTxn(lg, newTxnNumber);
-
+        // The cache of the last written record must always be advanced after a write so that
+        // subsequent writes have the correct point to start from.
         if (!_lastWrittenSessionRecord) {
             _lastWrittenSessionRecord.emplace();
 
@@ -388,7 +380,16 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
                 _lastWrittenSessionRecord->setLastWriteOpTimeTs(lastStmtIdWriteTs);
         }
 
-        if (_activeTxnNumber == newTxnNumber) {
+        if (newTxnNumber > _activeTxnNumber) {
+            // This call is necessary in order to advance the txn number and reset the cached state
+            // in the case where just before the storage transaction commits, the cache entry gets
+            // invalidated and immediately refreshed while there were no writes for newTxnNumber
+            // yet. In this case _activeTxnNumber will be less than newTxnNumber and we will fail to
+            // update the cache even though the write was successful.
+            _beginTxn(lg, newTxnNumber);
+        }
+
+        if (newTxnNumber == _activeTxnNumber) {
             for (const auto stmtId : stmtIdsWritten) {
                 const auto insertRes =
                     _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteTs);
