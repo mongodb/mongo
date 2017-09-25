@@ -35,87 +35,147 @@
 namespace mongo {
 namespace {
 
-using limits = std::numeric_limits<int64_t>;
 
-#define assertArithOverflow(FN, LHS, RHS, EXPECT_OVERFLOW, EXPECTED_RESULT)         \
-    do {                                                                            \
-        const bool expectOverflow = EXPECT_OVERFLOW;                                \
-        int64_t result;                                                             \
-        ASSERT_EQ(expectOverflow, FN(LHS, RHS, &result)) << #FN "(" #LHS ", " #RHS; \
-        if (!expectOverflow) {                                                      \
-            ASSERT_EQ(EXPECTED_RESULT, result) << #FN "(" #LHS ", " #RHS " - >";    \
-        }                                                                           \
+#define assertArithOverflow(TYPE, FN, LHS, RHS, EXPECT_OVERFLOW, EXPECTED_RESULT)            \
+    do {                                                                                     \
+        const bool expectOverflow = EXPECT_OVERFLOW;                                         \
+        TYPE result;                                                                         \
+        ASSERT_EQ(expectOverflow, FN(LHS, RHS, &result)) << #FN "(" #LHS ", " #RHS;          \
+        if (!expectOverflow) {                                                               \
+            ASSERT_EQ(TYPE(EXPECTED_RESULT), TYPE(result)) << #FN "(" #LHS ", " #RHS " - >"; \
+        }                                                                                    \
     } while (false)
 
-#define assertMultiplyNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(mongoSignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
-#define assertMultiplyWithOverflow(LHS, RHS) \
-    assertArithOverflow(mongoSignedMultiplyOverflow64, LHS, RHS, true, 0)
+#define assertSignedMultiplyNoOverflow(LHS, RHS, EXPECTED) \
+    assertArithOverflow(int64_t, mongoSignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
+#define assertSignedMultiplyWithOverflow(LHS, RHS) \
+    assertArithOverflow(int64_t, mongoSignedMultiplyOverflow64, LHS, RHS, true, 0)
 
-#define assertAddNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(mongoSignedAddOverflow64, LHS, RHS, false, EXPECTED)
-#define assertAddWithOverflow(LHS, RHS) \
-    assertArithOverflow(mongoSignedAddOverflow64, LHS, RHS, true, 0)
+#define assertUnsignedMultiplyNoOverflow(LHS, RHS, EXPECTED) \
+    assertArithOverflow(uint64_t, mongoUnsignedMultiplyOverflow64, LHS, RHS, false, EXPECTED)
+#define assertUnsignedMultiplyWithOverflow(LHS, RHS) \
+    assertArithOverflow(uint64_t, mongoUnsignedMultiplyOverflow64, LHS, RHS, true, 0)
 
-#define assertSubtractNoOverflow(LHS, RHS, EXPECTED) \
-    assertArithOverflow(mongoSignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
-#define assertSubtractWithOverflow(LHS, RHS) \
-    assertArithOverflow(mongoSignedSubtractOverflow64, LHS, RHS, true, 0)
+#define assertSignedAddNoOverflow(LHS, RHS, EXPECTED) \
+    assertArithOverflow(int64_t, mongoSignedAddOverflow64, LHS, RHS, false, EXPECTED)
+#define assertSignedAddWithOverflow(LHS, RHS) \
+    assertArithOverflow(int64_t, mongoSignedAddOverflow64, LHS, RHS, true, 0)
 
-TEST(OverflowArithmetic, MultiplicationTests) {
-    assertMultiplyNoOverflow(0, limits::max(), 0);
-    assertMultiplyNoOverflow(0, limits::min(), 0);
-    assertMultiplyNoOverflow(1, limits::max(), limits::max());
-    assertMultiplyNoOverflow(1, limits::min(), limits::min());
-    assertMultiplyNoOverflow(-1, limits::max(), limits::min() + 1);
-    assertMultiplyNoOverflow(1000, 57, 57000);
-    assertMultiplyNoOverflow(1000, -57, -57000);
-    assertMultiplyNoOverflow(-1000, -57, 57000);
-    assertMultiplyNoOverflow(0x3fffffffffffffff, 2, 0x7ffffffffffffffe);
-    assertMultiplyNoOverflow(0x3fffffffffffffff, -2, -0x7ffffffffffffffe);
-    assertMultiplyNoOverflow(-0x3fffffffffffffff, -2, 0x7ffffffffffffffe);
+#define assertUnsignedAddNoOverflow(LHS, RHS, EXPECTED) \
+    assertArithOverflow(uint64_t, mongoUnsignedAddOverflow64, LHS, RHS, false, EXPECTED)
+#define assertUnsignedAddWithOverflow(LHS, RHS) \
+    assertArithOverflow(uint64_t, mongoUnsignedAddOverflow64, LHS, RHS, true, 0)
 
-    assertMultiplyWithOverflow(-1, limits::min());
-    assertMultiplyWithOverflow(2, limits::max());
-    assertMultiplyWithOverflow(-2, limits::max());
-    assertMultiplyWithOverflow(2, limits::min());
-    assertMultiplyWithOverflow(-2, limits::min());
-    assertMultiplyWithOverflow(limits::min(), limits::max());
-    assertMultiplyWithOverflow(limits::max(), limits::max());
-    assertMultiplyWithOverflow(limits::min(), limits::min());
-    assertMultiplyWithOverflow(1LL << 62, 8);
-    assertMultiplyWithOverflow(-(1LL << 62), 8);
-    assertMultiplyWithOverflow(-(1LL << 62), -8);
+#define assertSignedSubtractNoOverflow(LHS, RHS, EXPECTED) \
+    assertArithOverflow(int64_t, mongoSignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
+#define assertSignedSubtractWithOverflow(LHS, RHS) \
+    assertArithOverflow(int64_t, mongoSignedSubtractOverflow64, LHS, RHS, true, 0)
+
+#define assertUnsignedSubtractNoOverflow(LHS, RHS, EXPECTED) \
+    assertArithOverflow(uint64_t, mongoUnsignedSubtractOverflow64, LHS, RHS, false, EXPECTED)
+#define assertUnsignedSubtractWithOverflow(LHS, RHS) \
+    assertArithOverflow(uint64_t, mongoUnsignedSubtractOverflow64, LHS, RHS, true, 0)
+
+TEST(OverflowArithmetic, SignedMultiplicationTests) {
+    using limits = std::numeric_limits<int64_t>;
+    assertSignedMultiplyNoOverflow(0, limits::max(), 0);
+    assertSignedMultiplyNoOverflow(0, limits::min(), 0);
+    assertSignedMultiplyNoOverflow(1, limits::max(), limits::max());
+    assertSignedMultiplyNoOverflow(1, limits::min(), limits::min());
+    assertSignedMultiplyNoOverflow(-1, limits::max(), limits::min() + 1);
+    assertSignedMultiplyNoOverflow(1000, 57, 57000);
+    assertSignedMultiplyNoOverflow(1000, -57, -57000);
+    assertSignedMultiplyNoOverflow(-1000, -57, 57000);
+    assertSignedMultiplyNoOverflow(0x3fffffffffffffff, 2, 0x7ffffffffffffffe);
+    assertSignedMultiplyNoOverflow(0x3fffffffffffffff, -2, -0x7ffffffffffffffe);
+    assertSignedMultiplyNoOverflow(-0x3fffffffffffffff, -2, 0x7ffffffffffffffe);
+
+    assertSignedMultiplyWithOverflow(-1, limits::min());
+    assertSignedMultiplyWithOverflow(2, limits::max());
+    assertSignedMultiplyWithOverflow(-2, limits::max());
+    assertSignedMultiplyWithOverflow(2, limits::min());
+    assertSignedMultiplyWithOverflow(-2, limits::min());
+    assertSignedMultiplyWithOverflow(limits::min(), limits::max());
+    assertSignedMultiplyWithOverflow(limits::max(), limits::max());
+    assertSignedMultiplyWithOverflow(limits::min(), limits::min());
+    assertSignedMultiplyWithOverflow(1LL << 62, 8);
+    assertSignedMultiplyWithOverflow(-(1LL << 62), 8);
+    assertSignedMultiplyWithOverflow(-(1LL << 62), -8);
 }
 
-TEST(OverflowArithmetic, AdditionTests) {
-    assertAddNoOverflow(0, limits::max(), limits::max());
-    assertAddNoOverflow(-1, limits::max(), limits::max() - 1);
-    assertAddNoOverflow(0, limits::min(), limits::min());
-    assertAddNoOverflow(1, limits::min(), limits::min() + 1);
-    assertAddNoOverflow(limits::max(), limits::min(), -1);
-    assertAddNoOverflow(1, 1, 2);
-    assertAddNoOverflow(-1, -1, -2);
+TEST(OverflowArithmetic, UnignedMultiplicationTests) {
+    using limits = std::numeric_limits<uint64_t>;
+    assertUnsignedMultiplyNoOverflow(0, limits::max(), 0);
+    assertUnsignedMultiplyNoOverflow(1, limits::max(), limits::max());
+    assertUnsignedMultiplyNoOverflow(1000, 57, 57000);
+    assertUnsignedMultiplyNoOverflow(0x3fffffffffffffff, 2, 0x7ffffffffffffffe);
+    assertUnsignedMultiplyNoOverflow(0x7fffffffffffffff, 2, 0xfffffffffffffffe);
 
-    assertAddWithOverflow(limits::max(), 1);
-    assertAddWithOverflow(limits::max(), limits::max());
-    assertAddWithOverflow(limits::min(), -1);
-    assertAddWithOverflow(limits::min(), limits::min());
+    assertUnsignedMultiplyWithOverflow(2, limits::max());
+    assertUnsignedMultiplyWithOverflow(limits::max(), limits::max());
+    assertUnsignedMultiplyWithOverflow(1LL << 62, 8);
+    assertUnsignedMultiplyWithOverflow(0x7fffffffffffffff, 4);
 }
 
-TEST(OverflowArithmetic, SubtractionTests) {
-    assertSubtractNoOverflow(limits::max(), 0, limits::max());
-    assertSubtractNoOverflow(limits::max(), 1, limits::max() - 1);
-    assertSubtractNoOverflow(limits::min(), 0, limits::min());
-    assertSubtractNoOverflow(limits::min(), -1, limits::min() + 1);
-    assertSubtractNoOverflow(limits::max(), limits::max(), 0);
-    assertSubtractNoOverflow(limits::min(), limits::min(), 0);
+TEST(OverflowArithmetic, SignedAdditionTests) {
+    using limits = std::numeric_limits<int64_t>;
+    assertSignedAddNoOverflow(0, limits::max(), limits::max());
+    assertSignedAddNoOverflow(-1, limits::max(), limits::max() - 1);
+    assertSignedAddNoOverflow(1, limits::max() - 1, limits::max());
+    assertSignedAddNoOverflow(0, limits::min(), limits::min());
+    assertSignedAddNoOverflow(1, limits::min(), limits::min() + 1);
+    assertSignedAddNoOverflow(-1, limits::min() + 1, limits::min());
+    assertSignedAddNoOverflow(limits::max(), limits::min(), -1);
+    assertSignedAddNoOverflow(1, 1, 2);
+    assertSignedAddNoOverflow(-1, -1, -2);
 
-    assertSubtractWithOverflow(0, limits::min());
-    assertSubtractWithOverflow(limits::max(), -1);
-    assertSubtractWithOverflow(limits::max(), limits::min());
-    assertSubtractWithOverflow(limits::min(), 1);
-    assertSubtractWithOverflow(limits::min(), limits::max());
+    assertSignedAddWithOverflow(limits::max(), 1);
+    assertSignedAddWithOverflow(limits::max(), limits::max());
+    assertSignedAddWithOverflow(limits::min(), -1);
+    assertSignedAddWithOverflow(limits::min(), limits::min());
+}
+
+TEST(OverflowArithmetic, UnsignedAdditionTests) {
+    using limits = std::numeric_limits<uint64_t>;
+    assertUnsignedAddNoOverflow(0, limits::max(), limits::max());
+    assertUnsignedAddNoOverflow(1, limits::max() - 1, limits::max());
+    assertUnsignedAddNoOverflow(1, 1, 2);
+
+    assertUnsignedAddWithOverflow(limits::max(), 1);
+    assertUnsignedAddWithOverflow(limits::max(), limits::max());
+}
+
+TEST(OverflowArithmetic, SignedSubtractionTests) {
+    using limits = std::numeric_limits<int64_t>;
+    assertSignedSubtractNoOverflow(limits::max(), 0, limits::max());
+    assertSignedSubtractNoOverflow(limits::max(), 1, limits::max() - 1);
+    assertSignedSubtractNoOverflow(limits::max() - 1, -1, limits::max());
+    assertSignedSubtractNoOverflow(limits::min(), 0, limits::min());
+    assertSignedSubtractNoOverflow(limits::min(), -1, limits::min() + 1);
+    assertSignedSubtractNoOverflow(limits::min() + 1, 1, limits::min());
+    assertSignedSubtractNoOverflow(limits::max(), limits::max(), 0);
+    assertSignedSubtractNoOverflow(limits::min(), limits::min(), 0);
+    assertSignedSubtractNoOverflow(0, 0, 0);
+    assertSignedSubtractNoOverflow(1, 1, 0);
+    assertSignedSubtractNoOverflow(0, 1, -1);
+
+    assertSignedSubtractWithOverflow(0, limits::min());
+    assertSignedSubtractWithOverflow(limits::max(), -1);
+    assertSignedSubtractWithOverflow(limits::max(), limits::min());
+    assertSignedSubtractWithOverflow(limits::min(), 1);
+    assertSignedSubtractWithOverflow(limits::min(), limits::max());
+}
+
+TEST(OverflowArithmetic, UnsignedSubtractionTests) {
+    using limits = std::numeric_limits<uint64_t>;
+    assertUnsignedSubtractNoOverflow(limits::max(), 0, limits::max());
+    assertUnsignedSubtractNoOverflow(limits::max(), 1, limits::max() - 1);
+    assertUnsignedSubtractNoOverflow(limits::max(), limits::max(), 0);
+    assertUnsignedSubtractNoOverflow(0, 0, 0);
+    assertUnsignedSubtractNoOverflow(1, 1, 0);
+
+    assertUnsignedSubtractWithOverflow(0, 1);
+    assertUnsignedSubtractWithOverflow(0, limits::max());
 }
 
 }  // namespace
