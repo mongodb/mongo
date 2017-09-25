@@ -255,11 +255,15 @@ TEST_F(PeriodicRunnerASIOTest, TwoJobsDontDeadlock) {
 
     timerFactory().fastForward(Milliseconds(1));
 
-    stdx::unique_lock<stdx::mutex> lk(mutex);
-    doneCv.wait(lk, [&] { return a && b; });
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        doneCv.wait(lk, [&] { return a && b; });
 
-    ASSERT(a);
-    ASSERT(b);
+        ASSERT(a);
+        ASSERT(b);
+    }
+
+    tearDown();
 }
 
 }  // namespace
