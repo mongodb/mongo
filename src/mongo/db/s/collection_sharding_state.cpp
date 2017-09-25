@@ -324,7 +324,7 @@ auto CollectionShardingState::makeDeleteState(BSONObj const& doc) -> DeleteState
             _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc)};
 }
 
-void CollectionShardingState::onDeleteOp(OperationContext* opCtx, DeleteState const& deleteState) {
+void CollectionShardingState::onDeleteOp(OperationContext* opCtx, const DeleteState& deleteState) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
