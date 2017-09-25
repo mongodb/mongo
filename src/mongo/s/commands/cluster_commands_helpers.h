@@ -47,12 +47,6 @@ class CachedDatabaseInfo;
 class OperationContext;
 class ShardId;
 
-/*
- * Allows callers of routing functions to specify a preferred targeting policy. See scatterGather
- * for a usage example.
- */
-enum class ShardTargetingPolicy { UseRoutingTable, BroadcastToAllShards };
-
 /**
  * This function appends the provided writeConcernError BSONElement to the sharded response.
  */
@@ -65,43 +59,66 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
 BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
 
 /**
- * Generic function for dispatching commands to the cluster.
+ * Utility for dispatching unversioned commands to all shards in a cluster.
  *
- * If 'targetPolicy' is ShardTargetingPolicy::BroadcastToAllShards, the command will be sent
- * unversioned to all shards and run on database 'dbName'. The 'query', 'collation' and
- * 'appendShardVersion' arguments, if supplied, will be ignored.
+ * Returns a non-OK status if a failure occurs on *this* node during execution. Otherwise, returns
+ * success and a list of responses from shards (including errors from the shards or errors reaching
+ * the shards).
  *
- * If 'targetPolicy' is ShardTargetingPolicy::UseRoutingTable, the routing table cache will be used
- * to determine which shards the command should be dispatched to. If the namespace specified by
- * 'nss' is an unsharded collection, the command will be sent to the Primary shard for the database.
- * If 'query' is specified, only shards that own data needed by the query are targeted; otherwise,
- * all shards are targeted. By default, shardVersions are attached to the outgoing requests, and the
- * function will re-target and retry if it receives a stale shardVersion error from any shard.
- *
- * Returns a non-OK status if a failure occurs on *this* node during execution or on seeing an error
- * from a shard that means the operation as a whole should fail, such as a exceeding retries for
- * stale shardVersion errors.
- *
- * If a shard returns an error saying that the request was on a view, the shard will also return a
- * view definition. This will be stored in the BSONObj* viewDefinition argument, if non-null, so
- * that the caller can re-run the operation as an aggregation.
- *
- * Otherwise, returns success and a list of responses from shards (including errors from the shards
- * or errors reaching the shards).
+ * Note, if this mongos has not refreshed its shard list since
+ * 1) a shard has been *added* through a different mongos, a request will not be sent to the added
+ *    shard
+ * 2) a shard has been *removed* through a different mongos, this function will return a
+ *    ShardNotFound error status.
  */
-StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherUnversionedTargetAllShards(
     OperationContext* opCtx,
     const std::string& dbName,
-    const boost::optional<NamespaceString> nss,
+    boost::optional<NamespaceString> nss,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
+
+/**
+ * Utility for dispatching versioned commands on a namespace, deciding which shards to
+ * target by applying the passed-in query and collation to the local routing table cache.
+ *
+ * Throws on seeing a StaleConfigException from any shard.
+ *
+ * Optionally populates a 'viewDefinition' out parameter if a shard's result contains a view
+ * definition. The viewDefinition can be used to re-run the command as an aggregation.
+ *
+ * Return value is the same as scatterGatherUnversionedTargetAllShards().
+ */
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherVersionedTargetByRoutingTable(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const NamespaceString& nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
-    const ShardTargetingPolicy targetPolicy = ShardTargetingPolicy::UseRoutingTable,
-    const boost::optional<BSONObj> query = boost::none,
-    const boost::optional<BSONObj> collation = boost::none,
-    const bool appendShardVersion = true,
-    const bool retryOnStaleShardVersion = true,
-    BSONObj* viewDefinition = nullptr);
+    const BSONObj& query,
+    const BSONObj& collation,
+    BSONObj* viewDefinition);
+
+/**
+ * Utility for dispatching commands on a namespace, but with special hybrid versioning:
+ * - If the namespace is unsharded, a version is attached (so this node can find out if its routing
+ * table was stale, and the namespace is actually sharded), and only the primary shard is targeted.
+ * - If the namespace is sharded, no version is attached, and the request is broadcast to all
+ * shards.
+ *
+ * Throws on seeing a StaleConfigException.
+ *
+ * Return value is the same as scatterGatherUnversionedTargetAllShards().
+ */
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherOnlyVersionIfUnsharded(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
 
 /**
  * Attaches each shard's response or error status by the shard's connection string in a top-level

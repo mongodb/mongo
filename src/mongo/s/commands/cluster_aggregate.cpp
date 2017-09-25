@@ -541,19 +541,31 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
         if (mergeCtx->explain) {
-            swShardResults = scatterGather(opCtx,
-                                           namespaces.executionNss.db().toString(),
-                                           namespaces.executionNss,
-                                           targetedCommand,
-                                           ReadPreferenceSetting::get(opCtx),
-                                           Shard::RetryPolicy::kIdempotent,
-                                           namespaces.executionNss.isCollectionlessAggregateNS()
-                                               ? ShardTargetingPolicy::BroadcastToAllShards
-                                               : ShardTargetingPolicy::UseRoutingTable,
-                                           shardQuery,
-                                           request.getCollation(),
-                                           true,
-                                           false);
+            if (namespaces.executionNss.isCollectionlessAggregateNS()) {
+                // Some commands, such as $currentOp, are implemented as aggregation stages on a
+                // "collectionless" namespace. Currently, all such commands should be broadcast to
+                // all shards, and should not participate in the shard version protocol.
+                swShardResults =
+                    scatterGatherUnversionedTargetAllShards(opCtx,
+                                                            namespaces.executionNss.db().toString(),
+                                                            namespaces.executionNss,
+                                                            targetedCommand,
+                                                            ReadPreferenceSetting::get(opCtx),
+                                                            Shard::RetryPolicy::kIdempotent);
+            } else {
+                // Aggregations on a real namespace should use the routing table to target shards,
+                // and should participate in the shard version protocol.
+                swShardResults = scatterGatherVersionedTargetByRoutingTable(
+                    opCtx,
+                    namespaces.executionNss.db().toString(),
+                    namespaces.executionNss,
+                    targetedCommand,
+                    ReadPreferenceSetting::get(opCtx),
+                    Shard::RetryPolicy::kIdempotent,
+                    shardQuery,
+                    request.getCollation(),
+                    nullptr /* viewDefinition */);
+            }
         } else {
             swCursors = establishShardCursors(opCtx,
                                               namespaces.executionNss,

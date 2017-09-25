@@ -606,18 +606,16 @@ Status Strategy::explainFind(OperationContext* opCtx,
     Timer timer;
 
     BSONObj viewDefinition;
-    auto swShardResponses = scatterGather(opCtx,
-                                          qr.nss().db().toString(),
-                                          qr.nss(),
-                                          explainCmd,
-                                          readPref,
-                                          Shard::RetryPolicy::kIdempotent,
-                                          ShardTargetingPolicy::UseRoutingTable,
-                                          qr.getFilter(),
-                                          qr.getCollation(),
-                                          true,  // do shard versioning
-                                          true,  // retry on stale shard version
-                                          &viewDefinition);
+    auto swShardResponses =
+        scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                   qr.nss().db().toString(),
+                                                   qr.nss(),
+                                                   explainCmd,
+                                                   readPref,
+                                                   Shard::RetryPolicy::kIdempotent,
+                                                   qr.getFilter(),
+                                                   qr.getCollation(),
+                                                   &viewDefinition);
 
     long long millisElapsed = timer.millis();
 

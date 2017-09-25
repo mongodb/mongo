@@ -141,18 +141,16 @@ public:
         auto countCmdObj = countCmdBuilder.done();
 
         BSONObj viewDefinition;
-        auto swShardResponses = scatterGather(opCtx,
-                                              dbname,
-                                              nss,
-                                              countCmdObj,
-                                              ReadPreferenceSetting::get(opCtx),
-                                              Shard::RetryPolicy::kIdempotent,
-                                              ShardTargetingPolicy::UseRoutingTable,
-                                              filter,
-                                              collation,
-                                              true,  // do shard versioning
-                                              true,  // retry on stale shard version
-                                              &viewDefinition);
+        auto swShardResponses =
+            scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                       dbname,
+                                                       nss,
+                                                       countCmdObj,
+                                                       ReadPreferenceSetting::get(opCtx),
+                                                       Shard::RetryPolicy::kIdempotent,
+                                                       filter,
+                                                       collation,
+                                                       &viewDefinition);
 
         if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
             if (viewDefinition.isEmpty()) {
@@ -272,18 +270,16 @@ public:
         Timer timer;
 
         BSONObj viewDefinition;
-        auto swShardResponses = scatterGather(opCtx,
-                                              dbname,
-                                              nss,
-                                              explainCmd,
-                                              ReadPreferenceSetting::get(opCtx),
-                                              Shard::RetryPolicy::kIdempotent,
-                                              ShardTargetingPolicy::UseRoutingTable,
-                                              targetingQuery,
-                                              targetingCollation,
-                                              true,  // do shard versioning
-                                              true,  // retry on stale shard version
-                                              &viewDefinition);
+        auto swShardResponses =
+            scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                       dbname,
+                                                       nss,
+                                                       explainCmd,
+                                                       ReadPreferenceSetting::get(opCtx),
+                                                       Shard::RetryPolicy::kIdempotent,
+                                                       targetingQuery,
+                                                       targetingCollation,
+                                                       &viewDefinition);
 
         long long millisElapsed = timer.millis();
 
