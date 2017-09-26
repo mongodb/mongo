@@ -100,7 +100,9 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
+messageCompressorEnv = env.Clone()
+messageCompressorEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+messageCompressorEnv.Library(
     target='message_compressor',
     source=[
         'message_compressor_manager.cpp',

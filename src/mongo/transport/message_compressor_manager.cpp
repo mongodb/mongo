@@ -51,22 +51,30 @@ struct CompressionHeader {
     uint8_t compressorId;
 
     void serialize(DataRangeCursor* cursor) {
-        cursor->writeAndAdvance<LittleEndian<int32_t>>(originalOpCode);
-        cursor->writeAndAdvance<LittleEndian<int32_t>>(uncompressedSize);
-        cursor->writeAndAdvance<LittleEndian<uint8_t>>(compressorId);
+        uassertStatusOK(cursor->writeAndAdvance<LittleEndian<int32_t>>(originalOpCode));
+        uassertStatusOK(cursor->writeAndAdvance<LittleEndian<int32_t>>(uncompressedSize));
+        uassertStatusOK(cursor->writeAndAdvance<LittleEndian<uint8_t>>(compressorId));
     }
 
     CompressionHeader(int32_t _opcode, int32_t _size, uint8_t _id)
         : originalOpCode{_opcode}, uncompressedSize{_size}, compressorId{_id} {}
 
     CompressionHeader(ConstDataRangeCursor* cursor) {
-        originalOpCode = cursor->readAndAdvance<LittleEndian<std::int32_t>>().getValue();
-        uncompressedSize = cursor->readAndAdvance<LittleEndian<std::int32_t>>().getValue();
-        compressorId = cursor->readAndAdvance<LittleEndian<uint8_t>>().getValue();
+        originalOpCode = _readWithChecking<LittleEndian<std::int32_t>>(cursor);
+        uncompressedSize = _readWithChecking<LittleEndian<std::int32_t>>(cursor);
+        compressorId = _readWithChecking<LittleEndian<uint8_t>>(cursor);
     }
 
     static size_t size() {
         return sizeof(originalOpCode) + sizeof(uncompressedSize) + sizeof(compressorId);
+    }
+
+private:
+    template <typename T>
+    T _readWithChecking(ConstDataRangeCursor* cursor) {
+        auto sw = cursor->readAndAdvance<T>();
+        uassertStatusOK(sw.getStatus());
+        return sw.getValue();
     }
 };
 }  // namespace
@@ -124,6 +132,9 @@ StatusWith<Message> MessageCompressorManager::compressMessage(const Message& msg
 StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& msg) {
     auto inputHeader = msg.header();
     ConstDataRangeCursor input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
+    if (input.length() < CompressionHeader::size()) {
+        return {ErrorCodes::BadValue, "Invalid compressed message header"};
+    }
     CompressionHeader compressionHeader(&input);
 
     auto compressor = _registry->getCompressor(compressionHeader.compressorId);
@@ -132,7 +143,12 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
                 "Compression algorithm specified in message is not available"};
     }
 
-    auto bufferSize = compressionHeader.uncompressedSize + MsgData::MsgDataHeaderSize;
+    size_t bufferSize = compressionHeader.uncompressedSize + MsgData::MsgDataHeaderSize;
+    if (bufferSize > MaxMessageSizeBytes) {
+        return {ErrorCodes::BadValue,
+                "Decompressed message would be larger than maximum message size"};
+    }
+
     auto outputMessageBuffer = SharedBuffer::allocate(bufferSize);
     MsgData::View outMessage(outputMessageBuffer.get());
     outMessage.setId(inputHeader.getId());
