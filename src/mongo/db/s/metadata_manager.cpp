@@ -477,11 +477,13 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
 
 auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
     -> CleanupNotification {
+
     stdx::unique_lock<stdx::mutex> scopedLock(_managerLock);
     invariant(!_metadata.empty());
 
     auto* activeMetadata = _metadata.back().get();
-    if (activeMetadata->rangeOverlapsChunk(range)) {
+    auto* overlapMetadata = _newestOverlappingMetadata(scopedLock, range);
+    if (overlapMetadata == activeMetadata) {
         return Status{ErrorCodes::RangeOverlapConflict,
                       str::stream() << "Requested deletion range overlaps a live shard chunk"};
     }
@@ -492,20 +494,21 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
                                        " migrated in"};
     }
 
-    StringData whenStr = (whenToDelete == Date_t{}) ? "immediate"_sd : "deferred"_sd;
-    if (!_overlapsInUseChunk(scopedLock, range)) {
+    if (overlapMetadata == nullptr) {
         // No running queries can depend on it, so queue it for deletion immediately.
+        auto whenStr = (whenToDelete == Date_t{}) ? "immediate"_sd : "deferred"_sd;
         log() << "Scheduling " << whenStr << " deletion of " << _nss.ns() << " range "
               << redact(range.toString());
         return _pushRangeToClean(scopedLock, range, whenToDelete);
     }
-    auto ownedRange = ChunkRange{range.getMin().getOwned(), range.getMax().getOwned()};
-    activeMetadata->_tracker.orphans.emplace_back(Deletion{std::move(ownedRange), whenToDelete});
 
     log() << "Scheduling deletion of " << _nss.ns() << " range " << redact(range.toString())
           << " after all possibly-dependent queries finish";
-
-    return activeMetadata->_tracker.orphans.back().notification;
+    // Put it on the oldest metadata permissible; the current one might live a long time.
+    auto& orphans = overlapMetadata->_tracker.orphans;
+    ChunkRange ownedRange{range.getMin().getOwned(), range.getMax().getOwned()};
+    orphans.emplace_back(Deletion{std::move(ownedRange), whenToDelete});
+    return orphans.back().notification;
 }
 
 auto MetadataManager::overlappingMetadata(std::shared_ptr<MetadataManager> const& self,
@@ -554,20 +557,27 @@ auto MetadataManager::trackOrphanedDataCleanup(ChunkRange const& range)
     return _rangesToClean.overlaps(range);
 }
 
-bool MetadataManager::_overlapsInUseChunk(WithLock, ChunkRange const& range) {
+auto MetadataManager::_newestOverlappingMetadata(WithLock, ChunkRange const& range) const
+    -> CollectionMetadata* {
+
     invariant(!_metadata.empty());
-    for (auto it = _metadata.begin(), end = --_metadata.end(); it != end; ++it) {
+    if (_metadata.back()->rangeOverlapsChunk(range)) {
+        return _metadata.back().get();
+    }
+    for (auto it = ++_metadata.rbegin(), et = _metadata.rend(); it != et; ++it) {
         if (((*it)->_tracker.usageCounter != 0) && (*it)->rangeOverlapsChunk(range)) {
-            return true;
+            return it->get();
         }
     }
-    if (_metadata.back()->rangeOverlapsChunk(range)) {  // for active metadata, ignore refcount.
-        return true;
-    }
-    return false;
+    return nullptr;
 }
 
-auto MetadataManager::_overlapsInUseCleanups(WithLock, ChunkRange const& range)
+bool MetadataManager::_overlapsInUseChunk(WithLock lk, ChunkRange const& range) const {
+    auto* cm = _newestOverlappingMetadata(lk, range);
+    return (cm != nullptr);
+}
+
+auto MetadataManager::_overlapsInUseCleanups(WithLock, ChunkRange const& range) const
     -> boost::optional<CleanupNotification> {
     invariant(!_metadata.empty());
 

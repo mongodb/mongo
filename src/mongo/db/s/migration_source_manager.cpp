@@ -439,32 +439,28 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                               << "'"};
     }
 
-    {
-        // TODO: This scope for the metadata is needed until SERVER-30083 is resolved.
+    auto refreshedMetadata = [&] {
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
+        return CollectionShardingState::get(opCtx, getNss())->getMetadata();
+    }();
 
-        auto refreshedMetadata = [&] {
-            AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
-            return CollectionShardingState::get(opCtx, getNss())->getMetadata();
-        }();
-
-        if (!refreshedMetadata) {
-            return {ErrorCodes::NamespaceNotSharded,
-                    str::stream() << "Chunk move failed because collection '" << getNss().ns()
-                                  << "' is no longer sharded. The migration commit error was: "
-                                  << migrationCommitStatus.toString()};
-        }
-
-        if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
-            // The chunk modification was not applied, so report the original error
-            return {migrationCommitStatus.code(),
-                    str::stream() << "Chunk move was not successful due to "
-                                  << migrationCommitStatus.reason()};
-        }
-
-        // Migration succeeded
-        log() << "Migration succeeded and updated collection version to "
-              << refreshedMetadata->getCollVersion();
+    if (!refreshedMetadata) {
+        return {ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Chunk move failed because collection '" << getNss().ns()
+                              << "' is no longer sharded. The migration commit error was: "
+                              << migrationCommitStatus.toString()};
     }
+
+    if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
+        // The chunk modification was not applied, so report the original error
+        return {migrationCommitStatus.code(),
+                str::stream() << "Chunk move was not successful due to "
+                              << migrationCommitStatus.reason()};
+    }
+
+    // Migration succeeded
+    log() << "Migration succeeded and updated collection version to "
+          << refreshedMetadata->getCollVersion();
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
