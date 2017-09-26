@@ -2252,7 +2252,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
           << " members parses ok";
 
     if (!args.force) {
-        status = checkQuorumForReconfig(_replExecutor.get(), newConfig, myIndex.getValue());
+        status = checkQuorumForReconfig(
+            _replExecutor.get(), newConfig, myIndex.getValue(), _topCoord->getTerm());
         if (!status.isOK()) {
             error() << "replSetReconfig failed; " << status;
             return status;
@@ -2385,7 +2386,13 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     log() << "replSetInitiate config object with " << newConfig.getNumMembers()
           << " members parses ok";
 
-    status = checkQuorumForInitiate(_replExecutor.get(), newConfig, myIndex.getValue());
+    // In pv1, the TopologyCoordinator has not set the term yet. It will be set to kInitialTerm if
+    // the initiate succeeds so we pass that here.
+    status = checkQuorumForInitiate(
+        _replExecutor.get(),
+        newConfig,
+        myIndex.getValue(),
+        newConfig.getProtocolVersion() == 1 ? OpTime::kInitialTerm : OpTime::kUninitializedTerm);
 
     if (!status.isOK()) {
         error() << "replSetInitiate failed; " << status;

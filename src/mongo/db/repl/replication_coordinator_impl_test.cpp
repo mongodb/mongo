@@ -343,13 +343,13 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     start(HostAndPort("node1", 12345));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    ReplSetHeartbeatArgs hbArgs;
+    ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName("mySet");
-    hbArgs.setProtocolVersion(1);
     hbArgs.setConfigVersion(1);
-    hbArgs.setCheckEmpty(true);
+    hbArgs.setCheckEmpty();
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
+    hbArgs.setTerm(0);
 
     Status status(ErrorCodes::InternalError, "Not set");
     stdx::thread prsiThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
@@ -375,13 +375,13 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     start(HostAndPort("node1", 12345));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    ReplSetHeartbeatArgs hbArgs;
+    ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName("mySet");
-    hbArgs.setProtocolVersion(1);
     hbArgs.setConfigVersion(1);
-    hbArgs.setCheckEmpty(true);
+    hbArgs.setCheckEmpty();
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
+    hbArgs.setTerm(0);
 
     auto appliedTS = Timestamp(3, 3);
     getReplCoord()->setMyLastAppliedOpTime(OpTime(appliedTS, 1));
@@ -3368,7 +3368,7 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
     Status status(ErrorCodes::InternalError, "Not Set");
     stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
-    replyToReceivedHeartbeat();
+    replyToReceivedHeartbeatV1();
     reconfigThread.join();
     ASSERT_OK(status);
 
@@ -3458,7 +3458,7 @@ TEST_F(
     Status status(ErrorCodes::InternalError, "Not Set");
     stdx::thread reconfigThread(stdx::bind(doReplSetReconfigToFewer, getReplCoord(), &status));
 
-    replyToReceivedHeartbeat();
+    replyToReceivedHeartbeatV1();
 
     reconfigThread.join();
     ASSERT_OK(status);
@@ -3544,7 +3544,7 @@ TEST_F(ReplCoordTest,
     Status status(ErrorCodes::InternalError, "Not Set");
     stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
-    replyToReceivedHeartbeat();
+    replyToReceivedHeartbeatV1();
     reconfigThread.join();
     ASSERT_OK(status);
 
@@ -5416,14 +5416,14 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
                                                  << startingOpTime.getTimestamp())))));
     ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args2, 0));
 
-    ReplSetHeartbeatArgs hbArgs;
+    ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName("mySet");
-    hbArgs.setProtocolVersion(1);
     hbArgs.setConfigVersion(2);
     hbArgs.setSenderId(1);
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeat(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
 
     // Confirm that the node relinquishes PRIMARY after only one node is left UP.
     const Date_t startDate1 = getNet()->now();

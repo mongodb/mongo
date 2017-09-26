@@ -1758,8 +1758,8 @@ TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) 
                  0);
     HostAndPort target("host2", 27017);
     Date_t requestDate = now();
-    std::pair<ReplSetHeartbeatArgs, Milliseconds> uppingRequest =
-        getTopoCoord().prepareHeartbeatRequest(requestDate, "myset", target);
+    std::pair<ReplSetHeartbeatArgsV1, Milliseconds> uppingRequest =
+        getTopoCoord().prepareHeartbeatRequestV1(requestDate, "myset", target);
     auto action = getTopoCoord().processHeartbeatResponse(
         requestDate, Milliseconds(0), target, makeStatusWith<ReplSetHeartbeatResponse>());
     Date_t expected(now() + Milliseconds(2500));
