@@ -79,7 +79,7 @@ wts_ops(int lastrun)
 	wt_thread_t alter_tid, backup_tid, compact_tid, lrt_tid, timestamp_tid;
 	int64_t fourths, quit_fourths, thread_ops;
 	uint32_t i;
-	int running;
+	bool running;
 
 	conn = g.wts_conn;
 
@@ -141,7 +141,23 @@ wts_ops(int lastrun)
 	tinfo_list = dcalloc((size_t)g.c_threads, sizeof(TINFO *));
 	for (i = 0; i < g.c_threads; ++i) {
 		tinfo_list[i] = tinfo = dcalloc(1, sizeof(TINFO));
+
 		tinfo->id = (int)i + 1;
+
+		/*
+		 * Characterize the per-thread random number generator. Normally
+		 * we want independent behavior so threads start in different
+		 * parts of the RNG space, but we've found bugs by having the
+		 * threads pound on the same key/value pairs, that is, by making
+		 * them traverse the same RNG space. 75% of the time we run in
+		 * independent RNG space.
+		 */
+		if (g.c_independent_thread_rng)
+			__wt_random_init_seed(
+			    (WT_SESSION_IMPL *)session, &tinfo->rnd);
+		else
+			__wt_random_init(&tinfo->rnd);
+
 		tinfo->state = TINFO_RUNNING;
 		testutil_check(
 		    __wt_thread_create(NULL, &tinfo->tid, ops, tinfo));
@@ -170,7 +186,7 @@ wts_ops(int lastrun)
 	for (;;) {
 		/* Clear out the totals each pass. */
 		memset(&total, 0, sizeof(total));
-		for (i = 0, running = 0; i < g.c_threads; ++i) {
+		for (i = 0, running = false; i < g.c_threads; ++i) {
 			tinfo = tinfo_list[i];
 			total.commit += tinfo->commit;
 			total.deadlock += tinfo->deadlock;
@@ -182,7 +198,7 @@ wts_ops(int lastrun)
 
 			switch (tinfo->state) {
 			case TINFO_RUNNING:
-				running = 1;
+				running = true;
 				break;
 			case TINFO_COMPLETE:
 				tinfo->state = TINFO_JOINED;
@@ -514,9 +530,6 @@ ops(void *arg)
 	snap = NULL;
 	iso_config = 0;
 	memset(snap_list, 0, sizeof(snap_list));
-
-	/* Initialize the per-thread random number generator. */
-	__wt_random_init(&tinfo->rnd);
 
 	/* Set up the default key and value buffers. */
 	key = &_key;
