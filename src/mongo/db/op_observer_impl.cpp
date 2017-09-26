@@ -75,13 +75,12 @@ void onWriteOpCompleted(OperationContext* opCtx,
                         Session* session,
                         std::vector<StmtId> stmtIdsWritten,
                         const repl::OpTime& lastStmtIdWriteOpTime) {
-    const auto lastStmtIdWriteTs = lastStmtIdWriteOpTime.getTimestamp();
-    if (lastStmtIdWriteTs.isNull())
+    if (lastStmtIdWriteOpTime.isNull())
         return;
 
     if (session) {
         session->onWriteOpCompletedOnPrimary(
-            opCtx, *opCtx->getTxnNumber(), std::move(stmtIdsWritten), lastStmtIdWriteTs);
+            opCtx, *opCtx->getTxnNumber(), std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
     }
 }
 
@@ -140,7 +139,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     if (session) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevTs = session->getLastWriteOpTimeTs(*opCtx->getTxnNumber());
+        oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
     }
 
     OpTimeBundle opTimes;
@@ -160,9 +159,9 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
         opTimes.prePostImageOpTime = noteUpdateOpTime;
 
         if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
-            oplogLink.preImageTs = noteUpdateOpTime.getTimestamp();
+            oplogLink.preImageOpTime = noteUpdateOpTime;
         } else if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PostImage) {
-            oplogLink.postImageTs = noteUpdateOpTime.getTimestamp();
+            oplogLink.postImageOpTime = noteUpdateOpTime;
         }
     }
 
@@ -197,7 +196,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     if (session) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevTs = session->getLastWriteOpTimeTs(*opCtx->getTxnNumber());
+        oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
     }
 
     OpTimeBundle opTimes;
@@ -206,7 +205,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
         auto noteOplog = repl::logOp(
             opCtx, "n", nss, uuid, deletedDoc.get(), nullptr, false, sessionInfo, stmtId, {});
         opTimes.prePostImageOpTime = noteOplog;
-        oplogLink.preImageTs = noteOplog.getTimestamp();
+        oplogLink.preImageOpTime = noteOplog;
     }
 
     opTimes.writeOpTime = repl::logOp(opCtx,
@@ -280,10 +279,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                bool fromMigrate) {
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
 
-    const size_t count = end - begin;
-    auto timestamps = stdx::make_unique<Timestamp[]>(count);
-    const auto lastOpTime =
-        repl::logInsertOps(opCtx, nss, uuid, session, begin, end, timestamps.get(), fromMigrate);
+    const auto opTimeList = repl::logInsertOps(opCtx, nss, uuid, session, begin, end, fromMigrate);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
 
@@ -292,10 +288,12 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         AuthorizationManager::get(opCtx->getServiceContext())
             ->logOp(opCtx, "i", nss, it->doc, nullptr);
         if (!fromMigrate) {
-            css->onInsertOp(opCtx, it->doc, timestamps[index]);
+            auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
+            css->onInsertOp(opCtx, it->doc, opTime);
         }
     }
 
+    auto lastOpTime = opTimeList.empty() ? repl::OpTime() : opTimeList.back();
     if (nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
     } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
@@ -336,8 +334,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                         args.criteria,
                         args.update,
                         args.updatedDoc,
-                        opTime.writeOpTime.getTimestamp(),
-                        opTime.prePostImageOpTime.getTimestamp());
+                        opTime.writeOpTime,
+                        opTime.prePostImageOpTime);
     }
 
     if (args.nss.coll() == "system.js") {
@@ -350,7 +348,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                !opTime.writeOpTime.isNull()) {
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, args.updatedDoc);
     }
-
 
     onWriteOpCompleted(
         opCtx, args.nss, session, std::vector<StmtId>{args.stmtId}, opTime.writeOpTime);
@@ -383,10 +380,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
     if (!fromMigrate) {
-        css->onDeleteOp(opCtx,
-                        deleteState,
-                        opTime.writeOpTime.getTimestamp(),
-                        opTime.prePostImageOpTime.getTimestamp());
+        css->onDeleteOp(opCtx, deleteState, opTime.writeOpTime, opTime.prePostImageOpTime);
     }
 
     if (nss.coll() == "system.js") {

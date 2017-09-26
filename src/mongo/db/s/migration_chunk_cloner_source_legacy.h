@@ -75,17 +75,17 @@ public:
 
     void onInsertOp(OperationContext* opCtx,
                     const BSONObj& insertedDoc,
-                    const Timestamp& oplogTs) override;
+                    const repl::OpTime& opTime) override;
 
     void onUpdateOp(OperationContext* opCtx,
                     const BSONObj& updatedDoc,
-                    const Timestamp& oplogTs,
-                    const Timestamp& prePostImageTs) override;
+                    const repl::OpTime& opTime,
+                    const repl::OpTime& prePostImageOpTime) override;
 
     void onDeleteOp(OperationContext* opCtx,
                     const BSONObj& deletedDocId,
-                    const Timestamp& oplogTs,
-                    const Timestamp& preImageTs) override;
+                    const repl::OpTime& opTime,
+                    const repl::OpTime& preImageOpTime) override;
 
     // Legacy cloner specific functionality
 

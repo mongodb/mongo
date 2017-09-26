@@ -544,16 +544,16 @@ SessionRecordMap computeLatestTransactionTableRecords(const MultiApplier::Operat
         LogicalSessionId lsid(*sessionInfo.getSessionId());
 
         auto txnNumber = *sessionInfo.getTxnNumber();
-        auto opTimeTs = op.getOpTime().getTimestamp();
+        auto opTime = op.getOpTime();
 
         auto it = latestRecords.find(lsid);
         if (it != latestRecords.end()) {
-            auto record = makeSessionTxnRecord(lsid, txnNumber, opTimeTs);
+            auto record = makeSessionTxnRecord(lsid, txnNumber, opTime);
             if (record > it->second) {
                 latestRecords[lsid] = std::move(record);
             }
         } else {
-            latestRecords.emplace(lsid, makeSessionTxnRecord(lsid, txnNumber, opTimeTs));
+            latestRecords.emplace(lsid, makeSessionTxnRecord(lsid, txnNumber, opTime));
         }
     }
     return latestRecords;

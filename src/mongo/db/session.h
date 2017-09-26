@@ -87,7 +87,7 @@ public:
      * Called after a write under the specified transaction completes while the node is a primary
      * and specifies the statement ids which were written. Must be called while the caller is still
      * in the write's WUOW. Updates the on-disk state of the session to match the specified
-     * transaction/timestamp and keeps the cached state in sync.
+     * transaction/opTime and keeps the cached state in sync.
      *
      * Must only be called with the session checked-out.
      *
@@ -96,7 +96,7 @@ public:
     void onWriteOpCompletedOnPrimary(OperationContext* opCtx,
                                      TxnNumber txnNumber,
                                      std::vector<StmtId> stmtIdsWritten,
-                                     Timestamp lastStmtIdWriteTs);
+                                     const repl::OpTime& lastStmtIdWriteOpTime);
 
     /**
      * Called after a replication batch has been applied on a secondary node. Keeps the session
@@ -120,7 +120,7 @@ public:
      *
      * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
-    Timestamp getLastWriteOpTimeTs(TxnNumber txnNumber) const;
+    repl::OpTime getLastWriteOpTime(TxnNumber txnNumber) const;
 
     /**
      * Returns the oplog entry with the given statementId for the specified transaction, if it
@@ -142,18 +142,18 @@ private:
 
     void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const;
 
-    boost::optional<Timestamp> _checkStatementExecuted(WithLock,
-                                                       TxnNumber txnNumber,
-                                                       StmtId stmtId) const;
+    boost::optional<repl::OpTime> _checkStatementExecuted(WithLock,
+                                                          TxnNumber txnNumber,
+                                                          StmtId stmtId) const;
 
     UpdateRequest _makeUpdateRequest(WithLock,
                                      TxnNumber newTxnNumber,
-                                     Timestamp newLastWriteTs) const;
+                                     const repl::OpTime& newLastWriteTs) const;
 
     void _registerUpdateCacheOnCommit(OperationContext* opCtx,
                                       TxnNumber newTxnNumber,
                                       std::vector<StmtId> stmtIdsWritten,
-                                      Timestamp lastStmtIdWriteTs);
+                                      const repl::OpTime& lastStmtIdWriteTs);
 
     const LogicalSessionId _sessionId;
 
@@ -176,9 +176,9 @@ private:
     TxnNumber _activeTxnNumber{kUninitializedTxnNumber};
 
     // For the active txn, tracks which statement ids have been committed and at which oplog
-    // timestamp. Used for fast retryability check and retrieving the previous write's data without
+    // opTime. Used for fast retryability check and retrieving the previous write's data without
     // having to scan through the oplog.
-    using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, Timestamp>;
+    using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, repl::OpTime>;
     CommittedStatementTimestampMap _activeTxnCommittedStatements;
 };
 

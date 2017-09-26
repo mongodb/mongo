@@ -30,10 +30,20 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/logical_session_id.h"
+        - "mongo/db/repl/optime.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
+
+# TODO: SERVER-31278 import from repl/replication_types.idl instead
+types:
+    optime:
+        bson_serialization_type: object
+        description: A document representing an OpTime.
+        cpp_type: "repl::OpTime"
+        serializer: repl::OpTime::toBSON
+        deserializer: repl::OpTime::parse
 
 structs:
     sessionTxnRecord:
@@ -46,8 +56,8 @@ structs:
             txnNum:
                 type: TxnNumber
                 description: "The id representing this transaction."
-            lastWriteOpTimeTs:
-                type: timestamp
+            lastWriteOpTime:
+                type: optime
                 description: "The optime timestamp component of the last write on this
                               transaction."
 

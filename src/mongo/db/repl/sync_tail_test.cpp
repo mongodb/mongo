@@ -541,31 +541,40 @@ TEST_F(SyncTailTest, MultiApplyUpdatesTheTransactionTable) {
     DBDirectClient client(_opCtx.get());
 
     // The txnNum and optime of the only write were saved.
-    auto resultSingle =
+    auto resultSingleDoc =
         client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                        BSON(SessionTxnRecord::kSessionIdFieldName << lsidSingle.toBSON()));
-    ASSERT_TRUE(!resultSingle.isEmpty());
-    ASSERT_EQ(resultSingle[SessionTxnRecord::kTxnNumFieldName].numberLong(), 5LL);
-    ASSERT_EQ(resultSingle[SessionTxnRecord::kLastWriteOpTimeTsFieldName].timestamp(),
-              Timestamp(Seconds(1), 0));
+    ASSERT_TRUE(!resultSingleDoc.isEmpty());
+
+    auto resultSingle =
+        SessionTxnRecord::parse(IDLParserErrorContext("resultSingleDoc test"), resultSingleDoc);
+
+    ASSERT_EQ(resultSingle.getTxnNum(), 5LL);
+    ASSERT_EQ(resultSingle.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(1), 0), 1));
 
     // The txnNum and optime of the write with the larger txnNum were saved.
-    auto resultDiffTxn =
+    auto resultDiffTxnDoc =
         client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                        BSON(SessionTxnRecord::kSessionIdFieldName << lsidDiffTxn.toBSON()));
-    ASSERT_TRUE(!resultDiffTxn.isEmpty());
-    ASSERT_EQ(resultDiffTxn[SessionTxnRecord::kTxnNumFieldName].numberLong(), 20LL);
-    ASSERT_EQ(resultDiffTxn[SessionTxnRecord::kLastWriteOpTimeTsFieldName].timestamp(),
-              Timestamp(Seconds(3), 0));
+    ASSERT_TRUE(!resultDiffTxnDoc.isEmpty());
+
+    auto resultDiffTxn =
+        SessionTxnRecord::parse(IDLParserErrorContext("resultDiffTxnDoc test"), resultDiffTxnDoc);
+
+    ASSERT_EQ(resultDiffTxn.getTxnNum(), 20LL);
+    ASSERT_EQ(resultDiffTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(3), 0), 1));
 
     // The txnNum and optime of the write with the later optime were saved.
-    auto resultSameTxn =
+    auto resultSameTxnDoc =
         client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
                        BSON(SessionTxnRecord::kSessionIdFieldName << lsidSameTxn.toBSON()));
-    ASSERT_TRUE(!resultSameTxn.isEmpty());
-    ASSERT_EQ(resultSameTxn[SessionTxnRecord::kTxnNumFieldName].numberLong(), 30LL);
-    ASSERT_EQ(resultSameTxn[SessionTxnRecord::kLastWriteOpTimeTsFieldName].timestamp(),
-              Timestamp(Seconds(6), 0));
+    ASSERT_TRUE(!resultSameTxnDoc.isEmpty());
+
+    auto resultSameTxn =
+        SessionTxnRecord::parse(IDLParserErrorContext("resultSameTxnDoc test"), resultSameTxnDoc);
+
+    ASSERT_EQ(resultSameTxn.getTxnNum(), 30LL);
+    ASSERT_EQ(resultSameTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(6), 0), 1));
 
     // There is no entry for the write with no txnNumber.
     auto resultNoTxn =

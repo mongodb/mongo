@@ -78,9 +78,9 @@ class ReplSettings;
 struct OplogLink {
     OplogLink() = default;
 
-    Timestamp prevTs;
-    Timestamp preImageTs;
-    Timestamp postImageTs;
+    OpTime prevOpTime;
+    OpTime preImageOpTime;
+    OpTime postImageOpTime;
 };
 
 /**
@@ -102,18 +102,15 @@ extern int OPLOG_VERSION;
 
 /**
  * Log insert(s) to the local oplog.
- * Returns the OpTime of the last insert.
- * The timestamps parameter can also be modified and contain the individual timestamps for each
- * insert after the oplog entries were created.
+ * Returns the OpTime of every insert.
  */
-OpTime logInsertOps(OperationContext* opCtx,
-                    const NamespaceString& nss,
-                    OptionalCollectionUUID uuid,
-                    Session* session,
-                    std::vector<InsertStatement>::const_iterator begin,
-                    std::vector<InsertStatement>::const_iterator end,
-                    Timestamp timestamps[],
-                    bool fromMigrate);
+std::vector<OpTime> logInsertOps(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 OptionalCollectionUUID uuid,
+                                 Session* session,
+                                 std::vector<InsertStatement>::const_iterator begin,
+                                 std::vector<InsertStatement>::const_iterator end,
+                                 bool fromMigrate);
 
 /**
  * @param opstr

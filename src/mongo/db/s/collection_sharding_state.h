@@ -224,17 +224,19 @@ public:
      *
      * The global exclusive lock is expected to be held by the caller of any of these functions.
      */
-    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc, const Timestamp& oplogTs);
+    void onInsertOp(OperationContext* opCtx,
+                    const BSONObj& insertedDoc,
+                    const repl::OpTime& opTime);
     void onUpdateOp(OperationContext* opCtx,
                     const BSONObj& query,
                     const BSONObj& update,
                     const BSONObj& updatedDoc,
-                    const Timestamp& oplogTs,
-                    const Timestamp& prePostImageTs);
+                    const repl::OpTime& opTime,
+                    const repl::OpTime& prePostImageOpTime);
     void onDeleteOp(OperationContext* opCtx,
                     const DeleteState& deleteState,
-                    const Timestamp& oplogTs,
-                    const Timestamp& preImageTs);
+                    const repl::OpTime& opTime,
+                    const repl::OpTime& preImageOpTime);
     void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName);
 
 private:

@@ -32,6 +32,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
+    - "mongo/db/repl/replication_types.idl"
 
 enums:
     OpType:
@@ -110,18 +111,18 @@ structs:
                                # must exist.
                 description: "Identifier of the transaction statement which generated this oplog
                               entry"
-            prevTs:
-                cpp_name: prevWriteTsInTransaction
-                type: timestamp
+            prevOpTime:
+                cpp_name: prevWriteOpTimeInTransaction
+                type: optime
                 optional: true # Only for writes that are part of a transaction
-                description: "The oplog timestamp of the previous write with the same transaction."
-            preImageTs:
-                type: timestamp
+                description: "The opTime of the previous write with the same transaction."
+            preImageOpTime:
+                type: optime
                 optional: true
-                description: "The oplog timestamp of another oplog entry that contains the document
+                description: "The optime of another oplog entry that contains the document
                               before an update/remove was applied."
-            postImageTs:
-                type: timestamp
+            postImageOpTime:
+                type: optime
                 optional: true
-                description: "The oplog timestamp of another oplog entry that contains the document
+                description: "The optime of another oplog entry that contains the document
                               after an update was applied."

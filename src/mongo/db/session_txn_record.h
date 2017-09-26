@@ -30,13 +30,14 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/session_txn_record_gen.h"
 
 namespace mongo {
 
 inline bool operator==(const SessionTxnRecord& lhs, const SessionTxnRecord& rhs) {
     return (lhs.getSessionId() == rhs.getSessionId()) && (lhs.getTxnNum() == rhs.getTxnNum()) &&
-        (lhs.getLastWriteOpTimeTs() == rhs.getLastWriteOpTimeTs());
+        (lhs.getLastWriteOpTime() == rhs.getLastWriteOpTime());
 }
 
 inline bool operator!=(const SessionTxnRecord& lhs, const SessionTxnRecord& rhs) {
@@ -52,10 +53,9 @@ inline bool operator>(const SessionTxnRecord& lhs, const SessionTxnRecord& rhs) 
     invariant(lhs.getSessionId() == rhs.getSessionId());
 
     return (lhs.getTxnNum() > rhs.getTxnNum()) ||
-        (lhs.getTxnNum() == rhs.getTxnNum() &&
-         lhs.getLastWriteOpTimeTs() > rhs.getLastWriteOpTimeTs());
+        (lhs.getTxnNum() == rhs.getTxnNum() && lhs.getLastWriteOpTime() > rhs.getLastWriteOpTime());
 }
 
-SessionTxnRecord makeSessionTxnRecord(LogicalSessionId lsid, TxnNumber txnNum, Timestamp ts);
+SessionTxnRecord makeSessionTxnRecord(LogicalSessionId lsid, TxnNumber txnNum, repl::OpTime opTime);
 
 }  // namespace mongo

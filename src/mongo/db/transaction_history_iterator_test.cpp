@@ -58,7 +58,7 @@ TEST_F(SessionHistoryIteratorTest, NormalHistory) {
                             repl::OpTypeEnum::kInsert,
                             NamespaceString("a.b"),
                             BSON("x" << 30));
-    entry1.setPrevWriteTsInTransaction(Timestamp(0, 0));
+    entry1.setPrevWriteOpTimeInTransaction(repl::OpTime());
     insertOplogEntry(entry1);
 
     repl::OplogEntry entry2(repl::OpTime(Timestamp(67, 54801), 2),
@@ -66,7 +66,7 @@ TEST_F(SessionHistoryIteratorTest, NormalHistory) {
                             repl::OpTypeEnum::kInsert,
                             NamespaceString("a.b"),
                             BSON("y" << 50));
-    entry2.setPrevWriteTsInTransaction(Timestamp(52, 345));
+    entry2.setPrevWriteOpTimeInTransaction(repl::OpTime(Timestamp(52, 345), 2));
     insertOplogEntry(entry2);
 
     // Insert an unrelated entry in between
@@ -75,7 +75,7 @@ TEST_F(SessionHistoryIteratorTest, NormalHistory) {
                             repl::OpTypeEnum::kInsert,
                             NamespaceString("a.b"),
                             BSON("z" << 40));
-    entry3.setPrevWriteTsInTransaction(Timestamp(22, 67));
+    entry3.setPrevWriteOpTimeInTransaction(repl::OpTime(Timestamp(22, 67), 2));
     insertOplogEntry(entry3);
 
     repl::OplogEntry entry4(repl::OpTime(Timestamp(97, 2472), 2),
@@ -83,29 +83,29 @@ TEST_F(SessionHistoryIteratorTest, NormalHistory) {
                             repl::OpTypeEnum::kInsert,
                             NamespaceString("a.b"),
                             BSON("a" << 3));
-    entry4.setPrevWriteTsInTransaction(Timestamp(67, 54801));
+    entry4.setPrevWriteOpTimeInTransaction(repl::OpTime(Timestamp(67, 54801), 2));
     insertOplogEntry(entry4);
 
-    TransactionHistoryIterator iter(Timestamp(97, 2472));
+    TransactionHistoryIterator iter(repl::OpTime(Timestamp(97, 2472), 2));
 
     {
         ASSERT_TRUE(iter.hasNext());
         auto nextEntry = iter.next(opCtx());
-        ASSERT_EQ(Timestamp(97, 2472), nextEntry.getTimestamp());
+        ASSERT_EQ(repl::OpTime(Timestamp(97, 2472), 2), nextEntry.getOpTime());
         ASSERT_BSONOBJ_EQ(BSON("a" << 3), nextEntry.getObject());
     }
 
     {
         ASSERT_TRUE(iter.hasNext());
         auto nextEntry = iter.next(opCtx());
-        ASSERT_EQ(Timestamp(67, 54801), nextEntry.getTimestamp());
+        ASSERT_EQ(repl::OpTime(Timestamp(67, 54801), 2), nextEntry.getOpTime());
         ASSERT_BSONOBJ_EQ(BSON("y" << 50), nextEntry.getObject());
     }
 
     {
         ASSERT_TRUE(iter.hasNext());
         auto nextEntry = iter.next(opCtx());
-        ASSERT_EQ(Timestamp(52, 345), nextEntry.getTimestamp());
+        ASSERT_EQ(repl::OpTime(Timestamp(52, 345), 2), nextEntry.getOpTime());
         ASSERT_BSONOBJ_EQ(BSON("x" << 30), nextEntry.getObject());
     }
 
@@ -118,10 +118,10 @@ TEST_F(SessionHistoryIteratorTest, StartAtZeroTSShouldNotBeAbleToIterate) {
                            repl::OpTypeEnum::kInsert,
                            NamespaceString("a.b"),
                            BSON("y" << 50));
-    entry.setPrevWriteTsInTransaction(Timestamp(52, 345));
+    entry.setPrevWriteOpTimeInTransaction(repl::OpTime(Timestamp(52, 345), 1));
     insertOplogEntry(entry);
 
-    TransactionHistoryIterator iter(Timestamp(0, 0));
+    TransactionHistoryIterator iter({});
     ASSERT_FALSE(iter.hasNext());
 }
 
@@ -131,14 +131,15 @@ TEST_F(SessionHistoryIteratorTest, NextShouldAssertIfHistoryIsTruncated) {
                            repl::OpTypeEnum::kInsert,
                            NamespaceString("a.b"),
                            BSON("y" << 50));
-    entry.setPrevWriteTsInTransaction(Timestamp(52, 345));
+    entry.setPrevWriteOpTimeInTransaction(repl::OpTime(Timestamp(52, 345), 1));
     insertOplogEntry(entry);
 
-    TransactionHistoryIterator iter(Timestamp(67, 54801));
+    repl::OpTime opTime(Timestamp(67, 54801), 2);
+    TransactionHistoryIterator iter(opTime);
     ASSERT_TRUE(iter.hasNext());
 
     auto nextEntry = iter.next(opCtx());
-    ASSERT_EQ(Timestamp(67, 54801), nextEntry.getTimestamp());
+    ASSERT_EQ(opTime, nextEntry.getOpTime());
     ASSERT_BSONOBJ_EQ(BSON("y" << 50), nextEntry.getObject());
 
     ASSERT_TRUE(iter.hasNext());
@@ -154,7 +155,7 @@ TEST_F(SessionHistoryIteratorTest, OplogInWriteHistoryChainWithMissingPrevTSShou
                            BSON("y" << 50));
     insertOplogEntry(entry);
 
-    TransactionHistoryIterator iter(Timestamp(67, 54801));
+    TransactionHistoryIterator iter(repl::OpTime(Timestamp(67, 54801), 2));
     ASSERT_TRUE(iter.hasNext());
     ASSERT_THROWS_CODE(iter.next(opCtx()), AssertionException, ErrorCodes::FailedToParse);
 }

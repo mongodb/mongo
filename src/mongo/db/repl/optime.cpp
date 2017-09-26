@@ -91,6 +91,22 @@ std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {
     return out << opTime.toString();
 }
 
+void OpTime::appendAsQuery(BSONObjBuilder* builder) const {
+    builder->append(kTimestampFieldName, _timestamp);
+    if (_term == kUninitializedTerm) {
+        // pv0 oplogs don't actually have the term field so don't query for {t: -1}.
+        builder->append(kTermFieldName, BSON("$exists" << false));
+    } else {
+        builder->append(kTermFieldName, _term);
+    }
+}
+
+BSONObj OpTime::asQuery() const {
+    BSONObjBuilder builder;
+    appendAsQuery(&builder);
+    return builder.obj();
+}
+
 }  // namespace repl
 
 BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const repl::OpTime& value) {

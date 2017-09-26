@@ -300,14 +300,17 @@ void appendSessionInfo(OperationContext* opCtx,
     sessionInfo.serialize(builder);
 
     builder->append(OplogEntryBase::kStatementIdFieldName, statementId);
-    builder->append(OplogEntryBase::kPrevWriteTsInTransactionFieldName, oplogLink.prevTs);
+    oplogLink.prevOpTime.append(builder,
+                                OplogEntryBase::kPrevWriteOpTimeInTransactionFieldName.toString());
 
-    if (!oplogLink.preImageTs.isNull()) {
-        builder->append(OplogEntryBase::kPreImageTsFieldName, oplogLink.preImageTs);
+    if (!oplogLink.preImageOpTime.isNull()) {
+        oplogLink.preImageOpTime.append(builder,
+                                        OplogEntryBase::kPreImageOpTimeFieldName.toString());
     }
 
-    if (!oplogLink.postImageTs.isNull()) {
-        builder->append(OplogEntryBase::kPostImageTsFieldName, oplogLink.postImageTs);
+    if (!oplogLink.postImageOpTime.isNull()) {
+        oplogLink.postImageOpTime.append(builder,
+                                         OplogEntryBase::kPostImageOpTimeFieldName.toString());
     }
 }
 
@@ -446,14 +449,13 @@ OpTime logOp(OperationContext* opCtx,
     return slot.opTime;
 }
 
-repl::OpTime logInsertOps(OperationContext* opCtx,
-                          const NamespaceString& nss,
-                          OptionalCollectionUUID uuid,
-                          Session* session,
-                          std::vector<InsertStatement>::const_iterator begin,
-                          std::vector<InsertStatement>::const_iterator end,
-                          Timestamp timestamps[],
-                          bool fromMigrate) {
+std::vector<OpTime> logInsertOps(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 OptionalCollectionUUID uuid,
+                                 Session* session,
+                                 std::vector<InsertStatement>::const_iterator begin,
+                                 std::vector<InsertStatement>::const_iterator end,
+                                 bool fromMigrate) {
     invariant(begin != end);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
@@ -478,10 +480,11 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
     if (session) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevTs = session->getLastWriteOpTimeTs(*opCtx->getTxnNumber());
+        oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
     }
 
-    OpTime lastOpTime;
+    auto timestamps = stdx::make_unique<Timestamp[]>(count);
+    std::vector<OpTime> opTimes;
     for (size_t i = 0; i < count; i++) {
         // Make a mutable copy.
         auto insertStatementOplogSlot = begin[i].oplogSlot;
@@ -502,19 +505,22 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
                                           sessionInfo,
                                           begin[i].stmtId,
                                           oplogLink));
-        oplogLink.prevTs = insertStatementOplogSlot.opTime.getTimestamp();
-        timestamps[i] = oplogLink.prevTs;
-        lastOpTime = insertStatementOplogSlot.opTime;
+        oplogLink.prevOpTime = insertStatementOplogSlot.opTime;
+        timestamps[i] = oplogLink.prevOpTime.getTimestamp();
+        opTimes.push_back(insertStatementOplogSlot.opTime);
     }
 
     std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
     for (size_t i = 0; i < count; i++) {
         basePtrs[i] = &writers[i];
     }
+
+    invariant(!opTimes.empty());
+    auto lastOpTime = opTimes.back();
     invariant(!lastOpTime.isNull());
-    _logOpsInner(opCtx, nss, basePtrs.get(), timestamps, count, oplog, lastOpTime);
+    _logOpsInner(opCtx, nss, basePtrs.get(), timestamps.get(), count, oplog, lastOpTime);
     wuow.commit();
-    return lastOpTime;
+    return opTimes;
 }
 
 namespace {

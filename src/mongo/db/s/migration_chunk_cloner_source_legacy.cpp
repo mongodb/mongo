@@ -42,6 +42,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_request.h"
@@ -136,13 +137,13 @@ public:
     LogOpForShardingHandler(MigrationChunkClonerSourceLegacy* cloner,
                             const BSONObj& idObj,
                             const char op,
-                            const Timestamp& oplogTs,
-                            const Timestamp& prePostImageTs)
+                            const repl::OpTime& opTime,
+                            const repl::OpTime& prePostImageOpTime)
         : _cloner(cloner),
           _idObj(idObj.getOwned()),
           _op(op),
-          _oplogTs(oplogTs),
-          _prePostImageTs(prePostImageTs) {}
+          _opTime(opTime),
+          _prePostImageOpTime(prePostImageOpTime) {}
 
     void commit() override {
         switch (_op) {
@@ -163,12 +164,12 @@ public:
                 MONGO_UNREACHABLE;
         }
 
-        if (!_prePostImageTs.isNull()) {
-            _cloner->_sessionCatalogSource.notifyNewWriteTS(_prePostImageTs);
+        if (!_prePostImageOpTime.isNull()) {
+            _cloner->_sessionCatalogSource.notifyNewWriteOpTime(_prePostImageOpTime);
         }
 
-        if (!_oplogTs.isNull()) {
-            _cloner->_sessionCatalogSource.notifyNewWriteTS(_oplogTs);
+        if (!_opTime.isNull()) {
+            _cloner->_sessionCatalogSource.notifyNewWriteOpTime(_opTime);
         }
     }
 
@@ -178,8 +179,8 @@ private:
     MigrationChunkClonerSourceLegacy* const _cloner;
     const BSONObj _idObj;
     const char _op;
-    const Timestamp _oplogTs;
-    const Timestamp _prePostImageTs;
+    const repl::OpTime _opTime;
+    const repl::OpTime _prePostImageOpTime;
 };
 
 MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(MoveChunkRequest request,
@@ -371,7 +372,7 @@ bool MigrationChunkClonerSourceLegacy::isDocumentInMigratingChunk(const BSONObj&
 
 void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
                                                   const BSONObj& insertedDoc,
-                                                  const Timestamp& oplogTs) {
+                                                  const repl::OpTime& opTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss().ns(), MODE_IX));
 
     BSONElement idElement = insertedDoc["_id"];
@@ -387,7 +388,7 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
 
     if (opCtx->getTxnNumber()) {
         opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'i', oplogTs, {}));
+            new LogOpForShardingHandler(this, idElement.wrap(), 'i', opTime, {}));
     } else {
         opCtx->recoveryUnit()->registerChange(
             new LogOpForShardingHandler(this, idElement.wrap(), 'i', {}, {}));
@@ -396,8 +397,8 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
 
 void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
                                                   const BSONObj& updatedDoc,
-                                                  const Timestamp& oplogTs,
-                                                  const Timestamp& prePostImageTs) {
+                                                  const repl::OpTime& opTime,
+                                                  const repl::OpTime& prePostImageOpTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss().ns(), MODE_IX));
 
     BSONElement idElement = updatedDoc["_id"];
@@ -413,7 +414,7 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
 
     if (opCtx->getTxnNumber()) {
         opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'u', oplogTs, prePostImageTs));
+            new LogOpForShardingHandler(this, idElement.wrap(), 'u', opTime, prePostImageOpTime));
     } else {
         opCtx->recoveryUnit()->registerChange(
             new LogOpForShardingHandler(this, idElement.wrap(), 'u', {}, {}));
@@ -422,8 +423,8 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
 
 void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
                                                   const BSONObj& deletedDocId,
-                                                  const Timestamp& oplogTs,
-                                                  const Timestamp& preImageTs) {
+                                                  const repl::OpTime& opTime,
+                                                  const repl::OpTime& preImageOpTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss().ns(), MODE_IX));
 
     BSONElement idElement = deletedDocId["_id"];
@@ -435,7 +436,7 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
 
     if (opCtx->getTxnNumber()) {
         opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'd', oplogTs, preImageTs));
+            new LogOpForShardingHandler(this, idElement.wrap(), 'd', opTime, preImageOpTime));
     } else {
         opCtx->recoveryUnit()->registerChange(
             new LogOpForShardingHandler(this, idElement.wrap(), 'd', {}, {}));
@@ -731,13 +732,15 @@ void MigrationChunkClonerSourceLegacy::_xfer(OperationContext* opCtx,
 void MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(OperationContext* opCtx,
                                                                  BSONArrayBuilder* arrBuilder) {
     while (_sessionCatalogSource.hasMoreOplog()) {
-        auto oplogDoc = _sessionCatalogSource.getLastFetchedOplog();
+        auto oplog = _sessionCatalogSource.getLastFetchedOplog();
 
-        if (oplogDoc.isEmpty()) {
+        if (!oplog) {
             // Last fetched turned out empty, try to see if there are more
             _sessionCatalogSource.fetchNextOplog(opCtx);
             continue;
         }
+
+        auto oplogDoc = oplog->toBSON();
 
         // Use the builder size instead of accumulating the document sizes directly so that we
         // take into consideration the overhead of BSONArray indices.

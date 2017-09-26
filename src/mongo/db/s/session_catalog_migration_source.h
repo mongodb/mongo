@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -70,16 +72,18 @@ public:
      * Returns the oplog document that was last fetched by the fetchNextOplog call.
      * Returns an empty object if there are no oplog to fetch.
      */
-    BSONObj getLastFetchedOplog();
+    boost::optional<repl::OplogEntry> getLastFetchedOplog();
 
     /**
      * Remembers the oplog timestamp of a new write that just occurred.
      */
-    void notifyNewWriteTS(Timestamp opTimestamp);
+    void notifyNewWriteOpTime(repl::OpTime opTimestamp);
 
 private:
     ///////////////////////////////////////////////////////////////////////////
     // Methods for extracting the oplog entries from session information.
+
+    void _initIfNotYet(WithLock, OperationContext* opCtx);
 
     /**
      * If this returns false, it just means that there are no more oplog entry in the buffer that
@@ -97,7 +101,7 @@ private:
     /**
      * Returns the document that was last fetched by fetchNextOplogFromSessionCatalog.
      */
-    BSONObj _getLastFetchedOplogFromSessionCatalog();
+    repl::OplogEntry _getLastFetchedOplogFromSessionCatalog();
 
     /**
      * Extracts oplog information from the current writeHistoryIterator to _lastFetchedOplog. This
@@ -124,16 +128,17 @@ private:
     /**
      * Returns the oplog that was last fetched by fetchNextNewWriteOplog.
      */
-    BSONObj _getLastFetchedNewWriteOplog();
+    repl::OplogEntry _getLastFetchedNewWriteOplog();
 
     const NamespaceString _ns;
 
-    // Protects _sessionCatalogCursor, _writeHistoryIterator,
+    // Protects _alreadyInitialized, _sessionCatalogCursor, _writeHistoryIterator
     // _lastFetchedOplogBuffer, _lastFetchedOplog
     stdx::mutex _sessionCloneMutex;
 
-    // Cursor for iterating over the session catalog.
-    std::unique_ptr<DBClientCursor> _sessionCatalogCursor;
+    bool _alreadyInitialized = false;
+
+    std::set<repl::OpTime> _sessionLastWriteOpTimes;
 
     // Iterator for oplog entries for a specific transaction.
     std::unique_ptr<TransactionHistoryIterator> _writeHistoryIterator;
@@ -141,19 +146,19 @@ private:
     // Used for temporarily storing oplog entries for operations that has more than one entry.
     // For example, findAndModify generates one for the actual operation and another for the
     // pre/post image.
-    std::vector<BSONObj> _lastFetchedOplogBuffer;
+    std::vector<repl::OplogEntry> _lastFetchedOplogBuffer;
 
     // Used to store the last fetched oplog. This enables calling get multiple times.
-    BSONObj _lastFetchedOplog;
+    boost::optional<repl::OplogEntry> _lastFetchedOplog;
 
     // Protects _newWriteTsList, _lastFetchedNewWriteOplog
     stdx::mutex _newOplogMutex;
 
-    // Stores oplog timestamps of new writes that are coming in.
-    std::list<Timestamp> _newWriteTsList;
+    // Stores oplog opTime of new writes that are coming in.
+    std::list<repl::OpTime> _newWriteOpTimeList;
 
     // Used to store the last fetched oplog from _newWriteTsList.
-    BSONObj _lastFetchedNewWriteOplog;
+    boost::optional<repl::OplogEntry> _lastFetchedNewWriteOplog;
 };
 
 }  // namespace mongo

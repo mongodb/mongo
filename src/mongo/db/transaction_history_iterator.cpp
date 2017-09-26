@@ -38,11 +38,11 @@
 
 namespace mongo {
 
-TransactionHistoryIterator::TransactionHistoryIterator(Timestamp startingOpTimeTs)
-    : _nextOpTimeTs(std::move(startingOpTimeTs)) {}
+TransactionHistoryIterator::TransactionHistoryIterator(repl::OpTime startingOpTime)
+    : _nextOpTime(std::move(startingOpTime)) {}
 
 bool TransactionHistoryIterator::hasNext() const {
-    return !_nextOpTimeTs.isNull();
+    return !_nextOpTime.isNull();
 }
 
 repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
@@ -50,26 +50,24 @@ repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
 
     DBDirectClient client(opCtx);
     // TODO: SERVER-29843 oplogReplay option might be needed to activate fast ts search.
-    auto oplogBSON =
-        client.findOne(NamespaceString::kRsOplogNamespace.ns(),
-                       BSON(repl::OplogEntryBase::kTimestampFieldName << _nextOpTimeTs));
+    auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace.ns(), _nextOpTime.asQuery());
 
     uassert(ErrorCodes::IncompleteTransactionHistory,
             str::stream() << "oplog no longer contains the complete write history of this "
-                             "transaction, log with ts "
-                          << _nextOpTimeTs.toBSON()
+                             "transaction, log with opTime "
+                          << _nextOpTime.toBSON()
                           << " cannot be found",
             !oplogBSON.isEmpty());
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
-    const auto& oplogPrevTsOption = oplogEntry.getPrevWriteTsInTransaction();
+    const auto& oplogPrevTsOption = oplogEntry.getPrevWriteOpTimeInTransaction();
     uassert(
         ErrorCodes::FailedToParse,
         str::stream() << "Missing prevTs field on oplog entry of previous write in transcation: "
                       << redact(oplogBSON),
         oplogPrevTsOption);
 
-    _nextOpTimeTs = oplogPrevTsOption.value();
+    _nextOpTime = oplogPrevTsOption.value();
 
     return oplogEntry;
 }

@@ -34,12 +34,14 @@
 
 namespace mongo {
 
-SessionTxnRecord makeSessionTxnRecord(LogicalSessionId lsid, TxnNumber txnNum, Timestamp ts) {
+SessionTxnRecord makeSessionTxnRecord(LogicalSessionId lsid,
+                                      TxnNumber txnNum,
+                                      repl::OpTime opTime) {
     SessionTxnRecord record;
 
     record.setSessionId(lsid);
     record.setTxnNum(txnNum);
-    record.setLastWriteOpTimeTs(ts);
+    record.setLastWriteOpTime(std::move(opTime));
 
     return record;
 }

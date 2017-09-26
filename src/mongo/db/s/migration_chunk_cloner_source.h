@@ -38,6 +38,10 @@ class OperationContext;
 class Status;
 class Timestamp;
 
+namespace repl {
+class OpTime;
+}  // namespace repl
+
 /**
  * This class is responsible for producing chunk documents to be moved from donor to a recipient
  * shard and its methods represent cloning stages. Its lifetime is owned and controlled by a single
@@ -121,7 +125,7 @@ public:
      */
     virtual void onInsertOp(OperationContext* opCtx,
                             const BSONObj& insertedDoc,
-                            const Timestamp& oplogTs) = 0;
+                            const repl::OpTime& opTime) = 0;
 
     /**
      * Notifies this cloner that an update happened to the collection, which it owns. It is up to
@@ -132,8 +136,8 @@ public:
      */
     virtual void onUpdateOp(OperationContext* opCtx,
                             const BSONObj& updatedDoc,
-                            const Timestamp& oplogTs,
-                            const Timestamp& prePostImageTs) = 0;
+                            const repl::OpTime& opTime,
+                            const repl::OpTime& prePostImageOpTime) = 0;
 
     /**
      * Notifies this cloner that a delede happened to the collection, which it owns. It is up to the
@@ -144,8 +148,8 @@ public:
      */
     virtual void onDeleteOp(OperationContext* opCtx,
                             const BSONObj& deletedDocId,
-                            const Timestamp& oplogTs,
-                            const Timestamp& preImageTs) = 0;
+                            const repl::OpTime& opTime,
+                            const repl::OpTime& preImageOpTime) = 0;
 
 protected:
     MigrationChunkClonerSource();

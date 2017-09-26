@@ -67,7 +67,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
         uassert(40607,
                 str::stream() << "No pre-image available for findAndModify retry request:"
                               << redact(request.toBSON()),
-                oplogWithCorrectLinks.getPreImageTs());
+                oplogWithCorrectLinks.getPreImageOpTime());
     } else if (opType == repl::OpTypeEnum::kInsert) {
         uassert(
             40608,
@@ -99,7 +99,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                                   << ts.toString()
                                   << ", oplog: "
                                   << redact(oplogEntry.toBSON()),
-                    oplogWithCorrectLinks.getPostImageTs());
+                    oplogWithCorrectLinks.getPostImageOpTime());
         } else {
             uassert(40612,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON())
@@ -108,7 +108,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                                   << ts.toString()
                                   << ", oplog: "
                                   << redact(oplogEntry.toBSON()),
-                    oplogWithCorrectLinks.getPreImageTs());
+                    oplogWithCorrectLinks.getPreImageOpTime());
         }
     }
 }
@@ -118,21 +118,21 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
  * oplog.
  */
 BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& oplog) {
-    invariant(oplog.getPreImageTs() || oplog.getPostImageTs());
-    auto ts =
-        oplog.getPreImageTs() ? oplog.getPreImageTs().value() : oplog.getPostImageTs().value();
+    invariant(oplog.getPreImageOpTime() || oplog.getPostImageOpTime());
+    auto opTime = oplog.getPreImageOpTime() ? oplog.getPreImageOpTime().value()
+                                            : oplog.getPostImageOpTime().value();
 
     DBDirectClient client(opCtx);
-    auto oplogDoc = client.findOne(NamespaceString::kRsOplogNamespace.ns(), BSON("ts" << ts));
+    auto oplogDoc = client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery());
 
     uassert(40613,
             str::stream() << "oplog no longer contains the complete write history of this "
-                             "transaction, log with ts "
-                          << ts.toString()
+                             "transaction, log with opTime "
+                          << opTime.toString()
                           << " cannot be found",
             !oplogDoc.isEmpty());
-    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogDoc));
 
+    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogDoc));
     return oplogEntry.getObject().getOwned();
 }
 

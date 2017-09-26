@@ -81,11 +81,11 @@ void fassertOnRepeatedExecution(OperationContext* opCtx,
                                 const LogicalSessionId& lsid,
                                 TxnNumber txnNumber,
                                 StmtId stmtId,
-                                Timestamp firstTs,
-                                Timestamp secondTs) {
+                                const repl::OpTime& firstOpTime,
+                                const repl::OpTime& secondOpTime) {
     severe() << "Statement id " << stmtId << " from transaction [ " << lsid.toBSON() << ":"
-             << txnNumber << " ] was committed once with timestamp " << firstTs
-             << " and a second time with timestamp " << secondTs
+             << txnNumber << " ] was committed once with opTime " << firstOpTime
+             << " and a second time with opTime " << secondOpTime
              << ". This indicates possible data corruption or server bug and the process will be "
                 "terminated.";
     fassertFailed(40526);
@@ -132,20 +132,20 @@ void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
         CommittedStatementTimestampMap activeTxnCommittedStatements;
 
         if (lastWrittenTxnRecord) {
-            auto it = TransactionHistoryIterator(lastWrittenTxnRecord->getLastWriteOpTimeTs());
+            auto it = TransactionHistoryIterator(lastWrittenTxnRecord->getLastWriteOpTime());
             while (it.hasNext()) {
                 const auto entry = it.next(opCtx);
                 invariant(entry.getStatementId());
                 const auto insertRes = activeTxnCommittedStatements.emplace(*entry.getStatementId(),
-                                                                            entry.getTimestamp());
+                                                                            entry.getOpTime());
                 if (!insertRes.second) {
-                    const auto& existingTs = insertRes.first->second;
+                    const auto& existingOpTime = insertRes.first->second;
                     fassertOnRepeatedExecution(opCtx,
                                                _sessionId,
                                                lastWrittenTxnRecord->getTxnNum(),
                                                *entry.getStatementId(),
-                                               existingTs,
-                                               entry.getTimestamp());
+                                               existingOpTime,
+                                               entry.getOpTime());
                 }
             }
         }
@@ -177,28 +177,29 @@ void Session::beginTxn(OperationContext* opCtx, TxnNumber txnNumber) {
 void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
                                           TxnNumber txnNumber,
                                           std::vector<StmtId> stmtIdsWritten,
-                                          Timestamp lastStmtIdWriteTs) {
+                                          const repl::OpTime& lastStmtIdWriteOpTime) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     // Sanity check that we don't double-execute statements
     for (const auto stmtId : stmtIdsWritten) {
-        const auto stmtTimestamp = _checkStatementExecuted(ul, txnNumber, stmtId);
-        if (stmtTimestamp) {
+        const auto stmtOpTime = _checkStatementExecuted(ul, txnNumber, stmtId);
+        if (stmtOpTime) {
             fassertOnRepeatedExecution(
-                opCtx, _sessionId, txnNumber, stmtId, *stmtTimestamp, lastStmtIdWriteTs);
+                opCtx, _sessionId, txnNumber, stmtId, *stmtOpTime, lastStmtIdWriteOpTime);
         }
     }
 
-    const auto updateRequest = _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteTs);
+    const auto updateRequest = _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime);
 
     ul.unlock();
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
     updateSessionEntry(opCtx, updateRequest);
-    _registerUpdateCacheOnCommit(opCtx, txnNumber, std::move(stmtIdsWritten), lastStmtIdWriteTs);
+    _registerUpdateCacheOnCommit(
+        opCtx, txnNumber, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
 }
 
 void Session::updateSessionRecordOnSecondary(OperationContext* opCtx,
@@ -233,15 +234,15 @@ void Session::invalidate() {
     _activeTxnCommittedStatements.clear();
 }
 
-Timestamp Session::getLastWriteOpTimeTs(TxnNumber txnNumber) const {
+repl::OpTime Session::getLastWriteOpTime(TxnNumber txnNumber) const {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _checkValid(lg);
     _checkIsActiveTransaction(lg, txnNumber);
 
     if (!_lastWrittenSessionRecord || _lastWrittenSessionRecord->getTxnNum() != txnNumber)
-        return Timestamp();
+        return {};
 
-    return _lastWrittenSessionRecord->getLastWriteOpTimeTs();
+    return _lastWrittenSessionRecord->getLastWriteOpTime();
 }
 
 boost::optional<repl::OplogEntry> Session::checkStatementExecuted(OperationContext* opCtx,
@@ -303,9 +304,9 @@ void Session::_checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const {
             txnNumber == _activeTxnNumber);
 }
 
-boost::optional<Timestamp> Session::_checkStatementExecuted(WithLock wl,
-                                                            TxnNumber txnNumber,
-                                                            StmtId stmtId) const {
+boost::optional<repl::OpTime> Session::_checkStatementExecuted(WithLock wl,
+                                                               TxnNumber txnNumber,
+                                                               StmtId stmtId) const {
     _checkValid(wl);
     _checkIsActiveTransaction(wl, txnNumber);
 
@@ -321,22 +322,21 @@ boost::optional<Timestamp> Session::_checkStatementExecuted(WithLock wl,
 
 UpdateRequest Session::_makeUpdateRequest(WithLock,
                                           TxnNumber newTxnNumber,
-                                          Timestamp newLastWriteTs) const {
+                                          const repl::OpTime& newLastWriteOpTime) const {
     UpdateRequest updateRequest(NamespaceString::kSessionTransactionsTableNamespace);
 
     if (_lastWrittenSessionRecord) {
         updateRequest.setQuery(_lastWrittenSessionRecord->toBSON());
-        updateRequest.setUpdates(
-            BSON("$set" << BSON(SessionTxnRecord::kTxnNumFieldName
-                                << newTxnNumber
-                                << SessionTxnRecord::kLastWriteOpTimeTsFieldName
-                                << newLastWriteTs)));
+        updateRequest.setUpdates(BSON("$set" << BSON(SessionTxnRecord::kTxnNumFieldName
+                                                     << newTxnNumber
+                                                     << SessionTxnRecord::kLastWriteOpTimeFieldName
+                                                     << newLastWriteOpTime)));
     } else {
         const auto updateBSON = [&] {
             SessionTxnRecord newTxnRecord;
             newTxnRecord.setSessionId(_sessionId);
             newTxnRecord.setTxnNum(newTxnNumber);
-            newTxnRecord.setLastWriteOpTimeTs(newLastWriteTs);
+            newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
             return newTxnRecord.toBSON();
         }();
 
@@ -351,13 +351,13 @@ UpdateRequest Session::_makeUpdateRequest(WithLock,
 void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
                                            TxnNumber newTxnNumber,
                                            std::vector<StmtId> stmtIdsWritten,
-                                           Timestamp lastStmtIdWriteTs) {
+                                           const repl::OpTime& lastStmtIdWriteOpTime) {
     opCtx->recoveryUnit()->onCommit([
         this,
         opCtx,
         newTxnNumber,
         stmtIdsWritten = std::move(stmtIdsWritten),
-        lastStmtIdWriteTs
+        lastStmtIdWriteOpTime
     ] {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
@@ -371,13 +371,13 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
 
             _lastWrittenSessionRecord->setSessionId(_sessionId);
             _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
-            _lastWrittenSessionRecord->setLastWriteOpTimeTs(lastStmtIdWriteTs);
+            _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
         } else {
             if (newTxnNumber > _lastWrittenSessionRecord->getTxnNum())
                 _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
 
-            if (lastStmtIdWriteTs > _lastWrittenSessionRecord->getLastWriteOpTimeTs())
-                _lastWrittenSessionRecord->setLastWriteOpTimeTs(lastStmtIdWriteTs);
+            if (lastStmtIdWriteOpTime > _lastWrittenSessionRecord->getLastWriteOpTime())
+                _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
         }
 
         if (newTxnNumber > _activeTxnNumber) {
@@ -392,11 +392,15 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
         if (newTxnNumber == _activeTxnNumber) {
             for (const auto stmtId : stmtIdsWritten) {
                 const auto insertRes =
-                    _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteTs);
+                    _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteOpTime);
                 if (!insertRes.second) {
-                    const auto& existingTs = insertRes.first->second;
-                    fassertOnRepeatedExecution(
-                        opCtx, _sessionId, newTxnNumber, stmtId, existingTs, lastStmtIdWriteTs);
+                    const auto& existingOpTime = insertRes.first->second;
+                    fassertOnRepeatedExecution(opCtx,
+                                               _sessionId,
+                                               newTxnNumber,
+                                               stmtId,
+                                               existingOpTime,
+                                               lastStmtIdWriteOpTime);
                 }
             }
         }

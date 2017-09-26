@@ -13,7 +13,7 @@
         let res = table.findOne({"_id.id": lsid.id});
 
         assert.eq(res.txnNum, txnNumber);
-        assert.eq(res.lastWriteOpTimeTs, ts);
+        assert.eq(res.lastWriteOpTime.ts, ts);
     }
 
     /**

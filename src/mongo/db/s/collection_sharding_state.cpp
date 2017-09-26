@@ -269,7 +269,7 @@ boost::optional<KeyRange> CollectionShardingState::getNextOrphanRange(BSONObj co
 
 void CollectionShardingState::onInsertOp(OperationContext* opCtx,
                                          const BSONObj& insertedDoc,
-                                         const Timestamp& oplogTs) {
+                                         const repl::OpTime& opTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
@@ -293,7 +293,7 @@ void CollectionShardingState::onInsertOp(OperationContext* opCtx,
     checkShardVersionOrThrow(opCtx);
 
     if (_sourceMgr) {
-        _sourceMgr->getCloner()->onInsertOp(opCtx, insertedDoc, oplogTs);
+        _sourceMgr->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
     }
 }
 
@@ -301,8 +301,8 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
                                          const BSONObj& query,
                                          const BSONObj& update,
                                          const BSONObj& updatedDoc,
-                                         const Timestamp& oplogTs,
-                                         const Timestamp& prePostImageTs) {
+                                         const repl::OpTime& opTime,
+                                         const repl::OpTime& prePostImageOpTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
@@ -319,7 +319,7 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
     checkShardVersionOrThrow(opCtx);
 
     if (_sourceMgr) {
-        _sourceMgr->getCloner()->onUpdateOp(opCtx, updatedDoc, oplogTs, prePostImageTs);
+        _sourceMgr->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
     }
 }
 
@@ -330,8 +330,8 @@ auto CollectionShardingState::makeDeleteState(BSONObj const& doc) -> DeleteState
 
 void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
                                          const DeleteState& deleteState,
-                                         const Timestamp& oplogTs,
-                                         const Timestamp& preImageTs) {
+                                         const repl::OpTime& opTime,
+                                         const repl::OpTime& preImageOpTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
@@ -372,7 +372,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
     checkShardVersionOrThrow(opCtx);
 
     if (_sourceMgr && deleteState.isMigrating) {
-        _sourceMgr->getCloner()->onDeleteOp(opCtx, deleteState.documentKey, oplogTs, preImageTs);
+        _sourceMgr->getCloner()->onDeleteOp(opCtx, deleteState.documentKey, opTime, preImageOpTime);
     }
 }
 

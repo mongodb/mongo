@@ -75,6 +75,8 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(TransactionRecordMinimumLifetimeMinutes,
 
 const auto kIdProjection = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
 const auto kSortById = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
+const auto kLastWriteTimestampFieldName =
+    SessionTxnRecord::kLastWriteOpTimeFieldName + "." + repl::OpTime::kTimestampFieldName;
 
 /**
  * Makes the query we'll use to scan the transactions table.
@@ -89,7 +91,7 @@ Query makeQuery(Date_t now) {
         0);
     BSONObjBuilder bob;
     {
-        BSONObjBuilder subbob(bob.subobjStart(SessionTxnRecord::kLastWriteOpTimeTsFieldName));
+        BSONObjBuilder subbob(bob.subobjStart(kLastWriteTimestampFieldName));
         subbob.append("$lt", possiblyExpired);
     }
     Query query(bob.obj());

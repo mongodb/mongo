@@ -90,16 +90,15 @@ repl::OplogLink extractPrePostImageTs(const ProcessOplogResult& lastResult,
         uassert(40628,
                 str::stream() << "expected oplog with ts: " << entry.getTimestamp().toString()
                               << " to not have "
-                              << repl::OplogEntryBase::kPreImageTsFieldName
+                              << repl::OplogEntryBase::kPreImageOpTimeFieldName
                               << " or "
-                              << repl::OplogEntryBase::kPostImageTsFieldName,
-                !entry.getPreImageTs() && !entry.getPostImageTs());
+                              << repl::OplogEntryBase::kPostImageOpTimeFieldName,
+                !entry.getPreImageOpTime() && !entry.getPostImageOpTime());
 
         return oplogLink;
     }
 
-    const auto ts = lastResult.oplogTime.getTimestamp();
-    invariant(!ts.isNull());
+    invariant(!lastResult.oplogTime.isNull());
 
     const auto& sessionInfo = entry.getOperationSessionInfo();
     const auto sessionId = *sessionInfo.getSessionId();
@@ -118,19 +117,19 @@ repl::OplogLink extractPrePostImageTs(const ProcessOplogResult& lastResult,
                           << lastResult.txnNum,
             lastResult.txnNum == txnNum);
 
-    if (entry.getPreImageTs()) {
-        oplogLink.preImageTs = ts;
-    } else if (entry.getPostImageTs()) {
-        oplogLink.postImageTs = ts;
+    if (entry.getPreImageOpTime()) {
+        oplogLink.preImageOpTime = lastResult.oplogTime;
+    } else if (entry.getPostImageOpTime()) {
+        oplogLink.postImageOpTime = lastResult.oplogTime;
     } else {
         uasserted(40631,
-                  str::stream() << "expected oplog with ts: " << entry.getTimestamp().toString()
+                  str::stream() << "expected oplog with opTime: " << entry.getOpTime().toString()
                                 << ": "
                                 << redact(entry.toBSON())
                                 << " to have either "
-                                << repl::OplogEntryBase::kPreImageTsFieldName
+                                << repl::OplogEntryBase::kPreImageOpTimeFieldName
                                 << " or "
-                                << repl::OplogEntryBase::kPostImageTsFieldName);
+                                << repl::OplogEntryBase::kPostImageOpTimeFieldName);
     }
 
     return oplogLink;
@@ -185,11 +184,13 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
                                             Shard::RetryPolicy::kNoRetry);
 
     uassertStatusOK(responseStatus.getStatus());
+    uassertStatusOK(responseStatus.getValue().commandStatus);
+
     auto result = responseStatus.getValue().response;
 
     auto oplogElement = result[kOplogField];
     uassert(ErrorCodes::FailedToParse,
-            "_migrateSession response does not have the 'oplog' field as array",
+            "_getNextSessionMods response does not have the 'oplog' field as array",
             oplogElement.type() == Array);
 
     return result;
@@ -252,49 +253,53 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                        ? oplogEntry.getObject()
                        : BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
     auto oplogLink = extractPrePostImageTs(lastResult, oplogEntry);
-    oplogLink.prevTs = scopedSession->getLastWriteOpTimeTs(result.txnNum);
+    oplogLink.prevOpTime = scopedSession->getLastWriteOpTime(result.txnNum);
 
-    writeConflictRetry(
-        opCtx,
-        "SessionOplogMigration",
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        [&] {
-            // Need to take global lock here so repl::logOp will not unlock it and trigger the
-            // invariant that disallows unlocking global lock while inside a WUOW.
-            // Grab a DBLock here instead of plain GlobalLock to make sure the MMAPV1 flush
-            // lock will be lock/unlocked correctly. Take the transaction table db lock to
-            // ensure the same lock ordering with normal replicated updates to the table.
-            Lock::DBLock lk(
-                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
-            WriteUnitOfWork wunit(opCtx);
+    writeConflictRetry(opCtx,
+                       "SessionOplogMigration",
+                       NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       [&] {
+                           // Need to take global lock here so repl::logOp will not unlock it and
+                           // trigger the invariant that disallows unlocking global lock while
+                           // inside a WUOW. Grab a DBLock here instead of plain GlobalLock to make
+                           // sure the MMAPV1 flush lock will be lock/unlocked correctly. Take the
+                           // transaction table db lock to ensure the same lock ordering with normal
+                           // replicated updates to the table.
+                           Lock::DBLock lk(opCtx,
+                                           NamespaceString::kSessionTransactionsTableNamespace.db(),
+                                           MODE_IX);
+                           WriteUnitOfWork wunit(opCtx);
 
-            result.oplogTime = repl::logOp(opCtx,
-                                           "n",
-                                           oplogEntry.getNamespace(),
-                                           oplogEntry.getUuid(),
-                                           object,
-                                           &object2,
-                                           true,
-                                           sessionInfo,
-                                           stmtId,
-                                           oplogLink);
+                           result.oplogTime = repl::logOp(opCtx,
+                                                          "n",
+                                                          oplogEntry.getNamespace(),
+                                                          oplogEntry.getUuid(),
+                                                          object,
+                                                          &object2,
+                                                          true,
+                                                          sessionInfo,
+                                                          stmtId,
+                                                          oplogLink);
 
-            auto oplogTs = result.oplogTime.getTimestamp();
-            uassert(40633,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << oplogEntry.getOpTime().toString()
-                                  << ": "
-                                  << redact(oplogBSON),
-                    !oplogTs.isNull());
+                           auto oplogOpTime = result.oplogTime;
+                           uassert(40633,
+                                   str::stream()
+                                       << "Failed to create new oplog entry for oplog with opTime: "
+                                       << oplogEntry.getOpTime().toString()
+                                       << ": "
+                                       << redact(oplogBSON),
+                                   !oplogOpTime.isNull());
 
-            // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post image, because
-            // the next oplog will contain the real operation.
-            if (!result.isPrePostImage) {
-                scopedSession->onWriteOpCompletedOnPrimary(opCtx, result.txnNum, {stmtId}, oplogTs);
-            }
+                           // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post
+                           // image, because
+                           // the next oplog will contain the real operation.
+                           if (!result.isPrePostImage) {
+                               scopedSession->onWriteOpCompletedOnPrimary(
+                                   opCtx, result.txnNum, {stmtId}, oplogOpTime);
+                           }
 
-            wunit.commit();
-        });
+                           wunit.commit();
+                       });
 
     return result;
 }
@@ -327,8 +332,10 @@ void SessionCatalogMigrationDestination::start(ServiceContext* service) {
 
 void SessionCatalogMigrationDestination::finish() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _state = State::Committing;
-    _isStateChanged.notify_all();
+    if (_state != State::ErrorOccurred) {
+        _state = State::Committing;
+        _isStateChanged.notify_all();
+    }
 }
 
 void SessionCatalogMigrationDestination::join() {

@@ -128,10 +128,9 @@ public:
         });
     }
 
-    repl::OplogEntry getOplog(OperationContext* opCtx, const Timestamp& ts) {
+    repl::OplogEntry getOplog(OperationContext* opCtx, const repl::OpTime& opTime) {
         DBDirectClient client(opCtx);
-        auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
-                                        BSON(repl::OplogEntryBase::kTimestampFieldName << ts));
+        auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery());
 
         ASSERT_FALSE(oplogBSON.isEmpty());
         auto parseStatus = repl::OplogEntry::parse(oplogBSON);
@@ -297,7 +296,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(2));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
     checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
@@ -350,7 +349,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, txnNum);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(txnNum));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(txnNum));
 
     ASSERT_TRUE(historyIter.hasNext());
     checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
@@ -396,7 +395,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparate
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(2));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
     checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
@@ -453,7 +452,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
 
     {
         auto session = getSessionWithTxn(opCtx, sessionId1, 2);
-        TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(2));
+        TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
         ASSERT_TRUE(historyIter.hasNext());
         checkOplogWithNestedOplog(oplog1, historyIter.next(opCtx));
         ASSERT_FALSE(historyIter.hasNext());
@@ -461,7 +460,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
 
     {
         auto session = getSessionWithTxn(opCtx, sessionId2, 42);
-        TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(42));
+        TransactionHistoryIterator historyIter(session->getLastWriteOpTime(42));
 
         ASSERT_TRUE(historyIter.hasNext());
         checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
@@ -526,7 +525,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(2));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
     checkOplog(oplog2, historyIter.next(opCtx));
@@ -565,7 +564,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setPreImageTs(Timestamp(100, 2));
+    updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog, updateOplog});
     // migration always fetches at least twice to transition from committing to done.
@@ -578,7 +577,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(2));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
 
@@ -606,13 +605,13 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
 
     ASSERT_FALSE(historyIter.hasNext());
 
-    ASSERT_TRUE(nextOplog.getPreImageTs());
-    ASSERT_FALSE(nextOplog.getPostImageTs());
+    ASSERT_TRUE(nextOplog.getPreImageOpTime());
+    ASSERT_FALSE(nextOplog.getPostImageOpTime());
 
     // Check preImage oplog
 
-    auto preImageTs = nextOplog.getPreImageTs().value();
-    auto newPreImageOplog = getOplog(opCtx, preImageTs);
+    auto preImageOpTime = nextOplog.getPreImageOpTime().value();
+    auto newPreImageOplog = getOplog(opCtx, preImageOpTime);
 
     ASSERT_TRUE(newPreImageOplog.getStatementId());
     ASSERT_EQ(45, newPreImageOplog.getStatementId().value());
@@ -656,7 +655,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setPostImageTs(Timestamp(100, 2));
+    updateOplog.setPostImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({postImageOplog, updateOplog});
     // migration always fetches at least twice to transition from committing to done.
@@ -669,7 +668,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(2));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
 
@@ -697,13 +696,13 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
 
     ASSERT_FALSE(historyIter.hasNext());
 
-    ASSERT_FALSE(nextOplog.getPreImageTs());
-    ASSERT_TRUE(nextOplog.getPostImageTs());
+    ASSERT_FALSE(nextOplog.getPreImageOpTime());
+    ASSERT_TRUE(nextOplog.getPostImageOpTime());
 
     // Check preImage oplog
 
-    auto postImageTs = nextOplog.getPostImageTs().value();
-    auto newPostImageOplog = getOplog(opCtx, postImageTs);
+    auto postImageOpTime = nextOplog.getPostImageOpTime().value();
+    auto newPostImageOplog = getOplog(opCtx, postImageOpTime);
 
     ASSERT_TRUE(newPostImageOplog.getStatementId());
     ASSERT_EQ(45, newPostImageOplog.getStatementId().value());
@@ -747,7 +746,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setPreImageTs(Timestamp(100, 2));
+    updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog});
     returnOplog({updateOplog});
@@ -761,7 +760,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(2));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
 
@@ -789,13 +788,13 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
 
     ASSERT_FALSE(historyIter.hasNext());
 
-    ASSERT_TRUE(nextOplog.getPreImageTs());
-    ASSERT_FALSE(nextOplog.getPostImageTs());
+    ASSERT_TRUE(nextOplog.getPreImageOpTime());
+    ASSERT_FALSE(nextOplog.getPostImageOpTime());
 
     // Check preImage oplog
 
-    auto preImageTs = nextOplog.getPreImageTs().value();
-    auto newPreImageOplog = getOplog(opCtx, preImageTs);
+    auto preImageOpTime = nextOplog.getPreImageOpTime().value();
+    auto newPreImageOplog = getOplog(opCtx, preImageOpTime);
 
     ASSERT_TRUE(newPreImageOplog.getStatementId());
     ASSERT_EQ(45, newPreImageOplog.getStatementId().value());
@@ -856,7 +855,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
     auto session = getSessionWithTxn(opCtx, sessionId, 20);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(20));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(20));
 
     ASSERT_TRUE(historyIter.hasNext());
     auto oplog = historyIter.next(opCtx);
@@ -912,7 +911,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
     auto session = getSessionWithTxn(opCtx, sessionId, 20);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(20));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(20));
 
     ASSERT_TRUE(historyIter.hasNext());
     auto oplog = historyIter.next(opCtx);
@@ -1079,7 +1078,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(2));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
     checkOplogWithNestedOplog(oplog2, historyIter.next(opCtx));
@@ -1157,7 +1156,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     sessionInfo.setSessionId(makeLogicalSessionIdForTest());
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setPreImageTs(Timestamp(100, 2));
+    updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog, updateOplog});
 
@@ -1197,7 +1196,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForPreImageOplogWithNo
     sessionInfo.setTxnNumber(56);
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setPreImageTs(Timestamp(100, 2));
+    updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog, updateOplog});
 
@@ -1276,7 +1275,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setPreImageTs(Timestamp(100, 2));
+    updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({oplog1, updateOplog});
 
@@ -1316,7 +1315,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setPostImageTs(Timestamp(100, 2));
+    updateOplog.setPostImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({oplog1, updateOplog});
 
@@ -1365,7 +1364,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
     auto session = getSessionWithTxn(opCtx, sessionId, 19);
-    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(19));
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(19));
 
     ASSERT_TRUE(historyIter.hasNext());
     checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));

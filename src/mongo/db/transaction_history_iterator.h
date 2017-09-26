@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
@@ -44,7 +43,7 @@ public:
     /**
      * Creates a new iterator starting with an oplog entry with the given start opTime.
      */
-    TransactionHistoryIterator(Timestamp startingOpTimeTs);
+    TransactionHistoryIterator(repl::OpTime startingOpTime);
 
     /**
      * Returns false if there are no more entries to iterate.
@@ -60,7 +59,7 @@ public:
     repl::OplogEntry next(OperationContext* opCtx);
 
 private:
-    Timestamp _nextOpTimeTs;
+    repl::OpTime _nextOpTime;
 };
 
 }  // namespace mongo

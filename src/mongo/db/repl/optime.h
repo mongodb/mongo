@@ -149,6 +149,9 @@ public:
 
     friend std::ostream& operator<<(std::ostream& out, const OpTime& opTime);
 
+    void appendAsQuery(BSONObjBuilder* builder) const;
+    BSONObj asQuery() const;
+
 private:
     Timestamp _timestamp;
     long long _term = kInitialTerm;

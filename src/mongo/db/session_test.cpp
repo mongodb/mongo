@@ -68,7 +68,7 @@ protected:
                               const LogicalSessionId& lsid,
                               TxnNumber txnNumber,
                               StmtId stmtId) {
-        return logOp(opCtx, nss, lsid, txnNumber, stmtId, Timestamp());
+        return logOp(opCtx, nss, lsid, txnNumber, stmtId, {});
     }
 
     static repl::OpTime logOp(OperationContext* opCtx,
@@ -76,13 +76,13 @@ protected:
                               const LogicalSessionId& lsid,
                               TxnNumber txnNumber,
                               StmtId stmtId,
-                              Timestamp prevTs) {
+                              repl::OpTime prevOpTime) {
         OperationSessionInfo osi;
         osi.setSessionId(lsid);
         osi.setTxnNumber(txnNumber);
 
         repl::OplogLink link;
-        link.prevTs = prevTs;
+        link.prevOpTime = prevOpTime;
 
         return repl::logOp(
             opCtx, "n", nss, kUUID, BSON("TestValue" << 0), nullptr, false, osi, stmtId, link);
@@ -98,7 +98,7 @@ TEST_F(SessionTest, SessionEntryNotWrittenOnBegin) {
     session.beginTxn(opCtx(), txnNum);
 
     ASSERT_EQ(sessionId, session.getSessionId());
-    ASSERT(session.getLastWriteOpTimeTs(txnNum).isNull());
+    ASSERT(session.getLastWriteOpTime(txnNum).isNull());
 
     DBDirectClient client(opCtx());
     auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(),
@@ -119,7 +119,7 @@ TEST_F(SessionTest, SessionEntryWrittenAtFirstWrite) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime.getTimestamp());
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime);
         wuow.commit();
 
         return opTime;
@@ -136,8 +136,8 @@ TEST_F(SessionTest, SessionEntryWrittenAtFirstWrite) {
     ASSERT(!cursor->more());
     ASSERT_EQ(sessionId, txnRecord.getSessionId());
     ASSERT_EQ(txnNum, txnRecord.getTxnNum());
-    ASSERT_EQ(opTime.getTimestamp(), txnRecord.getLastWriteOpTimeTs());
-    ASSERT_EQ(opTime.getTimestamp(), session.getLastWriteOpTimeTs(txnNum));
+    ASSERT_EQ(opTime, txnRecord.getLastWriteOpTime());
+    ASSERT_EQ(opTime, session.getLastWriteOpTime(txnNum));
 }
 
 TEST_F(SessionTest, StartingNewerTransactionUpdatesThePersistedSession) {
@@ -145,20 +145,20 @@ TEST_F(SessionTest, StartingNewerTransactionUpdatesThePersistedSession) {
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
 
-    const auto writeTxnRecordFn = [&](TxnNumber txnNum, StmtId stmtId, Timestamp prevTs) {
+    const auto writeTxnRecordFn = [&](TxnNumber txnNum, StmtId stmtId, repl::OpTime prevOpTime) {
         session.beginTxn(opCtx(), txnNum);
 
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, stmtId, prevTs);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {stmtId}, opTime.getTimestamp());
+        const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, stmtId, prevOpTime);
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {stmtId}, opTime);
         wuow.commit();
 
-        return opTime.getTimestamp();
+        return opTime;
     };
 
-    const auto firstTs = writeTxnRecordFn(100, 0, Timestamp());
-    const auto secondTs = writeTxnRecordFn(200, 1, firstTs);
+    const auto firstOpTime = writeTxnRecordFn(100, 0, {});
+    const auto secondOpTime = writeTxnRecordFn(200, 1, firstOpTime);
 
     DBDirectClient client(opCtx());
     auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(),
@@ -171,12 +171,12 @@ TEST_F(SessionTest, StartingNewerTransactionUpdatesThePersistedSession) {
     ASSERT(!cursor->more());
     ASSERT_EQ(sessionId, txnRecord.getSessionId());
     ASSERT_EQ(200, txnRecord.getTxnNum());
-    ASSERT_EQ(secondTs, txnRecord.getLastWriteOpTimeTs());
-    ASSERT_EQ(secondTs, session.getLastWriteOpTimeTs(200));
+    ASSERT_EQ(secondOpTime, txnRecord.getLastWriteOpTime());
+    ASSERT_EQ(secondOpTime, session.getLastWriteOpTime(200));
 
     session.invalidate();
     session.refreshFromStorageIfNeeded(opCtx());
-    ASSERT_EQ(secondTs, session.getLastWriteOpTimeTs(200));
+    ASSERT_EQ(secondOpTime, session.getLastWriteOpTime(200));
 }
 
 TEST_F(SessionTest, StartingOldTxnShouldAssert) {
@@ -189,7 +189,7 @@ TEST_F(SessionTest, StartingOldTxnShouldAssert) {
 
     ASSERT_THROWS_CODE(
         session.beginTxn(opCtx(), txnNum - 1), AssertionException, ErrorCodes::TransactionTooOld);
-    ASSERT(session.getLastWriteOpTimeTs(txnNum).isNull());
+    ASSERT(session.getLastWriteOpTime(txnNum).isNull());
 }
 
 TEST_F(SessionTest, SessionTransactionsCollectionNotDefaultCreated) {
@@ -209,7 +209,7 @@ TEST_F(SessionTest, SessionTransactionsCollectionNotDefaultCreated) {
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
     const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-    ASSERT_THROWS(session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime.getTimestamp()),
+    ASSERT_THROWS(session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime),
                   AssertionException);
 }
 
@@ -221,22 +221,22 @@ TEST_F(SessionTest, CheckStatementExecuted) {
     const TxnNumber txnNum = 100;
     session.beginTxn(opCtx(), txnNum);
 
-    const auto writeTxnRecordFn = [&](StmtId stmtId, Timestamp prevTs) {
+    const auto writeTxnRecordFn = [&](StmtId stmtId, repl::OpTime prevOpTime) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, stmtId, prevTs);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {stmtId}, opTime.getTimestamp());
+        const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, stmtId, prevOpTime);
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {stmtId}, opTime);
         wuow.commit();
 
-        return opTime.getTimestamp();
+        return opTime;
     };
 
     ASSERT(!session.checkStatementExecuted(opCtx(), txnNum, 1000));
-    const auto firstTs = writeTxnRecordFn(1000, Timestamp());
+    const auto firstOpTime = writeTxnRecordFn(1000, {});
     ASSERT(session.checkStatementExecuted(opCtx(), txnNum, 1000));
 
     ASSERT(!session.checkStatementExecuted(opCtx(), txnNum, 2000));
-    writeTxnRecordFn(2000, firstTs);
+    writeTxnRecordFn(2000, firstOpTime);
     ASSERT(session.checkStatementExecuted(opCtx(), txnNum, 2000));
 
     // Invalidate the session and ensure the statements still check out
@@ -282,7 +282,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime.getTimestamp());
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime);
         wuow.commit();
     }
 
@@ -290,10 +290,9 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum - 1, 0);
-        ASSERT_THROWS_CODE(
-            session.onWriteOpCompletedOnPrimary(opCtx(), txnNum - 1, {0}, opTime.getTimestamp()),
-            AssertionException,
-            ErrorCodes::ConflictingOperationInProgress);
+        ASSERT_THROWS_CODE(session.onWriteOpCompletedOnPrimary(opCtx(), txnNum - 1, {0}, opTime),
+                           AssertionException,
+                           ErrorCodes::ConflictingOperationInProgress);
     }
 }
 
@@ -311,10 +310,9 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
 
     session.invalidate();
 
-    ASSERT_THROWS_CODE(
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime.getTimestamp()),
-        AssertionException,
-        ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
 }
 
 TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
@@ -329,7 +327,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime.getTimestamp());
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime);
 
         session.invalidate();
 
