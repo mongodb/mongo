@@ -176,7 +176,7 @@ env.CppUnitTest(
 
 
 zlibEnv = env.Clone()
-zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
+zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib', 'snappy'])
 zlibEnv.Library(
     target='message_compressor',
     source=[
