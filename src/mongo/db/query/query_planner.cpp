@@ -865,15 +865,15 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         PlanEnumerator isp(enumParams);
         isp.init().transitional_ignore();
 
-        MatchExpression* rawTree;
-        while (isp.getNext(&rawTree) && (out->size() < params.maxIndexedSolutions)) {
+        unique_ptr<MatchExpression> rawTree;
+        while ((rawTree = isp.getNext()) && (out->size() < params.maxIndexedSolutions)) {
             LOG(5) << "About to build solntree from tagged tree:" << endl
-                   << redact(rawTree->toString());
+                   << redact(rawTree.get()->toString());
 
             // Store the plan cache index tree before calling prepareForAccessingPlanning(), so that
             // the PlanCacheIndexTree has the same sort as the MatchExpression used to generate the
             // plan cache key.
-            std::unique_ptr<MatchExpression> clone(rawTree->shallowClone());
+            std::unique_ptr<MatchExpression> clone(rawTree.get()->shallowClone());
             PlanCacheIndexTree* cacheData;
             Status indexTreeStatus =
                 cacheDataFromTaggedTree(clone.get(), relevantIndices, &cacheData);
@@ -884,11 +884,11 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
             // We have already cached the tree in canonical order, so now we can order the nodes for
             // access planning.
-            prepareForAccessPlanning(rawTree);
+            prepareForAccessPlanning(rawTree.get());
 
             // This can fail if enumeration makes a mistake.
             std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
-                query, rawTree, false, relevantIndices, params));
+                query, rawTree.release(), false, relevantIndices, params));
 
             if (!solnRoot) {
                 continue;

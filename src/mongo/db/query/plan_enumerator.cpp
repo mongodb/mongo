@@ -340,21 +340,21 @@ PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
     return it->second;
 }
 
-bool PlanEnumerator::getNext(MatchExpression** tree) {
+unique_ptr<MatchExpression> PlanEnumerator::getNext() {
     if (_done) {
-        return false;
+        return nullptr;
     }
 
     // Tag with our first solution.
     tagMemo(memoIDForNode(_root));
 
-    *tree = _root->shallowClone().release();
-    tagForSort(*tree);
+    unique_ptr<MatchExpression> tree(_root->shallowClone());
+    tagForSort(tree.get());
 
     _root->resetTag();
     LOG(5) << "Enumerator: memo just before moving:" << endl << dumpMemo();
     _done = nextMemo(memoIDForNode(_root));
-    return true;
+    return tree;
 }
 
 //
