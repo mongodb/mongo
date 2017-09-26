@@ -50,6 +50,7 @@
 #include "mongo/util/net/thread_idle_callback.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace {
@@ -105,6 +106,8 @@ void ServiceEntryPointMongod::startSession(transport::SessionHandle session) {
         });
 }
 
+static stdx::mutex screen_lock;
+
 void ServiceEntryPointMongod::_sessionLoop(const transport::SessionHandle& session) {
     Message inMessage;
     bool inExhaust = false;
@@ -112,6 +115,13 @@ void ServiceEntryPointMongod::_sessionLoop(const transport::SessionHandle& sessi
 
     while (true) {
         // 1. Source a Message from the client (unless we are exhausting)
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        screen_lock.lock();
+        printf("start %llu\n", (unsigned long long) (tv.tv_sec * 1000000 + tv.tv_usec));
+        screen_lock.unlock();
+
         if (!inExhaust) {
             inMessage.reset();
             auto status = [&] {
@@ -160,6 +170,10 @@ void ServiceEntryPointMongod::_sessionLoop(const transport::SessionHandle& sessi
         } else {
             inExhaust = false;
         }
+
+        screen_lock.lock();
+        printf("end %llu\n", (unsigned long long) (tv.tv_sec * 1000000 + tv.tv_usec));
+        screen_lock.unlock();
 
         if ((counter++ & 0xf) == 0) {
             markThreadIdle();

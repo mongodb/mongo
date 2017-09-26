@@ -1,0 +1,16 @@
+jira == 1.0.10
+pyyaml == 3.11
+unittest-xml-reporting == 2.1.0
+# Linters
+yapf == 0.16.0
+mypy == 0.501 ; python_version > "3"
+# typing in Python 2 for mypy
+typing == 3.6.1; python_version < "3"
+pylint == 1.6.5
+pydocstyle == 1.1.1
+# resmoke.py
+pymongo >= 3.0
+pypiwin32 == 219 ; sys_platform == "win32"
+PyYAML == 3.11
+requests >= 2.0.0
+subprocess32 >= 3.2.7 ; os_name == "posix" and python_version < "3"
