@@ -50,6 +50,15 @@ OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {
     return shardingMetadataDecoration(opCtx);
 }
 
+void OperationShardingState::setDisallowCollectionCreationIfNeeded(
+    const BSONElement& disallowCollectionCreationElt) {
+    _disallowCollectionCreation = disallowCollectionCreationElt.trueValue();
+}
+
+bool OperationShardingState::allowCollectionCreation() {
+    return !_disallowCollectionCreation;
+}
+
 void OperationShardingState::initializeShardVersion(NamespaceString nss,
                                                     const BSONElement& shardVersionElt) {
     invariant(!hasShardVersion());

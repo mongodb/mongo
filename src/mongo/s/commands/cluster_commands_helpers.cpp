@@ -249,7 +249,13 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherOnlyVersionI
 
     std::vector<AsyncRequestsSender::Request> requests;
     if (routingInfo.cm()) {
-        requests = buildUnversionedRequestsForAllShards(opCtx, cmdObj);
+        // An unversioned request on a sharded collection can cause a shard that has not owned data
+        // for the collection yet to implicitly create the collection without all the collection
+        // options. So, we signal to shards that they should not implicitly create the collection.
+        BSONObjBuilder augmentedCmdBob;
+        augmentedCmdBob.appendElementsUnique(cmdObj);
+        augmentedCmdBob.append("disallowCollectionCreation", true);
+        requests = buildUnversionedRequestsForAllShards(opCtx, augmentedCmdBob.obj());
     } else {
         requests = buildVersionedRequestsForTargetedShards(
             opCtx, routingInfo, cmdObj, BSONObj(), BSONObj());
@@ -262,7 +268,8 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherOnlyVersionI
 bool appendRawResponses(OperationContext* opCtx,
                         std::string* errmsg,
                         BSONObjBuilder* output,
-                        std::vector<AsyncRequestsSender::Response> shardResponses) {
+                        std::vector<AsyncRequestsSender::Response> shardResponses,
+                        std::set<ErrorCodes::Error> ignoredErrors) {
     BSONObjBuilder subobj;    // Stores raw responses by ConnectionString
     BSONObjBuilder errors;    // Stores errors by ConnectionString
     int commonErrCode = -1;   // Stores the overall error code
@@ -282,6 +289,7 @@ bool appendRawResponses(OperationContext* opCtx,
         const auto shardConnStr = shard->getConnString().toString();
 
         auto status = shardResponse.swResponse.getStatus();
+
         if (status.isOK()) {
             status = getStatusFromCommandResult(shardResponse.swResponse.getValue().data);
 
@@ -293,8 +301,10 @@ bool appendRawResponses(OperationContext* opCtx,
                 }
             }
 
-            if (status.isOK()) {
-                subobj.append(shardConnStr, shardResponse.swResponse.getValue().data);
+            if (status.isOK() || ignoredErrors.find(status.code()) != ignoredErrors.end()) {
+                subobj.append(shardConnStr,
+                              Command::filterCommandReplyForPassthrough(
+                                  shardResponse.swResponse.getValue().data));
                 continue;
             }
         }

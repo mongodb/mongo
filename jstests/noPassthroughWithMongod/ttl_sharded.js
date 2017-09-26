@@ -6,10 +6,6 @@
  *    deleted.
  */
 
-// TODO (SERVER-30344): enable UUID consistency check once createIndexes does not cause shards to
-// have inconsistent UUIDs.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 // start up a new sharded cluster
 var s = new ShardingTest({shards: 2, mongos: 1});
 

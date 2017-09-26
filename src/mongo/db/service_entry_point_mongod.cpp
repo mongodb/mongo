@@ -556,6 +556,7 @@ void execCommandDatabase(OperationContext* opCtx,
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 
         BSONElement cmdOptionMaxTimeMSField;
+        BSONElement disallowCollectionCreationField;
         BSONElement helpField;
         BSONElement shardVersionFieldIdx;
         BSONElement queryOptionMaxTimeMSField;
@@ -565,6 +566,8 @@ void execCommandDatabase(OperationContext* opCtx,
             StringData fieldName = element.fieldNameStringData();
             if (fieldName == QueryRequest::cmdOptionMaxTimeMS) {
                 cmdOptionMaxTimeMSField = element;
+            } else if (fieldName == "disallowCollectionCreation") {
+                disallowCollectionCreationField = element;
             } else if (fieldName == Command::kHelpFieldName) {
                 helpField = element;
             } else if (fieldName == ChunkVersion::kShardVersionField) {
@@ -669,6 +672,8 @@ void execCommandDatabase(OperationContext* opCtx,
             request.body,
             command->supportsNonLocalReadConcern(request.getDatabase().toString(), request.body)));
 
+        auto& oss = OperationShardingState::get(opCtx);
+
         // Don't handle the shard version that may have been sent along with the command iff
         //   fcv==3.4: This is a secondary.
         //   fcv==3.6: The 'available' rc-level is specified, or this is a secondary and neither the
@@ -684,7 +689,6 @@ void execCommandDatabase(OperationContext* opCtx,
                  ServerGlobalParams::FeatureCompatibility::Version::k34 ||
              !repl::ReadConcernArgs::get(opCtx).isLevelAvailable())) {
             auto commandNS = NamespaceString(command->parseNs(dbname, request.body));
-            auto& oss = OperationShardingState::get(opCtx);
             oss.initializeShardVersion(commandNS, shardVersionFieldIdx);
             auto shardingState = ShardingState::get(opCtx);
             if (oss.hasShardVersion()) {
@@ -694,6 +698,8 @@ void execCommandDatabase(OperationContext* opCtx,
             // Handle config optime information that may have been sent along with the command.
             uassertStatusOK(shardingState->updateConfigServerOpTimeFromMetadata(opCtx));
         }
+
+        oss.setDisallowCollectionCreationIfNeeded(disallowCollectionCreationField);
 
         // Can throw
         opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.

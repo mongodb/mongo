@@ -3,10 +3,6 @@
  * have the index and is not empty.
  */
 
-// TODO (SERVER-30344): enable UUID consistency check once createIndexes does not cause shards to
-// have inconsistent UUIDs.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 var st = new ShardingTest({shards: 2});
 
 var testDB = st.s.getDB('test');

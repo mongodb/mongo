@@ -125,14 +125,16 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherOnlyVersionI
  * field called 'raw' in 'output'.
  *
  * If all shards that errored had the same error, writes the common error code to 'output'. Writes a
- * string representation of all errors to 'errmsg.'
+ * string representation of all errors to 'errmsg.' Errors codes in 'ignoredErrors' are not treated
+ * as errors.
  *
  * Returns true if all the shards reported success.
  */
 bool appendRawResponses(OperationContext* opCtx,
                         std::string* errmsg,
                         BSONObjBuilder* output,
-                        std::vector<AsyncRequestsSender::Response> shardResponses);
+                        std::vector<AsyncRequestsSender::Response> shardResponses,
+                        std::set<ErrorCodes::Error> ignoredErrors = {});
 
 /**
  * Utility function to compute a single error code from a vector of command results.

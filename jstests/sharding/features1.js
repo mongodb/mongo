@@ -1,7 +1,3 @@
-// TODO (SERVER-30344): enable UUID consistency check once createIndexes does not cause shards to
-// have inconsistent UUIDs.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 (function() {
 
     var s = new ShardingTest({name: "features1", shards: 2, mongos: 1});

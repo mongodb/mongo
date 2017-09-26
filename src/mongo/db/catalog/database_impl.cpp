@@ -60,6 +60,7 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -755,6 +756,10 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            const BSONObj& idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
     invariant(!options.isView());
+
+    uassert(ErrorCodes::CannotImplicitlyCreateCollection,
+            "request was sent with 'disallowCollectionCreation' field",
+            OperationShardingState::get(opCtx).allowCollectionCreation());
 
     CollectionOptions optionsWithUUID = options;
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&

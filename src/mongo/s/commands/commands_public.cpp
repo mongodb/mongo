@@ -281,7 +281,8 @@ public:
                                                 filterCommandRequestForPassthrough(cmdObj),
                                                 ReadPreferenceSetting::get(opCtx),
                                                 Shard::RetryPolicy::kNotIdempotent));
-        return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
+        return appendRawResponses(
+            opCtx, &errmsg, &output, std::move(shardResponses), {ErrorCodes::NamespaceNotFound});
     }
 } dropIndexesCmd;
 
@@ -326,7 +327,11 @@ public:
                                                 filterCommandRequestForPassthrough(cmdObj),
                                                 ReadPreferenceSetting::get(opCtx),
                                                 Shard::RetryPolicy::kNoRetry));
-        return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
+        return appendRawResponses(opCtx,
+                                  &errmsg,
+                                  &output,
+                                  std::move(shardResponses),
+                                  {ErrorCodes::CannotImplicitlyCreateCollection});
     }
 } createIndexesCmd;
 
@@ -369,7 +374,8 @@ public:
                                                 filterCommandRequestForPassthrough(cmdObj),
                                                 ReadPreferenceSetting::get(opCtx),
                                                 Shard::RetryPolicy::kNoRetry));
-        return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
+        return appendRawResponses(
+            opCtx, &errmsg, &output, std::move(shardResponses), {ErrorCodes::NamespaceNotFound});
     }
 } reIndexCmd;
 
@@ -411,7 +417,8 @@ public:
                                                 filterCommandRequestForPassthrough(cmdObj),
                                                 ReadPreferenceSetting::get(opCtx),
                                                 Shard::RetryPolicy::kNoRetry));
-        return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
+        return appendRawResponses(
+            opCtx, &errmsg, &output, std::move(shardResponses), {ErrorCodes::NamespaceNotFound});
     }
 } collectionModCmd;
 

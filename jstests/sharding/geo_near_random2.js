@@ -1,9 +1,4 @@
 // This tests 1% of all points using $near and $nearSphere
-
-// TODO (SERVER-30344): enable UUID consistency check once createIndexes does not cause shards to
-// have inconsistent UUIDs.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 (function() {
 
     load("jstests/libs/geo_near_random.js");
