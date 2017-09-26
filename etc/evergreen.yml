@@ -1667,6 +1667,12 @@ post:
             if [ ! -f $new_binary_file ]; then
               mv $binary_file_location $new_binary_file
             fi
+            # On Windows if a .pdb symbol file exists, include it in the archive.
+            pdb_file=$(echo $binary_file_location | sed "s/\.exe/.pdb/")
+            if [ -f $pdb_file ]; then
+              new_pdb_file=unittest_binaries/$(echo $pdb_file | sed "s/.*\///")
+              mv $pdb_file $new_pdb_file
+            fi
           done
         done
   - command: archive.targz_pack
