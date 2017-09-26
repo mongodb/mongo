@@ -17,7 +17,7 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	uint16_t patch;
+	uint16_t major, minor, patch;
 	bool txn_active;
 
 	conn = S2C(session);
@@ -33,15 +33,14 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg)
 	 * release string.  We ignore the patch value, but allow it in the
 	 * string.
 	 */
-	if (sscanf(cval.str, "%" SCNu16 ".%" SCNu16,
-	    &conn->compat_major, &conn->compat_minor) != 2 &&
+	if (sscanf(cval.str, "%" SCNu16 ".%" SCNu16, &major, &minor) != 2 &&
 	    sscanf(cval.str, "%" SCNu16 ".%" SCNu16 ".%" SCNu16,
-	    &conn->compat_major, &conn->compat_minor, &patch) != 3)
+	    &major, &minor, &patch) != 3)
 		WT_RET_MSG(session, EINVAL, "illegal compatibility release");
-	if (conn->compat_major > WIREDTIGER_VERSION_MAJOR)
+	if (major > WIREDTIGER_VERSION_MAJOR)
 		WT_RET_MSG(session, ENOTSUP, "unsupported major version");
-	if (conn->compat_major == WIREDTIGER_VERSION_MAJOR &&
-	    conn->compat_minor > WIREDTIGER_VERSION_MINOR)
+	if (major == WIREDTIGER_VERSION_MAJOR &&
+	    minor > WIREDTIGER_VERSION_MINOR)
 		WT_RET_MSG(session, ENOTSUP, "unsupported minor version");
 
 	/*
@@ -52,6 +51,8 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (txn_active)
 		WT_RET_MSG(session, ENOTSUP,
 		    "system must be quiescent for upgrade or downgrade");
+	conn->compat_major = major;
+	conn->compat_minor = minor;
 	return (0);
 }
 
