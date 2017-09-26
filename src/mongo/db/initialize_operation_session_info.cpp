@@ -30,6 +30,7 @@
 
 #include "mongo/db/initialize_operation_session_info.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
@@ -48,6 +49,14 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     if (serverGlobalParams.featureCompatibility.version.load() ==
         ServerGlobalParams::FeatureCompatibility::Version::k34) {
         return;
+    }
+
+    {
+        // If we're using the localhost bypass, logical sessions are disabled
+        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+        if (authSession && authSession->isUsingLocalhostBypass()) {
+            return;
+        }
     }
 
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);

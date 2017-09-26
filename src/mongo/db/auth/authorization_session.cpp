@@ -962,6 +962,10 @@ RoleNameIterator AuthorizationSession::getImpersonatedRoleNames() {
     return makeRoleNameIterator(_impersonatedRoleNames.begin(), _impersonatedRoleNames.end());
 }
 
+bool AuthorizationSession::isUsingLocalhostBypass() {
+    return getAuthorizationManager().isAuthEnabled() && _externalState->shouldAllowLocalhost();
+}
+
 // Clear the vectors of impersonated usernames and roles.
 void AuthorizationSession::clearImpersonatedUserData() {
     _impersonatedUserNames.clear();

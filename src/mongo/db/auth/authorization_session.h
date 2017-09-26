@@ -224,6 +224,9 @@ public:
     // from a role.
     Status checkAuthorizedToRevokePrivilege(const Privilege& privilege);
 
+    // Checks if this connection is using the localhost bypass
+    bool isUsingLocalhostBypass();
+
     // Checks if this connection has the privileges necessary to create a new role
     bool isAuthorizedToCreateRole(const auth::CreateOrUpdateRoleArgs& args);
 

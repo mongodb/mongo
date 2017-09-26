@@ -10,9 +10,9 @@ var password = "bar";
 
 load("jstests/libs/host_ipaddr.js");
 
-var createUser = function(mongo) {
+var createUser = function(db) {
     print("============ adding a user.");
-    mongo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
+    db.createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
 };
 
 var createRole = function(mongo) {
@@ -123,7 +123,7 @@ var shutdown = function(conn) {
     MongoRunner.stopMongod(conn, /*signal*/ false, {auth: {user: username, pwd: password}});
 };
 
-var runTest = function(useHostName) {
+var runTest = function(useHostName, useSession) {
     print("==========================");
     print("starting mongod: useHostName=" + useHostName);
     print("==========================");
@@ -133,7 +133,13 @@ var runTest = function(useHostName) {
 
     assertCannotRunCommands(mongo);
 
-    createUser(mongo);
+    if (useSession) {
+        var session = mongo.startSession();
+        createUser(session.getDatabase("admin"));
+        session.endSession();
+    } else {
+        createUser(mongo.getDB("admin"));
+    }
 
     assertCannotRunCommands(mongo);
 
@@ -189,8 +195,10 @@ var runRoleTest = function() {
     assertCannotRunCommands(mongo);
 };
 
-runTest(false);
-runTest(true);
+runTest(false, false);
+runTest(false, true);
+runTest(true, false);
+runTest(true, true);
 
 runNonlocalTest(get_ipaddr());
 
