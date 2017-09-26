@@ -238,21 +238,29 @@ void DocumentSourceFacet::doReattachToOperationContext(OperationContext* opCtx) 
 }
 
 DocumentSource::StageConstraints DocumentSourceFacet::constraints() const {
-    StageConstraints constraints;
-    constraints.isAllowedInsideFacetStage = false;  // Disallow nested $facets.
+    const bool mayUseDisk = std::any_of(_facets.begin(), _facets.end(), [&](const auto& facet) {
+        const auto sources = facet.pipeline->getSources();
+        return std::any_of(sources.begin(), sources.end(), [&](const auto source) {
+            return source->constraints().diskRequirement == DiskUseRequirement::kWritesTmpData;
+        });
+    });
 
-    for (auto&& facet : _facets) {
-        for (auto&& nestedStage : facet.pipeline->getSources()) {
-            if (nestedStage->constraints().hostRequirement == HostTypeRequirement::kPrimaryShard) {
-                // Currently we don't split $facet to have a merger part and a shards part (see
-                // SERVER-24154). This means that if any stage in any of the $facet pipelines
-                // requires the primary shard, then the entire $facet must happen on the merger, and
-                // the merger must be the primary shard.
-                constraints.hostRequirement = HostTypeRequirement::kPrimaryShard;
-            }
-        }
-    }
-    return constraints;
+    // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
+    // This means that if any stage in any of the $facet pipelines requires the primary shard, then
+    // the entire $facet must happen on the merger, and the merger must be the primary shard.
+    const bool needsPrimaryShard =
+        std::any_of(_facets.begin(), _facets.end(), [&](const auto& facet) {
+            const auto sources = facet.pipeline->getSources();
+            return std::any_of(sources.begin(), sources.end(), [&](const auto source) {
+                return source->constraints().hostRequirement == HostTypeRequirement::kPrimaryShard;
+            });
+        });
+
+    return {StreamType::kBlocking,
+            PositionRequirement::kNone,
+            needsPrimaryShard ? HostTypeRequirement::kPrimaryShard : HostTypeRequirement::kAnyShard,
+            mayUseDisk ? DiskUseRequirement::kWritesTmpData : DiskUseRequirement::kNoDiskUse,
+            FacetRequirement::kNotAllowed};
 }
 
 DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* deps) const {

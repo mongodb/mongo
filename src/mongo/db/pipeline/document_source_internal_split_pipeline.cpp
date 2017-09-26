@@ -47,7 +47,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
 
     auto specObj = elem.embeddedObject();
 
-    HostTypeRequirement mergeType = HostTypeRequirement::kAnyShard;
+    HostTypeRequirement mergeType = HostTypeRequirement::kNone;
 
     for (auto&& elt : specObj) {
         if (elt.fieldNameStringData() == "mergeType"_sd) {
@@ -62,7 +62,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
             } else if ("primaryShard"_sd == mergeTypeString) {
                 mergeType = HostTypeRequirement::kPrimaryShard;
             } else if ("mongos"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kAnyShardOrMongoS;
+                mergeType = HostTypeRequirement::kNone;
             } else {
                 uasserted(ErrorCodes::BadValue,
                           str::stream() << "unrecognized field while parsing mergeType: '"
@@ -90,8 +90,8 @@ Value DocumentSourceInternalSplitPipeline::serialize(
     std::string mergeTypeString;
 
     switch (_mergeType) {
-        case HostTypeRequirement::kAnyShardOrMongoS:
-            mergeTypeString = "mongos";
+        case HostTypeRequirement::kAnyShard:
+            mergeTypeString = "anyShard";
             break;
 
         case HostTypeRequirement::kPrimaryShard:
@@ -99,7 +99,7 @@ Value DocumentSourceInternalSplitPipeline::serialize(
             break;
 
         default:
-            mergeTypeString = "anyShard";
+            mergeTypeString = "mongos";
             break;
     }
 

@@ -97,10 +97,11 @@ const char* DocumentSourceOplogMatch::getSourceName() const {
 }
 
 DocumentSource::StageConstraints DocumentSourceOplogMatch::constraints() const {
-    StageConstraints constraints;
-    constraints.requiredPosition = PositionRequirement::kFirst;
-    constraints.isAllowedInsideFacetStage = false;
-    return constraints;
+    return {StreamType::kStreaming,
+            PositionRequirement::kFirst,
+            HostTypeRequirement::kAnyShard,
+            DiskUseRequirement::kNoDiskUse,
+            FacetRequirement::kNotAllowed};
 }
 
 /**
@@ -140,6 +141,14 @@ public:
     const char* getSourceName() const final {
         // This is used in error reporting.
         return "$changeStream";
+    }
+
+    StageConstraints constraints() const final {
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {

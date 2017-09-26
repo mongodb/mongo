@@ -45,11 +45,11 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.hostRequirement = HostTypeRequirement::kPrimaryShard;
-        constraints.isAllowedInsideFacetStage = false;
-        constraints.requiredPosition = PositionRequirement::kLast;
-        return constraints;
+        return {StreamType::kStreaming,
+                PositionRequirement::kLast,
+                HostTypeRequirement::kPrimaryShard,
+                DiskUseRequirement::kWritesPersistentData,
+                FacetRequirement::kNotAllowed};
     }
 
     // Virtuals for SplittableDocumentSource

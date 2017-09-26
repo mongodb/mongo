@@ -118,6 +118,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
             Expression::parseOperand(pExpCtx, varElem, pExpCtx->variablesParseState),
             _variablesParseState.defineVariable(varName));
     }
+
+    initializeIntrospectionPipeline();
 }
 
 std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LiteParsed::parse(
@@ -659,16 +661,14 @@ void DocumentSourceLookUp::serializeToArray(
 
 DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker* deps) const {
     if (wasConstructedWithPipelineSyntax()) {
-        // Copy all 'let' variables into the foreign pipeline's expression context.
-        copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
-
-        auto pipeline = uassertStatusOK(Pipeline::parse(_resolvedPipeline, _fromExpCtx));
+        // We will use the introspection pipeline which we prebuilt during construction.
+        invariant(_parsedIntrospectionPipeline);
 
         DepsTracker subDeps(deps->getMetadataAvailable());
 
         // Get the subpipeline dependencies. Subpipeline stages may reference both 'let' variables
         // declared by this $lookup and variables declared externally.
-        for (auto&& source : pipeline->getSources()) {
+        for (auto&& source : _parsedIntrospectionPipeline->getSources()) {
             source->getDependencies(&subDeps);
         }
 

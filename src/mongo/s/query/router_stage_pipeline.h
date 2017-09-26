@@ -68,6 +68,14 @@ private:
             const boost::intrusive_ptr<ExpressionContext>& expCtx,
             std::unique_ptr<RouterExecStage> childStage);
 
+        StageConstraints constraints() const final {
+            return {StreamType::kStreaming,
+                    PositionRequirement::kFirst,
+                    HostTypeRequirement::kNone,
+                    DiskUseRequirement::kNoDiskUse,
+                    FacetRequirement::kNotAllowed};
+        }
+
         GetNextResult getNext() final;
         void doDispose() final;
         void reattachToOperationContext(OperationContext* opCtx) final;

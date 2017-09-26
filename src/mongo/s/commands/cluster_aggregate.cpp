@@ -622,7 +622,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     invariant(pipelineForMerging);
 
     // First, check whether we can merge on the mongoS.
-    if (pipelineForMerging->canRunOnMongos() && !internalQueryProhibitMergingOnMongoS.load()) {
+    if (!internalQueryProhibitMergingOnMongoS.load() && pipelineForMerging->canRunOnMongos()) {
         // Register the new mongoS cursor, and retrieve the initial batch of results.
         auto cursorResponse = establishMergingMongosCursor(opCtx,
                                                            request,

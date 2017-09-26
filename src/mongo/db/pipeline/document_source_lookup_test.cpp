@@ -162,7 +162,7 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineWithLetSyntax) {
                                << "pipeline"
                                << BSON_ARRAY(BSON("$project" << BSON("hasX"
                                                                      << "$$var1"))
-                                             << BSON("$match" << BSON("$hasX" << true)))
+                                             << BSON("$match" << BSON("hasX" << true)))
                                << "as"
                                << "as"))
             .firstElement(),
@@ -448,9 +448,9 @@ public:
     Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         Pipeline* pipeline) final {
         while (_removeLeadingQueryStages && !pipeline->getSources().empty()) {
-            if (pipeline->popFrontStageWithName("$match") ||
-                pipeline->popFrontStageWithName("$sort") ||
-                pipeline->popFrontStageWithName("$project")) {
+            if (pipeline->popFrontWithCriteria("$match") ||
+                pipeline->popFrontWithCriteria("$sort") ||
+                pipeline->popFrontWithCriteria("$project")) {
                 continue;
             }
             break;

@@ -117,7 +117,7 @@ public:
     bool fromMongos = false;
     bool needsMerge = false;
     bool inMongos = false;
-    bool extSortAllowed = false;
+    bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
 
     // We track whether the aggregation request came from a 3.4 mongos. If so, the merge may occur

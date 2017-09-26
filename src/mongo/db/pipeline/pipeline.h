@@ -38,6 +38,8 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_knobs.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
 
@@ -281,10 +283,13 @@ public:
     }
 
     /**
-     * Removes and returns the first stage of the pipeline if its name is 'targetStageName'. Returns
-     * nullptr if there is no first stage, or if the stage's name is not 'targetStageName'.
+     * Removes and returns the first stage of the pipeline if its name is 'targetStageName' and the
+     * given 'predicate' function, if present, returns 'true' when called with a pointer to the
+     * stage. Returns nullptr if there is no first stage which meets these criteria.
      */
-    boost::intrusive_ptr<DocumentSource> popFrontStageWithName(StringData targetStageName);
+    boost::intrusive_ptr<DocumentSource> popFrontWithCriteria(
+        StringData targetStageName,
+        stdx::function<bool(const DocumentSource* const)> predicate = nullptr);
 
     /**
      * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists

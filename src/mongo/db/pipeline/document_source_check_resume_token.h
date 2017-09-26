@@ -60,6 +60,14 @@ public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 
+    StageConstraints constraints() const final {
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kAnyShard,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
+    }
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
@@ -86,6 +94,14 @@ class DocumentSourceEnsureResumeTokenPresent final : public DocumentSource,
 public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
+
+    StageConstraints constraints() const final {
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
+    }
 
     /**
      * SplittableDocumentSource methods; this has to run on the merger, since the resume point could

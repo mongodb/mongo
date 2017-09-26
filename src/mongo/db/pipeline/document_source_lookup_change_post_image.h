@@ -62,9 +62,13 @@ public:
     }
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kAnyShard,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed);
+
         constraints.canSwapWithMatch = true;
-        constraints.isAllowedInsideFacetStage = false;
         return constraints;
     }
 

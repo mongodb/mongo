@@ -46,7 +46,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     : explain(request.getExplain()),
       fromMongos(request.isFromMongos()),
       needsMerge(request.needsMerge()),
-      extSortAllowed(request.shouldAllowDiskUse()),
+      allowDiskUse(request.shouldAllowDiskUse()),
       bypassDocumentValidation(request.shouldBypassDocumentValidation()),
       from34Mongos(request.isFrom34Mongos()),
       ns(request.getNamespaceString()),
@@ -84,7 +84,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns,
     expCtx->fromMongos = fromMongos;
     expCtx->from34Mongos = from34Mongos;
     expCtx->inMongos = inMongos;
-    expCtx->extSortAllowed = extSortAllowed;
+    expCtx->allowDiskUse = allowDiskUse;
     expCtx->bypassDocumentValidation = bypassDocumentValidation;
 
     expCtx->tempDir = tempDir;

@@ -50,13 +50,14 @@ public:
     }
 
     StageConstraints constraints() const {
-        StageConstraints constraints;
+        StageConstraints constraints(StreamType::kStreaming,
+                                     _cache->isServing() ? PositionRequirement::kFirst
+                                                         : PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed);
 
-        if (_cache->isServing()) {
-            constraints.requiredPosition = PositionRequirement::kFirst;
-            constraints.requiresInputDocSource = false;
-        }
-
+        constraints.requiresInputDocSource = (_cache->isBuilding());
         return constraints;
     }
 

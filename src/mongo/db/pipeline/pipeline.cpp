@@ -64,6 +64,9 @@ namespace dps = ::mongo::dotted_path_support;
 
 using HostTypeRequirement = DocumentSource::StageConstraints::HostTypeRequirement;
 using PositionRequirement = DocumentSource::StageConstraints::PositionRequirement;
+using DiskUseRequirement = DocumentSource::StageConstraints::DiskUseRequirement;
+using FacetRequirement = DocumentSource::StageConstraints::FacetRequirement;
+using StreamType = DocumentSource::StageConstraints::StreamType;
 
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
 
@@ -169,15 +172,14 @@ void Pipeline::validateFacetPipeline() const {
     }
     for (auto&& stage : _sources) {
         auto stageConstraints = stage->constraints();
-        if (!stageConstraints.isAllowedInsideFacetStage) {
+        if (!stageConstraints.isAllowedInsideFacetStage()) {
             uasserted(40600,
                       str::stream() << stage->getSourceName()
                                     << " is not allowed to be used within a $facet stage");
         }
         // We expect a stage within a $facet stage to have these properties.
-        invariant(stageConstraints.requiresInputDocSource);
-        invariant(!stageConstraints.isIndependentOfAnyCollection);
         invariant(stageConstraints.requiredPosition == PositionRequirement::kNone);
+        invariant(!stageConstraints.isIndependentOfAnyCollection);
     }
 
     // Facet pipelines cannot have any stages which are initial sources. We've already validated the
@@ -434,8 +436,18 @@ bool Pipeline::needsPrimaryShardMerger() const {
 }
 
 bool Pipeline::canRunOnMongos() const {
-    return std::all_of(_sources.begin(), _sources.end(), [](const auto& stage) {
-        return stage->constraints().hostRequirement == HostTypeRequirement::kAnyShardOrMongoS;
+    return std::all_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
+        auto constraints = stage->constraints();
+        const bool doesNotNeedShard = (constraints.hostRequirement == HostTypeRequirement::kNone);
+        const bool doesNotNeedDisk =
+            (constraints.diskRequirement == DiskUseRequirement::kNoDiskUse ||
+             (constraints.diskRequirement == DiskUseRequirement::kWritesTmpData &&
+              !pCtx->allowDiskUse));
+        const bool doesNotBlockOrBlockingIsPermitted =
+            (constraints.streamType == StreamType::kStreaming ||
+             !internalQueryProhibitBlockingMergeOnMongoS.load());
+
+        return doesNotNeedShard && doesNotNeedDisk && doesNotBlockOrBlockingIsPermitted;
     });
 }
 
@@ -579,11 +591,17 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
     return deps;
 }
 
-boost::intrusive_ptr<DocumentSource> Pipeline::popFrontStageWithName(StringData targetStageName) {
+boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithCriteria(
+    StringData targetStageName, stdx::function<bool(const DocumentSource* const)> predicate) {
     if (_sources.empty() || _sources.front()->getSourceName() != targetStageName) {
         return nullptr;
     }
     auto targetStage = _sources.front();
+
+    if (predicate && !predicate(targetStage.get())) {
+        return nullptr;
+    }
+
     _sources.pop_front();
     stitch();
     return targetStage;

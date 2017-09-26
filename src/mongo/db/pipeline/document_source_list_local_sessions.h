@@ -94,13 +94,15 @@ public:
     }
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        constraints.hostRequirement = StageConstraints::HostTypeRequirement::kAnyShardOrMongoS;
-        constraints.requiresInputDocSource = false;
-        constraints.isAllowedInsideFacetStage = false;
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kFirst,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed);
+
         constraints.isIndependentOfAnyCollection = true;
         constraints.allowedToForwardFromMongos = false;
+        constraints.requiresInputDocSource = false;
         return constraints;
     }
 

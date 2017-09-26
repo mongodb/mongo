@@ -61,7 +61,7 @@ DocumentSource::GetNextResult DocumentSourceGeoNear::getNext() {
     if (!resultsIterator->more())
         return GetNextResult::makeEOF();
 
-    // each result from the geoNear command is wrapped in a wrapper object with "obj",
+    // Each result from the geoNear command is wrapped in a wrapper object with "obj",
     // "dis" and maybe "loc" fields. We want to take the object from "obj" and inject the
     // other fields into it.
     Document result(resultsIterator->next().embeddedObject());
@@ -69,6 +69,11 @@ DocumentSource::GetNextResult DocumentSourceGeoNear::getNext() {
     output.setNestedField(*distanceField, result["dis"]);
     if (includeLocs)
         output.setNestedField(*includeLocs, result["loc"]);
+
+    // In a cluster, $geoNear output will be merged via $sort, so add the sort key.
+    if (pExpCtx->needsMerge) {
+        output.setSortKeyMetaField(BSON("" << result["dis"]));
+    }
 
     return output.freeze();
 }
@@ -89,12 +94,13 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
 }
 
 // This command is sent as-is to the shards.
-// On router this becomes a sort by distance (nearest-first) with limit.
 intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getShardSource() {
     return this;
 }
+// On mongoS this becomes a merge sort by distance (nearest-first) with limit.
 intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getMergeSource() {
-    return DocumentSourceSort::create(pExpCtx, BSON(distanceField->fullPath() << 1), limit);
+    return DocumentSourceSort::create(
+        pExpCtx, BSON(distanceField->fullPath() << 1 << "$mergePresorted" << true), limit);
 }
 
 Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {

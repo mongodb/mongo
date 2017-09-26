@@ -86,11 +86,11 @@ public:
     }
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        constraints.requiresInputDocSource = true;
-        constraints.isAllowedInsideFacetStage = false;
-        return constraints;
+        return {StreamType::kStreaming,
+                PositionRequirement::kFirst,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

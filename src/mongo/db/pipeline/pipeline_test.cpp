@@ -1791,7 +1791,7 @@ public:
     DocumentSourceCollectionlessMock() : DocumentSourceMock({}) {}
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
+        auto constraints = DocumentSourceMock::constraints();
         constraints.isIndependentOfAnyCollection = true;
         return constraints;
     }
@@ -1906,7 +1906,12 @@ public:
     DocumentSourceDependencyDummy() : DocumentSourceMock({}) {}
 
     StageConstraints constraints() const final {
-        return StageConstraints{};  // Overrides DocumentSourceMock's required position.
+        // Overrides DocumentSourceMock's required position.
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kAllowed};
     }
 };
 

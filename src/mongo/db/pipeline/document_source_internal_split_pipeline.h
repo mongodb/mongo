@@ -36,10 +36,10 @@ namespace mongo {
  * An internal stage available for testing. Acts as a simple passthrough of intermediate results
  * from the source stage, but forces the pipeline to split at the point where this stage appears
  * (assuming that no earlier splitpoints exist). Takes a single parameter, 'mergeType', which can be
- * one of 'anyShard', 'primaryShard' or 'mongos' to control where the merge may occur. Omitting this
- * parameter or specifying 'anyShard' produces the default merging behaviour; the merge half of the
- * pipeline will be sent to a random participating shard, subject to the requirements of any
- * subsequent splittable stages in the pipeline.
+ * one of 'primaryShard', 'anyShard' or 'mongos' to control where the merge may occur. Omitting this
+ * parameter or specifying 'mongos' produces the default merging behaviour; the merge half of the
+ * pipeline will be executed on mongoS if all other stages are eligible, and will be sent to a
+ * random participating shard otherwise.
  */
 class DocumentSourceInternalSplitPipeline final : public DocumentSource,
                                                   public SplittableDocumentSource {
@@ -67,9 +67,11 @@ public:
     }
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.hostRequirement = _mergeType;
-        return constraints;
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                _mergeType,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kAllowed};
     }
 
     GetNextResult getNext() final;
@@ -80,7 +82,7 @@ private:
         : DocumentSource(expCtx), _mergeType(mergeType) {}
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    HostTypeRequirement _mergeType = HostTypeRequirement::kAnyShard;
+    HostTypeRequirement _mergeType = HostTypeRequirement::kNone;
 };
 
 }  // namesace mongo

@@ -63,14 +63,15 @@ public:
     }
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
-        // Can't swap with a $match if a limit has been absorbed, since in general match can't swap
-        // with limit.
-        constraints.canSwapWithMatch = !limitSrc;
+        StageConstraints constraints(
+            _mergingPresorted ? StreamType::kStreaming : StreamType::kBlocking,
+            PositionRequirement::kNone,
+            HostTypeRequirement::kNone,
+            _mergingPresorted ? DiskUseRequirement::kNoDiskUse : DiskUseRequirement::kWritesTmpData,
+            FacetRequirement::kAllowed);
 
-        // Can run on mongoS only if this stage is merging presorted streams.
-        constraints.hostRequirement = (_mergingPresorted ? HostTypeRequirement::kAnyShardOrMongoS
-                                                         : HostTypeRequirement::kAnyShard);
+        // Can't swap with a $match if a limit has been absorbed, as $match can't swap with $limit.
+        constraints.canSwapWithMatch = !limitSrc;
         return constraints;
     }
 
@@ -102,6 +103,13 @@ public:
         BSONObj sortOrder,
         long long limit = -1,
         uint64_t maxMemoryUsageBytes = kMaxMemoryUsageBytes);
+
+    /**
+     * Returns true if this $sort stage is merging presorted streams.
+     */
+    bool mergingPresorted() const {
+        return _mergingPresorted;
+    }
 
     /**
      * Returns -1 for no limit.

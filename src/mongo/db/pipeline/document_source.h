@@ -132,19 +132,69 @@ public:
          * A HostTypeRequirement defines where this stage is permitted to be executed when the
          * pipeline is run on a sharded cluster.
          */
-        enum class HostTypeRequirement { kPrimaryShard, kAnyShard, kAnyShardOrMongoS };
+        enum class HostTypeRequirement { kNone, kPrimaryShard, kAnyShard };
 
-        // Set if this stage needs to be in a particular position of the pipeline.
-        PositionRequirement requiredPosition = PositionRequirement::kNone;
+        /**
+         * A DiskUseRequirement indicates whether this stage writes to disk, or whether it may spill
+         * to disk if its memory usage exceeds a given threshold. Note that this only indicates the
+         * *ability* of the stage to spill; if 'allowDiskUse' is set to false, it will be prevented
+         * from doing so.
+         */
+        enum class DiskUseRequirement { kNoDiskUse, kWritesTmpData, kWritesPersistentData };
 
-        // Set if this stage can only be executed on specific components of a sharded cluster.
-        HostTypeRequirement hostRequirement = HostTypeRequirement::kAnyShard;
+        /**
+         * A FacetRequirement indicates whether this stage may be used within a $facet pipeline.
+         */
+        enum class FacetRequirement { kAllowed, kNotAllowed };
 
-        bool isAllowedInsideFacetStage = true;
+        /**
+         * A StreamType defines whether this stage is streaming (can produce output based solely on
+         * the current input document) or blocking (must examine subsequent documents before
+         * producing an output document).
+         */
+        enum class StreamType { kStreaming, kBlocking };
+
+        StageConstraints(StreamType streamType,
+                         PositionRequirement requiredPosition,
+                         HostTypeRequirement hostRequirement,
+                         DiskUseRequirement diskRequirement,
+                         FacetRequirement facetRequirement)
+            : requiredPosition(requiredPosition),
+              hostRequirement(hostRequirement),
+              diskRequirement(diskRequirement),
+              facetRequirement(facetRequirement),
+              streamType(streamType) {
+            // Stages which are allowed to run in $facet pipelines must not have any specific
+            // position requirements.
+            invariant(!isAllowedInsideFacetStage() ||
+                      requiredPosition == PositionRequirement::kNone);
+        }
+
+        // Indicates whether this stage needs to be at a particular position in the pipeline.
+        const PositionRequirement requiredPosition;
+
+        // Indicates whether this stage can only be executed on specific components of a sharded
+        // cluster.
+        const HostTypeRequirement hostRequirement;
+
+        // Indicates whether this stage may write persistent data to disk, or may spill to temporary
+        // files if its memory usage becomes excessive.
+        const DiskUseRequirement diskRequirement;
+
+        // Indicates whether this stage may run inside a $facet stage.
+        const FacetRequirement facetRequirement;
+
+        // Indicates whether this is a streaming or blocking stage.
+        const StreamType streamType;
 
         // True if this stage does not generate results itself, and instead pulls inputs from an
         // input DocumentSource (via 'pSource').
         bool requiresInputDocSource = true;
+
+        // True if this stage should be permitted to run in a $facet pipeline.
+        bool isAllowedInsideFacetStage() const {
+            return facetRequirement == FacetRequirement::kAllowed;
+        }
 
         // True if this stage operates on a global or database level, like $currentOp.
         bool isIndependentOfAnyCollection = false;
@@ -165,6 +215,9 @@ public:
 
     using HostTypeRequirement = StageConstraints::HostTypeRequirement;
     using PositionRequirement = StageConstraints::PositionRequirement;
+    using DiskUseRequirement = StageConstraints::DiskUseRequirement;
+    using FacetRequirement = StageConstraints::FacetRequirement;
+    using StreamType = StageConstraints::StreamType;
 
     /**
      * This is what is returned from the main DocumentSource API: getNext(). It is essentially a
@@ -260,9 +313,7 @@ public:
      * Returns a struct containing information about any special constraints imposed on using this
      * stage.
      */
-    virtual StageConstraints constraints() const {
-        return StageConstraints{};
-    }
+    virtual StageConstraints constraints() const = 0;
 
     /**
      * Informs the stage that it is no longer needed and can release its resources. After dispose()

@@ -186,9 +186,11 @@ public:
     DocumentSourcePassthrough() : DocumentSourceMock({}) {}
 
     StageConstraints constraints() const override {
-        StageConstraints constraints;
-        constraints.isAllowedInsideFacetStage = true;
-        return constraints;
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kAllowed};
     }
 
     DocumentSource::GetNextResult getNext() final {
@@ -625,9 +627,11 @@ TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIs
 class DocumentSourceNeedsPrimaryShard final : public DocumentSourcePassthrough {
 public:
     StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.hostRequirement = HostTypeRequirement::kPrimaryShard;
-        return constraints;
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kPrimaryShard,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourceNeedsPrimaryShard> create() {

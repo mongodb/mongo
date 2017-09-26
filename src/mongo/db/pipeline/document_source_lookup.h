@@ -96,9 +96,22 @@ public:
     GetModPathsReturn getModifiedPaths() const final;
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
+        const bool mayUseDisk = wasConstructedWithPipelineSyntax() &&
+            std::any_of(_parsedIntrospectionPipeline->getSources().begin(),
+                        _parsedIntrospectionPipeline->getSources().end(),
+                        [](const auto& source) {
+                            return source->constraints().diskRequirement ==
+                                DiskUseRequirement::kWritesTmpData;
+                        });
+
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kPrimaryShard,
+                                     mayUseDisk ? DiskUseRequirement::kWritesTmpData
+                                                : DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed);
+
         constraints.canSwapWithMatch = true;
-        constraints.hostRequirement = HostTypeRequirement::kPrimaryShard;
         return constraints;
     }
 
@@ -243,6 +256,16 @@ private:
     void resolveLetVariables(const Document& localDoc, Variables* variables);
 
     /**
+     * Builds a parsed pipeline for introspection (e.g. constraints, dependencies). Any sub-$lookup
+     * pipelines will be built recursively.
+     */
+    void initializeIntrospectionPipeline() {
+        copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
+        _parsedIntrospectionPipeline =
+            uassertStatusOK(Pipeline::parse(_resolvedPipeline, _fromExpCtx));
+    }
+
+    /**
      * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
      * cursor and/or cache source as appropriate.
      */
@@ -296,6 +319,9 @@ private:
     // The aggregation pipeline defined with the user request, prior to optimization and view
     // resolution.
     std::vector<BSONObj> _userPipeline;
+    // A pipeline parsed from _resolvedPipeline at creation time, intended to support introspective
+    // functions. If sub-$lookup stages are present, their pipelines are constructed recursively.
+    std::unique_ptr<Pipeline, Pipeline::Deleter> _parsedIntrospectionPipeline;
 
     std::vector<LetVariable> _letVariables;
 
