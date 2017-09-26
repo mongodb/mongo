@@ -2418,7 +2418,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	cfg[1] = NULL;
 	WT_ERR(__wt_snprintf(version, sizeof(version),
 	    "version=(major=%d,minor=%d)",
-	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR));
+	    conn->compat_major, conn->compat_minor));
 	__conn_config_append(cfg, version);
 
 	/* Ignore the base_config file if config_base_set is false. */
