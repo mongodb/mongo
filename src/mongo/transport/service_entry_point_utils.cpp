@@ -39,7 +39,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 
-#ifdef __linux__  // TODO: consider making this ifndef _WIN32
+#if !defined(_WIN32)
 #include <sys/resource.h>
 #endif
 
