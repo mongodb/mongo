@@ -756,6 +756,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            const BSONObj& idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
     invariant(!options.isView());
+    NamespaceString nss(ns);
 
     uassert(ErrorCodes::CannotImplicitlyCreateCollection,
             "request was sent with 'disallowCollectionCreation' field",
@@ -764,10 +765,16 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     CollectionOptions optionsWithUUID = options;
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
         serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
+        auto coordinator = repl::ReplicationCoordinator::get(opCtx);
+        fassert(40643,
+                coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
+                    serverGlobalParams.featureCompatibility.version.load() !=
+                        ServerGlobalParams::FeatureCompatibility::Version::k36 ||
+                    coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) ||
+                    nss.isSystemDotProfile());  // system.profile is special as it's not replicated
         optionsWithUUID.uuid.emplace(CollectionUUID::gen());
     }
 
-    NamespaceString nss(ns);
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     audit::logCreateCollection(&cc(), ns);
 
