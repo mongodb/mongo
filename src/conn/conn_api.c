@@ -1088,10 +1088,9 @@ err:	/*
 
 	/*
 	 * Perform a system-wide checkpoint so that all tables are consistent
-	 * with each other.  All transactions are resolved but ignore
-	 * timestamps to make sure all data gets to disk.  Do this before
-	 * shutting down all the subsystems.  We have shut down all user
-	 * sessions, but send in true for waiting for internal races.
+	 * with each other.  Do this before shutting down all the subsystems.
+	 * We have shut down all user sessions, but send in true for waiting
+	 * for internal races.
 	 */
 	if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
 		s = NULL;
@@ -1100,7 +1099,6 @@ err:	/*
 		if (s != NULL) {
 			const char *checkpoint_cfg[] = {
 			    WT_CONFIG_BASE(session, WT_SESSION_checkpoint),
-			    "use_timestamp=false",
 			    NULL
 			};
 			wt_session = &s->iface;
