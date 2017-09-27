@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
+#include "mongo/db/read_concern.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -443,73 +444,77 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         return getPersistedMaxVersion(opCtx, nss);
     }();
 
-    auto remoteRefreshCallbackFn =
-        [this, nss, catalogCacheSinceVersion, maxLoaderVersion, termScheduled, callbackFn, notify](
-            OperationContext* opCtx,
-            StatusWith<CollectionAndChangedChunks> swCollectionAndChangedChunks) {
+    auto remoteRefreshCallbackFn = [this,
+                                    nss,
+                                    catalogCacheSinceVersion,
+                                    maxLoaderVersion,
+                                    termScheduled,
+                                    callbackFn,
+                                    notify](
+        OperationContext* opCtx,
+        StatusWith<CollectionAndChangedChunks> swCollectionAndChangedChunks) {
 
-            if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound) {
-                Status scheduleStatus = _scheduleTask(
-                    nss, Task{swCollectionAndChangedChunks, maxLoaderVersion, termScheduled});
-                if (!scheduleStatus.isOK()) {
-                    callbackFn(opCtx, scheduleStatus);
-                    notify->set();
-                    return;
+        if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound) {
+            Status scheduleStatus = _ensureMajorityPrimaryAndScheduleTask(
+                opCtx, nss, Task{swCollectionAndChangedChunks, maxLoaderVersion, termScheduled});
+            if (!scheduleStatus.isOK()) {
+                callbackFn(opCtx, scheduleStatus);
+                notify->set();
+                return;
+            }
+
+            log() << "Cache loader remotely refreshed for collection " << nss << " from version "
+                  << maxLoaderVersion << " and no metadata was found.";
+        } else if (swCollectionAndChangedChunks.isOK()) {
+            auto& collAndChunks = swCollectionAndChangedChunks.getValue();
+
+            if (collAndChunks.changedChunks.back().getVersion().epoch() != collAndChunks.epoch) {
+                swCollectionAndChangedChunks =
+                    Status{ErrorCodes::ConflictingOperationInProgress,
+                           str::stream()
+                               << "Invalid chunks found when reloading '"
+                               << nss.toString()
+                               << "' Previous collection epoch was '"
+                               << collAndChunks.epoch.toString()
+                               << "', but found a new epoch '"
+                               << collAndChunks.changedChunks.back().getVersion().epoch().toString()
+                               << "'. Collection was dropped and recreated."};
+            } else {
+                if ((collAndChunks.epoch != maxLoaderVersion.epoch()) ||
+                    (collAndChunks.changedChunks.back().getVersion() > maxLoaderVersion)) {
+                    Status scheduleStatus = _ensureMajorityPrimaryAndScheduleTask(
+                        opCtx,
+                        nss,
+                        Task{swCollectionAndChangedChunks, maxLoaderVersion, termScheduled});
+                    if (!scheduleStatus.isOK()) {
+                        callbackFn(opCtx, scheduleStatus);
+                        notify->set();
+                        return;
+                    }
                 }
 
                 log() << "Cache loader remotely refreshed for collection " << nss
-                      << " from version " << maxLoaderVersion << " and no metadata was found.";
-            } else if (swCollectionAndChangedChunks.isOK()) {
-                auto& collAndChunks = swCollectionAndChangedChunks.getValue();
+                      << " from collection version " << maxLoaderVersion
+                      << " and found collection version "
+                      << collAndChunks.changedChunks.back().getVersion();
 
-                if (collAndChunks.changedChunks.back().getVersion().epoch() !=
-                    collAndChunks.epoch) {
-                    swCollectionAndChangedChunks = Status{
-                        ErrorCodes::ConflictingOperationInProgress,
-                        str::stream()
-                            << "Invalid chunks found when reloading '"
-                            << nss.toString()
-                            << "' Previous collection epoch was '"
-                            << collAndChunks.epoch.toString()
-                            << "', but found a new epoch '"
-                            << collAndChunks.changedChunks.back().getVersion().epoch().toString()
-                            << "'. Collection was dropped and recreated."};
-                } else {
-                    if ((collAndChunks.epoch != maxLoaderVersion.epoch()) ||
-                        (collAndChunks.changedChunks.back().getVersion() > maxLoaderVersion)) {
-                        Status scheduleStatus = _scheduleTask(
-                            nss,
-                            Task{swCollectionAndChangedChunks, maxLoaderVersion, termScheduled});
-                        if (!scheduleStatus.isOK()) {
-                            callbackFn(opCtx, scheduleStatus);
-                            notify->set();
-                            return;
-                        }
-                    }
+                // Metadata was found remotely -- otherwise would have received NamespaceNotFound
+                // rather than Status::OK(). Return metadata for CatalogCache that's GTE
+                // catalogCacheSinceVersion, from the loader's persisted and enqueued metadata.
 
-                    log() << "Cache loader remotely refreshed for collection " << nss
-                          << " from collection version " << maxLoaderVersion
-                          << " and found collection version "
-                          << collAndChunks.changedChunks.back().getVersion();
-
-                    // Metadata was found remotely -- otherwise would have received
-                    // NamespaceNotFound rather than Status::OK(). Return metadata for CatalogCache
-                    // that's GTE catalogCacheSinceVersion, from the loader's persisted and enqueued
-                    // metadata.
-
-                    swCollectionAndChangedChunks =
-                        _getLoaderMetadata(opCtx, nss, catalogCacheSinceVersion, termScheduled);
-                    if (swCollectionAndChangedChunks.isOK()) {
-                        // After finding metadata remotely, we must have found metadata locally.
-                        invariant(!collAndChunks.changedChunks.empty());
-                    }
+                swCollectionAndChangedChunks =
+                    _getLoaderMetadata(opCtx, nss, catalogCacheSinceVersion, termScheduled);
+                if (swCollectionAndChangedChunks.isOK()) {
+                    // After finding metadata remotely, we must have found metadata locally.
+                    invariant(!collAndChunks.changedChunks.empty());
                 }
             }
+        }
 
-            // Complete the callbackFn work.
-            callbackFn(opCtx, std::move(swCollectionAndChangedChunks));
-            notify->set();
-        };
+        // Complete the callbackFn work.
+        callbackFn(opCtx, std::move(swCollectionAndChangedChunks));
+        notify->set();
+    };
 
     // Refresh the loader's metadata from the config server. The caller's request will
     // then be serviced from the loader's up-to-date metadata.
@@ -626,7 +631,16 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getE
     return std::make_pair(true, collAndChunks);
 }
 
-Status ShardServerCatalogCacheLoader::_scheduleTask(const NamespaceString& nss, Task task) {
+Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleTask(
+    OperationContext* opCtx, const NamespaceString& nss, Task task) {
+    Status linearizableReadStatus = waitForLinearizableReadConcern(opCtx);
+    if (!linearizableReadStatus.isOK()) {
+        return {linearizableReadStatus.code(),
+                str::stream() << "Unable to schedule routing table update because this is not the"
+                              << " majority primary and may not have the latest data. Error: "
+                              << linearizableReadStatus.reason()};
+    }
+
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     const bool wasEmpty = _taskLists[nss].empty();

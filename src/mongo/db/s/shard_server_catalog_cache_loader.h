@@ -297,12 +297,18 @@ private:
         const long long term);
 
     /**
-     * Adds 'task' to the task list for 'nss'. If this creates a new task list, then '_runTasks' is
-     * started on another thread to execute the tasks.
+     * First ensures that this server is a majority primary in the case of a replica set with two
+     * primaries: we do not want a minority primary to see majority side routing table changes for
+     * which the minority does not have the corresponding data.
+     *
+     * Then adds 'task' to the task list for 'nss'. If this creates a new task list, then
+     * '_runTasks' is started on another thread to execute the tasks.
      *
      * Only run on the shard primary.
      */
-    Status _scheduleTask(const NamespaceString& nss, Task task);
+    Status _ensureMajorityPrimaryAndScheduleTask(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 Task task);
 
     /**
      * Schedules tasks in the 'nss' task list to execute until the task list is depleted.
