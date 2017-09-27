@@ -98,6 +98,10 @@ public:
                                        const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
+        if (!authzSession->isAuthorizedToParseNamespaceElement(cmdObj.firstElement())) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+
         // Check for the listIndexes ActionType on the database, or find on system.indexes for pre
         // 3.0 systems.
         const NamespaceString ns(parseNsOrUUID(client->getOperationContext(), dbname, cmdObj));

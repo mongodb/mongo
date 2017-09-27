@@ -23,7 +23,7 @@ function testProperAuthorization(conn, t, testcase, privileges) {
     var firstDb = conn.getDB(firstDbName);
     var adminDb = conn.getDB(adminDbName);
 
-    authCommandsLib.setup(conn, t, runOnDb);
+    var state = authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
     assert.commandWorked(adminDb.runCommand({updateRole: testRole, privileges: privileges}));
@@ -32,7 +32,12 @@ function testProperAuthorization(conn, t, testcase, privileges) {
     assert(adminDb.auth(testUser, "password"));
 
     authCommandsLib.authenticatedSetup(t, runOnDb);
-    var res = runOnDb.runCommand(t.command);
+
+    var command = t.command;
+    if (typeof(command) === "function") {
+        command = t.command(state);
+    }
+    var res = runOnDb.runCommand(command);
 
     if (!testcase.expectFail && res.ok != 1 && res.code != commandNotSupportedCode) {
         // don't error if the test failed with code commandNotSupported since
@@ -56,7 +61,7 @@ function testInsufficientPrivileges(conn, t, testcase, privileges) {
     var firstDb = conn.getDB(firstDbName);
     var adminDb = conn.getDB(adminDbName);
 
-    authCommandsLib.setup(conn, t, runOnDb);
+    var state = authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
     assert.commandWorked(adminDb.runCommand({updateRole: testRole, privileges: privileges}));
@@ -65,7 +70,12 @@ function testInsufficientPrivileges(conn, t, testcase, privileges) {
     assert(adminDb.auth(testUser, "password"));
 
     authCommandsLib.authenticatedSetup(t, runOnDb);
-    var res = runOnDb.runCommand(t.command);
+
+    var command = t.command;
+    if (typeof(command) === "function") {
+        command = t.command(state);
+    }
+    var res = runOnDb.runCommand(command);
 
     if (res.ok == 1 || res.code != authErrCode) {
         out = "expected authorization failure " + " but received " + tojson(res) +

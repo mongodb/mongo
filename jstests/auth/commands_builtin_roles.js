@@ -48,10 +48,14 @@ function testProperAuthorization(conn, t, testcase, r) {
     var out = "";
 
     var runOnDb = conn.getDB(testcase.runOnDb);
-    authCommandsLib.setup(conn, t, runOnDb);
+    var state = authCommandsLib.setup(conn, t, runOnDb);
     assert(r.db.auth("user|" + r.key, "password"));
     authCommandsLib.authenticatedSetup(t, runOnDb);
-    var res = runOnDb.runCommand(t.command);
+    var command = t.command;
+    if (typeof(command) === "function") {
+        command = t.command(state);
+    }
+    var res = runOnDb.runCommand(command);
 
     if (testcase.roles[r.key]) {
         if (res.ok == 0 && res.code == authErrCode) {

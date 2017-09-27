@@ -227,6 +227,10 @@ public:
     // Checks if this connection is using the localhost bypass
     bool isUsingLocalhostBypass();
 
+    // Checks if this connection has the privileges necessary to parse a namespace from a
+    // given BSONElement.
+    bool isAuthorizedToParseNamespaceElement(const BSONElement& elem);
+
     // Checks if this connection has the privileges necessary to create a new role
     bool isAuthorizedToCreateRole(const auth::CreateOrUpdateRoleArgs& args);
 

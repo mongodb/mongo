@@ -123,12 +123,17 @@ public:
         return false;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) override {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj) override {
+        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+
+        if (!authSession->isAuthorizedToParseNamespaceElement(cmdObj.firstElement())) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+        const NamespaceString nss(parseNsOrUUID(opCtx, dbname, cmdObj));
         auto hasTerm = cmdObj.hasField(kTermField);
-        return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
+        return authSession->checkAuthForFind(nss, hasTerm);
     }
 
     Status explain(OperationContext* opCtx,

@@ -106,6 +106,7 @@
 "top",
 "touch",
 "unlock",
+"useUUID",
 "update",
 "updateRole",  # Not used for permissions checks, but to id the event in logs.
 "updateUser",  # Not used for permissions checks, but to id the event in logs.
