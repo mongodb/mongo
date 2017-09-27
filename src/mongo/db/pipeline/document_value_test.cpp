@@ -1375,10 +1375,10 @@ class TimestampToString : public ToStringBase {
 /** Coerce date to string. */
 class DateToString : public ToStringBase {
     Value value() {
-        return Value(Date_t::fromMillisSinceEpoch(1234567890LL * 1000));
+        return Value(Date_t::fromMillisSinceEpoch(1234567890123LL));
     }
     string expected() {
-        return "2009-02-13T23:31:30";
+        return "2009-02-13T23:31:30.123Z";
     }  // from js
 };
 

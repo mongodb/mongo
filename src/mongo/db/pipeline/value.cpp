@@ -57,7 +57,7 @@ using std::stringstream;
 using std::vector;
 
 namespace {
-constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S"_sd;
+constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
 }
 
 void ValueStorage::verifyRefCountingIfShould() const {

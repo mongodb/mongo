@@ -30,10 +30,6 @@ function test(date, testSynthetics) {
                 ,
                 millisecondPlusTen: {$millisecond: {$add: ['$date', 10]}}
 
-                // $substr will call coerceToString
-                ,
-                string: {$substr: ['$date', 0, 1000]}
-
                 // server-11118
                 ,
                 format: {$dateToString: {format: ISOfmt, date: '$date'}}
@@ -65,7 +61,6 @@ function test(date, testSynthetics) {
     assert.eq(res.cursor.firstBatch[0].millisecondPlusTen,
               (date.getUTCMilliseconds() + 10) % 1000,
               "millisecondPlusTen");
-    assert.eq(res.cursor.firstBatch[0].string, date.tojson().slice(9, 28), "string");
     assert.eq(res.cursor.firstBatch[0].format, date.tojson(), "format");
     assert.eq(res.cursor.firstBatch[0], {
         year: date.getUTCFullYear(),
@@ -76,7 +71,6 @@ function test(date, testSynthetics) {
         second: date.getUTCSeconds(),
         millisecond: date.getUTCMilliseconds(),
         millisecondPlusTen: ((date.getUTCMilliseconds() + 10) % 1000),
-        string: date.tojson().slice(9, 28),
         format: date.tojson()
     });
 

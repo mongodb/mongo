@@ -52,8 +52,8 @@ assertBoth(1, -1, 'ABC01234', 'abc0123');
 // String coercion.
 assertStrcasecmp(0, '1', 1);
 assertStrcasecmp(0, '1.23', 1.23);
-assertStrcasecmp(0, '1970-01-01T00:00:00', new Date(0));
-assertStrcasecmp(0, '1970-01-01t00:00:00', new Date(0));
+assertStrcasecmp(0, '1970-01-01T00:00:00.000Z', new Date(0));
+assertStrcasecmp(0, '1970-01-01t00:00:00.000Z', new Date(0));
 assertException(['abc', /abc/]);
 
 // Extended characters.
