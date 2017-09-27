@@ -242,6 +242,7 @@ private:
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+    ClockSource* const _clockSource;
 
     // Mutex to protect use of _oplogManager and _oplogManagerCount by this instance of KV
     // engine.
