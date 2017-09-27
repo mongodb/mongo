@@ -52,7 +52,7 @@ public:
         return kStageName.rawData();
     }
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

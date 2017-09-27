@@ -85,7 +85,7 @@ public:
         return Value(Document{{getSourceName(), _spec.toBSON()}});
     }
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kFirst,
                 HostTypeRequirement::kNone,

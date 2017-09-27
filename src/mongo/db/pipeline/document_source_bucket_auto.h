@@ -48,7 +48,7 @@ public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kBlocking,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

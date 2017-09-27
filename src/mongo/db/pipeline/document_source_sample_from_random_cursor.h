@@ -44,7 +44,7 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kFirst,
                 HostTypeRequirement::kAnyShard,

@@ -60,6 +60,12 @@ public:
     typedef std::list<boost::intrusive_ptr<DocumentSource>> SourceContainer;
 
     /**
+     * A SplitState specifies whether the pipeline is currently unsplit, split for the shards, or
+     * split for merging.
+     */
+    enum class SplitState { kUnsplit, kSplitForShards, kSplitForMerge };
+
+    /**
      * This class will ensure a Pipeline is disposed before it is deleted.
      */
     class Deleter {
@@ -204,11 +210,18 @@ public:
     void unsplitFromSharded(std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMergingShard);
 
     /**
+     * Returns true if this pipeline has not been split.
+     */
+    bool isUnsplit() const {
+        return _splitState == SplitState::kUnsplit;
+    }
+
+    /**
      * Returns true if this pipeline is the part of a split pipeline which should be targeted to the
      * shards.
      */
-    bool isSplitForSharded() const {
-        return _splitForSharded;
+    bool isSplitForShards() const {
+        return _splitState == SplitState::kSplitForShards;
     }
 
     /**
@@ -216,7 +229,7 @@ public:
      * merging the results from the shards.
      */
     bool isSplitForMerge() const {
-        return _splitForMerge;
+        return _splitState == SplitState::kSplitForMerge;
     }
 
     /** If the pipeline starts with a $match, return its BSON predicate.
@@ -230,15 +243,16 @@ public:
     bool needsPrimaryShardMerger() const;
 
     /**
-     * Returns whether or not every DocumentSource in the pipeline can run on mongoS.
+     * Returns true if the pipeline can run on mongoS, but is not obliged to; that is, it can run
+     * either on mongoS or on a shard.
      */
     bool canRunOnMongos() const;
 
     /**
-     * Returns whether or not every DocumentSource in the pipeline is allowed to forward from a
-     * mongos.
+     * Returns true if this pipeline must only run on mongoS. Can be called on unsplit or merge
+     * pipelines, but not on the shards part of a split pipeline.
      */
-    bool allowedToForwardFromMongos() const;
+    bool requiredToRunOnMongos() const;
 
     /**
      * Modifies the pipeline, optimizing it by combining and swapping stages.
@@ -368,6 +382,12 @@ private:
      */
     void ensureAllStagesAreInLegalPositions() const;
 
+    /**
+     * Returns Status::OK if the pipeline can run on mongoS, or an error with a message explaining
+     * why it cannot.
+     */
+    Status _pipelineCanRunOnMongoS() const;
+
     SourceContainer _sources;
 
     // When a pipeline is split via splitForSharded(), the resulting shards pipeline will set
@@ -376,9 +396,8 @@ private:
     // pipeline, if necessary.
     boost::optional<SourceContainer> _unsplitSources;
 
+    SplitState _splitState = SplitState::kUnsplit;
     boost::intrusive_ptr<ExpressionContext> pCtx;
-    bool _splitForSharded = false;
-    bool _splitForMerge = false;
     bool _disposed = false;
 };
 }  // namespace mongo

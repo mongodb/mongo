@@ -135,7 +135,7 @@ public:
     void doInjectMongoProcessInterface(std::shared_ptr<MongoProcessInterface>) final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext(OperationContext* opCtx) final;
-    StageConstraints constraints() const final;
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
 protected:
     void doDispose() final;

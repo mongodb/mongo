@@ -69,7 +69,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kBlocking,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

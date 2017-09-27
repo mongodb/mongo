@@ -101,7 +101,7 @@ public:
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,

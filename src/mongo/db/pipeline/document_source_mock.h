@@ -49,7 +49,7 @@ public:
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 
-    StageConstraints constraints() const override {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kNone,

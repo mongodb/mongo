@@ -66,7 +66,7 @@ public:
         return DocumentSourceInternalSplitPipeline::create(pExpCtx, _mergeType);
     }
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 _mergeType,

@@ -43,7 +43,7 @@ public:
     }
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kBlocking,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

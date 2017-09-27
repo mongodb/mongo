@@ -38,10 +38,13 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -50,6 +53,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/unittest/death_test.h"
 
 namespace PipelineTests {
 
@@ -1757,6 +1761,153 @@ class LookUp : public needsPrimaryShardMergerBase {
 };
 
 }  // namespace needsPrimaryShardMerger
+
+namespace mustRunOnMongoS {
+
+// Like a DocumentSourceMock, but must run on mongoS and can be used anywhere in the pipeline.
+class DocumentSourceMustRunOnMongoS : public DocumentSourceMock {
+public:
+    DocumentSourceMustRunOnMongoS() : DocumentSourceMock({}) {}
+
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        // Overrides DocumentSourceMock's required position.
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kMongoS,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
+    }
+
+    static boost::intrusive_ptr<DocumentSourceMustRunOnMongoS> create() {
+        return new DocumentSourceMustRunOnMongoS();
+    }
+};
+
+using HostTypeRequirement = DocumentSource::StageConstraints::HostTypeRequirement;
+using PipelineMustRunOnMongoSTest = AggregationContextFixture;
+
+TEST_F(PipelineMustRunOnMongoSTest, UnsplittablePipelineMustRunOnMongoS) {
+    auto expCtx = getExpCtx();
+    expCtx->inMongos = true;
+
+    auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
+    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+
+    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS}, expCtx));
+    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+
+    pipeline->optimizePipeline();
+    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+}
+
+TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowedStagePresent) {
+    auto expCtx = getExpCtx();
+
+    expCtx->allowDiskUse = true;
+    expCtx->inMongos = true;
+
+    auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
+    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto sort = DocumentSourceSort::create(expCtx, fromjson("{x: 1}"));
+
+    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS, sort}, expCtx));
+    pipeline->optimizePipeline();
+
+    // The entire pipeline must run on mongoS, but $sort cannot do so when 'allowDiskUse' is true.
+    ASSERT_THROWS_CODE(
+        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+}
+
+DEATH_TEST_F(PipelineMustRunOnMongoSTest,
+             SplittablePipelineMustMergeOnMongoSAfterSplit,
+             "invariant") {
+    auto expCtx = getExpCtx();
+    expCtx->inMongos = true;
+
+    auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
+    auto split = DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kNone);
+    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+
+    auto pipeline = uassertStatusOK(Pipeline::create({match, split, runOnMongoS}, expCtx));
+
+    // We don't need to run the entire pipeline on mongoS because we can split at
+    // $_internalSplitPipeline.
+    ASSERT_FALSE(pipeline->requiredToRunOnMongos());
+
+    auto shardPipe = pipeline->splitForSharded();
+    ASSERT(shardPipe);
+
+    // The merge half of the pipeline must run on mongoS.
+    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+
+    // Calling 'requiredToRunOnMongos' on the shard pipeline will hit an invariant.
+    shardPipe->requiredToRunOnMongos();
+}
+
+TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStagePresent) {
+    auto expCtx = getExpCtx();
+
+    expCtx->allowDiskUse = true;
+    expCtx->inMongos = true;
+
+    auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
+    auto split = DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kNone);
+    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto outSpec = fromjson("{$out: 'outcoll'}");
+    auto out = DocumentSourceOut::createFromBson(outSpec["$out"], expCtx);
+
+    auto pipeline = uassertStatusOK(Pipeline::create({match, split, runOnMongoS, out}, expCtx));
+
+    // We don't need to run the entire pipeline on mongoS because we can split at
+    // $_internalSplitPipeline.
+    ASSERT_FALSE(pipeline->requiredToRunOnMongos());
+
+    auto shardPipe = pipeline->splitForSharded();
+    ASSERT(shardPipe);
+
+    // The merge pipeline must run on mongoS, but $out needs to run on  the primary shard.
+    ASSERT_THROWS_CODE(
+        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+}
+
+TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShardSideOfSplit) {
+    auto expCtx = getExpCtx();
+    expCtx->inMongos = true;
+
+    auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
+    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto split =
+        DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kAnyShard);
+
+    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS, split}, expCtx));
+    pipeline->optimizePipeline();
+
+    // The 'runOnMongoS' stage comes before any splitpoint, so this entire pipeline must run on
+    // mongoS. However, the pipeline *cannot* run on mongoS and *must* split at
+    // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The mongoS stage would
+    // end up on the shard side of this split, and so it asserts.
+    ASSERT_THROWS_CODE(
+        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+}
+
+TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplitpointIsEligible) {
+    auto expCtx = getExpCtx();
+    expCtx->inMongos = true;
+
+    auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
+    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto split = DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kNone);
+
+    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS, split}, expCtx));
+    pipeline->optimizePipeline();
+
+    // The 'runOnMongoS' stage is before the splitpoint, so this entire pipeline must run on mongoS.
+    // In this case, the splitpoint is itself eligible to run on mongoS, and so we are able to
+    // return true.
+    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+}
+
+}  // namespace mustRunOnMongoS
 }  // namespace Sharded
 }  // namespace Optimizations
 
@@ -1790,9 +1941,14 @@ class DocumentSourceCollectionlessMock : public DocumentSourceMock {
 public:
     DocumentSourceCollectionlessMock() : DocumentSourceMock({}) {}
 
-    StageConstraints constraints() const final {
-        auto constraints = DocumentSourceMock::constraints();
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kFirst,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed);
         constraints.isIndependentOfAnyCollection = true;
+        constraints.requiresInputDocSource = false;
         return constraints;
     }
 
@@ -1905,7 +2061,7 @@ class DocumentSourceDependencyDummy : public DocumentSourceMock {
 public:
     DocumentSourceDependencyDummy() : DocumentSourceMock({}) {}
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         // Overrides DocumentSourceMock's required position.
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,

@@ -50,7 +50,7 @@ public:
 
     const char* getSourceName() const override;
 
-    StageConstraints constraints() const override {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

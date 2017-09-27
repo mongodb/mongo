@@ -62,7 +62,7 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(
             _mergingPresorted ? StreamType::kStreaming : StreamType::kBlocking,
             PositionRequirement::kNone,

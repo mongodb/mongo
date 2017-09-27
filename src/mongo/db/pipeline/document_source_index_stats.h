@@ -69,7 +69,7 @@ public:
     const char* getSourceName() const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kAnyShard,

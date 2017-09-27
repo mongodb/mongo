@@ -42,10 +42,8 @@ RouterStagePipeline::RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
                                          std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline)
     : RouterExecStage(mergePipeline->getContext()->opCtx),
       _mergePipeline(std::move(mergePipeline)),
-      _mongosOnly(!_mergePipeline->allowedToForwardFromMongos()) {
-    if (_mongosOnly) {
-        invariant(_mergePipeline->canRunOnMongos());
-    } else {
+      _mongosOnlyPipeline(!_mergePipeline->isSplitForMerge()) {
+    if (!_mongosOnlyPipeline) {
         // Add an adapter to the front of the pipeline to draw results from 'child'.
         _routerAdapter =
             DocumentSourceRouterAdapter::create(_mergePipeline->getContext(), std::move(child)),
@@ -84,7 +82,7 @@ void RouterStagePipeline::kill(OperationContext* opCtx) {
 }
 
 bool RouterStagePipeline::remotesExhausted() {
-    return _mongosOnly || _routerAdapter->remotesExhausted();
+    return _mongosOnlyPipeline || _routerAdapter->remotesExhausted();
 }
 
 Status RouterStagePipeline::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {

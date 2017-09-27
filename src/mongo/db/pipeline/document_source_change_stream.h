@@ -165,7 +165,7 @@ public:
 
     const char* getSourceName() const final;
 
-    StageConstraints constraints() const final;
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 

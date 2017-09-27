@@ -57,12 +57,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
 
             auto mergeTypeString = elt.valueStringData();
 
-            if ("anyShard"_sd == mergeTypeString) {
+            if ("localOnly"_sd == mergeTypeString) {
+                mergeType = HostTypeRequirement::kLocalOnly;
+            } else if ("anyShard"_sd == mergeTypeString) {
                 mergeType = HostTypeRequirement::kAnyShard;
             } else if ("primaryShard"_sd == mergeTypeString) {
                 mergeType = HostTypeRequirement::kPrimaryShard;
             } else if ("mongos"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kNone;
+                mergeType = HostTypeRequirement::kMongoS;
             } else {
                 uasserted(ErrorCodes::BadValue,
                           str::stream() << "unrecognized field while parsing mergeType: '"
@@ -98,12 +100,23 @@ Value DocumentSourceInternalSplitPipeline::serialize(
             mergeTypeString = "primaryShard";
             break;
 
-        default:
+        case HostTypeRequirement::kLocalOnly:
+            mergeTypeString = "localOnly";
+            break;
+
+        case HostTypeRequirement::kMongoS:
             mergeTypeString = "mongos";
+            break;
+
+        case HostTypeRequirement::kNone:
+        default:
             break;
     }
 
-    return Value(Document{{getSourceName(), Value{Document{{"mergeType", mergeTypeString}}}}});
+    return Value(
+        Document{{getSourceName(),
+                  Value{Document{{"mergeType",
+                                  mergeTypeString.empty() ? Value() : Value(mergeTypeString)}}}}});
 }
 
 }  // namesace mongo

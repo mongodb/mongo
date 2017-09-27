@@ -60,7 +60,7 @@ public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kAnyShard,
@@ -95,10 +95,13 @@ public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        // This stage should never be in the shards part of a split pipeline.
+        invariant(pipeState != Pipeline::SplitState::kSplitForShards);
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                HostTypeRequirement::kNone,
+                (pipeState == Pipeline::SplitState::kUnsplit ? HostTypeRequirement::kNone
+                                                             : HostTypeRequirement::kMongoS),
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed};
     }

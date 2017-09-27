@@ -61,7 +61,7 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, {kFullDocumentFieldName.toString()}, {}};
     }
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kAnyShard,

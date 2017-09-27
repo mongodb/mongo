@@ -68,7 +68,7 @@ private:
             const boost::intrusive_ptr<ExpressionContext>& expCtx,
             std::unique_ptr<RouterExecStage> childStage);
 
-        StageConstraints constraints() const final {
+        StageConstraints constraints(Pipeline::SplitState pipeState) const final {
             return {StreamType::kStreaming,
                     PositionRequirement::kFirst,
                     HostTypeRequirement::kNone,
@@ -97,7 +97,7 @@ private:
 
     boost::intrusive_ptr<DocumentSourceRouterAdapter> _routerAdapter;
     std::unique_ptr<Pipeline, Pipeline::Deleter> _mergePipeline;
-    bool _mongosOnly;
+    bool _mongosOnlyPipeline;
 };
 
 }  // namespace mongo

@@ -131,11 +131,19 @@ public:
 
     /**
      * A struct describing various constraints about where this stage can run, where it must be in
-     * the pipeline, and things like that.
+     * the pipeline, what resources it may require, etc.
      */
     struct StageConstraints {
         /**
-         * A Position describes a requirement of the position of the stage within the pipeline.
+         * A StreamType defines whether this stage is streaming (can produce output based solely on
+         * the current input document) or blocking (must examine subsequent documents before
+         * producing an output document).
+         */
+        enum class StreamType { kStreaming, kBlocking };
+
+        /**
+         * A PositionRequirement stipulates what specific position the stage must occupy within the
+         * pipeline, if any.
          */
         enum class PositionRequirement { kNone, kFirst, kLast };
 
@@ -143,13 +151,25 @@ public:
          * A HostTypeRequirement defines where this stage is permitted to be executed when the
          * pipeline is run on a sharded cluster.
          */
-        enum class HostTypeRequirement { kNone, kPrimaryShard, kAnyShard };
+        enum class HostTypeRequirement {
+            // Indicates that the stage can run either on mongoD or mongoS.
+            kNone,
+            // Indicates that the stage must run on the host to which it was originally sent and
+            // cannot be forwarded from mongoS to the shards.
+            kLocalOnly,
+            // Indicates that the stage must run on the primary shard.
+            kPrimaryShard,
+            // Indicates that the stage must run on any participating shard.
+            kAnyShard,
+            // Indicates that the stage can only run on mongoS.
+            kMongoS,
+        };
 
         /**
-         * A DiskUseRequirement indicates whether this stage writes to disk, or whether it may spill
-         * to disk if its memory usage exceeds a given threshold. Note that this only indicates the
-         * *ability* of the stage to spill; if 'allowDiskUse' is set to false, it will be prevented
-         * from doing so.
+         * A DiskUseRequirement indicates whether this stage writes permanent data to disk, or
+         * whether it may spill temporary data to disk if its memory usage exceeds a given
+         * threshold. Note that this only indicates that the stage has the ability to spill; if
+         * 'allowDiskUse' is set to false, it will be prevented from doing so.
          */
         enum class DiskUseRequirement { kNoDiskUse, kWritesTmpData, kWritesPersistentData };
 
@@ -157,13 +177,6 @@ public:
          * A FacetRequirement indicates whether this stage may be used within a $facet pipeline.
          */
         enum class FacetRequirement { kAllowed, kNotAllowed };
-
-        /**
-         * A StreamType defines whether this stage is streaming (can produce output based solely on
-         * the current input document) or blocking (must examine subsequent documents before
-         * producing an output document).
-         */
-        enum class StreamType { kStreaming, kBlocking };
 
         StageConstraints(StreamType streamType,
                          PositionRequirement requiredPosition,
@@ -179,6 +192,32 @@ public:
             // position requirements.
             invariant(!isAllowedInsideFacetStage() ||
                       requiredPosition == PositionRequirement::kNone);
+        }
+
+        /**
+         * Returns the literal HostTypeRequirement used to initialize the StageConstraints, or the
+         * effective HostTypeRequirement (kAnyShard or kMongoS) if kLocalOnly was specified.
+         */
+        HostTypeRequirement resolvedHostTypeRequirement(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+            return (hostRequirement != HostTypeRequirement::kLocalOnly
+                        ? hostRequirement
+                        : (expCtx->inMongos ? HostTypeRequirement::kMongoS
+                                            : HostTypeRequirement::kAnyShard));
+        }
+
+        /**
+         * True if this stage must run on the same host to which it was originally sent.
+         */
+        bool mustRunLocally() const {
+            return hostRequirement == HostTypeRequirement::kLocalOnly;
+        }
+
+        /**
+         * True if this stage should be permitted to run in a $facet pipeline.
+         */
+        bool isAllowedInsideFacetStage() const {
+            return facetRequirement == FacetRequirement::kAllowed;
         }
 
         // Indicates whether this stage needs to be at a particular position in the pipeline.
@@ -202,11 +241,6 @@ public:
         // input DocumentSource (via 'pSource').
         bool requiresInputDocSource = true;
 
-        // True if this stage should be permitted to run in a $facet pipeline.
-        bool isAllowedInsideFacetStage() const {
-            return facetRequirement == FacetRequirement::kAllowed;
-        }
-
         // True if this stage operates on a global or database level, like $currentOp.
         bool isIndependentOfAnyCollection = false;
 
@@ -217,11 +251,6 @@ public:
         // must also override getModifiedPaths() to provide information about which particular
         // $match predicates be swapped before itself.
         bool canSwapWithMatch = false;
-
-        // Extends HostTypeRequirement::kAnyShardOrMongos to indicate that a document source
-        // must run on whatever node initially received the pipeline.
-        // This can be a mongod directly, but mongos must not forward to a mongod.
-        bool allowedToForwardFromMongos = true;
     };
 
     using HostTypeRequirement = StageConstraints::HostTypeRequirement;
@@ -322,9 +351,11 @@ public:
 
     /**
      * Returns a struct containing information about any special constraints imposed on using this
-     * stage.
+     * stage. Input parameter Pipeline::SplitState is used by stages whose requirements change
+     * depending on whether they are in a split or unsplit pipeline.
      */
-    virtual StageConstraints constraints() const = 0;
+    virtual StageConstraints constraints(
+        Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const = 0;
 
     /**
      * Informs the stage that it is no longer needed and can release its resources. After dispose()

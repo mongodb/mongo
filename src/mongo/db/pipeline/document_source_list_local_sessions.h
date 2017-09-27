@@ -93,15 +93,14 @@ public:
         return Value(Document{{getSourceName(), _spec.toBSON()}});
     }
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kNone,
+                                     HostTypeRequirement::kLocalOnly,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed);
 
         constraints.isIndependentOfAnyCollection = true;
-        constraints.allowedToForwardFromMongos = false;
         constraints.requiresInputDocSource = false;
         return constraints;
     }

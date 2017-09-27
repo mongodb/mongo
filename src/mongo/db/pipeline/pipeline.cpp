@@ -147,7 +147,7 @@ void Pipeline::validatePipeline() const {
         const auto firstStage = _sources.front().get();
 
         if (nss.isCollectionlessAggregateNS() &&
-            !firstStage->constraints().isIndependentOfAnyCollection) {
+            !firstStage->constraints(_splitState).isIndependentOfAnyCollection) {
             uasserted(ErrorCodes::InvalidNamespace,
                       str::stream() << "{aggregate: 1} is not valid for '"
                                     << firstStage->getSourceName()
@@ -155,7 +155,7 @@ void Pipeline::validatePipeline() const {
         }
 
         if (!nss.isCollectionlessAggregateNS() &&
-            firstStage->constraints().isIndependentOfAnyCollection) {
+            firstStage->constraints(_splitState).isIndependentOfAnyCollection) {
             uasserted(ErrorCodes::InvalidNamespace,
                       str::stream() << "'" << firstStage->getSourceName()
                                     << "' can only be run with {aggregate: 1}");
@@ -170,8 +170,9 @@ void Pipeline::validateFacetPipeline() const {
     if (_sources.empty()) {
         uasserted(ErrorCodes::BadValue, "sub-pipeline in $facet stage cannot be empty");
     }
+
     for (auto&& stage : _sources) {
-        auto stageConstraints = stage->constraints();
+        auto stageConstraints = stage->constraints(_splitState);
         if (!stageConstraints.isAllowedInsideFacetStage()) {
             uasserted(40600,
                       str::stream() << stage->getSourceName()
@@ -191,7 +192,10 @@ void Pipeline::validateFacetPipeline() const {
 void Pipeline::ensureAllStagesAreInLegalPositions() const {
     size_t i = 0;
     for (auto&& stage : _sources) {
-        if (stage->constraints().requiredPosition == PositionRequirement::kFirst && i != 0) {
+        auto constraints = stage->constraints(_splitState);
+
+        // Verify that all stages adhere to their PositionRequirement constraints.
+        if (constraints.requiredPosition == PositionRequirement::kFirst && i != 0) {
             uasserted(40602,
                       str::stream() << stage->getSourceName()
                                     << " is only valid as the first stage in a pipeline.");
@@ -201,13 +205,18 @@ void Pipeline::ensureAllStagesAreInLegalPositions() const {
             uasserted(17313, "$match with $text is only allowed as the first pipeline stage");
         }
 
-        if (stage->constraints().requiredPosition == PositionRequirement::kLast &&
+        if (constraints.requiredPosition == PositionRequirement::kLast &&
             i != _sources.size() - 1) {
             uasserted(40601,
                       str::stream() << stage->getSourceName()
                                     << " can only be the final stage in the pipeline");
         }
         ++i;
+
+        // Verify that we are not attempting to run a mongoS-only stage on mongoD.
+        uassert(40644,
+                str::stream() << stage->getSourceName() << " can only be run on mongoS",
+                !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inMongos));
     }
 }
 
@@ -287,8 +296,8 @@ void Pipeline::dispose(OperationContext* opCtx) {
 }
 
 std::unique_ptr<Pipeline, Pipeline::Deleter> Pipeline::splitForSharded() {
-    invariant(!_splitForSharded);
-    invariant(!_splitForMerge);
+    invariant(!isSplitForShards());
+    invariant(!isSplitForMerge());
     invariant(!_unsplitSources);
 
     // Create and initialize the shard spec we'll return. We start with an empty pipeline on the
@@ -307,8 +316,8 @@ std::unique_ptr<Pipeline, Pipeline::Deleter> Pipeline::splitForSharded() {
     Optimizations::Sharded::moveFinalUnwindFromShardsToMerger(shardPipeline.get(), this);
     Optimizations::Sharded::limitFieldsSentFromShardsToMerger(shardPipeline.get(), this);
 
-    shardPipeline->_splitForSharded = true;
-    _splitForMerge = true;
+    shardPipeline->_splitState = SplitState::kSplitForShards;
+    _splitState = SplitState::kSplitForMerge;
 
     stitch();
 
@@ -317,8 +326,8 @@ std::unique_ptr<Pipeline, Pipeline::Deleter> Pipeline::splitForSharded() {
 
 void Pipeline::unsplitFromSharded(
     std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMergingShard) {
-    invariant(_splitForSharded);
-    invariant(!_splitForMerge);
+    invariant(isSplitForShards());
+    invariant(!isSplitForMerge());
     invariant(pipelineForMergingShard);
     invariant(_unsplitSources);
 
@@ -332,7 +341,7 @@ void Pipeline::unsplitFromSharded(
     _sources = *_unsplitSources;
     _unsplitSources.reset();
 
-    _splitForSharded = false;
+    _splitState = SplitState::kUnsplit;
 
     stitch();
 }
@@ -430,31 +439,44 @@ BSONObj Pipeline::getInitialQuery() const {
 }
 
 bool Pipeline::needsPrimaryShardMerger() const {
-    return std::any_of(_sources.begin(), _sources.end(), [](const auto& stage) {
-        return stage->constraints().hostRequirement == HostTypeRequirement::kPrimaryShard;
+    return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
+        return stage->constraints(_splitState).hostRequirement ==
+            HostTypeRequirement::kPrimaryShard;
     });
 }
 
 bool Pipeline::canRunOnMongos() const {
-    return std::all_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
-        auto constraints = stage->constraints();
-        const bool doesNotNeedShard = (constraints.hostRequirement == HostTypeRequirement::kNone);
-        const bool doesNotNeedDisk =
-            (constraints.diskRequirement == DiskUseRequirement::kNoDiskUse ||
-             (constraints.diskRequirement == DiskUseRequirement::kWritesTmpData &&
-              !pCtx->allowDiskUse));
-        const bool doesNotBlockOrBlockingIsPermitted =
-            (constraints.streamType == StreamType::kStreaming ||
-             !internalQueryProhibitBlockingMergeOnMongoS.load());
-
-        return doesNotNeedShard && doesNotNeedDisk && doesNotBlockOrBlockingIsPermitted;
-    });
+    return _pipelineCanRunOnMongoS().isOK();
 }
 
-bool Pipeline::allowedToForwardFromMongos() const {
-    return std::all_of(_sources.begin(), _sources.end(), [](const auto& stage) {
-        return stage->constraints().allowedToForwardFromMongos;
-    });
+bool Pipeline::requiredToRunOnMongos() const {
+    invariant(!isSplitForShards());
+
+    for (auto&& stage : _sources) {
+        // If this pipeline is capable of splitting before the mongoS-only stage, then the pipeline
+        // as a whole is not required to run on mongoS.
+        if (isUnsplit() && dynamic_cast<SplittableDocumentSource*>(stage.get())) {
+            return false;
+        }
+
+        auto hostRequirement = stage->constraints(_splitState).resolvedHostTypeRequirement(pCtx);
+
+        // If a mongoS-only stage occurs before a splittable stage, or if the pipeline is already
+        // split, this entire pipeline must run on mongoS.
+        if (hostRequirement == HostTypeRequirement::kMongoS) {
+            // Verify that the remainder of this pipeline can run on mongoS.
+            auto mongosRunStatus = _pipelineCanRunOnMongoS();
+
+            uassert(mongosRunStatus.code(),
+                    str::stream() << stage->getSourceName() << " must run on mongoS, but "
+                                  << mongosRunStatus.reason(),
+                    mongosRunStatus.isOK());
+
+            return true;
+        }
+    }
+
+    return false;
 }
 
 std::vector<NamespaceString> Pipeline::getInvolvedCollections() const {
@@ -589,6 +611,51 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
     }
 
     return deps;
+}
+
+Status Pipeline::_pipelineCanRunOnMongoS() const {
+    for (auto&& stage : _sources) {
+        auto constraints = stage->constraints(_splitState);
+        auto hostRequirement = constraints.resolvedHostTypeRequirement(pCtx);
+
+        const bool needsShard = (hostRequirement == HostTypeRequirement::kAnyShard ||
+                                 hostRequirement == HostTypeRequirement::kPrimaryShard);
+
+        const bool mustWriteToDisk =
+            (constraints.diskRequirement == DiskUseRequirement::kWritesPersistentData);
+        const bool mayWriteTmpDataAndDiskUseIsAllowed =
+            (pCtx->allowDiskUse &&
+             constraints.diskRequirement == DiskUseRequirement::kWritesTmpData);
+        const bool needsDisk = (mustWriteToDisk || mayWriteTmpDataAndDiskUseIsAllowed);
+
+        const bool needsToBlock = (constraints.streamType == StreamType::kBlocking);
+        const bool blockingIsPermitted = !internalQueryProhibitBlockingMergeOnMongoS.load();
+
+        // If nothing prevents this stage from running on mongoS, continue to the next stage.
+        if (!needsShard && !needsDisk && (!needsToBlock || blockingIsPermitted)) {
+            continue;
+        }
+
+        // Otherwise, return an error with an explanation.
+        StringBuilder ss;
+        ss << stage->getSourceName();
+
+        if (needsShard) {
+            ss << " must run on a shard";
+        } else if (needsToBlock && !blockingIsPermitted) {
+            ss << " is a blocking stage; running these stages on mongoS is disabled";
+        } else if (mustWriteToDisk) {
+            ss << " must write to disk";
+        } else if (mayWriteTmpDataAndDiskUseIsAllowed) {
+            ss << " may write to disk when 'allowDiskUse' is enabled";
+        } else {
+            MONGO_UNREACHABLE;
+        }
+
+        return {ErrorCodes::IllegalOperation, ss.str()};
+    }
+
+    return Status::OK();
 }
 
 boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithCriteria(

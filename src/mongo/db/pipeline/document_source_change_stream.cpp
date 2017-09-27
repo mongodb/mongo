@@ -96,7 +96,8 @@ const char* DocumentSourceOplogMatch::getSourceName() const {
     return DocumentSourceChangeStream::kStageName.rawData();
 }
 
-DocumentSource::StageConstraints DocumentSourceOplogMatch::constraints() const {
+DocumentSource::StageConstraints DocumentSourceOplogMatch::constraints(
+    Pipeline::SplitState pipeState) const {
     return {StreamType::kStreaming,
             PositionRequirement::kFirst,
             HostTypeRequirement::kAnyShard,
@@ -143,10 +144,13 @@ public:
         return "$changeStream";
     }
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        // This stage should never be in the shards part of a split pipeline.
+        invariant(pipeState != Pipeline::SplitState::kSplitForShards);
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                HostTypeRequirement::kNone,
+                (pipeState == Pipeline::SplitState::kUnsplit ? HostTypeRequirement::kNone
+                                                             : HostTypeRequirement::kMongoS),
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed};
     }

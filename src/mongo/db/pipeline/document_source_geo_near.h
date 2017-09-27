@@ -48,7 +48,7 @@ public:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kAnyShard,

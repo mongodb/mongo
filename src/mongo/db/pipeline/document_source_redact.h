@@ -40,7 +40,7 @@ public:
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

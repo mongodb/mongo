@@ -98,7 +98,7 @@ Status appendExplainResults(
     const std::unique_ptr<Pipeline, Pipeline::Deleter>& pipelineForTargetedShards,
     const std::unique_ptr<Pipeline, Pipeline::Deleter>& pipelineForMerging,
     BSONObjBuilder* result) {
-    if (pipelineForTargetedShards->isSplitForSharded()) {
+    if (pipelineForTargetedShards->isSplitForShards()) {
         *result << "mergeType"
                 << (pipelineForMerging->canRunOnMongos()
                         ? "mongos"
@@ -196,7 +196,7 @@ BSONObj createCommandForTargetedShards(
         targetedCmd[AggregationRequest::kPipelineName] =
             Value(pipelineForTargetedShards->serialize());
 
-        if (pipelineForTargetedShards->isSplitForSharded()) {
+        if (pipelineForTargetedShards->isSplitForShards()) {
             targetedCmd[AggregationRequest::kNeedsMergeName] = Value(true);
             targetedCmd[AggregationRequest::kCursorName] =
                 Value(DOC(AggregationRequest::kBatchSizeName << 0));
@@ -204,7 +204,7 @@ BSONObj createCommandForTargetedShards(
     }
 
     // If this pipeline is not split, ensure that the write concern is propagated if present.
-    if (!pipelineForTargetedShards || !pipelineForTargetedShards->isSplitForSharded()) {
+    if (!pipelineForTargetedShards || !pipelineForTargetedShards->isSplitForShards()) {
         targetedCmd["writeConcern"] = Value(originalCmdObj["writeConcern"]);
     }
 
@@ -431,10 +431,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
 
-    // If this pipeline is on an unsharded collection,
-    // is allowed to be forwarded on to shards,
-    // and doesn't need transformation via DocumentSoruce::serialize(),
-    // then go ahead and pass it through to the owning shard unmodified.
+    // If this pipeline is on an unsharded collection, is allowed to be forwarded on to shards, and
+    // doesn't need transformation via DocumentSoruce::serialize(), then go ahead and pass it
+    // through to the owning shard unmodified.
     if (!executionNsRoutingInfo.cm() && !namespaces.executionNss.isCollectionlessAggregateNS() &&
         liteParsedPipeline.allowedToForwardFromMongos() &&
         liteParsedPipeline.allowedToPassthroughFromMongos()) {
@@ -469,11 +468,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), mergeCtx));
     pipeline->optimizePipeline();
 
-    if (!liteParsedPipeline.allowedToForwardFromMongos()) {
-        // Pipeline must be run locally.
-        uassert(40567,
-                "Aggregation pipeline contains both mongos-only and non-mongos stages",
-                pipeline->canRunOnMongos());
+    // Check whether the entire pipeline must be run on mongoS.
+    if (pipeline->requiredToRunOnMongos()) {
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Aggregation pipeline must be run on mongoS, but "
+                              << pipeline->getSources().front()->getSourceName()
+                              << " is not capable of producing input",
+                !pipeline->getSources().front()->constraints().requiresInputDocSource);
+
         auto cursorResponse = establishMergingMongosCursor(
             opCtx, request, namespaces.requestedNss, std::move(pipeline), {});
         Command::filterCommandReplyForPassthrough(cursorResponse, result);
@@ -528,7 +530,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             (shardIds.size() > 1u ||
              (needsPrimaryShardMerge && *(shardIds.begin()) != executionNsRoutingInfo.primaryId()));
 
-        const bool isSplit = pipelineForTargetedShards->isSplitForSharded();
+        const bool isSplit = pipelineForTargetedShards->isSplitForShards();
 
         // If we have to run on multiple shards and the pipeline is not yet split, split it. If we
         // can run on a single shard and the pipeline is already split, reassemble it.
@@ -607,7 +609,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     invariant(cursors.size() > 0);
 
     // If we dispatched to a single shard, store the remote cursor and return immediately.
-    if (!pipelineForTargetedShards->isSplitForSharded()) {
+    if (!pipelineForTargetedShards->isSplitForShards()) {
         invariant(cursors.size() == 1);
         auto executorPool = Grid::get(opCtx)->getExecutorPool();
         const BSONObj reply = uassertStatusOK(storePossibleCursor(
@@ -625,8 +627,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // If we reach here, we have a merge pipeline to dispatch.
     invariant(pipelineForMerging);
 
-    // First, check whether we can merge on the mongoS.
-    if (!internalQueryProhibitMergingOnMongoS.load() && pipelineForMerging->canRunOnMongos()) {
+    // First, check whether we can merge on the mongoS. If the merge pipeline MUST run on mongoS,
+    // then ignore the internalQueryProhibitMergingOnMongoS parameter.
+    if (pipelineForMerging->requiredToRunOnMongos() ||
+        (!internalQueryProhibitMergingOnMongoS.load() && pipelineForMerging->canRunOnMongos())) {
         // Register the new mongoS cursor, and retrieve the initial batch of results.
         auto cursorResponse = establishMergingMongosCursor(opCtx,
                                                            request,

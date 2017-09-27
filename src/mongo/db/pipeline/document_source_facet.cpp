@@ -239,7 +239,8 @@ void DocumentSourceFacet::doReattachToOperationContext(OperationContext* opCtx) 
     }
 }
 
-DocumentSource::StageConstraints DocumentSourceFacet::constraints() const {
+DocumentSource::StageConstraints DocumentSourceFacet::constraints(
+    Pipeline::SplitState pipeState) const {
     const bool mayUseDisk = std::any_of(_facets.begin(), _facets.end(), [&](const auto& facet) {
         const auto sources = facet.pipeline->getSources();
         return std::any_of(sources.begin(), sources.end(), [&](const auto source) {

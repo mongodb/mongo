@@ -49,7 +49,7 @@ public:
         return kStageName.rawData();
     }
 
-    StageConstraints constraints() const {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const {
         StageConstraints constraints(StreamType::kStreaming,
                                      _cache->isServing() ? PositionRequirement::kFirst
                                                          : PositionRequirement::kNone,

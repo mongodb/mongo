@@ -95,7 +95,7 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final;
 
-    StageConstraints constraints() const final {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         const bool mayUseDisk = wasConstructedWithPipelineSyntax() &&
             std::any_of(_parsedIntrospectionPipeline->getSources().begin(),
                         _parsedIntrospectionPipeline->getSources().end(),
