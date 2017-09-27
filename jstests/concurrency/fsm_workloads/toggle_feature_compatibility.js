@@ -10,19 +10,29 @@
 var $config = (function() {
 
     var states = (function() {
-
         function init(db, collName) {
+            this.isInFeatureCompatibilityVersion36 = true;
         }
 
-        function featureCompatibilityVersion34(db, collName) {
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
-        }
-
-        function featureCompatibilityVersion36(db, collName) {
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
+        function flipFeatureCompatibilityVersion(db, data) {
+            data.isInFeatureCompatibilityVersion36 = !data.isInFeatureCompatibilityVersion36;
+            const newFeatureCompatibilityVersion =
+                data.isInFeatureCompatibilityVersion36 ? "3.6" : "3.4";
+            assert.commandWorked(
+                db.adminCommand({setFeatureCompatibilityVersion: newFeatureCompatibilityVersion}));
         }
 
         function insertAndUpdate(db, collName) {
+            // The desired behavior is to have one thread constantly executing
+            // flipFeatureCompatibilityVersion() and all the other threads
+            // constantly executing insertAndUpdate(). Since we can't explicitly
+            // set the state for each thread, we just have one transition
+            // function that changes behavior based on which thread it is in.
+            if (this.tid == 0) {
+                flipFeatureCompatibilityVersion(db, this);
+                return;
+            }
+
             let insertID = Random.randInt(1000000000);
             let res = db[collName].insert({_id: insertID});
 
@@ -32,30 +42,19 @@ var $config = (function() {
             assert.writeOK(db[collName].update({_id: insertID}, {$set: {b: 1, a: 1}}));
         }
 
-        return {
-            init: init,
-            featureCompatibilityVersion34: featureCompatibilityVersion34,
-            featureCompatibilityVersion36: featureCompatibilityVersion36,
-            insertAndUpdate: insertAndUpdate
-        };
+        return {init: init, insertAndUpdate: insertAndUpdate};
 
     })();
 
-    var transitions = {
-        init: {featureCompatibilityVersion34: 0.5, insertAndUpdate: 0.5},
-        featureCompatibilityVersion34: {featureCompatibilityVersion36: 1},
-        featureCompatibilityVersion36: {featureCompatibilityVersion34: 1},
-        insertAndUpdate: {insertAndUpdate: 1}
-    };
+    var transitions = {init: {insertAndUpdate: 1}, insertAndUpdate: {insertAndUpdate: 1}};
 
     function teardown(db, collName, cluster) {
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
-        assertWhenOwnColl(db[collName].drop());
     }
 
     return {
         threadCount: 8,
-        iterations: 1000,
+        iterations: 5000,
         data: null,
         states: states,
         transitions: transitions,
