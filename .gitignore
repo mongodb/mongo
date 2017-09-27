@@ -153,3 +153,6 @@ CMakeLists.txt
 DriverInclude.wxs
 
 compile_commands.json
+
+# Rietveld code review config
+codereview.rc
