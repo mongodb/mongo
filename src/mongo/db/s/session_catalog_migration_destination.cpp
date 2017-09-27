@@ -201,6 +201,7 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
  */
 ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                                        const BSONObj& oplogBSON,
+                                       // const Timestamp& prePostImageTs,
                                        const ProcessOplogResult& lastResult) {
     ProcessOplogResult result;
     auto oplogEntry = parseOplog(oplogBSON);
@@ -239,14 +240,9 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     const auto& sessionInfo = oplogEntry.getOperationSessionInfo();
     result.sessionId = sessionInfo.getSessionId().value();
     result.txnNum = sessionInfo.getTxnNumber().value();
-    const auto stmtId = *oplogEntry.getStatementId();
 
     auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, result.sessionId);
     scopedSession->beginTxn(opCtx, result.txnNum);
-
-    if (scopedSession->checkStatementExecuted(opCtx, result.txnNum, stmtId)) {
-        return lastResult;
-    }
 
     BSONObj object(result.isPrePostImage
                        ? oplogEntry.getObject()
@@ -254,47 +250,40 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     auto oplogLink = extractPrePostImageTs(lastResult, oplogEntry);
     oplogLink.prevTs = scopedSession->getLastWriteOpTimeTs(result.txnNum);
 
-    writeConflictRetry(
-        opCtx,
-        "SessionOplogMigration",
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        [&] {
-            // Need to take global lock here so repl::logOp will not unlock it and trigger the
-            // invariant that disallows unlocking global lock while inside a WUOW.
-            // Grab a DBLock here instead of plain GlobalLock to make sure the MMAPV1 flush
-            // lock will be lock/unlocked correctly. Take the transaction table db lock to
-            // ensure the same lock ordering with normal replicated updates to the table.
-            Lock::DBLock lk(
-                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
-            WriteUnitOfWork wunit(opCtx);
+    writeConflictRetry(opCtx,
+                       "SessionOplogMigration",
+                       NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       [&] {
+                           Lock::GlobalLock globalLock(opCtx, MODE_IX, UINT_MAX);
+                           WriteUnitOfWork wunit(opCtx);
 
-            result.oplogTime = repl::logOp(opCtx,
-                                           "n",
-                                           oplogEntry.getNamespace(),
-                                           oplogEntry.getUuid(),
-                                           object,
-                                           &object2,
-                                           true,
-                                           sessionInfo,
-                                           stmtId,
-                                           oplogLink);
+                           result.oplogTime = repl::logOp(opCtx,
+                                                          "n",
+                                                          oplogEntry.getNamespace(),
+                                                          oplogEntry.getUuid(),
+                                                          object,
+                                                          &object2,
+                                                          true,
+                                                          sessionInfo,
+                                                          *oplogEntry.getStatementId(),
+                                                          oplogLink);
 
-            auto oplogTs = result.oplogTime.getTimestamp();
-            uassert(40633,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << oplogEntry.getOpTime().toString()
-                                  << ": "
-                                  << redact(oplogBSON),
-                    !oplogTs.isNull());
+                           auto oplogTs = result.oplogTime.getTimestamp();
+                           uassert(40633,
+                                   str::stream()
+                                       << "Failed to create new oplog entry for oplog with opTime: "
+                                       << oplogEntry.getOpTime().toString()
+                                       << ": "
+                                       << redact(oplogBSON),
+                                   !oplogTs.isNull());
 
-            // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post image, because
-            // the next oplog will contain the real operation.
-            if (!result.isPrePostImage) {
-                scopedSession->onWriteOpCompletedOnPrimary(opCtx, result.txnNum, {stmtId}, oplogTs);
-            }
+                           if (!result.isPrePostImage) {
+                               scopedSession->onWriteOpCompletedOnPrimary(
+                                   opCtx, result.txnNum, {*oplogEntry.getStatementId()}, oplogTs);
+                           }
 
-            wunit.commit();
-        });
+                           wunit.commit();
+                       });
 
     return result;
 }
@@ -318,7 +307,6 @@ void SessionCatalogMigrationDestination::start(ServiceContext* service) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         invariant(_state == State::NotStarted);
         _state = State::Migrating;
-        _isStateChanged.notify_all();
     }
 
     _thread = stdx::thread(stdx::bind(
@@ -328,7 +316,6 @@ void SessionCatalogMigrationDestination::start(ServiceContext* service) {
 void SessionCatalogMigrationDestination::finish() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _state = State::Committing;
-    _isStateChanged.notify_all();
 }
 
 void SessionCatalogMigrationDestination::join() {
@@ -358,7 +345,6 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
 
     // Timestamp prePostImageTs;
     ProcessOplogResult lastResult;
-    repl::OpTime lastOpTimeWaited;
 
     while (true) {
         {
@@ -395,17 +381,8 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                     // Note: only transition to "ready to commit" if state is not error/force stop.
                     if (_state == State::Migrating) {
                         _state = State::ReadyToCommit;
-                        _isStateChanged.notify_all();
                     }
                 }
-
-                if (lastOpTimeWaited == lastResult.oplogTime) {
-                    // We got an empty result at least twice in a row from the source shard so
-                    // space it out a little bit so we don't hammer the shard.
-                    opCtx->sleepFor(Milliseconds(200));
-                }
-
-                lastOpTimeWaited = lastResult.oplogTime;
             }
 
             while (oplogIter.more()) {
@@ -434,7 +411,6 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _state = State::Done;
-        _isStateChanged.notify_all();
     }
 }
 
@@ -447,24 +423,11 @@ void SessionCatalogMigrationDestination::_errorOccurred(StringData errMsg) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _state = State::ErrorOccurred;
     _errMsg = errMsg.toString();
-
-    _isStateChanged.notify_all();
 }
 
 SessionCatalogMigrationDestination::State SessionCatalogMigrationDestination::getState() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _state;
-}
-
-void SessionCatalogMigrationDestination::forceFail(std::string& errMsg) {
-    _errorOccurred(errMsg);
-}
-
-void SessionCatalogMigrationDestination::waitUntilReadyToCommit(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    while (_state == State::Migrating) {
-        opCtx->waitForConditionOrInterrupt(_isStateChanged, lk);
-    }
 }
 
 }  // namespace mongo

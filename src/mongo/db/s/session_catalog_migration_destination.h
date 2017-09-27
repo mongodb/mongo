@@ -37,7 +37,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -89,17 +88,6 @@ public:
     void join();
 
     /**
-     * Forces this into an error state which will also stop session transfer thread.
-     */
-    void forceFail(std::string& errMsg);
-
-    /**
-     * Blocks until state changes is not Migrating. In other words, can return when state
-     * becomes ReadyToCommit/Done/ErrorOccurred, etc.
-     */
-    void waitUntilReadyToCommit(OperationContext* opCtx);
-
-    /**
      * Returns the current state.
      */
     State getState();
@@ -121,7 +109,6 @@ private:
 
     // Protects _state and _errMsg.
     stdx::mutex _mutex;
-    stdx::condition_variable _isStateChanged;
     State _state = State::NotStarted;
     std::string _errMsg;  // valid only if _state == ErrorOccurred.
 };
