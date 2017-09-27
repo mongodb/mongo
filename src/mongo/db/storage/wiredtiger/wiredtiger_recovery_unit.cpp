@@ -260,7 +260,7 @@ Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
     // Starts the WT transaction associated with this session.
     getSession(nullptr);
 
-    const std::string conf = str::stream() << "commit_timestamp=" << timestamp.toString();
+    const std::string conf = "commit_timestamp=" + timestamp.toString();
     auto rc = session->timestamp_transaction(session, conf.c_str());
     return wtRCToStatus(rc, "timestamp_transaction");
 }

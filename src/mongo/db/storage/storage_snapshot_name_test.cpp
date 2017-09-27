@@ -37,10 +37,10 @@
 namespace mongo {
 TEST(SnapshotNameTest, TestToString) {
     std::vector<std::pair<uint64_t, std::string>> tests = {
-        {1234, "4d2"},
-        {1501697192, "598214a8"},
-        {6449740328135032833, "598214a800000001"},
-        {6449740328135037744, "598214a800001330"}};
+        {1234, "4D2"},
+        {1501697192, "598214A8"},
+        {6449740328135032833, "598214A800000001"},
+        {6449740328135037744, "598214A800001330"}};
     for (auto pair : tests) {
         ASSERT_EQUALS(pair.second, SnapshotName(pair.first).toString());
     }

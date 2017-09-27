@@ -1002,7 +1002,7 @@ void WiredTigerKVEngine::setStableTimestamp(SnapshotName stableTimestamp) {
     // taking "stable checkpoints". In the transitioning case, it's imperative for the "stable
     // timestamp" to have first been communicated to WiredTiger.
     if (!keepOldBehavior) {
-        std::string conf = str::stream() << "stable_timestamp=" << stableTimestamp.toString();
+        std::string conf = "stable_timestamp=" + stableTimestamp.toString();
         _conn->set_timestamp(_conn, conf.c_str());
     }
     if (_checkpointThread) {
