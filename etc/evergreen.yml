@@ -5916,7 +5916,7 @@ buildvariants:
 ###########################################
 
 - name: windows-64-2k8-debug
-  display_name: "! Windows 2008R2 DEBUG"
+  display_name: "* Windows 2008R2 DEBUG"
   run_on:
   - windows-64-vs2015-small
   expansions:
@@ -6098,7 +6098,7 @@ buildvariants:
   - name: tool_WT
 
 - name: enterprise-windows-64-2k8
-  display_name: "* Enterprise Windows 2008R2"
+  display_name: "! Enterprise Windows 2008R2"
   modules:
   - enterprise
   run_on:
