@@ -438,6 +438,17 @@ private:
                                  AndAssignment* andAssignment);
 
     /**
+     * Assigns predicates in 'predsOverLeadingField' and 'idxToNotFirst' to 'indexAssign'. Assumes
+     * that the index is not multikey. Also assumes that that the index is of a type used to answer
+     * "mandatory predicates" such as text or geoNear.
+     */
+    void assignToNonMultikeyMandatoryIndex(
+        const IndexEntry& index,
+        const std::vector<MatchExpression*>& predsOverLeadingField,
+        const IndexToPredMap& idxToNotFirst,
+        OneIndexAssignment* indexAssign);
+
+    /**
      * Try to assign predicates in 'tryCompound' to 'thisIndex' as compound assignments.
      * Output the assignments in 'assign'.
      */
