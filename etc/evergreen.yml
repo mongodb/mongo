@@ -1073,10 +1073,12 @@ functions:
       script: |
         set -o errexit
 
+        # Since the macros 'private_key_remote' and 'private_key_file' are not always defined
+        # we default to /dev/null to avoid syntax errors of an empty expansion.
         if [ ! -z "${private_key_remote}" ] && [ ! -z "${private_key_file}" ] ; then
           mkdir -p ~/.ssh
-          echo -n "${private_key_remote}" > ${private_key_file}
-          chmod 0600 ${private_key_file}
+          echo -n "${private_key_remote}" > ${private_key_file|/dev/null}
+          chmod 0600 ${private_key_file|/dev/null}
         fi
 
         mkdir -p ~/.aws
