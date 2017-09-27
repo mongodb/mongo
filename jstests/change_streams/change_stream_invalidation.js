@@ -4,6 +4,7 @@
     "use strict";
 
     load('jstests/libs/uuid_util.js');
+    load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
 
     // Strip the oplog fields we aren't testing.
     const oplogProjection = {$project: {"_id.clusterTime": 0}};
@@ -43,15 +44,26 @@
 
     const collGetMoreUuid = getUUIDFromListCollections(db, collGetMore.getName());
 
-    // Drop the collection and test that we return "invalidate" entry and close the cursor.
+    // Drop the collection and test that we return "invalidate" entry and close the cursor. However,
+    // we return all oplog entries preceding the drop.
     jsTestLog("Testing getMore command closes cursor for invalidate entries");
-    collGetMore.drop();
+    // Create oplog entries of type insert, update, and delete.
+    assert.writeOK(collGetMore.insert({_id: 1}));
+    assert.writeOK(collGetMore.update({_id: 1}, {$set: {a: 1}}));
+    assert.writeOK(collGetMore.remove({_id: 1}));
+    // Drop the collection.
+    assert.commandWorked(db.runCommand({drop: collGetMore.getName(), writeConcern: {j: true}}));
+    // We should get 4 oplog entries of type insert, update, delete, and invalidate. The cursor
+    // should be closed.
     let res = assert.commandWorked(
         db.runCommand({getMore: aggcursor.id, collection: collGetMore.getName()}));
     aggcursor = res.cursor;
     assert.eq(aggcursor.id, 0, "expected invalidation to cause the cursor to be closed");
-    assert.eq(aggcursor.nextBatch.length, 1);
-    assert.docEq(aggcursor.nextBatch[0],
+    assert.eq(aggcursor.nextBatch.length, 4, tojson(aggcursor.nextBatch));
+    assert.eq(aggcursor.nextBatch[0].operationType, "insert", tojson(aggcursor.nextBatch));
+    assert.eq(aggcursor.nextBatch[1].operationType, "update", tojson(aggcursor.nextBatch));
+    assert.eq(aggcursor.nextBatch[2].operationType, "delete", tojson(aggcursor.nextBatch));
+    assert.docEq(aggcursor.nextBatch[3],
                  {_id: {uuid: collGetMoreUuid}, operationType: "invalidate"});
 
     jsTestLog("Testing aggregate command closes cursor for invalidate entries");
@@ -83,18 +95,41 @@
     // It should not possible to resume a change stream after a collection drop, even if the
     // invalidate has not been received.
     assert(collAgg.drop());
-    // Wait for the drop to actually happen.
+    // Wait for two-phase drop to complete, so that the UUID no longer exists.
     assert.soon(function() {
-        const visibleRes = assert.commandWorked(db.runCommand("listCollections"));
-        const allRes =
-            assert.commandWorked(db.runCommand("listCollections", {includePendingDrops: true}));
-        const visibleCollections = visibleRes.cursor.firstBatch;
-        const allCollections = allRes.cursor.firstBatch;
-        return visibleCollections.length == allCollections.length;
+        return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(db, collAgg.getName());
     });
-    res = assert.commandFailed(db.runCommand({
+    assert.commandFailed(db.runCommand({
         aggregate: collAgg.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}, oplogProjection],
         cursor: {}
     }));
+
+    // Test that it is possible to open a new change stream cursor on a collection that does not
+    // exist.
+    jsTestLog("Testing aggregate command on nonexistent collection");
+    const collDoesNotExist = db.change_stream_agg_invalidations_does_not_exist;
+    db.runCommand({drop: collDoesNotExist.getName(), writeConcern: {j: true}});
+    // Cursor creation succeeds, but there are no results.
+    res = assert.commandWorked(db.runCommand({
+        aggregate: collDoesNotExist.getName(),
+        pipeline: [{$changeStream: {}}, oplogProjection],
+        cursor: {}
+    }));
+    aggcursor = res.cursor;
+    assert.neq(aggcursor.id, 0);
+    // We explicitly test getMore, to ensure that the getMore command for a non-existent collection
+    // does not return an error.
+    res = assert.commandWorked(
+        db.runCommand({getMore: res.cursor.id, collection: collDoesNotExist.getName()}));
+    aggcursor = res.cursor;
+    assert.neq(aggcursor.id, 0);
+    assert.eq(aggcursor.nextBatch.length, 0, tojson(aggcursor.nextBatch));
+    // After collection creation, we see oplog entries for the collection.
+    assert.writeOK(collDoesNotExist.insert({_id: 0}, {writeConcern: {j: true}}));
+    res = assert.commandWorked(
+        db.runCommand({getMore: res.cursor.id, collection: collDoesNotExist.getName()}));
+    aggcursor = res.cursor;
+    assert.eq(aggcursor.nextBatch.length, 1, tojson(aggcursor.nextBatch));
+    assert.eq(aggcursor.nextBatch[0].operationType, "insert", tojson(aggcursor.nextBatch));
 }());
