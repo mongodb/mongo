@@ -132,13 +132,6 @@ var {
                 return false;
             }
 
-            if (cmdName === "aggregate" && cmdObjUnwrapped.explain) {
-                // TODO SERVER-30582: Aggregation's explain doesn't support the "readConcern"
-                // option. Note that an aggregation with a $out stage as its last stage still
-                // supports a read concern level of "local".
-                return false;
-            }
-
             if (cmdName === "explain") {
                 return kCommandsThatSupportReadConcern.has(Object.keys(cmdObjUnwrapped.explain)[0]);
             }

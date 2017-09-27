@@ -168,7 +168,7 @@
                     cursor: {batchSize: 5},
                     explain: true
                 }));
-            }, {expectedSession: withSession, expectedAfterClusterTime: false});
+            });
 
             let cursor;
 

@@ -80,6 +80,10 @@ Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity v
     explainCommandBuilder[QueryRequest::kUnwrappedReadPrefField] =
         Value(aggregateCommand[QueryRequest::kUnwrappedReadPrefField]);
 
+    // readConcern needs to be promoted to the top-level of the request.
+    explainCommandBuilder[repl::ReadConcernArgs::kReadConcernFieldName] =
+        Value(aggregateCommand[repl::ReadConcernArgs::kReadConcernFieldName]);
+
     // Add explain command options.
     for (auto&& explainOption : ExplainOptions::toBSON(verbosity)) {
         explainCommandBuilder[explainOption.fieldNameStringData()] = Value(explainOption);

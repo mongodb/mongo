@@ -57,6 +57,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
@@ -296,6 +297,14 @@ Status runAggregate(OperationContext* opCtx,
                     BSONObjBuilder& result) {
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespaceString();
+
+    if (request.getExplain() &&
+        repl::ReadConcernArgs::get(opCtx).getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "Explain for the aggregate command "
+                                 "does not support non-local "
+                                 "readConcern levels"};
+    }
 
     // Parse the user-specified collation, if any.
     std::unique_ptr<CollatorInterface> userSpecifiedCollator = request.getCollation().isEmpty()

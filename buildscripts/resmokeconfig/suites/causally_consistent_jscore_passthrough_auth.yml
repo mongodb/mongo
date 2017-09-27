@@ -164,6 +164,8 @@ selector:
   - jstests/core/count_plan_summary.js
   - jstests/core/shellstartparallel.js
   # TODO SERVER-30466
+  - jstests/core/explain_multi_plan.js
+  - jstests/core/explain_shell_helpers.js
   - jstests/core/index_partial_read_ops.js
   - jstests/core/update_arrayFilters.js
   # TODO: SERVER-30488
@@ -172,19 +174,6 @@ selector:
   - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
-  # TODO: SERVER-30582
-  - jstests/core/agg_hint.js
-  - jstests/core/explain_agg_write_concern.js
-  - jstests/core/explain_missing_collection.js
-  - jstests/core/explain_shell_helpers.js
-  - jstests/core/sort_array.js
-  - jstests/core/views/views_aggregation.js
-  - jstests/core/views/views_distinct.js
-  - jstests/core/views/views_count.js
-  - jstests/core/views/views_collation.js
-  - jstests/core/views/views_find.js
-  # TODO: SERVER-30582
-  - jstests/core/explain_multi_plan.js
   # Logical sessions require that only one user be authenticated,
   # but this suite puts us in a multi-auth state.
   - jstests/core/list_local_sessions.js # Too many users authenticated
