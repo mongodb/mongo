@@ -945,7 +945,6 @@ TEST_F(
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
 
-
     // Set up valid write concerns for the rest of the test
     WriteConcernOptions majorityWriteConcern;
     majorityWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -977,7 +976,6 @@ TEST_F(
     getReplCoord()->setLastDurableOptime_forTest(2, 1, time1).transitional_ignore();
     getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1).transitional_ignore();
     getReplCoord()->setLastDurableOptime_forTest(2, 2, time1).transitional_ignore();
-    getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
 
     statusAndDur = getReplCoord()->awaitReplication(opCtx.get(), time1, majorityWriteConcern);
     ASSERT_OK(statusAndDur.status);
@@ -995,39 +993,6 @@ TEST_F(
     statusAndDur = getReplCoord()->awaitReplication(opCtx.get(), time1, multiDCWriteConcern);
     ASSERT_OK(statusAndDur.status);
     statusAndDur = getReplCoord()->awaitReplication(opCtx.get(), time1, multiRackWriteConcern);
-    ASSERT_OK(statusAndDur.status);
-
-    // Majority also waits for the committed snapshot to be newer than all snapshots reserved by
-    // this operation. Custom modes not affected by this.
-    while (getReplCoord()->reserveSnapshotName(opCtx.get()) <= SnapshotName(1)) {
-        // These unittests "cheat" and use SnapshotName(1) without advancing the counter. Reserve
-        // another name if we didn't get a high enough one.
-    }
-
-    auto zeroOpTimeInCurrentTerm = OpTime(Timestamp(0, 0), 1);
-    ReplClientInfo::forClient(opCtx.get()->getClient()).setLastOp(zeroOpTimeInCurrentTerm);
-    statusAndDur =
-        getReplCoord()->awaitReplicationOfLastOpForClient(opCtx.get(), majorityWriteConcern);
-    ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
-    statusAndDur =
-        getReplCoord()->awaitReplicationOfLastOpForClient(opCtx.get(), multiDCWriteConcern);
-    ASSERT_OK(statusAndDur.status);
-    statusAndDur =
-        getReplCoord()->awaitReplicationOfLastOpForClient(opCtx.get(), multiRackWriteConcern);
-    ASSERT_OK(statusAndDur.status);
-
-    // All modes satisfied
-    getReplCoord()->createSnapshot(
-        opCtx.get(), time1, getReplCoord()->reserveSnapshotName(nullptr));
-
-    statusAndDur =
-        getReplCoord()->awaitReplicationOfLastOpForClient(opCtx.get(), majorityWriteConcern);
-    ASSERT_OK(statusAndDur.status);
-    statusAndDur =
-        getReplCoord()->awaitReplicationOfLastOpForClient(opCtx.get(), multiDCWriteConcern);
-    ASSERT_OK(statusAndDur.status);
-    statusAndDur =
-        getReplCoord()->awaitReplicationOfLastOpForClient(opCtx.get(), multiRackWriteConcern);
     ASSERT_OK(statusAndDur.status);
 
     // multiDC satisfied but not majority or multiRack
@@ -2898,12 +2863,11 @@ TEST_F(ReplCoordTest, IsMasterWithCommittedSnapshot) {
 
     time_t lastWriteDate = 101;
     OpTime opTime = OpTime(Timestamp(lastWriteDate, 2), 1);
-    time_t majorityWriteDate = 100;
-    OpTime majorityOpTime = OpTime(Timestamp(majorityWriteDate, 1), 1);
+    time_t majorityWriteDate = lastWriteDate;
+    OpTime majorityOpTime = opTime;
 
     getReplCoord()->setMyLastAppliedOpTime(opTime);
     getReplCoord()->setMyLastDurableOpTime(opTime);
-    getReplCoord()->createSnapshot(opCtx.get(), majorityOpTime, SnapshotName(1));
     ASSERT_EQUALS(majorityOpTime, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
     IsMasterResponse response;
@@ -3656,10 +3620,6 @@ TEST_F(ReplCoordTest,
 
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time));
     ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, 2, time));
-    ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
-                  getReplCoord()->awaitReplication(opCtx.get(), time, majorityWriteConcern).status);
-
-    getReplCoord()->createSnapshot(opCtx.get(), time, SnapshotName(1));
     ASSERT_OK(getReplCoord()->awaitReplication(opCtx.get(), time, majorityWriteConcern).status);
 }
 
@@ -3911,21 +3871,21 @@ TEST_F(StableTimestampTest, SetMyLastAppliedSetsStableTimestampForStorage) {
     Timestamp stableTimestamp;
 
     // There should be no stable timestamp candidates until setMyLastAppliedOpTime is called.
-    repl->advanceCommitPoint(OpTime({0, 2}, 0));
+    repl->advanceCommitPoint(OpTime({1, 2}, 0));
     ASSERT_EQUALS(SnapshotName::min(), getStorageInterface()->getStableTimestamp());
 
     // Check that the stable timestamp is updated when we set the applied optime.
-    repl->setMyLastAppliedOpTime(OpTime({0, 1}, 0));
+    repl->setMyLastAppliedOpTime(OpTime({1, 1}, 0));
     stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
-    ASSERT_EQUALS(Timestamp(0, 1), stableTimestamp);
+    ASSERT_EQUALS(Timestamp(1, 1), stableTimestamp);
 
     // Check that timestamp cleanup occurs.
-    repl->setMyLastAppliedOpTime(OpTime({0, 2}, 0));
+    repl->setMyLastAppliedOpTime(OpTime({1, 2}, 0));
     stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
-    ASSERT_EQUALS(Timestamp(0, 2), stableTimestamp);
+    ASSERT_EQUALS(Timestamp(1, 2), stableTimestamp);
 
     auto timestampCandidates = repl->getStableTimestampCandidates_forTest();
-    std::set<Timestamp> expectedTimestampCandidates = {{0, 2}};
+    std::set<Timestamp> expectedTimestampCandidates = {{1, 2}};
     ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
 }
 
@@ -3942,22 +3902,22 @@ TEST_F(StableTimestampTest, AdvanceCommitPointSetsStableTimestampForStorage) {
     Timestamp stableTimestamp;
 
     // Add two stable timestamp candidates.
-    repl->setMyLastAppliedOpTime(OpTime({0, 1}, 0));
-    repl->setMyLastAppliedOpTime(OpTime({0, 2}, 0));
+    repl->setMyLastAppliedOpTime(OpTime({1, 1}, 0));
+    repl->setMyLastAppliedOpTime(OpTime({1, 2}, 0));
 
     // Set a commit point and check the stable timestamp.
-    repl->advanceCommitPoint(OpTime({0, 1}, 0));
+    repl->advanceCommitPoint(OpTime({1, 1}, 0));
     stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
-    ASSERT_EQUALS(Timestamp(0, 1), stableTimestamp);
+    ASSERT_EQUALS(Timestamp(1, 1), stableTimestamp);
 
     // Check that the stable timestamp is updated when we advance the commit point.
-    repl->advanceCommitPoint(OpTime({0, 2}, 0));
+    repl->advanceCommitPoint(OpTime({1, 2}, 0));
     stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
-    ASSERT_EQUALS(Timestamp(0, 2), stableTimestamp);
+    ASSERT_EQUALS(Timestamp(1, 2), stableTimestamp);
 
     // Check that timestamp candidate cleanup occurs.
     auto timestampCandidates = getReplCoord()->getStableTimestampCandidates_forTest();
-    std::set<Timestamp> expectedTimestampCandidates = {{0, 2}};
+    std::set<Timestamp> expectedTimestampCandidates = {{1, 2}};
     ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
 }
 
@@ -4358,7 +4318,7 @@ TEST_F(ReplCoordTest, UpdateLastCommittedOpTimeWhenTheLastCommittedOpTimeIsNewer
 
     OpTime time(Timestamp(10, 0), 1);
     OpTime oldTime(Timestamp(9, 0), 1);
-    getReplCoord()->createSnapshot(opCtx.get(), time, SnapshotName(1));
+    getReplCoord()->setMyLastAppliedOpTime(time);
 
     // higher OpTime, should change
     getReplCoord()->advanceCommitPoint(time);
@@ -5030,84 +4990,18 @@ TEST_F(ReplCoordTest, AdvanceCommittedSnapshotToMostRecentSnapshotPriorToOpTimeW
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
 
-    getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
-    getReplCoord()->createSnapshot(opCtx.get(), time2, SnapshotName(2));
-    getReplCoord()->createSnapshot(opCtx.get(), time5, SnapshotName(3));
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time2);
+    getReplCoord()->setMyLastAppliedOpTime(time5);
 
     // ensure current snapshot follows price is right rules (closest but not greater than)
-    getReplCoord()->setMyLastAppliedOpTime(time3);
+
     getReplCoord()->setMyLastDurableOpTime(time3);
     ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshotOpTime());
-    getReplCoord()->setMyLastAppliedOpTime(time4);
     getReplCoord()->setMyLastDurableOpTime(time4);
     ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshotOpTime());
-}
-
-TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAnOpTimeIsNewerThanOurLatestSnapshot) {
-    init("mySet");
-
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version"
-                            << 1
-                            << "members"
-                            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                     << "test1:1234"))),
-                       HostAndPort("test1", 1234));
-    auto opCtx = makeOperationContext();
-    runSingleNodeElection(opCtx.get());
-
-    OpTime time1(Timestamp(100, 1), 1);
-    OpTime time2(Timestamp(100, 2), 1);
-    OpTime time3(Timestamp(100, 3), 1);
-    OpTime time4(Timestamp(100, 4), 1);
-    OpTime time5(Timestamp(100, 5), 1);
-    OpTime time6(Timestamp(100, 6), 1);
-
-    getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
-    getReplCoord()->createSnapshot(opCtx.get(), time2, SnapshotName(2));
-    getReplCoord()->createSnapshot(opCtx.get(), time5, SnapshotName(3));
-
-    // ensure current snapshot will not advance beyond existing snapshots
-    getReplCoord()->setMyLastAppliedOpTime(time6);
-    getReplCoord()->setMyLastDurableOpTime(time6);
+    getReplCoord()->setMyLastDurableOpTime(time5);
     ASSERT_EQUALS(time5, getReplCoord()->getCurrentCommittedSnapshotOpTime());
-}
-
-TEST_F(ReplCoordTest,
-       AdvanceCommittedSnapshotWhenASnapshotAtNewestAsOldAsOurNewestOpTimeIsCreated) {
-    init("mySet");
-
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version"
-                            << 1
-                            << "members"
-                            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                     << "test1:1234"))),
-                       HostAndPort("test1", 1234));
-
-    auto opCtx = makeOperationContext();
-    runSingleNodeElection(opCtx.get());
-
-    OpTime time1(Timestamp(100, 1), 1);
-    OpTime time2(Timestamp(100, 2), 1);
-    OpTime time3(Timestamp(100, 3), 1);
-    OpTime time4(Timestamp(100, 4), 1);
-    OpTime time5(Timestamp(100, 5), 1);
-    OpTime time6(Timestamp(100, 6), 1);
-
-    getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
-    getReplCoord()->createSnapshot(opCtx.get(), time2, SnapshotName(2));
-    getReplCoord()->createSnapshot(opCtx.get(), time5, SnapshotName(3));
-
-    getReplCoord()->setMyLastAppliedOpTime(time6);
-    getReplCoord()->setMyLastDurableOpTime(time6);
-    ASSERT_EQUALS(time5, getReplCoord()->getCurrentCommittedSnapshotOpTime());
-
-    // ensure current snapshot updates on new snapshot if we are that far
-    getReplCoord()->createSnapshot(opCtx.get(), time6, SnapshotName(4));
-    ASSERT_EQUALS(time6, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 }
 
 TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
@@ -5132,9 +5026,10 @@ TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
 
-    getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
-    getReplCoord()->createSnapshot(opCtx.get(), time2, SnapshotName(2));
-    getReplCoord()->createSnapshot(opCtx.get(), time5, SnapshotName(3));
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time2);
+    getReplCoord()->setMyLastAppliedOpTime(time5);
+    getReplCoord()->setMyLastDurableOpTime(time5);
 
     // ensure dropping all snapshots should reset the current committed snapshot
     getReplCoord()->dropAllSnapshots();
@@ -5159,15 +5054,12 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAppliedOpTimeChanges) {
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
 
-    getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
-
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime());
     getReplCoord()->setMyLastAppliedOpTime(time2);
     ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime());
-    getReplCoord()->setMyLastAppliedOpTime(time2);
     getReplCoord()->setMyLastDurableOpTime(time2);
-    ASSERT_EQUALS(time1, getReplCoord()->getCurrentCommittedSnapshotOpTime());
+    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 }
 
 TEST_F(ReplCoordTest,

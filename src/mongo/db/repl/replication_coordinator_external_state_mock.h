@@ -89,8 +89,6 @@ public:
     virtual void startProducerIfStopped();
     virtual void dropAllSnapshots();
     virtual void updateCommittedSnapshot(SnapshotInfo newCommitPoint);
-    virtual void createSnapshot(OperationContext* opCtx, SnapshotName name);
-    virtual void forceSnapshotCreation();
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
     virtual double getElectionTimeoutOffsetLimitFraction() const;

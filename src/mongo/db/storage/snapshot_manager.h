@@ -61,16 +61,6 @@ public:
     virtual Status prepareForCreateSnapshot(OperationContext* opCtx) = 0;
 
     /**
-     * Creates a new named snapshot representing the same point-in-time captured in
-     * prepareForCreateSnapshot().
-     *
-     * Must be called in the same ScopedTransaction as prepareForCreateSnapshot.
-     *
-     * Caller guarantees that this name must compare greater than all existing snapshots.
-     */
-    virtual Status createSnapshot(OperationContext* opCtx, const SnapshotName& name) = 0;
-
-    /**
      * Sets the snapshot to be used for committed reads.
      *
      * Implementations are allowed to assume that all older snapshots have names that compare

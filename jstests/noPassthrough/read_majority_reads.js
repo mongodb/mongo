@@ -19,6 +19,14 @@
 (function() {
     'use strict';
 
+    var testServer = MongoRunner.runMongod();
+    var db = testServer.getDB("test");
+    if (!db.serverStatus().storageEngine.supportsCommittedReads) {
+        print("Skipping read_majority.js since storageEngine doesn't support it.");
+        return;
+    }
+    MongoRunner.stopMongod(testServer);
+
     function makeCursor(db, result) {
         return new DBCommandCursor(db, result);
     }
@@ -206,17 +214,19 @@
         }
     }
 
-    var mongod = MongoRunner.runMongod(
-        {setParameter: 'testingSnapshotBehaviorInIsolation=true', shardsvr: ""});
-    assert.neq(
-        null,
-        mongod,
-        'mongod was unable to start with the testingSnapshotBehaviorInIsolation parameter enabled');
+    var replTest = new ReplSetTest({
+        nodes: 1,
+        oplogSize: 2,
+        nodeOptions: {
+            setParameter: 'testingSnapshotBehaviorInIsolation=true',
+            enableMajorityReadConcern: '',
+            shardsvr: ''
+        }
+    });
+    replTest.startSet();
+    replTest.initiate();
 
-    if (!mongod.adminCommand('serverStatus').storageEngine.supportsCommittedReads) {
-        print("Skipping read_majority_reads.js since storageEngine doesn't support it.");
-        return;
-    }
+    var mongod = replTest.getPrimary();
 
     (function testSingleNode() {
         var db = mongod.getDB("singleNode");
@@ -224,10 +234,10 @@
     })();
 
     var shardingTest = new ShardingTest({
-        shards: 0,  // We use the existing mongod.
+        shards: 0,
         mongos: 1,
     });
-    shardingTest.adminCommand({addShard: mongod.host});
+    assert(shardingTest.adminCommand({addShard: replTest.getURL()}));
 
     // Remove tests of commands that aren't supported at all through mongos, even on unsharded
     // collections.
@@ -265,5 +275,5 @@
     })();
 
     shardingTest.stop();
-    MongoRunner.stopMongod(mongod);
+    replTest.stopSet();
 })();

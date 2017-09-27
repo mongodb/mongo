@@ -461,8 +461,6 @@ SnapshotName ReplicationCoordinatorMock::reserveSnapshotName(OperationContext* o
     return SnapshotName(_snapshotNameGenerator.addAndFetch(1));
 }
 
-void ReplicationCoordinatorMock::forceSnapshotCreation() {}
-
 void ReplicationCoordinatorMock::createSnapshot(OperationContext* opCtx,
                                                 OpTime timeOfSnapshot,
                                                 SnapshotName name){};

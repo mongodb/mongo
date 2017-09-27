@@ -1166,8 +1166,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         } else {
             ts = timestamps[i];
         }
-        LOG(4) << "inserting record with timestamp " << ts.asULL();
         if (!ts.isNull()) {
+            LOG(4) << "inserting record with timestamp " << ts.asULL();
             fassertStatusOK(39001, opCtx->recoveryUnit()->setTimestamp(SnapshotName(ts)));
         }
         setKey(c, record.id);

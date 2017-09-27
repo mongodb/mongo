@@ -235,7 +235,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     WT_SESSION* session = _session->getSession();
 
     if (_readAtTimestamp != SnapshotName::min()) {
-        _sessionCache->snapshotManager().beginTransactionAtTimestamp(_readAtTimestamp, session);
+        uassertStatusOK(_sessionCache->snapshotManager().beginTransactionAtTimestamp(
+            _readAtTimestamp, session));
     } else if (_readFromMajorityCommittedSnapshot) {
         _majorityCommittedSnapshot =
             _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);

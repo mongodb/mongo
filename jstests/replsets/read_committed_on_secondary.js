@@ -124,11 +124,13 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     // state.
     log("turning off failpoint");
     secondary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'});
-    assert.eq(doDirtyRead(op1), 1);
+    // Do another write in order to update the committedSnapshot value.
+    var op2 = saveDoc(2);
+    assert.eq(doDirtyRead(op2), 2);
     log(replTest.status());
     replTest.awaitReplication();
     log(replTest.status());
-    assert.eq(doCommittedRead(op1), 1);
+    assert.eq(doCommittedRead(op2), 2);
     log("test success!");
     replTest.stopSet();
 }());

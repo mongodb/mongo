@@ -276,7 +276,6 @@ Status repairDatabase(OperationContext* opCtx,
             // versions are in the committed view.
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             auto snapshotName = replCoord->reserveSnapshotName(opCtx);
-            replCoord->forceSnapshotCreation();  // Ensure a newer snapshot is created even if idle.
 
             for (auto&& collection : *db) {
                 collection->setMinimumVisibleSnapshot(snapshotName);

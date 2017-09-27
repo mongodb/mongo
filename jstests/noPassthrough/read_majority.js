@@ -19,12 +19,26 @@ load("jstests/libs/analyze_plan.js");
 (function() {
     "use strict";
 
-    // This test needs its own mongod since the snapshot names must be in increasing order and once
-    // you
-    // have a majority commit point it is impossible to go back to not having one.
-    var testServer =
-        MongoRunner.runMongod({setParameter: 'testingSnapshotBehaviorInIsolation=true'});
+    var testServer = MongoRunner.runMongod();
     var db = testServer.getDB("test");
+    if (!db.serverStatus().storageEngine.supportsCommittedReads) {
+        print("Skipping read_majority.js since storageEngine doesn't support it.");
+        return;
+    }
+    MongoRunner.stopMongod(testServer);
+
+    var replTest = new ReplSetTest({
+        nodes: 1,
+        oplogSize: 2,
+        nodeOptions: {
+            setParameter: 'testingSnapshotBehaviorInIsolation=true',
+            enableMajorityReadConcern: ''
+        }
+    });
+    replTest.startSet();
+    replTest.initiate();
+
+    var db = replTest.getPrimary().getDB("test");
     var t = db.readMajority;
 
     function assertNoReadMajoritySnapshotAvailable() {
@@ -56,15 +70,10 @@ load("jstests/libs/analyze_plan.js");
     // Actual Test
     //
 
-    if (!db.serverStatus().storageEngine.supportsCommittedReads) {
-        print("Skipping read_majority.js since storageEngine doesn't support it.");
-        return;
-    }
-
     // Ensure killOp will work on an op that is waiting for snapshots to be created
     var blockedReader = startParallelShell(
         "db.readMajority.runCommand('find', {batchSize: 2, readConcern: {level: 'majority'}});",
-        testServer.port);
+        replTest.ports[0]);
 
     assert.soon(function() {
         var curOps = db.currentOp(true);
@@ -111,8 +120,7 @@ load("jstests/libs/analyze_plan.js");
     assert.eq(getReadMajorityAggCursor().itcount(), 10);
     getReadMajorityAggCursor().forEach(function(doc) {
         // Note: agg uses internal batching so can't reliably test flipping snapshot. However, it
-        // uses
-        // the same mechanism as find, so if one works, both should.
+        // uses the same mechanism as find, so if one works, both should.
         assert.eq(doc.version, 3);
     });
 
@@ -130,8 +138,7 @@ load("jstests/libs/analyze_plan.js");
     assert.eq(cursor.next().version, 4);
 
     // Adding an index bumps the min snapshot for a collection as of SERVER-20260. This may change
-    // to
-    // just filter that index out from query planning as part of SERVER-20439.
+    // to just filter that index out from query planning as part of SERVER-20439.
     t.ensureIndex({version: 1});
     assertNoReadMajoritySnapshotAvailable();
 
@@ -154,6 +161,7 @@ load("jstests/libs/analyze_plan.js");
     assert.eq(getReadMajorityCursor().itcount(), 10);
 
     // Reindex bumps the min snapshot.
+    assert.writeOK(t.bump.insert({a: 1}));  // Bump timestamp.
     t.reIndex();
     assertNoReadMajoritySnapshotAvailable();
     newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
@@ -162,6 +170,7 @@ load("jstests/libs/analyze_plan.js");
     assert.eq(getReadMajorityCursor().itcount(), 10);
 
     // Repair bumps the min snapshot.
+    assert.writeOK(t.bump.insert({a: 1}));  // Bump timestamp.
     db.repairDatabase();
     assertNoReadMajoritySnapshotAvailable();
     newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
@@ -171,16 +180,14 @@ load("jstests/libs/analyze_plan.js");
     assert.eq(getReadMajorityAggCursor().itcount(), 10);
 
     // Dropping the collection is visible in the committed snapshot, even though it hasn't been
-    // marked
-    // committed yet. This is allowed by the current specification even though it violates strict
-    // read-committed semantics since we don't guarantee them on metadata operations.
+    // marked committed yet. This is allowed by the current specification even though it violates
+    // strict read-committed semantics since we don't guarantee them on metadata operations.
     t.drop();
     assert.eq(getReadMajorityCursor().itcount(), 0);
     assert.eq(getReadMajorityAggCursor().itcount(), 0);
 
     // Creating a new collection with the same name hides the collection until that operation is in
-    // the
-    // committed view.
+    // the committed view.
     t.insert({_id: 0, version: 8});
     assertNoReadMajoritySnapshotAvailable();
     newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
@@ -190,8 +197,7 @@ load("jstests/libs/analyze_plan.js");
     assert.eq(getReadMajorityAggCursor().itcount(), 1);
 
     // Commands that only support read concern 'local', (such as ping) must work when it is
-    // explicitly
-    // specified and fail when 'majority' is specified.
+    // explicitly specified and fail when 'majority' is specified.
     assert.commandWorked(db.adminCommand({ping: 1, readConcern: {level: 'local'}}));
     var res = assert.commandFailed(db.adminCommand({ping: 1, readConcern: {level: 'majority'}}));
     assert.eq(res.code, ErrorCodes.InvalidOptions);
@@ -203,5 +209,5 @@ load("jstests/libs/analyze_plan.js");
         'aggregate', {pipeline: [{$out: 'out'}], cursor: {}, readConcern: {level: 'majority'}}));
     assert.eq(res.code, ErrorCodes.InvalidOptions);
 
-    MongoRunner.stopMongod(testServer);
+    replTest.stopSet();
 }());

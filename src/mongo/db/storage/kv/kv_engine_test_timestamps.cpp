@@ -89,25 +89,14 @@ public:
         return Operation(service.makeClient(""), helper->getEngine()->newRecoveryUnit());
     }
 
-    void prepareSnapshot() {
-        snapshotOperation = makeOperation();  // each prepare gets a new operation.
-        snapshotManager->prepareForCreateSnapshot(snapshotOperation).transitional_ignore();
-    }
-
-    SnapshotName createSnapshot() {
-        auto name = SnapshotName(++_counter);
-        ASSERT_OK(snapshotManager->createSnapshot(snapshotOperation, name));
+    SnapshotName incrementTimestamp() {
+        auto name = SnapshotName(_counter);
+        _counter = Timestamp(_counter.getSecs() + 1, _counter.getInc());
         return name;
     }
 
-    SnapshotName prepareAndCreateSnapshot() {
-        prepareSnapshot();
-        return createSnapshot();
-    }
-
     RecordId insertRecord(OperationContext* opCtx, std::string contents = "abcd") {
-        auto id =
-            rs->insertRecord(opCtx, contents.c_str(), contents.length() + 1, Timestamp(), false);
+        auto id = rs->insertRecord(opCtx, contents.c_str(), contents.length() + 1, _counter, false);
         ASSERT_OK(id);
         return id.getValue();
     }
@@ -123,6 +112,7 @@ public:
     void updateRecordAndCommit(RecordId id, std::string contents) {
         auto op = makeOperation();
         WriteUnitOfWork wuow(op);
+        ASSERT_OK(op->recoveryUnit()->setTimestamp(SnapshotName(_counter)));
         ASSERT_OK(
             rs->updateRecord(op, id, contents.c_str(), contents.length() + 1, false, nullptr));
         wuow.commit();
@@ -131,6 +121,7 @@ public:
     void deleteRecordAndCommit(RecordId id) {
         auto op = makeOperation();
         WriteUnitOfWork wuow(op);
+        ASSERT_OK(op->recoveryUnit()->setTimestamp(SnapshotName(_counter)));
         rs->deleteRecord(op, id);
         wuow.commit();
     }
@@ -190,7 +181,7 @@ public:
     Operation snapshotOperation;
 
 private:
-    uint64_t _counter = 0;
+    Timestamp _counter = Timestamp(1, 0);
 };
 
 }  // namespace
@@ -217,7 +208,7 @@ TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 
     // There is a snapshot but it isn't committed.
-    auto name = prepareAndCreateSnapshot();
+    auto name = incrementTimestamp();
     ASSERT_EQ(ru->setReadFromMajorityCommittedSnapshot(),
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 
@@ -238,7 +229,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
     auto op = makeOperation();
 
     // Start an operation using a committed snapshot.
-    auto name = prepareAndCreateSnapshot();
+    auto name = incrementTimestamp();
     snapshotManager->setCommittedSnapshot(name, Timestamp(name.asU64()));
     ASSERT_OK(op->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
     ASSERT_EQ(itCountOn(op), 0);  // acquires a snapshot.
@@ -259,27 +250,20 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
 
     // Snapshot variables are named according to the size of the RecordStore at the time of the
     // snapshot.
-    auto snap0 = prepareAndCreateSnapshot();
+    auto snap0 = incrementTimestamp();
+    snapshotManager->setCommittedSnapshot(snap0, Timestamp(snap0.asU64()));
+    ASSERT_EQ(itCountCommitted(), 0);
 
     insertRecordAndCommit();
-    auto snap1 = prepareAndCreateSnapshot();
+
+    ASSERT_EQ(itCountCommitted(), 0);
+
+
+    auto snap1 = incrementTimestamp();
 
     insertRecordAndCommit();
-    prepareSnapshot();
     insertRecordAndCommit();
-    auto snap2 = createSnapshot();
-
-    {
-        auto op = makeOperation();
-        WriteUnitOfWork wuow(op);
-        insertRecord(op);
-
-        prepareSnapshot();  // insert should still be invisible.
-        ASSERT_EQ(itCountOn(snapshotOperation), 3);
-
-        wuow.commit();
-    }
-    auto snap3 = createSnapshot();
+    auto snap3 = incrementTimestamp();
 
     {
         auto op = makeOperation();
@@ -287,19 +271,14 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
         insertRecord(op);
         // rolling back wuow
     }
-    auto snap4 = prepareAndCreateSnapshot();
+
+    insertRecordAndCommit();
+    auto snap4 = incrementTimestamp();
 
     // If these fail, everything is busted.
-    snapshotManager->setCommittedSnapshot(snap0, Timestamp(snap0.asU64()));
     ASSERT_EQ(itCountCommitted(), 0);
     snapshotManager->setCommittedSnapshot(snap1, Timestamp(snap1.asU64()));
     ASSERT_EQ(itCountCommitted(), 1);
-
-    // If this fails, the snapshot is from the 'create' time rather than the 'prepare' time.
-    snapshotManager->setCommittedSnapshot(snap2, Timestamp(snap2.asU64()));
-    ASSERT_EQ(itCountCommitted(), 2);
-
-    // If this fails, the snapshot contains writes that weren't yet committed.
     snapshotManager->setCommittedSnapshot(snap3, Timestamp(snap3.asU64()));
     ASSERT_EQ(itCountCommitted(), 3);
 
@@ -315,10 +294,6 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
     // If this fails, longOp changed snapshots at an illegal time.
     ASSERT_EQ(itCountOn(longOp), 3);
 
-    // If this fails, snapshots aren't preserved while in use.
-    snapshotManager->cleanupUnneededSnapshots();
-    ASSERT_EQ(itCountOn(longOp), 3);
-
     // If this fails, longOp didn't get a new snapshot when it should have.
     longOp->recoveryUnit()->abandonSnapshot();
     ASSERT_EQ(itCountOn(longOp), 4);
@@ -329,16 +304,16 @@ TEST_F(SnapshotManagerTests, UpdateAndDelete) {
         return;  // This test is only for engines that DO support SnapshotMangers.
 
     // Snapshot variables are named according to the state of the record.
-    auto snapBeforeInsert = prepareAndCreateSnapshot();
+    auto snapBeforeInsert = incrementTimestamp();
 
     auto id = insertRecordAndCommit("Dog");
-    auto snapDog = prepareAndCreateSnapshot();
+    auto snapDog = incrementTimestamp();
 
     updateRecordAndCommit(id, "Cat");
-    auto snapCat = prepareAndCreateSnapshot();
+    auto snapCat = incrementTimestamp();
 
     deleteRecordAndCommit(id);
-    auto snapAfterDelete = prepareAndCreateSnapshot();
+    auto snapAfterDelete = incrementTimestamp();
 
     snapshotManager->setCommittedSnapshot(snapBeforeInsert, Timestamp(snapBeforeInsert.asU64()));
     ASSERT_EQ(itCountCommitted(), 0);

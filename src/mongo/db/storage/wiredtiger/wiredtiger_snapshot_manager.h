@@ -55,7 +55,6 @@ public:
     }
 
     Status prepareForCreateSnapshot(OperationContext* opCtx) final;
-    Status createSnapshot(OperationContext* opCtx, const SnapshotName& name) final;
     void setCommittedSnapshot(const SnapshotName& name, Timestamp ts) final;
     void cleanupUnneededSnapshots() final;
     void dropAllSnapshots() final;
@@ -69,7 +68,7 @@ public:
      */
     void shutdown();
 
-    void beginTransactionAtTimestamp(SnapshotName pointInTime, WT_SESSION* session) const;
+    Status beginTransactionAtTimestamp(SnapshotName pointInTime, WT_SESSION* session) const;
 
     /**
      * Starts a transaction and returns the SnapshotName used.

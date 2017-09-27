@@ -178,6 +178,15 @@ BSONObj incrementConfigVersionByRandom(BSONObj config) {
     return builder.obj();
 }
 
+// This is a special flag that allows for testing of snapshot behavior by skipping the replication
+// related checks and isolating the storage/query side of snapshotting.
+// SERVER-31304 rename this parameter to something more appropriate.
+bool testingSnapshotBehaviorInIsolation = false;
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshotBehaviorInIsolation(
+    ServerParameterSet::getGlobal(),
+    "testingSnapshotBehaviorInIsolation",
+    &testingSnapshotBehaviorInIsolation);
+
 }  // namespace
 
 ReplicationCoordinatorImpl::Waiter::Waiter(OpTime _opTime, const WriteConcernOptions* _writeConcern)
@@ -1056,6 +1065,7 @@ void ReplicationCoordinatorImpl::_resetMyLastOpTimes_inlock() {
     // Reset to uninitialized OpTime
     _setMyLastAppliedOpTime_inlock(OpTime(), true);
     _setMyLastDurableOpTime_inlock(OpTime(), true);
+    _stableTimestampCandidates.clear();
 }
 
 void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::mutex> lock) {
@@ -1089,7 +1099,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     // set of stable timestamp candidates can only get cleaned up when the commit point advances, we
     // should refrain from updating stable timestamp candidates in master-slave mode, to avoid the
     // candidates list from growing unbounded.
-    if (getReplicationMode() == Mode::modeReplSet) {
+    if (!opTime.isNull() && getReplicationMode() == Mode::modeReplSet) {
         _stableTimestampCandidates.insert(opTime.getTimestamp());
         _setStableTimestampForStorage_inlock();
     }
@@ -1451,15 +1461,16 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
 
     StringData patternName;
     if (writeConcern.wMode == WriteConcernOptions::kMajority) {
-        if (_externalState->snapshotsEnabled()) {
+        if (_externalState->snapshotsEnabled() && !testingSnapshotBehaviorInIsolation) {
             // Make sure we have a valid "committed" snapshot up to the needed optime.
             if (!_currentCommittedSnapshot) {
                 return false;
             }
 
             // Wait for the "current" snapshot to advance to/past the opTime.
-            const auto haveSnapshot = (_currentCommittedSnapshot->opTime >= opTime &&
-                                       _currentCommittedSnapshot->name >= minSnapshot);
+            const auto haveSnapshot =
+                (_currentCommittedSnapshot->opTime >= opTime &&
+                 _currentCommittedSnapshot->opTime.getTimestamp().asULL() >= minSnapshot.asU64());
             if (!haveSnapshot) {
                 LOG(1) << "Required snapshot optime: " << opTime << " is not yet part of the "
                        << "current 'committed' snapshot: " << *_currentCommittedSnapshot;
@@ -2554,13 +2565,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
         }
     }
 
-    if (newState.readable() && !_memberState.readable()) {
-        // When we transition to a readable state from a non-readable one, force the SnapshotThread
-        // to take a snapshot, if it is running. This is because it never takes snapshots when not
-        // in readable states.
-        _externalState->forceSnapshotCreation();
-    }
-
     if (newState.rollback()) {
         // When we start rollback, we need to drop all snapshots since we may need to create
         // out-of-order snapshots. This would be necessary even if the SnapshotName was completely
@@ -2586,7 +2590,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
     if (_memberState.rollback()) {
         // Ensure that no snapshots were created while we were in rollback.
         invariant(!_currentCommittedSnapshot);
-        invariant(_uncommittedSnapshots.empty());
     }
 
     // If we are transitioning from secondary, cancel any scheduled takeovers.
@@ -3118,7 +3121,7 @@ bool ReplicationCoordinatorImpl::shouldChangeSyncSource(
 
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     if (_topCoord->updateLastCommittedOpTime()) {
-        _updateCommitPoint_inlock();
+        _setStableTimestampForStorage_inlock();
     }
     // Wake up any threads waiting for replication that now have their replication
     // check satisfied.  We must do this regardless of whether we updated the lastCommittedOpTime,
@@ -3190,8 +3193,13 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage_inlock() {
     if (stableTimestamp) {
         LOG(2) << "Setting replication's stable timestamp to " << stableTimestamp.value();
 
-        _storage->setStableTimestamp(getServiceContext(), SnapshotName(stableTimestamp.get()));
-
+        if (!testingSnapshotBehaviorInIsolation) {
+            // Update committed snapshot and wake up any threads waiting on read concern or
+            // write concern.
+            _updateCommittedSnapshot_inlock(SnapshotInfo{
+                OpTime(stableTimestamp.get(), _topCoord->getTerm()), SnapshotName::min()});
+            _storage->setStableTimestamp(getServiceContext(), SnapshotName(stableTimestamp.get()));
+        }
         _cleanupStableTimestampCandidates(&_stableTimestampCandidates, stableTimestamp.get());
     }
 }
@@ -3207,38 +3215,19 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint_inlock(const OpTime& commit
             _setMyLastAppliedOpTime_inlock(committedOpTime, false);
         }
 
-        _updateCommitPoint_inlock();
+        _setStableTimestampForStorage_inlock();
+        // Even if we have no new snapshot, we need to notify waiters that the commit point moved.
+        _externalState->notifyOplogMetadataWaiters(committedOpTime);
     }
 }
 
 void ReplicationCoordinatorImpl::_updateCommitPoint_inlock() {
-    auto committedOpTime = _topCoord->getLastCommittedOpTime();
-
-    // Update the stable timestamp.
+    // Update the stable timestamp
     _setStableTimestampForStorage_inlock();
 
-    auto maxSnapshotForOpTime = SnapshotInfo{committedOpTime, SnapshotName::max()};
-
-    if (!_uncommittedSnapshots.empty() && _uncommittedSnapshots.front() <= maxSnapshotForOpTime) {
-        // At least one uncommitted snapshot is ready to be blessed as committed.
-
-        // Seek to the first entry > the commit point. Previous element must be <=.
-        const auto onePastCommitPoint = std::upper_bound(
-            _uncommittedSnapshots.begin(), _uncommittedSnapshots.end(), maxSnapshotForOpTime);
-        const auto newSnapshot = *std::prev(onePastCommitPoint);
-
-        // Forget about all snapshots <= the new commit point.
-        _uncommittedSnapshots.erase(_uncommittedSnapshots.begin(), onePastCommitPoint);
-        _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
-
-        // Update committed snapshot and wake up any threads waiting on read concern or
-        // write concern.
-        _updateCommittedSnapshot_inlock(newSnapshot);
-    } else {
-        // Even if we have no new snapshot, we need to notify waiters that the commit point
-        // moved.
-        _externalState->notifyOplogMetadataWaiters(committedOpTime);
-    }
+    auto committedOpTime = _topCoord->getLastCommittedOpTime();
+    // Notify waiters that the commit point moved.
+    _externalState->notifyOplogMetadataWaiters(committedOpTime);
 }
 
 OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
@@ -3471,24 +3460,32 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
 }
 
 SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* opCtx) {
-    auto reservedName = SnapshotName(_snapshotNameGenerator.addAndFetch(1));
-    dassert(reservedName > SnapshotName::min());
-    dassert(reservedName < SnapshotName::max());
-    if (opCtx) {
-        ReplClientInfo::forClient(opCtx->getClient()).setLastSnapshot(reservedName);
+    SnapshotName reservedName;
+    if (getReplicationMode() == Mode::modeReplSet) {
+        invariant(opCtx->lockState()->isLocked());
+        if (getMemberState().primary()) {
+            // Use the current optime on the node, for primary nodes.
+            reservedName = SnapshotName(
+                LogicalClock::get(getServiceContext())->getClusterTime().asTimestamp());
+        } else {
+            // Use lastApplied time, for secondary nodes.
+            reservedName = SnapshotName(getMyLastAppliedOpTime().getTimestamp());
+        }
+    } else {
+        // All snapshots are the same for a standalone node.
+        reservedName = SnapshotName(0);
     }
+    // This was just in case the snapshot name was different from the lastOp in the client.
+    ReplClientInfo::forClient(opCtx->getClient()).setLastSnapshot(reservedName);
     return reservedName;
-}
-
-void ReplicationCoordinatorImpl::forceSnapshotCreation() {
-    _externalState->forceSnapshotCreation();
 }
 
 void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* opCtx,
                                                             const SnapshotName& untilSnapshot) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
-    while (!_currentCommittedSnapshot || _currentCommittedSnapshot->name < untilSnapshot) {
+    while (!_currentCommittedSnapshot ||
+           _currentCommittedSnapshot->opTime.getTimestamp().asULL() < untilSnapshot.asU64()) {
         opCtx->waitForConditionOrInterrupt(_currentCommittedSnapshotCond, lock);
     }
 }
@@ -3500,40 +3497,32 @@ size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
 void ReplicationCoordinatorImpl::createSnapshot(OperationContext* opCtx,
                                                 OpTime timeOfSnapshot,
                                                 SnapshotName name) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _externalState->createSnapshot(opCtx, name);
-    auto snapshotInfo = SnapshotInfo{timeOfSnapshot, name};
-
-    if (timeOfSnapshot <= _topCoord->getLastCommittedOpTime()) {
-        // This snapshot is ready to be marked as committed.
-        invariant(_uncommittedSnapshots.empty());
-        _updateCommittedSnapshot_inlock(snapshotInfo);
-        return;
-    }
-
-    if (!_uncommittedSnapshots.empty()) {
-        invariant(snapshotInfo > _uncommittedSnapshots.back());
-        // The name must independently be newer.
-        invariant(snapshotInfo.name > _uncommittedSnapshots.back().name);
-        // Technically, we could delete older snapshots from the same optime since we will only ever
-        // want the newest. However, multiple snapshots on the same optime will be very rare so it
-        // isn't worth the effort and potential bugs that would introduce.
-    }
-    _uncommittedSnapshots.push_back(snapshotInfo);
-    _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
+    // SERVER-31304: Delete this function.
+    return;
 }
+
+MONGO_FP_DECLARE(disableSnapshotting);
 
 void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
     SnapshotInfo newCommittedSnapshot) {
+    if (testingSnapshotBehaviorInIsolation) {
+        return;
+    }
+
+    // If we are in ROLLBACK state, do not set any new _currentCommittedSnapshot, as it will be
+    // cleared at the end of rollback anyway.
+    if (_memberState.rollback()) {
+        log() << "not updating committed snapshot because we are in rollback";
+        return;
+    }
     invariant(!newCommittedSnapshot.opTime.isNull());
-    invariant(newCommittedSnapshot.opTime <= _topCoord->getLastCommittedOpTime());
+    invariant(newCommittedSnapshot.opTime.getTimestamp() <=
+              _topCoord->getLastCommittedOpTime().getTimestamp());
     if (_currentCommittedSnapshot) {
         invariant(newCommittedSnapshot.opTime >= _currentCommittedSnapshot->opTime);
-        invariant(newCommittedSnapshot.name > _currentCommittedSnapshot->name);
     }
-    if (!_uncommittedSnapshots.empty())
-        invariant(newCommittedSnapshot < _uncommittedSnapshots.front());
-
+    if (MONGO_FAIL_POINT(disableSnapshotting))
+        return;
     _currentCommittedSnapshot = newCommittedSnapshot;
     _currentCommittedSnapshotCond.notify_all();
 
@@ -3549,8 +3538,6 @@ void ReplicationCoordinatorImpl::dropAllSnapshots() {
 }
 
 void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
-    _uncommittedSnapshots.clear();
-    _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
     _currentCommittedSnapshot = boost::none;
     _externalState->dropAllSnapshots();
 }

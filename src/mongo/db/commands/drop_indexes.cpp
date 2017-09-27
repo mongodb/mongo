@@ -218,7 +218,6 @@ public:
         // snapshot so are unable to be used.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto snapshotName = replCoord->reserveSnapshotName(opCtx);
-        replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
         collection->setMinimumVisibleSnapshot(snapshotName);
 
         result.append("nIndexes", static_cast<int>(indexInfoObjs.getValue().size()));

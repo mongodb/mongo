@@ -249,8 +249,6 @@ public:
 
     virtual SnapshotName reserveSnapshotName(OperationContext* opCtx);
 
-    virtual void forceSnapshotCreation() override;
-
     virtual void createSnapshot(OperationContext* opCtx,
                                 OpTime timeOfSnapshot,
                                 SnapshotName name) override;

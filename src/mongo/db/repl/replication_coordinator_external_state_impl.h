@@ -53,7 +53,6 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 class DropPendingCollectionReaper;
 class ReplicationProcess;
-class SnapshotThread;
 class StorageInterface;
 class NoopWriter;
 
@@ -102,8 +101,6 @@ public:
     virtual void startProducerIfStopped();
     void dropAllSnapshots() final;
     void updateCommittedSnapshot(SnapshotInfo newCommitPoint) final;
-    void createSnapshot(OperationContext* opCtx, SnapshotName name) final;
-    void forceSnapshotCreation() final;
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
     virtual double getElectionTimeoutOffsetLimitFraction() const;
@@ -193,8 +190,6 @@ private:
     stdx::mutex _nextThreadIdMutex;
     // Number used to uniquely name threads.
     long long _nextThreadId = 0;
-
-    std::unique_ptr<SnapshotThread> _snapshotThread;
 
     // Task executor used to run replication tasks.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;

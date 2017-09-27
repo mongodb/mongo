@@ -67,7 +67,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rs_sync.h"
-#include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/sharding_state.h"
@@ -121,11 +120,6 @@ const char tsFieldName[] = "ts";
 
 const char kCollectionOplogBufferName[] = "collection";
 const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
-
-// Set this to true to force background creation of snapshots even if --enableMajorityReadConcern
-// isn't specified. This can be used for A-B benchmarking to find how much overhead
-// repl::SnapshotThread introduces.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, false);
 
 // Set this to specify whether to use a collection to buffer the oplog on the destination server
 // during initial sync to prevent rolling over the oplog.
@@ -293,11 +287,6 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
         return;
     }
 
-    if (settings.isMajorityReadConcernEnabled() || enableReplSnapshotThread) {
-        log() << "Starting replication snapshot thread";
-        _snapshotThread = SnapshotThread::start(_service);
-    }
-
     log() << "Starting replication storage threads";
     _service->getGlobalStorageEngine()->setJournalListener(this);
 
@@ -324,11 +313,6 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     }
 
     _stopDataReplication_inlock(opCtx, &lk);
-
-    if (_snapshotThread) {
-        log() << "Stopping replication snapshot thread";
-        _snapshotThread->shutdown();
-    }
 
     if (_noopWriter) {
         LOG(1) << "Stopping noop writer";
@@ -802,25 +786,15 @@ void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
 
 void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(SnapshotInfo newCommitPoint) {
     auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
-    invariant(manager);  // This should never be called if there is no SnapshotManager.
-    manager->setCommittedSnapshot(newCommitPoint.name, newCommitPoint.opTime.getTimestamp());
+    if (manager) {
+        manager->setCommittedSnapshot(SnapshotName(newCommitPoint.opTime.getTimestamp()),
+                                      newCommitPoint.opTime.getTimestamp());
+    }
     notifyOplogMetadataWaiters(newCommitPoint.opTime);
 }
 
-void ReplicationCoordinatorExternalStateImpl::createSnapshot(OperationContext* opCtx,
-                                                             SnapshotName name) {
-    auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
-    invariant(manager);  // This should never be called if there is no SnapshotManager.
-    manager->createSnapshot(opCtx, name).transitional_ignore();
-}
-
-void ReplicationCoordinatorExternalStateImpl::forceSnapshotCreation() {
-    if (_snapshotThread)
-        _snapshotThread->forceSnapshot();
-}
-
 bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
-    return _snapshotThread != nullptr;
+    return _service->getGlobalStorageEngine()->getSnapshotManager() != nullptr;
 }
 
 void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(

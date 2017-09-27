@@ -303,8 +303,6 @@ public:
 
     virtual SnapshotName reserveSnapshotName(OperationContext* opCtx) override;
 
-    virtual void forceSnapshotCreation() override;
-
     virtual void createSnapshot(OperationContext* opCtx,
                                 OpTime timeOfSnapshot,
                                 SnapshotName name) override;

@@ -78,10 +78,8 @@ public:
 
         auto status = snapshotManager->prepareForCreateSnapshot(opCtx);
         if (status.isOK()) {
-            const auto name =
-                repl::ReplicationCoordinator::get(opCtx)->reserveSnapshotName(nullptr);
+            const auto name = repl::ReplicationCoordinator::get(opCtx)->reserveSnapshotName(opCtx);
             result.append("name", static_cast<long long>(name.asU64()));
-            status = snapshotManager->createSnapshot(opCtx, name);
         }
         return appendCommandStatus(result, status);
     }

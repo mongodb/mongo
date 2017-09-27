@@ -119,8 +119,8 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     assert.eq(doCommittedRead(oldPrimaryColl), 'old');
 
     // Reconnect oldPrimary to newPrimary, inducing rollback of the 'INVALID' write. This causes
-    // oldPrimary to drop all snapshots. oldPrimary still won't be connected to enough hosts to
-    // allow it to be elected, so newPrimary should stay primary for the rest of this test.
+    // oldPrimary to clear its read majority point. oldPrimary still won't be connected to enough
+    // hosts to allow it to be elected, so newPrimary should stay primary for the rest of this test.
     oldPrimary.reconnect(newPrimary);
     assert.soon(function() {
         try {
@@ -131,13 +131,6 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
         }
     }, '', 60 * 1000);
     assert.eq(doDirtyRead(oldPrimaryColl), 'new');
-    assertCommittedReadsBlock(oldPrimaryColl);
-
-    // Try asserts again after sleeping to make sure state doesn't change while pureSecondary isn't
-    // replicating.
-    sleep(1000);
-    assert.eq(doDirtyRead(oldPrimaryColl), 'new');
-    assertCommittedReadsBlock(oldPrimaryColl);
 
     // Resume oplog application on pureSecondary to allow the 'new' write to be committed. It should
     // now be visible as a committed read to both oldPrimary and newPrimary.
