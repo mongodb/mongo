@@ -2922,6 +2922,26 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplSetConfig& newC
     const ReplSetConfig oldConfig = _rsConfig;
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
+
+    // Warn if running --nojournal and writeConcernMajorityJournalDefault = false
+    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    if (storageEngine && !storageEngine->isDurable() &&
+        (newConfig.getWriteConcernMajorityShouldJournal() &&
+         (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal()))) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: This replica set is running without journaling enabled but the "
+              << startupWarningsLog;
+        log() << "**          writeConcernMajorityJournalDefault option to the replica set config "
+              << startupWarningsLog;
+        log() << "**          is set to true. The writeConcernMajorityJournalDefault "
+              << startupWarningsLog;
+        log() << "**          option to the replica set config must be set to false "
+              << startupWarningsLog;
+        log() << "**          or w:majority write concerns will never complete."
+              << startupWarningsLog;
+        log() << startupWarningsLog;
+    }
+
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
