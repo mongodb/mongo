@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/logical_time_validator.h"
@@ -39,6 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -104,7 +107,7 @@ SignedLogicalTime LogicalTimeValidator::_getProof(const KeysCollectionDocument& 
 }
 
 SignedLogicalTime LogicalTimeValidator::trySignLogicalTime(const LogicalTime& newTime) {
-    auto keyStatusWith = _keyManager->getKeyForSigning(nullptr, newTime);
+    auto keyStatusWith = _getKeyManagerCopy()->getKeyForSigning(nullptr, newTime);
     auto keyStatus = keyStatusWith.getStatus();
 
     if (keyStatus == ErrorCodes::KeyNotFound) {
@@ -118,13 +121,14 @@ SignedLogicalTime LogicalTimeValidator::trySignLogicalTime(const LogicalTime& ne
 
 SignedLogicalTime LogicalTimeValidator::signLogicalTime(OperationContext* opCtx,
                                                         const LogicalTime& newTime) {
-    auto keyStatusWith = _keyManager->getKeyForSigning(nullptr, newTime);
+    auto keyManager = _getKeyManagerCopy();
+    auto keyStatusWith = keyManager->getKeyForSigning(nullptr, newTime);
     auto keyStatus = keyStatusWith.getStatus();
 
     while (keyStatus == ErrorCodes::KeyNotFound) {
-        _keyManager->refreshNow(opCtx);
+        keyManager->refreshNow(opCtx);
 
-        keyStatusWith = _keyManager->getKeyForSigning(nullptr, newTime);
+        keyStatusWith = keyManager->getKeyForSigning(nullptr, newTime);
         keyStatus = keyStatusWith.getStatus();
 
         if (keyStatus == ErrorCodes::KeyNotFound) {
@@ -144,7 +148,8 @@ Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogic
         }
     }
 
-    auto keyStatus = _keyManager->getKeyForValidation(opCtx, newTime.getKeyId(), newTime.getTime());
+    auto keyStatus =
+        _getKeyManagerCopy()->getKeyForValidation(opCtx, newTime.getKeyId(), newTime.getTime());
     uassertStatusOK(keyStatus.getStatus());
 
     const auto& key = keyStatus.getValue().getKey();
@@ -163,15 +168,15 @@ Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogic
 }
 
 void LogicalTimeValidator::init(ServiceContext* service) {
-    _keyManager->startMonitoring(service);
+    _getKeyManagerCopy()->startMonitoring(service);
 }
 
 void LogicalTimeValidator::shutDown() {
-    _keyManager->stopMonitoring();
+    _getKeyManagerCopy()->stopMonitoring();
 }
 
 void LogicalTimeValidator::enableKeyGenerator(OperationContext* opCtx, bool doEnable) {
-    _keyManager->enableKeyGenerator(opCtx, doEnable);
+    _getKeyManagerCopy()->enableKeyGenerator(opCtx, doEnable);
 }
 
 bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
@@ -183,11 +188,38 @@ bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
 }
 
 bool LogicalTimeValidator::shouldGossipLogicalTime() {
-    return _keyManager->hasSeenKeys();
+    return _getKeyManagerCopy()->hasSeenKeys();
 }
 
 void LogicalTimeValidator::forceKeyRefreshNow(OperationContext* opCtx) {
-    _keyManager->refreshNow(opCtx);
+    _getKeyManagerCopy()->refreshNow(opCtx);
+}
+
+void LogicalTimeValidator::resetKeyManagerCache(ServiceContext* service) {
+    log() << "XXX resetting key manager cache";
+    if (auto keyManager = _getKeyManagerCopy()) {
+        keyManager->stopMonitoring();
+        keyManager->startMonitoring(service);
+        _lastSeenValidTime = SignedLogicalTime();
+        _timeProofService.resetCache();
+    }
+}
+
+void LogicalTimeValidator::resetKeyManager() {
+    log() << "XXX resetting key manager";
+    stdx::lock_guard<stdx::mutex> lk(_mutexKeyManager);
+    if (_keyManager) {
+        _keyManager->stopMonitoring();
+        _keyManager.reset();
+        _lastSeenValidTime = SignedLogicalTime();
+        _timeProofService.resetCache();
+    }
+}
+
+std::shared_ptr<KeysCollectionManagerSharding> LogicalTimeValidator::_getKeyManagerCopy() {
+    stdx::lock_guard<stdx::mutex> lk(_mutexKeyManager);
+    invariant(_keyManager);
+    return _keyManager;
 }
 
 }  // namespace mongo

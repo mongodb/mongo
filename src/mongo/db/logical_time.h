@@ -78,6 +78,11 @@ public:
     std::array<unsigned char, sizeof(uint64_t)> toUnsignedArray() const;
 
     /**
+     *  serialize into BSON object.
+     */
+    BSONObj toBSON() const;
+
+    /**
      * An uninitialized value of LogicalTime. Default constructed.
      */
     static const LogicalTime kUninitialized;

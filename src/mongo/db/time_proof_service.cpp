@@ -80,4 +80,11 @@ Status TimeProofService::checkProof(LogicalTime time, const TimeProof& proof, co
     return Status::OK();
 }
 
+void TimeProofService::resetCache() {
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    if (_cache) {
+        _cache = boost::none;
+    }
+}
+
 }  // namespace mongo

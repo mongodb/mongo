@@ -80,7 +80,7 @@ assert.eq(2, a_conn.getDB(name).foo.find().itcount(), 'invalid number of documen
 // restart B, which should rollback.
 replTest.restart(BID);
 
-awaitOpTime(b_conn, getLatestOp(a_conn).ts);
+awaitOpTime(b_conn, a_conn);
 replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
 

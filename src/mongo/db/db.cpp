@@ -73,7 +73,10 @@
 #include "mongo/db/initialize_snmp.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
+#include "mongo/db/keys_collection_client_direct.h"
+#include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/log_process_details.h"
@@ -736,10 +739,19 @@ ExitCode _initAndListen(int listenPort) {
             ShardingCatalogManager::create(
                 startupOpCtx->getServiceContext(),
                 makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
+        } else if (replSettings.usingReplSets()) {  // standalone replica set
+            auto keysCollectionClient = stdx::make_unique<KeysCollectionClientDirect>();
+            auto keyManager = std::make_shared<KeysCollectionManagerSharding>(
+                KeysCollectionManager::kKeyManagerPurposeString,
+                std::move(keysCollectionClient),
+                Seconds(KeysRotationIntervalSec));
+            keyManager->startMonitoring(startupOpCtx->getServiceContext());
+
+            LogicalTimeValidator::set(startupOpCtx->getServiceContext(),
+                                      stdx::make_unique<LogicalTimeValidator>(keyManager));
         }
 
         repl::ReplicationCoordinator::get(startupOpCtx.get())->startup(startupOpCtx.get());
-
         const unsigned long long missingRepl =
             checkIfReplMissingFromCommandLine(startupOpCtx.get());
         if (missingRepl) {

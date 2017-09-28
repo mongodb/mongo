@@ -25,6 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -32,6 +33,7 @@
 
 #include "mongo/db/keys_collection_cache_reader.h"
 #include "mongo/db/keys_collection_cache_reader_and_updater.h"
+#include "mongo/db/keys_collection_client.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
@@ -40,6 +42,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
@@ -81,13 +84,13 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
 
 }  // unnamed namespace
 
-KeysCollectionManagerSharding::KeysCollectionManagerSharding(std::string purpose,
-                                                             ShardingCatalogClient* client,
-                                                             Seconds keyValidForInterval)
-    : _purpose(std::move(purpose)),
+KeysCollectionManagerSharding::KeysCollectionManagerSharding(
+    std::string purpose, std::unique_ptr<KeysCollectionClient> client, Seconds keyValidForInterval)
+    : _client(std::move(client)),
+      _purpose(std::move(purpose)),
       _keyValidForInterval(keyValidForInterval),
-      _catalogClient(client),
-      _keysCache(_purpose, client) {}
+      _keysCache(_purpose, _client.get()) {}
+
 
 StatusWith<KeysCollectionDocument> KeysCollectionManagerSharding::getKeyForValidation(
     OperationContext* opCtx, long long keyId, const LogicalTime& forThisTime) {
@@ -142,6 +145,7 @@ void KeysCollectionManagerSharding::refreshNow(OperationContext* opCtx) {
 }
 
 void KeysCollectionManagerSharding::startMonitoring(ServiceContext* service) {
+    _keysCache.resetCache();
     _refresher.setFunc([this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
     _refresher.start(
         service, str::stream() << "monitoring keys for " << _purpose, _keyValidForInterval);
@@ -155,7 +159,7 @@ void KeysCollectionManagerSharding::enableKeyGenerator(OperationContext* opCtx, 
     if (doEnable) {
         _refresher.switchFunc(opCtx, [this](OperationContext* opCtx) {
             KeysCollectionCacheReaderAndUpdater keyGenerator(
-                _purpose, _catalogClient, _keyValidForInterval);
+                _purpose, _client.get(), _keyValidForInterval);
             auto keyGenerationStatus = keyGenerator.refresh(opCtx);
 
             if (ErrorCodes::isShutdownError(keyGenerationStatus.getStatus().code())) {

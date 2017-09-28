@@ -37,6 +37,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/logical_time_metadata_hook.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
@@ -88,18 +89,22 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
+    auto service = opCtx->getServiceContext();
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (storageGlobalParams.readOnly) {
-            CatalogCacheLoader::set(opCtx->getServiceContext(),
-                                    stdx::make_unique<ReadOnlyCatalogCacheLoader>());
+            CatalogCacheLoader::set(service, stdx::make_unique<ReadOnlyCatalogCacheLoader>());
         } else {
-            CatalogCacheLoader::set(opCtx->getServiceContext(),
+            CatalogCacheLoader::set(service,
                                     stdx::make_unique<ShardServerCatalogCacheLoader>(
                                         stdx::make_unique<ConfigServerCatalogCacheLoader>()));
         }
     } else {
-        CatalogCacheLoader::set(opCtx->getServiceContext(),
-                                stdx::make_unique<ConfigServerCatalogCacheLoader>());
+        CatalogCacheLoader::set(service, stdx::make_unique<ConfigServerCatalogCacheLoader>());
+    }
+
+    auto validator = LogicalTimeValidator::get(service);
+    if (validator) {  // The keyManager may be existing if the node was a part of a standalone RS.
+        validator->resetKeyManager();
     }
 
     return initializeGlobalShardingState(

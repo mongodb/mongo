@@ -265,21 +265,20 @@ void appendReplyMetadata(OperationContext* opCtx,
             rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
                 .writeToMetadata(metadataBob)
                 .transitional_ignore();
-            if (serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k36) {
-                if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-                    // No need to sign cluster times for internal clients.
-                    SignedLogicalTime currentTime(LogicalClock::get(opCtx)->getClusterTime(),
-                                                  TimeProofService::TimeProof(),
-                                                  0);
-                    rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                    logicalTimeMetadata.writeToMetadata(metadataBob);
-                } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
-                    auto currentTime =
-                        validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-                    rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                    logicalTimeMetadata.writeToMetadata(metadataBob);
-                }
+        }
+        if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k36) {
+            if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+                // No need to sign cluster times for internal clients.
+                SignedLogicalTime currentTime(
+                    LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
+                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                logicalTimeMetadata.writeToMetadata(metadataBob);
+            } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
+                auto currentTime =
+                    validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                logicalTimeMetadata.writeToMetadata(metadataBob);
             }
         }
     }

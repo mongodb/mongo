@@ -273,28 +273,6 @@ public:
     virtual StorageEngine* getGlobalStorageEngine() = 0;
 
     //
-    // Key manager, for HMAC keys.
-    //
-
-    /**
-     * Sets the key manager on this service context.
-     */
-    void setKeyManager(std::shared_ptr<KeysCollectionManager> keyManager) & {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _keyManager = std::move(keyManager);
-    }
-
-    /**
-     * Returns a pointer to the keys collection manager owned by this service context.
-     */
-    std::shared_ptr<KeysCollectionManager> getKeyManager() & {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _keyManager;
-    }
-
-    std::shared_ptr<KeysCollectionManager> getKeyManager() && = delete;
-
-    //
     // Global operation management.  This may not belong here and there may be too many methods
     // here.
     //
@@ -481,11 +459,6 @@ private:
      * Returns a new OperationContext. Private, for use by makeOperationContext.
      */
     virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) = 0;
-
-    /**
-     * The key manager.
-     */
-    std::shared_ptr<KeysCollectionManager> _keyManager;
 
     /**
      * The periodic runner.

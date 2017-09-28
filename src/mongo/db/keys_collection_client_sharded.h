@@ -28,46 +28,38 @@
 
 #pragma once
 
-#include <map>
+#include <memory>
+#include <string>
 
-#include "mongo/db/keys_collection_cache.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/base/status.h"
+#include "mongo/db/keys_collection_client.h"
 
 namespace mongo {
 
-class KeysCollectionClient;
+class OperationContext;
+class LogicalTime;
+class BSONObj;
+class ShardingCatalogClient;
 
-/**
- * Keeps a local cache of the keys with the ability to refresh.
- *
- * Note: This assumes that user does not manually update the keys collection.
- */
-class KeysCollectionCacheReader : public KeysCollectionCache {
+class KeysCollectionClientSharded : public KeysCollectionClient {
 public:
-    KeysCollectionCacheReader(std::string purpose, KeysCollectionClient* client);
-    ~KeysCollectionCacheReader() = default;
+    KeysCollectionClientSharded(ShardingCatalogClient*);
+    /**
+     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis.
+     */
+    StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+        OperationContext* opCtx, StringData purpose, const LogicalTime& newerThanThis) override;
 
     /**
-     * Check if there are new documents expiresAt > latestKeyDoc.expiresAt.
-     */
-    StatusWith<KeysCollectionDocument> refresh(OperationContext* opCtx) override;
+    * Directly inserts a key document to the storage
+    */
+    Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) override;
 
-    StatusWith<KeysCollectionDocument> getKey(const LogicalTime& forThisTime) override;
-    StatusWith<KeysCollectionDocument> getKeyById(long long keyId,
-                                                  const LogicalTime& forThisTime) override;
-
-    /**
-     * Resets the cache of keys if the client doesnt allow readConcern level:majority reads.
-     * This method intended to be called on the rollback of the node.
-     */
-    void resetCache();
+    bool supportsMajorityReads() const final {
+        return true;
+    }
 
 private:
-    const std::string _purpose;
-    KeysCollectionClient* const _client;
-
-    stdx::mutex _cacheMutex;
-    std::map<LogicalTime, KeysCollectionDocument> _cache;  // expiresAt -> KeysDocument
+    ShardingCatalogClient* const _catalogClient;
 };
-
 }  // namespace mongo

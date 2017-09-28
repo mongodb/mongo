@@ -82,8 +82,8 @@
 
     testDB = replTest.getPrimary().getDB("test");
     res = assert.commandWorked(testDB.runCommand("insert", {insert: "foo", documents: [{x: 4}]}));
-    assert(!containsValidLogicalTimeBson(res),
-           "Expected command body from a mongod in a non-sharded replica set to not " +
+    assert(containsValidLogicalTimeBson(res),
+           "Expected command body from a mongod in a non-sharded replica set to " +
                "contain logicalTime, received: " + tojson(res));
 
     replTest.stopSet();

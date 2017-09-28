@@ -8,8 +8,8 @@
     "use strict";
 
     var name = 'lastOpVisible';
-    var replTest =
-        new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
+    var replTest = new ReplSetTest(
+        {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}, waitForKeys: true});
 
     try {
         replTest.startSet();

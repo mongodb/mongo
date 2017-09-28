@@ -15,7 +15,7 @@ var nodes = {
 };
 
 function runDowngradeTest(protocolVersion) {
-    var rst = new ReplSetTest({name: name, nodes: nodes});
+    var rst = new ReplSetTest({name: name, nodes: nodes, waitForKeys: true});
     rst.startSet();
     var replSetConfig = rst.getReplSetConfig();
     replSetConfig.protocolVersion = protocolVersion;

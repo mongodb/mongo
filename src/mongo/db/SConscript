@@ -815,6 +815,7 @@ env.Library(
         "index/index_descriptor",
         "index_d",
         "introspect",
+        'keys_collection_client_direct',
         "matcher/expressions_mongod_only",
         "op_observer_d",
         "write_ops",
@@ -1222,6 +1223,7 @@ env.Library(
         'keys_collection_manager.cpp',
     ],
     LIBDEPS=[
+        'server_parameters',
     ],
 )
 
@@ -1250,6 +1252,34 @@ env.Library(
 )
 
 env.Library(
+    target='keys_collection_client_direct',
+    source=[
+        'keys_collection_client_direct.cpp',
+    ],
+    LIBDEPS=[
+        'logical_clock',
+        'keys_collection_document',
+        'logical_time',
+        'server_options',
+        '$BUILD_DIR/mongo/s/client/rs_local_client',
+    ],
+)
+
+env.Library(
+    target='keys_collection_client_sharded',
+    source=[
+        'keys_collection_client_sharded.cpp',
+    ],
+    LIBDEPS=[
+        'logical_clock',
+        'keys_collection_document',
+        'logical_time',
+        'server_options',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
+    ],
+)
+
+env.Library(
     target='keys_collection_manager_sharding',
     source=[
         'keys_collection_manager_sharding.cpp',
@@ -1262,7 +1292,7 @@ env.Library(
         'keys_collection_manager',
         'logical_time',
         'server_options',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
+        'keys_collection_client_sharded',
     ],
 )
 

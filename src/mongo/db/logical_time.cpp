@@ -68,15 +68,19 @@ LogicalTime LogicalTime::addTicks(uint64_t ticks) const {
 }
 
 std::string LogicalTime::toString() const {
-    StringBuilder buf;
-    buf << asTimestamp().toString();
-    return buf.str();
+    return toBSON().toString();
 }
 
 std::array<unsigned char, sizeof(uint64_t)> LogicalTime::toUnsignedArray() const {
     std::array<unsigned char, sizeof(uint64_t)> output;
     DataView(reinterpret_cast<char*>(output.data())).write(LittleEndian<uint64_t>{_time});
     return output;
+}
+
+BSONObj LogicalTime::toBSON() const {
+    BSONObjBuilder bldr;
+    bldr.append("ts", asTimestamp());
+    return bldr.obj();
 }
 
 }  // namespace mongo

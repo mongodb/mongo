@@ -33,6 +33,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keys_collection_cache_reader_and_updater.h"
+#include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
@@ -59,6 +60,8 @@ protected:
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
+        _catalogClient = stdx::make_unique<KeysCollectionClientSharded>(
+            Grid::get(operationContext())->catalogClient());
     }
 
     std::unique_ptr<DistLockManager> makeDistLockManager(
@@ -66,11 +69,17 @@ protected:
         invariant(distLockCatalog);
         return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
     }
+
+    KeysCollectionClient* catalogClient() const {
+        return _catalogClient.get();
+    }
+
+private:
+    std::unique_ptr<KeysCollectionClient> _catalogClient;
 };
 
 TEST_F(CacheUpdaterTest, ShouldCreate2KeysFromEmpty) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient();
-    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 2)));
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
@@ -103,8 +112,7 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysFromEmpty) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldPropagateWriteError) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient();
-    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 2)));
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
@@ -116,8 +124,7 @@ TEST_F(CacheUpdaterTest, ShouldPropagateWriteError) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient();
-    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
     LogicalClock::get(operationContext())
         ->setClusterTimeFromTrustedSource(LogicalTime(Timestamp(100, 2)));
@@ -171,8 +178,7 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfNoValidKeyAfterCurrent) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient();
-    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
     LogicalClock::get(operationContext())
         ->setClusterTimeFromTrustedSource(LogicalTime(Timestamp(108, 2)));
@@ -263,8 +269,7 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfNoValidKeyAfterCurrent) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldCreate2KeysIfAllKeysAreExpired) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient();
-    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
     LogicalClock::get(operationContext())
         ->setClusterTimeFromTrustedSource(LogicalTime(Timestamp(120, 2)));
@@ -368,8 +373,7 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysIfAllKeysAreExpired) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeyIfThereAre2UnexpiredKeys) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient();
-    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
     LogicalClock::get(operationContext())
         ->setClusterTimeFromTrustedSource(LogicalTime(Timestamp(100, 2)));
@@ -435,8 +439,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeyIfThereAre2UnexpiredKeys) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
-    auto catalogClient = Grid::get(operationContext())->catalogClient();
-    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
@@ -457,8 +460,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeysInFeatureCompatiblityVersion34) {
     serverGlobalParams.featureCompatibility.version.store(
         ServerGlobalParams::FeatureCompatibility::Version::k34);
 
-    auto catalogClient = Grid::get(operationContext())->catalogClient();
-    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient, Seconds(5));
+    KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);

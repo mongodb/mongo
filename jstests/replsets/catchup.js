@@ -8,7 +8,7 @@
     load("jstests/replsets/rslib.js");
 
     var name = "catch_up";
-    var rst = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+    var rst = new ReplSetTest({name: name, nodes: 3, useBridge: true, waitForKeys: true});
 
     rst.startSet();
     var conf = rst.getReplSetConfig();

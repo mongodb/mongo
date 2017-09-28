@@ -33,6 +33,7 @@
 #include "mongo/db/repl/rollback_impl.h"
 
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
@@ -131,6 +132,11 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // At this point these functions need to always be called before returning, even on failure.
     // These functions fassert on failure.
     ON_BLOCK_EXIT([this, opCtx] {
+        auto validator = LogicalTimeValidator::get(opCtx);
+        if (validator) {
+            validator->resetKeyManagerCache(opCtx->getClient()->getServiceContext());
+        }
+
         _checkShardIdentityRollback(opCtx);
         _resetSessions(opCtx);
         _transitionFromRollbackToSecondary(opCtx);

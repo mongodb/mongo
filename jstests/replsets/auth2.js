@@ -4,20 +4,20 @@
 // @tags: [requires_persistence]
 
 (function() {
-    var testInvalidAuthStates = function(replSetTest) {
+    var testInvalidAuthStates = function(replSetTest, expectedState) {
         print("check that 0 is in recovering");
-        replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
+        replSetTest.waitForState(replSetTest.nodes[0], expectedState);
 
         print("shut down 1, 0 still in recovering.");
         replSetTest.stop(1);
         sleep(5);
 
-        replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
+        replSetTest.waitForState(replSetTest.nodes[0], expectedState);
 
         print("shut down 2, 0 becomes a secondary.");
         replSetTest.stop(2);
 
-        replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.SECONDARY);
+        replSetTest.waitForState(replSetTest.nodes[0], expectedState);
 
         replSetTest.restart(1, {"keyFile": key1});
         replSetTest.restart(2, {"keyFile": key1});
@@ -30,7 +30,7 @@
     var key1 = path + "key1";
     var key2 = path + "key2";
 
-    var replSetTest = new ReplSetTest({name: name, nodes: 3});
+    var replSetTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
     var nodes = replSetTest.startSet();
     var hostnames = replSetTest.nodeList();
     replSetTest.initiate({
@@ -58,7 +58,7 @@
     // auth to all nodes with auth
     replSetTest.nodes[1].getDB("admin").auth("foo", "bar");
     replSetTest.nodes[2].getDB("admin").auth("foo", "bar");
-    testInvalidAuthStates(replSetTest);
+    testInvalidAuthStates(replSetTest, ReplSetTest.State.RECOVERING);
 
     print("restart mongod with bad keyFile");
 
@@ -69,12 +69,10 @@
     replSetTest.nodes[0].getDB("admin").auth("foo", "bar");
     replSetTest.nodes[1].getDB("admin").auth("foo", "bar");
     replSetTest.nodes[2].getDB("admin").auth("foo", "bar");
-    testInvalidAuthStates(replSetTest);
+    testInvalidAuthStates(replSetTest, ReplSetTest.State.RECOVERING);
 
     replSetTest.stop(0);
     m = replSetTest.restart(0, {"keyFile": key1});
-
-    print("0 becomes a secondary");
 
     replSetTest.stopSet();
 }());

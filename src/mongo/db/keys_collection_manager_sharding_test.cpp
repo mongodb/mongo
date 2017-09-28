@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/logical_clock.h"
@@ -68,9 +69,10 @@ protected:
         clockSource->advance(Seconds(1));
 
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
-        auto catalogClient = Grid::get(operationContext())->catalogClient();
-        _keyManager =
-            stdx::make_unique<KeysCollectionManagerSharding>("dummy", catalogClient, Seconds(1));
+        auto catalogClient = stdx::make_unique<KeysCollectionClientSharded>(
+            Grid::get(operationContext())->catalogClient());
+        _keyManager = stdx::make_unique<KeysCollectionManagerSharding>(
+            "dummy", std::move(catalogClient), Seconds(1));
     }
 
     void tearDown() override {

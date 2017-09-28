@@ -106,10 +106,28 @@ public:
      */
     void forceKeyRefreshNow(OperationContext* opCtx);
 
+    /**
+     * Reset the key manager to prevent the former members of standalone replica set to use old
+     * keys with sharded cluster.
+     */
+    void resetKeyManager();
+
+    /**
+     * Reset the key manager cache of keys.
+     */
+    void resetKeyManagerCache(ServiceContext* service);
+
 private:
+    /**
+     *  Returns the copy of the _keyManager to work when its reset by resetKeyManager call.
+     */
+    std::shared_ptr<KeysCollectionManagerSharding> _getKeyManagerCopy();
+
+
     SignedLogicalTime _getProof(const KeysCollectionDocument& keyDoc, LogicalTime newTime);
 
-    stdx::mutex _mutex;
+    stdx::mutex _mutex;            // protects _lastSeenValidTime
+    stdx::mutex _mutexKeyManager;  // protects _keyManager
     SignedLogicalTime _lastSeenValidTime;
     TimeProofService _timeProofService;
     std::shared_ptr<KeysCollectionManagerSharding> _keyManager;

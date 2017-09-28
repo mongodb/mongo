@@ -197,20 +197,16 @@ var getLastOpTime;
         return master;
     };
 
-    awaitOpTime = function(node, opTime) {
-        var ts, ex;
+    awaitOpTime = function(catchingUpNode, latestOpTimeNode) {
+        var ts, ex, opTime;
         assert.soon(
             function() {
                 try {
                     // The following statement extracts the timestamp field from the most recent
                     // element of
                     // the oplog, and stores it in "ts".
-                    ts = node.getDB("local")['oplog.rs']
-                             .find({})
-                             .sort({'$natural': -1})
-                             .limit(1)
-                             .next()
-                             .ts;
+                    ts = getLatestOp(catchingUpNode).ts;
+                    opTime = getLatestOp(latestOpTimeNode).ts;
                     if ((ts.t == opTime.t) && (ts.i == opTime.i)) {
                         return true;
                     }
@@ -221,8 +217,8 @@ var getLastOpTime;
                 }
             },
             function() {
-                var message = "Node " + node + " only reached optime " + tojson(ts) + " not " +
-                    tojson(opTime);
+                var message = "Node " + catchingUpNode + " only reached optime " + tojson(ts) +
+                    " not " + tojson(opTime);
                 if (ex) {
                     message += "; last attempt failed with exception " + tojson(ex);
                 }
