@@ -50,7 +50,7 @@ void testExprRewrite(BSONObj expr, BSONObj expectedMatch) {
     auto expression =
         Expression::parseOperand(expCtx, expr.firstElement(), expCtx->variablesParseState);
 
-    auto result = RewriteExpr::rewrite(expression);
+    auto result = RewriteExpr::rewrite(expression, expCtx->getCollator());
 
     // Confirm expected match.
     if (!expectedMatch.isEmpty()) {
@@ -246,14 +246,14 @@ TEST(RewriteExpr, InWithoutLhsFieldPathDoesNotRewriteToMatch) {
 TEST(RewriteExpr, NestedAndWithTwoFieldPathsWithinOrPartiallyRewriteToMatch) {
     const BSONObj expr = fromjson(
         "{$expr: {$or: [{$and: [{$eq: ['$x', '$w']}, {$eq: ['$z', 5]}]}, {$eq: ['$y', 4]}]}}");
-    const BSONObj expectedMatch = fromjson("{$or: [{$and: [{z: {$eq: 5}}]}, {y: {$eq: 4}}]}");
+    const BSONObj expectedMatch = fromjson("{$or: [{z: {$eq: 5}}, {y: {$eq: 4}}]}");
 
     testExprRewrite(expr, expectedMatch);
 }
 
 TEST(RewriteExpr, AndWithDistinctMatchAndNonMatchSubTreeSplitsOnRewrite) {
     const BSONObj expr = fromjson("{$expr: {$and: [{$eq: ['$x', 1]}, {$eq: ['$y', '$z']}]}}");
-    const BSONObj expectedMatch = fromjson("{$and: [{x: {$eq: 1}}]}");
+    const BSONObj expectedMatch = fromjson("{x: {$eq: 1}}");
 
     testExprRewrite(expr, expectedMatch);
 }
@@ -291,7 +291,7 @@ TEST(RewriteExpr, ComplexSupersetMatchRewritesToMatchSuperset) {
         "        $or: ["
         "            {d: {$eq: 1}},"
         "            {e: {$eq: 3}},"
-        "            {$and: [{f: {$eq: 1}}]}"
+        "            {f: {$eq: 1}}"
         "        ]"
         "      }"
         "  ]"
@@ -303,7 +303,7 @@ TEST(RewriteExpr, ComplexSupersetMatchRewritesToMatchSuperset) {
 TEST(RewriteExpr, OrWithAndContainingMatchAndNonMatchChildPartiallyRewritesToMatch) {
     const BSONObj expr = fromjson(
         "{$expr: {$or: [{$eq: ['$x', 3]}, {$and: [{$eq: ['$y', 4]}, {$eq: ['$y', '$z']}]}]}}");
-    const BSONObj expectedMatch = fromjson("{$or: [{x: {$eq: 3}}, {$and: [{y: {$eq: 4}}]}]}");
+    const BSONObj expectedMatch = fromjson("{$or: [{x: {$eq: 3}}, {y: {$eq: 4}}]}");
 
     testExprRewrite(expr, expectedMatch);
 }

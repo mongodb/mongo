@@ -31,13 +31,21 @@
 #include "mongo/db/matcher/expression_expr.h"
 
 namespace mongo {
+ExprMatchExpression::ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : MatchExpression(MatchType::EXPRESSION), _expCtx(expCtx), _expression(expr) {}
+
 ExprMatchExpression::ExprMatchExpression(BSONElement elem,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : MatchExpression(MatchType::EXPRESSION),
-      _expCtx(expCtx),
-      _expression(Expression::parseOperand(expCtx, elem, expCtx->variablesParseState)) {}
+    : ExprMatchExpression(Expression::parseOperand(expCtx, elem, expCtx->variablesParseState),
+                          expCtx) {}
 
 bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
+    if (_rewriteResult && _rewriteResult->matchExpression() &&
+        !_rewriteResult->matchExpression()->matches(doc, details)) {
+        return false;
+    }
+
     Document document(doc->toBSON());
     auto value = _expression->evaluate(document);
     return value.coerceToBool();
@@ -66,6 +74,10 @@ bool ExprMatchExpression::equivalent(const MatchExpression* other) const {
 
 void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
     _expCtx->setCollator(collator);
+
+    if (_rewriteResult && _rewriteResult->matchExpression()) {
+        _rewriteResult->matchExpression()->setCollator(collator);
+    }
 }
 
 
@@ -82,7 +94,25 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
 MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() const {
     return [](std::unique_ptr<MatchExpression> expression) {
         auto& exprMatchExpr = static_cast<ExprMatchExpression&>(*expression);
+
+        // If '_expression' can be rewritten to a MatchExpression, we will return a $and node with
+        // both the original ExprMatchExpression and the MatchExpression rewrite as children.
+        // Exiting early prevents additional calls to optimize from performing additional rewrites
+        // and adding duplicate MatchExpression sub-trees to the tree.
+        if (exprMatchExpr._rewriteResult) {
+            return expression;
+        }
+
         exprMatchExpr._expression = exprMatchExpr._expression->optimize();
+        exprMatchExpr._rewriteResult =
+            RewriteExpr::rewrite(exprMatchExpr._expression, exprMatchExpr._expCtx->getCollator());
+
+        if (exprMatchExpr._rewriteResult->matchExpression()) {
+            auto andMatch = stdx::make_unique<AndMatchExpression>();
+            andMatch->add(exprMatchExpr._rewriteResult->releaseMatchExpression().release());
+            andMatch->add(expression.release());
+            expression = std::move(andMatch);
+        }
 
         return expression;
     };

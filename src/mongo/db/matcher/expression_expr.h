@@ -32,6 +32,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 
@@ -46,8 +47,7 @@ public:
     ExprMatchExpression(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
-                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : MatchExpression(MatchType::EXPRESSION), _expCtx(expCtx), _expression(expr) {}
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
         MONGO_UNREACHABLE;
@@ -96,7 +96,8 @@ private:
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     boost::intrusive_ptr<Expression> _expression;
-};
 
+    boost::optional<RewriteExpr::RewriteResult> _rewriteResult;
+};
 
 }  // namespace mongo

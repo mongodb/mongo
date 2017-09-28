@@ -798,7 +798,8 @@ TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized)
     BSONObjBuilder builder;
     matchSource.getMatchExpression()->serialize(&builder);
     auto serializedMatch = builder.obj();
-    auto expectedMatch = fromjson("{$expr: {$eq: ['$_id', {$const: 5}]}}");
+    auto expectedMatch =
+        fromjson("{$and: [{_id: {$eq: 5}}, {$expr: {$eq: ['$_id', {$const: 5}]}}]}");
 
     ASSERT_VALUE_EQ(Value(serializedMatch), Value(expectedMatch));
 }

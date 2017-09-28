@@ -52,8 +52,12 @@ public:
               _matchExprStringStorage(std::move(matchExprStringStorage)),
               _matchExprElemStorage(std::move(matchExprElemStorage)) {}
 
-        const MatchExpression* matchExpression() const {
+        MatchExpression* matchExpression() const {
             return _matchExpression.get();
+        }
+
+        std::unique_ptr<MatchExpression> releaseMatchExpression() {
+            return std::move(_matchExpression);
         }
 
     private:
@@ -72,9 +76,12 @@ public:
      * superset of the documents matched by 'expr'. Returns the MatchExpression as a RewriteResult.
      * If a rewrite is not possible, RewriteResult::matchExpression() will return a nullptr.
      */
-    static RewriteResult rewrite(const boost::intrusive_ptr<Expression>& expr);
+    static RewriteResult rewrite(const boost::intrusive_ptr<Expression>& expr,
+                                 const CollatorInterface* collator);
 
 private:
+    RewriteExpr(const CollatorInterface* collator) : _collator(collator) {}
+
     // Returns rewritten MatchExpression or null unique_ptr if not rewritable.
     std::unique_ptr<MatchExpression> _rewriteExpression(
         const boost::intrusive_ptr<Expression>& currExprNode);
@@ -109,6 +116,7 @@ private:
 
     std::vector<BSONObj> _matchExprElemStorage;
     std::vector<std::string> _matchExprStringStorage;
+    const CollatorInterface* _collator;
 };
 
 }  // namespace mongo

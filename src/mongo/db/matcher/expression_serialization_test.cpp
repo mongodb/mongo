@@ -974,8 +974,7 @@ TEST(SerializeBasic, ExpressionNotWithGeoSerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(
         *reserialized.getQuery(),
         fromjson("{$nor: [{$and: [{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: "
-                 "[[[0,0], "
-                 "[5,0], [5, 5], [0, 5], [0, 0]]]}}}}]}]}"));
+                 "[[[ 0, 0 ], [5, 0], [5, 5], [0, 5], [0, 0]]]}}}}]}]}"));
 
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
     BSONObj obj =

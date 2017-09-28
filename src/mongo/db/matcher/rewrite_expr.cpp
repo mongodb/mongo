@@ -40,19 +40,19 @@ namespace mongo {
 
 using CmpOp = ExpressionCompare::CmpOp;
 
-RewriteExpr::RewriteResult RewriteExpr::rewrite(
-    const boost::intrusive_ptr<Expression>& expression) {
+RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expression>& expression,
+                                                const CollatorInterface* collator) {
     LOG(5) << "Expression prior to rewrite: " << expression->serialize(false);
 
-    RewriteExpr rewriteExpr;
+    RewriteExpr rewriteExpr(collator);
     std::unique_ptr<MatchExpression> matchExpression;
 
     if (auto matchTree = rewriteExpr._rewriteExpression(expression)) {
         matchExpression = std::move(matchTree);
         LOG(5) << "Post-rewrite MatchExpression: " << matchExpression->toString();
+        matchExpression = MatchExpression::optimize(std::move(matchExpression));
+        LOG(5) << "Post-rewrite/post-optimized MatchExpression: " << matchExpression->toString();
     }
-
-    // TODO SERVER-30989: Optimize via MatchExpression::optimize().
 
     return {std::move(matchExpression),
             std::move(rewriteExpr._matchExprStringStorage),
@@ -151,6 +151,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
     inValues.elems(elementList);
 
     auto matchInExpr = stdx::make_unique<InMatchExpression>();
+    matchInExpr->setCollator(_collator);
     uassertStatusOK(matchInExpr->init(fieldPath));
     uassertStatusOK(matchInExpr->setEqualities(elementList));
 
@@ -254,6 +255,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
     }
 
     uassertStatusOK(compMatchExpr->init(fieldAndValue.fieldName(), fieldAndValue));
+    compMatchExpr->setCollator(_collator);
 
     if (notMatchExpr) {
         uassertStatusOK(notMatchExpr->init(compMatchExpr.release()));
