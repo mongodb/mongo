@@ -90,16 +90,6 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                           << ", oplog: "
                           << redact(oplogEntry.toBSON()),
             opType == repl::OpTypeEnum::kUpdate);
-        uassert(
-            40610,
-            str::stream() << "findAndModify retry request: " << redact(request.toBSON())
-                          << " is not compatible with previous write in the transaction of type: "
-                          << OpType_serializer(oplogEntry.getOpType())
-                          << ", oplogTs: "
-                          << ts.toString()
-                          << ", oplog: "
-                          << redact(oplogEntry.toBSON()),
-            !request.isUpsert());
 
         if (request.shouldReturnNew()) {
             uassert(40611,

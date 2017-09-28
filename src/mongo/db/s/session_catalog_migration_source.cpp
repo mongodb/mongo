@@ -76,7 +76,6 @@ BSONObj SessionCatalogMigrationSource::getLastFetchedOplog() {
 
     {
         stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
-        invariant(!_lastFetchedNewWriteOplog.isEmpty());
         return _lastFetchedNewWriteOplog;
     }
 }
@@ -101,11 +100,13 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationConte
                 return false;
             }
 
-            _lastFetchedOplog = nextOplog.toBSON().getOwned();
-
+            auto nextOplogBSON = nextOplog.toBSON().getOwned();
             auto doc = fetchPrePostImageOplog(opCtx, nextOplog);
             if (!doc.isEmpty()) {
-                _lastFetchedOplogBuffer.push_back(doc);
+                _lastFetchedOplogBuffer.push_back(nextOplogBSON);
+                _lastFetchedOplog = doc;
+            } else {
+                _lastFetchedOplog = nextOplogBSON;
             }
 
             return true;

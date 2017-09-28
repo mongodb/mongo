@@ -39,6 +39,7 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_session_id.h"
+#include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -211,6 +212,8 @@ private:
 
     State _state{READY};
     std::string _errmsg;
+
+    std::unique_ptr<SessionCatalogMigrationDestination> _sessionMigration;
 };
 
 }  // namespace mongo

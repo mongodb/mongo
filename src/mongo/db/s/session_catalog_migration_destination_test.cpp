@@ -1303,6 +1303,59 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     ASSERT_FALSE(sessionMigration.getErrMsg().empty());
 }
 
+TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatements) {
+    const NamespaceString kNs("a.b");
+    const auto sessionId = makeLogicalSessionIdForTest();
+
+    auto opCtx = operationContext();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(19);
+
+    insertDocWithSessionInfo(sessionInfo, kNs, BSON("_id" << 46), 30);
+
+    SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
+    sessionMigration.start(getServiceContext());
+    sessionMigration.finish();
+
+    OplogEntry oplog1(
+        OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
+    oplog1.setOperationSessionInfo(sessionInfo);
+    oplog1.setStatementId(23);
+
+    OplogEntry oplog2(OpTime(Timestamp(70, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
+    oplog2.setOperationSessionInfo(sessionInfo);
+    oplog2.setStatementId(30);
+
+    OplogEntry oplog3(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
+    oplog3.setOperationSessionInfo(sessionInfo);
+    oplog3.setStatementId(45);
+
+    returnOplog({oplog1, oplog2, oplog3});
+    returnOplog({});
+
+    sessionMigration.join();
+
+    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+
+    auto session = getSessionWithTxn(opCtx, sessionId, 19);
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(19));
+
+    ASSERT_TRUE(historyIter.hasNext());
+    checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
+
+    ASSERT_TRUE(historyIter.hasNext());
+    checkOplogWithNestedOplog(oplog1, historyIter.next(opCtx));
+
+    ASSERT_TRUE(historyIter.hasNext());
+    auto firstInsertOplog = historyIter.next(opCtx);
+
+    ASSERT_TRUE(firstInsertOplog.getOpType() == OpTypeEnum::kInsert);
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 46), firstInsertOplog.getObject());
+    ASSERT_TRUE(firstInsertOplog.getStatementId());
+    ASSERT_EQ(30, *firstInsertOplog.getStatementId());
+}
+
 }  // namespace
 
 }  // namespace mongo

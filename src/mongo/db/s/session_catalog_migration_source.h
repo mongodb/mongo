@@ -68,6 +68,7 @@ public:
 
     /**
      * Returns the oplog document that was last fetched by the fetchNextOplog call.
+     * Returns an empty object if there are no oplog to fetch.
      */
     BSONObj getLastFetchedOplog();
 

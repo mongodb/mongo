@@ -273,23 +273,6 @@ TEST_F(FindAndModifyRetryability, NestedUpsert) {
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), result.getValue());
 }
 
-TEST_F(FindAndModifyRetryability, ErrorIfRequestIsUpsertButOplogIsUpdate) {
-    auto request = FindAndModifyRequest::makeUpdate(kNs, BSONObj(), BSONObj());
-    request.setUpsert(true);
-
-    Timestamp imageTs(120, 3);
-    repl::OplogEntry noteOplog(
-        repl::OpTime(imageTs, 1), 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
-
-    insertOplogEntry(noteOplog);
-
-    repl::OplogEntry oplog(
-        repl::OpTime(), 0, repl::OpTypeEnum::kUpdate, kNs, BSON("x" << 1), BSON("y" << 1));
-    oplog.setPreImageTs(imageTs);
-
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, oplog), AssertionException);
-}
-
 TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithUpdateWithoutUpsertErrors) {
     auto request = FindAndModifyRequest::makeUpdate(kNs, BSONObj(), BSONObj());
     request.setUpsert(false);

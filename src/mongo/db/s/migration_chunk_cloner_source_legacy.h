@@ -37,6 +37,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_session_id.h"
+#include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/s/move_chunk_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/memory.h"
@@ -72,11 +73,19 @@ public:
 
     bool isDocumentInMigratingChunk(const BSONObj& doc) override;
 
-    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc) override;
+    void onInsertOp(OperationContext* opCtx,
+                    const BSONObj& insertedDoc,
+                    const Timestamp& oplogTs) override;
 
-    void onUpdateOp(OperationContext* opCtx, const BSONObj& updatedDoc) override;
+    void onUpdateOp(OperationContext* opCtx,
+                    const BSONObj& updatedDoc,
+                    const Timestamp& oplogTs,
+                    const Timestamp& prePostImageTs) override;
 
-    void onDeleteOp(OperationContext* opCtx, const BSONObj& deletedDocId) override;
+    void onDeleteOp(OperationContext* opCtx,
+                    const BSONObj& deletedDocId,
+                    const Timestamp& oplogTs,
+                    const Timestamp& preImageTs) override;
 
     // Legacy cloner specific functionality
 
@@ -120,6 +129,8 @@ public:
      * NOTE: Must be called with the collection lock held in at least IS mode.
      */
     Status nextModsBatch(OperationContext* opCtx, Database* db, BSONObjBuilder* builder);
+
+    void nextSessionMigrationBatch(OperationContext* opCtx, BSONArrayBuilder* arrBuilder);
 
 private:
     friend class DeleteNotificationStage;
@@ -182,6 +193,8 @@ private:
     // Registered deletion notifications plan executor, which will listen for document deletions
     // during the cloning stage
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _deleteNotifyExec;
+
+    SessionCatalogMigrationSource _sessionCatalogSource;
 
     // Protects the entries below
     stdx::mutex _mutex;
