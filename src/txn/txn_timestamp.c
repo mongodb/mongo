@@ -476,6 +476,7 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, wt_timestamp_t *ts,
 {
 	WT_TXN *txn = &session->txn;
 	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+	char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 1];
 	bool older_than_oldest_ts, older_than_stable_ts;
 
 	/*
@@ -501,15 +502,18 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, wt_timestamp_t *ts,
 
 	/*
 	 * Compare against the commit timestamp of the current transaction.
-	 * Return an error if the given timestamp is older than the commit
-	 * timestamp.
+	 * Return an error if the given timestamp is older than the first
+	 * commit timestamp.
 	 */
 	if (cmp_commit && F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
-	    __wt_timestamp_cmp(ts, &txn->commit_timestamp) < 0)
+	    __wt_timestamp_cmp(ts, &txn->first_commit_timestamp) < 0) {
+		WT_RET(__wt_timestamp_to_hex_string(
+		    session, hex_timestamp, &txn->first_commit_timestamp));
 		WT_RET_MSG(session, EINVAL,
-		    "commit timestamp %.*s older than the current "
-		    "commit timestamp set for this transaction",
-		    (int)cval->len, cval->str);
+		    "commit timestamp %.*s older than the first "
+		    "commit timestamp %s for this transaction",
+		    (int)cval->len, cval->str, hex_timestamp);
+	}
 
 	return (0);
 }
