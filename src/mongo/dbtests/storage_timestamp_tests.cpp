@@ -291,6 +291,73 @@ public:
     }
 };
 
+class SecondaryDeleteTimes : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // In order for applyOps to assign timestamps, we must be in non-replicated mode.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        // Create a new collection.
+        NamespaceString nss("unittests.timestampedDeletes");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+
+        // Insert some documents.
+        const std::int32_t docsToInsert = 10;
+        const LogicalTime firstInsertTime = _clock->reserveTicks(docsToInsert);
+        const LogicalTime lastInsertTime = firstInsertTime.addTicks(docsToInsert - 1);
+        WriteUnitOfWork wunit(_opCtx);
+        for (std::int32_t num = 0; num < docsToInsert; ++num) {
+            insertDocument(
+                autoColl.getCollection(),
+                InsertStatement(BSON("_id" << num << "a" << num),
+                                SnapshotName(firstInsertTime.addTicks(num).asTimestamp()),
+                                0LL));
+        }
+        wunit.commit();
+        ASSERT_EQ(docsToInsert, itCount(autoColl.getCollection()));
+
+        // Delete all documents one at a time.
+        const LogicalTime startDeleteTime = _clock->reserveTicks(docsToInsert);
+        for (std::int32_t num = 0; num < docsToInsert; ++num) {
+            BSONObjBuilder result;
+            ASSERT_OK(applyOps(
+                _opCtx,
+                nss.db().toString(),
+                BSON("applyOps" << BSON_ARRAY(BSON(
+                         "ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL << "h"
+                              << 0xBEEFBEEFLL
+                              << "v"
+                              << 2
+                              << "op"
+                              << "d"
+                              << "ns"
+                              << nss.ns()
+                              << "ui"
+                              << autoColl.getCollection()->uuid().get()
+                              << "o"
+                              << BSON("_id" << num)))),
+                &result));
+        }
+
+        for (std::int32_t num = 0; num <= docsToInsert; ++num) {
+            // The first loop queries at `lastInsertTime` and should count all documents. Querying
+            // at each successive tick counts one less document.
+            auto recoveryUnit = _opCtx->recoveryUnit();
+            recoveryUnit->abandonSnapshot();
+            ASSERT_OK(recoveryUnit->selectSnapshot(
+                SnapshotName(lastInsertTime.addTicks(num).asTimestamp())));
+            ASSERT_EQ(docsToInsert - num, itCount(autoColl.getCollection()));
+        }
+    }
+};
+
 class SecondaryUpdateTimes : public StorageTimestampTest {
 public:
     void run() {
@@ -377,6 +444,7 @@ public:
     void setupTests() {
         add<SecondaryInsertTimes>();
         add<SecondaryArrayInsertTimes>();
+        add<SecondaryDeleteTimes>();
         add<SecondaryUpdateTimes>();
     }
 };

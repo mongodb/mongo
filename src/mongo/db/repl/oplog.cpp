@@ -1273,13 +1273,26 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 str::stream() << "Failed to apply delete due to missing _id: " << op.toString(),
                 o.hasField("_id"));
 
-        if (opType[1] == 0) {
-            deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
-        } else
-            verify(opType[1] == 'b');  // "db" advertisement
-        if (incrementOpsAppliedStats) {
-            incrementOpsAppliedStats();
+        SnapshotName timestamp;
+        if (assignOperationTimestamp) {
+            timestamp = SnapshotName(fieldTs.timestamp());
         }
+        const StringData ns = fieldNs.valueStringData();
+        writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
+            WriteUnitOfWork wuow(opCtx);
+            if (timestamp != SnapshotName::min()) {
+                uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+            }
+
+            if (opType[1] == 0) {
+                deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
+            } else
+                verify(opType[1] == 'b');  // "db" advertisement
+            if (incrementOpsAppliedStats) {
+                incrementOpsAppliedStats();
+            }
+            wuow.commit();
+        });
     } else if (*opType == 'n') {
         // no op
         if (incrementOpsAppliedStats) {
