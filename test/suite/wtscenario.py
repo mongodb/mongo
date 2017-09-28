@@ -196,6 +196,12 @@ def prune_scenarios(scenes, default_count = -1, long_count = -1):
             del scene[1]['_order']
         return check_scenarios(scenes)
 
+def filter_scenarios(scenes, pred):
+    """
+    Filter scenarios that match a predicate
+    """
+    return [s for s in scenes if pred(*s)]
+
 def number_scenarios(scenes):
     """
     Add a 'scenario_number' and 'scenario_name' variable to each scenario.

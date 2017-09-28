@@ -30,7 +30,7 @@ import random, string
 import wiredtiger, wttest
 from helper import copy_wiredtiger_home
 from wtdataset import SimpleDataSet
-from wtscenario import make_scenarios
+from wtscenario import filter_scenarios, make_scenarios
 
 # test_cursor12.py
 #    Test cursor modify call
@@ -44,7 +44,9 @@ class test_cursor12(wttest.WiredTigerTestCase):
         ('lsm', dict(uri='lsm:modify')),
         ('table', dict(uri='table:modify')),
     ]
-    scenarios = make_scenarios(types, keyfmt)
+    # Skip record number keys with LSM.
+    scenarios = filter_scenarios(make_scenarios(types, keyfmt),
+        lambda name, d: not ('lsm' in d['uri'] and d['keyfmt'] == 'r'))
 
     # List with original value, final value, and modifications to get
     # there.
@@ -174,10 +176,6 @@ class test_cursor12(wttest.WiredTigerTestCase):
     }
     ]
 
-    # Skip record number keys with LSM.
-    def skip(self):
-        return self.keyfmt == 'r' and 'lsm' in self.uri
-
     # Create a set of modified records and verify in-memory reads.
     def modify_load(self, ds, single):
         # For each test in the list:
@@ -225,9 +223,6 @@ class test_cursor12(wttest.WiredTigerTestCase):
 
     # Smoke-test the modify API, operating on a group of records.
     def test_modify_smoke(self):
-        if self.skip():
-            return
-
         ds = SimpleDataSet(self,
             self.uri, 100, key_format=self.keyfmt, value_format='u')
         ds.populate()
@@ -235,9 +230,6 @@ class test_cursor12(wttest.WiredTigerTestCase):
 
     # Smoke-test the modify API, operating on a single record
     def test_modify_smoke_single(self):
-        if self.skip():
-            return
-
         ds = SimpleDataSet(self,
             self.uri, 100, key_format=self.keyfmt, value_format='u')
         ds.populate()
@@ -245,9 +237,6 @@ class test_cursor12(wttest.WiredTigerTestCase):
 
     # Smoke-test the modify API, closing and re-opening the database.
     def test_modify_smoke_reopen(self):
-        if self.skip():
-            return
-
         ds = SimpleDataSet(self,
             self.uri, 100, key_format=self.keyfmt, value_format='u')
         ds.populate()
@@ -260,9 +249,6 @@ class test_cursor12(wttest.WiredTigerTestCase):
 
     # Smoke-test the modify API, recovering the database.
     def test_modify_smoke_recover(self):
-        if self.skip():
-            return
-
         # Close the original database.
         self.conn.close()
 
