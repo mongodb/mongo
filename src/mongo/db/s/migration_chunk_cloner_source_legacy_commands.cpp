@@ -216,57 +216,5 @@ public:
 
 } transferModsCommand;
 
-/**
- * Command for extracting the oplog entries that needs to be migrated for the given migration
- * session id.
- * Note: this command is not stateless. Calling this command has a side-effect of gradually
- * depleting the buffer that contains the oplog entries to be transfered.
- */
-class MigrateSessionCommand : public BasicCommand {
-public:
-    MigrateSessionCommand() : BasicCommand("_getNextSessionMods") {}
-
-    void help(std::stringstream& h) const {
-        h << "internal";
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    virtual bool slaveOk() const {
-        return false;
-    }
-
-    virtual bool adminOnly() const {
-        return true;
-    }
-
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::internal);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        const MigrationSessionId migrationSessionId(
-            uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
-
-        BSONArrayBuilder arrBuilder;
-
-        AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
-        autoCloner.getCloner()->nextSessionMigrationBatch(opCtx, &arrBuilder);
-
-        result.appendArray("oplog", arrBuilder.arr());
-        return true;
-    }
-
-} migrateSessionCommand;
-
 }  // namespace
 }  // namespace mongo

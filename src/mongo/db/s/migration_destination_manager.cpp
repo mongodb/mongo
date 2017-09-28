@@ -57,8 +57,6 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/concurrency/notification.h"
@@ -233,8 +231,6 @@ void MigrationDestinationManager::setStateFail(std::string msg) {
         _errmsg = std::move(msg);
         _state = FAIL;
     }
-
-    _sessionMigration->forceFail(msg);
 }
 
 void MigrationDestinationManager::setStateFailWarn(std::string msg) {
@@ -244,8 +240,6 @@ void MigrationDestinationManager::setStateFailWarn(std::string msg) {
         _errmsg = std::move(msg);
         _state = FAIL;
     }
-
-    _sessionMigration->forceFail(msg);
 }
 
 bool MigrationDestinationManager::isActive() const {
@@ -340,9 +334,6 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
         _migrateThreadHandle.join();
     }
 
-    _sessionMigration =
-        stdx::make_unique<SessionCatalogMigrationDestination>(fromShard, *_sessionId);
-
     _migrateThreadHandle =
         stdx::thread([this, min, max, shardKeyPattern, fromShardConnString, epoch, writeConcern]() {
             _migrateThread(min, max, shardKeyPattern, fromShardConnString, epoch, writeConcern);
@@ -406,7 +397,6 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
                               << _sessionId->toString()};
     }
 
-    _sessionMigration->finish();
     _state = COMMIT_START;
 
     auto const deadline = Date_t::now() + Seconds(30);
@@ -421,7 +411,6 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     if (_state != DONE) {
         return {ErrorCodes::CommandFailed, "startCommit failed, final data failed to transfer"};
     }
-
     return Status::OK();
 }
 
@@ -683,8 +672,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         // 3. Initial bulk clone
         setState(CLONE);
 
-        _sessionMigration->start(opCtx->getServiceContext());
-
         const BSONObj migrateCloneRequest = createMigrateCloneRequest(_nss, *_sessionId);
 
         _chunkMarkedPending = true;  // no lock needed, only the migrate thread looks.
@@ -842,15 +829,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 break;
             }
 
-            opCtx->sleepFor(Seconds(1));
+            sleepsecs(1);
         }
 
         if (t.minutes() >= 600) {
             setStateFail("Cannot go to critical section because secondaries cannot keep up");
             return;
         }
-
-        _sessionMigration->waitUntilReadyToCommit(opCtx);
     }
 
     {
@@ -908,12 +893,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
         timing.done(5);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep5);
-    }
-
-    _sessionMigration->join();
-    if (_sessionMigration->getState() == SessionCatalogMigrationDestination::State::ErrorOccurred) {
-        setStateFail(_sessionMigration->getErrMsg());
-        return;
     }
 
     setState(DONE);

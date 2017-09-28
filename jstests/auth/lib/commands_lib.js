@@ -4454,19 +4454,6 @@ var authCommandsLib = {
           command: {refreshSessionsInternal: []},
           testcases: [{runOnDb: adminDbName, roles: {__system: 1}}],
         },
-        {
-          testname: "_getNextSessionMods",
-          command: {_getNextSessionMods: "a-b"},
-          skipSharded: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: {__system: 1},
-                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-                expectFail: true
-              },
-          ]
-        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

@@ -452,7 +452,6 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
                           Session* session,
                           std::vector<InsertStatement>::const_iterator begin,
                           std::vector<InsertStatement>::const_iterator end,
-                          Timestamp timestamps[],
                           bool fromMigrate) {
     invariant(begin != end);
 
@@ -481,6 +480,7 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
         oplogLink.prevTs = session->getLastWriteOpTimeTs(*opCtx->getTxnNumber());
     }
 
+    auto timestamps = stdx::make_unique<Timestamp[]>(count);
     OpTime lastOpTime;
     for (size_t i = 0; i < count; i++) {
         // Make a mutable copy.
@@ -512,7 +512,7 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
         basePtrs[i] = &writers[i];
     }
     invariant(!lastOpTime.isNull());
-    _logOpsInner(opCtx, nss, basePtrs.get(), timestamps, count, oplog, lastOpTime);
+    _logOpsInner(opCtx, nss, basePtrs.get(), timestamps.get(), count, oplog, lastOpTime);
     wuow.commit();
     return lastOpTime;
 }
