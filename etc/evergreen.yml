@@ -4749,10 +4749,9 @@ buildvariants:
   - name: concurrency_simultaneous_WT
 
 - name: linux-64-debug
-  display_name: Linux DEBUG
+  display_name: "! Linux DEBUG"
   run_on:
   - rhel62-large
-  batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -4768,10 +4767,33 @@ buildvariants:
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
+  - name: change_streams_WT
+  - name: change_streams_mongos_passthrough_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_WT
+  - name: concurrency_sharded_causal_consistency_and_balancer
+  - name: concurrency_sharded_causal_consistency_and_balancer_WT
+  - name: concurrency_sharded_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns_WT
+  - name: concurrency_sharded_with_stepdowns_and_balancer
+  - name: concurrency_sharded_with_stepdowns_and_balancer_WT
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_WT
   - name: dbtest
   - name: dbtest_WT
   - name: disk
@@ -4779,6 +4801,9 @@ buildvariants:
   - name: durability
   - name: failpoints
   - name: failpoints_auth
+  - name: integration_tests_replset
+  - name: integration_tests_sharded
+  - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -4786,53 +4811,58 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
+  - name: jsonSchema
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
   - name: read_concern_linearizable_passthrough
   - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
+  - name: read_only
+  - name: read_only_WT
+  - name: read_only_sharded
+  - name: read_only_sharded_WT
   - name: replica_sets
   - name: replica_sets_WT
   - name: replica_sets_auth
-  - name: replica_sets_pv0
+  - name: replica_sets_initsync_jscore_passthrough
+  - name: replica_sets_initsync_jscore_passthrough_WT
+  - name: replica_sets_initsync_static_jscore_passthrough
+  - name: replica_sets_initsync_static_jscore_passthrough_WT
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  - name: replica_sets_resync_static_jscore_passthrough
+  - name: replica_sets_resync_static_jscore_passthrough_WT
+  - name: replica_sets_pv0
+  - name: retryable_writes_jscore_passthrough_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough
   - name: master_slave_jscore_passthrough_WT
+  - name: serial_run
+  - name: serial_run_WT
+  - name: session_jscore_passthrough_WT
+  - name: sharded_causally_consistent_jscore_passthrough_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: slow1
-  - name: slow1_WT
-  - name: serial_run
-  - name: serial_run_WT
-  - name: sharded_collections_jscore_passthrough
-  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_op_query_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: slow1
+  - name: slow1_WT
   - name: tool
   - name: tool_WT
 
@@ -7321,12 +7351,11 @@ buildvariants:
   - name: sslSpecial
 
 - name: enterprise-rhel-70-64-bit
-  display_name: Enterprise RHEL 7.0
+  display_name: "* Enterprise RHEL 7.0"
   modules:
   - enterprise
   run_on:
   - rhel70-small
-  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -7352,6 +7381,8 @@ buildvariants:
     - rhel70
   - name: audit
   - name: audit_WT
+  - name: auth
+  - name: auth_audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
@@ -7376,6 +7407,7 @@ buildvariants:
   - name: replica_sets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_auth_audit_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -7385,6 +7417,30 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
+- name: rhel-70-64-bit-debug
+  display_name: "* RHEL 7.0 DEBUG"
+  run_on:
+  - rhel70-small
+  expansions:
+    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
+    compile_flags: MONGO_DISTMOD=rhel70 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    use_scons_cache: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - rhel70
+  - name: jsCore
+  - name: jsCore_WT
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
+  - name: read_concern_majority_passthrough_WT
+  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_resync_static_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding
+  - name: sharding_auth
 
 - name: rhel62
   display_name: SSL RHEL 6.2
