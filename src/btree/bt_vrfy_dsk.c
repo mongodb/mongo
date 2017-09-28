@@ -45,9 +45,9 @@ int
 __wt_verify_dsk_image(WT_SESSION_IMPL *session,
     const char *tag, const WT_PAGE_HEADER *dsk, size_t size, bool empty_page_ok)
 {
+	uint8_t flags;
 	const uint8_t *p, *end;
 	u_int i;
-	uint8_t flags;
 
 	/* Check the page type. */
 	switch (dsk->type) {
@@ -555,9 +555,9 @@ __verify_dsk_col_var(
 	WT_DECL_RET;
 	size_t last_size;
 	uint32_t cell_num, cell_type, i;
-	bool last_deleted;
-	const uint8_t *last_data;
 	uint8_t *end;
+	const uint8_t *last_data;
+	bool last_deleted;
 
 	btree = S2BT(session);
 	bm = btree->bm;

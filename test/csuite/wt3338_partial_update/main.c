@@ -282,7 +282,7 @@ int
 main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
-	WT_ITEM *local, _local, *library, _library;
+	WT_ITEM *library, _library, *local, _local;
 
 	if (testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
 		nruns = 10000;

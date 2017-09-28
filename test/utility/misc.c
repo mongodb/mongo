@@ -223,6 +223,7 @@ void *
 drealloc(void *p, size_t len)
 {
 	void *t;
+
 	if ((t = realloc(p, len)) != NULL)
 		return (t);
 	testutil_die(errno, "realloc: %" WT_SIZET_FMT "B", len);

@@ -1032,8 +1032,8 @@ __wt_row_leaf_value_cell(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *kpack)
 {
 	WT_CELL *kcell, *vcell;
 	WT_CELL_UNPACK unpack;
-	void *copy, *key;
 	size_t size;
+	void *copy, *key;
 
 	/* If we already have an unpacked key cell, use it. */
 	if (kpack != NULL)
@@ -1150,8 +1150,8 @@ __wt_ref_info(WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 static inline int
 __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	const uint8_t *addr;
 	size_t addr_size;
+	const uint8_t *addr;
 
 	if (ref->addr == NULL)
 		return (0);
@@ -1172,8 +1172,8 @@ static inline bool
 __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_INSERT_HEAD *ins_head;
 	WT_INSERT *ins;
+	WT_INSERT_HEAD *ins_head;
 	size_t size;
 	int count;
 

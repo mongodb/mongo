@@ -869,9 +869,9 @@ __wt_txn_init(WT_SESSION_IMPL *session, WT_SESSION_IMPL *session_ret)
 void
 __wt_txn_stats_update(WT_SESSION_IMPL *session)
 {
-	WT_TXN_GLOBAL *txn_global;
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS **stats;
+	WT_TXN_GLOBAL *txn_global;
 	uint64_t checkpoint_pinned, snapshot_pinned;
 
 	conn = S2C(session);

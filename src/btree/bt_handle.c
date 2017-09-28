@@ -289,8 +289,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_DECL_RET;
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
-	bool fixed;
 	const char **cfg, *enc_cfg[] = { NULL, NULL };
+	bool fixed;
 
 	WT_UNUSED(maj_version);				/* !HAVE_VERBOSE */
 	WT_UNUSED(min_version);				/* !HAVE_VERBOSE */

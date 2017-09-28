@@ -872,9 +872,9 @@ __conn_load_extension_int(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_DLH *dlh;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
-	bool is_local;
-	const char *ext_config, *init_name, *terminate_name;
 	const char *ext_cfg[2];
+	const char *ext_config, *init_name, *terminate_name;
+	bool is_local;
 
 	dlh = NULL;
 	ext_config = init_name = terminate_name = NULL;
@@ -1348,10 +1348,10 @@ __conn_config_file(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_FH *fh;
-	size_t len;
 	wt_off_t size;
-	bool exist, quoted;
+	size_t len;
 	char *p, *t;
+	bool exist, quoted;
 
 	fh = NULL;
 
@@ -1487,8 +1487,8 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	const char *env_config;
 	size_t len;
+	const char *env_config;
 
 	/* Only use the environment variable if configured. */
 	WT_RET(__wt_config_gets(session, cfg, "use_environment", &cval));
@@ -1583,10 +1583,10 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn, *t;
 	WT_DECL_RET;
 	WT_FH *fh;
-	size_t len;
 	wt_off_t size;
-	bool bytelock, exist, is_create, match;
+	size_t len;
 	char buf[256];
+	bool bytelock, exist, is_create, match;
 
 	conn = S2C(session);
 	fh = NULL;
@@ -2018,12 +2018,12 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_FSTREAM *fs;
 	WT_CONFIG parser;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
-	bool exist;
+	WT_FSTREAM *fs;
 	const char *base_config;
+	bool exist;
 
 	fs = NULL;
 	base_config = NULL;

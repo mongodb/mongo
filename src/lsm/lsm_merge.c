@@ -147,8 +147,8 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
     u_int id, u_int *start, u_int *end, uint64_t *records)
 {
 	WT_LSM_CHUNK *chunk, *previous, *youngest;
-	uint32_t aggressive, max_gap, max_gen, max_level;
 	uint64_t chunk_size, record_count;
+	uint32_t aggressive, max_gap, max_gen, max_level;
 	u_int end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
 	u_int oldest_gen, youngest_gen;
 
@@ -347,12 +347,12 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	WT_DECL_RET;
 	WT_ITEM key, value;
 	WT_LSM_CHUNK *chunk;
-	uint32_t generation;
 	uint64_t insert_count, record_count;
+	uint32_t generation;
 	u_int dest_id, end_chunk, i, nchunks, start_chunk, start_id, verb;
 	int tret;
-	bool created_chunk, create_bloom, locked, in_sync;
 	const char *cfg[3];
+	bool created_chunk, create_bloom, locked, in_sync;
 	const char *drop_cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_drop), "force", NULL };
 

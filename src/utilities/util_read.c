@@ -17,8 +17,8 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	WT_DECL_RET;
 	uint64_t recno;
 	int ch;
-	bool rkey, rval;
 	char *uri, *value;
+	bool rkey, rval;
 
 	uri = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "")) != EOF)

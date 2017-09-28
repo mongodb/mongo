@@ -133,8 +133,8 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 	WT_DECL_RET;
 	WT_PAGE *page;
 	const WT_PAGE_HEADER *dsk;
-	uint32_t alloc_entries;
 	size_t size;
+	uint32_t alloc_entries;
 
 	*pagep = NULL;
 
@@ -329,10 +329,10 @@ __inmem_col_var(
     WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno, size_t *sizep)
 {
 	WT_BTREE *btree;
-	WT_COL *cip;
-	WT_COL_RLE *repeats;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_COL *cip;
+	WT_COL_RLE *repeats;
 	const WT_PAGE_HEADER *dsk;
 	size_t size;
 	uint64_t rle;

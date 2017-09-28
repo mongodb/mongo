@@ -18,8 +18,8 @@ int
 __wt_las_remove_block(WT_SESSION_IMPL *session,
     WT_CURSOR *cursor, uint32_t btree_id, const uint8_t *addr, size_t addr_size)
 {
-	WT_ITEM las_addr, las_key, las_timestamp;
 	WT_DECL_RET;
+	WT_ITEM las_addr, las_key, las_timestamp;
 	uint64_t las_counter, las_txnid, remove_cnt;
 	uint32_t las_id;
 	int exact;
@@ -383,11 +383,11 @@ static int
 __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	struct timespec start, stop;
-	const WT_PAGE_HEADER *dsk;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM tmp;
 	WT_PAGE *page;
+	const WT_PAGE_HEADER *dsk;
 	size_t addr_size;
 	uint32_t previous_state;
 	const uint8_t *addr;
@@ -511,8 +511,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint64_t sleep_cnt, wait_cnt;
-	bool busy, cache_work, evict_soon, stalled;
 	int force_attempts;
+	bool busy, cache_work, evict_soon, stalled;
 
 	btree = S2BT(session);
 

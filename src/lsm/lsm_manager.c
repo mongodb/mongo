@@ -19,8 +19,8 @@ static WT_THREAD_RET __lsm_worker_manager(void *);
 int
 __wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
 
@@ -292,8 +292,8 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *current;
 	WT_SESSION *wt_session;
-	uint32_t i;
 	uint64_t removed;
+	uint32_t i;
 
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
@@ -384,10 +384,10 @@ __lsm_manager_worker_shutdown(WT_SESSION_IMPL *session)
 static int
 __lsm_manager_run_server(WT_SESSION_IMPL *session)
 {
+	struct timespec now;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	struct timespec now;
 	uint64_t fillms, idlems;
 	bool dhandle_locked;
 

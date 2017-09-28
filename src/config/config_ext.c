@@ -73,8 +73,8 @@ __wt_ext_config_parser_open_arg(WT_EXTENSION_API *wt_ext,
     WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg,
     WT_CONFIG_PARSER **config_parserp)
 {
-	const char **cfg, *p;
 	size_t len;
+	const char **cfg, *p;
 
 	WT_UNUSED(wt_ext);
 

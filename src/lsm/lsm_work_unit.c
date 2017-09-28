@@ -22,8 +22,8 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie, bool old_chunks)
 {
 	WT_DECL_RET;
-	u_int i, nchunks;
 	size_t alloc;
+	u_int i, nchunks;
 
 	/* Always return zero chunks on error. */
 	cookie->nchunks = 0;

@@ -582,7 +582,7 @@ wts_stats(void)
 	FILE *fp;
 	size_t len;
 	char *stat_name;
-	const char *pval, *desc;
+	const char *desc, *pval;
 	uint64_t v;
 
 	/* Ignore statistics if they're not configured. */

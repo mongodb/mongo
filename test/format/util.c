@@ -573,8 +573,8 @@ alter(void *arg)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	u_int period;
-	bool access_value;
 	char buf[32];
+	bool access_value;
 
 	(void)(arg);
 	conn = g.wts_conn;

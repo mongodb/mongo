@@ -393,10 +393,10 @@ __cursor_key_order_check_row(
     WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool next)
 {
 	WT_BTREE *btree;
-	WT_ITEM *key;
-	WT_DECL_RET;
 	WT_DECL_ITEM(a);
 	WT_DECL_ITEM(b);
+	WT_DECL_RET;
+	WT_ITEM *key;
 	int cmp;
 
 	btree = S2BT(session);

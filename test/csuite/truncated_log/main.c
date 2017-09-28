@@ -247,7 +247,7 @@ main(int argc, char *argv[])
 	pid_t pid;
 	uint64_t new_offset, offset;
 	uint32_t count, max_key;
-	int ch, status, ret;
+	int ch, ret, status;
 	const char *working_dir;
 
 	(void)testutil_set_progname(argv);

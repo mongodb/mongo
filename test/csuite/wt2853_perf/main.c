@@ -265,7 +265,7 @@ thread_get(void *arg)
 	WT_SESSION *session;
 	double elapsed;
 	time_t prevtime, curtime; /* 1 second resolution is okay */
-	int bal, flag, key, key2, post, bal2, flag2, post2;
+	int bal, bal2, flag, flag2, key, key2, post, post2;
 	char *extra;
 
 	threadargs = (THREAD_ARGS *)arg;

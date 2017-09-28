@@ -323,7 +323,7 @@ static void *thread_join(void *arg)
 	SHARED_OPTS *sharedopts;
 	TEST_OPTS *opts;
 	THREAD_ARGS *threadargs;
-	WT_CURSOR *postcur, *balcur, *flagcur, *joincur;
+	WT_CURSOR *balcur, *flagcur, *joincur, *postcur;
 	WT_SESSION *session;
 	int bal, flag, key, key2, post, ret;
 	char cfg[128];

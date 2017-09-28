@@ -446,10 +446,10 @@ __clsm_open_cursors(
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
-	const char *checkpoint, *ckpt_cfg[3];
 	uint64_t saved_gen;
-	u_int i, nchunks, ngood, nupdates;
 	u_int close_range_end, close_range_start;
+	u_int i, nchunks, ngood, nupdates;
+	const char *checkpoint, *ckpt_cfg[3];
 	bool locked;
 
 	c = &clsm->iface;
@@ -777,8 +777,8 @@ __clsm_get_current(WT_SESSION_IMPL *session,
     WT_CURSOR_LSM *clsm, bool smallest, bool *deletedp)
 {
 	WT_CURSOR *c, *current;
-	int cmp;
 	u_int i;
+	int cmp;
 	bool multiple;
 
 	current = NULL;
@@ -859,8 +859,8 @@ err:	API_END_RET(session, ret);
 static int
 __clsm_next(WT_CURSOR *cursor)
 {
-	WT_CURSOR_LSM *clsm;
 	WT_CURSOR *c;
+	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
@@ -985,8 +985,8 @@ __clsm_random_chunk(WT_SESSION_IMPL *session,
 static int
 __clsm_next_random(WT_CURSOR *cursor)
 {
-	WT_CURSOR_LSM *clsm;
 	WT_CURSOR *c;
+	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	int exact;
@@ -1037,8 +1037,8 @@ err:		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 static int
 __clsm_prev(WT_CURSOR *cursor)
 {
-	WT_CURSOR_LSM *clsm;
 	WT_CURSOR *c;
+	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;

@@ -97,8 +97,8 @@ backup(void *arg)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	u_int incremental, period;
-	bool full;
 	const char *config, *key;
+	bool full;
 
 	(void)(arg);
 

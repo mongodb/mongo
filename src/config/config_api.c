@@ -98,9 +98,9 @@ int
 wiredtiger_config_validate(WT_SESSION *wt_session,
     WT_EVENT_HANDLER *handler, const char *name, const char *config)
 {
+	const WT_CONFIG_ENTRY *ep, **epp;
 	WT_CONNECTION_IMPL *conn, dummy_conn;
 	WT_SESSION_IMPL *session;
-	const WT_CONFIG_ENTRY *ep, **epp;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -209,10 +209,10 @@ __wt_configure_method(WT_SESSION_IMPL *session,
     const char *method, const char *uri,
     const char *config, const char *type, const char *check)
 {
-	const WT_CONFIG_CHECK *cp;
 	WT_CONFIG_CHECK *checks, *newcheck;
-	const WT_CONFIG_ENTRY **epp;
+	const WT_CONFIG_CHECK *cp;
 	WT_CONFIG_ENTRY *entry;
+	const WT_CONFIG_ENTRY **epp;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	size_t cnt, len;

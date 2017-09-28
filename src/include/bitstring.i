@@ -163,8 +163,8 @@ __bit_nset(uint8_t *bitf, uint64_t start, uint64_t stop)
 static inline int
 __bit_ffc(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 {
-	uint8_t lb;
 	uint64_t byte, stopbyte, value;
+	uint8_t lb;
 
 	if (nbits == 0)
 		return (-1);
@@ -194,8 +194,8 @@ __bit_ffc(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 static inline int
 __bit_ffs(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 {
-	uint8_t lb;
 	uint64_t byte, stopbyte, value;
+	uint8_t lb;
 
 	if (nbits == 0)
 		return (-1);
@@ -225,8 +225,8 @@ __bit_ffs(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 static inline uint8_t
 __bit_getv(uint8_t *bitf, uint64_t entry, uint8_t width)
 {
-	uint8_t value;
 	uint64_t bit;
+	uint8_t value;
 
 	value = 0;
 	bit = entry * width;

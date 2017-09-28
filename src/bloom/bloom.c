@@ -265,10 +265,10 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 {
 	WT_CURSOR *c;
 	WT_DECL_RET;
-	int result;
-	uint32_t i;
 	uint64_t h1, h2;
+	uint32_t i;
 	uint8_t bit;
+	int result;
 
 	/* Get operations are only supported by finalized bloom filters. */
 	WT_ASSERT(bloom->session, bloom->bitstring == NULL);

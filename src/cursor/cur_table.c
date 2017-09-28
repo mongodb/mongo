@@ -209,8 +209,8 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR **cp, *primary;
 	WT_CURSOR_TABLE *ctable;
-	va_list ap;
 	u_int i;
+	va_list ap;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	cp = ctable->cg_cursors;
@@ -244,8 +244,8 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	WT_DECL_RET;
 	WT_ITEM *item, *tmp;
 	WT_SESSION_IMPL *session;
-	va_list ap;
 	u_int i;
+	va_list ap;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
@@ -447,8 +447,8 @@ err:	API_END_RET(session, ret);
 static int
 __curtable_search_near(WT_CURSOR *cursor, int *exact)
 {
-	WT_CURSOR_TABLE *ctable;
 	WT_CURSOR *primary, **cp;
+	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
@@ -792,8 +792,8 @@ err:	__wt_scr_free(session, &key);
 static int
 __curtable_close(WT_CURSOR *cursor)
 {
-	WT_CURSOR_TABLE *ctable;
 	WT_CURSOR **cp;
+	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
@@ -866,9 +866,9 @@ __curtable_complete(WT_SESSION_IMPL *session, WT_TABLE *table)
 static int
 __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 {
+	WT_CURSOR **cp;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
-	WT_CURSOR **cp;
 	/*
 	 * Underlying column groups are always opened without dump or readonly,
 	 * and only the primary is opened with next_random.

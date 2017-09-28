@@ -231,8 +231,8 @@ static inline void
 writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *key, _key, *value, _value;
-	uint64_t keyno;
 	size_t len;
+	uint64_t keyno;
 	int ret;
 	char keybuf[64], valuebuf[64];
 

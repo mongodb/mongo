@@ -180,8 +180,8 @@ __wt_compact_page_skip(
 	WT_BM *bm;
 	WT_DECL_RET;
 	size_t addr_size;
-	u_int type;
 	const uint8_t *addr;
+	u_int type;
 
 	WT_UNUSED(context);
 	/*

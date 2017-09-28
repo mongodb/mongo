@@ -94,8 +94,8 @@ load_dump(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int tret;
-	bool hex;
 	char **list, **tlist, *uri, config[64];
+	bool hex;
 
 	cursor = NULL;
 	list = NULL;		/* -Wuninitialized */
@@ -358,8 +358,8 @@ config_update(WT_SESSION *session, char **list)
 	WT_DECL_RET;
 	size_t cnt;
 	int found;
-	const char *p, **cfg;
 	char **configp, **listp;
+	const char *p, **cfg;
 
 	/*
 	 * If the object has been renamed, replace all of the column group,

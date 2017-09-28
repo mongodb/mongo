@@ -31,9 +31,9 @@
 static void
 check(const char *fmt, ...)
 {
+	size_t len;
 	char buf[200], *end, *p;
 	va_list ap;
-	size_t len;
 
 	len = 0;			/* -Werror=maybe-uninitialized */
 

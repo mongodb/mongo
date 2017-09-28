@@ -61,10 +61,10 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 int
 start_workers(table_type type)
 {
-	WT_SESSION *session;
 	struct timeval start, stop;
-	double seconds;
+	WT_SESSION *session;
 	wt_thread_t *tids;
+	double seconds;
 	int i, ret;
 
 	ret = 0;
@@ -164,8 +164,8 @@ static int
 real_worker(void)
 {
 	WT_CURSOR **cursors;
-	WT_SESSION *session;
 	WT_RAND_STATE rnd;
+	WT_SESSION *session;
 	u_int i, keyno;
 	int j, ret, t_ret;
 

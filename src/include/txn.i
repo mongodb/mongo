@@ -176,8 +176,8 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 static inline int
 __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	WT_TXN_OP *op;
 	WT_TXN *txn;
+	WT_TXN_OP *op;
 
 	txn = &session->txn;
 

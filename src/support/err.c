@@ -177,10 +177,10 @@ __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
     WT_GCC_FUNC_ATTRIBUTE((cold))
 {
-	WT_EVENT_HANDLER *handler;
-	WT_DECL_RET;
-	WT_SESSION *wt_session;
 	struct timespec ts;
+	WT_DECL_RET;
+	WT_EVENT_HANDLER *handler;
+	WT_SESSION *wt_session;
 	size_t len, remain;
 	const char *err, *prefix;
 	char *p, tid[128];

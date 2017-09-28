@@ -41,9 +41,9 @@ lrt(void *arg)
 	WT_SESSION *session;
 	size_t buf_len, buf_size;
 	uint64_t keyno, saved_keyno;
+	uint8_t bitfield;
 	u_int period;
 	int pinned, ret;
-	uint8_t bitfield;
 	void *buf;
 
 	(void)(arg);			/* Unused parameter */

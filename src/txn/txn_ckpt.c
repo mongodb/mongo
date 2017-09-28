@@ -229,8 +229,8 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 static int
 __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_NAMED_DATA_SOURCE *ndsrc;
 	WT_DATA_SOURCE *dsrc;
+	WT_NAMED_DATA_SOURCE *ndsrc;
 
 	/*
 	 * A place-holder, to support Helium devices: we assume calling the
@@ -376,9 +376,9 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 static void
 __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 {
+	struct timespec last, start, stop;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	struct timespec start, last, stop;
 	double current_dirty, delta, scrub_min;
 	uint64_t bytes_written_last, bytes_written_start, bytes_written_total;
 	uint64_t cache_size, max_write;
@@ -727,10 +727,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
-	void *saved_meta_next;
-	u_int i;
 	uint64_t fsync_duration_usecs, generation;
+	u_int i;
 	bool failed, full, idle, logging, tracking;
+	void *saved_meta_next;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -1180,8 +1180,8 @@ __checkpoint_lock_dirty_tree(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	char *name_alloc;
 	const char *name;
+	char *name_alloc;
 	bool hot_backup_locked;
 
 	btree = S2BT(session);
@@ -1373,8 +1373,8 @@ __checkpoint_mark_skip(
 {
 	WT_BTREE *btree;
 	WT_CKPT *ckpt;
-	const char *name;
 	int deleted;
+	const char *name;
 
 	btree = S2BT(session);
 

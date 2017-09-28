@@ -19,8 +19,8 @@ static int
 __wt_endian_check(void)
 {
 	uint64_t v;
-	bool big;
 	const char *e;
+	bool big;
 
 	v = 1;
 	big = *((uint8_t *)&v) == 0;

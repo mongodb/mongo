@@ -161,11 +161,11 @@ main(int argc, char *argv[])
 	WT_ITEM data;
 	WT_SESSION *session;
 	uint64_t i;
-	int ch, status, op, ret;
-	bool child;
-	const char *working_dir;
-	char cmd[512];
 	uint8_t buf[MAX_VAL];
+	int ch, op, ret, status;
+	char cmd[512];
+	const char *working_dir;
+	bool child;
 
 	(void)testutil_set_progname(argv);
 

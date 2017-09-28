@@ -50,8 +50,8 @@ void
 fop_start(u_int nthreads)
 {
 	struct timeval start, stop;
-	double seconds;
 	wt_thread_t *tids;
+	double seconds;
 	u_int i;
 
 	tids = NULL; /* Silence GCC 4.1 warning. */

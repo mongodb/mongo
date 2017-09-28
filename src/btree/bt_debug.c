@@ -60,8 +60,8 @@ static int __dmsg_wrapup(WT_DBG *);
 int
 __wt_debug_set_verbose(WT_SESSION_IMPL *session, const char *v)
 {
-	const char *cfg[2] = { NULL, NULL };
 	char buf[256];
+	const char *cfg[2] = { NULL, NULL };
 
 	WT_RET(__wt_snprintf(buf, sizeof(buf), "verbose=[%s]", v));
 	cfg[0] = buf;
@@ -87,8 +87,8 @@ static int
 __debug_bytes(WT_DBG *ds, const void *data_arg, size_t size)
 {
 	size_t i;
-	u_char ch;
 	const uint8_t *data;
+	u_char ch;
 
 	for (data = data_arg, i = 0; i < size; ++i, ++data) {
 		ch = data[0];
@@ -125,8 +125,8 @@ __dmsg_event(WT_DBG *ds, const char *fmt, ...)
 	WT_ITEM *msg;
 	WT_SESSION_IMPL *session;
 	size_t len, space;
-	va_list ap;
 	char *p;
+	va_list ap;
 
 	session = ds->session;
 
@@ -223,8 +223,8 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 static int
 __dmsg_wrapup(WT_DBG *ds)
 {
-	WT_SESSION_IMPL *session;
 	WT_ITEM *msg;
+	WT_SESSION_IMPL *session;
 
 	session = ds->session;
 	msg = ds->msg;
@@ -1026,8 +1026,8 @@ __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
 static int
 __debug_modified(WT_DBG *ds, WT_UPDATE *upd)
 {
-	const size_t *p;
 	size_t nentries, data_size, offset, size;
+	const size_t *p;
 	const uint8_t *data;
 
 	p = (size_t *)upd->data;

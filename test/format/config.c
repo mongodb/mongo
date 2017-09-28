@@ -262,8 +262,8 @@ config_checksum(void)
 static void
 config_compression(const char *conf_name)
 {
-	const char *cstr;
 	char confbuf[128];
+	const char *cstr;
 
 	/* Return if already specified. */
 	if (config_is_perm(conf_name))
@@ -693,7 +693,7 @@ void
 config_file(const char *name)
 {
 	FILE *fp;
-	char *p, buf[256];
+	char buf[256], *p;
 
 	if ((fp = fopen(name, "r")) == NULL)
 		testutil_die(errno, "fopen: %s", name);

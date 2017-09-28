@@ -58,8 +58,8 @@ load(const char *name)
 	WT_CURSOR *cursor;
 	WT_ITEM *key, _key, *value, _value;
 	WT_SESSION *session;
-	uint64_t keyno;
 	size_t len;
+	uint64_t keyno;
 	char keybuf[64], valuebuf[64];
 
 	file_create(name);

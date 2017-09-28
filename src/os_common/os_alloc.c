@@ -100,8 +100,8 @@ __realloc_func(WT_SESSION_IMPL *session,
     size_t *bytes_allocated_ret, size_t bytes_to_allocate, bool clear_memory,
     void *retp)
 {
-	void *p;
 	size_t bytes_allocated;
+	void *p;
 
 	/*
 	 * !!!

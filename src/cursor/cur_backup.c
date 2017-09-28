@@ -367,8 +367,8 @@ __backup_uri(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	bool target_list;
 	const char *uri;
+	bool target_list;
 
 	*foundp = *log_only = false;
 
@@ -503,8 +503,8 @@ static int
 __backup_list_append(
     WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *uri)
 {
-	char **p;
 	const char *name;
+	char **p;
 
 	/* Leave a NULL at the end to mark the end of the list. */
 	WT_RET(__wt_realloc_def(session, &cb->list_allocated,

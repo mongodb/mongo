@@ -84,8 +84,8 @@ static void
 run(CONFIG *cp, int bigkey, size_t bytes)
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	uint64_t keyno;
 	void *p;
 

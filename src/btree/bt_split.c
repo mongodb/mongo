@@ -609,9 +609,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_SPLIT_ERROR_PHASE complete;
 	size_t parent_decr, size;
 	uint64_t split_gen;
-	uint32_t hint, i, j;
 	uint32_t deleted_entries, parent_entries, result_entries;
 	uint32_t *deleted_refs;
+	uint32_t hint, i, j;
 	bool empty_parent;
 
 	parent = ref->home;
@@ -1385,8 +1385,8 @@ __split_multi_inmem(
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_UPDATE *upd;
 	WT_SAVE_UPD *supd;
+	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t i, slot;
 
@@ -1646,8 +1646,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 static int
 __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	WT_DECL_RET;
 	WT_DECL_ITEM(key);
+	WT_DECL_RET;
 	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
 	WT_INSERT_HEAD *ins_head, *tmp_ins_head;
 	WT_PAGE *page, *right;

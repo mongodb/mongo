@@ -95,8 +95,8 @@ obj_bulk_unique(int force)
 void
 obj_cursor(void)
 {
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	int ret;
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));

@@ -214,8 +214,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_FH *fh;
 	WT_FILE_SYSTEM *file_system;
-	bool lock_file, open_called;
 	char *path;
+	bool lock_file, open_called;
 
 	WT_ASSERT(session, file_type != 0);	/* A file type is required. */
 

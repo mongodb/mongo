@@ -52,10 +52,10 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 int
 __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+	struct timespec start, stop;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	struct timespec start, stop;
 	bool locked, too_big;
 
 	btree = S2BT(session);
@@ -295,8 +295,8 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_ADDR *addr;
 	WT_DECL_RET;
-	WT_PAGE_MODIFY *mod;
 	WT_MULTI multi;
+	WT_PAGE_MODIFY *mod;
 
 	mod = ref->page->modify;
 

@@ -16,8 +16,8 @@
 static inline bool
 __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_PAGE_MODIFY *mod;
 	WT_MULTI *multi;
+	WT_PAGE_MODIFY *mod;
 	WT_TXN *txn;
 	u_int i;
 

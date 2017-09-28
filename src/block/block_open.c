@@ -29,8 +29,8 @@ int
 __wt_block_manager_create(
     WT_SESSION_IMPL *session, const char *filename, uint32_t allocsize)
 {
-	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 	WT_FH *fh;
 	int suffix;
 	bool exists;

@@ -243,7 +243,7 @@ int
 __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG objectconf;
-	WT_CONFIG_ITEM all_config, k, names_config, to_config, before_config, v;
+	WT_CONFIG_ITEM all_config, before_config, k, names_config, to_config, v;
 	WT_DECL_RET;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "drop.all", 0, &all_config));
@@ -349,8 +349,8 @@ int
 __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
     const char *cfg[], bool *has_create, bool *has_drops)
 {
+	WT_CONFIG_ITEM all_config, before_config, names_config, to_config;
 	WT_CONFIG_ITEM cval;
-	WT_CONFIG_ITEM all_config, names_config, to_config, before_config;
 	WT_TXN *txn;
 
 	txn = &session->txn;

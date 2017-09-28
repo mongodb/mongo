@@ -41,7 +41,7 @@ stats(void)
 	uint64_t v;
 	int ret;
 	char name[64];
-	const char *pval, *desc;
+	const char *desc, *pval;
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 

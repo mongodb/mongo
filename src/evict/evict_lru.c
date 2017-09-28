@@ -612,10 +612,10 @@ __evict_update_work(WT_SESSION_IMPL *session)
 static int
 __evict_pass(WT_SESSION_IMPL *session)
 {
+	struct timespec now, prev;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN_GLOBAL *txn_global;
-	struct timespec now, prev;
 	uint64_t oldest_id, pages_evicted, prev_oldest_id;
 	u_int loop;
 
@@ -1521,8 +1521,8 @@ static bool
 __evict_push_candidate(WT_SESSION_IMPL *session,
     WT_EVICT_QUEUE *queue, WT_EVICT_ENTRY *evict, WT_REF *ref)
 {
-	u_int slot;
 	uint8_t orig_flags, new_flags;
+	u_int slot;
 
 	/*
 	 * Threads can race to queue a page (e.g., an ordinary LRU walk can
@@ -2524,8 +2524,8 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int pct;
 	uint64_t total_bytes, total_dirty_bytes;
+	u_int pct;
 
 	conn = S2C(session);
 	total_bytes = total_dirty_bytes = 0;

@@ -115,7 +115,7 @@ check_results(TEST_OPTS *opts, uint64_t *foundp)
 	uint64_t count, idxcount, nrecords;
 	uint32_t rndint;
 	int key, key_got, ret, v0, v1, v2;
-	char *bigref, *big;
+	char *big, *bigref;
 
 	testutil_check(create_big_string(&bigref));
 	nrecords = opts->nrecords;

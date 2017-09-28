@@ -321,8 +321,8 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	bool last_ckpt;
 	const char *checkpoint;
+	bool last_ckpt;
 
 	last_ckpt = false;
 	checkpoint = NULL;

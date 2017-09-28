@@ -156,8 +156,8 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
     WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT **new_insp,
     size_t new_ins_size, uint64_t *recnop, u_int skipdepth, bool exclusive)
 {
-	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
+	WT_INSERT *new_ins = *new_insp;
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
@@ -205,8 +205,8 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
     WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT **new_insp,
     size_t new_ins_size, u_int skipdepth, bool exclusive)
 {
-	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
+	WT_INSERT *new_ins = *new_insp;
 	u_int i;
 	bool simple;
 

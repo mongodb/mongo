@@ -13,6 +13,15 @@ def source_files():
         if file_re.match(line):
             yield os.path.join('..', line.split()[0])
 
+# all_c_files --
+#       Return list of all WiredTiger C source file names.
+def all_c_files():
+    file_re = re.compile(r'^\w')
+    for line in glob.iglob('../src/*/*.[ci]'):
+        yield line
+    for line in glob.iglob('../test/*/*.[ci]'):
+        yield line
+
 # source_dirs --
 #    Return a list of the WiredTiger source directory names.
 def source_dirs():

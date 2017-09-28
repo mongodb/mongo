@@ -231,8 +231,8 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
 	WT_FH *fh;
-	size_t align_size;
 	wt_off_t offset;
+	size_t align_size;
 	uint32_t checksum;
 	bool local_locked;
 

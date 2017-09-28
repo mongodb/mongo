@@ -2659,8 +2659,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	size_t corrected_page_size, extra_skip, len, result_len;
 	uint64_t recno;
 	uint32_t entry, i, max_image_slot, result_slots, slots;
-	bool compressed, last_block;
 	uint8_t *next_start;
+	bool compressed, last_block;
 
 	wt_session = (WT_SESSION *)session;
 	btree = S2BT(session);
@@ -3044,8 +3044,8 @@ __rec_split_raw(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 static int
 __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
-	WT_CHUNK *cur_ptr, *prev_ptr, *tmp;
 	WT_BTREE *btree;
+	WT_CHUNK *cur_ptr, *prev_ptr, *tmp;
 	WT_PAGE_HEADER *dsk;
 	size_t combined_size, len_to_move;
 	uint8_t *cur_dsk_start;
@@ -5243,8 +5243,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	uint64_t slvg_skip;
 	uint32_t i;
 	bool dictionary, key_onpage_ovfl, ovfl_key;
-	const void *p;
 	void *copy;
+	const void *p;
 
 	btree = S2BT(session);
 	cbt = &r->update_modify_cbt;
@@ -5741,8 +5741,8 @@ static int
 __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_PAGE_MODIFY *mod;
 	WT_MULTI *multi;
+	WT_PAGE_MODIFY *mod;
 	uint32_t i;
 
 	btree = S2BT(session);
@@ -6090,8 +6090,8 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_KV *key;
 	size_t pfx_max;
-	uint8_t pfx;
 	const uint8_t *a, *b;
+	uint8_t pfx;
 
 	*is_ovflp = false;
 

@@ -333,8 +333,8 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	int64_t val;
 	size_t prefixlen;
+	int64_t val;
 	const char *desc, *endprefix, *valstr, *uri;
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
@@ -569,8 +569,8 @@ static int
 __statlog_on_close(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 
 	conn = S2C(session);
 

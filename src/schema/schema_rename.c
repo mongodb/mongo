@@ -17,9 +17,9 @@ __rename_file(
     WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 {
 	WT_DECL_RET;
-	bool exist;
 	const char *filename, *newfile;
 	char *newvalue, *oldvalue;
+	bool exist;
 
 	newvalue = oldvalue = NULL;
 
@@ -88,9 +88,9 @@ __rename_tree(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(nv);
 	WT_DECL_ITEM(os);
 	WT_DECL_RET;
-	bool is_colgroup;
 	const char *newname, *olduri, *suffix;
 	char *value;
+	bool is_colgroup;
 
 	olduri = table->iface.name;
 	value = NULL;
