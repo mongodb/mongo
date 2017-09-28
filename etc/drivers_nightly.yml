@@ -3,7 +3,7 @@
 #####################################################
 
 ### Instructions for Adding a Driver ###
-# The Major sections are:
+## The Major sections are:
 
 # VARIABLES
 # FUNCTIONS (MongoDB and Drivers)
@@ -218,8 +218,9 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: "src/${DRIVER_WORKING_DIRECTORY}"
+        working_dir: src
         script: |
+          cd ${DRIVER_WORKING_DIRECTORY}
           ${PREPARE_SHELL}
           echo $DRIVERS_TOOLS
           echo $MONGO_ORCHESTRATION_HOME
@@ -318,8 +319,9 @@ functions:
   "setup drivers environment":
     - command: shell.exec
       params:
-        working_dir: "src/${DRIVER_WORKING_DIRECTORY}"
+        working_dir: src
         script: |
+           cd "${DRIVER_WORKING_DIRECTORY}"
            # Get the current unique version of this checkout
            if [ "${is_patch}" = "true" ]; then
               CURRENT_VERSION=$(git describe)-patch-${version_id}
@@ -433,10 +435,7 @@ tasks:
           if [ `which strip` ]; then
             echo "found strip"
             find . -maxdepth 1 -type f -iname "mongo*" -exec strip {} \;
-            strip mongo/mongo
           fi
-          # On RHEL, the mongo shell binary is in a mongo directory
-          mv mongo/mongo ./mongodb-binaries/bin/ || true
           find . -maxdepth 1 -type f -iname "mongo*" -exec mv {} ./mongodb-binaries/bin/ \;
           ${compress} mongodb-binaries.${ext|tgz} mongodb-binaries/
 
@@ -584,7 +583,6 @@ axes:
         display_name: "Python 2.6"
         variables:
            ### There is no python toolchain on RHEL 6.2, using system python
-           ### PYTHON_BINARY: "/opt/python/2.6/bin/python"
            PYTHON_BINARY: "/usr/bin/python"
            DRIVER_WORKING_DIRECTORY: "mongo-python-driver"
            DRIVER_TEST_UPLOAD_DIRECTORY: "src/mongo-python-driver/xunit-results/TEST-*.xml"
@@ -629,7 +627,7 @@ modules:
 
 - name: mongo-python-driver
   repo: git@github.com:mongodb/mongo-python-driver.git
-  branch: evergreen
+  branch: master
 
 #######################################
 #            BUILDVARIANTS            #
