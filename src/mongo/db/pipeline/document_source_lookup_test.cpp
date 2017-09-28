@@ -678,7 +678,10 @@ TEST_F(DocumentSourceLookUpTest,
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
 
-    // TODO SERVER-30991: $match within $facet should optimize to $const.
+    // TODO: The '$$var1' in this expression actually gets optimized to a constant expression with
+    // value 5, but the explain output does not reflect that change. SERVER-31292 will make that
+    // optimization visible here, so we will need to replace '$$var1' with a $const expression for
+    // this test to pass.
     auto expectedPipe =
         fromjson(str::stream() << "[{mock: {}}, {$match: {x:1}}, {$sort: {sortKey: {x: 1}}}, "
                                << sequentialCacheStageObj()
@@ -686,6 +689,43 @@ TEST_F(DocumentSourceLookUpTest,
                                   "{$expr: {$eq: ['$_id', '$$var1']}}}]}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
+}
+
+TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    // This pipeline includes a $match stage that itself includes a $expr expression.
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {$expr: {$eq: "
+                 "['$_id','$$var1']}}}], from: 'coll', as: 'as'}}")
+            .firstElement(),
+        expCtx);
+
+    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT(lookupStage);
+
+    lookupStage->injectMongodInterface(
+        std::shared_ptr<MockMongodInterface>(new MockMongodInterface({})));
+
+    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
+    ASSERT(subPipeline);
+
+    auto sources = subPipeline->getSources();
+    ASSERT_GTE(sources.size(), 2u);
+
+    // The first source is our mock data source, and the second should be the $match expression.
+    auto secondSource = *(++sources.begin());
+    auto& matchSource = dynamic_cast<const DocumentSourceMatch&>(*secondSource);
+
+    // Ensure that the '$$var' in the embedded expression got optimized to ExpressionConstant.
+    BSONObjBuilder builder;
+    matchSource.getMatchExpression()->serialize(&builder);
+    auto serializedMatch = builder.obj();
+    auto expectedMatch = fromjson("{$expr: {$eq: ['$_id', {$const: 5}]}}");
+
+    ASSERT_VALUE_EQ(Value(serializedMatch), Value(expectedMatch));
 }
 
 TEST_F(DocumentSourceLookUpTest,

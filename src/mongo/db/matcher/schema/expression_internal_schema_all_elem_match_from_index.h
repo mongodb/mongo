@@ -89,6 +89,10 @@ public:
     }
 
 private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+
     long long _index;
     std::unique_ptr<ExpressionWithPlaceholder> _expression;
 };

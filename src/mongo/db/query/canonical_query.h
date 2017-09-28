@@ -148,13 +148,6 @@ public:
     static Status isValid(MatchExpression* root, const QueryRequest& parsed);
 
     /**
-     * Returns the normalized version of the subtree rooted at 'root'.
-     *
-     * Takes ownership of 'root'.
-     */
-    static MatchExpression* normalizeTree(MatchExpression* root);
-
-    /**
      * Traverses expression tree post-order.
      * Sorts children at each non-leaf node by (MatchType, path(), children, number of children)
      */
@@ -192,7 +185,7 @@ private:
 
     Status init(std::unique_ptr<QueryRequest> qr,
                 bool canHaveNoopMatchNodes,
-                MatchExpression* root,
+                std::unique_ptr<MatchExpression> root,
                 std::unique_ptr<CollatorInterface> collator);
 
     std::unique_ptr<QueryRequest> _qr;

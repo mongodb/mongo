@@ -89,6 +89,7 @@ env.CppUnitTest(
         'expression_expr_test.cpp',
         'expression_geo_test.cpp',
         'expression_leaf_test.cpp',
+        'expression_optimize_test.cpp',
         'expression_parser_geo_test.cpp',
         'expression_test.cpp',
         'expression_tree_test.cpp',
@@ -114,6 +115,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/query/query_planner',
         'expressions',
     ],
 )
