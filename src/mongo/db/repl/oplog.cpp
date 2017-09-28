@@ -1020,12 +1020,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
     //
     //  Atomic `applyOps`: The server receives an `applyOps` command with operations that can be
     //    run under a single transaction. In this case the caller has already opened a
-    //    `WriteUnitOfWork` and expects all writes to become visible at the same time. The caller
-    //    is responsible for setting the timestamp before committing. Assigning a competing
-    //    timestamp in this codepath would break that atomicity. Sharding is a consumer of this
-    //    use-case.
-    const bool assignOperationTimestamp =
-        !opCtx->writesAreReplicated() && !haveWrappingWriteUnitOfWork && fieldTs;
+    //    `WriteUnitOfWork` and expects all writes to become visible at the same time. Moreover,
+    //    the individual operations will not contain a `ts` field. The caller is responsible for
+    //    setting the timestamp before committing. Assigning a competing timestamp in this
+    //    codepath would break that atomicity. Sharding is a consumer of this use-case.
+    const bool assignOperationTimestamp = !opCtx->writesAreReplicated() &&
+        !haveWrappingWriteUnitOfWork && fieldTs &&
+        getGlobalReplicationCoordinator()->getReplicationMode() !=
+            ReplicationCoordinator::modeMasterSlave;
 
     if (*opType == 'i') {
         if (requestNss.isSystemDotIndexes()) {
@@ -1123,14 +1125,23 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // 3. If not, do upsert (and commit)
             // 4. If both !Ok, return status
 
-            // We cannot rely on a DuplicateKey error if we'repart of a larger transaction, because
-            // that would require the transaction to abort. So instead, use upsert in that case.
+            // We cannot rely on a DuplicateKey error if we're part of a larger transaction,
+            // because that would require the transaction to abort. So instead, use upsert in that
+            // case.
             bool needToDoUpsert = haveWrappingWriteUnitOfWork;
 
-            if (!needToDoUpsert) {
-                SnapshotName timestamp;
-                long long term = OpTime::kUninitializedTerm;
+            SnapshotName timestamp;
+            long long term = OpTime::kUninitializedTerm;
+            if (assignOperationTimestamp) {
+                if (fieldTs) {
+                    timestamp = SnapshotName(fieldTs.timestamp());
+                }
+                if (fieldT) {
+                    term = fieldT.Long();
+                }
+            }
 
+            if (!needToDoUpsert) {
                 WriteUnitOfWork wuow(opCtx);
 
                 // Do not use supplied timestamps if running through applyOps, as that would allow
@@ -1145,8 +1156,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
 
                 OpDebug* const nullOpDebug = nullptr;
-                auto status = collection->insertDocument(
+                Status status = collection->insertDocument(
                     opCtx, InsertStatement(o, timestamp, term), nullOpDebug, true);
+
                 if (status.isOK()) {
                     wuow.commit();
                 } else if (status == ErrorCodes::DuplicateKey) {
@@ -1155,6 +1167,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     return status;
                 }
             }
+
             // Now see if we need to do an upsert.
             if (needToDoUpsert) {
                 // Do update on DuplicateKey errors.
@@ -1164,20 +1177,31 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 b.append(o.getField("_id"));
 
                 UpdateRequest request(requestNss);
-
                 request.setQuery(b.done());
                 request.setUpdates(o);
                 request.setUpsert();
                 request.setFromOplogApplication(true);
+
                 UpdateLifecycleImpl updateLifecycle(requestNss);
                 request.setLifecycle(&updateLifecycle);
 
-                UpdateResult res = update(opCtx, db, request);
-                if (res.numMatched == 0 && res.upserted.isEmpty()) {
-                    error() << "No document was updated even though we got a DuplicateKey "
-                               "error when inserting";
-                    fassertFailedNoTrace(28750);
-                }
+                const StringData ns = fieldNs.valueStringData();
+                writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
+                    WriteUnitOfWork wuow(opCtx);
+                    // If this is an atomic applyOps (i.e: `haveWrappingWriteUnitOfWork` is true),
+                    // do not timestamp the write.
+                    if (assignOperationTimestamp && timestamp != SnapshotName::min()) {
+                        uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+                    }
+
+                    UpdateResult res = update(opCtx, db, request);
+                    if (res.numMatched == 0 && res.upserted.isEmpty()) {
+                        error() << "No document was updated even though we got a DuplicateKey "
+                                   "error when inserting";
+                        fassertFailedNoTrace(28750);
+                    }
+                    wuow.commit();
+                });
             }
 
             if (incrementOpsAppliedStats) {
@@ -1195,11 +1219,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 updateCriteria.hasField("_id"));
 
         UpdateRequest request(requestNss);
-
         request.setQuery(updateCriteria);
         request.setUpdates(o);
         request.setUpsert(upsert);
         request.setFromOplogApplication(true);
+
         UpdateLifecycleImpl updateLifecycle(requestNss);
         request.setLifecycle(&updateLifecycle);
 
@@ -1216,7 +1240,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
 
             UpdateResult ur = update(opCtx, db, request);
-
             if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
                 if (ur.modifiers) {
                     if (updateCriteria.nFields() == 1) {
@@ -1225,6 +1248,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         error() << msg;
                         return Status(ErrorCodes::UpdateOperationFailed, msg);
                     }
+
                     // Need to check to see if it isn't present so we can exit early with a
                     // failure. Note that adds some overhead for this extra check in some cases,
                     // such as an updateCriteria of the form
@@ -1277,6 +1301,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         if (assignOperationTimestamp) {
             timestamp = SnapshotName(fieldTs.timestamp());
         }
+
         const StringData ns = fieldNs.valueStringData();
         writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
@@ -1288,11 +1313,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
             } else
                 verify(opType[1] == 'b');  // "db" advertisement
-            if (incrementOpsAppliedStats) {
-                incrementOpsAppliedStats();
-            }
             wuow.commit();
         });
+
+        if (incrementOpsAppliedStats) {
+            incrementOpsAppliedStats();
+        }
     } else if (*opType == 'n') {
         // no op
         if (incrementOpsAppliedStats) {

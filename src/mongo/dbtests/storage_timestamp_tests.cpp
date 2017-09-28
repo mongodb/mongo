@@ -52,6 +52,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -144,8 +145,44 @@ public:
 
     BSONObj findOne(Collection* coll) {
         auto optRecord = coll->getRecordStore()->getCursor(_opCtx)->next();
-        ASSERT(optRecord != boost::none);
+        if (optRecord == boost::none) {
+            // Print a stack trace to help disambiguate which `findOne` failed.
+            printStackTrace();
+            FAIL("Did not find any documents.");
+        }
         return optRecord.get().data.toBson();
+    }
+
+    StatusWith<BSONObj> doAtomicApplyOps(const std::string& dbName,
+                                         const std::list<BSONObj>& applyOpsList) {
+        BSONObjBuilder result;
+        Status status = applyOps(_opCtx, dbName, BSON("applyOps" << applyOpsList), &result);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return {result.obj()};
+    }
+
+    // Creates a dummy command operation to persuade `applyOps` to be non-atomic.
+    StatusWith<BSONObj> doNonAtomicApplyOps(const std::string& dbName,
+                                            const std::list<BSONObj>& applyOpsList,
+                                            Timestamp dummyTs) {
+        BSONArrayBuilder builder;
+        builder.append(applyOpsList);
+        builder << BSON("ts" << dummyTs << "t" << 1LL << "h" << 1 << "op"
+                             << "c"
+                             << "ns"
+                             << "test.$cmd"
+                             << "o"
+                             << BSON("applyOps" << BSONArrayBuilder().obj()));
+        BSONObjBuilder result;
+        Status status = applyOps(_opCtx, dbName, BSON("applyOps" << builder.arr()), &result);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return {result.obj()};
     }
 };
 
@@ -326,24 +363,23 @@ public:
         // Delete all documents one at a time.
         const LogicalTime startDeleteTime = _clock->reserveTicks(docsToInsert);
         for (std::int32_t num = 0; num < docsToInsert; ++num) {
-            BSONObjBuilder result;
-            ASSERT_OK(applyOps(
-                _opCtx,
-                nss.db().toString(),
-                BSON("applyOps" << BSON_ARRAY(BSON(
-                         "ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL << "h"
-                              << 0xBEEFBEEFLL
-                              << "v"
-                              << 2
-                              << "op"
-                              << "d"
-                              << "ns"
-                              << nss.ns()
-                              << "ui"
-                              << autoColl.getCollection()->uuid().get()
-                              << "o"
-                              << BSON("_id" << num)))),
-                &result));
+            ASSERT_OK(
+                doNonAtomicApplyOps(
+                    nss.db().toString(),
+                    {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL << "h"
+                               << 0xBEEFBEEFLL
+                               << "v"
+                               << 2
+                               << "op"
+                               << "d"
+                               << "ns"
+                               << nss.ns()
+                               << "ui"
+                               << autoColl.getCollection()->uuid().get()
+                               << "o"
+                               << BSON("_id" << num))},
+                    startDeleteTime.addTicks(num).asTimestamp())
+                    .getStatus());
         }
 
         for (std::int32_t num = 0; num <= docsToInsert; ++num) {
@@ -384,6 +420,9 @@ public:
         wunit.commit();
         ASSERT_EQ(1, itCount(autoColl.getCollection()));
 
+        // Each pair in the vector represents the update to perform at the next tick of the
+        // clock. `pair.first` is the update to perform and `pair.second` is the full value of the
+        // document after the transformation.
         const std::vector<std::pair<BSONObj, BSONObj>> updates = {
             {BSON("$set" << BSON("val" << 1)), BSON("_id" << 0 << "val" << 1)},
             {BSON("$unset" << BSON("val" << 1)), BSON("_id" << 0)},
@@ -401,26 +440,25 @@ public:
 
         const LogicalTime firstUpdateTime = _clock->reserveTicks(updates.size());
         for (std::size_t idx = 0; idx < updates.size(); ++idx) {
-            BSONObjBuilder result;
-            ASSERT_OK(applyOps(
-                _opCtx,
-                nss.db().toString(),
-                BSON("applyOps" << BSON_ARRAY(BSON(
-                         "ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL << "h"
-                              << 0xBEEFBEEFLL
-                              << "v"
-                              << 2
-                              << "op"
-                              << "u"
-                              << "ns"
-                              << nss.ns()
-                              << "ui"
-                              << autoColl.getCollection()->uuid().get()
-                              << "o2"
-                              << BSON("_id" << 0)
-                              << "o"
-                              << updates[idx].first))),
-                &result));
+            ASSERT_OK(
+                doNonAtomicApplyOps(
+                    nss.db().toString(),
+                    {BSON("ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL << "h"
+                               << 0xBEEFBEEFLL
+                               << "v"
+                               << 2
+                               << "op"
+                               << "u"
+                               << "ns"
+                               << nss.ns()
+                               << "ui"
+                               << autoColl.getCollection()->uuid().get()
+                               << "o2"
+                               << BSON("_id" << 0)
+                               << "o"
+                               << updates[idx].first)},
+                    firstUpdateTime.addTicks(idx).asTimestamp())
+                    .getStatus());
         }
 
         for (std::size_t idx = 0; idx < updates.size(); ++idx) {
@@ -438,6 +476,199 @@ public:
     }
 };
 
+class SecondaryInsertToUpsert : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // In order for applyOps to assign timestamps, we must be in non-replicated mode.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        // Create a new collection.
+        NamespaceString nss("unittests.insertToUpsert");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+
+        const LogicalTime insertTime = _clock->reserveTicks(2);
+
+        // This applyOps runs into an insert of `{_id: 0, field: 0}` followed by a second insert
+        // on the same collection with `{_id: 0}`. It's expected for this second insert to be
+        // turned into an upsert. The goal document does not contain `field: 0`.
+        BSONObjBuilder resultBuilder;
+        auto swResult = doNonAtomicApplyOps(
+            nss.db().toString(),
+            {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
+                       << "op"
+                       << "i"
+                       << "ns"
+                       << nss.ns()
+                       << "ui"
+                       << autoColl.getCollection()->uuid().get()
+                       << "o"
+                       << BSON("_id" << 0 << "field" << 0)),
+             BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL
+                       << "v"
+                       << 2
+                       << "op"
+                       << "i"
+                       << "ns"
+                       << nss.ns()
+                       << "ui"
+                       << autoColl.getCollection()->uuid().get()
+                       << "o"
+                       << BSON("_id" << 0))},
+            insertTime.addTicks(1).asTimestamp());
+        ASSERT_OK(swResult);
+
+        BSONObj& result = swResult.getValue();
+        ASSERT_EQ(3, result.getIntField("applied"));
+        ASSERT(result["results"].Array()[0].Bool());
+        ASSERT(result["results"].Array()[1].Bool());
+        ASSERT(result["results"].Array()[2].Bool());
+
+        // Reading at `insertTime` should show the original document, `{_id: 0, field: 0}`.
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(SnapshotName(insertTime.asTimestamp())));
+        auto doc = findOne(autoColl.getCollection());
+        ASSERT_EQ(0,
+                  SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0 << "field" << 0)))
+            << "Doc: " << doc.toString() << " Expected: {_id: 0, field: 0}";
+
+        // Reading at `insertTime + 1` should show the second insert that got converted to an
+        // upsert, `{_id: 0}`.
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(SnapshotName(insertTime.addTicks(1).asTimestamp())));
+        doc = findOne(autoColl.getCollection());
+        ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0)))
+            << "Doc: " << doc.toString() << " Expected: {_id: 0}";
+    }
+};
+
+class SecondaryAtomicApplyOps : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // Create a new collection.
+        NamespaceString nss("unittests.insertToUpsert");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+
+        // Reserve a timestamp before the inserts should happen.
+        const LogicalTime preInsertTimestamp = _clock->reserveTicks(1);
+        auto swResult = doAtomicApplyOps(nss.db().toString(),
+                                         {BSON("v" << 2 << "op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss.ns()
+                                                   << "ui"
+                                                   << autoColl.getCollection()->uuid().get()
+                                                   << "o"
+                                                   << BSON("_id" << 0)),
+                                          BSON("v" << 2 << "op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss.ns()
+                                                   << "ui"
+                                                   << autoColl.getCollection()->uuid().get()
+                                                   << "o"
+                                                   << BSON("_id" << 1))});
+        ASSERT_OK(swResult);
+
+        ASSERT_EQ(2, swResult.getValue().getIntField("applied"));
+        ASSERT(swResult.getValue()["results"].Array()[0].Bool());
+        ASSERT(swResult.getValue()["results"].Array()[1].Bool());
+
+        // Reading at `preInsertTimestamp` should not find anything.
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(SnapshotName(preInsertTimestamp.asTimestamp())));
+        ASSERT_EQ(0, itCount(autoColl.getCollection()))
+            << "Should not observe a write at `preInsertTimestamp`. TS: "
+            << preInsertTimestamp.asTimestamp();
+
+        // Reading at `preInsertTimestamp + 1` should observe both inserts.
+        recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(
+            SnapshotName(preInsertTimestamp.addTicks(1).asTimestamp())));
+        ASSERT_EQ(2, itCount(autoColl.getCollection()))
+            << "Should observe both writes at `preInsertTimestamp + 1`. TS: "
+            << preInsertTimestamp.addTicks(1).asTimestamp();
+    }
+};
+
+
+// This should have the same result as `SecondaryInsertToUpsert` except it gets there a different
+// way. Doing an atomic `applyOps` should result in a WriteConflictException because the same
+// transaction is trying to write modify the same document twice. The `applyOps` command should
+// catch that failure and retry in non-atomic mode, preserving the timestamps supplied by the
+// user.
+class SecondaryAtomicApplyOpsWCEToNonAtomic : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // Create a new collectiont.
+        NamespaceString nss("unitteTsts.insertToUpsert");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+
+        const LogicalTime preInsertTimestamp = _clock->reserveTicks(1);
+        auto swResult = doAtomicApplyOps(nss.db().toString(),
+                                         {BSON("v" << 2 << "op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss.ns()
+                                                   << "ui"
+                                                   << autoColl.getCollection()->uuid().get()
+                                                   << "o"
+                                                   << BSON("_id" << 0 << "field" << 0)),
+                                          BSON("v" << 2 << "op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << nss.ns()
+                                                   << "ui"
+                                                   << autoColl.getCollection()->uuid().get()
+                                                   << "o"
+                                                   << BSON("_id" << 0))});
+        ASSERT_OK(swResult);
+
+        ASSERT_EQ(2, swResult.getValue().getIntField("applied"));
+        ASSERT(swResult.getValue()["results"].Array()[0].Bool());
+        ASSERT(swResult.getValue()["results"].Array()[1].Bool());
+
+        // Reading at `insertTime` should not see any documents.
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(SnapshotName(preInsertTimestamp.asTimestamp())));
+        ASSERT_EQ(0, itCount(autoColl.getCollection()))
+            << "Should not find any documents at `preInsertTimestamp`. TS: "
+            << preInsertTimestamp.asTimestamp();
+
+        // Reading at `preInsertTimestamp + 1` should show the final state of the document.
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(
+            SnapshotName(preInsertTimestamp.addTicks(1).asTimestamp())));
+        auto doc = findOne(autoColl.getCollection());
+        ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0)))
+            << "Doc: " << doc.toString() << " Expected: {_id: 0}";
+    }
+};
+
 class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
@@ -446,6 +677,9 @@ public:
         add<SecondaryArrayInsertTimes>();
         add<SecondaryDeleteTimes>();
         add<SecondaryUpdateTimes>();
+        add<SecondaryInsertToUpsert>();
+        add<SecondaryAtomicApplyOps>();
+        add<SecondaryAtomicApplyOpsWCEToNonAtomic>();
     }
 };
 

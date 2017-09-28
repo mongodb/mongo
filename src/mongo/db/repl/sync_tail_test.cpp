@@ -211,27 +211,6 @@ TEST_F(SyncTailTest, SyncApplyNoOp) {
     ASSERT_TRUE(applyOpCalled);
 }
 
-TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
-    const BSONObj op = BSON("op"
-                            << "n"
-                            << "ns"
-                            << "test.t");
-    int applyOpCalled = 0;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool inSteadyStateReplication,
-                                                   stdx::function<void()>) {
-        applyOpCalled++;
-        if (applyOpCalled < 5) {
-            throw WriteConflictException();
-        }
-        return Status::OK();
-    };
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, false, applyOp, failedApplyCommand, _incOps));
-    ASSERT_EQUALS(5, applyOpCalled);
-}
-
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
     ASSERT_THROWS_CODE(_testSyncApplyInsertDocument(ErrorCodes::OK),
                        AssertionException,

@@ -327,14 +327,11 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
     bool isNoOp = opType[0] == 'n';
     if (isNoOp || (opType[0] == 'i' && nss.isSystemDotIndexes())) {
-        auto opStr = isNoOp ? "syncApply_noop" : "syncApply_indexBuild";
         if (isNoOp && nss.db() == "")
             return Status::OK();
-        return writeConflictRetry(opCtx, opStr, nss.ns(), [&] {
-            Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-            OldClientContext ctx(opCtx, nss.ns());
-            return applyOp(ctx.db());
-        });
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+        OldClientContext ctx(opCtx, nss.ns());
+        return applyOp(ctx.db());
     }
 
     if (isCrudOpType(opType)) {
