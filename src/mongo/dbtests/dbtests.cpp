@@ -123,6 +123,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     serverGlobalParams.featureCompatibility.version.store(
         ServerGlobalParams::FeatureCompatibility::Version::k36);
+    serverGlobalParams.featureCompatibility.isSchemaVersion36.store(true);
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     ServiceContext* service = getGlobalServiceContext();

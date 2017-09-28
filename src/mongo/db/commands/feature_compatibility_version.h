@@ -41,18 +41,6 @@ class BSONObj;
 class OperationContext;
 
 /**
- * Store state of featureCompatibilityVersion document.
- **/
-struct FeatureCompatibilityVersionInfo {
-    ServerGlobalParams::FeatureCompatibility::Version version;
-    ServerGlobalParams::FeatureCompatibility::Version targetVersion;
-
-    FeatureCompatibilityVersionInfo()
-        : version(ServerGlobalParams::FeatureCompatibility::Version::kUnset),
-          targetVersion(ServerGlobalParams::FeatureCompatibility::Version::kUnset) {}
-};
-
-/**
  * Startup parameter to ignore featureCompatibilityVersion checks. This parameter cannot be set if
  * the node is started with --replSet, --master, or --slave. This should never be set by end users.
  */
@@ -65,13 +53,12 @@ public:
     static constexpr StringData kDatabase = "admin"_sd;
     static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
     static constexpr StringData kVersionField = "version"_sd;
-    static constexpr StringData kTargetVersionField = "targetVersion"_sd;
 
     /**
      * Parses the featureCompatibilityVersion document from admin.system.version, and returns the
      * version.
      */
-    static StatusWith<FeatureCompatibilityVersionInfo> parse(
+    static StatusWith<ServerGlobalParams::FeatureCompatibility::Version> parse(
         const BSONObj& featureCompatibilityVersionDoc);
 
     static StringData toString(ServerGlobalParams::FeatureCompatibility::Version version) {
@@ -80,8 +67,6 @@ public:
                 return FeatureCompatibilityVersionCommandParser::kVersion36;
             case ServerGlobalParams::FeatureCompatibility::Version::k34:
                 return FeatureCompatibilityVersionCommandParser::kVersion34;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUnset:
-                return FeatureCompatibilityVersionCommandParser::kVersionUnset;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -93,27 +78,6 @@ public:
      * 'version' should be '3.4' or '3.6'.
      */
     static void set(OperationContext* opCtx, StringData version);
-
-    /**
-     * Indicate intent to perform an upgrade. Should be set before schemas are modified.
-     * This sets the 'targetVersion' field only.
-     * Use unsetTargetUpgradeOrDowngrade to indicate that the schemas have completed the upgrading.
-     */
-    static void setTargetUpgrade(OperationContext* opCtx, StringData version);
-
-    /**
-     * Indicate intent to perform a downgrade. Should be set before schemas are modified.
-     * This atomically updates both the 'version' and 'targetVersion' fields.
-     * Use unsetTargetUpgradeOrDowngrade to indicate that the schemas have completed downgrading.
-     */
-    static void setTargetDowngrade(OperationContext* opCtx, StringData version);
-
-    /**
-     * Indicate the completion of an upgrade or downgrade. Should be set only when schemas are
-     * done being upgraded or modified.
-     * Unsets the 'targetVersion' field and updates the 'version' field.
-     */
-    static void unsetTargetUpgradeOrDowngrade(OperationContext* opCtx, StringData version);
 
     /**
      * If there are no non-local databases and we are not running with --shardsvr, set
@@ -140,28 +104,6 @@ public:
      * Resets the server parameter to its default value on commit.
      */
     static void onDropCollection(OperationContext* opCtx);
-
-private:
-    /**
-     * Validate version. Uasserts if invalid.
-     */
-    static void _validateVersion(StringData version);
-
-    /**
-     * Close incoming connections from interal clients who cannot speak our highest wire protocol
-     * version.
-     */
-    static void _closeConnectionsBelowVersion(OperationContext* opCtx,
-                                              FeatureCompatibilityVersionInfo versionInfo);
-
-    /**
-     * Build update command.
-     */
-    typedef stdx::function<void(BSONObjBuilder)> UpdateBuilder;
-    static void _runUpdateCommand(OperationContext* opCtx,
-                                  StringData version,
-                                  UpdateBuilder callback);
 };
-
 
 }  // namespace mongo

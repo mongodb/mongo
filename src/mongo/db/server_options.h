@@ -158,22 +158,14 @@ struct ServerGlobalParams {
              * 3.4 node can participate in a cluster whose feature compatibility version is 3.6.
              */
             k36,
-            /**
-             * This is only used for targetVersion to indicate that no upgrade is in progress.
-             */
-            kUnset
         };
 
         // Read-only parameter featureCompatibilityVersion.
         AtomicWord<Version> version{Version::k34};
 
-        // If set, an upgrade or downgrade is in progress to the set version.
-        AtomicWord<Version> targetVersion{Version::kUnset};
-
-        // This determines whether to give Collections UUIDs upon creation.
-        bool isSchemaVersion36() {
-            return (version.load() == Version::k36 || targetVersion.load() == Version::k36);
-        }
+        // Read-only global isSchemaVersion36. This determines whether to give Collections UUIDs
+        // upon creation.
+        AtomicWord<bool> isSchemaVersion36{false};
 
         // Feature validation differs depending on the role of a mongod in a replica set or
         // master/slave configuration. Masters/primaries can accept user-initiated writes and

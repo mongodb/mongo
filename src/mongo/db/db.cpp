@@ -405,33 +405,17 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                                      versionColl,
                                      BSON("_id" << FeatureCompatibilityVersion::kParameterName),
                                      featureCompatibilityVersion)) {
-                    auto swVersionInfo =
-                        FeatureCompatibilityVersion::parse(featureCompatibilityVersion);
-                    if (!swVersionInfo.isOK()) {
-                        severe() << swVersionInfo.getStatus();
+                    auto version = FeatureCompatibilityVersion::parse(featureCompatibilityVersion);
+                    if (!version.isOK()) {
+                        severe() << version.getStatus();
                         fassertFailedNoTrace(40283);
                     }
-                    auto versionInfo = swVersionInfo.getValue();
-                    serverGlobalParams.featureCompatibility.version.store(versionInfo.version);
-                    serverGlobalParams.featureCompatibility.targetVersion.store(
-                        versionInfo.targetVersion);
+                    serverGlobalParams.featureCompatibility.version.store(version.getValue());
 
-                    // On startup, if the targetVersion field exists, then an upgrade/downgrade
-                    // did not complete successfully.
-                    if (versionInfo.targetVersion !=
-                        ServerGlobalParams::FeatureCompatibility::Version::kUnset) {
-                        log() << "** WARNING: A featureCompatibilityVersion upgrade or downgrade "
-                                 "did not complete. "
-                              << startupWarningsLog;
-                        log() << "**          The current featureCompatibilityVersion is "
-                              << FeatureCompatibilityVersion::toString(versionInfo.version)
-                              << " and the targeted version is "
-                              << FeatureCompatibilityVersion::toString(versionInfo.targetVersion)
-                              << "." << startupWarningsLog;
-                        log() << "**          To fix this, use the setFeatureCompatibilityVersion "
-                              << "command to resume upgrade to 3.6 or downgrade to 3.4."
-                              << startupWarningsLog;
-                    }
+                    // Update schemaVersion parameter.
+                    serverGlobalParams.featureCompatibility.isSchemaVersion36.store(
+                        serverGlobalParams.featureCompatibility.version.load() ==
+                        ServerGlobalParams::FeatureCompatibility::Version::k36);
                 }
             }
         }
