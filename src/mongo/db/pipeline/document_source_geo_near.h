@@ -33,7 +33,8 @@
 
 namespace mongo {
 
-class DocumentSourceGeoNear : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
+class DocumentSourceGeoNear : public DocumentSourceNeedsMongoProcessInterface,
+                              public SplittableDocumentSource {
 public:
     static const long long kDefaultLimit;
 

@@ -55,7 +55,7 @@ class NamespaceString;
  * stage which will produce a document like the following:
  * {facetA: [<all input documents except the first one>], facetB: [<the first document>]}.
  */
-class DocumentSourceFacet final : public DocumentSourceNeedsMongod,
+class DocumentSourceFacet final : public DocumentSourceNeedsMongoProcessInterface,
                                   public SplittableDocumentSource {
 public:
     struct FacetPipeline {
@@ -132,7 +132,7 @@ public:
 
     // The following are overridden just to forward calls to sub-pipelines.
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final;
-    void doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) final;
+    void doInjectMongoProcessInterface(std::shared_ptr<MongoProcessInterface>) final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext(OperationContext* opCtx) final;
     StageConstraints constraints() const final;

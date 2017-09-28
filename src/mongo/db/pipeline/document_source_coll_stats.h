@@ -36,7 +36,7 @@ namespace mongo {
  * Provides a document source interface to retrieve collection-level statistics for a given
  * collection.
  */
-class DocumentSourceCollStats : public DocumentSourceNeedsMongod {
+class DocumentSourceCollStats : public DocumentSourceNeedsMongoProcessInterface {
 public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -68,7 +68,7 @@ public:
     };
 
     DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-        : DocumentSourceNeedsMongod(pExpCtx) {}
+        : DocumentSourceNeedsMongoProcessInterface(pExpCtx) {}
 
     GetNextResult getNext() final;
 

@@ -55,7 +55,7 @@ typedef DocumentSourceEnsureResumeTokenPresentSpec DocumentSourceShardCheckResum
  * This source need only run on a sharded collection.  For unsharded collections,
  * DocumentSourceEnsureResumeTokenPresent is sufficient.
  */
-class DocumentSourceShardCheckResumability final : public DocumentSourceNeedsMongod {
+class DocumentSourceShardCheckResumability final : public DocumentSourceNeedsMongoProcessInterface {
 public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;

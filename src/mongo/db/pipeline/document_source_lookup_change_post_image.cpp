@@ -103,7 +103,7 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     // TODO SERVER-29134 we need to extract the namespace from the document and set them on the new
     // ExpressionContext if we're getting notifications from an entire database.
     auto foreignExpCtx = pExpCtx->copyWith(nss, resumeToken.getUuid());
-    auto pipelineStatus = _mongod->makePipeline({matchSpec}, foreignExpCtx);
+    auto pipelineStatus = _mongoProcessInterface->makePipeline({matchSpec}, foreignExpCtx);
     if (pipelineStatus.getStatus() == ErrorCodes::NamespaceNotFound) {
         // We couldn't find the collection with UUID, it may have been dropped.
         return Value(BSONNULL);

@@ -32,7 +32,8 @@
 
 namespace mongo {
 
-class DocumentSourceOut final : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
+class DocumentSourceOut final : public DocumentSourceNeedsMongoProcessInterface,
+                                public SplittableDocumentSource {
 public:
     static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
         const AggregationRequest& request, const BSONElement& spec);

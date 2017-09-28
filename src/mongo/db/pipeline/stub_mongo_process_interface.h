@@ -35,12 +35,13 @@
 namespace mongo {
 
 /**
- * A stub MongodInterface that can be used for testing. Create a subclass and override methods as
- * needed.
+ * A stub MongoProcessInterface that can be used for testing. Create a subclass and override
+ * methods as needed.
  */
-class StubMongodInterface : public DocumentSourceNeedsMongod::MongodInterface {
+class StubMongoProcessInterface
+    : public DocumentSourceNeedsMongoProcessInterface::MongoProcessInterface {
 public:
-    virtual ~StubMongodInterface() = default;
+    virtual ~StubMongoProcessInterface() = default;
 
     void setOperationContext(OperationContext* opCtx) override {
         MONGO_UNREACHABLE;

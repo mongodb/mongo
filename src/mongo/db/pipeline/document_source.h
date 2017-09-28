@@ -606,14 +606,20 @@ protected:
 };
 
 
-/** This class marks DocumentSources which need mongod-specific functionality.
- *  It causes a MongodInterface to be injected when in a mongod and prevents mongos from
- *  merging pipelines containing this stage.
+/**
+ * This class marks DocumentSources which need functionality specific to a mongos or a mongod. It
+ * causes a MongodProcessInterface to be injected when in a mongod and a MongosProcessInterface when
+ * in a mongos.
  */
-class DocumentSourceNeedsMongod : public DocumentSource {
+class DocumentSourceNeedsMongoProcessInterface : public DocumentSource {
 public:
-    // Wraps mongod-specific functions to allow linking into mongos.
-    class MongodInterface {
+    /**
+     * Any functionality needed by an aggregation stage that is either context specific to a mongod
+     * or mongos process, or is only compiled in to one of those two binaries must be accessed via
+     * this interface. This allows all DocumentSources to be parsed on either mongos or mongod, but
+     * only executable where it makes sense.
+     */
+    class MongoProcessInterface {
     public:
         enum class CurrentOpConnectionsMode { kIncludeIdle, kExcludeIdle };
         enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
@@ -625,14 +631,15 @@ public:
             bool optimize = true;
             bool attachCursorSource = true;
 
-            // Ordinarily, a MongodInterface is injected into the pipeline at the point when the
-            // cursor source is added. If true, 'forceInjectMongod' will inject MongodInterfaces
-            // into the pipeline even if 'attachCursorSource' is false. If 'attachCursorSource' is
-            // true, then the value of 'forceInjectMongod' is irrelevant.
-            bool forceInjectMongod = false;
+            // Ordinarily, a MongoProcessInterface is injected into the pipeline at the point
+            // when the cursor source is added. If true, 'forceInjectMongoProcessInterface' will
+            // inject MongoProcessInterfaces into the pipeline even if 'attachCursorSource' is
+            // false. If 'attachCursorSource' is true, then the value of
+            // 'forceInjectMongoProcessInterface' is irrelevant.
+            bool forceInjectMongoProcessInterface = false;
         };
 
-        virtual ~MongodInterface(){};
+        virtual ~MongoProcessInterface(){};
 
         /**
          * Sets the OperationContext of the DBDirectClient returned by directClient(). This method
@@ -701,10 +708,10 @@ public:
          * the returned pipeline will depend upon the supplied MakePipelineOptions:
          * - The boolean opts.optimize determines whether the pipeline will be optimized.
          * - If opts.attachCursorSource is false, the pipeline will be returned without attempting
-         * to add an initial cursor source.
-         * - If opts.forceInjectMongod is true, then a MongodInterface will be provided to each
-         * stage which requires one, regardless of whether a cursor source is attached to the
-         * pipeline.
+         *   to add an initial cursor source.
+         * - If opts.forceInjectMongoProcessInterface is true, then a MongoProcessInterface will be
+         *   provided to each stage which requires one, regardless of whether a cursor source is
+         *   attached to the pipeline.
          *
          * This function returns a non-OK status if parsing the pipeline failed.
          */
@@ -740,22 +747,23 @@ public:
         // Add new methods as needed.
     };
 
-    DocumentSourceNeedsMongod(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceNeedsMongoProcessInterface(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(expCtx) {}
 
-    void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
-        _mongod = mongod;
-        doInjectMongodInterface(mongod);
+    void injectMongoProcessInterface(std::shared_ptr<MongoProcessInterface> mongoProcessInterface) {
+        _mongoProcessInterface = mongoProcessInterface;
+        doInjectMongoProcessInterface(mongoProcessInterface);
     }
 
     /**
      * Derived classes may override this method to register custom inject functionality.
      */
-    virtual void doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) {}
+    virtual void doInjectMongoProcessInterface(
+        std::shared_ptr<MongoProcessInterface> mongoProcessInterface) {}
 
     void detachFromOperationContext() override {
-        invariant(_mongod);
-        _mongod->setOperationContext(nullptr);
+        invariant(_mongoProcessInterface);
+        _mongoProcessInterface->setOperationContext(nullptr);
         doDetachFromOperationContext();
     }
 
@@ -765,8 +773,8 @@ public:
     virtual void doDetachFromOperationContext() {}
 
     void reattachToOperationContext(OperationContext* opCtx) final {
-        invariant(_mongod);
-        _mongod->setOperationContext(opCtx);
+        invariant(_mongoProcessInterface);
+        _mongoProcessInterface->setOperationContext(opCtx);
         doReattachToOperationContext(opCtx);
     }
 
@@ -776,11 +784,11 @@ public:
     virtual void doReattachToOperationContext(OperationContext* opCtx) {}
 
 protected:
-    // It is invalid to delete through a DocumentSourceNeedsMongod-typed pointer.
-    virtual ~DocumentSourceNeedsMongod() {}
+    // It is invalid to delete through a DocumentSourceNeedsMongoProcessInterface-typed pointer.
+    virtual ~DocumentSourceNeedsMongoProcessInterface() {}
 
-    // Gives subclasses access to a MongodInterface implementation
-    std::shared_ptr<MongodInterface> _mongod;
+    // Gives subclasses access to a MongoProcessInterface implementation
+    std::shared_ptr<MongoProcessInterface> _mongoProcessInterface;
 };
 
 

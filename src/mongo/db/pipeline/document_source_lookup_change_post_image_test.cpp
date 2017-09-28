@@ -42,7 +42,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/stub_mongod_interface.h"
+#include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -75,11 +75,11 @@ public:
 };
 
 /**
- * A mock MongodInterface which allows mocking a foreign pipeline.
+ * A mock MongoProcessInterface which allows mocking a foreign pipeline.
  */
-class MockMongodInterface final : public StubMongodInterface {
+class MockMongoProcessInterface final : public StubMongoProcessInterface {
 public:
-    MockMongodInterface(deque<DocumentSource::GetNextResult> mockResults)
+    MockMongoProcessInterface(deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
     bool isSharded(const NamespaceString& ns) final {
@@ -132,8 +132,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyO
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    lookupChangeStage->injectMongodInterface(
-        std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
+    lookupChangeStage->injectMongoProcessInterface(
+        std::make_shared<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{}));
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
@@ -154,8 +154,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationTyp
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    lookupChangeStage->injectMongodInterface(
-        std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
+    lookupChangeStage->injectMongoProcessInterface(
+        std::make_shared<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{}));
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
@@ -176,8 +176,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    lookupChangeStage->injectMongodInterface(
-        std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
+    lookupChangeStage->injectMongoProcessInterface(
+        std::make_shared<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{}));
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
@@ -198,8 +198,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    lookupChangeStage->injectMongodInterface(
-        std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
+    lookupChangeStage->injectMongoProcessInterface(
+        std::make_shared<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{}));
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
@@ -220,8 +220,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatch
     lookupChangeStage->setSource(mockLocalSource.get());
 
     // Mock out the foreign collection.
-    lookupChangeStage->injectMongodInterface(
-        std::make_shared<MockMongodInterface>(deque<DocumentSource::GetNextResult>{}));
+    lookupChangeStage->injectMongoProcessInterface(
+        std::make_shared<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{}));
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
 }
@@ -244,8 +244,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
     // Mock out the foreign collection to have two documents with the same document key.
     deque<DocumentSource::GetNextResult> foreignCollection = {Document{{"_id", 0}},
                                                               Document{{"_id", 0}}};
-    lookupChangeStage->injectMongodInterface(
-        std::make_shared<MockMongodInterface>(std::move(foreignCollection)));
+    lookupChangeStage->injectMongoProcessInterface(
+        std::make_shared<MockMongoProcessInterface>(std::move(foreignCollection)));
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40580);
 }
@@ -275,8 +275,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
                                                              Document{{"_id", 1}}};
-    lookupChangeStage->injectMongodInterface(
-        std::make_shared<MockMongodInterface>(std::move(mockForeignContents)));
+    lookupChangeStage->injectMongoProcessInterface(
+        std::make_shared<MockMongoProcessInterface>(std::move(mockForeignContents)));
 
     auto next = lookupChangeStage->getNext();
     ASSERT_TRUE(next.isAdvanced());

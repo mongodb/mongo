@@ -44,7 +44,8 @@ DocumentSourceOut::~DocumentSourceOut() {
         // Make sure we drop the temp collection if anything goes wrong. Errors are ignored
         // here because nothing can be done about them. Additionally, if this fails and the
         // collection is left behind, it will be cleaned up next time the server is started.
-        if (_mongod && _tempNs.size()) _mongod->directClient()->dropCollection(_tempNs.ns());)
+        if (_mongoProcessInterface && _tempNs.size()) _mongoProcessInterface->directClient()
+            ->dropCollection(_tempNs.ns());)
 }
 
 std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::liteParse(
@@ -79,12 +80,12 @@ const char* DocumentSourceOut::getSourceName() const {
 static AtomicUInt32 aggOutCounter;
 
 void DocumentSourceOut::initialize() {
-    invariant(_mongod);
-    DBClientBase* conn = _mongod->directClient();
+    invariant(_mongoProcessInterface);
+    DBClientBase* conn = _mongoProcessInterface->directClient();
 
     // Save the original collection options and index specs so we can check they didn't change
     // during computation.
-    _originalOutOptions = _mongod->getCollectionOptions(_outputNs);
+    _originalOutOptions = _mongoProcessInterface->getCollectionOptions(_outputNs);
     _originalIndexes = conn->getIndexSpecs(_outputNs.ns());
 
     // Check if it's sharded or capped to make sure we have a chance of succeeding before we do all
@@ -94,7 +95,7 @@ void DocumentSourceOut::initialize() {
     uassert(17017,
             str::stream() << "namespace '" << _outputNs.ns()
                           << "' is sharded so it can't be used for $out'",
-            !_mongod->isSharded(_outputNs));
+            !_mongoProcessInterface->isSharded(_outputNs));
     uassert(17152,
             str::stream() << "namespace '" << _outputNs.ns()
                           << "' is capped so it can't be used for $out",
@@ -144,7 +145,7 @@ void DocumentSourceOut::initialize() {
 }
 
 void DocumentSourceOut::spill(const vector<BSONObj>& toInsert) {
-    BSONObj err = _mongod->insert(_tempNs, toInsert);
+    BSONObj err = _mongoProcessInterface->insert(_tempNs, toInsert);
     uassert(16996,
             str::stream() << "insert for $out failed: " << err,
             DBClientBase::getLastErrorString(err).empty());
@@ -194,7 +195,7 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
                 BSON("renameCollection" << _tempNs.ns() << "to" << _outputNs.ns() << "dropTarget"
                                         << true);
 
-            auto status = _mongod->renameIfOptionsAndIndexesHaveNotChanged(
+            auto status = _mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(
                 renameCommandObj, _outputNs, _originalOutOptions, _originalIndexes);
             uassert(16997, str::stream() << "$out failed: " << status.reason(), status.isOK());
 
@@ -211,7 +212,7 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
 
 DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
                                      const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongod(pExpCtx),
+    : DocumentSourceNeedsMongoProcessInterface(pExpCtx),
       _done(false),
       _tempNs(""),  // Filled in during getNext().
       _outputNs(outputNs) {}

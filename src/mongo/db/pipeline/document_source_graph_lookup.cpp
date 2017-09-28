@@ -205,7 +205,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 
             // We've already allocated space for the trailing $match stage in '_fromPipeline'.
             _fromPipeline.back() = *matchStage;
-            auto pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
+            auto pipeline =
+                uassertStatusOK(_mongoProcessInterface->makePipeline(_fromPipeline, _fromExpCtx));
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()
@@ -454,7 +455,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     boost::optional<FieldPath> depthField,
     boost::optional<long long> maxDepth,
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc)
-    : DocumentSourceNeedsMongod(expCtx),
+    : DocumentSourceNeedsMongoProcessInterface(expCtx),
       _from(std::move(from)),
       _as(std::move(as)),
       _connectFromField(std::move(connectFromField)),

@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-class DocumentSourceCurrentOp final : public DocumentSourceNeedsMongod {
+class DocumentSourceCurrentOp final : public DocumentSourceNeedsMongoProcessInterface {
 public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -64,9 +64,9 @@ public:
         const bool _allUsers;
     };
 
-    using TruncationMode = MongodInterface::CurrentOpTruncateMode;
-    using ConnMode = MongodInterface::CurrentOpConnectionsMode;
-    using UserMode = MongodInterface::CurrentOpUserMode;
+    using TruncationMode = MongoProcessInterface::CurrentOpTruncateMode;
+    using ConnMode = MongoProcessInterface::CurrentOpConnectionsMode;
+    using UserMode = MongoProcessInterface::CurrentOpUserMode;
 
     static boost::intrusive_ptr<DocumentSourceCurrentOp> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -100,7 +100,7 @@ private:
                             ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
                             UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
                             TruncationMode truncateOps = TruncationMode::kNoTruncation)
-        : DocumentSourceNeedsMongod(pExpCtx),
+        : DocumentSourceNeedsMongoProcessInterface(pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
           _truncateOps(truncateOps) {}

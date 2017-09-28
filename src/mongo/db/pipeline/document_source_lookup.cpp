@@ -68,7 +68,7 @@ std::string pipelineToString(const vector<BSONObj>& pipeline) {
 DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
                                            std::string as,
                                            const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongod(pExpCtx),
+    : DocumentSourceNeedsMongoProcessInterface(pExpCtx),
       _fromNs(std::move(fromNs)),
       _as(std::move(as)),
       _variables(pExpCtx->variables),
@@ -251,21 +251,22 @@ std::unique_ptr<Pipeline, Pipeline::Deleter> DocumentSourceLookUp::buildPipeline
 
     // If we don't have a cache, build and return the pipeline immediately.
     if (!_cache || _cache->isAbandoned()) {
-        return uassertStatusOK(_mongod->makePipeline(_resolvedPipeline, _fromExpCtx));
+        return uassertStatusOK(
+            _mongoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx));
     }
 
     // Tailor the pipeline construction for our needs. We want a non-optimized pipeline without a
     // cursor source. If the cache is present and serving, then we will not be adding a cursor
-    // source later, so inject a mongod interface into all stages that need one.
-    MongodInterface::MakePipelineOptions pipelineOpts;
+    // source later, so inject a MongoProcessInterface into all stages that need one.
+    MongoProcessInterface::MakePipelineOptions pipelineOpts;
 
     pipelineOpts.optimize = false;
     pipelineOpts.attachCursorSource = false;
-    pipelineOpts.forceInjectMongod = _cache->isServing();
+    pipelineOpts.forceInjectMongoProcessInterface = _cache->isServing();
 
     // Construct the basic pipeline without a cache stage.
-    auto pipeline =
-        uassertStatusOK(_mongod->makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts));
+    auto pipeline = uassertStatusOK(
+        _mongoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts));
 
     // Add the cache stage at the end and optimize. During the optimization process, the cache will
     // either move itself to the correct position in the pipeline, or will abandon itself if no
@@ -277,7 +278,8 @@ std::unique_ptr<Pipeline, Pipeline::Deleter> DocumentSourceLookUp::buildPipeline
 
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
-        uassertStatusOK(_mongod->attachCursorSourceToPipeline(_fromExpCtx, pipeline.get()));
+        uassertStatusOK(
+            _mongoProcessInterface->attachCursorSourceToPipeline(_fromExpCtx, pipeline.get()));
     }
 
     // If the cache has been abandoned, release it.

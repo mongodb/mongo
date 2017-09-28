@@ -106,7 +106,7 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
 
     builder.append("ns", pExpCtx->ns.ns());
 
-    auto shardName = _mongod->getShardName(pExpCtx->opCtx);
+    auto shardName = _mongoProcessInterface->getShardName(pExpCtx->opCtx);
 
     if (!shardName.empty()) {
         builder.append("shard", shardName);
@@ -121,13 +121,13 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
         if (_collStatsSpec["latencyStats"].type() == BSONType::Object) {
             includeHistograms = _collStatsSpec["latencyStats"]["histograms"].boolean();
         }
-        _mongod->appendLatencyStats(pExpCtx->ns, includeHistograms, &builder);
+        _mongoProcessInterface->appendLatencyStats(pExpCtx->ns, includeHistograms, &builder);
     }
 
     if (_collStatsSpec.hasField("storageStats")) {
         // If the storageStats field exists, it must have been validated as an object when parsing.
         BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        Status status = _mongod->appendStorageStats(
+        Status status = _mongoProcessInterface->appendStorageStats(
             pExpCtx->ns, _collStatsSpec["storageStats"].Obj(), &storageBuilder);
         storageBuilder.doneFast();
         if (!status.isOK()) {
@@ -138,7 +138,7 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
     }
 
     if (_collStatsSpec.hasField("count")) {
-        Status status = _mongod->appendRecordCount(pExpCtx->ns, &builder);
+        Status status = _mongoProcessInterface->appendRecordCount(pExpCtx->ns, &builder);
         if (!status.isOK()) {
             uasserted(40481,
                       str::stream() << "Unable to retrieve count in $collStats stage: "

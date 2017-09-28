@@ -57,7 +57,7 @@ using std::vector;
 
 DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                                          const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceNeedsMongod(expCtx),
+    : DocumentSourceNeedsMongoProcessInterface(expCtx),
       _teeBuffer(TeeBuffer::create(facetPipelines.size())),
       _facets(std::move(facetPipelines)) {
     for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
@@ -215,11 +215,13 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::optimize() {
     return this;
 }
 
-void DocumentSourceFacet::doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
+void DocumentSourceFacet::doInjectMongoProcessInterface(
+    std::shared_ptr<MongoProcessInterface> pipelineContext) {
     for (auto&& facet : _facets) {
         for (auto&& stage : facet.pipeline->getSources()) {
-            if (auto stageNeedingMongod = dynamic_cast<DocumentSourceNeedsMongod*>(stage.get())) {
-                stageNeedingMongod->injectMongodInterface(mongod);
+            if (auto stageNeedingMongoProcessInterface =
+                    dynamic_cast<DocumentSourceNeedsMongoProcessInterface*>(stage.get())) {
+                stageNeedingMongoProcessInterface->injectMongoProcessInterface(pipelineContext);
             }
         }
     }

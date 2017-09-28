@@ -88,9 +88,10 @@ using std::string;
 using std::unique_ptr;
 
 namespace {
-class MongodImplementation final : public DocumentSourceNeedsMongod::MongodInterface {
+class MongodProcessInterface final
+    : public DocumentSourceNeedsMongoProcessInterface::MongoProcessInterface {
 public:
-    MongodImplementation(const intrusive_ptr<ExpressionContext>& ctx)
+    MongodProcessInterface(const intrusive_ptr<ExpressionContext>& ctx)
         : _ctx(ctx), _client(ctx->opCtx) {}
 
     void setOperationContext(OperationContext* opCtx) {
@@ -194,7 +195,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts) final {
         // 'expCtx' may represent the settings for an aggregation pipeline on a different namespace
-        // than the DocumentSource this MongodImplementation is injected into, but both
+        // than the DocumentSource this MongodProcessInterface is injected into, but both
         // ExpressionContext instances should still have the same OperationContext.
         invariant(_ctx->opCtx == expCtx->opCtx);
 
@@ -211,7 +212,7 @@ public:
 
         if (opts.attachCursorSource) {
             cursorStatus = attachCursorSourceToPipeline(expCtx, pipeline.getValue().get());
-        } else if (opts.forceInjectMongod) {
+        } else if (opts.forceInjectMongoProcessInterface) {
             PipelineD::injectMongodInterface(pipeline.getValue().get());
         }
 
@@ -477,9 +478,10 @@ BSONObj removeSortKeyMetaProjection(BSONObj projectionObj) {
 
 void PipelineD::injectMongodInterface(Pipeline* pipeline) {
     for (auto&& source : pipeline->_sources) {
-        if (auto needsMongod = dynamic_cast<DocumentSourceNeedsMongod*>(source.get())) {
-            needsMongod->injectMongodInterface(
-                std::make_shared<MongodImplementation>(pipeline->getContext()));
+        if (auto needsMongod =
+                dynamic_cast<DocumentSourceNeedsMongoProcessInterface*>(source.get())) {
+            needsMongod->injectMongoProcessInterface(
+                std::make_shared<MongodProcessInterface>(pipeline->getContext()));
         }
     }
 }
@@ -493,7 +495,7 @@ void PipelineD::prepareCursorSource(Collection* collection,
     // We will be modifying the source vector as we go.
     Pipeline::SourceContainer& sources = pipeline->_sources;
 
-    // Inject a MongodImplementation to sources that need them.
+    // Inject a MongodProcessInterface to sources that need them.
     injectMongodInterface(pipeline);
 
     if (!sources.empty() && !sources.front()->constraints().requiresInputDocSource) {

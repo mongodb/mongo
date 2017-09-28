@@ -45,7 +45,7 @@ namespace mongo {
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class DocumentSourceLookUp final : public DocumentSourceNeedsMongod,
+class DocumentSourceLookUp final : public DocumentSourceNeedsMongoProcessInterface,
                                    public SplittableDocumentSource {
 public:
     class LiteParsed final : public LiteParsedDocumentSource {

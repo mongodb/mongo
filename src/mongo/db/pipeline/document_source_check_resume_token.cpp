@@ -95,7 +95,7 @@ intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResu
 
 DocumentSourceShardCheckResumability::DocumentSourceShardCheckResumability(
     const intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceShardCheckResumabilitySpec spec)
-    : DocumentSourceNeedsMongod(expCtx),
+    : DocumentSourceNeedsMongoProcessInterface(expCtx),
       _token(spec.getResumeToken()),
       _verifiedResumability(false) {}
 
@@ -122,7 +122,8 @@ DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
     // with the resume token.
     auto firstEntryExpCtx = pExpCtx->copyWith(pExpCtx->ns);
     auto matchSpec = BSON("$match" << BSONObj());
-    auto pipeline = uassertStatusOK(_mongod->makePipeline({matchSpec}, firstEntryExpCtx));
+    auto pipeline =
+        uassertStatusOK(_mongoProcessInterface->makePipeline({matchSpec}, firstEntryExpCtx));
     if (auto first = pipeline->getNext()) {
         auto firstOplogEntry = Value(*first);
         uassert(40576,

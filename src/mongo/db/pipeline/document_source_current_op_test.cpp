@@ -32,7 +32,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_current_op.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/stub_mongod_interface.h"
+#include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -55,14 +55,15 @@ public:
 };
 
 /**
- * A MongodInterface used for testing which returns artificial currentOp entries.
+ * A MongoProcessInterface used for testing which returns artificial currentOp entries.
  */
-class MockMongodImplementation final : public StubMongodInterface {
+class MockMongoProcessInterfaceImplementation final : public StubMongoProcessInterface {
 public:
-    MockMongodImplementation(std::vector<BSONObj> ops, bool hasShardName = true)
+    MockMongoProcessInterfaceImplementation(std::vector<BSONObj> ops, bool hasShardName = true)
         : _ops(std::move(ops)), _hasShardName(hasShardName) {}
 
-    MockMongodImplementation(bool hasShardName = true) : _hasShardName(hasShardName) {}
+    MockMongoProcessInterfaceImplementation(bool hasShardName = true)
+        : _hasShardName(hasShardName) {}
 
     std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
                                        CurrentOpUserMode userMode,
@@ -183,8 +184,8 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldSerializeOmittedOptionalArgumentsAsDef
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
-    const auto mongod = std::make_shared<MockMongodImplementation>();
-    currentOp->injectMongodInterface(mongod);
+    const auto mongod = std::make_shared<MockMongoProcessInterfaceImplementation>();
+    currentOp->injectMongoProcessInterface(mongod);
 
     ASSERT(currentOp->getNext().isEOF());
 }
@@ -194,10 +195,10 @@ TEST_F(DocumentSourceCurrentOpTest,
     getExpCtx()->fromMongos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
-    const auto mongod = std::make_shared<MockMongodImplementation>(ops);
+    const auto mongod = std::make_shared<MockMongoProcessInterfaceImplementation>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
-    currentOp->injectMongodInterface(mongod);
+    currentOp->injectMongoProcessInterface(mongod);
 
     const auto expectedOutput =
         Document{{"shard", kMockShardName},
@@ -212,10 +213,10 @@ TEST_F(DocumentSourceCurrentOpTest,
     getExpCtx()->fromMongos = false;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
-    const auto mongod = std::make_shared<MockMongodImplementation>(ops);
+    const auto mongod = std::make_shared<MockMongoProcessInterfaceImplementation>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
-    currentOp->injectMongodInterface(mongod);
+    currentOp->injectMongoProcessInterface(mongod);
 
     const auto expectedOutput =
         Document{{"client", std::string("192.168.1.10:50844")}, {"opid", 430}};
@@ -226,10 +227,10 @@ TEST_F(DocumentSourceCurrentOpTest,
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRequest) {
     getExpCtx()->fromMongos = true;
 
-    const auto mongod = std::make_shared<MockMongodImplementation>(false);
+    const auto mongod = std::make_shared<MockMongoProcessInterfaceImplementation>(false);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
-    currentOp->injectMongodInterface(mongod);
+    currentOp->injectMongoProcessInterface(mongod);
 
     ASSERT_THROWS_CODE(currentOp->getNext(), AssertionException, 40465);
 }
@@ -238,10 +239,10 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInS
     getExpCtx()->fromMongos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 'string' }")};
-    const auto mongod = std::make_shared<MockMongodImplementation>(ops);
+    const auto mongod = std::make_shared<MockMongoProcessInterfaceImplementation>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
-    currentOp->injectMongodInterface(mongod);
+    currentOp->injectMongoProcessInterface(mongod);
 
     ASSERT_THROWS_CODE(currentOp->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
