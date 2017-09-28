@@ -1000,6 +1000,33 @@ Status applyOperation_inlock(OperationContext* opCtx,
             str::stream() << "applyOps not supported on view: " << requestNss.ns(),
             collection || !db->getViewCatalog()->lookup(opCtx, requestNss.ns()));
 
+    // This code must decide what timestamp the storage engine should make the upcoming writes
+    // visible with. The requirements and use-cases:
+    //
+    // Requirement: A client calling the `applyOps` command must not be able to dictate timestamps
+    //      that violate oplog ordering. Disallow this regardless of whether the timestamps chosen
+    //      are otherwise legal.
+    //
+    // Use cases: Secondary oplog application: Use the timestamp in the operation document. These
+    //     operations are replicated to the oplog and this is not nested in a parent
+    //     `WriteUnitOfWork`.
+    //
+    //   Non-atomic `applyOps`: The server receives an `applyOps` command with a series of
+    //     operations that cannot be run under a single transaction. The common exemption from
+    //     being "transactionable" is containing a command operation. These will not be under a
+    //     parent `WriteUnitOfWork`. The timestamps on the operations will only be used if the
+    //     writes are not being replicated, as that would violate the guiding requirement. This is
+    //     primarily allowed for unit testing. See `dbtest/storage_timestamp_tests.cpp`.
+    //
+    //  Atomic `applyOps`: The server receives an `applyOps` command with operations that can be
+    //    run under a single transaction. In this case the caller has already opened a
+    //    `WriteUnitOfWork` and expects all writes to become visible at the same time. The caller
+    //    is responsible for setting the timestamp before committing. Assigning a competing
+    //    timestamp in this codepath would break that atomicity. Sharding is a consumer of this
+    //    use-case.
+    const bool assignOperationTimestamp =
+        !opCtx->writesAreReplicated() && !haveWrappingWriteUnitOfWork && fieldTs;
+
     if (*opType == 'i') {
         if (requestNss.isSystemDotIndexes()) {
             BSONObj indexSpec;
@@ -1108,7 +1135,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 // Do not use supplied timestamps if running through applyOps, as that would allow
                 // a user to dictate what timestamps appear in the oplog.
-                if (!opCtx->writesAreReplicated()) {
+                if (assignOperationTimestamp) {
                     if (fieldTs.ok()) {
                         timestamp = SnapshotName(fieldTs.timestamp());
                     }
@@ -1176,46 +1203,66 @@ Status applyOperation_inlock(OperationContext* opCtx,
         UpdateLifecycleImpl updateLifecycle(requestNss);
         request.setLifecycle(&updateLifecycle);
 
-        UpdateResult ur = update(opCtx, db, request);
+        SnapshotName timestamp;
+        if (assignOperationTimestamp) {
+            timestamp = SnapshotName(fieldTs.timestamp());
+        }
 
-        if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
-            if (ur.modifiers) {
-                if (updateCriteria.nFields() == 1) {
-                    // was a simple { _id : ... } update criteria
-                    string msg = str::stream() << "failed to apply update: " << redact(op);
-                    error() << msg;
-                    return Status(ErrorCodes::UpdateOperationFailed, msg);
-                }
-                // Need to check to see if it isn't present so we can exit early with a
-                // failure. Note that adds some overhead for this extra check in some cases,
-                // such as an updateCriteria
-                // of the form
-                //   { _id:..., { x : {$size:...} }
-                // thus this is not ideal.
-                if (collection == NULL ||
-                    (indexCatalog->haveIdIndex(opCtx) &&
-                     Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
-                    // capped collections won't have an _id index
-                    (!indexCatalog->haveIdIndex(opCtx) &&
-                     Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
-                    string msg = str::stream() << "couldn't find doc: " << redact(op);
-                    error() << msg;
-                    return Status(ErrorCodes::UpdateOperationFailed, msg);
-                }
+        const StringData ns = fieldNs.valueStringData();
+        auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
+            WriteUnitOfWork wuow(opCtx);
+            if (timestamp != SnapshotName::min()) {
+                uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+            }
 
-                // Otherwise, it's present; zero objects were updated because of additional
-                // specifiers in the query for idempotence
-            } else {
-                // this could happen benignly on an oplog duplicate replay of an upsert
-                // (because we are idempotent),
-                // if an regular non-mod update fails the item is (presumably) missing.
-                if (!upsert) {
-                    string msg = str::stream() << "update of non-mod failed: " << redact(op);
-                    error() << msg;
-                    return Status(ErrorCodes::UpdateOperationFailed, msg);
+            UpdateResult ur = update(opCtx, db, request);
+
+            if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
+                if (ur.modifiers) {
+                    if (updateCriteria.nFields() == 1) {
+                        // was a simple { _id : ... } update criteria
+                        string msg = str::stream() << "failed to apply update: " << redact(op);
+                        error() << msg;
+                        return Status(ErrorCodes::UpdateOperationFailed, msg);
+                    }
+                    // Need to check to see if it isn't present so we can exit early with a
+                    // failure. Note that adds some overhead for this extra check in some cases,
+                    // such as an updateCriteria of the form
+                    // { _id:..., { x : {$size:...} }
+                    // thus this is not ideal.
+                    if (collection == NULL ||
+                        (indexCatalog->haveIdIndex(opCtx) &&
+                         Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
+                        // capped collections won't have an _id index
+                        (!indexCatalog->haveIdIndex(opCtx) &&
+                         Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
+                        string msg = str::stream() << "couldn't find doc: " << redact(op);
+                        error() << msg;
+                        return Status(ErrorCodes::UpdateOperationFailed, msg);
+                    }
+
+                    // Otherwise, it's present; zero objects were updated because of additional
+                    // specifiers in the query for idempotence
+                } else {
+                    // this could happen benignly on an oplog duplicate replay of an upsert
+                    // (because we are idempotent),
+                    // if an regular non-mod update fails the item is (presumably) missing.
+                    if (!upsert) {
+                        string msg = str::stream() << "update of non-mod failed: " << redact(op);
+                        error() << msg;
+                        return Status(ErrorCodes::UpdateOperationFailed, msg);
+                    }
                 }
             }
+
+            wuow.commit();
+            return Status::OK();
+        });
+
+        if (!status.isOK()) {
+            return status;
         }
+
         if (incrementOpsAppliedStats) {
             incrementOpsAppliedStats();
         }

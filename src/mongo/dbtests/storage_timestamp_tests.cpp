@@ -291,12 +291,93 @@ public:
     }
 };
 
+class SecondaryUpdateTimes : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // In order for applyOps to assign timestamps, we must be in non-replicated mode.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        // Create a new collection.
+        NamespaceString nss("unittests.timestampedUpdates");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+
+        // Insert one document that will go through a series of updates.
+        const LogicalTime insertTime = _clock->reserveTicks(1);
+        WriteUnitOfWork wunit(_opCtx);
+        insertDocument(
+            autoColl.getCollection(),
+            InsertStatement(BSON("_id" << 0), SnapshotName(insertTime.asTimestamp()), 0LL));
+        wunit.commit();
+        ASSERT_EQ(1, itCount(autoColl.getCollection()));
+
+        const std::vector<std::pair<BSONObj, BSONObj>> updates = {
+            {BSON("$set" << BSON("val" << 1)), BSON("_id" << 0 << "val" << 1)},
+            {BSON("$unset" << BSON("val" << 1)), BSON("_id" << 0)},
+            {BSON("$addToSet" << BSON("theSet" << 1)),
+             BSON("_id" << 0 << "theSet" << BSON_ARRAY(1))},
+            {BSON("$addToSet" << BSON("theSet" << 2)),
+             BSON("_id" << 0 << "theSet" << BSON_ARRAY(1 << 2))},
+            {BSON("$pull" << BSON("theSet" << 1)), BSON("_id" << 0 << "theSet" << BSON_ARRAY(2))},
+            {BSON("$pull" << BSON("theSet" << 2)), BSON("_id" << 0 << "theSet" << BSONArray())},
+            {BSON("$set" << BSON("theMap.val" << 1)),
+             BSON("_id" << 0 << "theSet" << BSONArray() << "theMap" << BSON("val" << 1))},
+            {BSON("$rename" << BSON("theSet"
+                                    << "theOtherSet")),
+             BSON("_id" << 0 << "theMap" << BSON("val" << 1) << "theOtherSet" << BSONArray())}};
+
+        const LogicalTime firstUpdateTime = _clock->reserveTicks(updates.size());
+        for (std::size_t idx = 0; idx < updates.size(); ++idx) {
+            BSONObjBuilder result;
+            ASSERT_OK(applyOps(
+                _opCtx,
+                nss.db().toString(),
+                BSON("applyOps" << BSON_ARRAY(BSON(
+                         "ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL << "h"
+                              << 0xBEEFBEEFLL
+                              << "v"
+                              << 2
+                              << "op"
+                              << "u"
+                              << "ns"
+                              << nss.ns()
+                              << "ui"
+                              << autoColl.getCollection()->uuid().get()
+                              << "o2"
+                              << BSON("_id" << 0)
+                              << "o"
+                              << updates[idx].first))),
+                &result));
+        }
+
+        for (std::size_t idx = 0; idx < updates.size(); ++idx) {
+            // Querying at each successive ticks after `insertTime` sees the document transform in
+            // the series.
+            auto recoveryUnit = _opCtx->recoveryUnit();
+            recoveryUnit->abandonSnapshot();
+            ASSERT_OK(recoveryUnit->selectSnapshot(
+                SnapshotName(insertTime.addTicks(idx + 1).asTimestamp())));
+
+            auto doc = findOne(autoColl.getCollection());
+            ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, updates[idx].second))
+                << "Doc: " << doc.toString() << " Expected: " << updates[idx].second.toString();
+        }
+    }
+};
+
 class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
     void setupTests() {
         add<SecondaryInsertTimes>();
         add<SecondaryArrayInsertTimes>();
+        add<SecondaryUpdateTimes>();
     }
 };
 
