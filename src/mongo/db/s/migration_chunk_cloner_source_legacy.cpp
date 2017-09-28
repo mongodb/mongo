@@ -385,13 +385,8 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
         return;
     }
 
-    if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'i', oplogTs, {}));
-    } else {
-        opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'i', {}, {}));
-    }
+    opCtx->recoveryUnit()->registerChange(
+        new LogOpForShardingHandler(this, idElement.wrap(), 'i', oplogTs, {}));
 }
 
 void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
@@ -411,13 +406,8 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
         return;
     }
 
-    if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'u', oplogTs, prePostImageTs));
-    } else {
-        opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'u', {}, {}));
-    }
+    opCtx->recoveryUnit()->registerChange(
+        new LogOpForShardingHandler(this, idElement.wrap(), 'u', oplogTs, prePostImageTs));
 }
 
 void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
@@ -433,13 +423,8 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
         return;
     }
 
-    if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'd', oplogTs, preImageTs));
-    } else {
-        opCtx->recoveryUnit()->registerChange(
-            new LogOpForShardingHandler(this, idElement.wrap(), 'd', {}, {}));
-    }
+    opCtx->recoveryUnit()->registerChange(
+        new LogOpForShardingHandler(this, idElement.wrap(), 'd', oplogTs, preImageTs));
 }
 
 uint64_t MigrationChunkClonerSourceLegacy::getCloneBatchBufferAllocationSize() {

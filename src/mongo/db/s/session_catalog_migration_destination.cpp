@@ -356,7 +356,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
     auto uniqueCtx = cc().makeOperationContext();
     auto opCtx = uniqueCtx.get();
 
-    bool oplogDrainedAfterCommiting = false;
+    // Timestamp prePostImageTs;
     ProcessOplogResult lastResult;
     repl::OpTime lastOpTimeWaited;
 
@@ -377,16 +377,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                 {
                     stdx::lock_guard<stdx::mutex> lk(_mutex);
                     if (_state == State::Committing) {
-                        // The migration is considered done only when it gets an empty result from
-                        // the source shard while this is in state committing. This is to make sure
-                        // that it doesn't miss any new oplog created between the time window where
-                        // this depleted the buffer from the source shard and receiving the commit
-                        // command.
-                        if (oplogDrainedAfterCommiting) {
-                            break;
-                        }
-
-                        oplogDrainedAfterCommiting = true;
+                        break;
                     }
                 }
 
