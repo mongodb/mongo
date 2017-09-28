@@ -216,7 +216,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
     SessionCatalogMigrationSource migrationSource(kNs);
     ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
 
-    auto expectedSequece = {entry4.toBSON(), entry3.toBSON(), entry2.toBSON(), entry1.toBSON()};
+    auto expectedSequece = {entry3.toBSON(), entry4.toBSON(), entry1.toBSON(), entry2.toBSON()};
 
     for (auto oplogDoc : expectedSequece) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());

@@ -103,6 +103,8 @@ extern int OPLOG_VERSION;
 /**
  * Log insert(s) to the local oplog.
  * Returns the OpTime of the last insert.
+ * The timestamps parameter can also be modified and contain the individual timestamps for each
+ * insert after the oplog entries were created.
  */
 OpTime logInsertOps(OperationContext* opCtx,
                     const NamespaceString& nss,
@@ -110,6 +112,7 @@ OpTime logInsertOps(OperationContext* opCtx,
                     Session* session,
                     std::vector<InsertStatement>::const_iterator begin,
                     std::vector<InsertStatement>::const_iterator end,
+                    Timestamp timestamps[],
                     bool fromMigrate);
 
 /**

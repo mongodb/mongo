@@ -76,6 +76,7 @@
         _configsvrShardCollection: {skip: isAnInternalCommand},
         _configsvrSetFeatureCompatibilityVersion: {skip: isAnInternalCommand},
         _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
+        _getNextSessionMods: {skip: isAnInternalCommand},
         _getUserCacheGeneration: {skip: isAnInternalCommand},
         _hashBSONElement: {skip: isAnInternalCommand},
         _isSelf: {skip: isAnInternalCommand},

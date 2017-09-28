@@ -225,6 +225,7 @@ error_code("JSONSchemaNotAllowed", 224)
 error_code("TransactionTooOld", 225)
 error_code("AtomicityFailure", 226)
 error_code("CannotImplicitlyCreateCollection", 227);
+error_code("SessionTransferIncomplete", 228)
 
 # Error codes 4000-8999 are reserved.
 

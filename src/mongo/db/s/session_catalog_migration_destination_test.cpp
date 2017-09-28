@@ -253,6 +253,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyWhenNothingToTr
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -285,6 +287,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
     oplog3.setStatementId(5);
 
     returnOplog({oplog1, oplog2, oplog3});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -336,6 +340,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
     oplog3.setStatementId(5);
 
     returnOplog({oplog1, oplog2, oplog3});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -380,6 +386,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparate
 
     returnOplog({oplog1, oplog2});
     returnOplog({oplog3});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -433,6 +441,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
     oplog3.setStatementId(5);
 
     returnOplog({oplog1, oplog2, oplog3});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -506,6 +516,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
     oplog2.setStatementId(45);
 
     returnOplog({oplog1, oplog2});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -556,6 +568,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
     updateOplog.setPreImageTs(Timestamp(100, 2));
 
     returnOplog({preImageOplog, updateOplog});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -645,6 +659,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
     updateOplog.setPostImageTs(Timestamp(100, 2));
 
     returnOplog({postImageOplog, updateOplog});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -735,6 +751,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
 
     returnOplog({preImageOplog});
     returnOplog({updateOplog});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -829,6 +847,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
     oplog2.setStatementId(45);
 
     returnOplog({oplog1, oplog2});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -883,6 +903,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     oplog2.setStatementId(45);
 
     returnOplog({oplog2});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -1048,6 +1070,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     oplog2.setStatementId(45);
 
     returnOplog({oplog2});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
     returnOplog({});
 
     sessionMigration.join();
@@ -1301,6 +1325,61 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::ErrorOccurred ==
                 sessionMigration.getState());
     ASSERT_FALSE(sessionMigration.getErrMsg().empty());
+}
+
+TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatements) {
+    const NamespaceString kNs("a.b");
+    const auto sessionId = makeLogicalSessionIdForTest();
+
+    auto opCtx = operationContext();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(19);
+
+    insertDocWithSessionInfo(sessionInfo, kNs, BSON("_id" << 46), 30);
+
+    SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
+    sessionMigration.start(getServiceContext());
+    sessionMigration.finish();
+
+    OplogEntry oplog1(
+        OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
+    oplog1.setOperationSessionInfo(sessionInfo);
+    oplog1.setStatementId(23);
+
+    OplogEntry oplog2(OpTime(Timestamp(70, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
+    oplog2.setOperationSessionInfo(sessionInfo);
+    oplog2.setStatementId(30);
+
+    OplogEntry oplog3(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
+    oplog3.setOperationSessionInfo(sessionInfo);
+    oplog3.setStatementId(45);
+
+    returnOplog({oplog1, oplog2, oplog3});
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
+    returnOplog({});
+
+    sessionMigration.join();
+
+    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+
+    auto session = getSessionWithTxn(opCtx, sessionId, 19);
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTimeTs(19));
+
+    ASSERT_TRUE(historyIter.hasNext());
+    checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
+
+    ASSERT_TRUE(historyIter.hasNext());
+    checkOplogWithNestedOplog(oplog1, historyIter.next(opCtx));
+
+    ASSERT_TRUE(historyIter.hasNext());
+    auto firstInsertOplog = historyIter.next(opCtx);
+
+    ASSERT_TRUE(firstInsertOplog.getOpType() == OpTypeEnum::kInsert);
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 46), firstInsertOplog.getObject());
+    ASSERT_TRUE(firstInsertOplog.getStatementId());
+    ASSERT_EQ(30, *firstInsertOplog.getStatementId());
 }
 
 }  // namespace
