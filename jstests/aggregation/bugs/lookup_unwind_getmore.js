@@ -46,7 +46,7 @@
         },
     }));
 
-    const cursor = new DBCommandCursor(conn, res, batchSize);
+    const cursor = new DBCommandCursor(testDB, res, batchSize);
     assert.eq(numMatches, cursor.itcount());
 
     MongoRunner.stopMongod(conn);

@@ -18,7 +18,7 @@ function iterateSliced() {
     var count = 0;
     for (var i = 0; i < res.cursors.length; i++) {
         var x = res.cursors[i];
-        var cursor = new DBCommandCursor(db.getMongo(), x, 5);
+        var cursor = new DBCommandCursor(db, x, 5);
         count += cursor.itcount();
     }
 

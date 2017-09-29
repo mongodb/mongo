@@ -48,7 +48,7 @@
         let serverStatus = assert.commandWorked(testDB.serverStatus());
         const expectedNumTimedOutCursors = serverStatus.metrics.cursor.timedOut + 1;
 
-        const cursor = new DBCommandCursor(conn, res, batchSize);
+        const cursor = new DBCommandCursor(testDB, res, batchSize);
 
         // Wait until the idle cursor background job has killed the aggregation cursor.
         assert.soon(

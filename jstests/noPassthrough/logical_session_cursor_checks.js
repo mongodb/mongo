@@ -45,6 +45,19 @@
             session1.endSession();
         }
 
+        // Test that query.js driven getMore works correctly on the same session.
+        {
+            var session1 = conn.startSession();
+            var session2 = conn.startSession();
+            var cursor = session1.getDatabase("data_storage").test.find({}).batchSize(1);
+            cursor.next();
+            cursor.next();
+            cursor.close();
+
+            session2.endSession();
+            session1.endSession();
+        }
+
         fixture.stop();
     }
 

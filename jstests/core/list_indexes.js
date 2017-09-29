@@ -32,7 +32,7 @@
 
     var getListIndexesCursor = function(coll, options, subsequentBatchSize) {
         return new DBCommandCursor(
-            coll.getDB().getMongo(), coll.runCommand("listIndexes", options), subsequentBatchSize);
+            coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
     };
 
     var cursorGetIndexSpecs = function(cursor) {
@@ -167,9 +167,9 @@
     assert.commandWorked(coll.ensureIndex({c: 1}, {unique: true}));
 
     res = coll.runCommand("listIndexes", {cursor: {batchSize: 0}});
-    cursor = new DBCommandCursor(coll.getDB().getMongo(), res, 2);
+    cursor = new DBCommandCursor(coll.getDB(), res, 2);
     cursor.close();
-    cursor = new DBCommandCursor(coll.getDB().getMongo(), res, 2);
+    cursor = new DBCommandCursor(coll.getDB(), res, 2);
     assert.throws(function() {
         cursor.hasNext();
     });

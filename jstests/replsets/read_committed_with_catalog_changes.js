@@ -227,7 +227,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
             coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
         assert.commandWorked(res, 'reading from ' + coll.getFullName());
         // Exhaust the cursor to avoid leaking cursors on the server.
-        new DBCommandCursor(coll.getMongo(), res).itcount();
+        new DBCommandCursor(coll.getDB(), res).itcount();
     }
 
     // Set up a set and grab things for later.

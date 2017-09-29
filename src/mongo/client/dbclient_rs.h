@@ -63,7 +63,6 @@ public:
                        StringData applicationName,
                        double so_timeout = 0,
                        MongoURI uri = {});
-    virtual ~DBClientReplicaSet();
 
     /**
      * Returns false if no member of the set were reachable. This object
@@ -188,6 +187,8 @@ public:
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) final;
+    std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> runCommandWithTarget(
+        OpMsgRequest request, std::shared_ptr<DBClientBase> me) final;
     DBClientBase* runFireAndForgetCommand(OpMsgRequest request) final;
 
     void setRequestMetadataWriter(rpc::RequestMetadataWriter writer) final;
@@ -300,7 +301,7 @@ private:
     std::shared_ptr<ReplicaSetMonitor> _rsm;
 
     HostAndPort _masterHost;
-    std::unique_ptr<DBClientConnection> _master;
+    std::shared_ptr<DBClientConnection> _master;
 
     // Last used host in a slaveOk query (can be a primary).
     HostAndPort _lastSlaveOkHost;
@@ -308,7 +309,7 @@ private:
     // Connection can either be owned here or returned to the connection pool. Note that
     // if connection is primary, it is owned by _master so it is incorrect to return
     // it to the pool.
-    std::unique_ptr<DBClientConnection> _lastSlaveOkConn;
+    std::shared_ptr<DBClientConnection> _lastSlaveOkConn;
     std::shared_ptr<ReadPreferenceSetting> _lastReadPref;
 
     double _so_timeout;

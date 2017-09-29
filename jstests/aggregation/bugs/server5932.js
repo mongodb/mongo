@@ -22,7 +22,7 @@ function makeCursor(cmdOut, followupBatchSize) {
     assert.neq(cmdOut.cursor.id, undefined);
     assert(cmdOut.cursor.id instanceof NumberLong);
     assert(cmdOut.cursor.firstBatch instanceof Array);
-    return new DBCommandCursor(db.getMongo(), cmdOut, followupBatchSize);
+    return new DBCommandCursor(db, cmdOut, followupBatchSize);
 }
 
 // both batch sizes are optional

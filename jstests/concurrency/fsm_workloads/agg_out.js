@@ -67,7 +67,7 @@ var $config = extendWorkload($config, function($config, $super) {
             cursor: {}
         });
         if (res.ok) {
-            const cursor = new DBCommandCursor(db.getMongo(), res);
+            const cursor = new DBCommandCursor(db, res);
             assertAlways.eq(0, cursor.itcount());  // No matter how many documents were in the
                                                    // original input stream, $out should never
                                                    // return any results.

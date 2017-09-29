@@ -291,6 +291,22 @@ public:
     virtual std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request);
 
     /**
+     * This shared_ptr overload is used to possibly return a shared_ptr to the replica set member
+     * that the command was dispatched to.  It's needed if the caller needs a lifetime for that
+     * connection that extends beyond the lifetime, or subsequent calls, against the top level
+     * client.
+     *
+     * It has this slightly insane api because:
+     * + we don't want to thread enable_shared_from_this pervasively through the dbclient tree
+     * + we use this from places we don't want to know about dbclient_rs (and so don't know if we'll
+     *   get our own ptr back).
+     * + the only caller who needs this is the shell (because other callers have more control over
+     *   lifetime).
+     */
+    virtual std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> runCommandWithTarget(
+        OpMsgRequest request, std::shared_ptr<DBClientBase> me);
+
+    /**
      * Runs the specified command request. This thin wrapper just unwraps the reply and ignores the
      * target connection from the above runCommandWithTarget().
      */
@@ -331,6 +347,16 @@ public:
                                                          BSONObj cmd,
                                                          BSONObj& info,
                                                          int options = 0);
+
+    /**
+     * See the opMsg overload comment for why this function takes a shared_ptr ostensibly to this.
+     */
+    std::tuple<bool, std::shared_ptr<DBClientBase>> runCommandWithTarget(
+        const std::string& dbname,
+        BSONObj cmd,
+        BSONObj& info,
+        std::shared_ptr<DBClientBase> me,
+        int options = 0);
 
     /**
     * Authenticates to another cluster member using appropriate authentication data.
@@ -927,6 +953,8 @@ public:
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
+    std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> runCommandWithTarget(
+        OpMsgRequest request, std::shared_ptr<DBClientBase> me) override;
 
     rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
                                               const Message& replyMsg) override;

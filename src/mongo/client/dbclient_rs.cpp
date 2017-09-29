@@ -144,12 +144,6 @@ DBClientReplicaSet::DBClientReplicaSet(const string& name,
     }
 }
 
-DBClientReplicaSet::~DBClientReplicaSet() {
-    if (_lastSlaveOkConn.get() == _master.get()) {
-        _lastSlaveOkConn.release();
-    }
-}
-
 ReplicaSetMonitorPtr DBClientReplicaSet::_getMonitor() {
     // If you can't get a ReplicaSetMonitor then this connection isn't valid
     uassert(16340,
@@ -704,10 +698,14 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
 
         LOG(3) << "dbclient_rs selecting primary node " << selectedNode << endl;
 
-        _lastSlaveOkConn.reset(_master.get());
+        _lastSlaveOkConn = _master;
 
         return _master.get();
     }
+
+    auto dtor = [host = _lastSlaveOkHost.toString()](DBClientConnection * ptr) {
+        globalConnPool.release(host, ptr);
+    };
 
     // Needs to perform a dynamic_cast because we need to set the replSet
     // callback. We should eventually not need this after we remove the
@@ -721,7 +719,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
             str::stream() << "Failed to connect to " << _lastSlaveOkHost.toString(),
             newConn != NULL);
 
-    _lastSlaveOkConn.reset(newConn);
+    _lastSlaveOkConn = std::shared_ptr<DBClientConnection>(newConn, std::move(dtor));
     _lastSlaveOkConn->setParentReplSetName(_setName);
     _lastSlaveOkConn->setRequestMetadataWriter(getRequestMetadataWriter());
     _lastSlaveOkConn->setReplyMetadataReader(getReplyMetadataReader());
@@ -948,6 +946,26 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientReplicaSet::runCommandWithTar
                             << request.getCommandName());
 }
 
+std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientReplicaSet::runCommandWithTarget(
+    OpMsgRequest request, std::shared_ptr<DBClientBase> me) {
+
+    auto out = runCommandWithTarget(std::move(request));
+
+    std::shared_ptr<DBClientBase> conn = [&] {
+        if (out.second == _lastSlaveOkConn.get()) {
+            return _lastSlaveOkConn;
+        }
+
+        if (out.second == _master.get()) {
+            return _master;
+        }
+
+        MONGO_UNREACHABLE;
+    }();
+
+    return {std::move(out.first), std::move(conn)};
+}
+
 bool DBClientReplicaSet::call(Message& toSend,
                               Message& response,
                               bool assertOk,
@@ -1047,7 +1065,7 @@ void DBClientReplicaSet::setAuthPooledSecondaryConn(bool setting) {
 
 void DBClientReplicaSet::resetMaster() {
     if (_master.get() == _lastSlaveOkConn.get()) {
-        _lastSlaveOkConn.release();
+        _lastSlaveOkConn.reset();
         _lastSlaveOkHost = HostAndPort();
     }
 
@@ -1057,7 +1075,7 @@ void DBClientReplicaSet::resetMaster() {
 
 void DBClientReplicaSet::resetSlaveOkConn() {
     if (_lastSlaveOkConn.get() == _master.get()) {
-        _lastSlaveOkConn.release();
+        _lastSlaveOkConn.reset();
     } else if (_lastSlaveOkConn.get() != NULL) {
         if (_authPooledSecondaryConn) {
             logoutAll(_lastSlaveOkConn.get());
@@ -1066,8 +1084,7 @@ void DBClientReplicaSet::resetSlaveOkConn() {
             // so no need to logout.
         }
 
-        // If the connection was bad, the pool will clean it up.
-        globalConnPool.release(_lastSlaveOkHost.toString(), _lastSlaveOkConn.release());
+        _lastSlaveOkConn.reset();
     }
 
     _lastSlaveOkHost = HostAndPort();

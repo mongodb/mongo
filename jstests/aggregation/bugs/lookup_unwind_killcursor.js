@@ -45,7 +45,7 @@
         },
     }));
 
-    const cursor = new DBCommandCursor(conn, res, batchSize);
+    const cursor = new DBCommandCursor(testDB, res, batchSize);
     cursor.close();  // Closing the cursor will issue the "killCursors" command.
 
     const serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));

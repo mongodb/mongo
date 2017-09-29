@@ -84,7 +84,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     function doRead(coll, readConcern) {
         readConcern.maxTimeMS = 3000;
         var res = assert.commandWorked(coll.runCommand('find', readConcern));
-        return new DBCommandCursor(coll.getMongo(), res).toArray();
+        return new DBCommandCursor(coll.getDB(), res).toArray();
     }
 
     function doDirtyRead(coll) {
@@ -110,7 +110,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
             limit: 1,
         });
         assert.commandWorked(res);
-        return new DBCommandCursor(coll.getMongo(), res).toArray()[0];
+        return new DBCommandCursor(coll.getDB(), res).toArray()[0];
     }
 
     for (var testName in testCases) {

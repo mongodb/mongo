@@ -35,7 +35,7 @@
     let cmd = {find: uuid};
     let res = db.runCommand(cmd);
     assert.commandWorked(res, 'could not run ' + tojson(cmd));
-    let cursor = new DBCommandCursor(db.getMongo(), res);
+    let cursor = new DBCommandCursor(db, res);
     let errMsg = 'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
     assert(cursor.hasNext(), errMsg);
     let doc = cursor.next();
@@ -56,7 +56,7 @@
     cmd = {listIndexes: uuid};
     res = db.runCommand(cmd);
     assert.commandWorked(res, 'could not run ' + tojson(cmd));
-    cursor = new DBCommandCursor(db.getMongo(), res);
+    cursor = new DBCommandCursor(db, res);
     cursor.forEach(function(doc) {
         assert.eq(doc.ns, 'test.' + mainCollName);
     });

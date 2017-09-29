@@ -316,7 +316,7 @@
 
         confirmCurrentOpContents({
             test: function() {
-                var cursor = new DBCommandCursor(db.getMongo(), TestData.commandResult, 5);
+                var cursor = new DBCommandCursor(db, TestData.commandResult, 5);
                 assert.eq(cursor.itcount(), 10);
             },
             planSummary: "COLLSCAN",
@@ -445,7 +445,7 @@
 
         confirmCurrentOpContents({
             test: function() {
-                var cursor = new DBCommandCursor(db.getMongo(), TestData.commandResult, 5);
+                var cursor = new DBCommandCursor(db, TestData.commandResult, 5);
                 assert.eq(cursor.itcount(), 0);
             },
             planSummary: "COLLSCAN",

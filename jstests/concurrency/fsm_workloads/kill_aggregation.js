@@ -32,7 +32,7 @@ var $config = extendWorkload($config, function($config, $super) {
             return;
         }
 
-        var cursor = new DBCommandCursor(db.getMongo(), res);
+        var cursor = new DBCommandCursor(db, res);
         try {
             // No documents are ever inserted into the collection.
             assertAlways.eq(0, cursor.itcount());

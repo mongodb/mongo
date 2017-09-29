@@ -41,7 +41,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     function doRead(readConcern) {
         readConcern.maxTimeMS = 3000;
         var res = assert.commandWorked(t.runCommand('find', readConcern));
-        var docs = (new DBCommandCursor(db.getMongo(), res)).toArray();
+        var docs = (new DBCommandCursor(db, res)).toArray();
         assert.gt(docs.length, 0, "no docs returned!");
         return docs[0].state;
     }

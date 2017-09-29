@@ -15,7 +15,7 @@
     let assertFindResultEq = function(cmd, expected, ordered) {
         let res = viewsDB.runCommand(cmd);
         assert.commandWorked(res);
-        let arr = new DBCommandCursor(db.getMongo(), res, 5).toArray();
+        let arr = new DBCommandCursor(viewsDB, res, 5).toArray();
         let errmsg = tojson({expected: expected, got: arr});
 
         if (typeof(ordered) === "undefined" || !ordered)

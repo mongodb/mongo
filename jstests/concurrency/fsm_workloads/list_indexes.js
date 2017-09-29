@@ -22,7 +22,7 @@ var $config = (function() {
         // List indexes, using a batchSize of 2 to ensure getmores happen.
         function listIndices(db, collName) {
             var cursor = new DBCommandCursor(
-                db.getMongo(), db.runCommand({listIndexes: collName, cursor: {batchSize: 2}}));
+                db, db.runCommand({listIndexes: collName, cursor: {batchSize: 2}}));
             assertWhenOwnColl.gte(cursor.itcount(), 0);
         }
 

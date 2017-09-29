@@ -2,7 +2,7 @@
  * Implements the sessions api for the shell.
  */
 var {
-    DriverSession, SessionOptions, _DummyDriverSession,
+    DriverSession, SessionOptions, _DummyDriverSession, _DelegatingDriverSession,
 } = (function() {
     "use strict";
 
@@ -278,7 +278,7 @@ var {
             if (!cmdObjUnwrapped.hasOwnProperty("lsid")) {
                 cmdObjUnwrapped.lsid = this.handle.getId();
 
-                // We consider the session to still be in used by the client any time the session id
+                // We consider the session to still be in use by the client any time the session id
                 // is injected into the command object as part of making a request.
                 updateLastUsed();
             }
@@ -414,6 +414,10 @@ var {
                 return client;
             };
 
+            this._getSessionAwareClient = function _getSessionAwareClient() {
+                return this._serverSession.client;
+            };
+
             this.getOptions = function getOptions() {
                 return _options;
             };
@@ -457,6 +461,45 @@ var {
         },
     });
 
+    function DelegatingDriverSession(client, originalSession) {
+        this._serverSession = originalSession._serverSession;
+        Object.defineProperty(this, "_operationTime", {
+            get: function() {
+                return originalSession._operationTime;
+            },
+            set: function(operationTime) {
+                originalSession._operationTime = operationTime;
+            },
+        });
+        const sessionAwareClient = new SessionAwareClient(client);
+
+        this.getClient = function() {
+            return client;
+        };
+
+        this._getSessionAwareClient = function() {
+            return sessionAwareClient;
+        };
+
+        this.getOptions = function() {
+            return originalSession.getOptions();
+        };
+
+        this.getDatabase = function(dbName) {
+            const db = client.getDB(dbName);
+            db._session = this;
+            return db;
+        };
+
+        this.hasEnded = function() {
+            return originalSession.hasEnded();
+        };
+
+        this.endSession = function() {
+            return originalSession.endSession();
+        };
+    }
+
     const DummyDriverSession = makeDriverSessionConstructor({
         createServerSession: function createServerSession(client) {
             return {
@@ -488,5 +531,6 @@ var {
         DriverSession: DriverSession,
         SessionOptions: SessionOptions,
         _DummyDriverSession: DummyDriverSession,
+        _DelegatingDriverSession: DelegatingDriverSession,
     };
 })();

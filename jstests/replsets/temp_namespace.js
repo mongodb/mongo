@@ -39,13 +39,13 @@ assert.writeOK(masterDB.keep4.insert({}, {writeConcern: {w: 2}}));
 function countCollection(mydb, nameFilter) {
     var result = mydb.runCommand("listCollections", {filter: {name: nameFilter}});
     assert.commandWorked(result);
-    return new DBCommandCursor(mydb.getMongo(), result).itcount();
+    return new DBCommandCursor(mydb, result).itcount();
 }
 
 function countIndexesFor(mydb, nameFilter) {
     var result = mydb.runCommand("listCollections", {filter: {name: nameFilter}});
     assert.commandWorked(result);
-    var arr = new DBCommandCursor(mydb.getMongo(), result).toArray();
+    var arr = new DBCommandCursor(mydb, result).toArray();
     var total = 0;
     for (var i = 0; i < arr.length; i++) {
         var coll = arr[i];

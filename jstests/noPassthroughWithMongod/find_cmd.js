@@ -39,7 +39,7 @@ assert.commandWorked(res);
 assert.neq(0, res.cursor.id);
 assert.eq(101, res.cursor.firstBatch.length);
 
-cursor = new DBCommandCursor(coll.getDB().getMongo(), res);
+cursor = new DBCommandCursor(coll.getDB(), res);
 assert.eq(cursor.itcount(), 140);
 
 // Command doesn't parse.

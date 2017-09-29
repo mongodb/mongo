@@ -143,7 +143,7 @@
         delete aggCmd.$geoNear.num;
         var cmdRes = db[coll].runCommand("aggregate", {pipeline: [aggCmd], cursor: {batchSize: 0}});
         assert.commandWorked(cmdRes);
-        var cmdCursor = new DBCommandCursor(db[coll].getMongo(), cmdRes, 0);
+        var cmdCursor = new DBCommandCursor(db, cmdRes, 0);
         checkOutput(db.runCommand(geoCmd), cmdCursor, 70);
     }
 

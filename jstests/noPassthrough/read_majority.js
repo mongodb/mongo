@@ -37,14 +37,14 @@ load("jstests/libs/analyze_plan.js");
     function getReadMajorityCursor() {
         var res = t.runCommand('find', {batchSize: 2, readConcern: {level: "majority"}});
         assert.commandWorked(res);
-        return new DBCommandCursor(db.getMongo(), res, 2);
+        return new DBCommandCursor(db, res, 2);
     }
 
     function getReadMajorityAggCursor() {
         var res = t.runCommand(
             'aggregate', {pipeline: [], cursor: {batchSize: 2}, readConcern: {level: "majority"}});
         assert.commandWorked(res);
-        return new DBCommandCursor(db.getMongo(), res, 2);
+        return new DBCommandCursor(db, res, 2);
     }
 
     function getExplainPlan(query) {

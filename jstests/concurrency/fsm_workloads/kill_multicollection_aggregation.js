@@ -23,7 +23,7 @@ var $config = extendWorkload($config, function($config, $super) {
             {aggregate: collName, pipeline: pipeline, cursor: {batchSize: this.batchSize}});
 
         if (res.ok) {
-            this.cursor = new DBCommandCursor(db.getMongo(), res, this.batchSize);
+            this.cursor = new DBCommandCursor(db, res, this.batchSize);
         }
     };
 

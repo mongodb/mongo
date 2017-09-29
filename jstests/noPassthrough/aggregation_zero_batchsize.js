@@ -23,7 +23,7 @@
     let res = assert.commandWorked(
         testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 0}}));
 
-    let cursor = new DBCommandCursor(conn, res);
+    let cursor = new DBCommandCursor(testDB, res);
     assert.eq(
         0, cursor.itcount(), "expected no results from getMore of aggregation on empty collection");
 
@@ -38,7 +38,7 @@
 
     res = assert.commandWorked(
         testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 0}}));
-    cursor = new DBCommandCursor(conn, res);
+    cursor = new DBCommandCursor(testDB, res);
     assert.eq(nDocs, cursor.itcount(), "expected all results to be returned via getMores");
 
     // Test that an error in a getMore will destroy the cursor.
@@ -58,7 +58,7 @@
         pipeline: [{$project: {invalidComputation: {$add: [1, "$stringField"]}}}],
         cursor: {batchSize: 0}
     }));
-    cursor = new DBCommandCursor(conn, res);
+    cursor = new DBCommandCursor(testDB, res);
     assertNumOpenCursors(1);
 
     assert.throws(() => cursor.itcount(), [], "expected getMore to fail");
@@ -74,7 +74,7 @@
         pipeline: [{$out: "validated_collection"}],
         cursor: {batchSize: 0}
     }));
-    cursor = new DBCommandCursor(conn, res);
+    cursor = new DBCommandCursor(testDB, res);
     assertNumOpenCursors(1);
 
     // Add a document validation rule to the $out collection so that insertion will fail.

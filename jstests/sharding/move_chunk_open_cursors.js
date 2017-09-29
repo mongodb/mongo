@@ -29,7 +29,7 @@
     const getMoreBatchSize = 100;
     const aggResponse = assert.commandWorked(
         coll.runCommand({aggregate: collName, pipeline: [], cursor: {batchSize: 0}}));
-    const aggCursor = new DBCommandCursor(st.s0, aggResponse, getMoreBatchSize);
+    const aggCursor = new DBCommandCursor(coll.getDB(), aggResponse, getMoreBatchSize);
 
     assert(st.adminCommand({split: testNs, middle: {_id: nDocs / 2}}));
     assert(st.adminCommand({moveChunk: testNs, find: {_id: nDocs - 1}, to: "shard0001"}));
@@ -42,7 +42,7 @@
     // Test the same behavior with the find command.
     const findResponse = assert.commandWorked(
         coll.runCommand({find: collName, filter: {}, batchSize: getMoreBatchSize}));
-    const findCursor = new DBCommandCursor(st.s0, findResponse, getMoreBatchSize);
+    const findCursor = new DBCommandCursor(coll.getDB(), findResponse, getMoreBatchSize);
     assert(st.adminCommand({split: testNs, middle: {_id: nDocs / 4}}));
     assert(st.adminCommand({moveChunk: testNs, find: {_id: 0}, to: "shard0001"}));
 

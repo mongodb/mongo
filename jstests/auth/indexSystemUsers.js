@@ -28,7 +28,7 @@ var collectionInfosCursor = adminDB.runCommand("listCollections", {
     }
 });
 
-assert.eq([], new DBCommandCursor(adminDB.getMongo(), collectionInfosCursor).toArray());
+assert.eq([], new DBCommandCursor(adminDB, collectionInfosCursor).toArray());
 adminDB.logout();
 
 adminDB.auth('admin', 'x');

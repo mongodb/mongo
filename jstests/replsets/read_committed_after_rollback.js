@@ -24,14 +24,14 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
             coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 10000});
         assert.commandWorked(res,
                              'reading from ' + coll.getFullName() + ' on ' + coll.getMongo().host);
-        return new DBCommandCursor(coll.getMongo(), res).toArray()[0].state;
+        return new DBCommandCursor(coll.getDB(), res).toArray()[0].state;
     }
 
     function doDirtyRead(coll) {
         var res = coll.runCommand('find', {"readConcern": {"level": "local"}});
         assert.commandWorked(res,
                              'reading from ' + coll.getFullName() + ' on ' + coll.getMongo().host);
-        return new DBCommandCursor(coll.getMongo(), res).toArray()[0].state;
+        return new DBCommandCursor(coll.getDB(), res).toArray()[0].state;
     }
 
     // Set up a set and grab things for later.

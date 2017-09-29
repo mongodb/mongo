@@ -1,4 +1,4 @@
-// All tests for the $listLocalSessions aggregateion stage.
+// All tests for the $listLocalSessions aggregation stage.
 
 (function() {
     'use strict';

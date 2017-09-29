@@ -47,7 +47,7 @@ function test(input, pipeline, expected) {
 
 function listCollections(name) {
     var collectionInfosCursor = db.runCommand("listCollections", {filter: {name: name}});
-    return new DBCommandCursor(db.getMongo(), collectionInfosCursor).toArray();
+    return new DBCommandCursor(db, collectionInfosCursor).toArray();
 }
 
 input.insert({_id: 1});

@@ -62,7 +62,7 @@ var $config = (function() {
             });
 
             if (res.ok) {
-                this.cursor = new DBCommandCursor(db.getMongo(), res, this.batchSize);
+                this.cursor = new DBCommandCursor(db, res, this.batchSize);
             }
         },
 

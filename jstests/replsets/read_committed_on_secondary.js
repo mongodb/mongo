@@ -84,7 +84,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
         });
         assert.commandWorked(res);
         log("done doing dirty read.");
-        return new DBCommandCursor(secondary, res).toArray()[0].state;
+        return new DBCommandCursor(dbSecondary, res).toArray()[0].state;
     }
 
     function doCommittedRead(lastOp) {
@@ -95,7 +95,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
         });
         assert.commandWorked(res);
         log("done doing committed read.");
-        return new DBCommandCursor(secondary, res).toArray()[0].state;
+        return new DBCommandCursor(dbSecondary, res).toArray()[0].state;
     }
 
     // Do a write, wait for it to replicate, and ensure it is visible.

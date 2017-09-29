@@ -19,21 +19,21 @@
 (function() {
     'use strict';
 
-    function makeCursor(mongo, result) {
-        return new DBCommandCursor(mongo, result);
+    function makeCursor(db, result) {
+        return new DBCommandCursor(db, result);
     }
 
     // These test cases are functions that return a cursor of the documents in collections without
     // fetching them yet.
     var cursorTestCases = {
         find: function(coll) {
-            return makeCursor(coll.getMongo(),
+            return makeCursor(coll.getDB(),
                               assert.commandWorked(coll.runCommand(
                                   'find', {readConcern: {level: 'majority'}, batchSize: 0})));
         },
         aggregate: function(coll) {
             return makeCursor(
-                coll.getMongo(),
+                coll.getDB(),
                 assert.commandWorked(coll.runCommand(
                     'aggregate',
                     {readConcern: {level: 'majority'}, cursor: {batchSize: 0}, pipeline: []})));
@@ -43,7 +43,7 @@
                                       {readConcern: {level: 'majority'}, numCursors: 1});
             assert.commandWorked(res);
             assert.eq(res.cursors.length, 1, tojson(res));
-            return makeCursor(coll.getMongo(), res.cursors[0]);
+            return makeCursor(coll.getDB(), res.cursors[0]);
         },
     };
 

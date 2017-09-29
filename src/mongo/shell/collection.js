@@ -1079,7 +1079,7 @@ DBCollection.prototype._getIndexesCommand = function(filter) {
         throw _getErrorWithCode(res, "listIndexes failed: " + tojson(res));
     }
 
-    return new DBCommandCursor(res._mongo, res).toArray();
+    return new DBCommandCursor(this._db, res).toArray();
 };
 
 DBCollection.prototype.getIndexes = function(filter) {
@@ -1254,7 +1254,7 @@ DBCollection.prototype.convertToCapped = function(bytes) {
 DBCollection.prototype.exists = function() {
     var res = this._db.runCommand("listCollections", {filter: {name: this._shortName}});
     if (res.ok) {
-        var cursor = new DBCommandCursor(res._mongo, res);
+        const cursor = new DBCommandCursor(this._db, res);
         if (!cursor.hasNext())
             return null;
         return cursor.next();

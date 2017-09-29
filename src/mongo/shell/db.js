@@ -142,7 +142,7 @@ var DB;
     // runCommand uses this impl to actually execute the command
     DB.prototype._runCommandImpl = function(name, obj, options) {
         const session = this.getSession();
-        return session._serverSession.client.runCommand(session, name, obj, options);
+        return session._getSessionAwareClient().runCommand(session, name, obj, options);
     };
 
     DB.prototype.runCommand = function(obj, extra, queryOptions) {
@@ -173,7 +173,7 @@ var DB;
 
     DB.prototype.runCommandWithMetadata = function(commandArgs, metadata) {
         const session = this.getSession();
-        return session._serverSession.client.runCommandWithMetadata(
+        return session._getSessionAwareClient().runCommandWithMetadata(
             session, this._name, metadata, commandArgs);
     };
 
@@ -263,7 +263,7 @@ var DB;
                 batchSizeValue = cmdObj["cursor"]["batchSize"];
             }
 
-            return new DBCommandCursor(res._mongo, res, batchSizeValue);
+            return new DBCommandCursor(this, res, batchSizeValue);
         }
 
         return res;
@@ -940,7 +940,7 @@ var DB;
             throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
         }
 
-        return new DBCommandCursor(res._mongo, res).toArray().sort(compareOn("name"));
+        return new DBCommandCursor(this, res).toArray().sort(compareOn("name"));
     };
 
     /**

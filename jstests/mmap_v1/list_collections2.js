@@ -8,7 +8,7 @@ mydb.foo.insert({x: 5});
 mydb.runCommand({create: "bar", temp: true});
 
 res = mydb.runCommand("listCollections");
-collections = new DBCommandCursor(db.getMongo(), res).toArray();
+collections = new DBCommandCursor(db, res).toArray();
 
 bar = collections.filter(function(x) {
     return x.name == "bar";

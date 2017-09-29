@@ -3,14 +3,13 @@
     'use strict';
 
     var getListCollectionsCursor = function(database, options, subsequentBatchSize) {
-        return new DBCommandCursor(database.getMongo(),
-                                   database.runCommand("listCollections", options),
-                                   subsequentBatchSize);
+        return new DBCommandCursor(
+            database, database.runCommand("listCollections", options), subsequentBatchSize);
     };
 
     var getListIndexesCursor = function(coll, options, subsequentBatchSize) {
         return new DBCommandCursor(
-            coll.getDB().getMongo(), coll.runCommand("listIndexes", options), subsequentBatchSize);
+            coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
     };
 
     var arrayGetNames = function(array) {
