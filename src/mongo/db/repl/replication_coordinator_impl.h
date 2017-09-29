@@ -410,6 +410,12 @@ public:
      */
     void waitForElectionDryRunFinish_forTest();
 
+    /**
+     * Waits until a stepdown command has begun. Callers should ensure that the stepdown attempt
+     * won't fully complete before this method is called, or this method may never return.
+     */
+    void waitForStepDownAttempt_forTest();
+
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;
 

@@ -1389,6 +1389,9 @@ protected:
         PromisedClientAndOperation operationPromise;
         auto operationFuture = operationPromise.get_future();
         stdx::thread(std::move(task), std::move(operationPromise)).detach();
+
+        getReplCoord()->waitForStepDownAttempt_forTest();
+
         return std::make_pair(operationFuture.get(), std::move(result));
     }
 
@@ -2052,44 +2055,43 @@ TEST_F(StepDownTest, NodeReturnsInterruptedWhenInterruptedDuringStepDown) {
     ASSERT_TRUE(repl->getMemberState().primary());
 }
 
-// TEST_F(StepDownTest, OnlyOneStepDownCmdIsAllowedAtATime) {
-//     OpTime optime1(Timestamp(100, 1), 1);
-//     OpTime optime2(Timestamp(100, 2), 1);
+TEST_F(StepDownTest, OnlyOneStepDownCmdIsAllowedAtATime) {
+    OpTime optime1(Timestamp(100, 1), 1);
+    OpTime optime2(Timestamp(100, 2), 1);
 
-//     // No secondary is caught up
-//     auto repl = getReplCoord();
-//     repl->setMyLastAppliedOpTime(optime2);
-//     repl->setMyLastDurableOpTime(optime2);
-//     ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 1, optime1));
-//     ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, optime1));
+    // No secondary is caught up
+    auto repl = getReplCoord();
+    repl->setMyLastAppliedOpTime(optime2);
+    repl->setMyLastDurableOpTime(optime2);
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 1, optime1));
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, optime1));
 
-//     simulateSuccessfulV1Election();
+    simulateSuccessfulV1Election();
 
-//     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-//     // Step down where the secondary actually has to catch up before the stepDown can succeed.
-//     // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
-//     // T + 2 seconds and send out a new round of heartbeats immediately.
-//     // This makes it unnecessary to advance the clock after entering the network to process
-//     // the heartbeat requests.
-//     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
+    // Step down where the secondary actually has to catch up before the stepDown can succeed.
+    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
+    // T + 2 seconds and send out a new round of heartbeats immediately.
+    // This makes it unnecessary to advance the clock after entering the network to process
+    // the heartbeat requests.
+    auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
 
-//     // We should still be primary at this point
-//     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+    // We should still be primary at this point
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-//     // Now while the first stepdown request is waiting for secondaries to catch up, attempt
-//     another
-//     // stepdown request and ensure it fails.
-//     const auto opCtx = makeOperationContext();
-//     auto status = getReplCoord()->stepDown(opCtx.get(), false, Seconds(10), Seconds(60));
-//     ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status);
+    // Now while the first stepdown request is waiting for secondaries to catch up, attempt
+    // another stepdown request and ensure it fails.
+    const auto opCtx = makeOperationContext();
+    auto status = getReplCoord()->stepDown(opCtx.get(), false, Seconds(10), Seconds(60));
+    ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status);
 
-//     // Now ensure that the original stepdown command can still succeed.
-//     catchUpSecondaries(optime2);
+    // Now ensure that the original stepdown command can still succeed.
+    catchUpSecondaries(optime2);
 
-//     ASSERT_OK(*result.second.get());
-//     ASSERT_TRUE(repl->getMemberState().secondary());
-// }
+    ASSERT_OK(*result.second.get());
+    ASSERT_TRUE(repl->getMemberState().secondary());
+}
 
 // Test that if a stepdown command is blocked waiting for secondaries to catch up when an
 // unconditional stepdown happens, the stepdown command fails.

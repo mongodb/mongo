@@ -1621,6 +1621,13 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     return _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
 }
 
+void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    while (!_topCoord->isSteppingDown()) {
+        _stepDownWaiters.wait(lk);
+    }
+}
+
 Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                                             const bool force,
                                             const Milliseconds& waitTime,
@@ -1666,6 +1673,9 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         // This will cause us to fail if we're already in the process of stepping down.
         return status;
     }
+
+    // Wake up threads blocked in waitForStepDownAttempt_forTest.
+    _stepDownWaiters.notify_all();
 
     // Update _canAcceptNonLocalWrites from the TopologyCoordinator now that we're in the middle
     // of a stepdown attempt.  This will prevent us from accepting writes so that if our stepdown
