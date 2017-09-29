@@ -1239,8 +1239,13 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
                 for (auto groupingIterator = oplogEntriesIterator;
                      groupingIterator != endOfGroupableOpsIterator;
                      ++groupingIterator) {
-                    tArrayBuilder.append(
-                        static_cast<long long>((*groupingIterator)->getTerm().get()));
+                    auto parsedTerm = (*groupingIterator)->getTerm();
+                    long long term = OpTime::kUninitializedTerm;
+                    // Term may not be present (pv0)
+                    if (parsedTerm) {
+                        term = parsedTerm.get();
+                    }
+                    tArrayBuilder.append(term);
                 }
                 tArrayBuilder.done();
 
