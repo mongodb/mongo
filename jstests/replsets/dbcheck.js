@@ -7,6 +7,10 @@
 (function() {
     "use strict";
 
+    // TODO(SERVER-31323): Re-enable when existing dbCheck issues are fixed.
+    if (true)
+        return;
+
     let nodeCount = 3;
     let replSet = new ReplSetTest({name: "dbCheckSet", nodes: nodeCount});
 
