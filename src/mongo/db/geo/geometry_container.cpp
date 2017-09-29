@@ -449,14 +449,11 @@ bool GeometryContainer::contains(const S2Polyline& otherLine) const {
     }
 
     if (NULL != _cap && (_cap->crs == SPHERE)) {
-        // If the radian distance of a line to the complement spherical cap is less than the arc
-        // radian of the complement cap, then the line is not within the spherical cap.
+        // If the radian distance of a line to the centroid of the complement spherical cap is less
+        // than the arc radian of the complement cap, then the line is not within the spherical cap.
         S2Cap complementSphere = _cap->cap.Complement();
-        double arcRad = complementSphere.angle().radians();
-        if (arcRad > M_PI) {
-            arcRad = M_PI;
-        }
-        if (S2Distance::minDistanceRad(complementSphere.axis(), otherLine) < arcRad) {
+        if (S2Distance::minDistanceRad(complementSphere.axis(), otherLine) <
+            complementSphere.angle().radians()) {
             return false;
         }
         return true;
@@ -508,14 +505,12 @@ bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
     }
 
     if (NULL != _cap && (_cap->crs == SPHERE)) {
-        // If the radian distance of a polygon to the complement spherical cap is less than the arc
-        // radian of the complement cap, then the polygon is not within the spherical cap.
+        // If the radian distance of a polygon to the centroid of the complement spherical cap is
+        // less than the arc radian of the complement cap, then the polygon is not within the
+        // spherical cap.
         S2Cap complementSphere = _cap->cap.Complement();
-        double arcRad = complementSphere.angle().radians();
-        if (arcRad > M_PI) {
-            arcRad = M_PI;
-        }
-        if (S2Distance::minDistanceRad(complementSphere.axis(), otherPolygon) < arcRad) {
+        if (S2Distance::minDistanceRad(complementSphere.axis(), otherPolygon) <
+            complementSphere.angle().radians()) {
             return false;
         }
         return true;

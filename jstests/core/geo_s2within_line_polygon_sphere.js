@@ -2,24 +2,31 @@
     let coll = db.geo_s2within_line_polygon_sphere;
     coll.drop();
 
+    // Convenient test function for $geowithin $centerSphere.
+    function testGeoWithinCenterSphere(centerSphere, expected) {
+        let result = coll.find({geoField: {$geoWithin: {$centerSphere: centerSphere}}},
+                               {"name": 1, "_id": 0})
+                         .toArray();
+        assert.eq(result, expected);
+    }
+
     // Basic tests.
-    assert.writeOK(coll.insert({name: "Point1", location: {type: "Point", coordinates: [1, 1]}}));
+    assert.writeOK(coll.insert({name: "Point1", geoField: {type: "Point", coordinates: [1, 1]}}));
     assert.writeOK(coll.insert(
-        {name: "LineString1", location: {type: "LineString", coordinates: [[1, 1], [2, 2]]}}));
+        {name: "LineString1", geoField: {type: "LineString", coordinates: [[1, 1], [2, 2]]}}));
     assert.writeOK(coll.insert({
         name: "Polygon1",
-        location: {type: "Polygon", coordinates: [[[1, 1], [2, 2], [2, 1], [1, 1]]]}
+        geoField: {type: "Polygon", coordinates: [[[1, 1], [2, 2], [2, 1], [1, 1]]]}
     }));
 
-    let result =
-        coll.find({location: {$geoWithin: {$centerSphere: [[1, 1], 1]}}}, {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, [{name: 'Point1'}, {name: 'LineString1'}, {name: 'Polygon1'}]);
+    // The second parameter of $centerSphere is in radian and the angle between [1, 1] and [2,2]
+    // is about 0.0246 radian, much less than 1.
+    testGeoWithinCenterSphere([[1, 1], 1],
+                              [{name: 'Point1'}, {name: 'LineString1'}, {name: 'Polygon1'}]);
 
-    // Test for a LineString within a geowithin sphere.
-    let route = {
+    let geoDoc = {
         "name": "LineString2",
-        "route": {
+        "geoField": {
             "type": "LineString",
             "coordinates": [
                 [151.0997772216797, -33.86157820443923],
@@ -27,95 +34,47 @@
             ]
         }
     };
-    assert.writeOK(coll.insert(route));
-    result =
-        coll.find({
-                route: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.16789425018004, -33.8508357122312], 0.0011167360027064348]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, [{name: "LineString2"}]);
+    assert.writeOK(coll.insert(geoDoc));
+
+    // Test for a LineString within a geowithin sphere.
+    testGeoWithinCenterSphere([[151.16789425018004, -33.8508357122312], 0.0011167360027064348],
+                              [{name: "LineString2"}]);
 
     // Test for a LineString intersecting with geowithin sphere (should not return a match).
-    result =
-        coll.find({
-                route: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.09822404831158, -33.85109290503663], 0.0013568277575574095]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, []);
+    testGeoWithinCenterSphere([[151.09822404831158, -33.85109290503663], 0.0013568277575574095],
+                              []);
 
-    // Test for a LineString intersecting with the boundary of geowithin sphere (should not return a
-    // match).
-    result = coll.find({
-                     route: {
-                         $geoWithin: {
-                             $centerSphere:
-                                 [[150.60873004726824, -35.15381561943695], 0.02354657484463536]
-                         }
-                     }
-                 },
-                       {"name": 1, "_id": 0})
-                 .toArray();
-    assert.eq(result, []);
-
-    // Test for a LineString forming a closed loop rectangle within a geowithin sphere.
-    route = {
+    geoDoc = {
         "name": "LineString3",
-        "route": {
+        "geoField": {
             "type": "LineString",
             "coordinates": [
-                [151.1986541748047, -33.85045895313796],
-                [151.22835159301758, -33.85060151680233],
-                [151.22800827026367, -33.87312358690302],
-                [151.1989974975586, -33.87312358690302],
-                [151.19813919067383, -33.845611646988544]
+                [174.72896575927734, -36.86698689106876],
+                [174.72965240478516, -36.90707799098374],
+                [174.7808074951172, -36.9062544131224],
+                [174.77840423583982, -36.88154294352893],
+                [174.72827911376953, -36.88373984256185]
             ]
         }
     };
-    assert.writeOK(coll.insert(route));
-    result =
-        coll.find({
-                route: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.211603874292, -33.85773242760729], 0.00036551370187988725]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, [{name: "LineString3"}]);
+    assert.writeOK(coll.insert(geoDoc));
+
+    // Test for a LineString forming a closed loop rectangle within a geowithin sphere.
+    testGeoWithinCenterSphere([[174.75211152791763, -36.88962755605813], 0.000550933650273084],
+                              [{name: "LineString3"}]);
 
     // Test for a LineString intersecting with geowithin sphere (should not return a match).
-    result =
-        coll.find({
-                route: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.21456360474633, -33.86297699430086], 0.00031012015041612405]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, []);
+    testGeoWithinCenterSphere([[174.75689891704758, -36.8998373317427], 0.0005315628331256537], []);
+
+    // Test for a LineString outside of geowithin sphere (should not return a match).
+    testGeoWithinCenterSphere([[174.8099591465865, -36.89409450096385], 0.00027296698925637807],
+                              []);
 
     // Test for a Polygon within a geowithin sphere.
-    let city = {
+    geoDoc = {
         "name": "Polygon2",
         "city": "Wellington",
-        "boundary": {
+        "geoField": {
             "type": "Polygon",
             "coordinates": [[
                 [174.72930908203125, -41.281676559981676],
@@ -126,50 +85,27 @@
             ]]
         }
     };
-    assert.writeOK(coll.insert(city));
-    result =
-        coll.find({
-                boundary: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[174.78536621904806, -41.30510816038769], 0.0009483659386360411]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, [{name: "Polygon2"}]);
+    assert.writeOK(coll.insert(geoDoc));
+
+    // Test for a Polygon within a geowithin sphere.
+    testGeoWithinCenterSphere([[174.78536621904806, -41.30510816038769], 0.0009483659386360411],
+                              [{name: "Polygon2"}]);
 
     // Test for an empty query cap (radius 0) inside of a polygon that covers the centerSphere
     // (should not return a match).
-    result =
-        coll.find({
-                boundary:
-                    {$geoWithin: {$centerSphere: [[174.79144274337722, -41.307682001033385], 0]}}
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, []);
+    testGeoWithinCenterSphere([[174.79144274337722, -41.307682001033385], 0], []);
 
     // Test for a Polygon intersecting with geowithin sphere (should not return a match).
-    result =
-        coll.find({
-                boundary: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[174.7599527533759, -41.27137819591382], 0.0011247013153526434]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, []);
+    testGeoWithinCenterSphere([[174.7599527533759, -41.27137819591382], 0.0011247013153526434], []);
 
-    // Test for a MultiPolygon (two seperate polygons) within a geowithin sphere.
-    city = {
+    // Test for a Polygon outside of geowithin sphere (should not return a match).
+    testGeoWithinCenterSphere([[174.80008799649448, -41.201484845543426], 0.0007748581633291528],
+                              []);
+
+    geoDoc = {
         "name": "MultiPolygon1",
         "city": "Sydney",
-        "boundary": {
+        "geoField": {
             "type": "MultiPolygon",
             "coordinates": [
                 [[
@@ -190,55 +126,20 @@
         }
     };
 
-    assert.writeOK(coll.insert(city));
-    result =
-        coll.find({
-                boundary: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.20821632978107, -33.865139891361636], 0.000981007241416606]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, [{name: "MultiPolygon1"}]);
+    assert.writeOK(coll.insert(geoDoc));
 
-    // Test for a MultiPolygon with geowithin sphere only one of the polygons
-    // (should not return a match).
-    result =
-        coll.find({
-                boundary: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.20438542915883, -33.89006380099829], 0.0006390286437185907]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, []);
+    // Test for a MultiPolygon (two seperate polygons) within a geowithin sphere.
+    testGeoWithinCenterSphere([[151.20821632978107, -33.865139891361636], 0.000981007241416606],
+                              [{name: "MultiPolygon1"}]);
 
-    // Test for a MultiPolygon with the boundary of geowithin sphere
-    // (should not return a match).
-    result =
-        coll.find({
-                boundary: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.2079123018654, -33.86617801222522], 0.0008612335666681253]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, []);
+    // Verify that only one of the polygons of a MultiPolygon in the $centerSphere does not match
+    testGeoWithinCenterSphere([[151.20438542915883, -33.89006380099829], 0.0006390286437185907],
+                              []);
 
-    // Test for a MultiPolygon (with a hole) within a geowithin sphere.
-    customRegion = {
+    geoDoc = {
         "name": "MultiPolygon2",
         "city": "Sydney",
-        "boundary": {
+        "geoField": {
             "type": "MultiPolygon",
             "coordinates": [[
                 [
@@ -258,84 +159,73 @@
             ]]
         }
     };
-    assert.writeOK(coll.insert(customRegion));
-    result =
-        coll.find({
-                boundary: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.20936119647115, -33.875266834633265], 0.00020277354002627845]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, [{name: "MultiPolygon2"}]);
+    assert.writeOK(coll.insert(geoDoc));
+
+    // Test for a MultiPolygon (with a hole) within a geowithin sphere.
+    testGeoWithinCenterSphere([[151.20936119647115, -33.875266834633265], 0.00020277354002627845],
+                              [{name: "MultiPolygon2"}]);
 
     // Test for centerSphere as big as earth radius (should return all).
-    result = coll.find({
-                     boundary: {
-                         $geoWithin:
-                             {$centerSphere: [[151.20936119647115, -33.875266834633265], 6378.1]}
-                     }
-                 },
-                       {"name": 1, "_id": 0})
-                 .toArray();
-    assert.eq(result, [{name: "Polygon2"}, {name: "MultiPolygon1"}, {name: "MultiPolygon2"}]);
+    testGeoWithinCenterSphere([[151.20936119647115, -33.875266834633265], 3.14159265358979323846], [
+        {name: "Point1"},
+        {name: "LineString1"},
+        {name: "Polygon1"},
+        {name: "LineString2"},
+        {name: "LineString3"},
+        {name: "Polygon2"},
+        {name: "MultiPolygon1"},
+        {name: "MultiPolygon2"}
+    ]);
 
     // Test for a MultiPolygon with holes intersecting with geowithin sphere (should not return a
     // match).
-    result =
-        coll.find({
-                boundary: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.21028000820485, -33.87067923462358], 0.00013138775245714733]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, []);
+    testGeoWithinCenterSphere([[151.21028000820485, -33.87067923462358], 0.00013138775245714733],
+                              []);
 
     // Test for a MultiPolygon with holes with geowithin sphere inside the hole (should not return a
     // match).
-    result =
-        coll.find({
-                boundary: {
-                    $geoWithin: {
-                        $centerSphere:
-                            [[151.21093787887645, -33.87533330567804], 0.000016565456776516003]
-                    }
-                }
-            },
-                  {"name": 1, "_id": 0})
-            .toArray();
-    assert.eq(result, []);
+    testGeoWithinCenterSphere([[151.21093787887645, -33.87533330567804], 0.000016565456776516003],
+                              []);
 
     coll.drop();
 
     // Test for a large query cap containing both of line vertices but not the line itself.
     // (should not return a match).
-    customLongLine = {
+    geoDoc = {
         "name": "HorizontalLongLine",
-        "route": {
+        "geoField": {
             "type": "LineString",
             "coordinates": [[96.328125, 5.61598581915534], [153.984375, -6.315298538330033]]
         }
     };
-    assert.writeOK(coll.insert(customLongLine));
-    result = coll.find({
-                     route: {
-                         $geoWithin: {
-                             $centerSphere:
-                                 [[-59.80246852929814, -2.3633072488322853], 2.768403272464979]
-                         }
-                     }
-                 },
-                       {"name": 1, "_id": 0})
-                 .toArray();
-    assert.eq(result, []);
+    assert.writeOK(coll.insert(geoDoc));
+
+    // Test for a large query cap containing both of line vertices but not the line itself.
+    // (should not return a match).
+    testGeoWithinCenterSphere([[-59.80246852929814, -2.3633072488322853], 2.768403272464979], []);
+
+    coll.drop();
+
+    // Test for a large query cap containing all polygon vertices but not the whole polygon.
+    // (should not return a match).
+    geoDoc = {
+        "name": "LargeRegion",
+        "geoField": {
+            "type": "Polygon",
+            "coordinates": [[
+                [98.96484375, -11.350796722383672],
+                [135.35156249999997, -11.350796722383672],
+                [135.35156249999997, 0.8788717828324276],
+                [98.96484375, 0.8788717828324276],
+                [98.96484375, -11.350796722383672]
+            ]]
+        }
+    };
+    assert.writeOK(coll.insert(geoDoc));
+
+    // Test for a large query cap containing both of line vertices but not the line itself.
+    // (should not return a match).
+    testGeoWithinCenterSphere([[-61.52266094410311, 17.79937981451866], 2.9592242752161573], []);
 
     // End of Test.
 })();
