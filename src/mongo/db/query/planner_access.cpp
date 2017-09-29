@@ -691,8 +691,7 @@ std::vector<QuerySolutionNode*> QueryPlannerAccess::collapseEquivalentScans(
             collapsedFilter->add(collapseIntoFetch->filter.release());
 
             // Normalize the filter and add it to 'into'.
-            collapseIntoFetch->filter.reset(
-                CanonicalQuery::normalizeTree(collapsedFilter.release()));
+            collapseIntoFetch->filter = MatchExpression::optimize(std::move(collapsedFilter));
         } else {
             // Scans are not equivalent and can't be collapsed.
             collapsedScans.push_back(std::move(ownedScans[i]));

@@ -68,6 +68,11 @@ public:
     void serialize(BSONObjBuilder* out) const final;
 
     bool equivalent(const MatchExpression* other) const final;
+
+private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
 };
 
 }  // namespace mongo

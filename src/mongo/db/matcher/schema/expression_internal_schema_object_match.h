@@ -77,6 +77,10 @@ public:
     }
 
 private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+
     std::unique_ptr<MatchExpression> _sub;
 };
 }  // namespace mongo

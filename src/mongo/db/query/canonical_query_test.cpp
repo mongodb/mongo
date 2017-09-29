@@ -28,15 +28,10 @@
 
 #include "mongo/db/query/canonical_query.h"
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
@@ -70,17 +65,6 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
     return status.getValue().release();
 }
 
-/**
- * Helper function which parses and normalizes 'queryStr', and returns whether the given
- * (expression tree, query request) tuple passes CanonicalQuery::isValid().
- * Returns Status::OK() if the tuple is valid, else returns an error Status.
- */
-Status isValid(const std::string& queryStr, const QueryRequest& qrRaw) {
-    BSONObj queryObj = fromjson(queryStr);
-    unique_ptr<MatchExpression> me(CanonicalQuery::normalizeTree(parseMatchExpression(queryObj)));
-    return CanonicalQuery::isValid(me.get(), qrRaw);
-}
-
 void assertEquivalent(const char* queryStr,
                       const MatchExpression* expected,
                       const MatchExpression* actual) {
@@ -107,222 +91,6 @@ void assertNotEquivalent(const char* queryStr,
     FAIL(ss);
 }
 
-
-TEST(CanonicalQueryTest, IsValidText) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    ASSERT_OK(qr->validate());
-
-    // Valid: regular TEXT.
-    ASSERT_OK(isValid("{$text: {$search: 's'}}", *qr));
-
-    // Valid: TEXT inside OR.
-    ASSERT_OK(
-        isValid("{$or: ["
-                "    {$text: {$search: 's'}},"
-                "    {a: 1}"
-                "]}",
-                *qr));
-
-    // Valid: TEXT outside NOR.
-    ASSERT_OK(isValid("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}", *qr));
-
-    // Invalid: TEXT inside NOR.
-    ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *qr));
-
-    // Invalid: TEXT inside NOR.
-    ASSERT_NOT_OK(
-        isValid("{$nor: ["
-                "    {$or: ["
-                "        {$text: {$search: 's'}},"
-                "        {a: 1}"
-                "    ]},"
-                "    {a: 2}"
-                "]}",
-                *qr));
-
-    // Invalid: >1 TEXT.
-    ASSERT_NOT_OK(
-        isValid("{$and: ["
-                "    {$text: {$search: 's'}},"
-                "    {$text: {$search: 't'}}"
-                "]}",
-                *qr));
-
-    // Invalid: >1 TEXT.
-    ASSERT_NOT_OK(
-        isValid("{$and: ["
-                "    {$or: ["
-                "        {$text: {$search: 's'}},"
-                "        {a: 1}"
-                "    ]},"
-                "    {$or: ["
-                "        {$text: {$search: 't'}},"
-                "        {b: 1}"
-                "    ]}"
-                "]}",
-                *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidTextTailable) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setTailableMode(TailableMode::kTailable);
-    ASSERT_OK(qr->validate());
-
-    // Invalid: TEXT and tailable.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidGeo) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    ASSERT_OK(qr->validate());
-
-    // Valid: regular GEO_NEAR.
-    ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *qr));
-
-    // Valid: GEO_NEAR inside nested AND.
-    ASSERT_OK(
-        isValid("{$and: ["
-                "    {$and: ["
-                "        {a: {$near: [0, 0]}},"
-                "        {b: 1}"
-                "    ]},"
-                "    {c: 1}"
-                "]}",
-                *qr));
-
-    // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(
-        isValid("{$and: ["
-                "    {a: {$near: [0, 0]}},"
-                "    {b: {$near: [0, 0]}}"
-                "]}",
-                *qr));
-
-    // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(
-        isValid("{$and: ["
-                "    {a: {$geoNear: [0, 0]}},"
-                "    {b: {$near: [0, 0]}}"
-                "]}",
-                *qr));
-
-    // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(
-        isValid("{$and: ["
-                "    {$and: ["
-                "        {a: {$near: [0, 0]}},"
-                "        {b: 1}"
-                "    ]},"
-                "    {$and: ["
-                "        {c: {$near: [0, 0]}},"
-                "        {d: 1}"
-                "    ]}"
-                "]}",
-                *qr));
-
-    // Invalid: GEO_NEAR inside NOR.
-    ASSERT_NOT_OK(
-        isValid("{$nor: ["
-                "    {a: {$near: [0, 0]}},"
-                "    {b: 1}"
-                "]}",
-                *qr));
-
-    // Invalid: GEO_NEAR inside OR.
-    ASSERT_NOT_OK(
-        isValid("{$or: ["
-                "    {a: {$near: [0, 0]}},"
-                "    {b: 1}"
-                "]}",
-                *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidTextAndGeo) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    ASSERT_OK(qr->validate());
-
-    // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$near: [0, 0]}}", *qr));
-
-    // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}", *qr));
-
-    // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(
-        isValid("{$or: ["
-                "    {$text: {$search: 's'}},"
-                "    {a: 1}"
-                " ],"
-                " b: {$near: [0, 0]}}",
-                *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidTextAndNaturalAscending) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setSort(fromjson("{$natural: 1}"));
-    ASSERT_OK(qr->validate());
-
-    // Invalid: TEXT and {$natural: 1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidTextAndNaturalDescending) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setSort(fromjson("{$natural: -1}"));
-    ASSERT_OK(qr->validate());
-
-    // Invalid: TEXT and {$natural: -1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidTextAndHint) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setHint(fromjson("{a: 1}"));
-    ASSERT_OK(qr->validate());
-
-    // Invalid: TEXT and {$natural: -1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
-}
-
-// SERVER-14366
-TEST(CanonicalQueryTest, IsValidGeoNearNaturalSort) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setSort(fromjson("{$natural: 1}"));
-    ASSERT_OK(qr->validate());
-
-    // Invalid: GEO_NEAR and {$natural: 1} sort order.
-    ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *qr));
-}
-
-// SERVER-14366
-TEST(CanonicalQueryTest, IsValidGeoNearNaturalHint) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setHint(fromjson("{$natural: 1}"));
-    ASSERT_OK(qr->validate());
-
-    // Invalid: GEO_NEAR and {$natural: 1} hint.
-    ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setSnapshot(true);
-    ASSERT_OK(qr->validate());
-
-    // Invalid: TEXT and snapshot.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
-}
-
 TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -346,33 +114,6 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
         auto cq = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
         ASSERT_OK(cq.getStatus());
     }
-}
-
-TEST(CanonicalQueryTest, IsValidNaturalSortIndexHint) {
-    const bool isExplain = false;
-    auto qr = assertGet(QueryRequest::makeFromFindCommand(
-        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {a: 1}}"), isExplain));
-
-    // Invalid: {$natural: 1} sort order and index hint.
-    ASSERT_NOT_OK(isValid("{}", *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidNaturalSortNaturalHint) {
-    const bool isExplain = false;
-    auto qr = assertGet(QueryRequest::makeFromFindCommand(
-        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: 1}}"), isExplain));
-
-    // Valid: {$natural: 1} sort order and {$natural: 1} hint.
-    ASSERT_OK(isValid("{}", *qr));
-}
-
-TEST(CanonicalQueryTest, IsValidNaturalSortNaturalHintDifferentDirections) {
-    const bool isExplain = false;
-    auto qr = assertGet(QueryRequest::makeFromFindCommand(
-        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: -1}}"), isExplain));
-
-    // Invalid: {$natural: 1} sort order and {$natural: -1} hint.
-    ASSERT_NOT_OK(isValid("{}", *qr));
 }
 
 //
@@ -508,12 +249,19 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
     testNormalizeQuery("{$or: [{b: 1}]}", "{b: 1}");
     // Single-child $and elimination.
     testNormalizeQuery("{$or: [{$and: [{a: 1}]}, {b: 1}]}", "{$or: [{a: 1}, {b: 1}]}");
+    // Single-child $_internalSchemaXor elimination.
+    testNormalizeQuery("{$_internalSchemaXor: [{b: 1}]}", "{b: 1}");
     // $or absorbs $or children.
     testNormalizeQuery("{$or: [{a: 1}, {$or: [{b: 1}, {$or: [{c: 1}]}]}, {d: 1}]}",
                        "{$or: [{a: 1}, {b: 1}, {c: 1}, {d: 1}]}");
     // $and absorbs $and children.
     testNormalizeQuery("{$and: [{$and: [{a: 1}, {b: 1}]}, {c: 1}]}",
                        "{$and: [{a: 1}, {b: 1}, {c: 1}]}");
+    // $_internalSchemaXor _does not_ absorb any children.
+    testNormalizeQuery(
+        "{$_internalSchemaXor: [{$and: [{a: 1}, {b:1}]}, {$_internalSchemaXor: [{c: 1}, {d: 1}]}]}",
+        "{$_internalSchemaXor: [{$and: [{a: 1}, {b:1}]}, {$_internalSchemaXor: [{c: 1}, {d: "
+        "1}]}]}");
     // $in with one argument is rewritten as an equality or regex predicate.
     testNormalizeQuery("{a: {$in: [1]}}", "{a: {$eq: 1}}");
     testNormalizeQuery("{a: {$in: [/./]}}", "{a: {$regex: '.'}}");
@@ -522,41 +270,15 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
     testNormalizeQuery("{a: {$in: [/./, 3]}}", "{a: {$in: [/./, 3]}}");
     // Child of $elemMatch object expression is normalized.
     testNormalizeQuery("{a: {$elemMatch: {$or: [{b: 1}]}}}", "{a: {$elemMatch: {b: 1}}}");
-}
 
-TEST(CanonicalQueryTest, NormalizeWithInPreservesTags) {
-    BSONObj obj = fromjson("{x: {$in: [1]}}");
-    unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
-    matchExpression->setTag(new IndexTag(2U, 1U, false));
-    matchExpression.reset(CanonicalQuery::normalizeTree(matchExpression.release()));
-    IndexTag* tag = dynamic_cast<IndexTag*>(matchExpression->getTag());
-    ASSERT(tag);
-    ASSERT_EQ(2U, tag->index);
-}
-
-TEST(CanonicalQueryTest, NormalizeWithInAndRegexPreservesTags) {
-    BSONObj obj = fromjson("{x: {$in: [/a.b/]}}");
-    unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
-    matchExpression->setTag(new IndexTag(2U, 1U, false));
-    matchExpression.reset(CanonicalQuery::normalizeTree(matchExpression.release()));
-    IndexTag* tag = dynamic_cast<IndexTag*>(matchExpression->getTag());
-    ASSERT(tag);
-    ASSERT_EQ(2U, tag->index);
-}
-
-TEST(CanonicalQueryTest, NormalizeWithInPreservesCollator) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    BSONObj obj = fromjson("{'': 'string'}");
-    auto inMatchExpression = stdx::make_unique<InMatchExpression>();
-    inMatchExpression->setCollator(&collator);
-    std::vector<BSONElement> equalities{obj.firstElement()};
-    ASSERT_OK(inMatchExpression->setEqualities(std::move(equalities)));
-    unique_ptr<MatchExpression> matchExpression(
-        CanonicalQuery::normalizeTree(inMatchExpression.release()));
-    ASSERT(matchExpression->matchType() == MatchExpression::MatchType::EQ);
-    EqualityMatchExpression* eqMatchExpression =
-        static_cast<EqualityMatchExpression*>(matchExpression.get());
-    ASSERT_EQ(eqMatchExpression->getCollator(), &collator);
+    // All three children of $_internalSchemaCond are normalized.
+    testNormalizeQuery(
+        "{$_internalSchemaCond: ["
+        "  {$and: [{a: 1}]},"
+        "  {$or: [{b: 1}]},"
+        "  {$_internalSchemaXor: [{c: 1}]}"
+        "]}",
+        "{$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}");
 }
 
 TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {

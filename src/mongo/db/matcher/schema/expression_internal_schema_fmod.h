@@ -68,6 +68,10 @@ public:
     }
 
 private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+
     Decimal128 _divisor;
     Decimal128 _remainder;
 };

@@ -161,7 +161,7 @@ std::unique_ptr<MatchExpression> SubplanStage::rewriteToRootedOr(
     }
 
     // Normalize and sort the resulting match expression.
-    orChild = std::unique_ptr<MatchExpression>(CanonicalQuery::normalizeTree(orChild.release()));
+    orChild = MatchExpression::optimize(std::move(orChild));
     CanonicalQuery::sortTree(orChild.get());
 
     return orChild;

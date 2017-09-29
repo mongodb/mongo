@@ -167,7 +167,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         cq->init(opCtx,
                  std::move(qr),
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
-                 me.release(),
+                 std::move(me),
                  std::move(collator));
 
     if (!initStatus.isOK()) {
@@ -202,7 +202,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     Status initStatus = cq->init(opCtx,
                                  std::move(qr),
                                  baseQuery.canHaveNoopMatchNodes(),
-                                 root->shallowClone().release(),
+                                 root->shallowClone(),
                                  std::move(collator));
 
     if (!initStatus.isOK()) {
@@ -214,7 +214,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 Status CanonicalQuery::init(OperationContext* opCtx,
                             std::unique_ptr<QueryRequest> qr,
                             bool canHaveNoopMatchNodes,
-                            MatchExpression* root,
+                            std::unique_ptr<MatchExpression> root,
                             std::unique_ptr<CollatorInterface> collator) {
     _qr = std::move(qr);
     _collator = std::move(collator);
@@ -223,11 +223,9 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     _isIsolated = QueryRequest::isQueryIsolated(_qr->getFilter());
 
     // Normalize, sort and validate tree.
-    root = normalizeTree(root);
-
-    sortTree(root);
-    _root.reset(root);
-    Status validStatus = isValid(root, *_qr);
+    _root = MatchExpression::optimize(std::move(root));
+    sortTree(_root.get());
+    Status validStatus = isValid(_root.get(), *_qr);
     if (!validStatus.isOK()) {
         return validStatus;
     }
@@ -290,120 +288,6 @@ bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
     }
 
     return hasID;
-}
-
-// static
-MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
-    if (MatchExpression::AND == root->matchType() || MatchExpression::OR == root->matchType()) {
-        // We could have AND of AND of AND.  Make sure we clean up our children before merging them.
-        for (size_t i = 0; i < root->getChildVector()->size(); ++i) {
-            (*root->getChildVector())[i] = normalizeTree(root->getChild(i));
-        }
-
-        // If any of our children are of the same logical operator that we are, we remove the
-        // child's children and append them to ourselves after we examine all children.
-        std::vector<MatchExpression*> absorbedChildren;
-
-        for (size_t i = 0; i < root->numChildren();) {
-            MatchExpression* child = root->getChild(i);
-            if (child->matchType() == root->matchType()) {
-                // AND of an AND or OR of an OR.  Absorb child's children into ourself.
-                for (size_t j = 0; j < child->numChildren(); ++j) {
-                    absorbedChildren.push_back(child->getChild(j));
-                }
-                // TODO(opt): this is possibly n^2-ish
-                root->getChildVector()->erase(root->getChildVector()->begin() + i);
-                child->getChildVector()->clear();
-                // Note that this only works because we cleared the child's children
-                delete child;
-                // Don't increment 'i' as the current child 'i' used to be child 'i+1'
-            } else {
-                ++i;
-            }
-        }
-
-        root->getChildVector()->insert(
-            root->getChildVector()->end(), absorbedChildren.begin(), absorbedChildren.end());
-
-        // AND of 1 thing is the thing, OR of 1 thing is the thing.
-        if (1 == root->numChildren()) {
-            MatchExpression* ret = root->getChild(0);
-            root->getChildVector()->clear();
-            delete root;
-            return ret;
-        }
-    } else if (MatchExpression::NOR == root->matchType()) {
-        // First clean up children.
-        for (size_t i = 0; i < root->getChildVector()->size(); ++i) {
-            (*root->getChildVector())[i] = normalizeTree(root->getChild(i));
-        }
-
-        // NOR of one thing is NOT of the thing.
-        if (1 == root->numChildren()) {
-            // Detach the child and assume ownership.
-            std::unique_ptr<MatchExpression> child(root->getChild(0));
-            root->getChildVector()->clear();
-
-            // Delete the root when this goes out of scope.
-            std::unique_ptr<NorMatchExpression> ownedRoot(static_cast<NorMatchExpression*>(root));
-
-            // Make a NOT to be the new root and transfer ownership of the child to it.
-            auto newRoot = stdx::make_unique<NotMatchExpression>();
-            newRoot->init(child.release()).transitional_ignore();
-
-            return newRoot.release();
-        }
-    } else if (MatchExpression::NOT == root->matchType()) {
-        // Normalize the rest of the tree hanging off this NOT node.
-        NotMatchExpression* nme = static_cast<NotMatchExpression*>(root);
-        MatchExpression* child = nme->releaseChild();
-        // normalizeTree(...) takes ownership of 'child', and then
-        // transfers ownership of its return value to 'nme'.
-        nme->resetChild(normalizeTree(child));
-    } else if (MatchExpression::ELEM_MATCH_OBJECT == root->matchType()) {
-        // Normalize the rest of the tree hanging off this ELEM_MATCH_OBJECT node.
-        ElemMatchObjectMatchExpression* emome = static_cast<ElemMatchObjectMatchExpression*>(root);
-        auto child = emome->releaseChild();
-        // normalizeTree(...) takes ownership of 'child', and then
-        // transfers ownership of its return value to 'emome'.
-        emome->resetChild(std::unique_ptr<MatchExpression>(normalizeTree(child.release())));
-    } else if (MatchExpression::ELEM_MATCH_VALUE == root->matchType()) {
-        // Just normalize our children.
-        for (size_t i = 0; i < root->getChildVector()->size(); ++i) {
-            (*root->getChildVector())[i] = normalizeTree(root->getChild(i));
-        }
-    } else if (MatchExpression::MATCH_IN == root->matchType()) {
-        std::unique_ptr<InMatchExpression> in(static_cast<InMatchExpression*>(root));
-
-        // IN of 1 regex is the regex.
-        if (in->getRegexes().size() == 1 && in->getEqualities().empty()) {
-            RegexMatchExpression* childRe = in->getRegexes().begin()->get();
-            invariant(!childRe->getTag());
-
-            // Create a new RegexMatchExpression, because 'childRe' does not have a path.
-            auto re = stdx::make_unique<RegexMatchExpression>();
-            re->init(in->path(), childRe->getString(), childRe->getFlags()).transitional_ignore();
-            if (in->getTag()) {
-                re->setTag(in->getTag()->clone());
-            }
-            return normalizeTree(re.release());
-        }
-
-        // IN of 1 equality is the equality.
-        if (in->getEqualities().size() == 1 && in->getRegexes().empty()) {
-            auto eq = stdx::make_unique<EqualityMatchExpression>();
-            eq->init(in->path(), *(in->getEqualities().begin())).transitional_ignore();
-            eq->setCollator(in->getCollator());
-            if (in->getTag()) {
-                eq->setTag(in->getTag()->clone());
-            }
-            return eq.release();
-        }
-
-        return in.release();
-    }
-
-    return root;
 }
 
 // static
