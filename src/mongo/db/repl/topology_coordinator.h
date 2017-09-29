@@ -267,6 +267,11 @@ public:
     virtual OpTime getLastCommittedOpTime() const = 0;
 
     /**
+     * Returns true if it's safe to transition to LeaderMode::kMaster.
+     */
+    virtual bool canCompleteTransitionToPrimary(long long termWhenDrainCompleted) const = 0;
+
+    /**
      * Called by the ReplicationCoordinator to signal that we have finished catchup and drain modes
      * and are ready to fully become primary and start accepting writes.
      * "firstOpTimeOfTerm" is a floor on the OpTimes this node will be allowed to consider committed

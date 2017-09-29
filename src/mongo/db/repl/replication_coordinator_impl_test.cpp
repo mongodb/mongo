@@ -102,20 +102,6 @@ struct OpTimeWithTermOne {
     Timestamp timestamp;
 };
 
-void runSingleNodeElection(ServiceContext::UniqueOperationContext opCtx,
-                           ReplicationCoordinatorImpl* replCoord,
-                           executor::NetworkInterfaceMock* net) {
-    replCoord->setMyLastAppliedOpTime(OpTime(Timestamp(1, 0), 0));
-    replCoord->setMyLastDurableOpTime(OpTime(Timestamp(1, 0), 0));
-    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoord->waitForElectionFinish_forTest();
-
-    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
-    ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
-
-    replCoord->signalDrainComplete(opCtx.get(), replCoord->getTerm());
-}
-
 /**
  * Helper that kills an operation, taking the necessary locks.
  */
@@ -1597,6 +1583,54 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     }
 }
 
+TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
+    init("mySet/test1:1234,test2:1234,test3:1234");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test2:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test3:1234"))
+                            << "protocolVersion"
+                            << 1),
+                       HostAndPort("test1", 1234));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(
+        getReplCoord()->getElectionTimeout_forTest());
+
+    ASSERT_EQUALS(1, getReplCoord()->getTerm());
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    // Now update term to trigger a stepdown.
+    TopologyCoordinator::UpdateTermResult termUpdated;
+    auto updateTermEvh = getReplCoord()->updateTerm_forTest(2, &termUpdated);
+    ASSERT(updateTermEvh.isValid());
+    ASSERT(termUpdated == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
+
+    // Now signal that replication applier is finished draining its buffer.
+    const auto opCtx = makeOperationContext();
+    getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
+
+    // Now wait for stepdown to complete
+    getReplExec()->waitForEvent(updateTermEvh);
+
+    // By now drain mode should be cancelled.
+    ASSERT_OK(getReplCoord()->waitForDrainFinish(Milliseconds(0)));
+
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+    // ASSERT_EQUALS(2, getReplCoord()->getTerm()); // SERVER-28290
+}
+
 TEST_F(StepDownTest, NodeReturnsNotMasterWhenAskedToStepDownAsANonPrimaryNode) {
     const auto opCtx = makeOperationContext();
 
@@ -1824,8 +1858,8 @@ TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingle
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
-    const auto opCtx = makeOperationContext();
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000)));
     getNet()->enterNetwork();  // Must do this before inspecting the topocoord
@@ -1856,8 +1890,8 @@ TEST_F(
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
     const auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000)));
     getNet()->enterNetwork();  // Must do this before inspecting the topocoord
@@ -2857,14 +2891,13 @@ TEST_F(ReplCoordTest, IsMasterWithCommittedSnapshot) {
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     time_t lastWriteDate = 101;
     OpTime opTime = OpTime(Timestamp(lastWriteDate, 2), 1);
     time_t majorityWriteDate = 100;
     OpTime majorityOpTime = OpTime(Timestamp(majorityWriteDate, 1), 1);
-
-    auto opCtx = makeOperationContext();
 
     getReplCoord()->setMyLastAppliedOpTime(opTime);
     getReplCoord()->setMyLastDurableOpTime(opTime);
@@ -4095,12 +4128,12 @@ TEST_F(ReplCoordTest, ReadAfterCommittedWhileShutdown) {
                                                << 0))),
                        HostAndPort("node1", 12345));
 
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
 
-    auto opCtx = makeOperationContext();
     shutdown(opCtx.get());
 
     auto status = getReplCoord()->waitUntilOpTimeForRead(
@@ -4120,8 +4153,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedInterrupted) {
                                                << "_id"
                                                << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
     const auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
@@ -4143,9 +4176,9 @@ TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
                                                << "_id"
                                                << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
-
     auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 1));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 1));
     getReplCoord()->createSnapshot(opCtx.get(), OpTime(Timestamp(100, 0), 1), SnapshotName(1));
@@ -4166,8 +4199,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
                                                << "_id"
                                                << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
     auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     OpTime time(Timestamp(100, 0), 1);
     getReplCoord()->setMyLastAppliedOpTime(time);
@@ -4189,7 +4222,9 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
                                                << "_id"
                                                << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(0, 0), 1));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(0, 0), 1));
     OpTime committedOpTime(Timestamp(200, 0), 1);
@@ -4199,8 +4234,6 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
         getReplCoord()->setMyLastDurableOpTime(committedOpTime);
         getReplCoord()->createSnapshot(nullptr, committedOpTime, SnapshotName(1));
     });
-
-    auto opCtx = makeOperationContext();
 
     ASSERT_OK(getReplCoord()->waitUntilOpTimeForRead(
         opCtx.get(),
@@ -4218,7 +4251,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
                                                << "_id"
                                                << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(0, 0), 1));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(0, 0), 1));
 
@@ -4230,8 +4264,6 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
         getReplCoord()->setMyLastDurableOpTime(opTimeToWait);
         getReplCoord()->createSnapshot(nullptr, opTimeToWait, SnapshotName(1));
     });
-
-    auto opCtx = makeOperationContext();
 
     ASSERT_OK(getReplCoord()->waitUntilOpTimeForRead(
         opCtx.get(), ReadConcernArgs(opTimeToWait, ReadConcernLevel::kMajorityReadConcern)));
@@ -4985,7 +5017,9 @@ TEST_F(ReplCoordTest, AdvanceCommittedSnapshotToMostRecentSnapshotPriorToOpTimeW
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -4993,7 +5027,6 @@ TEST_F(ReplCoordTest, AdvanceCommittedSnapshotToMostRecentSnapshotPriorToOpTimeW
     OpTime time4(Timestamp(100, 4), 1);
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
-    auto opCtx = makeOperationContext();
 
     getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
     getReplCoord()->createSnapshot(opCtx.get(), time2, SnapshotName(2));
@@ -5019,7 +5052,8 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAnOpTimeIsNewerThanOurLat
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -5027,7 +5061,6 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAnOpTimeIsNewerThanOurLat
     OpTime time4(Timestamp(100, 4), 1);
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
-    auto opCtx = makeOperationContext();
 
     getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
     getReplCoord()->createSnapshot(opCtx.get(), time2, SnapshotName(2));
@@ -5051,7 +5084,9 @@ TEST_F(ReplCoordTest,
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -5059,7 +5094,6 @@ TEST_F(ReplCoordTest,
     OpTime time4(Timestamp(100, 4), 1);
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
-    auto opCtx = makeOperationContext();
 
     getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
     getReplCoord()->createSnapshot(opCtx.get(), time2, SnapshotName(2));
@@ -5085,7 +5119,9 @@ TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -5093,7 +5129,6 @@ TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
     OpTime time4(Timestamp(100, 4), 1);
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
-    auto opCtx = makeOperationContext();
 
     getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
     getReplCoord()->createSnapshot(opCtx.get(), time2, SnapshotName(2));
@@ -5115,11 +5150,12 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAppliedOpTimeChanges) {
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
+
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
-    auto opCtx = makeOperationContext();
 
     getReplCoord()->createSnapshot(opCtx.get(), time1, SnapshotName(1));
 
@@ -5510,7 +5546,7 @@ TEST_F(ReplCoordTest, WaitForDrainFinish) {
     ASSERT_EQUALS(ErrorCodes::BadValue, replCoord->waitForDrainFinish(Milliseconds(-1)));
 
     const auto opCtx = makeOperationContext();
-    replCoord->signalDrainComplete(opCtx.get(), replCoord->getTerm());
+    signalDrainComplete(opCtx.get());
     ASSERT_OK(replCoord->waitForDrainFinish(timeout));
 
     // Zero timeout is fine.

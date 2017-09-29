@@ -237,6 +237,23 @@ protected:
     void simulateSuccessfulV1ElectionAt(Date_t electionTime);
 
     /**
+     * When the test has been configured with a replica set config with a single member, use this
+     * to put that single member into state PRIMARY.
+     */
+    void runSingleNodeElection(OperationContext* opCtx);
+
+    /**
+     * Same as simulateSuccessfulV1ElectionAt, but stops short of signaling drain completion,
+     * so the node stays in drain mode.
+     */
+    void simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime);
+
+    /**
+     * Transition the ReplicationCoordinator from drain mode to being fully primary/master.
+     */
+    void signalDrainComplete(OperationContext* opCtx);
+
+    /**
      * Shuts down the objects under test.
      */
     void shutdown(OperationContext* opCtx);

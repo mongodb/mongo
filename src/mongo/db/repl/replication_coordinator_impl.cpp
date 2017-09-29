@@ -939,8 +939,10 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     Lock::GlobalWrite globalWriteLock(opCtx);
     lk.lock();
 
-    // Exit drain mode when the buffer is empty in the current term and we're in Draining mode.
-    if (_applierState != ApplierState::Draining || termWhenBufferIsEmpty != _topCoord->getTerm()) {
+    // Exit drain mode only if we're actually in draining mode, the apply buffer is empty in the
+    // current term, and we're allowed to become the write master.
+    if (_applierState != ApplierState::Draining ||
+        !_topCoord->canCompleteTransitionToPrimary(termWhenBufferIsEmpty)) {
         return;
     }
     _applierState = ApplierState::Stopped;
@@ -961,9 +963,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     _updateLastCommittedOpTime_inlock();
 
     // Update _canAcceptNonLocalWrites
-    invariant(!_canAcceptNonLocalWrites);
     _updateMemberStateFromTopologyCoordinator_inlock(opCtx);
-    invariant(_canAcceptNonLocalWrites);
 
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
     _drainFinishedCond.notify_all();

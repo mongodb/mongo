@@ -1,18 +1,10 @@
-// Test stepdown during drain mode
-// 1. Set up a 3-node set. Assume Node 1 is the primary at the beginning for simplicity.
-// 2. Prevent applying retrieved ops on all secondaries, including Node 2.
-// 3. Insert data to ensure Node 2 has ops to apply in its queue.
-// 4. Step up Node 2. Now it enters drain mode, but cannot proceed.
-// 5. Step up Node 1. Wait until Node 2 knows of a higher term and steps down.
-//    Node 2 re-enables bgsync producer while it's still in drain mode.
-// 6. Step up Node 2 again. It enters drain mode again.
-// 7. Enable applying ops.
-// 8. Ensure the ops in queue are applied and that Node 2 begins to accept writes as usual.
-
-load("jstests/replsets/rslib.js");
+// Test that the stepdown command can be run successfully during drain mode
 
 (function() {
     "use strict";
+
+    load("jstests/replsets/rslib.js");
+
     var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
     var nodes = replSet.nodeList();
     replSet.startSet();
@@ -53,6 +45,7 @@ load("jstests/replsets/rslib.js");
     // Since this test blocks a node in drain mode, we cannot use the ReplSetTest stepUp helper
     // that waits for a node to leave drain mode.
     function stepUpNode(node) {
+        jsTest.log("Stepping up: " + node.host);
         assert.soonNoExcept(function() {
             assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
             // We do not specify a specific primary so that if a different primary gets elected
@@ -107,27 +100,30 @@ load("jstests/replsets/rslib.js");
         ErrorCodes.ExceededTimeLimit,
         'replSetTest waitForDrainFinish should time out when draining is not allowed to complete');
 
-    // Original primary steps up.
-    reconnect(primary);
-    stepUpNode(primary);
+    try {
+        secondary.adminCommand({replSetStepDown: 60, force: true});
+    } catch (e) {
+        // expected
+        print("Caught stepdown exception: " + tojson(e));
+    }
 
+    // Assert stepdown was successful.
     reconnect(secondary);
-    stepUpNode(secondary);
+    assert.eq(ReplSetTest.State.SECONDARY, secondary.adminCommand({replSetGetStatus: 1}).myState);
+    assert(!secondary.adminCommand('ismaster').ismaster);
 
-    // Disable fail point to allow replication.
+    // Prevent the producer from fetching new ops
+    assert.commandWorked(
+        secondary.adminCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'}));
+
+    // Allow the secondary to apply the ops already in its buffer.
+    jsTestLog("Re-enabling replication on secondaries");
+    assert.gt(numDocuments, secondary.getDB("foo").foo.find().itcount());
     secondaries.forEach(disableFailPoint);
 
-    assert.commandWorked(
-        secondary.adminCommand({
-            replSetTest: 1,
-            waitForDrainFinish: replSet.kDefaultTimeoutMS,
-        }),
-        'replSetTest waitForDrainFinish should work when draining is allowed to complete');
-
-    // Ensure new primary is writable.
-    jsTestLog('New primary should be writable after draining is complete');
-    assert.writeOK(secondary.getDB("foo").flag.insert({sentinel: 1}));
-    // Check that all writes reached the secondary's op queue prior to
-    // stepping down the original primary and got applied.
-    assert.eq(secondary.getDB("foo").foo.find().itcount(), numDocuments);
+    // The node should now be able to apply the writes in its buffer.
+    jsTestLog("Waiting for node to drain its apply buffer");
+    assert.soon(function() {
+        return secondary.getDB("foo").foo.find().itcount() == numDocuments;
+    });
 })();

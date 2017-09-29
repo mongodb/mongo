@@ -152,6 +152,8 @@ public:
      */
     void setStoreLocalLastVoteDocumentToHang(bool hang);
 
+    void setFirstOpTimeOfMyTerm(const OpTime& opTime);
+
     /**
      * Returns true if startThreads() has been called.
      */
@@ -199,6 +201,7 @@ private:
     bool _threadsStarted;
     bool _isReadCommittedSupported = true;
     bool _areSnapshotsEnabled = true;
+    OpTime _firstOpTimeOfMyTerm;
 };
 
 }  // namespace repl

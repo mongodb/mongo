@@ -319,7 +319,7 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
     simulateSuccessfulV1ElectionAt(electionTimeoutWhen);
 }
 
-void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
+void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime) {
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
 
@@ -374,11 +374,17 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
     replCoord->fillIsMasterForReplSet(&imResponse);
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+}
+void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime);
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+
     {
         auto opCtx = makeOperationContext();
-        replCoord->signalDrainComplete(opCtx.get(), replCoord->getTerm());
+        signalDrainComplete(opCtx.get());
     }
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
+    IsMasterResponse imResponse;
     replCoord->fillIsMasterForReplSet(&imResponse);
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
@@ -446,6 +452,24 @@ void ReplCoordTest::simulateSuccessfulElection() {
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
+}
+
+void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) {
+    getExternalState()->setFirstOpTimeOfMyTerm(OpTime(Timestamp(1, 1), getReplCoord()->getTerm()));
+    getReplCoord()->signalDrainComplete(opCtx, getReplCoord()->getTerm());
+}
+
+void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(1, 0), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(1, 0), 0));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->waitForElectionFinish_forTest();
+
+    ASSERT(getReplCoord()->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
+    ASSERT(getReplCoord()->getMemberState().primary())
+        << getReplCoord()->getMemberState().toString();
+
+    signalDrainComplete(opCtx);
 }
 
 void ReplCoordTest::shutdown(OperationContext* opCtx) {

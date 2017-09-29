@@ -168,6 +168,7 @@ public:
     virtual bool updateLastCommittedOpTime();
     virtual bool advanceLastCommittedOpTime(const OpTime& committedOpTime);
     virtual OpTime getLastCommittedOpTime() const;
+    virtual bool canCompleteTransitionToPrimary(long long termWhenDrainCompleted) const override;
     virtual void completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm);
     virtual void adjustMaintenanceCountBy(int inc);
     virtual void prepareSyncFromResponse(const HostAndPort& target,

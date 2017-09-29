@@ -198,6 +198,10 @@ void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentToHan
     }
 }
 
+void ReplicationCoordinatorExternalStateMock::setFirstOpTimeOfMyTerm(const OpTime& opTime) {
+    _firstOpTimeOfMyTerm = opTime;
+}
+
 void ReplicationCoordinatorExternalStateMock::closeConnections() {
     _connectionsClosed = true;
 }
@@ -278,9 +282,8 @@ void ReplicationCoordinatorExternalStateMock::onDrainComplete(OperationContext* 
 
 OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationContext* opCtx,
                                                                       bool isV1ElectionProtocol) {
-    if (isV1ElectionProtocol) {
-        _lastOpTime = OpTime(Timestamp(1, 0), 1);
-    }
+    _lastOpTime = _firstOpTimeOfMyTerm;
+    _firstOpTimeOfMyTerm = OpTime();
     return fassertStatusOK(40297, _lastOpTime);
 }
 

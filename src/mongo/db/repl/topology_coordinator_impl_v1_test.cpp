@@ -110,11 +110,11 @@ protected:
                              stdx::bind(stringContains, stdx::placeholders::_1, needle));
     }
 
-    void makeSelfPrimary(const Timestamp& electionTimestamp = Timestamp(0, 0),
-                         const OpTime& firstOpTimeOfTerm = OpTime()) {
+    void makeSelfPrimary(const Timestamp& electionTimestamp = Timestamp(0, 0)) {
         getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
         getTopoCoord()._setCurrentPrimaryForTest(_selfIndex);
-        getTopoCoord().completeTransitionToPrimary(firstOpTimeOfTerm);
+        OpTime dummyOpTime(Timestamp(1, 1), getTopoCoord().getTerm());
+        getTopoCoord().completeTransitionToPrimary(dummyOpTime);
     }
 
     void setMyOpTime(const OpTime& opTime) {

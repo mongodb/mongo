@@ -371,7 +371,20 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
         return;
     }
 
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(blockHeartbeatStepdown);
+    if (MONGO_FAIL_POINT(blockHeartbeatStepdown)) {
+        // This log output is used in js tests so please leave it.
+        log() << "stepDown - blockHeartbeatStepdown fail point enabled. "
+                 "Blocking until fail point is disabled.";
+
+        auto inShutdown = [&] {
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            return _inShutdown;
+        };
+
+        while (MONGO_FAIL_POINT(blockHeartbeatStepdown) && !inShutdown()) {
+            mongo::sleepsecs(1);
+        }
+    }
 
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalWrite globalExclusiveLock(opCtx.get());
