@@ -10,6 +10,13 @@ class ResmokeError(Exception):
     pass
 
 
+class SuiteNotFound(ResmokeError):
+    """
+    A suite that isn't recognized was specified.
+    """
+    pass
+
+
 class StopExecution(ResmokeError):
     """
     Exception that is raised when resmoke.py should stop executing tests

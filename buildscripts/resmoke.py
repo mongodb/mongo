@@ -115,6 +115,11 @@ def find_suites_by_test(suites):
     return memberships
 
 
+def _list_suites_and_exit(logger, exit_code=0):
+    suite_names = resmokelib.parser.get_named_suites()
+    logger.info("Suites available to execute:\n%s", "\n".join(suite_names))
+    sys.exit(exit_code)
+
 def main():
     start_time = time.time()
 
@@ -130,16 +135,18 @@ def main():
     resmoke_logger = exec_logger.new_resmoke_logger()
 
     if values.list_suites:
-        suite_names = resmokelib.parser.get_named_suites()
-        resmoke_logger.info("Suites available to execute:\n%s", "\n".join(suite_names))
-        sys.exit(0)
+        _list_suites_and_exit(resmoke_logger)
 
     # Log the command line arguments specified to resmoke.py to make it easier to re-run the
     # resmoke.py invocation used by an Evergreen task.
     resmoke_logger.info("resmoke.py invocation: %s", " ".join(sys.argv))
 
     interrupted = False
-    suites = resmokelib.parser.get_suites(values, args)
+    try:
+        suites = resmokelib.parser.get_suites(values, args)
+    except resmokelib.errors.SuiteNotFound as err:
+        resmoke_logger.error("Failed to parse YAML suite definition: %s", str(err))
+        _list_suites_and_exit(resmoke_logger, exit_code=1)
 
     # Register a signal handler or Windows event object so we can write the report file if the task
     # times out.

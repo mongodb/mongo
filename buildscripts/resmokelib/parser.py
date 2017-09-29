@@ -10,6 +10,7 @@ import os.path
 import optparse
 
 from . import config as _config
+from . import errors
 from . import testing
 from . import utils
 from .. import resmokeconfig
@@ -470,7 +471,7 @@ def _get_yaml_config(kind, pathname):
     # extension.
     if not utils.is_yaml_file(pathname) and not os.path.dirname(pathname):
         if pathname not in resmokeconfig.NAMED_SUITES:
-            raise optparse.OptionValueError("Unknown %s '%s'" % (kind, pathname))
+            raise errors.SuiteNotFound("Unknown %s '%s'" % (kind, pathname))
         pathname = resmokeconfig.NAMED_SUITES[pathname]  # Expand 'pathname' to full path.
 
     if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
