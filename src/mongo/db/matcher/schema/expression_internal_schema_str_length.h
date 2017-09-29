@@ -72,10 +72,6 @@ protected:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
     StringData _name;
     long long _strLen = 0;
 };

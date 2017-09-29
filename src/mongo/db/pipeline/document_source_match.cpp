@@ -68,7 +68,8 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
         return nullptr;
     }
 
-    _expression = MatchExpression::optimize(std::move(_expression));
+    // TODO SERVER-30991: thread optimization down to the MatchExpression.
+    //_expression->optimize();
 
     return this;
 }

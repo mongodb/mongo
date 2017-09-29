@@ -74,13 +74,4 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
 
     return stdx::make_unique<ExprMatchExpression>(std::move(clonedExpr), _expCtx);
 }
-
-MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        auto& exprMatchExpr = static_cast<ExprMatchExpression&>(*expression);
-        exprMatchExpr._expression = exprMatchExpr._expression->optimize();
-
-        return expression;
-    };
-}
 }  // namespace mongo

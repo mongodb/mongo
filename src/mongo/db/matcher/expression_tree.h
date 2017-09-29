@@ -99,8 +99,6 @@ protected:
     void _listToBSON(BSONArrayBuilder* out) const;
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     std::vector<MatchExpression*> _expressions;
 };
 
@@ -239,8 +237,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     std::unique_ptr<MatchExpression> _exp;
 };
 }

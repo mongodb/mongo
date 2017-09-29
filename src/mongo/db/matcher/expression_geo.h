@@ -110,10 +110,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
     // The original geo specification provided by the user.
     BSONObj _rawObj;
 
@@ -191,10 +187,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
     // The original geo specification provided by the user.
     BSONObj _rawObj;
 

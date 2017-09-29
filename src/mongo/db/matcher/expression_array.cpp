@@ -108,14 +108,6 @@ void ElemMatchObjectMatchExpression::serialize(BSONObjBuilder* out) const {
     out->append(path(), BSON("$elemMatch" << subBob.obj()));
 }
 
-MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        auto& elemExpression = static_cast<ElemMatchObjectMatchExpression&>(*expression);
-        elemExpression._sub = MatchExpression::optimize(std::move(elemExpression._sub));
-
-        return expression;
-    };
-}
 
 // -------
 
@@ -192,19 +184,6 @@ void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
     out->append(path(), BSON("$elemMatch" << emBob.obj()));
 }
 
-MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        auto& subs = static_cast<ElemMatchValueMatchExpression&>(*expression)._subs;
-
-        for (MatchExpression*& subExpression : subs) {
-            auto optimizedSubExpression =
-                MatchExpression::optimize(std::unique_ptr<MatchExpression>(subExpression));
-            subExpression = optimizedSubExpression.release();
-        }
-
-        return expression;
-    };
-}
 
 // ---------
 

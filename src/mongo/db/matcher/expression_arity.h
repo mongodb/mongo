@@ -147,20 +147,6 @@ protected:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            for (auto& subExpression :
-                 static_cast<FixedArityMatchExpression&>(*expression)._expressions) {
-                // Since 'subExpression' is a reference to a member of the
-                // FixedArityMatchExpression's child array, this assignment replaces the original
-                // child with the optimized child.
-                subExpression = MatchExpression::optimize(std::move(subExpression));
-            }
-
-            return expression;
-        };
-    }
-
     std::array<std::unique_ptr<MatchExpression>, nargs> _expressions;
 };
 

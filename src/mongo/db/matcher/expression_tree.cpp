@@ -62,71 +62,6 @@ void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out) const {
     out->doneFast();
 }
 
-MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) -> std::unique_ptr<MatchExpression> {
-        auto& children = static_cast<ListOfMatchExpression&>(*expression)._expressions;
-
-        // Recursively apply optimizations to child expressions.
-        for (auto& childExpression : children) {
-            // Since 'childExpression' is a reference to a member of the ListOfMatchExpression's
-            // child array, this assignment replaces the original child with the optimized child.
-            std::unique_ptr<MatchExpression> childExpressionPtr(childExpression);
-            auto optimizedExpression = MatchExpression::optimize(std::move(childExpressionPtr));
-            childExpression = optimizedExpression.release();
-        }
-
-        // Associativity of AND and OR: an AND absorbs the children of any ANDs among its children
-        // (and likewise for any OR with OR children).
-        MatchType matchType = expression->matchType();
-        if (matchType == AND || matchType == OR) {
-            std::vector<MatchExpression*> absorbedExpressions;
-            for (MatchExpression*& childExpression : children) {
-                if (childExpression->matchType() == matchType) {
-                    // Move this child out of the children array.
-                    std::unique_ptr<ListOfMatchExpression> childExpressionPtr(
-                        static_cast<ListOfMatchExpression*>(childExpression));
-                    childExpression = nullptr;  // NULL out this child's entry in _expressions, so
-                                                // that it will be deleted by the erase call below.
-
-                    // Move all of the grandchildren from the child expression to
-                    // absorbedExpressions.
-                    auto& grandChildren = childExpressionPtr->_expressions;
-                    absorbedExpressions.insert(
-                        absorbedExpressions.end(), grandChildren.begin(), grandChildren.end());
-                    grandChildren.clear();
-
-                    // Note that 'childExpressionPtr' will now be destroyed.
-                }
-            }
-
-            // We replaced each destroyed child expression with nullptr. Now we remove those
-            // nullptrs from the array.
-            children.erase(std::remove(children.begin(), children.end(), nullptr), children.end());
-
-            // Append the absorbed children to the end of the array.
-            children.insert(children.end(), absorbedExpressions.begin(), absorbedExpressions.end());
-        }
-
-        if (children.size() == 1) {
-            if ((matchType == AND || matchType == OR || matchType == INTERNAL_SCHEMA_XOR)) {
-                // Simplify AND/OR/XOR with exactly one operand to an expression consisting of just
-                // that operand.
-                MatchExpression* simplifiedExpression = children.front();
-                children.clear();
-                return std::unique_ptr<MatchExpression>(simplifiedExpression);
-            } else if (matchType == NOR) {
-                // Simplify NOR of exactly one operand to NOT of that operand.
-                auto simplifiedExpression = stdx::make_unique<NotMatchExpression>();
-                invariantOK(simplifiedExpression->init(children.front()));
-                children.clear();
-                return simplifiedExpression;
-            }
-        }
-
-        return expression;
-    };
-}
-
 bool ListOfMatchExpression::equivalent(const MatchExpression* other) const {
     if (matchType() != other->matchType())
         return false;
@@ -278,15 +213,5 @@ bool NotMatchExpression::equivalent(const MatchExpression* other) const {
         return false;
 
     return _exp->equivalent(other->getChild(0));
-}
-
-
-MatchExpression::ExpressionOptimizerFunc NotMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        auto& notExpression = static_cast<NotMatchExpression&>(*expression);
-        notExpression._exp = MatchExpression::optimize(std::move(notExpression._exp));
-
-        return expression;
-    };
 }
 }

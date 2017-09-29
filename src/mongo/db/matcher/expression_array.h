@@ -111,8 +111,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     std::unique_ptr<MatchExpression> _sub;
 };
 
@@ -157,8 +155,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     bool _arrayElementMatchesAll(const BSONElement& e) const;
 
     std::vector<MatchExpression*> _subs;
@@ -203,10 +199,6 @@ public:
     }
 
 private:
-    virtual ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
     int _size;  // >= 0 real, < 0, nothing will match
 };
 }

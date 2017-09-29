@@ -93,48 +93,19 @@ TEST(ExprMatchExpression, ComparisonThrowsWithUnboundVariable) {
     ASSERT_THROWS(ExprMatchExpression pipelineExpr(expression.firstElement(), expCtx), DBException);
 }
 
+// TODO SERVER-30991: Uncomment once MatchExpression::optimize() is in place and handles
+// optimization of the Expression held by ExprMatchExpression. Also add a second expression,
+// BSON("$expr" << "$$var"), with $$var bound to 4 to confirm it optimizes to {$const: 4} as
+// well.
+/*
 TEST(ExprMatchExpression, IdenticalPostOptimizedExpressionsAreEquivalent) {
     BSONObj expression = BSON("$expr" << BSON("$multiply" << BSON_ARRAY(2 << 2)));
     BSONObj expressionEquiv = BSON("$expr" << BSON("$const" << 4));
     BSONObj expressionNotEquiv = BSON("$expr" << BSON("$const" << 10));
 
-    // Create and optimize an ExprMatchExpression.
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::unique_ptr<MatchExpression> matchExpr =
-        stdx::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
-    matchExpr = MatchExpression::optimize(std::move(matchExpr));
-
-    // We expect that the optimized 'matchExpr' is still an ExprMatchExpression.
-    std::unique_ptr<ExprMatchExpression> pipelineExpr(
-        dynamic_cast<ExprMatchExpression*>(matchExpr.release()));
-    ASSERT_TRUE(pipelineExpr);
-
-    ASSERT_TRUE(pipelineExpr->equivalent(pipelineExpr.get()));
-
-    ExprMatchExpression pipelineExprEquiv(expressionEquiv.firstElement(), expCtx);
-    ASSERT_TRUE(pipelineExpr->equivalent(&pipelineExprEquiv));
-
-    ExprMatchExpression pipelineExprNotEquiv(expressionNotEquiv.firstElement(), expCtx);
-    ASSERT_FALSE(pipelineExpr->equivalent(&pipelineExprNotEquiv));
-}
-
-TEST(ExprMatchExpression, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto varId = expCtx->variablesParseState.defineVariable("var");
-    expCtx->variables.setValue(varId, Value(4));
-
-    BSONObj expression = BSON("$expr"
-                              << "$$var");
-    BSONObj expressionEquiv = BSON("$expr" << BSON("$const" << 4));
-    BSONObj expressionNotEquiv = BSON("$expr" << BSON("$const" << 10));
-
-    // Create and optimize an ExprMatchExpression.
-    std::unique_ptr<MatchExpression> matchExpr =
-        stdx::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
-    matchExpr = MatchExpression::optimize(std::move(matchExpr));
-
-    // We expect that the optimized 'matchExpr' is still an ExprMatchExpression.
-    auto& pipelineExpr = dynamic_cast<ExprMatchExpression&>(*matchExpr);
+    ExprMatchExpression pipelineExpr(expression.firstElement(), expCtx);
+    pipelineExpr::optimize();
     ASSERT_TRUE(pipelineExpr.equivalent(&pipelineExpr));
 
     ExprMatchExpression pipelineExprEquiv(expressionEquiv.firstElement(), expCtx);
@@ -143,6 +114,7 @@ TEST(ExprMatchExpression, ExpressionOptimizeRewritesVariableDereferenceAsConstan
     ExprMatchExpression pipelineExprNotEquiv(expressionNotEquiv.firstElement(), expCtx);
     ASSERT_FALSE(pipelineExpr.equivalent(&pipelineExprNotEquiv));
 }
+*/
 
 TEST(ExprMatchExpression, ShallowClonedExpressionIsEquivalentToOriginal) {
     BSONObj expression = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a" << 5)));

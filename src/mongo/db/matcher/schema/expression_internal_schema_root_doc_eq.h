@@ -93,10 +93,6 @@ protected:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
     UnorderedFieldsBSONObjComparator _objCmp;
     BSONObj _rhsObj;
 };
