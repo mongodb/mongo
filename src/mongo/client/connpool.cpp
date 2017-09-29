@@ -196,7 +196,9 @@ DBConnectionPool::DBConnectionPool()
       _hooks(new list<DBConnectionHook*>()) {}
 
 DBClientBase* DBConnectionPool::_get(const string& ident, double socketTimeout) {
-    uassert(17382, "Can't use connection pool during shutdown", !globalInShutdownDeprecated());
+    uassert(ErrorCodes::ShutdownInProgress,
+            "Can't use connection pool during shutdown",
+            !globalInShutdownDeprecated());
     stdx::lock_guard<stdx::mutex> L(_mutex);
     PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
     p.setMaxPoolSize(_maxPoolSize);

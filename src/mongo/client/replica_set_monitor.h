@@ -296,9 +296,7 @@ public:
      *
      * This is called by ReplicaSetMonitor::getHostWithRefresh()
      */
-    HostAndPort refreshUntilMatches(const ReadPreferenceSetting& criteria) {
-        return _refreshUntilMatches(&criteria);
-    };
+    HostAndPort refreshUntilMatches(const ReadPreferenceSetting& criteria);
 
     /**
      * Refresh all hosts. Equivalent to refreshUntilMatches with a criteria that never
@@ -306,9 +304,7 @@ public:
      *
      * This is intended to be called periodically, possibly from a background thread.
      */
-    void refreshAll() {
-        _refreshUntilMatches(NULL);
-    }
+    void refreshAll();
 
     //
     // Remaining methods are only for testing and internal use.
@@ -356,13 +352,6 @@ public:
     void failedHost(const HostAndPort& host, const Status& status);
 
     /**
-     * True if this Refresher started a new full scan rather than joining an existing one.
-     */
-    bool startedNewScan() const {
-        return _startedNewScan;
-    }
-
-    /**
      * Starts a new scan over the hosts in set.
      */
     static ScanStatePtr startNewScan(const SetState* set);
@@ -398,7 +387,6 @@ private:
     // Both pointers are never NULL
     SetStatePtr _set;
     ScanStatePtr _scan;  // May differ from _set->currentScan if a new scan has started.
-    bool _startedNewScan;
 };
 
 }  // namespace mongo
