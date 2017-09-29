@@ -49,7 +49,7 @@ WiredTigerEngineRuntimeConfigParameter::WiredTigerEngineRuntimeConfigParameter(
 void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder& b,
                                                     const std::string& name) {
-    b << name << "";
+    b << name << _currentValue;
 }
 
 Status WiredTigerEngineRuntimeConfigParameter::set(const BSONElement& newValueElement) {
@@ -90,6 +90,7 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
         return Status(ErrorCodes::BadValue, result);
     }
 
+    _currentValue = str;
     return Status::OK();
 }
 }
