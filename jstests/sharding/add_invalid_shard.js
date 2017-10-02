@@ -11,14 +11,7 @@
     var shardDoc = configDB.shards.findOne();
 
     // Can't add mongos as shard.
-    assert.commandFailedWithCode(st.admin.runCommand({addshard: st.s.host}),
-                                 ErrorCodes.IllegalOperation);
-
-    // Can't add a mongod with a lower binary version than our featureCompatibilityVersion.
-    var lastStableMongod = MongoRunner.runMongod({binVersion: "last-stable"});
-    assert.commandFailedWithCode(st.admin.runCommand({addshard: lastStableMongod.host}),
-                                 ErrorCodes.IncompatibleServerVersion);
-    MongoRunner.stopMongod(lastStableMongod);
+    assert.commandFailed(st.admin.runCommand({addshard: st.s.host}));
 
     // Can't add config servers as shard.
     assert.commandFailed(st.admin.runCommand({addshard: st._configDB}));
