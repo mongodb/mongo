@@ -303,26 +303,10 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::string* shardProposedName,
     const ConnectionString& connectionString) {
-
-    // Check if the node being added is a mongos or a version of mongod too old to speak the current
-    // communication protocol.
     auto swCommandResponse =
         _runCommandForAddShard(opCtx, targeter.get(), "admin", BSON("isMaster" << 1));
     if (!swCommandResponse.isOK()) {
-        if (swCommandResponse.getStatus() == ErrorCodes::RPCProtocolNegotiationFailed) {
-            // Mongos to mongos commands are no longer supported in the wire protocol
-            // (because mongos does not support OP_COMMAND), similarly for a new mongos
-            // and an old mongod. So the call will fail in such cases.
-            // TODO: If/When mongos ever supports opCommands, this logic will break because
-            // cmdStatus will be OK.
-            return {ErrorCodes::RPCProtocolNegotiationFailed,
-                    str::stream() << targeter->connectionString().toString()
-                                  << " does not recognize the RPC protocol being used. This is"
-                                  << " likely because it contains a node that is a mongos or an old"
-                                  << " version of mongod."};
-        } else {
-            return swCommandResponse.getStatus();
-        }
+        return swCommandResponse.getStatus();
     }
 
     // Check for a command response error
@@ -337,15 +321,14 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
 
     auto resIsMaster = std::move(swCommandResponse.getValue().response);
 
-    // Check that the node being added is a new enough version.
-    // If we're running this code, that means the mongos that the addShard request originated from
-    // must be at least version 3.4 (since 3.2 mongoses don't know about the _configsvrAddShard
-    // command).  Since it is illegal to have v3.4 mongoses with v3.2 shards, we should reject
-    // adding any shards that are not v3.4.  We can determine this by checking that the
-    // maxWireVersion reported in isMaster is at least COMMANDS_ACCEPT_WRITE_CONCERN.
-    // TODO(SERVER-25623): This approach won't work to prevent v3.6 mongoses from adding v3.4
-    // shards, so we'll have to rethink this during the 3.5 development cycle.
+    // Fail if the node being added is a mongos.
+    const std::string msg = resIsMaster.getStringField("msg");
+    if (msg == "isdbgrid") {
+        return {ErrorCodes::IllegalOperation, "cannot add a mongos as a shard"};
+    }
 
+    // Fail if the node being added's binary version is lower than the cluster's
+    // featureCompatibilityVersion.
     long long maxWireVersion;
     Status status = bsonExtractIntegerField(resIsMaster, "maxWireVersion", &maxWireVersion);
     if (!status.isOK()) {
@@ -356,14 +339,14 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                     << " as a shard: "
                                     << status.reason());
     }
-    if (maxWireVersion < WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN) {
-        return Status(ErrorCodes::IncompatibleServerVersion,
-                      str::stream() << "Cannot add " << connectionString.toString()
-                                    << " as a shard because we detected a mongod with server "
-                                       "version older than 3.4.0.  It is invalid to add v3.2 and "
-                                       "older shards through a v3.4 mongos.");
+    if (serverGlobalParams.featureCompatibility.version.load() !=
+            ServerGlobalParams::FeatureCompatibility::Version::k34 &&
+        maxWireVersion < WireVersion::LATEST_WIRE_VERSION) {
+        return {ErrorCodes::IncompatibleServerVersion,
+                str::stream() << "Cannot add " << connectionString.toString()
+                              << " as a shard because its binary version is not compatible with "
+                                 "the cluster's featureCompatibilityVersion."};
     }
-
 
     // Check whether there is a master. If there isn't, the replica set may not have been
     // initiated. If the connection is a standalone, it will return true for isMaster.
