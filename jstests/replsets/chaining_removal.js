@@ -41,7 +41,7 @@
     syncFrom(nodes[4], nodes[1], replTest);
 
     // write that should reach all nodes
-    var timeout = 60 * 1000;
+    var timeout = ReplSetTest.kDefaultTimeoutMS;
     var options = {writeConcern: {w: numNodes, wtimeout: timeout}};
     assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
 

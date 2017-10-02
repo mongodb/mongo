@@ -452,8 +452,8 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanRewriteToRootedOr) {
     // Rewrite (AND (OR a b) e) => (OR (AND a e) (AND b e))
     {
         BSONObj queryObj = fromjson("{$or:[{a:1}, {b:1}], e:1}");
-        const CollatorInterface* collator = nullptr;
-        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, collator);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, expCtx);
         ASSERT_OK(expr.getStatus());
         std::unique_ptr<MatchExpression> rewrittenExpr =
             SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));
@@ -469,8 +469,8 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanRewriteToRootedOr) {
     // Rewrite (AND (OR a b) e f) => (OR (AND a e f) (AND b e f))
     {
         BSONObj queryObj = fromjson("{$or:[{a:1}, {b:1}], e:1, f:1}");
-        const CollatorInterface* collator = nullptr;
-        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, collator);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, expCtx);
         ASSERT_OK(expr.getStatus());
         std::unique_ptr<MatchExpression> rewrittenExpr =
             SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));
@@ -486,8 +486,8 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanRewriteToRootedOr) {
     // Rewrite (AND (OR (AND a b) (AND c d) e f) => (OR (AND a b e f) (AND c d e f))
     {
         BSONObj queryObj = fromjson("{$or:[{a:1,b:1}, {c:1,d:1}], e:1,f:1}");
-        const CollatorInterface* collator = nullptr;
-        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, collator);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, expCtx);
         ASSERT_OK(expr.getStatus());
         std::unique_ptr<MatchExpression> rewrittenExpr =
             SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));

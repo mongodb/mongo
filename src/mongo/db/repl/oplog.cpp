@@ -123,6 +123,11 @@ namespace {
  */
 Collection* _localOplogCollection = nullptr;
 
+// Specifies whether we abort initial sync when attempting to apply a renameCollection operation.
+// If set to true, users risk corrupting their data. This should only be enabled by expert users
+// of the server who understand the risks this poses.
+MONGO_EXPORT_SERVER_PARAMETER(allowUnsafeRenamesDuringInitialSync, bool, false);
+
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
 
 // Synchronizes the section where a new Timestamp is generated and when it is registered in the
@@ -329,11 +334,13 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     b.append("op", opstr);
     b.append("ns", nss.ns());
     if (uuid &&
-        repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
-            repl::ReplicationCoordinator::modeMasterSlave)
+        ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+            ReplicationCoordinator::modeMasterSlave)
         uuid->appendToBuilder(&b, "ui");
+
     if (fromMigrate)
         b.appendBool("fromMigrate", true);
+
     if (o2)
         b.append("o2", *o2);
 
@@ -344,7 +351,6 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     }
 
     appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
-
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
 }  // end anon namespace
@@ -446,6 +452,7 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
                           Session* session,
                           std::vector<InsertStatement>::const_iterator begin,
                           std::vector<InsertStatement>::const_iterator end,
+                          Timestamp timestamps[],
                           bool fromMigrate) {
     invariant(begin != end);
 
@@ -465,16 +472,15 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
     WriteUnitOfWork wuow(opCtx);
     auto wallTime = Date_t::now();
 
-    OplogLink oplogLink;
     OperationSessionInfo sessionInfo;
+    OplogLink oplogLink;
 
     if (session) {
-        oplogLink.prevTs = session->getLastWriteOpTimeTs();
-        sessionInfo.setSessionId(session->getSessionId());
-        sessionInfo.setTxnNumber(session->getTxnNum());
+        sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+        sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+        oplogLink.prevTs = session->getLastWriteOpTimeTs(*opCtx->getTxnNumber());
     }
 
-    auto timestamps = stdx::make_unique<Timestamp[]>(count);
     OpTime lastOpTime;
     for (size_t i = 0; i < count; i++) {
         // Make a mutable copy.
@@ -506,7 +512,7 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
         basePtrs[i] = &writers[i];
     }
     invariant(!lastOpTime.isNull());
-    _logOpsInner(opCtx, nss, basePtrs.get(), timestamps.get(), count, oplog, lastOpTime);
+    _logOpsInner(opCtx, nss, basePtrs.get(), timestamps, count, oplog, lastOpTime);
     wuow.commit();
     return lastOpTime;
 }
@@ -554,6 +560,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
     return sz;
 #endif
 }
+
 }  // namespace
 
 void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName, bool isReplSet) {
@@ -600,8 +607,9 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
         WriteUnitOfWork uow(opCtx);
         invariant(ctx.db()->createCollection(opCtx, oplogCollectionName, options));
         acquireOplogCollectionForLogging(opCtx);
-        if (!isReplSet)
-            getGlobalServiceContext()->getOpObserver()->onOpMessage(opCtx, BSONObj());
+        if (!isReplSet) {
+            opCtx->getServiceContext()->getOpObserver()->onOpMessage(opCtx, BSONObj());
+        }
         uow.commit();
     });
 
@@ -618,13 +626,27 @@ void createOplog(OperationContext* opCtx) {
     createOplog(opCtx, _oplogCollectionName, isReplSet);
 }
 
-void getNextOpTimes(OperationContext* opCtx, std::size_t count, OplogSlot* slotsOut) {
+OplogSlot getNextOpTime(OperationContext* opCtx) {
     // The local oplog collection pointer must already be established by this point.
     // We can't establish it here because that would require locking the local database, which would
     // be a lock order violation.
     invariant(_localOplogCollection);
-    _getNextOpTimes(opCtx, _localOplogCollection, count, slotsOut);
+    OplogSlot os;
+    _getNextOpTimes(opCtx, _localOplogCollection, 1, &os);
+    return os;
 }
+
+std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) {
+    // The local oplog collection pointer must already be established by this point.
+    // We can't establish it here because that would require locking the local database, which would
+    // be a lock order violation.
+    invariant(_localOplogCollection);
+    std::vector<OplogSlot> oplogSlots(count);
+    auto oplogSlot = oplogSlots.begin();
+    _getNextOpTimes(opCtx, _localOplogCollection, count, &(*oplogSlot));
+    return oplogSlots;
+}
+
 
 // -------------------------------------
 
@@ -913,25 +935,22 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
     OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
 
-    std::array<StringData, 7> names = {"ts", "o", "ui", "ns", "op", "b", "o2"};
-    std::array<BSONElement, 7> fields;
+    std::array<StringData, 8> names = {"ts", "t", "o", "ui", "ns", "op", "b", "o2"};
+    std::array<BSONElement, 8> fields;
     op.getFields(names, &fields);
     BSONElement& fieldTs = fields[0];
-    BSONElement& fieldO = fields[1];
-    BSONElement& fieldUI = fields[2];
-    BSONElement& fieldNs = fields[3];
-    BSONElement& fieldOp = fields[4];
-    BSONElement& fieldB = fields[5];
-    BSONElement& fieldO2 = fields[6];
+    BSONElement& fieldT = fields[1];
+    BSONElement& fieldO = fields[2];
+    BSONElement& fieldUI = fields[3];
+    BSONElement& fieldNs = fields[4];
+    BSONElement& fieldOp = fields[5];
+    BSONElement& fieldB = fields[6];
+    BSONElement& fieldO2 = fields[7];
 
     BSONObj o;
     if (fieldO.isABSONObj())
         o = fieldO.embeddedObject();
 
-    SnapshotName timestamp;
-    if (fieldTs.ok()) {
-        timestamp = SnapshotName(fieldTs.timestamp());
-    }
     // operation type -- see logOp() comments for types
     const char* opType = fieldOp.valuestrsafe();
 
@@ -981,6 +1000,35 @@ Status applyOperation_inlock(OperationContext* opCtx,
             str::stream() << "applyOps not supported on view: " << requestNss.ns(),
             collection || !db->getViewCatalog()->lookup(opCtx, requestNss.ns()));
 
+    // This code must decide what timestamp the storage engine should make the upcoming writes
+    // visible with. The requirements and use-cases:
+    //
+    // Requirement: A client calling the `applyOps` command must not be able to dictate timestamps
+    //      that violate oplog ordering. Disallow this regardless of whether the timestamps chosen
+    //      are otherwise legal.
+    //
+    // Use cases: Secondary oplog application: Use the timestamp in the operation document. These
+    //     operations are replicated to the oplog and this is not nested in a parent
+    //     `WriteUnitOfWork`.
+    //
+    //   Non-atomic `applyOps`: The server receives an `applyOps` command with a series of
+    //     operations that cannot be run under a single transaction. The common exemption from
+    //     being "transactionable" is containing a command operation. These will not be under a
+    //     parent `WriteUnitOfWork`. The timestamps on the operations will only be used if the
+    //     writes are not being replicated, as that would violate the guiding requirement. This is
+    //     primarily allowed for unit testing. See `dbtest/storage_timestamp_tests.cpp`.
+    //
+    //  Atomic `applyOps`: The server receives an `applyOps` command with operations that can be
+    //    run under a single transaction. In this case the caller has already opened a
+    //    `WriteUnitOfWork` and expects all writes to become visible at the same time. Moreover,
+    //    the individual operations will not contain a `ts` field. The caller is responsible for
+    //    setting the timestamp before committing. Assigning a competing timestamp in this
+    //    codepath would break that atomicity. Sharding is a consumer of this use-case.
+    const bool assignOperationTimestamp = !opCtx->writesAreReplicated() &&
+        !haveWrappingWriteUnitOfWork && fieldTs &&
+        getGlobalReplicationCoordinator()->getReplicationMode() !=
+            ReplicationCoordinator::modeMasterSlave;
+
     if (*opType == 'i') {
         if (requestNss.isSystemDotIndexes()) {
             BSONObj indexSpec;
@@ -997,16 +1045,55 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
         if (fieldO.type() == Array) {
             // Batched inserts.
-            std::vector<InsertStatement> insertObjs;
-            for (auto elem : fieldO.Obj()) {
-                // Note: we don't care about statement ids here since the secondaries don't create
-                // their own oplog entries.
-                insertObjs.emplace_back(elem.Obj(), timestamp);
-            }
+
+            // Cannot apply an array insert with applyOps command.  No support for wiping out
+            // the provided timestamps and using new ones for oplog.
+            uassert(ErrorCodes::OperationFailed,
+                    "Cannot apply an array insert with applyOps",
+                    !opCtx->writesAreReplicated());
+
+            uassert(ErrorCodes::BadValue,
+                    "Expected array for field 'ts'",
+                    fieldTs.ok() && fieldTs.type() == Array);
+            uassert(ErrorCodes::BadValue,
+                    "Expected array for field 't'",
+                    fieldT.ok() && fieldT.type() == Array);
+
             uassert(ErrorCodes::OperationFailed,
                     str::stream() << "Failed to apply insert due to empty array element: "
                                   << op.toString(),
-                    !insertObjs.empty());
+                    !fieldO.Obj().isEmpty() && !fieldTs.Obj().isEmpty() && !fieldT.Obj().isEmpty());
+
+            std::vector<InsertStatement> insertObjs;
+            auto fieldOIt = fieldO.Obj().begin();
+            auto fieldTsIt = fieldTs.Obj().begin();
+            auto fieldTIt = fieldT.Obj().begin();
+
+            while (true) {
+                auto oElem = fieldOIt.next();
+                auto tsElem = fieldTsIt.next();
+                auto tElem = fieldTIt.next();
+
+                // Note: we don't care about statement ids here since the secondaries don't create
+                // their own oplog entries.
+                insertObjs.emplace_back(
+                    oElem.Obj(), SnapshotName(tsElem.timestamp()), tElem.Long());
+                if (!fieldOIt.more()) {
+                    // Make sure arrays are the same length.
+                    uassert(ErrorCodes::OperationFailed,
+                            str::stream()
+                                << "Failed to apply insert due to invalid array elements: "
+                                << op.toString(),
+                            !fieldTsIt.more());
+                    break;
+                }
+                // Make sure arrays are the same length.
+                uassert(ErrorCodes::OperationFailed,
+                        str::stream() << "Failed to apply insert due to invalid array elements: "
+                                      << op.toString(),
+                        fieldTsIt.more());
+            }
+
             WriteUnitOfWork wuow(opCtx);
             OpDebug* const nullOpDebug = nullptr;
             Status status = collection->insertDocuments(
@@ -1038,15 +1125,40 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // 3. If not, do upsert (and commit)
             // 4. If both !Ok, return status
 
-            // We cannot rely on a DuplicateKey error if we'repart of a larger transaction, because
-            // that would require the transaction to abort. So instead, use upsert in that case.
+            // We cannot rely on a DuplicateKey error if we're part of a larger transaction,
+            // because that would require the transaction to abort. So instead, use upsert in that
+            // case.
             bool needToDoUpsert = haveWrappingWriteUnitOfWork;
+
+            SnapshotName timestamp;
+            long long term = OpTime::kUninitializedTerm;
+            if (assignOperationTimestamp) {
+                if (fieldTs) {
+                    timestamp = SnapshotName(fieldTs.timestamp());
+                }
+                if (fieldT) {
+                    term = fieldT.Long();
+                }
+            }
 
             if (!needToDoUpsert) {
                 WriteUnitOfWork wuow(opCtx);
+
+                // Do not use supplied timestamps if running through applyOps, as that would allow
+                // a user to dictate what timestamps appear in the oplog.
+                if (assignOperationTimestamp) {
+                    if (fieldTs.ok()) {
+                        timestamp = SnapshotName(fieldTs.timestamp());
+                    }
+                    if (fieldT.ok()) {
+                        term = fieldT.Long();
+                    }
+                }
+
                 OpDebug* const nullOpDebug = nullptr;
-                auto status = collection->insertDocument(
-                    opCtx, InsertStatement(o, timestamp), nullOpDebug, true);
+                Status status = collection->insertDocument(
+                    opCtx, InsertStatement(o, timestamp, term), nullOpDebug, true);
+
                 if (status.isOK()) {
                     wuow.commit();
                 } else if (status == ErrorCodes::DuplicateKey) {
@@ -1055,6 +1167,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     return status;
                 }
             }
+
             // Now see if we need to do an upsert.
             if (needToDoUpsert) {
                 // Do update on DuplicateKey errors.
@@ -1064,19 +1177,31 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 b.append(o.getField("_id"));
 
                 UpdateRequest request(requestNss);
-
                 request.setQuery(b.done());
                 request.setUpdates(o);
                 request.setUpsert();
+                request.setFromOplogApplication(true);
+
                 UpdateLifecycleImpl updateLifecycle(requestNss);
                 request.setLifecycle(&updateLifecycle);
 
-                UpdateResult res = update(opCtx, db, request);
-                if (res.numMatched == 0 && res.upserted.isEmpty()) {
-                    error() << "No document was updated even though we got a DuplicateKey "
-                               "error when inserting";
-                    fassertFailedNoTrace(28750);
-                }
+                const StringData ns = fieldNs.valueStringData();
+                writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
+                    WriteUnitOfWork wuow(opCtx);
+                    // If this is an atomic applyOps (i.e: `haveWrappingWriteUnitOfWork` is true),
+                    // do not timestamp the write.
+                    if (assignOperationTimestamp && timestamp != SnapshotName::min()) {
+                        uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+                    }
+
+                    UpdateResult res = update(opCtx, db, request);
+                    if (res.numMatched == 0 && res.upserted.isEmpty()) {
+                        error() << "No document was updated even though we got a DuplicateKey "
+                                   "error when inserting";
+                        fassertFailedNoTrace(28750);
+                    }
+                    wuow.commit();
+                });
             }
 
             if (incrementOpsAppliedStats) {
@@ -1094,53 +1219,74 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 updateCriteria.hasField("_id"));
 
         UpdateRequest request(requestNss);
-
         request.setQuery(updateCriteria);
         request.setUpdates(o);
         request.setUpsert(upsert);
+        request.setFromOplogApplication(true);
+
         UpdateLifecycleImpl updateLifecycle(requestNss);
         request.setLifecycle(&updateLifecycle);
 
-        UpdateResult ur = update(opCtx, db, request);
+        SnapshotName timestamp;
+        if (assignOperationTimestamp) {
+            timestamp = SnapshotName(fieldTs.timestamp());
+        }
 
-        if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
-            if (ur.modifiers) {
-                if (updateCriteria.nFields() == 1) {
-                    // was a simple { _id : ... } update criteria
-                    string msg = str::stream() << "failed to apply update: " << redact(op);
-                    error() << msg;
-                    return Status(ErrorCodes::UpdateOperationFailed, msg);
-                }
-                // Need to check to see if it isn't present so we can exit early with a
-                // failure. Note that adds some overhead for this extra check in some cases,
-                // such as an updateCriteria
-                // of the form
-                //   { _id:..., { x : {$size:...} }
-                // thus this is not ideal.
-                if (collection == NULL ||
-                    (indexCatalog->haveIdIndex(opCtx) &&
-                     Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
-                    // capped collections won't have an _id index
-                    (!indexCatalog->haveIdIndex(opCtx) &&
-                     Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
-                    string msg = str::stream() << "couldn't find doc: " << redact(op);
-                    error() << msg;
-                    return Status(ErrorCodes::UpdateOperationFailed, msg);
-                }
+        const StringData ns = fieldNs.valueStringData();
+        auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
+            WriteUnitOfWork wuow(opCtx);
+            if (timestamp != SnapshotName::min()) {
+                uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+            }
 
-                // Otherwise, it's present; zero objects were updated because of additional
-                // specifiers in the query for idempotence
-            } else {
-                // this could happen benignly on an oplog duplicate replay of an upsert
-                // (because we are idempotent),
-                // if an regular non-mod update fails the item is (presumably) missing.
-                if (!upsert) {
-                    string msg = str::stream() << "update of non-mod failed: " << redact(op);
-                    error() << msg;
-                    return Status(ErrorCodes::UpdateOperationFailed, msg);
+            UpdateResult ur = update(opCtx, db, request);
+            if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
+                if (ur.modifiers) {
+                    if (updateCriteria.nFields() == 1) {
+                        // was a simple { _id : ... } update criteria
+                        string msg = str::stream() << "failed to apply update: " << redact(op);
+                        error() << msg;
+                        return Status(ErrorCodes::UpdateOperationFailed, msg);
+                    }
+
+                    // Need to check to see if it isn't present so we can exit early with a
+                    // failure. Note that adds some overhead for this extra check in some cases,
+                    // such as an updateCriteria of the form
+                    // { _id:..., { x : {$size:...} }
+                    // thus this is not ideal.
+                    if (collection == NULL ||
+                        (indexCatalog->haveIdIndex(opCtx) &&
+                         Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
+                        // capped collections won't have an _id index
+                        (!indexCatalog->haveIdIndex(opCtx) &&
+                         Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
+                        string msg = str::stream() << "couldn't find doc: " << redact(op);
+                        error() << msg;
+                        return Status(ErrorCodes::UpdateOperationFailed, msg);
+                    }
+
+                    // Otherwise, it's present; zero objects were updated because of additional
+                    // specifiers in the query for idempotence
+                } else {
+                    // this could happen benignly on an oplog duplicate replay of an upsert
+                    // (because we are idempotent),
+                    // if an regular non-mod update fails the item is (presumably) missing.
+                    if (!upsert) {
+                        string msg = str::stream() << "update of non-mod failed: " << redact(op);
+                        error() << msg;
+                        return Status(ErrorCodes::UpdateOperationFailed, msg);
+                    }
                 }
             }
+
+            wuow.commit();
+            return Status::OK();
+        });
+
+        if (!status.isOK()) {
+            return status;
         }
+
         if (incrementOpsAppliedStats) {
             incrementOpsAppliedStats();
         }
@@ -1151,10 +1297,25 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 str::stream() << "Failed to apply delete due to missing _id: " << op.toString(),
                 o.hasField("_id"));
 
-        if (opType[1] == 0) {
-            deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
-        } else
-            verify(opType[1] == 'b');  // "db" advertisement
+        SnapshotName timestamp;
+        if (assignOperationTimestamp) {
+            timestamp = SnapshotName(fieldTs.timestamp());
+        }
+
+        const StringData ns = fieldNs.valueStringData();
+        writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
+            WriteUnitOfWork wuow(opCtx);
+            if (timestamp != SnapshotName::min()) {
+                uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+            }
+
+            if (opType[1] == 0) {
+                deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
+            } else
+                verify(opType[1] == 'b');  // "db" advertisement
+            wuow.commit();
+        });
+
         if (incrementOpsAppliedStats) {
             incrementOpsAppliedStats();
         }
@@ -1211,12 +1372,19 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    // Applying renameCollection during initial sync might lead to data corruption, so we restart
-    // the initial sync.
-    if (!inSteadyStateReplication && o.firstElementFieldName() == std::string("renameCollection")) {
-        return Status(ErrorCodes::OplogOperationUnsupported,
-                      str::stream() << "Applying renameCollection not supported in initial sync: "
-                                    << redact(op));
+    // Applying renameCollection during initial sync to a collection without UUID might lead to
+    // data corruption, so we restart the initial sync.
+    if (fieldUI.eoo() && !inSteadyStateReplication &&
+        o.firstElementFieldName() == std::string("renameCollection")) {
+        if (!allowUnsafeRenamesDuringInitialSync.load()) {
+            return Status(ErrorCodes::OplogOperationUnsupported,
+                          str::stream()
+                              << "Applying renameCollection not supported in initial sync: "
+                              << redact(op));
+        }
+        warning() << "allowUnsafeRenamesDuringInitialSync set to true. Applying renameCollection "
+                     "operation during initial sync even though it may lead to data corruption: "
+                  << redact(op);
     }
 
     // Applying commands in repl is done under Global W-lock, so it is safe to not

@@ -80,6 +80,10 @@ Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity v
     explainCommandBuilder[QueryRequest::kUnwrappedReadPrefField] =
         Value(aggregateCommand[QueryRequest::kUnwrappedReadPrefField]);
 
+    // readConcern needs to be promoted to the top-level of the request.
+    explainCommandBuilder[repl::ReadConcernArgs::kReadConcernFieldName] =
+        Value(aggregateCommand[repl::ReadConcernArgs::kReadConcernFieldName]);
+
     // Add explain command options.
     for (auto&& explainOption : ExplainOptions::toBSON(verbosity)) {
         explainCommandBuilder[explainOption.fieldNameStringData()] = Value(explainOption);
@@ -348,7 +352,7 @@ BSONObj establishMergingMongosCursor(
     CursorResponseBuilder responseBuilder(true, &cursorResponse);
 
     for (long long objCount = 0; objCount < request.getBatchSize(); ++objCount) {
-        auto next = uassertStatusOK(ccc->next());
+        auto next = uassertStatusOK(ccc->next(RouterExecStage::ExecContext::kInitialFind));
 
         // Check whether we have exhausted the pipeline's results.
         if (next.isEOF()) {
@@ -419,11 +423,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     LiteParsedPipeline liteParsedPipeline(request);
 
-    // TODO SERVER-29141 support forcing pipeline to run on Mongos.
-    uassert(40567,
-            "Unable to force mongos-only stage to run on mongos",
-            liteParsedPipeline.allowedToForwardFromMongos());
-
     for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         const auto resolvedNsRoutingInfo =
             uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
@@ -432,12 +431,25 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
 
-    // If this aggregation is on an unsharded collection, pass through to the primary shard.
+    // If this pipeline is on an unsharded collection,
+    // is allowed to be forwarded on to shards,
+    // and doesn't need transformation via DocumentSoruce::serialize(),
+    // then go ahead and pass it through to the owning shard unmodified.
     if (!executionNsRoutingInfo.cm() && !namespaces.executionNss.isCollectionlessAggregateNS() &&
+        liteParsedPipeline.allowedToForwardFromMongos() &&
         liteParsedPipeline.allowedToPassthroughFromMongos()) {
-        return aggPassthrough(
-            opCtx, namespaces, executionNsRoutingInfo.primary()->getId(), request, cmdObj, result);
+        return aggPassthrough(opCtx,
+                              namespaces,
+                              executionNsRoutingInfo.primary()->getId(),
+                              cmdObj,
+                              request,
+                              liteParsedPipeline,
+                              result);
     }
+    // TODO SERVER-29141 support $changeStream on sharded collections.
+    uassert(40622,
+            "$changeStream is not yet supported on sharded collections",
+            !liteParsedPipeline.hasChangeStream());
 
     std::unique_ptr<CollatorInterface> collation;
     if (!request.getCollation().isEmpty()) {
@@ -456,6 +468,17 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), mergeCtx));
     pipeline->optimizePipeline();
+
+    if (!liteParsedPipeline.allowedToForwardFromMongos()) {
+        // Pipeline must be run locally.
+        uassert(40567,
+                "Aggregation pipeline contains both mongos-only and non-mongos stages",
+                pipeline->canRunOnMongos());
+        auto cursorResponse = establishMergingMongosCursor(
+            opCtx, request, namespaces.requestedNss, std::move(pipeline), {});
+        Command::filterCommandReplyForPassthrough(cursorResponse, result);
+        return getStatusFromCommandResult(result->asTempObj());
+    }
 
     // Begin shard targeting. The process is as follows:
     // - First, determine whether we need to target more than one shard. If so, we split the
@@ -522,18 +545,31 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
         if (mergeCtx->explain) {
-            swShardResults = scatterGather(opCtx,
-                                           namespaces.executionNss.db().toString(),
-                                           namespaces.executionNss,
-                                           targetedCommand,
-                                           ReadPreferenceSetting::get(opCtx),
-                                           namespaces.executionNss.isCollectionlessAggregateNS()
-                                               ? ShardTargetingPolicy::BroadcastToAllShards
-                                               : ShardTargetingPolicy::UseRoutingTable,
-                                           shardQuery,
-                                           request.getCollation(),
-                                           true,
-                                           false);
+            if (namespaces.executionNss.isCollectionlessAggregateNS()) {
+                // Some commands, such as $currentOp, are implemented as aggregation stages on a
+                // "collectionless" namespace. Currently, all such commands should be broadcast to
+                // all shards, and should not participate in the shard version protocol.
+                swShardResults =
+                    scatterGatherUnversionedTargetAllShards(opCtx,
+                                                            namespaces.executionNss.db().toString(),
+                                                            namespaces.executionNss,
+                                                            targetedCommand,
+                                                            ReadPreferenceSetting::get(opCtx),
+                                                            Shard::RetryPolicy::kIdempotent);
+            } else {
+                // Aggregations on a real namespace should use the routing table to target shards,
+                // and should participate in the shard version protocol.
+                swShardResults = scatterGatherVersionedTargetByRoutingTable(
+                    opCtx,
+                    namespaces.executionNss.db().toString(),
+                    namespaces.executionNss,
+                    targetedCommand,
+                    ReadPreferenceSetting::get(opCtx),
+                    Shard::RetryPolicy::kIdempotent,
+                    shardQuery,
+                    request.getCollation(),
+                    nullptr /* viewDefinition */);
+            }
         } else {
             swCursors = establishShardCursors(opCtx,
                                               namespaces.executionNss,
@@ -590,7 +626,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     invariant(pipelineForMerging);
 
     // First, check whether we can merge on the mongoS.
-    if (pipelineForMerging->canRunOnMongos() && !internalQueryProhibitMergingOnMongoS.load()) {
+    if (!internalQueryProhibitMergingOnMongoS.load() && pipelineForMerging->canRunOnMongos()) {
         // Register the new mongoS cursor, and retrieve the initial batch of results.
         auto cursorResponse = establishMergingMongosCursor(opCtx,
                                                            request,
@@ -668,8 +704,9 @@ void ClusterAggregate::uassertAllShardsSupportExplain(
 Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const Namespaces& namespaces,
                                         const ShardId& shardId,
-                                        const AggregationRequest& aggRequest,
                                         BSONObj cmdObj,
+                                        const AggregationRequest& aggRequest,
+                                        const LiteParsedPipeline& liteParsedPipeline,
                                         BSONObjBuilder* out) {
     // Temporary hack. See comment on declaration for details.
     auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
@@ -692,8 +729,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         Shard::RetryPolicy::kIdempotent));
 
     if (ErrorCodes::isStaleShardingError(cmdResponse.commandStatus.code())) {
-        throw RecvStaleConfigException("command failed because of stale config",
-                                       cmdResponse.response);
+        throw StaleConfigException("command failed because of stale config", cmdResponse.response);
     }
 
     BSONObj result;
@@ -704,14 +740,16 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         // The merging shard is remote, so if a response was received, a HostAndPort must have been
         // set.
         invariant(cmdResponse.hostAndPort);
-        result = uassertStatusOK(
-            storePossibleCursor(opCtx,
-                                shard->getId(),
-                                *cmdResponse.hostAndPort,
-                                cmdResponse.response,
-                                namespaces.requestedNss,
-                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                Grid::get(opCtx)->getCursorManager()));
+        result = uassertStatusOK(storePossibleCursor(
+            opCtx,
+            shard->getId(),
+            *cmdResponse.hostAndPort,
+            cmdResponse.response,
+            namespaces.requestedNss,
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            Grid::get(opCtx)->getCursorManager(),
+            liteParsedPipeline.hasChangeStream() ? TailableMode::kTailableAndAwaitData
+                                                 : TailableMode::kNormal));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped

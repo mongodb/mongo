@@ -142,11 +142,11 @@ TEST_F(ClusterCursorManagerTest, RegisterCursor) {
                                                ClusterCursorManager::CursorLifetime::Mortal));
     auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
-    auto nextResult = pinnedCursor.getValue().next();
+    auto nextResult = pinnedCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(nextResult.getStatus());
     ASSERT(nextResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(BSON("a" << 1), *nextResult.getValue().getResult());
-    nextResult = pinnedCursor.getValue().next();
+    nextResult = pinnedCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(nextResult.getStatus());
     ASSERT_TRUE(nextResult.getValue().isEOF());
 }
@@ -175,11 +175,11 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorBasic) {
     auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(checkedOutCursor.getStatus());
     ASSERT_EQ(cursorId, checkedOutCursor.getValue().getCursorId());
-    auto nextResult = checkedOutCursor.getValue().next();
+    auto nextResult = checkedOutCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(nextResult.getStatus());
     ASSERT(nextResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(BSON("a" << 1), *nextResult.getValue().getResult());
-    nextResult = checkedOutCursor.getValue().next();
+    nextResult = checkedOutCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(nextResult.getStatus());
     ASSERT_TRUE(nextResult.getValue().isEOF());
 }
@@ -202,11 +202,11 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorMultipleCursors) {
     for (int i = 0; i < numCursors; ++i) {
         auto pinnedCursor = getManager()->checkOutCursor(nss, cursorIds[i], _opCtx.get());
         ASSERT_OK(pinnedCursor.getStatus());
-        auto nextResult = pinnedCursor.getValue().next();
+        auto nextResult = pinnedCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind);
         ASSERT_OK(nextResult.getStatus());
         ASSERT(nextResult.getValue().getResult());
         ASSERT_BSONOBJ_EQ(BSON("a" << i), *nextResult.getValue().getResult());
-        nextResult = pinnedCursor.getValue().next();
+        nextResult = pinnedCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind);
         ASSERT_OK(nextResult.getStatus());
         ASSERT_TRUE(nextResult.getValue().isEOF());
     }
@@ -656,7 +656,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustShardedCursor) {
                                                ClusterCursorManager::CursorLifetime::Mortal));
     auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
-    ASSERT_OK(pinnedCursor.getValue().next().getStatus());
+    ASSERT_OK(pinnedCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind).getStatus());
     ASSERT_EQ(1U, getManager()->stats().cursorsMultiTarget);
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::Exhausted);
     ASSERT_EQ(0U, getManager()->stats().cursorsMultiTarget);
@@ -672,7 +672,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustNotShardedCursor) {
                                                ClusterCursorManager::CursorLifetime::Mortal));
     auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
-    ASSERT_OK(pinnedCursor.getValue().next().getStatus());
+    ASSERT_OK(pinnedCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind).getStatus());
     ASSERT_EQ(1U, getManager()->stats().cursorsSingleTarget);
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::Exhausted);
     ASSERT_EQ(0U, getManager()->stats().cursorsSingleTarget);
@@ -689,7 +689,7 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustPinnedCursor) {
                                                ClusterCursorManager::CursorLifetime::Mortal));
     auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
-    ASSERT_OK(pinnedCursor.getValue().next().getStatus());
+    ASSERT_OK(pinnedCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind).getStatus());
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::Exhausted);
     ASSERT_EQ(0U, getManager()->stats().cursorsPinned);
@@ -706,7 +706,7 @@ TEST_F(ClusterCursorManagerTest, StatsCheckInWithoutExhaustingPinnedCursor) {
                                                ClusterCursorManager::CursorLifetime::Mortal));
     auto pinnedCursor = getManager()->checkOutCursor(nss, cursorId, _opCtx.get());
     ASSERT_OK(pinnedCursor.getStatus());
-    ASSERT_OK(pinnedCursor.getValue().next().getStatus());
+    ASSERT_OK(pinnedCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind).getStatus());
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
     ASSERT_EQ(0U, getManager()->stats().cursorsPinned);
@@ -814,7 +814,8 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhausted) {
     ASSERT_OK(registeredCursor.getStatus());
     ASSERT_EQ(cursorId, registeredCursor.getValue().getCursorId());
     ASSERT_NE(0, cursorId);
-    ASSERT_OK(registeredCursor.getValue().next().getStatus());
+    ASSERT_OK(
+        registeredCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind).getStatus());
     registeredCursor.getValue().returnCursor(ClusterCursorManager::CursorState::Exhausted);
     ASSERT_EQ(0, registeredCursor.getValue().getCursorId());
 
@@ -846,7 +847,8 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhaustedWithNonExhaust
     ASSERT_OK(registeredCursor.getStatus());
     ASSERT_EQ(cursorId, registeredCursor.getValue().getCursorId());
     ASSERT_NE(0, cursorId);
-    ASSERT_OK(registeredCursor.getValue().next().getStatus());
+    ASSERT_OK(
+        registeredCursor.getValue().next(RouterExecStage::ExecContext::kInitialFind).getStatus());
     registeredCursor.getValue().returnCursor(ClusterCursorManager::CursorState::Exhausted);
     ASSERT_EQ(0, registeredCursor.getValue().getCursorId());
 

@@ -376,10 +376,13 @@ public:
             if ((nl = name.find('\n', nl)) != string::npos)
                 // stop at first newline
                 name.erase(nl);
-            // no standard format for name and version.  use kernel version
-            version = "Kernel ";
-            version += LinuxSysHelper::readLineFromFile("/proc/sys/kernel/osrelease");
+        } else {
+            name = "unknown";
         }
+
+        // There is no standard format for name and version so use the kernel version.
+        version = "Kernel ";
+        version += LinuxSysHelper::readLineFromFile("/proc/sys/kernel/osrelease");
     }
 
     /**

@@ -1,51 +1,5 @@
 [
     {
-        "description": "integer type matches integers",
-        "schema": {"type": "integer"},
-        "tests": [
-            {
-                "description": "an integer is an integer",
-                "data": 1,
-                "valid": true
-            },
-            {
-                "description": "a float is not an integer",
-                "data": 1.1,
-                "valid": false
-            },
-            {
-                "description": "a string is not an integer",
-                "data": "foo",
-                "valid": false
-            },
-            {
-                "description": "a string is still not an integer, even if it looks like one",
-                "data": "1",
-                "valid": false
-            },
-            {
-                "description": "an object is not an integer",
-                "data": {},
-                "valid": false
-            },
-            {
-                "description": "an array is not an integer",
-                "data": [],
-                "valid": false
-            },
-            {
-                "description": "a boolean is not an integer",
-                "data": true,
-                "valid": false
-            },
-            {
-                "description": "null is not an integer",
-                "data": null,
-                "valid": false
-            }
-        ]
-    },
-    {
         "description": "number type matches numbers",
         "schema": {"type": "number"},
         "tests": [
@@ -303,7 +257,8 @@
     },
     {
         "description": "multiple types can be specified in an array",
-        "schema": {"type": ["integer", "string"]},
+        "schema": {"type": ["number", "string"]},
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "tests": [
             {
                 "description": "an integer is valid",
@@ -316,9 +271,9 @@
                 "valid": true
             },
             {
-                "description": "a float is invalid",
+                "description": "a float is valid",
                 "data": 1.1,
-                "valid": false
+                "valid": true
             },
             {
                 "description": "an object is invalid",

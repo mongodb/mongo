@@ -61,7 +61,8 @@ private:
     const CollatorInterface* _collator;
 };
 
-Status PullAllNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status PullAllNode::init(BSONElement modExpr,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
     if (modExpr.type() != Array) {
@@ -70,7 +71,7 @@ Status PullAllNode::init(BSONElement modExpr, const CollatorInterface* collator)
                                     << typeName(modExpr.type()));
     }
 
-    _matcher = stdx::make_unique<SetMatcher>(modExpr.Array(), collator);
+    _matcher = stdx::make_unique<SetMatcher>(modExpr.Array(), expCtx->getCollator());
 
     return Status::OK();
 }

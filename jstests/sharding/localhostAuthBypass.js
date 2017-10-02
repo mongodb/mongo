@@ -2,6 +2,12 @@
 //
 // This test is to ensure that localhost authentication works correctly against a sharded
 // cluster whether they are hosted with "localhost" or a hostname.
+
+// Checking UUID consistency, which occurs on ShardingTest.stop, involves using a mongos to read
+// data on the config server, but this test uses a special shutdown function which stops the
+// mongoses before calling ShardingTest.stop.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
 

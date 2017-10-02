@@ -459,22 +459,23 @@ public:
         // Not including "help" since we don't pass help requests through to the command parser.
         // If that changes, it should be added. When you add to this list, consider whether you
         // should also change the filterCommandRequestForPassthrough() function.
-        return arg == "$audit" ||           //
-            arg == "$client" ||             //
-            arg == "$configServerState" ||  //
-            arg == "$db" ||                 //
-            arg == "$oplogQueryData" ||     //
-            arg == "$queryOptions" ||       //
-            arg == "$readPreference" ||     //
-            arg == "$replData" ||           //
-            arg == "$clusterTime" ||        //
-            arg == "maxTimeMS" ||           //
-            arg == "readConcern" ||         //
-            arg == "shardVersion" ||        //
-            arg == "tracking_info" ||       //
-            arg == "writeConcern" ||        //
-            arg == "lsid" ||                //
-            arg == "txnNumber" ||           //
+        return arg == "$audit" ||                   //
+            arg == "$client" ||                     //
+            arg == "$configServerState" ||          //
+            arg == "$db" ||                         //
+            arg == "disallowCollectionCreation" ||  //
+            arg == "$oplogQueryData" ||             //
+            arg == "$queryOptions" ||               //
+            arg == "$readPreference" ||             //
+            arg == "$replData" ||                   //
+            arg == "$clusterTime" ||                //
+            arg == "maxTimeMS" ||                   //
+            arg == "readConcern" ||                 //
+            arg == "shardVersion" ||                //
+            arg == "tracking_info" ||               //
+            arg == "writeConcern" ||                //
+            arg == "lsid" ||                        //
+            arg == "txnNumber" ||                   //
             false;  // These comments tell clang-format to keep this line-oriented.
     }
 

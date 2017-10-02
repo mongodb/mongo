@@ -44,7 +44,6 @@
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
-    checkLog.contains(secondary, 'Applying renameCollection not supported');
     checkLog.contains(secondary, 'initial sync done');
 
     replSet.awaitReplication();

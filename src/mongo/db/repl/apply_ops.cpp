@@ -123,8 +123,7 @@ Status _applyOps(OperationContext* opCtx,
         if (*opType == 'n')
             continue;
 
-        const std::string ns = opObj["ns"].String();
-        const NamespaceString nss{ns};
+        const NamespaceString nss(opObj["ns"].String());
 
         // Need to check this here, or OldClientContext may fail an invariant.
         if (*opType != 'c' && !nss.isValid())
@@ -136,63 +135,99 @@ Status _applyOps(OperationContext* opCtx,
             invariant(opCtx->lockState()->isW());
             invariant(*opType != 'c');
 
-            if (!dbHolder().get(opCtx, ns)) {
+            auto db = dbHolder().get(opCtx, nss.ns());
+            if (!db) {
+                // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
+                // within an active WriteUnitOfWork.
                 throw DBException(
-                    ErrorCodes::NamespaceNotFound,
+                    ErrorCodes::AtomicityFailure,
                     "cannot create a database in atomic applyOps mode; will retry without "
                     "atomicity");
             }
 
-            OldClientContext ctx(opCtx, ns);
+            // When processing an update on a non-existent collection, applyOperation_inlock()
+            // returns UpdateOperationFailed on updates and allows the collection to be
+            // implicitly created on upserts. We detect both cases here and fail early with
+            // NamespaceNotFound.
+            // Additionally for inserts, we fail early on non-existent collections.
+            auto collection = db->getCollection(opCtx, nss);
+            if (!collection && !nss.isSystemDotIndexes() && (*opType == 'i' || *opType == 'u')) {
+                throw DBException(
+                    ErrorCodes::AtomicityFailure,
+                    str::stream()
+                        << "cannot apply insert or update operation on a non-existent namespace "
+                        << nss.ns()
+                        << " in atomic applyOps mode: "
+                        << redact(opObj));
+            }
+
+            // Cannot specify timestamp values in an atomic applyOps.
+            if (opObj.hasField("ts")) {
+                throw DBException(ErrorCodes::AtomicityFailure,
+                                  "cannot apply an op with a timestamp in atomic applyOps mode; "
+                                  "will retry without atomicity");
+            }
+
+            OldClientContext ctx(opCtx, nss.ns());
+
             status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
             if (!status.isOK())
                 return status;
         } else {
             try {
-                writeConflictRetry(opCtx, "applyOps", ns, [&] {
-                    if (*opType == 'c') {
-                        invariant(opCtx->lockState()->isW());
-                        status = repl::applyCommand_inlock(opCtx, opObj, true);
-                    } else {
-                        Lock::DBLock dbWriteLock(opCtx, nss.db(), MODE_IX);
-                        Lock::CollectionLock lock(opCtx->lockState(), nss.ns(), MODE_IX);
-                        OldClientContext ctx(opCtx, ns);
-                        const char* names[] = {"o", "ns"};
-                        BSONElement fields[2];
-                        opObj.getFields(2, names, fields);
-                        BSONElement& fieldO = fields[0];
-                        BSONElement& fieldNs = fields[1];
-                        const StringData ns = fieldNs.valueStringData();
-                        NamespaceString requestNss{ns};
-
-                        if (nss.isSystemDotIndexes()) {
-                            BSONObj indexSpec;
-                            NamespaceString indexNss;
-                            std::tie(indexSpec, indexNss) =
-                                repl::prepForApplyOpsIndexInsert(fieldO, opObj, requestNss);
-                            BSONObjBuilder command;
-                            command.append("createIndexes", indexNss.coll());
-                            {
-                                BSONArrayBuilder indexes(command.subarrayStart("indexes"));
-                                indexes.append(indexSpec);
-                                indexes.doneFast();
-                            }
-                            const BSONObj commandObj = command.done();
-
-                            DBDirectClient client(opCtx);
-                            BSONObj infoObj;
-                            client.runCommand(nsToDatabase(ns), commandObj, infoObj);
-                            status = getStatusFromCommandResult(infoObj);
-
-                            // Only uassert to stop applyOps only when building indexes,
-                            // but not for CRUD ops.
-                            uassertStatusOK(status);
-                        } else {
-                            status =
-                                repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
+                status = writeConflictRetry(
+                    opCtx, "applyOps", nss.ns(), [opCtx, nss, opObj, opType, alwaysUpsert] {
+                        if (*opType == 'c') {
+                            invariant(opCtx->lockState()->isW());
+                            return repl::applyCommand_inlock(opCtx, opObj, true);
                         }
-                    }
-                });
+
+                        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                        if (!autoColl.getCollection() && !nss.isSystemDotIndexes()) {
+                            // For idempotency reasons, return success on delete operations.
+                            if (*opType == 'd') {
+                                return Status::OK();
+                            }
+                            throw DBException(ErrorCodes::NamespaceNotFound,
+                                              str::stream()
+                                                  << "cannot apply insert or update operation on a "
+                                                     "non-existent namespace "
+                                                  << nss.ns()
+                                                  << ": "
+                                                  << mongo::redact(opObj));
+                        }
+
+                        OldClientContext ctx(opCtx, nss.ns());
+
+                        if (!nss.isSystemDotIndexes()) {
+                            return repl::applyOperation_inlock(
+                                opCtx, ctx.db(), opObj, alwaysUpsert);
+                        }
+
+                        auto fieldO = opObj["o"];
+                        BSONObj indexSpec;
+                        NamespaceString indexNss;
+                        std::tie(indexSpec, indexNss) =
+                            repl::prepForApplyOpsIndexInsert(fieldO, opObj, nss);
+                        BSONObjBuilder command;
+                        command.append("createIndexes", indexNss.coll());
+                        {
+                            BSONArrayBuilder indexes(command.subarrayStart("indexes"));
+                            indexes.append(indexSpec);
+                            indexes.doneFast();
+                        }
+                        const BSONObj commandObj = command.done();
+
+                        DBDirectClient client(opCtx);
+                        BSONObj infoObj;
+                        client.runCommand(nss.db().toString(), commandObj, infoObj);
+
+                        // Uassert to stop applyOps only when building indexes, but not for CRUD
+                        // ops.
+                        uassertStatusOK(getStatusFromCommandResult(infoObj));
+
+                        return Status::OK();
+                    });
             } catch (const DBException& ex) {
                 ab.append(false);
                 result->append("applied", ++(*numApplied));
@@ -274,7 +309,8 @@ Status _checkPrecondition(OperationContext* opCtx,
 
         // applyOps does not allow any extensions, such as $text, $where, $geoNear, $near,
         // $nearSphere, or $expr.
-        Matcher matcher(preCondition["res"].Obj(), collator);
+        boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
+        Matcher matcher(preCondition["res"].Obj(), std::move(expCtx));
         if (!matcher.matches(realres)) {
             result->append("got", realres);
             result->append("whatFailed", preCondition);
@@ -338,6 +374,7 @@ Status applyOps(OperationContext* opCtx,
 
     // Perform write ops atomically
     invariant(globalWriteLock);
+
     try {
         writeConflictRetry(opCtx, "applyOps", dbName, [&] {
             BSONObjBuilder intermediateResult;
@@ -375,9 +412,8 @@ Status applyOps(OperationContext* opCtx,
             result->appendElements(intermediateResult.obj());
         });
     } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::NamespaceNotFound) {
-            // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
-            // within an active WriteUnitOfWork.
+        if (ex.code() == ErrorCodes::AtomicityFailure) {
+            // Retry in non-atomic mode.
             return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied);
         }
         BSONArrayBuilder ab;

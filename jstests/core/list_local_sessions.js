@@ -3,8 +3,9 @@
 (function() {
     'use strict';
 
+    const admin = db.getSisterDB('admin');
     function listLocalSessions() {
-        return db.aggregate([{'$listLocalSessions': {allUsers: false}}]);
+        return admin.aggregate([{'$listLocalSessions': {allUsers: false}}]);
     }
 
     // Start a new session and capture its sessionId.
@@ -38,8 +39,15 @@
         return {user: authUsers[0].user, db: authUsers[0].db};
     })();
     function listMyLocalSessions() {
-        return db.aggregate([{'$listLocalSessions': {users: [myusername]}}]);
+        return admin.aggregate([{'$listLocalSessions': {users: [myusername]}}]);
     }
-    const myArray = assert.doesNotThrow(listMyLocalSessions).toArray();
-    assert.eq(myArray.length, resultArray.length);
+    const myArray = assert.doesNotThrow(listMyLocalSessions)
+                        .toArray()
+                        .map(function(sess) {
+                            return sess._id.id;
+                        })
+                        .filter(function(id) {
+                            return 0 == bsonWoCompare({x: id}, {x: myid});
+                        });
+    assert.eq(0, bsonWoCompare(myArray, resultArrayMine));
 })();

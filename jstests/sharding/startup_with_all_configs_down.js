@@ -5,6 +5,11 @@
 // This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
 // A restarted standalone will lose all data when using an ephemeral storage engine.
 // @tags: [requires_persistence]
+
+// The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
+// test restarts a shard, so the cached connection is not usable.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 

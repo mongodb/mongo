@@ -18,8 +18,8 @@
 
     var name = "command_response_operation_time";
 
-    var replTest =
-        new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}});
+    var replTest = new ReplSetTest(
+        {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}, waitForKeys: true});
 
     if (!startSetIfSupportsReadMajority(replTest)) {
         jsTestLog("Skipping test since storage engine doesn't support majority read concern.");

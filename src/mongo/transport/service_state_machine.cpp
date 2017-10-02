@@ -178,16 +178,16 @@ private:
 
 std::shared_ptr<ServiceStateMachine> ServiceStateMachine::create(ServiceContext* svcContext,
                                                                  transport::SessionHandle session,
-                                                                 bool sync) {
-    return std::make_shared<ServiceStateMachine>(svcContext, std::move(session), sync);
+                                                                 transport::Mode transportMode) {
+    return std::make_shared<ServiceStateMachine>(svcContext, std::move(session), transportMode);
 }
 
 ServiceStateMachine::ServiceStateMachine(ServiceContext* svcContext,
                                          transport::SessionHandle session,
-                                         bool sync)
+                                         transport::Mode transportMode)
     : _state{State::Created},
       _sep{svcContext->getServiceEntryPoint()},
-      _sync(sync),
+      _transportMode(transportMode),
       _serviceContext(svcContext),
       _sessionHandle(session),
       _dbClient{svcContext->makeClient("conn", std::move(session))},
@@ -208,7 +208,7 @@ void ServiceStateMachine::_sourceCallback(Status status) {
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
         return _scheduleFunc([this, status] { _sourceCallback(status); },
-                             ServiceExecutor::DeferredTask);
+                             ServiceExecutor::kDeferredTask);
     }
 
     // Make sure we just called sourceMessage();
@@ -225,8 +225,7 @@ void ServiceStateMachine::_sourceCallback(Status status) {
         // If this callback doesn't own the ThreadGuard, then we're being called recursively,
         // and the executor shouldn't start a new thread to process the message - it can use this
         // one just after this returns.
-        auto flags = guard.isOwner() ? ServiceExecutor::EmptyFlags : ServiceExecutor::DeferredTask;
-        return scheduleNext(flags);
+        return scheduleNext(ServiceExecutor::kMayRecurse);
     } else if (ErrorCodes::isInterruption(status.code()) ||
                ErrorCodes::isNetworkError(status.code())) {
         LOG(2) << "Session from " << remote << " encountered a network error during SourceMessage";
@@ -255,7 +254,7 @@ void ServiceStateMachine::_sinkCallback(Status status) {
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
         return _scheduleFunc([this, status] { _sinkCallback(status); },
-                             ServiceExecutor::DeferredTask);
+                             ServiceExecutor::kDeferredTask);
     }
 
     invariant(state() == State::SinkWait);
@@ -276,16 +275,7 @@ void ServiceStateMachine::_sinkCallback(Status status) {
         _state.store(State::Source);
     }
 
-    // If the session ended, then runNext to clean it up
-    if (state() == State::EndSession) {
-        _runNextInGuard(guard);
-    } else {  // Otherwise scheduleNext to unwind the stack and run the next step later
-        // If this callback doesn't own the ThreadGuard, then we're being called recursively,
-        // and the executor shouldn't start a new thread to process the message - it can use this
-        // one just after this returns.
-        auto flags = guard.isOwner() ? ServiceExecutor::EmptyFlags : ServiceExecutor::DeferredTask;
-        return scheduleNext(flags);
-    }
+    return scheduleNext(ServiceExecutor::kDeferredTask | ServiceExecutor::kMayYieldBeforeSchedule);
 }
 
 void ServiceStateMachine::_processMessage(ThreadGuard& guard) {
@@ -347,16 +337,18 @@ void ServiceStateMachine::_processMessage(ThreadGuard& guard) {
         auto ticket = _session()->sinkMessage(toSink);
 
         _state.store(State::SinkWait);
-        if (_sync) {
+        if (_transportMode == transport::Mode::kSynchronous) {
             _sinkCallback(_session()->getTransportLayer()->wait(std::move(ticket)));
-        } else {
+        } else if (_transportMode == transport::Mode::kAsynchronous) {
             _session()->getTransportLayer()->asyncWait(
                 std::move(ticket), [this](Status status) { _sinkCallback(status); });
+        } else {
+            MONGO_UNREACHABLE;
         }
     } else {
         _state.store(State::Source);
         _inMessage.reset();
-        return scheduleNext(ServiceExecutor::DeferredTask);
+        return scheduleNext(ServiceExecutor::kDeferredTask);
     }
 }
 
@@ -368,7 +360,7 @@ void ServiceStateMachine::runNext() {
     // runNext() so that this thread can do other useful work with its timeslice instead of going
     // to sleep while waiting for the SSM to be released.
     if (!guard) {
-        return scheduleNext(ServiceExecutor::DeferredTask);
+        return scheduleNext(ServiceExecutor::kDeferredTask);
     }
     return _runNextInGuard(guard);
 }
@@ -392,16 +384,18 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard& guard) {
 
                 auto ticket = _session()->sourceMessage(&_inMessage);
                 _state.store(State::SourceWait);
-                if (_sync) {
+                if (_transportMode == transport::Mode::kSynchronous) {
                     _sourceCallback([this](auto ticket) {
                         MONGO_IDLE_THREAD_BLOCK;
                         return _session()->getTransportLayer()->wait(std::move(ticket));
                     }(std::move(ticket)));
-                } else {
+                } else if (_transportMode == transport::Mode::kAsynchronous) {
                     _session()->getTransportLayer()->asyncWait(
                         std::move(ticket), [this](Status status) { _sourceCallback(status); });
-                    break;
+                } else {
+                    MONGO_UNREACHABLE;
                 }
+                break;
             }
             case State::Process:
                 _processMessage(guard);
@@ -412,10 +406,6 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard& guard) {
                 break;
             default:
                 MONGO_UNREACHABLE;
-        }
-
-        if ((_counter++ & 0xf) == 0) {
-            markThreadIdle();
         }
 
         if (state() == State::EndSession) {
@@ -436,7 +426,7 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard& guard) {
 }
 
 void ServiceStateMachine::scheduleNext(ServiceExecutor::ScheduleFlags flags) {
-    _maybeScheduleFunc(_serviceContext->getServiceExecutor(), [this] { runNext(); }, flags);
+    _scheduleFunc([this] { runNext(); }, flags);
 }
 
 void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask tags) {
@@ -460,27 +450,21 @@ ServiceStateMachine::State ServiceStateMachine::state() {
     return _state.load();
 }
 
+void ServiceStateMachine::_terminateAndLogIfError(Status status) {
+    if (!status.isOK()) {
+        warning(logger::LogComponent::kExecutor) << "Terminating session due to error: " << status;
+        terminateIfTagsDontMatch(transport::Session::kEmptyTagMask);
+    }
+}
+
 void ServiceStateMachine::_cleanupSession(ThreadGuard& guard) {
     _state.store(State::Ended);
-
-    auto tl = _session()->getTransportLayer();
-    auto remote = _session()->remote();
 
     _inMessage.reset();
 
     // By ignoring the return value of Client::releaseCurrent() we destroy the session.
     // _dbClient is now nullptr and _dbClientPtr is invalid and should never be accessed.
     Client::releaseCurrent();
-
-    if (!serverGlobalParams.quiet.load()) {
-        // Get the number of open sessions minus 1 (this one will get cleaned up when
-        // this SSM gets destroyed)
-        // TODO Swich to using ServiceEntryPointImpl::getNumberOfConnections(), or move this
-        // into the ServiceEntryPoint
-        auto conns = tl->sessionStats().numOpenSessions - 1;
-        const char* word = (conns == 1 ? " connection" : " connections");
-        log() << "end connection " << remote << " (" << conns << word << " now open)";
-    }
 }
 
 }  // namespace mongo

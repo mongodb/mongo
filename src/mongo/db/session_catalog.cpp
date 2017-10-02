@@ -104,6 +104,8 @@ boost::optional<UUID> SessionCatalog::getTransactionTableUUID(OperationContext* 
 }
 
 void SessionCatalog::onStepUp(OperationContext* opCtx) {
+    invalidateSessions(opCtx, boost::none);
+
     DBDirectClient client(opCtx);
 
     const size_t initialExtentSize = 0;
@@ -155,15 +157,50 @@ ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx)
 
 ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
                                                  const LogicalSessionId& lsid) {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->getLogicalSessionId());
+    invariant(!opCtx->getTxnNumber());
 
-    return ScopedSession(_getOrCreateSessionRuntimeInfo(opCtx, lsid, ul));
+    auto ss = [&] {
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
+        return ScopedSession(_getOrCreateSessionRuntimeInfo(opCtx, lsid, ul));
+    }();
+
+    // Perform the refresh outside of the mutex
+    ss->refreshFromStorageIfNeeded(opCtx);
+
+    return ss;
 }
 
-void SessionCatalog::resetSessions() {
+void SessionCatalog::invalidateSessions(OperationContext* opCtx,
+                                        boost::optional<BSONObj> singleSessionDoc) {
+    uassert(40528,
+            str::stream() << "Direct writes against "
+                          << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                          << " cannot be performed using a transaction or on a session.",
+            !opCtx->getLogicalSessionId());
+
+    const auto invalidateSessionFn = [&](WithLock, SessionRuntimeInfoMap::iterator it) {
+        auto& sri = it->second;
+        sri->txnState.invalidate();
+        _txnTable.erase(it);
+    };
+
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    for (const auto& it : _txnTable) {
-        it.second->txnState.reset();
+
+    if (singleSessionDoc) {
+        const auto lsid = LogicalSessionId::parse(IDLParserErrorContext("lsid"),
+                                                  singleSessionDoc->getField("_id").Obj());
+
+        auto it = _txnTable.find(lsid);
+        if (it != _txnTable.end()) {
+            invalidateSessionFn(lg, it);
+        }
+    } else {
+        auto it = _txnTable.begin();
+        while (it != _txnTable.end()) {
+            invalidateSessionFn(lg, it++);
+        }
     }
 }
 
@@ -192,8 +229,18 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
     sri->availableCondVar.notify_one();
 }
 
-OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opCtx(opCtx) {
+OperationContextSession::OperationContextSession(OperationContext* opCtx, bool checkOutSession)
+    : _opCtx(opCtx) {
     if (!opCtx->getLogicalSessionId()) {
+        return;
+    }
+
+    if (!checkOutSession) {
+        // The session may have already been checked out by this operation, so bump the nesting
+        // level if necessary to avoid resetting the session when this command completes.
+        if (auto& checkedOutSession = operationSessionDecoration(opCtx)) {
+            checkedOutSession->checkOutNestingLevel++;
+        }
         return;
     }
 
@@ -212,8 +259,10 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opC
         return;
     }
 
+    checkedOutSession->scopedSession->refreshFromStorageIfNeeded(opCtx);
+
     if (opCtx->getTxnNumber()) {
-        checkedOutSession->scopedSession->begin(opCtx, opCtx->getTxnNumber().get());
+        checkedOutSession->scopedSession->beginTxn(opCtx, *opCtx->getTxnNumber());
     }
 }
 

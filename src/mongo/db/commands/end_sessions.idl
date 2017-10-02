@@ -1,0 +1,28 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+global:
+  cpp_namespace: "mongo"
+
+imports:
+  - "mongo/db/logical_session_id.idl"
+
+structs:
+
+  EndSessionsCmdFromClient:
+    description: "A struct representing an endSessions command from a client"
+    strict: false
+    fields:
+      endSessions: array<LogicalSessionFromClient>

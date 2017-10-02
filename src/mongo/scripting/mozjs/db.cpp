@@ -56,16 +56,6 @@ void DBInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool*
     ObjectWrapper parentWrapper(cx, parent);
     ObjectWrapper o(cx, obj);
 
-    // Check if this exists on the parent, ie. DBCollection::resolve case
-    if (parentWrapper.hasOwnField(id)) {
-        parentWrapper.getValue(id, &coll);
-
-        o.defineProperty(id, coll, 0);
-
-        *resolvedp = true;
-        return;
-    }
-
     IdWrapper idw(cx, id);
 
     // if starts with '_' we dont return collection, one must use getCollection()
@@ -75,6 +65,22 @@ void DBInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool*
         if (sname.size() == 0 || sname[0] == '_') {
             return;
         }
+
+        // SpiderMonkey will call resolve even for __proto__ so acknowledge it exists.
+        if (sname == "__proto__"_sd) {
+            *resolvedp = true;
+            return;
+        }
+    }
+
+    // Check if this exists on the parent, ie. DBCollection::resolve case
+    if (parentWrapper.hasOwnField(id)) {
+        parentWrapper.getValue(id, &coll);
+
+        o.defineProperty(id, coll, 0);
+
+        *resolvedp = true;
+        return;
     }
 
     // no hit, create new collection

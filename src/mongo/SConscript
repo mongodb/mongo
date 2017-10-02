@@ -444,12 +444,17 @@ if not has_option('noshell') and usemozjs:
     mongo_shell = shellEnv.Program(
         "mongo",
         ["shell/dbshell.cpp"] + env.WindowsResourceFile("shell/shell.rc"),
-        LIBDEPS=["$BUILD_DIR/third_party/shim_pcrecpp",
-                 "shell_core",
-                 "db/server_options_core",
-                 "client/clientdriver",
-                 "$BUILD_DIR/mongo/util/password",
-                 ])
+        LIBDEPS=[
+            "$BUILD_DIR/third_party/shim_pcrecpp",
+            "shell_core",
+            "db/server_options_core",
+            "client/clientdriver",
+            "$BUILD_DIR/mongo/util/password",
+        ],
+        LIBDEPS_PRIVATE=[
+            "$BUILD_DIR/mongo/client/connection_string",
+        ]
+    )
 
     shellEnv.Install( '#/', mongo_shell )
 else:

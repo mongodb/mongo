@@ -99,8 +99,7 @@ public:
         Collection* coll,
         BSONObj& filterObj,
         PlanExecutor::YieldPolicy yieldPolicy = PlanExecutor::YieldPolicy::YIELD_MANUAL,
-        bool tailable = false,
-        bool awaitData = false) {
+        TailableMode tailableMode = TailableMode::kNormal) {
         CollectionScanParams csparams;
         csparams.collection = coll;
         csparams.direction = CollectionScanParams::FORWARD;
@@ -109,8 +108,7 @@ public:
         // Canonicalize the query.
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(filterObj);
-        qr->setTailable(tailable);
-        qr->setAwaitData(awaitData);
+        qr->setTailableMode(tailableMode);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
@@ -306,10 +304,10 @@ TEST_F(PlanExecutorTest, ShouldReportEOFIfExceedsTimeLimitDuringYieldButIsTailab
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
     Collection* coll = ctx.getCollection();
-    const bool tailable = true;
-    const bool awaitData = true;
-    auto exec = makeCollScanExec(
-        coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, tailable, awaitData);
+    auto exec = makeCollScanExec(coll,
+                                 filterObj,
+                                 PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT,
+                                 TailableMode::kTailableAndAwaitData);
 
     BSONObj resultObj;
     ASSERT_EQ(PlanExecutor::IS_EOF, exec->getNext(&resultObj, nullptr));
@@ -323,9 +321,8 @@ TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailabl
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
     Collection* coll = ctx.getCollection();
-    const bool tailable = true;
-    auto exec =
-        makeCollScanExec(coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, tailable);
+    auto exec = makeCollScanExec(
+        coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, TailableMode::kTailable);
 
     BSONObj resultObj;
     ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));

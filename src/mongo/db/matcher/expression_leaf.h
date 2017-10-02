@@ -127,6 +127,11 @@ protected:
 
     // Collator used to compare elements. By default, simple binary comparison will be used.
     const CollatorInterface* _collator = nullptr;
+
+private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
 };
 
 class EqualityMatchExpression : public ComparisonMatchExpression {
@@ -201,13 +206,6 @@ public:
 
 class RegexMatchExpression : public LeafMatchExpression {
 public:
-    /**
-     * Maximum pattern size which pcre v8.3 can do matches correctly with
-     * LINK_SIZE define macro set to 2 @ pcre's config.h (based on
-     * experiments)
-     */
-    static const size_t MaxPatternSize = 32764;
-
     RegexMatchExpression();
     ~RegexMatchExpression();
 
@@ -243,6 +241,10 @@ public:
     }
 
 private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+
     std::string _regex;
     std::string _flags;
     std::unique_ptr<pcrecpp::RE> _re;
@@ -279,6 +281,10 @@ public:
     }
 
 private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+
     int _divisor;
     int _remainder;
 };
@@ -305,6 +311,11 @@ public:
     virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
+
+private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
 };
 
 /**
@@ -359,6 +370,8 @@ public:
     }
 
 private:
+    ExpressionOptimizerFunc getOptimizer() const final;
+
     // Whether or not '_equalities' has a jstNULL element in it.
     bool _hasNull = false;
 
@@ -428,6 +441,10 @@ protected:
     }
 
 private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+
     /**
      * Performs bit test using bit positions on 'eValue' and returns whether or not the bit test
      * passes.

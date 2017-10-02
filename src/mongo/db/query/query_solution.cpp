@@ -247,6 +247,7 @@ QuerySolutionNode* CollectionScanNode::clone() const {
     copy->tailable = this->tailable;
     copy->direction = this->direction;
     copy->maxScan = this->maxScan;
+    copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
 
     return copy;
 }

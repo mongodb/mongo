@@ -32,7 +32,7 @@ function optimesAreEqual(replTest) {
     return true;
 }
 
-var replTest = new ReplSetTest({name: "replStatus", nodes: 3, oplogSize: 1});
+var replTest = new ReplSetTest({name: "replStatus", nodes: 3, oplogSize: 1, waitForKeys: true});
 
 replTest.startSet();
 replTest.initiate();

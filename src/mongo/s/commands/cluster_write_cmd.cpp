@@ -314,7 +314,8 @@ private:
                                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                 dbName,
                                 requests,
-                                readPref);
+                                readPref,
+                                Shard::RetryPolicy::kNoRetry);
 
         // Receive the responses.
 

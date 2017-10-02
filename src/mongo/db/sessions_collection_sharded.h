@@ -48,8 +48,7 @@ public:
      * or equal to the current time.
      */
     Status refreshSessions(OperationContext* opCtx,
-                           const LogicalSessionRecordSet& sessions,
-                           Date_t refreshTime) override;
+                           const LogicalSessionRecordSet& sessions) override;
 
     /**
      * Removes the authoritative records for the specified sessions.
@@ -58,6 +57,9 @@ public:
 
     StatusWith<LogicalSessionIdSet> findRemovedSessions(
         OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
+
+    Status removeTransactionRecords(OperationContext* opCtx,
+                                    const LogicalSessionIdSet& sessions) override;
 };
 
 }  // namespace mongo

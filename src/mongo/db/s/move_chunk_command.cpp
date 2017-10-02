@@ -202,7 +202,7 @@ private:
                                           moveChunkRequest.getNss().ns(),
                                           moveChunkRequest.getMinKey(),
                                           moveChunkRequest.getMaxKey(),
-                                          7,  // Total number of steps
+                                          6,  // Total number of steps
                                           &unusedErrMsg,
                                           moveChunkRequest.getToShardId(),
                                           moveChunkRequest.getFromShardId());
@@ -210,68 +210,28 @@ private:
         moveTimingHelper.done(1);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep1);
 
-        BSONObj shardKeyPattern;
+        MigrationSourceManager migrationSourceManager(
+            opCtx, moveChunkRequest, donorConnStr, recipientHost);
 
-        {
-            MigrationSourceManager migrationSourceManager(
-                opCtx, moveChunkRequest, donorConnStr, recipientHost);
+        moveTimingHelper.done(2);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
 
-            shardKeyPattern = migrationSourceManager.getKeyPattern().getOwned();
+        uassertStatusOKWithWarning(migrationSourceManager.startClone(opCtx));
+        moveTimingHelper.done(3);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
 
-            moveTimingHelper.done(2);
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
+        uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp(opCtx));
+        moveTimingHelper.done(4);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
 
-            uassertStatusOKWithWarning(migrationSourceManager.startClone(opCtx));
-            moveTimingHelper.done(3);
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
+        uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(opCtx));
+        uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(opCtx));
+        moveTimingHelper.done(5);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
 
-            uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp(opCtx));
-            moveTimingHelper.done(4);
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
-
-            uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(opCtx));
-            uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(opCtx));
-            moveTimingHelper.done(5);
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
-
-            uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(opCtx));
-        }
+        uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(opCtx));
         moveTimingHelper.done(6);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
-
-        auto nss = moveChunkRequest.getNss();
-        const auto range = ChunkRange(moveChunkRequest.getMinKey(), moveChunkRequest.getMaxKey());
-
-        // Wait for the metadata update to be persisted in order to avoid orphaned documents from
-        // starting to get deleted before the metadata changes have propagated to the secondaries.
-        auto notification = [&] {
-            CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
-
-            auto const whenToClean = moveChunkRequest.getWaitForDelete()
-                ? CollectionShardingState::kNow
-                : CollectionShardingState::kDelayed;
-
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-
-            return CollectionShardingState::get(opCtx, nss)->cleanUpRange(range, whenToClean);
-        }();
-
-        // Check for immediate failure on scheduling range deletion.
-        if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
-            warning() << "Failed to initiate cleanup of " << nss.ns() << " range "
-                      << redact(range.toString())
-                      << " due to: " << redact(notification.waitStatus(opCtx));
-        } else if (moveChunkRequest.getWaitForDelete()) {
-            log() << "Waiting for cleanup of " << nss.ns() << " range " << redact(range.toString());
-            uassertStatusOK(notification.waitStatus(opCtx));
-        } else {
-            log() << "Leaving cleanup of " << nss.ns() << " range " << redact(range.toString())
-                  << " to complete in background";
-            notification.abandon();
-        }
-
-        moveTimingHelper.done(7);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep7);
     }
 
 } moveChunkCmd;

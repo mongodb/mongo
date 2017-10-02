@@ -50,6 +50,7 @@ DEST_TO_CONFIG = {
     "storage_engine_cache_size": "storageEngineCacheSizeGB",
     "tag_file": "tagFile",
     "task_id": "taskId",
+    "transport_layer": "transportLayer",
     "wt_coll_config": "wiredTigerCollectionConfigString",
     "wt_engine_config": "wiredTigerEngineConfigString",
     "wt_index_config": "wiredTigerIndexConfigString"
@@ -194,6 +195,9 @@ def parse_command_line():
     parser.add_option("--serviceExecutor", dest="service_executor", metavar="EXECUTOR",
                       help="The service executor used by jstests")
 
+    parser.add_option("--transportLayer", dest="transport_layer", metavar="TRANSPORT",
+                      help="The transport layer used by jstests")
+
     parser.add_option("--shellReadMode", type="choice", action="store", dest="shell_read_mode",
                       choices=("commands", "compatibility", "legacy"), metavar="READ_MODE",
                       help="The read mode used by the mongo shell.")
@@ -295,9 +299,9 @@ def update_config_vars(values):
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpathPrefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest"))
     _config.DRY_RUN = config.pop("dryRun")
-    _config.EXCLUDE_WITH_ANY_TAGS = config.pop("excludeWithAnyTags")
+    _config.EXCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("excludeWithAnyTags"))
     _config.FAIL_FAST = not config.pop("continueOnFailure")
-    _config.INCLUDE_WITH_ANY_TAGS = config.pop("includeWithAnyTags")
+    _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("includeWithAnyTags"))
     _config.JOBS = config.pop("jobs")
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod"))
@@ -319,6 +323,7 @@ def update_config_vars(values):
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
     _config.TAG_FILE = config.pop("tagFile")
     _config.TASK_ID = config.pop("taskId")
+    _config.TRANSPORT_LAYER = config.pop("transportLayer")
     _config.WT_COLL_CONFIG = config.pop("wiredTigerCollectionConfigString")
     _config.WT_ENGINE_CONFIG = config.pop("wiredTigerEngineConfigString")
     _config.WT_INDEX_CONFIG = config.pop("wiredTigerIndexConfigString")
@@ -386,7 +391,6 @@ def get_suites(values, args):
                                                          _config.INCLUDE_WITH_ANY_TAGS))
         # Build configuration for list of files to run.
         suite_roots = _get_suite_roots(args)
-
 
     suite_files = values.suite_files.split(",")
 
@@ -482,3 +486,17 @@ def _expand_user(pathname):
     if pathname is None:
         return None
     return os.path.expanduser(pathname)
+
+
+def _tags_from_list(tags_list):
+    """
+    Returns the list of tags from a list of tag parameter values.
+
+    Each parameter value in the list may be a list of comma separated tags, with empty strings
+    ignored.
+    """
+    tags = []
+    if tags_list is not None:
+        for tag in tags_list:
+            tags.extend([t for t in tag.split(",") if t != ""])
+    return tags

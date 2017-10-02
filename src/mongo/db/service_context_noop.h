@@ -47,10 +47,6 @@ public:
 
     StorageFactoriesIterator* makeStorageFactoriesIterator() override;
 
-    void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
-
-    OpObserver* getOpObserver() override;
-
 private:
     std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 };

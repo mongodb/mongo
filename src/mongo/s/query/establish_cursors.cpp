@@ -61,7 +61,12 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishCursor
     }
 
     // Send the requests
-    AsyncRequestsSender ars(opCtx, executor, nss.db().toString(), std::move(requests), readPref);
+    AsyncRequestsSender ars(opCtx,
+                            executor,
+                            nss.db().toString(),
+                            std::move(requests),
+                            readPref,
+                            Shard::RetryPolicy::kIdempotent);
 
     // Get the responses
     std::vector<ClusterClientCursorParams::RemoteCursor> remoteCursors;

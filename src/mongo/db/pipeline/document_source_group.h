@@ -69,6 +69,14 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    StageConstraints constraints() const final {
+        return {StreamType::kBlocking,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kWritesTmpData,
+                FacetRequirement::kAllowed};
+    }
+
     /**
      * Add an accumulator, which will become a field in each Document that results from grouping.
      */
@@ -176,7 +184,7 @@ private:
 
     // Only used when '_spilled' is true.
     std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
-    const bool _extSortAllowed;
+    const bool _allowDiskUse;
 
     std::pair<Value, Value> _firstPartOfNextGroup;
     // Only used when '_sorted' is true.

@@ -202,7 +202,9 @@ Status handleOplogUpdate(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    UpdateDriver::Options updateOptions;
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr));
+    UpdateDriver::Options updateOptions(std::move(expCtx));
+    updateOptions.modOptions.fromOplogApplication = true;
     UpdateDriver driver(updateOptions);
 
     // Oplog updates do not have array filters.

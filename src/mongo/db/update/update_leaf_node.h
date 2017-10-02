@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/update/update_node.h"
 
 namespace mongo {
@@ -47,11 +48,12 @@ public:
      * root["$set"]["a.b"]. Returns a non-OK status if the value in 'modExpr' is invalid for the
      * type of leaf node. 'modExpr' must not be empty.
      *
-     * Some leaf nodes require a collator during initialization. For example, $pull requires a
-     * collator to construct a MatchExpression that will be used for applying updates across
-     * multiple documents.
+     * Some leaf nodes require an ExpressionContext during initialization. For example, $pull
+     * requires an ExpressionContext to construct a MatchExpression that will be used for applying
+     * updates across multiple documents.
      */
-    virtual Status init(BSONElement modExpr, const CollatorInterface* collator) = 0;
+    virtual Status init(BSONElement modExpr,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
 
     /* Check if it would be possible to create the path at 'pathToCreate' but don't actually create
      * it. If 'element' is not an embedded object or array (e.g., we are trying to create path

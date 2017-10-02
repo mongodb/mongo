@@ -100,14 +100,26 @@ env.Library(
 )
 
 env.Library(
+    target='rs_local_client',
+    source=[
+        'rs_local_client.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl'
+    ],
+)
+
+env.Library(
     target='shard_local',
     source=[
         'shard_local.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
+        'rs_local_client',
         'shard_interface'
     ],
 )

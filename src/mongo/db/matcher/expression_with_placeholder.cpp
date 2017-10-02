@@ -89,8 +89,8 @@ const std::regex ExpressionWithPlaceholder::placeholderRegex("^[a-z][a-zA-Z0-9]*
 
 // static
 StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> ExpressionWithPlaceholder::parse(
-    BSONObj rawFilter, const CollatorInterface* collator) {
-    StatusWithMatchExpression statusWithFilter = MatchExpressionParser::parse(rawFilter, collator);
+    BSONObj rawFilter, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    StatusWithMatchExpression statusWithFilter = MatchExpressionParser::parse(rawFilter, expCtx);
 
     if (!statusWithFilter.isOK()) {
         return statusWithFilter.getStatus();

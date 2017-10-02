@@ -111,7 +111,8 @@ public:
      */
     virtual Status insertDocument(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  const TimestampedBSONObj& doc) = 0;
+                                  const TimestampedBSONObj& doc,
+                                  long long term) = 0;
 
     /**
      * Inserts the given documents, with associated timestamps and statement id's, into the

@@ -48,6 +48,14 @@ public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 
+    StageConstraints constraints() const final {
+        return {StreamType::kBlocking,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kWritesTmpData,
+                FacetRequirement::kAllowed};
+    }
+
     /**
      * The $bucketAuto stage must be run on the merging shard.
      */

@@ -80,7 +80,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock
                                                  boost::optional<LogicalSessionId> lsid)
     : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {}
 
-StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
+StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(
+    RouterExecStage::ExecContext execContext) {
     // First return stashed results, if there are any.
     if (!_stash.empty()) {
         auto front = std::move(_stash.front());
@@ -89,7 +90,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
         return {front};
     }
 
-    auto next = _root->next();
+    auto next = _root->next(execContext);
     if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
     }
@@ -109,7 +110,11 @@ void ClusterClientCursorImpl::detachFromOperationContext() {
 }
 
 bool ClusterClientCursorImpl::isTailable() const {
-    return _params.isTailable;
+    return _params.tailableMode != TailableMode::kNormal;
+}
+
+bool ClusterClientCursorImpl::isTailableAndAwaitData() const {
+    return _params.tailableMode == TailableMode::kTailableAndAwaitData;
 }
 
 UserNameIterator ClusterClientCursorImpl::getAuthenticatedUsers() const {
@@ -148,7 +153,13 @@ namespace {
  * sort key pattern of such a $sort stage if there was one, and boost::none otherwise.
  */
 boost::optional<BSONObj> extractLeadingSort(Pipeline* mergePipeline) {
-    if (auto frontSort = mergePipeline->popFrontStageWithName(DocumentSourceSort::kStageName)) {
+    // Remove a leading $sort iff it is a mergesort, since the ARM cannot handle blocking $sort.
+    auto frontSort = mergePipeline->popFrontWithCriteria(
+        DocumentSourceSort::kStageName, [](const DocumentSource* const source) {
+            return static_cast<const DocumentSourceSort* const>(source)->mergingPresorted();
+        });
+
+    if (frontSort) {
         auto sortStage = static_cast<DocumentSourceSort*>(frontSort.get());
         if (auto sortLimit = sortStage->getLimitSrc()) {
             // There was a limit stage absorbed into the sort stage, so we need to preserve that.
@@ -193,10 +204,10 @@ std::unique_ptr<RouterExecStage> buildPipelinePlan(executor::TaskExecutor* execu
     // instead.
     while (!pipeline->getSources().empty()) {
         invariant(isSkipOrLimit(pipeline->getSources().front()));
-        if (auto skip = pipeline->popFrontStageWithName(DocumentSourceSkip::kStageName)) {
+        if (auto skip = pipeline->popFrontWithCriteria(DocumentSourceSkip::kStageName)) {
             root = stdx::make_unique<RouterStageSkip>(
                 opCtx, std::move(root), static_cast<DocumentSourceSkip*>(skip.get())->getSkip());
-        } else if (auto limit = pipeline->popFrontStageWithName(DocumentSourceLimit::kStageName)) {
+        } else if (auto limit = pipeline->popFrontWithCriteria(DocumentSourceLimit::kStageName)) {
             root = stdx::make_unique<RouterStageLimit>(
                 opCtx, std::move(root), static_cast<DocumentSourceLimit*>(limit.get())->getLimit());
         }

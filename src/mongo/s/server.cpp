@@ -177,6 +177,10 @@ ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 static ExitCode initService();
 #endif
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 // NOTE: This function may be called at any time after
 // registerShutdownTask is called below. It must not depend on the
 // prior execution of mongo initializers or the existence of threads.
@@ -220,6 +224,37 @@ static void cleanupTask() {
         if (auto catalog = Grid::get(opCtx)->catalogClient()) {
             catalog->shutDown(opCtx);
         }
+
+#if __has_feature(address_sanitizer)
+        // When running under address sanitizer, we get false positive leaks due to disorder around
+        // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
+        // harder to dry up the server from active connections before going on to really shut down.
+
+        // Shutdown the TransportLayer so that new connections aren't accepted
+        if (auto tl = serviceContext->getTransportLayer()) {
+            log(LogComponent::kNetwork)
+                << "shutdown: going to close all sockets because ASAN is active...";
+
+            tl->shutdown();
+        }
+
+        // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
+        if (auto sep = serviceContext->getServiceEntryPoint()) {
+            if (!sep->shutdown(Seconds(10))) {
+                log(LogComponent::kNetwork)
+                    << "Service entry point failed to shutdown within timelimit.";
+            }
+        }
+
+        // Shutdown and wait for the service executor to exit
+        if (auto svcExec = serviceContext->getServiceExecutor()) {
+            Status status = svcExec->shutdown(Seconds(5));
+            if (!status.isOK()) {
+                log(LogComponent::kNetwork)
+                    << "Service executor failed to shutdown within timelimit: " << status.reason();
+            }
+        }
+#endif
 
         // Shutdown Full-Time Data Capture
         stopMongoSFTDC();
@@ -293,8 +328,9 @@ static Status initializeSharding(OperationContext* opCtx) {
 
 static void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
-    // connect to version supporting Write Concern only
-    spec.outgoing.minWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    // Since the upgrade order calls for upgrading mongos last, it only needs to talk the latest
+    // wire version. This ensures that users will get errors if they upgrade in the wrong order.
+    spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
     spec.isInternalClient = true;
@@ -411,12 +447,10 @@ static ExitCode runMongosServer() {
         return EXIT_NET_ERROR;
     }
 
-    if (auto svcExec = getGlobalServiceContext()->getServiceExecutor()) {
-        start = svcExec->start();
-        if (!start.isOK()) {
-            error() << "Failed to start the service executor: " << start;
-            return EXIT_NET_ERROR;
-        }
+    start = getGlobalServiceContext()->getServiceExecutor()->start();
+    if (!start.isOK()) {
+        error() << "Failed to start the service executor: " << start;
+        return EXIT_NET_ERROR;
     }
 
     getGlobalServiceContext()->notifyStartupComplete();

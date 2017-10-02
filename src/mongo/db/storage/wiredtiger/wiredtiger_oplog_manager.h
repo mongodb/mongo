@@ -67,16 +67,12 @@ public:
                                                  OperationContext* opCtx) const;
 
 private:
-    // TIMESTAMP_SIZE is configured to be 8 bytes, and so its hexadecimal string representation
-    // is 2 characters per byte (00 through FF), plus one more for the null terminator.
-    static const int TIMESTAMP_BUF_SIZE = 2 * /*TIMESTAMP_SIZE*/ 8 + 1;
-
     void _oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
                                  WiredTigerRecordStore* oplogRecordStore) noexcept;
 
-    void _setOplogReadTimestamp(char buf[TIMESTAMP_BUF_SIZE]);
+    void _setOplogReadTimestamp(uint64_t newTimestamp);
 
-    void _fetchAllCommittedValue(WT_CONNECTION* conn, char buf[TIMESTAMP_BUF_SIZE]);
+    uint64_t _fetchAllCommittedValue(WT_CONNECTION* conn);
 
     stdx::thread _oplogJournalThread;
     mutable stdx::mutex _oplogVisibilityStateMutex;

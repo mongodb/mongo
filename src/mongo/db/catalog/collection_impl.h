@@ -284,6 +284,7 @@ public:
      * Returns a non-ok Status if validator is not legal for this collection.
      */
     StatusWithMatchExpression parseValidator(
+        OperationContext* opCtx,
         const BSONObj& validator,
         MatchExpressionParser::AllowedFeatureSet allowedFeatures) const final;
 

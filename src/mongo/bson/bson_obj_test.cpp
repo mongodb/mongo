@@ -29,6 +29,7 @@
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/platform/decimal128.h"
@@ -525,6 +526,8 @@ TEST(BSONObjCompare, BSONObjHashingIgnoresTopLevelFieldNamesWhenRequested) {
     ASSERT_NE(bsonCmpConsiderFieldNames.hash(obj1), bsonCmpConsiderFieldNames.hash(obj2));
     ASSERT_EQ(bsonCmpIgnoreFieldNames.hash(obj1), bsonCmpIgnoreFieldNames.hash(obj2));
     ASSERT_NE(bsonCmpIgnoreFieldNames.hash(obj1), bsonCmpIgnoreFieldNames.hash(obj3));
+    ASSERT_NE(bsonCmpIgnoreFieldNames.hash(fromjson("{a: {b: 1, c: 1}, d: 1}")),
+              bsonCmpIgnoreFieldNames.hash(fromjson("{a: {b: 1, c: 2}, d: 1}")));
 }
 
 TEST(BSONObjCompare, BSONElementHashingIgnoresEltFieldNameWhenRequested) {
@@ -542,6 +545,50 @@ TEST(BSONObjCompare, BSONElementHashingIgnoresEltFieldNameWhenRequested) {
               bsonCmpIgnoreFieldNames.hash(obj2.firstElement()));
     ASSERT_NE(bsonCmpIgnoreFieldNames.hash(obj1.firstElement()),
               bsonCmpIgnoreFieldNames.hash(obj3.firstElement()));
+}
+
+TEST(BSONObjCompare, WoCompareWithIdxKey) {
+    BSONObj obj = fromjson("{a: 1, b: 1, c: 1}");
+    BSONObj objEq = fromjson("{a: 1, b: 1, c: 1}");
+    BSONObj objGt = fromjson("{a: 2, b: 2, c: 2}");
+    BSONObj objLt = fromjson("{a: 0, b: 0, c: 0}");
+    BSONObj idxKeyAsc = fromjson("{a: 1, b: 1}");
+    BSONObj idxKeyDesc = fromjson("{a: -1, b: 1}");
+    BSONObj idxKeyShort = fromjson("{a: 1}");
+
+    ASSERT_EQ(obj.woCompare(objEq, idxKeyAsc), 0);
+    ASSERT_EQ(obj.woCompare(objEq, idxKeyDesc), 0);
+    ASSERT_EQ(obj.woCompare(objEq, idxKeyShort), 0);
+    ASSERT_EQ(obj.woCompare(objGt, idxKeyAsc), -1);
+    ASSERT_EQ(obj.woCompare(objGt, idxKeyDesc), 1);
+    ASSERT_EQ(obj.woCompare(objGt, idxKeyShort), -1);
+    ASSERT_EQ(obj.woCompare(objLt, idxKeyAsc), 1);
+    ASSERT_EQ(obj.woCompare(objLt, idxKeyDesc), -1);
+    ASSERT_EQ(obj.woCompare(objLt, idxKeyShort), 1);
+}
+
+TEST(BSONObjCompare, UnorderedFieldsBSONObjComparison) {
+    BSONObj obj = fromjson("{a: {b: 1}, c: 1}");
+
+    UnorderedFieldsBSONObjComparator bsonCmp;
+
+    ASSERT_TRUE(bsonCmp.evaluate(obj == fromjson("{c: 1, a: {b: 1}}")));
+    ASSERT_FALSE(bsonCmp.evaluate(obj == fromjson("{a: {b: 1}, c: 1, d: 1}")));
+    ASSERT_FALSE(bsonCmp.evaluate(obj == fromjson("{a: {b: 1}}")));
+    ASSERT_FALSE(bsonCmp.evaluate(obj == fromjson("{a: {b: 2}, c: 1}")));
+}
+
+TEST(BSONObjCompare, UnorderedFieldsBSONObjHashing) {
+    BSONObj obj = fromjson("{a: {b: 1, c: 1}, d: 1}");
+
+    UnorderedFieldsBSONObjComparator bsonCmp;
+
+    ASSERT_EQ(bsonCmp.hash(obj), bsonCmp.hash(obj));
+    ASSERT_EQ(bsonCmp.hash(obj), bsonCmp.hash(fromjson("{d: 1, a: {b: 1, c: 1}}")));
+    ASSERT_EQ(bsonCmp.hash(obj), bsonCmp.hash(fromjson("{a: {c: 1, b: 1}, d: 1}")));
+    ASSERT_NE(bsonCmp.hash(obj), bsonCmp.hash(fromjson("{a: {b: 1, c: 1}}")));
+    ASSERT_NE(bsonCmp.hash(obj), bsonCmp.hash(fromjson("{a: {b: 1, c: 1}, d: 2}")));
+    ASSERT_NE(bsonCmp.hash(obj), bsonCmp.hash(fromjson("{a: {b: 1}, d: 1}")));
 }
 
 TEST(Looping, Cpp11Basic) {

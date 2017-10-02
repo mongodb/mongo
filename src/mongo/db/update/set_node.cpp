@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-Status SetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status SetNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
     _val = modExpr;

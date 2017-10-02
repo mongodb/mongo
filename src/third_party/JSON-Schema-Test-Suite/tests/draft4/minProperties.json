@@ -2,6 +2,8 @@
     {
         "description": "minProperties validation",
         "schema": {"minProperties": 1},
+        "banFromTopLevel": true,
+        "note": "Cannot run this schema at the top-level because it is unaware of the _id field.",
         "tests": [
             {
                 "description": "longer is valid",

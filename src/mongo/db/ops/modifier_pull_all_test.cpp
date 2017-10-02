@@ -38,6 +38,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
@@ -46,6 +47,7 @@ namespace {
 
 using mongo::BSONObj;
 using mongo::CollatorInterfaceMock;
+using mongo::ExpressionContextForTest;
 using mongo::LogBuilder;
 using mongo::ModifierPullAll;
 using mongo::ModifierInterface;
@@ -63,7 +65,8 @@ public:
     Mod() : _mod() {}
 
     explicit Mod(BSONObj modObj,
-                 ModifierInterface::Options options = ModifierInterface::Options::normal())
+                 ModifierInterface::Options options =
+                     ModifierInterface::Options::normal(new ExpressionContextForTest()))
         : _modObj(modObj), _mod() {
         ASSERT_OK(_mod.init(_modObj["$pullAll"].embeddedObject().firstElement(), options));
     }
@@ -92,22 +95,23 @@ private:
 TEST(Init, BadThings) {
     BSONObj modObj;
     ModifierPullAll mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     modObj = fromjson("{$pullAll: {a:1}}");
     ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     modObj = fromjson("{$pullAll: {a:'test'}}");
     ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     modObj = fromjson("{$pullAll: {a:{}}}");
     ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     modObj = fromjson("{$pullAll: {a:true}}");
     ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(PrepareApply, SimpleNumber) {
@@ -252,8 +256,10 @@ TEST(Prepare, FromArrayElementPath) {
 TEST(Collation, RespectsCollationFromOptions) {
     Document doc(fromjson("{ a : ['foo', 'bar' ] }"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     Mod mod(fromjson("{ $pullAll : { 'a' : ['FOO', 'BAR'] } }"),
-            ModifierInterface::Options::normal(&collator));
+            ModifierInterface::Options::normal(expCtx));
 
     ModifierInterface::ExecInfo execInfo;
     ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));

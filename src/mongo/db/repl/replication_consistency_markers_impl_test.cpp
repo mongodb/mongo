@@ -311,7 +311,8 @@ TEST_F(ReplicationConsistencyMarkersTest, OplogTruncateAfterPointUpgrade) {
                                       << minValidTime.getTerm()
                                       << MinValidDocument::kOldOplogDeleteFromPointFieldName
                                       << time1),
-                           SnapshotName(0)}));
+                           SnapshotName(0)},
+        OpTime::kUninitializedTerm));
     consistencyMarkers.initializeMinValidDocument(opCtx);
 
     // Set the feature compatibility version to 3.6.

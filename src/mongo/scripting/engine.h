@@ -43,7 +43,7 @@ class OperationContext;
 
 struct JSFile {
     const char* name;
-    const StringData& source;
+    const StringData source;
 };
 
 class Scope {

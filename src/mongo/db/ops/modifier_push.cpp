@@ -338,7 +338,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                 }
             }
 
-            _sort = PatternElementCmp(sortElem.embeddedObject(), opts.collator);
+            _sort = PatternElementCmp(sortElem.embeddedObject(), opts.expCtx->getCollator());
         } else {
             // Ensure the sortElem number is valid.
             if (!isPatternElement(sortElem)) {
@@ -346,7 +346,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                               "The $sort element value must be either 1 or -1");
             }
 
-            _sort = PatternElementCmp(BSON("" << sortElem.number()), opts.collator);
+            _sort = PatternElementCmp(BSON("" << sortElem.number()), opts.expCtx->getCollator());
         }
 
         _sortPresent = true;

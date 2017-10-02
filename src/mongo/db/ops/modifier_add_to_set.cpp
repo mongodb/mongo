@@ -169,7 +169,7 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
         _val = each;
     }
 
-    setCollator(opts.collator);
+    setCollator(opts.expCtx->getCollator());
     return Status::OK();
 }
 

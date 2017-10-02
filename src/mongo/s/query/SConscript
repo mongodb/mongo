@@ -40,6 +40,7 @@ env.Library(
         "router_stage_skip.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_common",
         "async_results_merger",
     ],
 )

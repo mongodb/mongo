@@ -73,7 +73,7 @@ Status ShardingCatalogClientMock::updateDatabase(OperationContext* opCtx,
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientMock::getDatabase(
-    OperationContext* opCtx, const string& dbName) {
+    OperationContext* opCtx, const string& dbName, repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -206,11 +206,6 @@ Status ShardingCatalogClientMock::createDatabase(OperationContext* opCtx,
 
 DistLockManager* ShardingCatalogClientMock::getDistLockManager() {
     return _distLockManager.get();
-}
-
-Status ShardingCatalogClientMock::appendInfoForConfigServerDatabases(
-    OperationContext* opCtx, const BSONObj& listDatabasesCmd, BSONArrayBuilder* builder) {
-    return Status::OK();
 }
 
 StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewKeys(

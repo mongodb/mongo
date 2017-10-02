@@ -601,6 +601,21 @@ Status AuthorizationSession::checkAuthorizedToRevokePrivilege(const Privilege& p
     return Status::OK();
 }
 
+bool AuthorizationSession::isAuthorizedToParseNamespaceElement(const BSONElement& element) {
+    const bool isUUID = element.type() == BinData && element.binDataType() == BinDataType::newUUID;
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Failed to parse namespace element",
+            element.type() == String || isUUID);
+
+    if (isUUID) {
+        return isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                ActionType::useUUID);
+    }
+
+    return true;
+}
+
 bool AuthorizationSession::isAuthorizedToCreateRole(
     const struct auth::CreateOrUpdateRoleArgs& args) {
     // A user is allowed to create a role under either of two conditions.
@@ -960,6 +975,10 @@ UserNameIterator AuthorizationSession::getImpersonatedUserNames() {
 
 RoleNameIterator AuthorizationSession::getImpersonatedRoleNames() {
     return makeRoleNameIterator(_impersonatedRoleNames.begin(), _impersonatedRoleNames.end());
+}
+
+bool AuthorizationSession::isUsingLocalhostBypass() {
+    return getAuthorizationManager().isAuthEnabled() && _externalState->shouldAllowLocalhost();
 }
 
 // Clear the vectors of impersonated usernames and roles.

@@ -62,7 +62,7 @@ data_df=$(df -BG -T /data | tail -n1 | tr -s ' ')
 base_device_name=$(echo $data_df | cut -f1 -d ' ' | sed -e 's/.*\///g')
 fstype=$(echo $data_df | cut -f2 -d ' ')
 device_size=$(echo $data_df | cut -f3 -d ' ' | cut -f1 -d "G" | cut -f1 -d ".")
-if [[ -z $base_device_name || -z $fstype || -z $device_size ]]; then
+if [[ -z "$base_device_name" || -z "$fstype" || -z "$device_size" ]]; then
   echo "Could not detect /data mount point, one of the following are not detected:"
   echo "base_device_name: '$base_device_name' fstype: '$fstype' device_size: '$device_size'"
   exit 1
@@ -108,31 +108,24 @@ if [ $(uname) = "Linux" ]; then
       fs_options="-m $xfs_options"
     fi
   fi
+  # Specify the Block devices and sizes to be attached to the EC2 instance.
+  for info in $devices_info
+  do
+    device=$(echo $info | cut -f1 -d ';')
+    size=$(echo $info | cut -f3 -d ';')
+    device_names=$(echo "$device_names $device" | sed -e 's/^ *//; s/ *$//')
+    block_device_option="$block_device_option --blockDevice $device $size"
+  done
 elif [ "Windows_NT" = "$OS" ]; then
   # We use 'xvdf' as the first available device for the EBS volume, which is mounted on 'd:'
   # See http://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/device_naming.html
-  used_drive_letters=$(wmic logicaldisk get name | grep ':' | tr -d ' :[\r\n]' | tr '[:upper:]' '[:lower:]')
-  for letter in {z..a}
-  do
-    if [ $(echo $used_drive_letters | tr -d $letter) == $used_drive_letters ]; then
-      device_names="$letter:"
-      break
-    fi
-  done
+  device="xvdf"
   device_names="d"
-  devices_info="xvdf;$fstype;$device_size"
+  devices_info="$device;$fstype;$device_size"
+  block_device_option="--blockDevice $device $device_size"
 fi
 
 echo "Devices: $devices_info"
-
-# Specify the Block devices and sizes to be attached to the EC2 instance.
-for info in $devices_info
-do
-  device=$(echo $info | cut -f1 -d ';')
-  size=$(echo $info | cut -f3 -d ';')
-  device_names=$(echo "$device_names $device" | sed -e 's/^ *//; s/ *$//')
-  block_device_option="$block_device_option --blockDevice $device $size"
-done
 
 # Launch a new instance.
 aws_ec2=$(python buildscripts/aws_ec2.py \

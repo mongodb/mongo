@@ -457,6 +457,12 @@ public:
         return *_killReason;
     }
 
+    /**
+     * If the last oplog timestamp is being tracked for this PlanExecutor, return it.
+     * Otherwise return a null timestamp.
+     */
+    Timestamp getLatestOplogTimestamp();
+
 private:
     /**
      * Returns true if the PlanExecutor should wait for data to be inserted, which is when a getMore

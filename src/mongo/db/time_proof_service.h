@@ -63,6 +63,11 @@ public:
      */
     Status checkProof(LogicalTime time, const TimeProof& proof, const Key& key);
 
+    /**
+     * Resets the cache.
+     */
+    void resetCache();
+
 private:
     /**
      * Nested class to cache TimeProof. It holds proof for the greatest time allowed.

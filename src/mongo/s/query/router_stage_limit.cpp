@@ -41,12 +41,12 @@ RouterStageLimit::RouterStageLimit(OperationContext* opCtx,
     invariant(limit > 0);
 }
 
-StatusWith<ClusterQueryResult> RouterStageLimit::next() {
+StatusWith<ClusterQueryResult> RouterStageLimit::next(RouterExecStage::ExecContext execContext) {
     if (_returnedSoFar >= _limit) {
         return {ClusterQueryResult()};
     }
 
-    auto childResult = getChildStage()->next();
+    auto childResult = getChildStage()->next(execContext);
     if (!childResult.isOK()) {
         return childResult;
     }

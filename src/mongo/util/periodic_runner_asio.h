@@ -33,6 +33,7 @@
 #include "mongo/executor/async_timer_interface.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -45,11 +46,13 @@ class Client;
  *
  * This class takes a timer factory so that it may be mocked out for testing.
  *
- * The runner will set up a client on its internal thread. Scheduled jobs that require
- * an operation context should use Client::getCurrent()->makeOperationContext() to
- * create one for themselves, and MUST clear it before they return.
+ * The runner will set up a background thread per job and allow asio to distribute jobs across those
+ * threads. Thus, scheduled jobs cannot block each other from running (a long running job can only
+ * block itself). Scheduled jobs that require an operation context should use
+ * Client::getCurrent()->makeOperationContext() to create one for themselves, and MUST clear it
+ * before they return.
  *
- * The thread running internally will use the thread name "PeriodicRunnerASIO" and
+ * The threads running internally will use the thread name "PeriodicRunnerASIO" and
  * anything logged from within a scheduled background task will use this thread name.
  * Scheduled tasks may set the thread name to a custom value as they run. However,
  * if they do this, they MUST set the thread name back to its original value before
@@ -103,13 +106,14 @@ private:
     // Internally, we will transition through these states
     enum class State { kReady, kRunning, kComplete };
 
-    void _scheduleJob(std::weak_ptr<PeriodicJobASIO> job);
+    void _scheduleJob(std::weak_ptr<PeriodicJobASIO> job, bool firstTime);
+
+    void _spawnThreads(WithLock);
 
     asio::io_service _io_service;
     asio::io_service::strand _strand;
 
-    Client* _client;
-    stdx::thread _thread;
+    std::vector<stdx::thread> _threads;
 
     std::unique_ptr<executor::AsyncTimerFactoryInterface> _timerFactory;
 

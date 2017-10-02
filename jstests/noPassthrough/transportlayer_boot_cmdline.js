@@ -19,7 +19,7 @@
         {dbpath: dbpath, transportLayer: 'legacy', serviceExecutor: 'adaptive'});
     assert.isnull(
         m,
-        'MongoDB with transportLayer=legacy and serviceExecutor=fixedForTesting managed to startup which is an unsupported combination');
+        'MongoDB with transportLayer=legacy and serviceExecutor=adaptive managed to startup which is an unsupported combination');
     if (m) {
         MongoRunner.stopMongod(m);
     }

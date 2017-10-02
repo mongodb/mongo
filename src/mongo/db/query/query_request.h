@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/tailable_mode.h"
 
 namespace mongo {
 
@@ -77,7 +78,8 @@ public:
 
     /**
      * If _uuid exists for this QueryRequest, use it to update the value of _nss via the
-     * UUIDCatalog associated with opCtx.
+     * UUIDCatalog associated with opCtx. This should only be called when we hold a DBLock
+     * on the database to which _uuid belongs, if the _uuid is present in the UUIDCatalog.
      */
     void refreshNSS(OperationContext* opCtx);
 
@@ -331,11 +333,20 @@ public:
     }
 
     bool isTailable() const {
-        return _tailable;
+        return _tailableMode == TailableMode::kTailable ||
+            _tailableMode == TailableMode::kTailableAndAwaitData;
     }
 
-    void setTailable(bool tailable) {
-        _tailable = tailable;
+    bool isTailableAndAwaitData() const {
+        return _tailableMode == TailableMode::kTailableAndAwaitData;
+    }
+
+    void setTailableMode(TailableMode tailableMode) {
+        _tailableMode = tailableMode;
+    }
+
+    TailableMode getTailableMode() const {
+        return _tailableMode;
     }
 
     bool isSlaveOk() const {
@@ -360,14 +371,6 @@ public:
 
     void setNoCursorTimeout(bool noCursorTimeout) {
         _noCursorTimeout = noCursorTimeout;
-    }
-
-    bool isAwaitData() const {
-        return _awaitData;
-    }
-
-    void setAwaitData(bool awaitData) {
-        _awaitData = awaitData;
     }
 
     bool isExhaust() const {
@@ -510,11 +513,10 @@ private:
     bool _hasReadPref = false;
 
     // Options that can be specified in the OP_QUERY 'flags' header.
-    bool _tailable = false;
+    TailableMode _tailableMode = TailableMode::kNormal;
     bool _slaveOk = false;
     bool _oplogReplay = false;
     bool _noCursorTimeout = false;
-    bool _awaitData = false;
     bool _exhaust = false;
     bool _allowPartialResults = false;
 

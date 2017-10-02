@@ -37,6 +37,12 @@ load("jstests/libs/kill_sessions.js");
                 host.getDB("local").auth("__system", "foopdedoop");
             }
             hosts.push(host);
+
+            assert.soon(function() {
+                var fcv = host.getDB("admin").runCommand(
+                    {getParameter: 1, featureCompatibilityVersion: 1});
+                return fcv["ok"] && fcv["featureCompatibilityVersion"] != "3.4";
+            });
         }
 
         var args = [forExec, forKill, hosts];

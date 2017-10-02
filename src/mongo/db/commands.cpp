@@ -106,7 +106,7 @@ NamespaceString Command::parseNsCollectionRequired(const string& dbname, const B
     // Accepts both BSON String and Symbol for collection name per SERVER-16260
     // TODO(kangas) remove Symbol support in MongoDB 3.0 after Ruby driver audit
     BSONElement first = cmdObj.firstElement();
-    uassert(ErrorCodes::BadValue,
+    uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
     const NamespaceString nss(dbname, first.valueStringData());
@@ -121,10 +121,18 @@ NamespaceString Command::parseNsOrUUID(OperationContext* opCtx,
                                        const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
-        StatusWith<UUID> uuidRes = UUID::parse(first);
-        uassertStatusOK(uuidRes);
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        return catalog.lookupNSSByUUID(uuidRes.getValue());
+        UUID uuid = uassertStatusOK(UUID::parse(first));
+        NamespaceString nss = catalog.lookupNSSByUUID(uuid);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "UUID " << uuid << " specified in "
+                              << cmdObj.firstElement().fieldNameStringData()
+                              << " command not found in "
+                              << dbname
+                              << " database",
+                nss.isValid() && nss.db() == dbname);
+
+        return nss;
     } else {
         // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));

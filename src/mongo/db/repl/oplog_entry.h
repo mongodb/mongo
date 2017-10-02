@@ -67,7 +67,7 @@ public:
                NamespaceString nss,
                int version,
                const BSONObj& oField,
-               const BSONObj& o2Field);
+               const boost::optional<BSONObj>& o2Field);
     OplogEntry(OpTime opTime,
                long long hash,
                OpTypeEnum opType,
@@ -84,7 +84,7 @@ public:
                OpTypeEnum opType,
                NamespaceString nss,
                const BSONObj& oField,
-               const BSONObj& o2Field);
+               const boost::optional<BSONObj>& o2Field);
 
     // DEPRECATED: This constructor can throw. Use static parse method instead.
     explicit OplogEntry(BSONObj raw);

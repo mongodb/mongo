@@ -57,6 +57,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
@@ -93,8 +94,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 
     long long batchSize = request.getBatchSize();
 
-    // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
-    BSONArrayBuilder resultsArray;
+    CursorResponseBuilder responseBuilder(true, &result);
     BSONObj next;
     for (int objCount = 0; objCount < batchSize; objCount++) {
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
@@ -112,6 +112,8 @@ bool handleCursorCommand(OperationContext* opCtx,
         }
 
         if (state == PlanExecutor::IS_EOF) {
+            responseBuilder.setLatestOplogTimestamp(
+                cursor->getExecutor()->getLatestOplogTimestamp());
             if (!cursor->isTailable()) {
                 // make it an obvious error to use cursor or executor after this point
                 cursor = nullptr;
@@ -128,12 +130,13 @@ bool handleCursorCommand(OperationContext* opCtx,
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
-        if (!FindCommon::haveSpaceForNext(next, objCount, resultsArray.len())) {
+        if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
             cursor->getExecutor()->enqueue(next);
             break;
         }
 
-        resultsArray.append(next);
+        responseBuilder.setLatestOplogTimestamp(cursor->getExecutor()->getLatestOplogTimestamp());
+        responseBuilder.append(next);
     }
 
     if (cursor) {
@@ -152,7 +155,7 @@ bool handleCursorCommand(OperationContext* opCtx,
     }
 
     const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
-    appendCursorResponseObject(cursorId, nsForCursor.ns(), resultsArray.arr(), &result);
+    responseBuilder.done(cursorId, nsForCursor.ns());
 
     return static_cast<bool>(cursor);
 }
@@ -295,6 +298,14 @@ Status runAggregate(OperationContext* opCtx,
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespaceString();
 
+    if (request.getExplain() &&
+        repl::ReadConcernArgs::get(opCtx).getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "Explain for the aggregate command "
+                                 "does not support non-local "
+                                 "readConcern levels"};
+    }
+
     // Parse the user-specified collation, if any.
     std::unique_ptr<CollatorInterface> userSpecifiedCollator = request.getCollation().isEmpty()
         ? nullptr
@@ -367,16 +378,11 @@ Status runAggregate(OperationContext* opCtx,
                 return resolvedView.getStatus();
             }
 
-            auto collationSpec = ctx->getView()->defaultCollator()
-                ? ctx->getView()->defaultCollator()->getSpec().toBSON().getOwned()
-                : CollationSpec::kSimpleSpec;
-
             // With the view & collation resolved, we can relinquish locks.
             ctx->releaseLocksForView();
 
             // Parse the resolved view into a new aggregation request.
             auto newRequest = resolvedView.getValue().asExpandedViewAggregation(request);
-            newRequest.setCollation(collationSpec);
             auto newCmd = newRequest.serializeToCommandObj().toBson();
 
             auto status = runAggregate(opCtx, origNss, newRequest, newCmd, result);
@@ -409,7 +415,7 @@ Status runAggregate(OperationContext* opCtx,
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
         if (liteParsedPipeline.hasChangeStream()) {
-            expCtx->tailableMode = ExpressionContext::TailableMode::kTailableAndAwaitData;
+            expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
         }
 
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
@@ -471,7 +477,7 @@ Status runAggregate(OperationContext* opCtx,
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
         opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
         cmdObj);
-    if (expCtx->tailableMode == ExpressionContext::TailableMode::kTailableAndAwaitData) {
+    if (expCtx->tailableMode == TailableMode::kTailableAndAwaitData) {
         cursorParams.setTailable(true);
         cursorParams.setAwaitData(true);
     }

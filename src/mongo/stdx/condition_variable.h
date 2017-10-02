@@ -36,6 +36,7 @@ namespace stdx {
 using condition_variable = ::std::condition_variable;          // NOLINT
 using condition_variable_any = ::std::condition_variable_any;  // NOLINT
 using cv_status = ::std::cv_status;                            // NOLINT
+using ::std::notify_all_at_thread_exit;                        // NOLINT
 
 }  // namespace stdx
 }  // namespace mongo

@@ -62,9 +62,13 @@ public:
     }
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kAnyShard,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed);
+
         constraints.canSwapWithMatch = true;
-        constraints.isAllowedInsideFacetStage = false;
         return constraints;
     }
 
@@ -74,6 +78,7 @@ public:
         deps->fields.insert(DocumentSourceChangeStream::kNamespaceField.toString());
         deps->fields.insert(DocumentSourceChangeStream::kDocumentKeyField.toString());
         deps->fields.insert(DocumentSourceChangeStream::kOperationTypeField.toString());
+        deps->fields.insert(DocumentSourceChangeStream::kIdField.toString());
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
         return SEE_NEXT;

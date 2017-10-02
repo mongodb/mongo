@@ -1,3 +1,8 @@
+
+// Checking UUID consistency involves talking to the shard primary, but by the end of this test, the
+// shard does not have a primary.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
 

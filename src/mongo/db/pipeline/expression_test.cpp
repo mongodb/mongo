@@ -2663,6 +2663,68 @@ TEST(ExpressionObjectDependencies, FieldPathsShouldBeAddedToDependencies) {
     ASSERT_EQ(deps.fields.count("c.d"), 1UL);
 };
 
+TEST(ExpressionObjectDependencies, VariablesShouldBeAddedToDependencies) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varID = expCtx->variablesParseState.defineVariable("var1");
+    auto fieldPath = ExpressionFieldPath::parse(expCtx, "$$var1", expCtx->variablesParseState);
+    DepsTracker deps;
+    fieldPath->addDependencies(&deps);
+    ASSERT_EQ(deps.vars.size(), 1UL);
+    ASSERT_EQ(deps.vars.count(varID), 1UL);
+}
+
+TEST(ExpressionObjectDependencies, LocalLetVariablesShouldBeFilteredOutOfDependencies) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->variablesParseState.defineVariable("var1");
+    auto letSpec = BSON("$let" << BSON("vars" << BSON("var2"
+                                                      << "abc")
+                                              << "in"
+                                              << BSON("$multiply" << BSON_ARRAY("$$var1"
+                                                                                << "$$var2"))));
+    auto expressionLet =
+        ExpressionLet::parse(expCtx, letSpec.firstElement(), expCtx->variablesParseState);
+    DepsTracker deps;
+    expressionLet->addDependencies(&deps);
+    ASSERT_EQ(deps.vars.size(), 1UL);
+    ASSERT_EQ(expCtx->variablesParseState.getVariable("var1"), *deps.vars.begin());
+}
+
+TEST(ExpressionObjectDependencies, LocalMapVariablesShouldBeFilteredOutOfDependencies) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->variablesParseState.defineVariable("var1");
+    auto mapSpec = BSON("$map" << BSON("input"
+                                       << "$field1"
+                                       << "as"
+                                       << "var2"
+                                       << "in"
+                                       << BSON("$multiply" << BSON_ARRAY("$$var1"
+                                                                         << "$$var2"))));
+
+    auto expressionMap =
+        ExpressionMap::parse(expCtx, mapSpec.firstElement(), expCtx->variablesParseState);
+    DepsTracker deps;
+    expressionMap->addDependencies(&deps);
+    ASSERT_EQ(deps.vars.size(), 1UL);
+    ASSERT_EQ(expCtx->variablesParseState.getVariable("var1"), *deps.vars.begin());
+}
+
+TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDependencies) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->variablesParseState.defineVariable("var1");
+    auto filterSpec = BSON("$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3) << "as"
+                                                     << "var2"
+                                                     << "cond"
+                                                     << BSON("$gt" << BSON_ARRAY("$$var1"
+                                                                                 << "$$var2"))));
+
+    auto expressionFilter =
+        ExpressionFilter::parse(expCtx, filterSpec.firstElement(), expCtx->variablesParseState);
+    DepsTracker deps;
+    expressionFilter->addDependencies(&deps);
+    ASSERT_EQ(deps.vars.size(), 1UL);
+    ASSERT_EQ(expCtx->variablesParseState.getVariable("var1"), *deps.vars.begin());
+}
+
 //
 // Optimizations.
 //

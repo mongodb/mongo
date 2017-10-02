@@ -30,7 +30,6 @@
 
 #include "mongo/db/service_context_noop.h"
 
-#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/stdx/memory.h"
 
@@ -69,12 +68,6 @@ StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
 
 std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client, unsigned opId) {
     return stdx::make_unique<OperationContextNoop>(client, opId);
-}
-
-void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {}
-
-OpObserver* ServiceContextNoop::getOpObserver() {
-    return nullptr;
 }
 
 }  // namespace mongo

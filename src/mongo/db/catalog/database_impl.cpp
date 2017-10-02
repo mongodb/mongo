@@ -60,6 +60,7 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -755,14 +756,25 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            const BSONObj& idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
     invariant(!options.isView());
+    NamespaceString nss(ns);
+
+    uassert(ErrorCodes::CannotImplicitlyCreateCollection,
+            "request was sent with 'disallowCollectionCreation' field",
+            OperationShardingState::get(opCtx).allowCollectionCreation());
 
     CollectionOptions optionsWithUUID = options;
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
         serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
+        auto coordinator = repl::ReplicationCoordinator::get(opCtx);
+        fassert(40643,
+                coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
+                    serverGlobalParams.featureCompatibility.version.load() !=
+                        ServerGlobalParams::FeatureCompatibility::Version::k36 ||
+                    coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) ||
+                    nss.isSystemDotProfile());  // system.profile is special as it's not replicated
         optionsWithUUID.uuid.emplace(CollectionUUID::gen());
     }
 
-    NamespaceString nss(ns);
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     audit::logCreateCollection(&cc(), ns);
 
@@ -1008,9 +1020,10 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
             // the secondary or on a backup instance, as indicated by !validateFeaturesAsMaster.
             allowedFeatures |= MatchExpressionParser::kJSONSchema;
         }
+        boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContext(opCtx, collator.get()));
         auto statusWithMatcher = MatchExpressionParser::parse(collectionOptions.validator,
-                                                              collator.get(),
-                                                              nullptr,
+                                                              std::move(expCtx),
                                                               ExtensionsCallbackNoop(),
                                                               allowedFeatures);
 

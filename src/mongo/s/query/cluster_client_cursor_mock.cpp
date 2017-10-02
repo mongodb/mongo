@@ -44,7 +44,8 @@ ClusterClientCursorMock::~ClusterClientCursorMock() {
     invariant(_exhausted || _killed);
 }
 
-StatusWith<ClusterQueryResult> ClusterClientCursorMock::next() {
+StatusWith<ClusterQueryResult> ClusterClientCursorMock::next(
+    RouterExecStage::ExecContext execContext) {
     invariant(!_killed);
 
     if (_resultsQueue.empty()) {
@@ -75,6 +76,10 @@ void ClusterClientCursorMock::kill(OperationContext* opCtx) {
 }
 
 bool ClusterClientCursorMock::isTailable() const {
+    return false;
+}
+
+bool ClusterClientCursorMock::isTailableAndAwaitData() const {
     return false;
 }
 

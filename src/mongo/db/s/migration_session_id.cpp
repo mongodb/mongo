@@ -66,6 +66,10 @@ StatusWith<MigrationSessionId> MigrationSessionId::extractFromBSON(const BSONObj
     return status;
 }
 
+MigrationSessionId MigrationSessionId::parseFromBSON(const BSONObj& obj) {
+    return uassertStatusOK(extractFromBSON(obj));
+}
+
 MigrationSessionId::MigrationSessionId(std::string sessionId) {
     invariant(!sessionId.empty());
     _sessionId = std::move(sessionId);

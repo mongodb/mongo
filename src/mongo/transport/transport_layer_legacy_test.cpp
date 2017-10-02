@@ -61,6 +61,18 @@ public:
         _sessions.clear();
     }
 
+    bool shutdown(Milliseconds timeout) override {
+        return true;
+    }
+
+    Stats sessionStats() const override {
+        return {};
+    }
+
+    size_t numOpenSessions() const override {
+        return 0ULL;
+    }
+
     transport::TransportLayerLegacy* tll = nullptr;
 
     std::list<transport::SessionHandle> _sessions;

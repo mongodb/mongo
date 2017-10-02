@@ -392,8 +392,10 @@
         assert.docEq(expectedEntry, actualEntry);
     });
 
-    latestShard.stopSet();
+    // Call ShardingTest.stop before shutting down latestShard, so that the UUID check in
+    // ShardingTest.stop can talk to latestShard.
     st.stop();
+    latestShard.stopSet();
 
     // Create cluster with 3.4 mongos so that we can add 3.4 shards.
     st = new ShardingTest({shards: 0, other: {mongosOptions: {binVersion: downgrade}}});
@@ -421,8 +423,10 @@
     assert.commandWorked(res);
     assert.eq(res.featureCompatibilityVersion, "3.4");
 
-    downgradeShard.stopSet();
+    // call ShardingTest.stop before shutting down downgradeShard, so that the UUID check in
+    // ShardingTest.stop can talk to downgradeShard.
     st.stop();
+    downgradeShard.stopSet();
 
     // Create a cluster running with featureCompatibilityVersion=3.6.
     st = new ShardingTest({shards: 1, mongos: 1});

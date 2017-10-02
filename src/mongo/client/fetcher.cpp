@@ -172,7 +172,8 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const BSONObj& findCmdObj,
                  const CallbackFn& work,
                  const BSONObj& metadata,
-                 Milliseconds timeout,
+                 Milliseconds findNetworkTimeout,
+                 Milliseconds getMoreNetworkTimeout,
                  std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy)
     : _executor(executor),
       _source(source),
@@ -180,10 +181,11 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
       _cmdObj(findCmdObj.getOwned()),
       _metadata(metadata.getOwned()),
       _work(work),
-      _timeout(timeout),
+      _findNetworkTimeout(findNetworkTimeout),
+      _getMoreNetworkTimeout(getMoreNetworkTimeout),
       _firstRemoteCommandScheduler(
           _executor,
-          RemoteCommandRequest(_source, _dbname, _cmdObj, _metadata, nullptr, _timeout),
+          RemoteCommandRequest(_source, _dbname, _cmdObj, _metadata, nullptr, _findNetworkTimeout),
           stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, kFirstBatchFieldName),
           std::move(firstCommandRetryPolicy)) {
     uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
@@ -205,10 +207,6 @@ BSONObj Fetcher::getMetadataObject() const {
     return _metadata;
 }
 
-Milliseconds Fetcher::getTimeout() const {
-    return _timeout;
-}
-
 std::string Fetcher::toString() const {
     return getDiagnosticString();
 }
@@ -222,7 +220,8 @@ std::string Fetcher::getDiagnosticString() const {
     output << " query: " << _cmdObj;
     output << " query metadata: " << _metadata;
     output << " active: " << _isActive_inlock();
-    output << " timeout: " << _timeout;
+    output << " findNetworkTimeout: " << _findNetworkTimeout;
+    output << " getMoreNetworkTimeout: " << _getMoreNetworkTimeout;
     output << " shutting down?: " << _isShuttingDown_inlock();
     output << " first: " << _first;
     output << " firstCommandScheduler: " << _firstRemoteCommandScheduler.toString();
@@ -317,7 +316,8 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
     }
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
-            RemoteCommandRequest(_source, _dbname, cmdObj, _metadata, nullptr, _timeout),
+            RemoteCommandRequest(
+                _source, _dbname, cmdObj, _metadata, nullptr, _getMoreNetworkTimeout),
             stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, kNextBatchFieldName));
 
     if (!scheduleResult.isOK()) {

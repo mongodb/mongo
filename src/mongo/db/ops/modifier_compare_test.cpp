@@ -35,6 +35,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
@@ -43,6 +44,7 @@ namespace {
 
 using mongo::BSONObj;
 using mongo::CollatorInterfaceMock;
+using mongo::ExpressionContextForTest;
 using mongo::LogBuilder;
 using mongo::ModifierCompare;
 using mongo::ModifierInterface;
@@ -62,7 +64,8 @@ public:
     Mod() : _mod() {}
 
     explicit Mod(BSONObj modObj,
-                 ModifierInterface::Options options = ModifierInterface::Options::normal())
+                 ModifierInterface::Options options =
+                     ModifierInterface::Options::normal(new ExpressionContextForTest()))
         : _modObj(modObj),
           _mod((modObj.firstElement().fieldNameStringData() == "$min") ? ModifierCompare::MIN
                                                                        : ModifierCompare::MAX) {
@@ -94,18 +97,19 @@ private:
 TEST(Init, ValidValues) {
     BSONObj modObj;
     ModifierCompare mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     modObj = fromjson("{ $min : { a : 2 } }");
     ASSERT_OK(mod.init(modObj[kModNameMin].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 
     modObj = fromjson("{ $max : { a : 1 } }");
     ASSERT_OK(mod.init(modObj[kModNameMax].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 
     modObj = fromjson("{ $min : { a : {$date : 0 } } }");
     ASSERT_OK(mod.init(modObj[kModNameMin].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(ExistingNumber, MaxSameNumber) {
@@ -297,7 +301,9 @@ TEST(ExistingEmbeddedDoc, MaxNumber) {
 TEST(Collation, MinRespectsCollationFromModifierInterfaceOptions) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     Document doc(fromjson("{a: 'cbc'}"));
-    ModifierInterface::Options options = ModifierInterface::Options::normal(&collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    ModifierInterface::Options options = ModifierInterface::Options::normal(expCtx);
     Mod mod(fromjson("{$min: {a: 'dba'}}"), options);
 
     ModifierInterface::ExecInfo execInfo;

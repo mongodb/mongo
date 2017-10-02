@@ -2,6 +2,11 @@
 // Test for what happens when config servers are down and the database config is loaded
 // Should fail sanely
 //
+
+// Checking UUID consistency involves talking to the config servers, which are shut down in this
+// test.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 

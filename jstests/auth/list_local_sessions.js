@@ -60,11 +60,6 @@
     runListLocalSessionsTest(mongod);
     MongoRunner.stopMongod(mongod);
 
-    if (true) {
-        // TODO SERVER-29141: Support forcing pipelines to run on mongos
-        return;
-    }
-
     const st =
         new ShardingTest({shards: 1, mongos: 1, config: 1, other: {keyFile: 'jstests/libs/key1'}});
     runListLocalSessionsTest(st.s0);

@@ -101,7 +101,7 @@ void NamespaceIndex::kill_ns(OperationContext* opCtx, StringData ns) {
     const Namespace n(ns);
     _ht->kill(opCtx, n);
 
-    if (ns.size() <= Namespace::MaxNsColletionLen) {
+    if (ns.size() <= Namespace::MaxNsCollectionLen) {
         // Larger namespace names don't have room for $extras so they can't exist. The code
         // below would cause an "$extra: ns too large" error and stacktrace to be printed to the
         // log even though everything is fine.

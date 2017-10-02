@@ -234,13 +234,15 @@ private:
     bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 
     std::string _uri(StringData ident) const;
-    bool _drop(StringData ident);
 
+    // Not threadsafe; callers must be serialized.
     void _setOldestTimestamp(SnapshotName oldestTimestamp);
+    SnapshotName _previousSetOldestTimestamp;
 
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+    ClockSource* const _clockSource;
 
     // Mutex to protect use of _oplogManager and _oplogManagerCount by this instance of KV
     // engine.

@@ -104,10 +104,15 @@ Status ShardingCatalogManager::createDatabase(OperationContext* opCtx, const std
 Status ShardingCatalogManager::enableSharding(OperationContext* opCtx, const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
-    if (dbName == NamespaceString::kConfigDb || dbName == NamespaceString::kAdminDb) {
+    if (dbName == NamespaceString::kAdminDb) {
         return {
             ErrorCodes::IllegalOperation,
             str::stream() << "Enabling sharding on system configuration databases is not allowed"};
+    }
+
+    // Sharding is enabled automatically on the config db.
+    if (dbName == NamespaceString::kConfigDb) {
+        return Status::OK();
     }
 
     // Lock the database globally to prevent conflicts with simultaneous database

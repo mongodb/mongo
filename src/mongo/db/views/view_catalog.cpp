@@ -186,7 +186,7 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
                                   request,
                                   CollatorInterface::cloneCollator(viewDef.defaultCollator()),
                                   std::move(resolvedNamespaces));
-        auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), expCtx);
+        auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
         if (!pipelineStatus.isOK()) {
             uassert(40255,
                     str::stream() << "Invalid pipeline for view " << viewDef.name().ns() << "; "
@@ -378,6 +378,7 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     const NamespaceString* resolvedNss = &nss;
     std::vector<BSONObj> resolvedPipeline;
+    BSONObj collation;
 
     for (int i = 0; i < ViewGraph::kMaxViewDepth; i++) {
         auto view = _lookup_inlock(opCtx, resolvedNss->ns());
@@ -392,10 +393,13 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                         str::stream() << "View pipeline exceeds maximum size; maximum size is "
                                       << ViewGraph::kMaxViewPipelineSizeBytes};
             }
-            return StatusWith<ResolvedView>({*resolvedNss, resolvedPipeline});
+            return StatusWith<ResolvedView>(
+                {*resolvedNss, std::move(resolvedPipeline), std::move(collation)});
         }
 
         resolvedNss = &(view->viewOn());
+        collation = view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON()
+                                            : CollationSpec::kSimpleSpec;
 
         // Prepend the underlying view's pipeline to the current working pipeline.
         const std::vector<BSONObj>& toPrepend = view->pipeline();
@@ -403,7 +407,8 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
 
         // If the first stage is a $collStats, then we return early with the viewOn namespace.
         if (toPrepend.size() > 0 && !toPrepend[0]["$collStats"].eoo()) {
-            return StatusWith<ResolvedView>({*resolvedNss, resolvedPipeline});
+            return StatusWith<ResolvedView>(
+                {*resolvedNss, std::move(resolvedPipeline), std::move(collation)});
         }
     }
 

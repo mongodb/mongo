@@ -2,9 +2,10 @@
     {
         "description":
             "patternProperties validates properties matching a regex",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
             "patternProperties": {
-                "f.*o": {"type": "integer"}
+                "f.*o": {"type": "number"}
             }
         },
         "tests": [
@@ -49,10 +50,13 @@
         "description": "multiple simultaneous patternProperties are validated",
         "schema": {
             "patternProperties": {
-                "a*": {"type": "integer"},
+                "a*": {"type": "number"},
                 "aaa*": {"maximum": 20}
             }
         },
+        "banFromTopLevel": true,
+        "note": "Cannot run this schema at the top-level because it is unaware of the _id field. ",
+        "note_ext": "Instances of 'integer' in this test have been replaced with 'number'.",
         "tests": [
             {
                 "description": "a single valid match is valid",

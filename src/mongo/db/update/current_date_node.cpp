@@ -51,7 +51,8 @@ void setValue(mutablebson::Element* element, bool typeIsDate) {
 }
 }  // namespace
 
-Status CurrentDateNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status CurrentDateNode::init(BSONElement modExpr,
+                             const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
     if (modExpr.type() == BSONType::Bool) {

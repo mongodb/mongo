@@ -1,9 +1,10 @@
 [
     {
         "description": "additionalItems as schema",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
             "items": [{}],
-            "additionalItems": {"type": "integer"}
+            "additionalItems": {"type": "number"}
         },
         "tests": [
             {
@@ -75,7 +76,8 @@
     },
     {
         "description": "additionalItems are allowed by default",
-        "schema": {"items": [{"type": "integer"}]},
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
+        "schema": {"items": [{"type": "number"}]},
         "tests": [
             {
                 "description": "only the first item is validated",

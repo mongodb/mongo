@@ -39,7 +39,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/service_context.h"
-#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/thread_idle_callback.h"
@@ -60,8 +60,7 @@ stdx::mutex tcmallocCleanupLock;
  *  favorable times. Ideally would do some milder cleanup or scavenge...
  */
 void threadStateChange() {
-    if (getGlobalServiceContext()->getTransportLayer()->sessionStats().numOpenSessions <=
-        kManyClients)
+    if (getGlobalServiceContext()->getServiceEntryPoint()->numOpenSessions() <= kManyClients)
         return;
 
 #if MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE

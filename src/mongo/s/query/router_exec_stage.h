@@ -52,6 +52,12 @@ class OperationContext;
  */
 class RouterExecStage {
 public:
+    enum class ExecContext {
+        kInitialFind,
+        kGetMoreNoResultsYet,
+        kGetMoreWithAtLeastOneResultInBatch,
+    };
+
     RouterExecStage(OperationContext* opCtx) : _opCtx(opCtx) {}
     RouterExecStage(OperationContext* opCtx, std::unique_ptr<RouterExecStage> child)
         : _opCtx(opCtx), _child(std::move(child)) {}
@@ -67,7 +73,7 @@ public:
      * holding on to a subset of the returned results and need to minimize memory usage, call copy()
      * on the BSONObjs.
      */
-    virtual StatusWith<ClusterQueryResult> next() = 0;
+    virtual StatusWith<ClusterQueryResult> next(ExecContext) = 0;
 
     /**
      * Must be called before destruction to abandon a not-yet-exhausted plan. May block waiting for

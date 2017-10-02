@@ -8,8 +8,8 @@ def jsToHeader(target, source):
 
     h = [
         '#include "mongo/base/string_data.h"',
+        '#include "mongo/scripting/engine.h"',
         'namespace mongo {',
-        'struct JSFile{ const char* name; const StringData& source; };',
         'namespace JSFiles{',
     ]
 
@@ -21,7 +21,7 @@ def jsToHeader(target, source):
         objname = os.path.split(filename)[1].split('.')[0]
         stringname = '_jscode_raw_' + objname
 
-        h.append('const char ' + stringname + "[] = {")
+        h.append('constexpr char ' + stringname + "[] = {")
 
         with open(filename, 'r') as f:
             for line in f:
@@ -30,8 +30,8 @@ def jsToHeader(target, source):
         h.append("0};")
         # symbols aren't exported w/o this
         h.append('extern const JSFile %s;' % objname)
-        h.append('const JSFile %s = { "%s", StringData(%s) };' %
-                 (objname, filename.replace('\\', '/'), stringname))
+        h.append('const JSFile %s = { "%s", StringData(%s, sizeof(%s) - 1) };' %
+                 (objname, filename.replace('\\', '/'), stringname, stringname))
 
     h.append("} // namespace JSFiles")
     h.append("} // namespace mongo")

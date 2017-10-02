@@ -657,16 +657,14 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
 
     ShardingState::get(_service)->markCollectionsNotShardedAtStepdown();
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        if (auto validator = LogicalTimeValidator::get(_service)) {
-            auto opCtx = cc().getOperationContext();
+    if (auto validator = LogicalTimeValidator::get(_service)) {
+        auto opCtx = cc().getOperationContext();
 
-            if (opCtx != nullptr) {
-                validator->enableKeyGenerator(opCtx, false);
-            } else {
-                auto opCtxPtr = cc().makeOperationContext();
-                validator->enableKeyGenerator(opCtxPtr.get(), false);
-            }
+        if (opCtx != nullptr) {
+            validator->enableKeyGenerator(opCtx, false);
+        } else {
+            auto opCtxPtr = cc().makeOperationContext();
+            validator->enableKeyGenerator(opCtxPtr.get(), false);
         }
     }
 }
@@ -743,6 +741,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         CatalogCacheLoader::get(_service).onStepUp();
         PeriodicBalancerSettingsRefresher::get(_service)->start();
         ShardingState::get(_service)->initiateChunkSplitter();
+    } else {  // unsharded
+        if (auto validator = LogicalTimeValidator::get(_service)) {
+            validator->enableKeyGenerator(opCtx, true);
+        }
     }
 
     SessionCatalog::get(_service)->onStepUp(opCtx);

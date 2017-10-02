@@ -43,12 +43,11 @@ public:
     static const SimpleBSONElementComparator kInstance;
 
     int compare(const BSONElement& lhs, const BSONElement& rhs) const final {
-        return lhs.woCompare(rhs, true, nullptr);
+        return lhs.woCompare(rhs, ComparisonRules::kConsiderFieldName, nullptr);
     }
 
     void hash_combine(size_t& seed, const BSONElement& toHash) const final {
-        const bool considerFieldName = true;
-        hashCombineBSONElement(seed, toHash, considerFieldName, nullptr);
+        hashCombineBSONElement(seed, toHash, ComparisonRules::kConsiderFieldName, nullptr);
     }
 };
 

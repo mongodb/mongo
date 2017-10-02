@@ -88,7 +88,7 @@ if (VERSION_MAJOR == None or
     VERSION_MINOR == None or
     VERSION_PATCH == None or
     VERSION_STRING == None):
-    print "Failed to find version variables in " + version_file
+    print("Failed to find version variables in " + version_file)
     Exit(1)
 
 wiredtiger_includes = """

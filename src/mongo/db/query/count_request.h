@@ -132,10 +132,11 @@ public:
     StatusWith<BSONObj> asAggregationCommand() const;
 
     /**
-     * Construct a CountRequest from the command specification and db name. Caller must indicate if
-     * this is an explained count via 'isExplain'.
+     * Construct a CountRequest from the command specification and namespace string. Caller must
+     * already have parsed the first (command) field. Indicate if this is an explained count via
+     * 'isExplain'.
      */
-    static StatusWith<CountRequest> parseFromBSON(const std::string& dbname,
+    static StatusWith<CountRequest> parseFromBSON(const NamespaceString& nss,
                                                   const BSONObj& cmdObj,
                                                   bool isExplain);
 

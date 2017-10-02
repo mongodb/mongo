@@ -60,7 +60,7 @@ public:
 
     void setCollator(const CollatorInterface* collator) final {}
 
-    Status init(BSONElement modExpr, const CollatorInterface* collator) {
+    Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
         return Status::OK();
     }
 
@@ -99,7 +99,8 @@ private:
 
 }  // namespace
 
-Status RenameNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status RenameNode::init(BSONElement modExpr,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
     invariant(BSONType::String == modExpr.type());
 

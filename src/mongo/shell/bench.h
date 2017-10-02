@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
 #include "mongo/client/dbclientinterface.h"
@@ -119,7 +120,7 @@ public:
     void initializeFromBson(const BSONObj& args);
 
     // Create a new connection to the mongo instance specified by this configuration.
-    DBClientBase* createConnection() const;
+    std::unique_ptr<DBClientBase> createConnection() const;
 
     /**
      * Connection std::string describing the host to which to connect.
@@ -154,6 +155,17 @@ public:
      * NOTE: Only used by the javascript benchRun() and benchRunSync() functions.
      */
     double seconds;
+
+    /**
+     * Whether the individual benchRun thread connections should be creating and using sessions.
+     */
+    bool useSessions{false};
+
+    /**
+     * Whether write commands should be sent with a txnNumber to ensure they are idempotent. This
+     * setting doesn't actually cause the workload generator to perform any retries.
+     */
+    bool useIdempotentWrites{false};
 
     /// Base random seed for threads
     int64_t randomSeed;
@@ -192,17 +204,8 @@ private:
  * Not thread safe. Expected use is one instance per thread during parallel execution.
  */
 class BenchRunEventCounter {
-    MONGO_DISALLOW_COPYING(BenchRunEventCounter);
-
 public:
-    /// Constructs a zeroed out counter.
     BenchRunEventCounter();
-    ~BenchRunEventCounter();
-
-    /**
-     * Zero out the counter.
-     */
-    void reset();
 
     /**
      * Conceptually the equivalent of "+=". Adds "other" into this.
@@ -232,8 +235,8 @@ public:
     }
 
 private:
-    unsigned long long _numEvents;
-    long long _totalTimeMicros;
+    long long _totalTimeMicros{0};
+    unsigned long long _numEvents{0};
 };
 
 /**
@@ -292,20 +295,13 @@ private:
 /**
  * Statistics object representing the result of a bench run activity.
  */
-class BenchRunStats {
-    MONGO_DISALLOW_COPYING(BenchRunStats);
-
-public:
-    BenchRunStats();
-    ~BenchRunStats();
-
-    void reset();
-
+struct BenchRunStats {
     void updateFrom(const BenchRunStats& other);
 
-    bool error;
-    unsigned long long errCount;
-    unsigned long long opCount;
+    bool error{false};
+
+    unsigned long long errCount{0};
+    unsigned long long opCount{0};
 
     BenchRunEventCounter findOneCounter;
     BenchRunEventCounter updateCounter;
@@ -354,8 +350,10 @@ public:
      */
     void tellWorkersToCollectStats();
 
-    /// Check that the current state is BRS_FINISHED.
-    void assertFinished();
+    /**
+     * Check that the current state is BRS_FINISHED.
+     */
+    void assertFinished() const;
 
     //
     // Functions called by the worker threads, through instances of BenchRunWorker.
@@ -365,13 +363,13 @@ public:
      * Predicate that workers call to see if they should finish (as a result of a call
      * to tellWorkersToFinish()).
      */
-    bool shouldWorkerFinish();
+    bool shouldWorkerFinish() const;
 
     /**
     * Predicate that workers call to see if they should start collecting stats (as a result
     * of a call to tellWorkersToCollectStats()).
     */
-    bool shouldWorkerCollectStats();
+    bool shouldWorkerCollectStats() const;
 
     /**
      * Called by each BenchRunWorker from within its thread context, immediately before it
@@ -386,10 +384,13 @@ public:
     void onWorkerFinished();
 
 private:
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
+
     stdx::condition_variable _stateChangeCondition;
+
     unsigned _numUnstartedWorkers;
     unsigned _numActiveWorkers;
+
     AtomicUInt32 _isShuttingDown;
     AtomicUInt32 _isCollectingStats;
 };
@@ -412,7 +413,7 @@ public:
      */
     BenchRunWorker(size_t id,
                    const BenchRunConfig* config,
-                   BenchRunState* brState,
+                   BenchRunState& brState,
                    int64_t randomSeed);
     ~BenchRunWorker();
 
@@ -443,13 +444,19 @@ private:
     /// Predicate, used to decide whether or not it's time to collect statistics
     bool shouldCollectStats() const;
 
-    size_t _id;
+    const size_t _id;
+
     const BenchRunConfig* _config;
-    BenchRunState* _brState;
-    BenchRunStats _stats;
-    /// Dummy stats to use before observation period.
+
+    BenchRunState& _brState;
+
+    const int64_t _randomSeed;
+
+    // Dummy stats to use before observation period.
     BenchRunStats _statsBlackHole;
-    int64_t _randomSeed;
+
+    // Actual stats collected during the run
+    BenchRunStats _stats;
 };
 
 /**
@@ -506,7 +513,7 @@ public:
      *
      * Illegal to call until after stop() returns.
      */
-    void populateStats(BenchRunStats* stats);
+    BenchRunStats gatherStats() const;
 
     OID oid() const {
         return _oid;
@@ -528,10 +535,12 @@ private:
 
     OID _oid;
     BenchRunState _brState;
-    Timer* _brTimer;
+
+    boost::optional<Timer> _brTimer;
     unsigned long long _microsElapsed;
+
     std::unique_ptr<BenchRunConfig> _config;
-    std::vector<BenchRunWorker*> _workers;
+    std::vector<std::unique_ptr<BenchRunWorker>> _workers;
 };
 
 }  // namespace mongo

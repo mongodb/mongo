@@ -69,11 +69,7 @@ StatusWith<BSONObj> ViewShardingCheck::getResolvedViewIfSharded(OperationContext
         return BSONObj();
     }
 
-    BSONObjBuilder viewDetailBob;
-    viewDetailBob.append("ns", sourceNss.ns());
-    viewDetailBob.append("pipeline", resolvedView.getValue().getPipeline());
-
-    return viewDetailBob.obj();
+    return resolvedView.getValue().toBSON();
 }
 
 Status ViewShardingCheck::appendShardedViewResponse(const BSONObj& resolvedView,

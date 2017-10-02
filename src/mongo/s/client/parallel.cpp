@@ -328,10 +328,10 @@ void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
     const int tries = ++_staleNSMap[staleNS.ns()];
 
     if (tries >= 5) {
-        throw SendStaleConfigException(staleNS.ns(),
-                                       "too many retries of stale version info",
-                                       e.getVersionReceived(),
-                                       e.getVersionWanted());
+        throw StaleConfigException(staleNS.ns(),
+                                   "too many retries of stale version info",
+                                   e.getVersionReceived(),
+                                   e.getVersionWanted());
     }
 }
 
@@ -764,7 +764,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
                 LOG(pc) << "finished on shard " << shardId << ", current connection state is "
                         << mdata.toBSON();
             }
-        } catch (RecvStaleConfigException& e) {
+        } catch (StaleConfigException& e) {
             retry = true;
 
             string staleNS = e.getns();
@@ -999,10 +999,10 @@ void ParallelSortClusteredCursor::_oldInit() {
                 // Version is zero b/c this is deprecated codepath
                 staleConfigExs.push_back(str::stream()
                                          << "stale config detected for "
-                                         << RecvStaleConfigException(_ns,
-                                                                     "ParallelCursor::_init",
-                                                                     ChunkVersion(0, 0, OID()),
-                                                                     ChunkVersion(0, 0, OID()))
+                                         << StaleConfigException(_ns,
+                                                                 "ParallelCursor::_init",
+                                                                 ChunkVersion(0, 0, OID()),
+                                                                 ChunkVersion(0, 0, OID()))
                                                 .what()
                                          << errLoc);
                 break;
@@ -1157,7 +1157,7 @@ void ParallelSortClusteredCursor::_oldInit() {
 
         if (throwException && staleConfigExs.size() > 0) {
             // Version is zero b/c this is deprecated codepath
-            throw RecvStaleConfigException(
+            throw StaleConfigException(
                 _ns, errMsg.str(), ChunkVersion(0, 0, OID()), ChunkVersion(0, 0, OID()));
         } else if (throwException) {
             throw DBException(14827, errMsg.str());
@@ -1341,7 +1341,7 @@ void throwCursorStale(DBClientCursor* cursor) {
     if (cursor->hasResultFlag(ResultFlag_ShardConfigStale)) {
         BSONObj error;
         cursor->peekError(&error);
-        throw RecvStaleConfigException("query returned a stale config error", error);
+        throw StaleConfigException("query returned a stale config error", error);
     }
 
     if (NamespaceString(cursor->getns()).isCommand()) {
@@ -1351,8 +1351,8 @@ void throwCursorStale(DBClientCursor* cursor) {
         //
         // TODO: Standardize stale config reporting.
         BSONObj res = cursor->peekFirst();
-        if (res.hasField("code") && res["code"].Number() == ErrorCodes::SendStaleConfig) {
-            throw RecvStaleConfigException("command returned a stale config error", res);
+        if (res.hasField("code") && res["code"].Number() == ErrorCodes::StaleConfig) {
+            throw StaleConfigException("command returned a stale config error", res);
         }
     }
 }

@@ -44,7 +44,7 @@ namespace mongo {
  */
 class ConflictPlaceholderNode : public UpdateLeafNode {
 public:
-    Status init(BSONElement modExpr, const CollatorInterface* collator) final {
+    Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
         return Status::OK();
     }
 

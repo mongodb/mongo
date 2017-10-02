@@ -113,9 +113,10 @@ ClusterCursorManager::PinnedCursor& ClusterCursorManager::PinnedCursor::operator
     return *this;
 }
 
-StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next() {
+StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next(
+    RouterExecStage::ExecContext execContext) {
     invariant(_cursor);
-    return _cursor->next();
+    return _cursor->next(execContext);
 }
 
 void ClusterCursorManager::PinnedCursor::reattachToOperationContext(OperationContext* opCtx) {
@@ -131,6 +132,11 @@ void ClusterCursorManager::PinnedCursor::detachFromOperationContext() {
 bool ClusterCursorManager::PinnedCursor::isTailable() const {
     invariant(_cursor);
     return _cursor->isTailable();
+}
+
+bool ClusterCursorManager::PinnedCursor::isTailableAndAwaitData() const {
+    invariant(_cursor);
+    return _cursor->isTailableAndAwaitData();
 }
 
 UserNameIterator ClusterCursorManager::PinnedCursor::getAuthenticatedUsers() const {
@@ -196,10 +202,10 @@ ClusterCursorManager::~ClusterCursorManager() {
 }
 
 void ClusterCursorManager::shutdown(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _inShutdown = true;
-    lk.unlock();
-
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _inShutdown = true;
+    }
     killAllCursors();
     reapZombieCursors(opCtx);
 }
@@ -272,23 +278,26 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
                       "Cannot check out cursor as we are in the process of shutting down");
     }
 
-    CursorEntry* entry = getEntry_inlock(nss, cursorId);
+    CursorEntry* entry = _getEntry(lk, nss, cursorId);
     if (!entry) {
         return cursorNotFoundStatus(nss, cursorId);
     }
     if (entry->getKillPending()) {
         return cursorNotFoundStatus(nss, cursorId);
     }
+
+    const auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, entry->getLsid());
+    if (!cursorPrivilegeStatus.isOK()) {
+        return cursorPrivilegeStatus;
+    }
+
     std::unique_ptr<ClusterClientCursor> cursor = entry->releaseCursor();
     if (!cursor) {
         return cursorInUseStatus(nss, cursorId);
     }
-
-    const auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, cursor->getLsid());
-
-    if (!cursorPrivilegeStatus.isOK()) {
-        return cursorPrivilegeStatus;
-    }
+    // Note: due to SERVER-31138, despite putting this in a unique_ptr, it's actually not safe to
+    // return before the end of this function.  Be careful to avoid any early returns/throws after
+    // this point.
 
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).
@@ -314,7 +323,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
 
     const bool remotesExhausted = cursor->remotesExhausted();
 
-    CursorEntry* entry = getEntry_inlock(nss, cursorId);
+    CursorEntry* entry = _getEntry(lk, nss, cursorId);
     invariant(entry);
 
     entry->setLastActive(now);
@@ -333,7 +342,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
 
     // The cursor is exhausted, is not already scheduled for deletion, and does not have any
     // remote cursor state left to clean up. We can delete the cursor right away.
-    auto detachedCursor = detachCursor_inlock(nss, cursorId);
+    auto detachedCursor = _detachCursor(lk, nss, cursorId);
     invariantOK(detachedCursor.getStatus());
 
     // Deletion of the cursor can happen out of the lock.
@@ -344,7 +353,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
 Status ClusterCursorManager::killCursor(const NamespaceString& nss, CursorId cursorId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    CursorEntry* entry = getEntry_inlock(nss, cursorId);
+    CursorEntry* entry = _getEntry(lk, nss, cursorId);
     if (!entry) {
         return cursorNotFoundStatus(nss, cursorId);
     }
@@ -413,7 +422,7 @@ std::size_t ClusterCursorManager::reapZombieCursors(OperationContext* opCtx) {
 
     for (auto& cursorDescriptor : zombieCursorDescriptors) {
         StatusWith<std::unique_ptr<ClusterClientCursor>> zombieCursor =
-            detachCursor_inlock(cursorDescriptor.ns, cursorDescriptor.cursorId);
+            _detachCursor(lk, cursorDescriptor.ns, cursorDescriptor.cursorId);
         if (!zombieCursor.isOK()) {
             // Cursor in use, or has already been deleted.
             continue;
@@ -533,8 +542,9 @@ boost::optional<NamespaceString> ClusterCursorManager::getNamespaceForCursorId(
     return it->second;
 }
 
-ClusterCursorManager::CursorEntry* ClusterCursorManager::getEntry_inlock(const NamespaceString& nss,
-                                                                         CursorId cursorId) {
+auto ClusterCursorManager::_getEntry(WithLock, NamespaceString const& nss, CursorId cursorId)
+    -> CursorEntry* {
+
     auto nsToContainerIt = _namespaceToContainerMap.find(nss);
     if (nsToContainerIt == _namespaceToContainerMap.end()) {
         return nullptr;
@@ -548,9 +558,10 @@ ClusterCursorManager::CursorEntry* ClusterCursorManager::getEntry_inlock(const N
     return &entryMapIt->second;
 }
 
-StatusWith<std::unique_ptr<ClusterClientCursor>> ClusterCursorManager::detachCursor_inlock(
-    const NamespaceString& nss, CursorId cursorId) {
-    CursorEntry* entry = getEntry_inlock(nss, cursorId);
+StatusWith<std::unique_ptr<ClusterClientCursor>> ClusterCursorManager::_detachCursor(
+    WithLock lk, NamespaceString const& nss, CursorId cursorId) {
+
+    CursorEntry* entry = _getEntry(lk, nss, cursorId);
     if (!entry) {
         return cursorNotFoundStatus(nss, cursorId);
     }

@@ -39,6 +39,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/update_index_data.h"
@@ -50,7 +51,8 @@ namespace {
 using mongoutils::str::stream;
 
 TEST(Parse, Normal) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$set:{a:1}}"), arrayFilters));
@@ -59,7 +61,8 @@ TEST(Parse, Normal) {
 }
 
 TEST(Parse, MultiMods) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$set:{a:1, b:1}}"), arrayFilters));
@@ -68,7 +71,8 @@ TEST(Parse, MultiMods) {
 }
 
 TEST(Parse, MixingMods) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}"), arrayFilters));
@@ -77,7 +81,8 @@ TEST(Parse, MixingMods) {
 }
 
 TEST(Parse, ObjectReplacment) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{obj: \"obj replacement\"}"), arrayFilters));
@@ -85,7 +90,8 @@ TEST(Parse, ObjectReplacment) {
 }
 
 TEST(Parse, EmptyMod) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -96,7 +102,8 @@ TEST(Parse, EmptyMod) {
 }
 
 TEST(Parse, WrongMod) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -107,7 +114,8 @@ TEST(Parse, WrongMod) {
 }
 
 TEST(Parse, WrongType) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -119,7 +127,8 @@ TEST(Parse, WrongType) {
 }
 
 TEST(Parse, ModsWithLaterObjReplacement) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -131,7 +140,8 @@ TEST(Parse, ModsWithLaterObjReplacement) {
 }
 
 TEST(Parse, SetOnInsert) {
-    UpdateDriver::Options opts;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}"), arrayFilters));
@@ -140,9 +150,10 @@ TEST(Parse, SetOnInsert) {
 }
 
 TEST(Collator, SetCollationUpdatesModifierInterfaces) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    CollatorInterfaceMock reverseStringCollator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj updateDocument = fromjson("{$max: {a: 'abd'}}");
-    UpdateDriver::Options opts;
+    UpdateDriver::Options opts(expCtx);
     UpdateDriver driver(opts);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
@@ -154,7 +165,7 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     const FieldRefSet emptyImmutablePaths;
     bool modified = false;
     mutablebson::Document doc(fromjson("{a: 'cba'}"));
-    driver.setCollator(&collator);
+    driver.setCollator(&reverseStringCollator);
     driver
         .update(StringData(),
                 original,
@@ -178,11 +189,13 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
 class CreateFromQueryFixture : public mongo::unittest::Test {
 public:
     CreateFromQueryFixture()
-        : _driverOps(new UpdateDriver(UpdateDriver::Options())),
-          _driverRepl(new UpdateDriver(UpdateDriver::Options())) {
+        : _opCtx(_serviceContext.makeOperationContext()),
+          _driverOps(new UpdateDriver(
+              UpdateDriver::Options(new ExpressionContext(_opCtx.get(), nullptr)))),
+          _driverRepl(new UpdateDriver(
+              UpdateDriver::Options(new ExpressionContext(_opCtx.get(), nullptr)))) {
         _driverOps->parse(fromjson("{$set:{'_':1}}"), _arrayFilters).transitional_ignore();
         _driverRepl->parse(fromjson("{}"), _arrayFilters).transitional_ignore();
-        _opCtx = _serviceContext.makeOperationContext();
     }
 
     mutablebson::Document& doc() {

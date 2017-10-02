@@ -1,61 +1,93 @@
-// tests that listDatabases doesn't show config db on a shard, even if it is there
+(function() {
+    'use strict';
+    var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
 
-var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
+    var mongos = test.s0;
+    var mongod = test.shard0;
 
-var mongos = test.s0;
-var mongod = test.shard0;
+    var res;
+    var dbArray;
 
-// grab the config db instance by name
-var getDBSection = function(dbsArray, dbToFind) {
-    for (var pos in dbsArray) {
-        if (dbsArray[pos].name && dbsArray[pos].name === dbToFind)
-            return dbsArray[pos];
+    // grab the config db instance by name
+    var getDBSection = function(dbsArray, dbToFind) {
+        for (var pos in dbsArray) {
+            if (dbsArray[pos].name && dbsArray[pos].name === dbToFind)
+                return dbsArray[pos];
+        }
+        return null;
+    };
+
+    // Function to verify information for a database entry in listDatabases.
+    var dbEntryCheck = function(dbEntry, onConfig) {
+        assert.neq(null, dbEntry);
+        assert.neq(null, dbEntry.sizeOnDisk);
+        assert.eq(false, dbEntry.empty);
+
+        // Check against shards
+        var shards = dbEntry.shards;
+        assert(shards);
+        assert((shards["config"] && onConfig) || (!shards["config"] && !onConfig));
+    };
+
+    // Non-config-server db checks.
+    {
+        assert.writeOK(mongos.getDB("blah").foo.insert({_id: 1}));
+        assert.writeOK(mongos.getDB("foo").foo.insert({_id: 1}));
+        assert.writeOK(mongos.getDB("raw").foo.insert({_id: 1}));
+
+        res = mongos.adminCommand("listDatabases");
+        dbArray = res.databases;
+
+        dbEntryCheck(getDBSection(dbArray, "blah"), false);
+        dbEntryCheck(getDBSection(dbArray, "foo"), false);
+        dbEntryCheck(getDBSection(dbArray, "raw"), false);
     }
-    return null;
-};
 
-var dbInConfigEntryCheck = function(dbEntry) {
-    assert.neq(null, dbEntry);
-    assert(!dbEntry.shards);  // db should not be in shard.
-    assert.neq(null, dbEntry.sizeOnDisk);
-    assert.eq(false, dbEntry.empty);
-};
+    // Local db is never returned.
+    {
+        res = mongos.adminCommand("listDatabases");
+        dbArray = res.databases;
 
-assert.writeOK(mongos.getDB("blah").foo.insert({_id: 1}));
-assert.writeOK(mongos.getDB("foo").foo.insert({_id: 1}));
-assert.writeOK(mongos.getDB("raw").foo.insert({_id: 1}));
+        assert(!getDBSection(dbArray, 'local'));
+    }
 
-// verify that the config db is not on a shard
-var res = mongos.adminCommand("listDatabases");
-var dbArray = res.databases;
-dbInConfigEntryCheck(getDBSection(dbArray, "config"));
+    // Admin and config are always reported on the config shard.
+    {
+        assert.writeOK(mongos.getDB("admin").test.insert({_id: 1}));
+        assert.writeOK(mongos.getDB("config").test.insert({_id: 1}));
 
-// Local database should never be returned
-var localSection = getDBSection(dbArray, 'local');
-assert(!localSection);
+        res = mongos.adminCommand("listDatabases");
+        dbArray = res.databases;
 
-// add doc in admin db on the config server.
-assert.writeOK(mongos.getDB('admin').test.insert({_id: 1}));
-res = mongos.adminCommand("listDatabases");
-dbArray = res.databases;
-dbInConfigEntryCheck(getDBSection(dbArray, "config"));
-dbInConfigEntryCheck(getDBSection(dbArray, 'admin'));
+        dbEntryCheck(getDBSection(dbArray, "config"), true);
+        dbEntryCheck(getDBSection(dbArray, "admin"), true);
+    }
 
-// add doc in config/admin db on the shard
-mongod.getDB("config").foo.insert({_id: 1});
-mongod.getDB("admin").foo.insert({_id: 1});
+    // Config db can be present on config shard and on other shards.
+    {
+        mongod.getDB("config").foo.insert({_id: 1});
 
-// add doc in admin db (via mongos)
-mongos.getDB("admin").foo.insert({_id: 1});
+        res = mongos.adminCommand("listDatabases");
+        dbArray = res.databases;
 
-// verify that the config db is not on a shard
-res = mongos.adminCommand("listDatabases");
-dbArray = res.databases;
-// check config db
-assert(getDBSection(dbArray, "config"), "config db not found! 2");
-assert(!getDBSection(dbArray, "config").shards, "config db is on a shard! 2");
-// check admin db
-assert(getDBSection(dbArray, "admin"), "admin db not found! 2");
-assert(!getDBSection(dbArray, "admin").shards, "admin db is on a shard! 2");
+        var entry = getDBSection(dbArray, "config");
+        dbEntryCheck(entry, true);
+        assert(entry["shards"]);
+        assert.eq(Object.keys(entry["shards"]).length, 2);
+    }
 
-test.stop();
+    // Admin db is only reported on the config shard, never on other shards.
+    {
+        mongod.getDB("admin").foo.insert({_id: 1});
+
+        res = mongos.adminCommand("listDatabases");
+        dbArray = res.databases;
+
+        var entry = getDBSection(dbArray, "admin");
+        dbEntryCheck(entry, true);
+        assert(entry["shards"]);
+        assert.eq(Object.keys(entry["shards"]).length, 1);
+    }
+
+    test.stop();
+})();

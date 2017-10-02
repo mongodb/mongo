@@ -44,14 +44,14 @@ assert.soon(function() {
     return res.myState == 7;
 }, "Arbiter failed to initialize.");
 
-var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
+var options = {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}, upsert: true};
 assert.writeOK(A.foo.update({key: 'value1'}, {$set: {req: 'req'}}, options));
 replTest.stop(AID);
 
 master = replTest.getPrimary();
 assert(b_conn.host == master.host);
 options = {
-    writeConcern: {w: 1, wtimeout: 60000},
+    writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
     upsert: true
 };
 assert.writeOK(B.foo.update({key: 'value1'}, {$set: {res: 'res'}}, options));
@@ -60,7 +60,7 @@ replTest.restart(AID);
 master = replTest.getPrimary();
 assert(a_conn.host == master.host);
 options = {
-    writeConcern: {w: 1, wtimeout: 60000},
+    writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
     upsert: true
 };
 assert.writeOK(A.foo.update({key: 'value2'}, {$set: {req: 'req'}}, options));

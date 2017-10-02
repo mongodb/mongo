@@ -1179,6 +1179,12 @@ TEST(RegexMatchExpression, RegexOptionsStringCannotContainEmbeddedNullByte) {
     }
 }
 
+TEST(RegexMatchExpression, RegexCannotBeInvalid) {
+    RegexMatchExpression regex;
+    const auto invalid = "["_sd;
+    ASSERT_NOT_OK(regex.init("path", invalid, ""));
+}
+
 TEST(ModMatchExpression, MatchesElement) {
     BSONObj match = BSON("a" << 1);
     BSONObj largerMatch = BSON("a" << 4.0);

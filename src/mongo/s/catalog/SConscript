@@ -193,7 +193,6 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='sharding_catalog_test',
     source=[
-        'sharding_catalog_append_db_stats_test.cpp',
         'sharding_catalog_drop_coll_test.cpp',
         'sharding_catalog_log_change_test.cpp',
         'sharding_catalog_test.cpp',

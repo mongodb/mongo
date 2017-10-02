@@ -173,6 +173,21 @@
         mongos.adminCommand({shardCollection: kDbName + '.foo', key: {aKey: 1}, unique: true}));
 
     //
+    // Session-related tests
+    //
+
+    assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
+    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+
+    // shardCollection can be called under a session.
+    const sessionDb = mongos.startSession().getDatabase(kDbName);
+    assert.commandWorked(
+        sessionDb.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 'hashed'}}));
+    sessionDb.getSession().endSession();
+
+    assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
+
+    //
     // Collation-related tests
     //
 

@@ -58,23 +58,22 @@ public:
                       FieldNamesMode fieldNamesMode,
                       const StringData::ComparatorInterface* stringComparator)
         : _ordering(std::move(ordering)),
-          _fieldNamesMode(fieldNamesMode),
-          _stringComparator(stringComparator) {}
+          _stringComparator(stringComparator),
+          _rules((fieldNamesMode == FieldNamesMode::kConsider) ? ComparisonRules::kConsiderFieldName
+                                                               : 0) {}
 
     int compare(const BSONObj& lhs, const BSONObj& rhs) const final {
-        const bool considerFieldName = (_fieldNamesMode == FieldNamesMode::kConsider);
-        return lhs.woCompare(rhs, _ordering, considerFieldName, _stringComparator);
+        return lhs.woCompare(rhs, _ordering, _rules, _stringComparator);
     }
 
     void hash_combine(size_t& seed, const BSONObj& toHash) const final {
-        const bool considerFieldName = (_fieldNamesMode == FieldNamesMode::kConsider);
-        hashCombineBSONObj(seed, toHash, considerFieldName, _stringComparator);
+        hashCombineBSONObj(seed, toHash, _rules, _stringComparator);
     }
 
 private:
     BSONObj _ordering;
-    FieldNamesMode _fieldNamesMode;
     const StringData::ComparatorInterface* _stringComparator;
+    ComparisonRulesSet _rules;
 };
 
 }  // namespace mongo

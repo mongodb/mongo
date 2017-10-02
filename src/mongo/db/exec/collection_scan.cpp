@@ -66,6 +66,7 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
       _wsidForFetch(_workingSet->allocate()) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
+    invariant(!_params.shouldTrackLatestOplogTimestamp || _params.collection->ns().isOplog());
 }
 
 PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
@@ -169,6 +170,13 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     }
 
     _lastSeenId = record->id;
+    if (_params.shouldTrackLatestOplogTimestamp) {
+        auto status = setLatestOplogEntryTimestamp(*record);
+        if (!status.isOK()) {
+            *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
+            return PlanStage::FAILURE;
+        }
+    }
 
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
@@ -177,6 +185,19 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     _workingSet->transitionToRecordIdAndObj(id);
 
     return returnIfMatches(member, id, out);
+}
+
+Status CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
+    auto tsElem = record.data.toBson()["ts"];
+    if (tsElem.type() != BSONType::bsonTimestamp) {
+        Status status(ErrorCodes::InternalError,
+                      str::stream() << "CollectionScan was asked to track latest operation time, "
+                                       "but found a result without a valid 'ts' field: "
+                                    << record.data.toBson().toString());
+        return status;
+    }
+    _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, tsElem.timestamp());
+    return Status::OK();
 }
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,

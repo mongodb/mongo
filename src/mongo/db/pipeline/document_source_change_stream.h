@@ -62,10 +62,6 @@ public:
         PrivilegeVector requiredPrivileges(bool isMongos) const final {
             return {};
         }
-
-        bool allowedToForwardFromMongos() const final {
-            return false;
-        }
     };
 
     class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
@@ -128,6 +124,8 @@ public:
     static constexpr StringData kReplaceOpType = "replace"_sd;
     static constexpr StringData kInsertOpType = "insert"_sd;
     static constexpr StringData kInvalidateOpType = "invalidate"_sd;
+    // Internal op type to close the cursor.
+    static constexpr StringData kRetryNeededOpType = "retryNeeded"_sd;
 
     /**
      * Produce the BSON object representing the filter for the $match stage to filter oplog entries

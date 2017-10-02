@@ -46,7 +46,7 @@ namespace mongo {
 class OperationContext;
 class LogicalTime;
 class ServiceContext;
-class ShardingCatalogClient;
+class KeysCollectionClient;
 
 /**
  * This implementation of the KeysCollectionManager queries the config servers for keys.
@@ -58,7 +58,7 @@ public:
     static const Seconds kKeyValidInterval;
 
     KeysCollectionManagerSharding(std::string purpose,
-                                  ShardingCatalogClient* client,
+                                  std::unique_ptr<KeysCollectionClient> client,
                                   Seconds keyValidForInterval);
 
     /**
@@ -185,9 +185,9 @@ private:
      */
     StatusWith<KeysCollectionDocument> _getKey(const LogicalTime& forThisTime);
 
+    std::unique_ptr<KeysCollectionClient> _client;
     const std::string _purpose;
     const Seconds _keyValidForInterval;
-    ShardingCatalogClient* _catalogClient;
 
     // No mutex needed since the members below have their own mutexes.
     KeysCollectionCacheReader _keysCache;

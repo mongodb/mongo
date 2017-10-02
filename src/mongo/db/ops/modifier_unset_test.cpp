@@ -38,6 +38,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
@@ -45,6 +46,7 @@ namespace {
 
 using mongo::Array;
 using mongo::BSONObj;
+using mongo::ExpressionContextForTest;
 using mongo::fromjson;
 using mongo::LogBuilder;
 using mongo::ModifierInterface;
@@ -62,7 +64,7 @@ public:
     explicit Mod(BSONObj modObj) {
         _modObj = modObj;
         ASSERT_OK(_mod.init(_modObj["$unset"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+                            ModifierInterface::Options::normal(new ExpressionContextForTest())));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {

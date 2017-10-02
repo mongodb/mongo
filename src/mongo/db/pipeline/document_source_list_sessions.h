@@ -37,7 +37,7 @@ namespace mongo {
 
 /**
  * $listSessions: { allUsers: true/false, users: [ {user:"jsmith", db:"test"}, ... ] }
- * Return all sessions in the admin.system.sessions collection
+ * Return all sessions in the config.system.sessions collection
  * or just sessions for the currently logged in user. (Default: false)
  *
  * This is essentially an alias for {$match:{"_id.uid": myid}} or {$match:{}}
@@ -86,11 +86,11 @@ public:
     }
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        constraints.requiresInputDocSource = true;
-        constraints.isAllowedInsideFacetStage = false;
-        return constraints;
+        return {StreamType::kStreaming,
+                PositionRequirement::kFirst,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

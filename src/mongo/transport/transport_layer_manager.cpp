@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/service_executor_adaptive.h"
+#include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/transport/transport_layer_legacy.h"
@@ -70,32 +71,13 @@ void TransportLayerManager::asyncWait(Ticket&& ticket, TicketCallback callback) 
 }
 
 template <typename Callable>
-void TransportLayerManager::_foreach(Callable&& cb) {
+void TransportLayerManager::_foreach(Callable&& cb) const {
     {
         stdx::lock_guard<stdx::mutex> lk(_tlsMutex);
         for (auto&& tl : _tls) {
             cb(tl.get());
         }
     }
-}
-
-TransportLayer::Stats TransportLayerManager::sessionStats() {
-    Stats stats;
-
-    _foreach([&](TransportLayer* tl) {
-        Stats s = tl->sessionStats();
-
-        stats.numOpenSessions += s.numOpenSessions;
-        stats.numCreatedSessions += s.numCreatedSessions;
-        if (std::numeric_limits<size_t>::max() - stats.numAvailableSessions <
-            s.numAvailableSessions) {
-            stats.numAvailableSessions = std::numeric_limits<size_t>::max();
-        } else {
-            stats.numAvailableSessions += s.numAvailableSessions;
-        }
-    });
-
-    return stats;
 }
 
 void TransportLayerManager::end(const SessionHandle& session) {
@@ -148,8 +130,12 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     auto sep = ctx->getServiceEntryPoint();
     if (config->transportLayer == "asio") {
         transport::TransportLayerASIO::Options opts(config);
-        if (config->serviceExecutor != "synchronous") {
-            opts.async = true;
+        if (config->serviceExecutor == "adaptive") {
+            opts.transportMode = transport::Mode::kAsynchronous;
+        } else if (config->serviceExecutor == "synchronous") {
+            opts.transportMode = transport::Mode::kSynchronous;
+        } else {
+            MONGO_UNREACHABLE;
         }
 
         auto transportLayerASIO = stdx::make_unique<transport::TransportLayerASIO>(opts, sep);
@@ -157,11 +143,14 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
         if (config->serviceExecutor == "adaptive") {
             ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorAdaptive>(
                 ctx, transportLayerASIO->getIOContext()));
+        } else if (config->serviceExecutor == "synchronous") {
+            ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorSynchronous>(ctx));
         }
         transportLayer = std::move(transportLayerASIO);
     } else if (serverGlobalParams.transportLayer == "legacy") {
         transport::TransportLayerLegacy::Options opts(config);
         transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(opts, sep);
+        ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorSynchronous>(ctx));
     }
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;

@@ -39,6 +39,7 @@
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/mock_ticket.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor_noop.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -75,6 +76,18 @@ public:
     }
 
     void endAllSessions(transport::Session::TagMask tags) override {}
+
+    bool shutdown(Milliseconds timeout) override {
+        return true;
+    }
+
+    Stats sessionStats() const override {
+        return {};
+    }
+
+    size_t numOpenSessions() const override {
+        return 0ULL;
+    }
 
     void setUassertInHandler() {
         _uassertInHandler = true;
@@ -193,7 +206,7 @@ Message buildRequest(BSONObj input) {
     return builder.finish();
 }
 
-}  // namespace
+using State = ServiceStateMachine::State;
 
 class ServiceStateMachineFixture : public unittest::Test {
 protected:
@@ -210,12 +223,15 @@ protected:
         _sep = sep.get();
         sc->setServiceEntryPoint(std::move(sep));
 
+        sc->setServiceExecutor(stdx::make_unique<ServiceExecutorNoop>(sc));
+
         auto tl = stdx::make_unique<MockTL>();
         _tl = tl.get();
         sc->setTransportLayer(std::move(tl));
         _tl->start().transitional_ignore();
 
-        _ssm = ServiceStateMachine::create(getGlobalServiceContext(), _tl->createSession(), true);
+        _ssm = ServiceStateMachine::create(
+            getGlobalServiceContext(), _tl->createSession(), transport::Mode::kSynchronous);
         _tl->setSSM(_ssm.get());
     }
 
@@ -223,7 +239,7 @@ protected:
         getGlobalServiceContext()->getTransportLayer()->shutdown();
     }
 
-    ServiceStateMachine::State runPingTest();
+    void runPingTest(State first, State second);
     void checkPingOk();
 
     MockTL* _tl;
@@ -233,17 +249,22 @@ protected:
     bool _ranHandler;
 };
 
-ServiceStateMachine::State ServiceStateMachineFixture::runPingTest() {
+void ServiceStateMachineFixture::runPingTest(State first, State second) {
     _tl->setNextMessage(buildRequest(BSON("ping" << 1)));
 
     ASSERT_FALSE(haveClient());
-    ASSERT_EQ(_ssm->state(), ServiceStateMachine::State::Created);
+    ASSERT_EQ(_ssm->state(), State::Created);
     log() << "run next";
     _ssm->runNext();
-    auto ret = _ssm->state();
+
+    ASSERT_EQ(_ssm->state(), first);
+    if (first == State::Ended)
+        return;
+
+    _ssm->runNext();
     ASSERT_FALSE(haveClient());
 
-    return ret;
+    ASSERT_EQ(_ssm->state(), second);
 }
 
 void ServiceStateMachineFixture::checkPingOk() {
@@ -253,14 +274,14 @@ void ServiceStateMachineFixture::checkPingOk() {
 }
 
 TEST_F(ServiceStateMachineFixture, TestOkaySimpleCommand) {
-    ASSERT_EQ(ServiceStateMachine::State::Source, runPingTest());
+    runPingTest(State::Process, State::Source);
     checkPingOk();
 }
 
 TEST_F(ServiceStateMachineFixture, TestThrowHandling) {
     _sep->setUassertInHandler();
 
-    ASSERT_EQ(ServiceStateMachine::State::Ended, runPingTest());
+    runPingTest(State::Process, State::Ended);
     ASSERT(_tl->getLastSunk().empty());
     ASSERT_TRUE(_tl->ranSource());
     ASSERT_FALSE(_tl->ranSink());
@@ -269,7 +290,8 @@ TEST_F(ServiceStateMachineFixture, TestThrowHandling) {
 TEST_F(ServiceStateMachineFixture, TestSourceError) {
     _tl->setNextFailure(MockTL::Source);
 
-    ASSERT_EQ(ServiceStateMachine::State::Ended, runPingTest());
+
+    runPingTest(State::Ended, State::Ended);
     ASSERT(_tl->getLastSunk().empty());
     ASSERT_TRUE(_tl->ranSource());
     ASSERT_FALSE(_tl->ranSink());
@@ -278,7 +300,7 @@ TEST_F(ServiceStateMachineFixture, TestSourceError) {
 TEST_F(ServiceStateMachineFixture, TestSinkError) {
     _tl->setNextFailure(MockTL::Sink);
 
-    ASSERT_EQ(ServiceStateMachine::State::Ended, runPingTest());
+    runPingTest(State::Process, State::Ended);
     ASSERT_TRUE(_tl->ranSource());
     ASSERT_TRUE(_tl->ranSink());
 }
@@ -292,12 +314,12 @@ TEST_F(ServiceStateMachineFixture, TestSessionCleanupOnDestroy) {
     _ssm->setCleanupHook([&hookRan] { hookRan = true; });
 
     // Do a regular ping test so that all the processMessage/sinkMessage code gets exercised
-    ASSERT_EQ(ServiceStateMachine::State::Source, runPingTest());
+    runPingTest(State::Process, State::Source);
 
     // Set the next run up to fail on source (like a disconnected client) and run it
     _tl->setNextFailure(MockTL::Source);
     _ssm->runNext();
-    ASSERT_EQ(ServiceStateMachine::State::Ended, _ssm->state());
+    ASSERT_EQ(State::Ended, _ssm->state());
 
     // Check that after the failure and the session getting cleaned up that the SessionHandle
     // only has one use (our copy in _sessionHandle)
@@ -307,4 +329,5 @@ TEST_F(ServiceStateMachineFixture, TestSessionCleanupOnDestroy) {
     ASSERT_TRUE(hookRan);
 }
 
+}  // namespace
 }  // namespace mongo

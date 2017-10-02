@@ -110,7 +110,7 @@ public:
 
         // This is provided because some modifiers may ignore certain errors when the update is from
         // replication.
-        bool fromReplication = false;
+        bool fromOplogApplication = false;
 
         // If true, UpdateNode::apply ensures that modified elements do not violate depth or DBRef
         // constraints.

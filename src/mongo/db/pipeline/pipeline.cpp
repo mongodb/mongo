@@ -64,6 +64,9 @@ namespace dps = ::mongo::dotted_path_support;
 
 using HostTypeRequirement = DocumentSource::StageConstraints::HostTypeRequirement;
 using PositionRequirement = DocumentSource::StageConstraints::PositionRequirement;
+using DiskUseRequirement = DocumentSource::StageConstraints::DiskUseRequirement;
+using FacetRequirement = DocumentSource::StageConstraints::FacetRequirement;
+using StreamType = DocumentSource::StageConstraints::StreamType;
 
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
 
@@ -169,15 +172,14 @@ void Pipeline::validateFacetPipeline() const {
     }
     for (auto&& stage : _sources) {
         auto stageConstraints = stage->constraints();
-        if (!stageConstraints.isAllowedInsideFacetStage) {
+        if (!stageConstraints.isAllowedInsideFacetStage()) {
             uasserted(40600,
                       str::stream() << stage->getSourceName()
                                     << " is not allowed to be used within a $facet stage");
         }
         // We expect a stage within a $facet stage to have these properties.
-        invariant(stageConstraints.requiresInputDocSource);
-        invariant(!stageConstraints.isIndependentOfAnyCollection);
         invariant(stageConstraints.requiredPosition == PositionRequirement::kNone);
+        invariant(!stageConstraints.isIndependentOfAnyCollection);
     }
 
     // Facet pipelines cannot have any stages which are initial sources. We've already validated the
@@ -217,7 +219,7 @@ void Pipeline::optimizePipeline() {
     // We could be swapping around stages during this process, so disconnect the pipeline to prevent
     // us from entering a state with dangling pointers.
     unstitch();
-    while (itr != _sources.end() && std::next(itr) != _sources.end()) {
+    while (itr != _sources.end()) {
         invariant((*itr).get());
         itr = (*itr).get()->optimizeAt(itr, &_sources);
     }
@@ -434,8 +436,24 @@ bool Pipeline::needsPrimaryShardMerger() const {
 }
 
 bool Pipeline::canRunOnMongos() const {
+    return std::all_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
+        auto constraints = stage->constraints();
+        const bool doesNotNeedShard = (constraints.hostRequirement == HostTypeRequirement::kNone);
+        const bool doesNotNeedDisk =
+            (constraints.diskRequirement == DiskUseRequirement::kNoDiskUse ||
+             (constraints.diskRequirement == DiskUseRequirement::kWritesTmpData &&
+              !pCtx->allowDiskUse));
+        const bool doesNotBlockOrBlockingIsPermitted =
+            (constraints.streamType == StreamType::kStreaming ||
+             !internalQueryProhibitBlockingMergeOnMongoS.load());
+
+        return doesNotNeedShard && doesNotNeedDisk && doesNotBlockOrBlockingIsPermitted;
+    });
+}
+
+bool Pipeline::allowedToForwardFromMongos() const {
     return std::all_of(_sources.begin(), _sources.end(), [](const auto& stage) {
-        return stage->constraints().hostRequirement == HostTypeRequirement::kAnyShardOrMongoS;
+        return stage->constraints().allowedToForwardFromMongos;
     });
 }
 
@@ -502,19 +520,35 @@ void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
     _sources.push_front(source);
 }
 
+void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
+    if (!_sources.empty()) {
+        source->setSource(_sources.back().get());
+    }
+    _sources.push_back(source);
+}
+
 DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const {
     DepsTracker deps(metadataAvailable);
+    const bool scopeHasVariables = pCtx->variablesParseState.hasDefinedVariables();
+    bool skipFieldsAndMetadataDeps = false;
     bool knowAllFields = false;
     bool knowAllMeta = false;
     for (auto&& source : _sources) {
         DepsTracker localDeps(deps.getMetadataAvailable());
         DocumentSource::GetDepsReturn status = source->getDependencies(&localDeps);
 
-        if (status == DocumentSource::NOT_SUPPORTED) {
+        deps.vars.insert(localDeps.vars.begin(), localDeps.vars.end());
+
+        if ((skipFieldsAndMetadataDeps |= (status == DocumentSource::NOT_SUPPORTED))) {
             // Assume this stage needs everything. We may still know something about our
-            // dependencies if an earlier stage returned either EXHAUSTIVE_FIELDS or
-            // EXHAUSTIVE_META.
-            break;
+            // dependencies if an earlier stage returned EXHAUSTIVE_FIELDS or EXHAUSTIVE_META. If
+            // this scope has variables, we need to keep enumerating the remaining stages but will
+            // skip adding any further field or metadata dependencies.
+            if (scopeHasVariables) {
+                continue;
+            } else {
+                break;
+            }
         }
 
         if (!knowAllFields) {
@@ -534,7 +568,9 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
             knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
         }
 
-        if (knowAllMeta && knowAllFields) {
+        // If there are variables defined at this pipeline's scope, there may be dependencies upon
+        // them in subsequent stages. Keep enumerating.
+        if (knowAllMeta && knowAllFields && !scopeHasVariables) {
             break;
         }
     }
@@ -555,11 +591,17 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
     return deps;
 }
 
-boost::intrusive_ptr<DocumentSource> Pipeline::popFrontStageWithName(StringData targetStageName) {
+boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithCriteria(
+    StringData targetStageName, stdx::function<bool(const DocumentSource* const)> predicate) {
     if (_sources.empty() || _sources.front()->getSourceName() != targetStageName) {
         return nullptr;
     }
     auto targetStage = _sources.front();
+
+    if (predicate && !predicate(targetStage.get())) {
+        return nullptr;
+    }
+
     _sources.pop_front();
     stitch();
     return targetStage;

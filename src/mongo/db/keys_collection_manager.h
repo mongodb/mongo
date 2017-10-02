@@ -39,6 +39,7 @@ class OperationContext;
 class LogicalTime;
 class ServiceContext;
 
+extern int KeysRotationIntervalSec;
 /**
  * This is responsible for providing keys that can be used for HMAC computation. This also supports
  * automatic key rotation that happens on a configurable interval.
@@ -46,6 +47,7 @@ class ServiceContext;
 class KeysCollectionManager {
 public:
     static const Seconds kKeyValidInterval;
+    static const std::string kKeyManagerPurposeString;
 
     virtual ~KeysCollectionManager();
 

@@ -28,7 +28,9 @@
     }
 
     assert.commandWorked(db.runCommand({insert: mainCollName, documents: [{fooField: 'FOO'}]}));
-    assert.commandWorked(db.runCommand({insert: subCollName, documents: [{fooField: 'BAR'}]}));
+    assert.commandWorked(
+        db.runCommand({insert: subCollName, documents: [{fooField: 'BAR'}, {fooField: 'FOOBAR'}]}));
+
     // Ensure passing a UUID to find retrieves results from the correct collection.
     let cmd = {find: uuid};
     let res = db.runCommand(cmd);
@@ -40,6 +42,16 @@
     assert.eq(doc.fooField, 'FOO');
     assert(!cursor.hasNext(), 'expected to have exhausted cursor for results ' + tojson(res));
 
+    // Ensure passing a missing UUID to commands taking UUIDs uasserts that the UUID is not found.
+    const missingUUID = UUID();
+    for (cmd of[{count: missingUUID},
+                {find: missingUUID},
+                {listIndexes: missingUUID},
+                {parallelCollectionScan: missingUUID, numCursors: 1}]) {
+        assert.commandFailedWithCode(
+            db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
+    }
+
     // Ensure passing a UUID to listIndexes retrieves results from the correct collection.
     cmd = {listIndexes: uuid};
     res = db.runCommand(cmd);
@@ -48,6 +60,12 @@
     cursor.forEach(function(doc) {
         assert.eq(doc.ns, 'test.' + mainCollName);
     });
+
+    // Ensure passing a UUID to count retrieves results from the correct collection.
+    cmd = {count: uuid};
+    res = db.runCommand(cmd);
+    assert.commandWorked(res, 'could not run ' + tojson(cmd));
+    assert.eq(res.n, 1, "expected to count a single document with command: " + tojson(cmd));
 
     // Ensure passing a UUID to parallelCollectionScan retrieves results from the correct
     // collection.

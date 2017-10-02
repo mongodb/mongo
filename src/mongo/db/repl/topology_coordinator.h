@@ -68,6 +68,40 @@ public:
 
     virtual ~TopologyCoordinator();
 
+    /**
+     * Different modes a node can be in while still reporting itself as in state PRIMARY.
+     *
+     * Valid transitions:
+     *
+     *       kNotLeader <----------------------------------
+     *          |                                         |
+     *          |                                         |
+     *          |                                         |
+     *          v                                         |
+     *       kLeaderElect-----                            |
+     *          |            |                            |
+     *          |            |                            |
+     *          v            |                            |
+     *       kMaster -------------------------            |
+     *        |  ^           |                |           |
+     *        |  |     -------------------    |           |
+     *        |  |     |                 |    |           |
+     *        v  |     v                 v    v           |
+     *  kAttemptingStepDown----------->kSteppingDown      |
+     *        |                              |            |
+     *        |                              |            |
+     *        |                              |            |
+     *        ---------------------------------------------
+     *
+     */
+    enum class LeaderMode {
+        kNotLeader,           // This node is not currently a leader.
+        kLeaderElect,         // This node has been elected leader, but can't yet accept writes.
+        kMaster,              // This node reports ismaster:true and can accept writes.
+        kSteppingDown,        // This node is in the middle of a (hb) stepdown that must complete.
+        kAttemptingStepDown,  // This node is in the middle of a stepdown (cmd) that might fail.
+    };
+
     ////////////////////////////////////////////////////////////
     //
     // State inspection methods.
@@ -83,6 +117,19 @@ public:
      * Gets the MemberState of this member in the replica set.
      */
     virtual MemberState getMemberState() const = 0;
+
+    /**
+     * Returns whether this node should be allowed to accept writes.
+     */
+    virtual bool canAcceptWrites() const = 0;
+
+    /**
+     * Returns true if this node is in the process of stepping down.  Note that this can be
+     * due to an unconditional stepdown that must succeed (for instance from learning about a new
+     * term) or due to a stepdown attempt that could fail (for instance from a stepdown cmd that
+     * could fail if not enough nodes are caught up).
+     */
+    virtual bool isSteppingDown() const = 0;
 
     /**
      * Returns the address of the current sync source, or an empty HostAndPort if there is no
@@ -114,18 +161,18 @@ public:
 
     enum class UpdateTermResult { kAlreadyUpToDate, kTriggerStepDown, kUpdatedTerm };
 
+    ////////////////////////////////////////////////////////////
+    //
+    // Basic state manipulation methods.
+    //
+    ////////////////////////////////////////////////////////////
+
     /**
      * Sets the latest term this member is aware of to the higher of its current value and
      * the value passed in as "term".
      * Returns the result of setting the term value, or if a stepdown should be triggered.
      */
     virtual UpdateTermResult updateTerm(long long term, Date_t now) = 0;
-
-    ////////////////////////////////////////////////////////////
-    //
-    // Basic state manipulation methods.
-    //
-    ////////////////////////////////////////////////////////////
 
     /**
      * Sets the index into the config used when we next choose a sync source
@@ -220,11 +267,13 @@ public:
     virtual OpTime getLastCommittedOpTime() const = 0;
 
     /**
-     * This is used to set a floor of "newOpTime" on the OpTimes we will consider committed.
-     * This prevents entries from before our election from counting as committed in our view,
-     * until our election (the "newOpTime" op) has been committed.
+     * Called by the ReplicationCoordinator to signal that we have finished catchup and drain modes
+     * and are ready to fully become primary and start accepting writes.
+     * "firstOpTimeOfTerm" is a floor on the OpTimes this node will be allowed to consider committed
+     * for this tenure as primary. This prevents entries from before our election from counting as
+     * committed in our view, until our election (the "firstOpTimeOfTerm" op) has been committed.
      */
-    virtual void setFirstOpTimeOfMyTerm(const OpTime& newOpTime) = 0;
+    virtual void completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm) = 0;
 
     /**
      * Adjusts the maintenance mode count by "inc".
@@ -398,10 +447,10 @@ public:
                                                        bool skipSelf) = 0;
 
     /**
-     * Marks a member has down from our persepctive and returns a HeartbeatResponseAction, which
-     * will be StepDownSelf if we can no longer see a majority of the nodes.
+     * Marks a member as down from our perspective and returns a bool which indicates if we can no
+     * longer see a majority of the nodes and thus should step down.
      */
-    virtual HeartbeatResponseAction setMemberAsDown(Date_t now, const int memberIndex) = 0;
+    virtual bool setMemberAsDown(Date_t now, const int memberIndex) = 0;
 
     /**
      * Goes through the memberData and determines which member that is currently live
@@ -500,40 +549,71 @@ public:
     virtual void processLoseElection() = 0;
 
     /**
+     * Readies the TopologyCoordinator for an attempt to stepdown that may fail.  This is used
+     * when we receive a stepdown command (which can fail if not enough secondaries are caught up)
+     * to ensure that we never process more than one stepdown request at a time.
+     * Returns OK if it is safe to continue with the stepdown attempt, or returns
+     * ConflictingOperationInProgess if this node is already processing a stepdown request of any
+     * kind.
+     */
+    virtual Status prepareForStepDownAttempt() = 0;
+
+    /**
+     * If this node is still attempting to process a stepdown attempt, aborts the attempt and
+     * returns this node to normal primary/master state.  If this node has already completed
+     * stepping down or is now in the process of handling an unconditional stepdown, then this
+     * method does nothing.
+     */
+    virtual void abortAttemptedStepDownIfNeeded() = 0;
+
+    /**
      * Tries to transition the coordinator from the leader role to the follower role.
      *
-     * If force==true, step down this node and return true immediately. Else, a step down
-     * succeeds only if the following conditions are met:
+     * A step down succeeds based on the following conditions:
      *
-     *      C1. A majority set of nodes, M, in the replica set have optimes greater than or
+     *      C1. 'force' is true and now > waitUntil
+     *
+     *      C2. A majority set of nodes, M, in the replica set have optimes greater than or
      *      equal to the last applied optime of the primary.
      *
-     *      C2. If C1 holds, then there must exist at least one electable secondary node in the
-     *      majority set M.
+     *      C3. There exists at least one electable secondary node in the majority set M.
      *
-     * C1 should already be checked in ReplicationCoordinator. This method checks C2.
      *
-     * If C2 holds, a step down occurs and this method returns true. Else, the step down
-     * fails and this method returns false.
-     *
-     * NOTE: It is illegal to call this method if the node is not a primary.
+     * If C1 is true, or if both C2 and C3 are true, then the stepdown occurs and this method
+     * returns true. If the conditions for successful stepdown aren't met yet, but waiting for more
+     * time to pass could make it succeed, returns false.  If the whole stepdown attempt should be
+     * abandoned (for example because the time limit expired or because we've already stepped down),
+     * throws an exception.
+     * TODO(spencer): Unify with the finishUnconditionalStepDown() method.
      */
-    virtual bool stepDown(Date_t until, bool force) = 0;
+    virtual bool attemptStepDown(
+        long long termAtStart, Date_t now, Date_t waitUntil, Date_t stepDownUntil, bool force) = 0;
+
+    /**
+     * Returns whether it is safe for a stepdown attempt to complete, ignoring the 'force' argument.
+     * This is essentially checking conditions C2 and C3 as described in the comment to
+     * attemptStepDown().
+     */
+    virtual bool isSafeToStepDown() = 0;
+
+    /**
+     * Readies the TopologyCoordinator for stepdown.  Returns false if we're already in the process
+     * of an unconditional step down.  If we are in the middle of a stepdown command attempt when
+     * this is called then this unconditional stepdown will supersede the stepdown attempt, which
+     * will cause the stepdown to fail.  When this returns true it must be followed by a call to
+     * finishUnconditionalStepDown() that is called when holding the global X lock.
+     */
+    virtual bool prepareForUnconditionalStepDown() = 0;
 
     /**
      * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
      * global exclusive lock so we can't actually stepdown at that moment. When that happens
-     * we record that a stepdown request is pending and schedule work to stepdown in the global
-     * lock.  This method is called after holding the global lock to perform the actual
-     * stepdown, but only if the node hasn't already stepped down another way since the work was
-     * scheduled.  Returns true if it actually steps down, and false otherwise.
+     * we record that a stepdown request is pending (by calling prepareForUnconditionalStepDown())
+     * and schedule work to stepdown in the global X lock.  This method is called after holding the
+     * global lock to perform the actual stepdown.
+     * TODO(spencer): Unify with the finishAttemptedStepDown() method.
      */
-    virtual bool stepDownIfPending() = 0;
-
-    /**
-     * Returns true if a stepdown request is pending on acquisition of the global lock.
-     */
-    virtual bool isStepDownPending() const = 0;
+    virtual void finishUnconditionalStepDown() = 0;
 
     /**
      * Considers whether or not this node should stand for election, and returns true
@@ -576,11 +656,6 @@ public:
      * Called only during replication startup. All other updates are done internally.
      */
     virtual void loadLastVote(const LastVote& lastVote) = 0;
-
-    /**
-     * Readies the TopologyCoordinator for stepdown.
-     */
-    virtual void prepareForStepDown() = 0;
 
     /**
      * Updates the current primary index.

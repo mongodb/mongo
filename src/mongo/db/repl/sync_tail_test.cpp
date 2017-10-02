@@ -33,6 +33,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -142,6 +143,20 @@ void createCollection(OperationContext* opCtx,
     });
 }
 
+auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
+    BSONElement tsArray;
+    Status status =
+        bsonExtractTypedField(obj, OpTime::kTimestampFieldName, BSONType::Array, &tsArray);
+    ASSERT_OK(status);
+
+    BSONElement termArray;
+    status = bsonExtractTypedField(obj, OpTime::kTermFieldName, BSONType::Array, &termArray);
+    ASSERT_OK(status);
+
+    return OpTime(tsArray.Array()[elem].timestamp(), termArray.Array()[elem].Long());
+};
+
+
 TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {
     const BSONObj op = BSON("op"
                             << "x");
@@ -194,27 +209,6 @@ TEST_F(SyncTailTest, SyncApplyNoOp) {
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
     ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, false, applyOp, failedApplyCommand, _incOps));
     ASSERT_TRUE(applyOpCalled);
-}
-
-TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
-    const BSONObj op = BSON("op"
-                            << "n"
-                            << "ns"
-                            << "test.t");
-    int applyOpCalled = 0;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool inSteadyStateReplication,
-                                                   stdx::function<void()>) {
-        applyOpCalled++;
-        if (applyOpCalled < 5) {
-            throw WriteConflictException();
-        }
-        return Status::OK();
-    };
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, false, applyOp, failedApplyCommand, _incOps));
-    ASSERT_EQUALS(5, applyOpCalled);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
@@ -683,7 +677,7 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
     ASSERT_BSONOBJ_EQ(createOp2.raw, operationsApplied[1]);
 
     // Check grouped insert operations in namespace "nss1".
-    ASSERT_EQUALS(insertOp1a.getOpTime(), OpTime::parseFromOplogEntry(operationsApplied[2]));
+    ASSERT_EQUALS(insertOp1a.getOpTime(), parseFromOplogEntryArray(operationsApplied[2], 0));
     ASSERT_EQUALS(insertOp1a.getNamespace().ns(), operationsApplied[2]["ns"].valuestrsafe());
     ASSERT_EQUALS(BSONType::Array, operationsApplied[2]["o"].type());
     auto group1 = operationsApplied[2]["o"].Array();
@@ -692,7 +686,7 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
     ASSERT_BSONOBJ_EQ(insertOp1b.getObject(), group1[1].Obj());
 
     // Check grouped insert operations in namespace "nss2".
-    ASSERT_EQUALS(insertOp2a.getOpTime(), OpTime::parseFromOplogEntry(operationsApplied[3]));
+    ASSERT_EQUALS(insertOp2a.getOpTime(), parseFromOplogEntryArray(operationsApplied[3], 0));
     ASSERT_EQUALS(insertOp2a.getNamespace().ns(), operationsApplied[3]["ns"].valuestrsafe());
     ASSERT_EQUALS(BSONType::Array, operationsApplied[3]["o"].type());
     auto group2 = operationsApplied[3]["o"].Array();
@@ -738,7 +732,7 @@ TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchCountWhenGroupingInsertOperation) 
     ASSERT_BSONOBJ_EQ(createOp.raw, operationsApplied[0]);
 
     const auto& groupedInsertOp = operationsApplied[1];
-    ASSERT_EQUALS(insertOps.front().getOpTime(), OpTime::parseFromOplogEntry(groupedInsertOp));
+    ASSERT_EQUALS(insertOps.front().getOpTime(), parseFromOplogEntryArray(groupedInsertOp, 0));
     ASSERT_EQUALS(insertOps.front().getNamespace().ns(), groupedInsertOp["ns"].valuestrsafe());
     ASSERT_EQUALS(BSONType::Array, groupedInsertOp["o"].type());
     auto groupedInsertDocuments = groupedInsertOp["o"].Array();
@@ -1411,20 +1405,6 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
 
     auto ops = {collModOp, dropIndexOp};
     testOpsAreIdempotent(ops);
-}
-
-TEST_F(IdempotencyTest, ResyncOnRenameCollection) {
-    ASSERT_OK(
-        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-
-    auto cmd = BSON("renameCollection" << nss.ns() << "to"
-                                       << "test.bar"
-                                       << "stayTemp"
-                                       << false
-                                       << "dropTarget"
-                                       << false);
-    auto op = makeCommandOplogEntry(nextOpTime(), nss, cmd);
-    ASSERT_EQUALS(runOp(op), ErrorCodes::OplogOperationUnsupported);
 }
 
 }  // namespace

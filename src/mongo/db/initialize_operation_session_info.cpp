@@ -30,17 +30,33 @@
 
 #include "mongo/db/initialize_operation_session_info.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 
 void initializeOperationSessionInfo(OperationContext* opCtx,
                                     const BSONObj& requestBody,
-                                    bool requiresAuth) {
+                                    bool requiresAuth,
+                                    bool canAcceptTxnNumber) {
     if (!requiresAuth) {
         return;
+    }
+
+    if (serverGlobalParams.featureCompatibility.version.load() ==
+        ServerGlobalParams::FeatureCompatibility::Version::k34) {
+        return;
+    }
+
+    {
+        // If we're using the localhost bypass, logical sessions are disabled
+        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+        if (authSession && authSession->isUsingLocalhostBypass()) {
+            return;
+        }
     }
 
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
@@ -60,6 +76,9 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction number requires a sessionId to be specified",
                 opCtx->getLogicalSessionId());
+        uassert(ErrorCodes::IllegalOperation,
+                "Transaction numbers are only allowed on a replica set member or mongos",
+                canAcceptTxnNumber);
         uassert(ErrorCodes::BadValue,
                 "Transaction number cannot be negative",
                 *osi.getTxnNumber() >= 0);

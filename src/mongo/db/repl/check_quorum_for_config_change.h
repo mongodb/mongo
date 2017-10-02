@@ -57,7 +57,7 @@ public:
      *
      * "rsConfig" must stay in scope until QuorumChecker's destructor completes.
      */
-    QuorumChecker(const ReplSetConfig* rsConfig, int myIndex);
+    QuorumChecker(const ReplSetConfig* rsConfig, int myIndex, long long term);
     virtual ~QuorumChecker();
 
     virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
@@ -91,6 +91,9 @@ private:
     // Index of the local node's member configuration in _rsConfig.
     const int _myIndex;
 
+    // The term of this node.
+    const long long _term;
+
     // List of voting nodes that have responded affirmatively.
     std::vector<HostAndPort> _voters;
 
@@ -118,6 +121,7 @@ private:
  *
  * "myIndex" is the index of this node's member configuration in "rsConfig".
  * "executor" is the event loop in which to schedule network/aysnchronous processing.
+ * "term" is the term of this node.
  *
  * For purposes of initiate, a quorum is only met if all of the following conditions
  * are met:
@@ -128,7 +132,8 @@ private:
  */
 Status checkQuorumForInitiate(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,
-                              const int myIndex);
+                              const int myIndex,
+                              long long term);
 
 /**
  * Performs a quorum call to determine if a sufficient number of nodes are up
@@ -136,6 +141,7 @@ Status checkQuorumForInitiate(executor::TaskExecutor* executor,
  *
  * "myIndex" is the index of this node's member configuration in "rsConfig".
  * "executor" is the event loop in which to schedule network/aysnchronous processing.
+ * "term" is the term of this node.
  *
  * For purposes of reconfig, a quorum is only met if all of the following conditions
  * are met:
@@ -146,7 +152,8 @@ Status checkQuorumForInitiate(executor::TaskExecutor* executor,
  */
 Status checkQuorumForReconfig(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,
-                              const int myIndex);
+                              const int myIndex,
+                              long long term);
 
 }  // namespace repl
 }  // namespace mongo

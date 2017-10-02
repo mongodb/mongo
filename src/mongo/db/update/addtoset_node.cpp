@@ -61,7 +61,8 @@ void deduplicate(std::vector<BSONElement>& elements, const CollatorInterface* co
 
 }  // namespace
 
-Status AddToSetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status AddToSetNode::init(BSONElement modExpr,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
     bool isEach = false;
@@ -92,7 +93,7 @@ Status AddToSetNode::init(BSONElement modExpr, const CollatorInterface* collator
         _elements.push_back(modExpr);
     }
 
-    setCollator(collator);
+    setCollator(expCtx->getCollator());
     return Status::OK();
 }
 

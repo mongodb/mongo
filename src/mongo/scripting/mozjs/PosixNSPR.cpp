@@ -97,9 +97,13 @@ PRThread* PR_CreateThread(PRThreadType type,
     MOZ_ASSERT(priority == PR_PRIORITY_NORMAL);
 
     try {
-        std::unique_ptr<nspr::Thread, void (*)(nspr::Thread*)> t(
-            js_new<nspr::Thread>(start, arg, state != PR_UNJOINABLE_THREAD),
-            js_delete_nonconst<nspr::Thread>);
+        // We can't use the nspr allocator to allocate this thread, because under asan we
+        // instrument the allocator so that asan can track the pointers correctly. This
+        // instrumentation
+        // requires that pointers be deleted in the same thread that they were allocated in.
+        // The threads created in PR_CreateThread are not always freed in the same thread
+        // that they were created in. So, we use the standard allocator here.
+        auto t = std::make_unique<nspr::Thread>(start, arg, state != PR_UNJOINABLE_THREAD);
 
         t->thread() = mongo::stdx::thread(&nspr::Thread::ThreadRoutine, t.get());
 
@@ -117,7 +121,7 @@ PRStatus PR_JoinThread(PRThread* thread) {
     try {
         thread->thread().join();
 
-        js_delete(thread);
+        delete thread;
 
         return PR_SUCCESS;
     } catch (...) {

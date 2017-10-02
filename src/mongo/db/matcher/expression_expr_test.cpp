@@ -31,7 +31,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/matcher.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -39,15 +39,12 @@ namespace mongo {
 namespace {
 
 TEST(ExprMatchExpression, ComparisonToConstantMatchesCorrectly) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    const CollatorInterface* kSimpleCollator = nullptr;
-
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto match = BSON("a" << 5);
     auto notMatch = BSON("a" << 6);
 
     auto expression1 = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a" << 5)));
     Matcher matcher1(expression1,
-                     kSimpleCollator,
                      expCtx,
                      ExtensionsCallbackNoop(),
                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -59,7 +56,6 @@ TEST(ExprMatchExpression, ComparisonToConstantMatchesCorrectly) {
     auto expression2 = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
                                                                 << "$$var")));
     Matcher matcher2(expression2,
-                     kSimpleCollator,
                      expCtx,
                      ExtensionsCallbackNoop(),
                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -68,17 +64,15 @@ TEST(ExprMatchExpression, ComparisonToConstantMatchesCorrectly) {
 }
 
 TEST(ExprMatchExpression, ComparisonBetweenTwoFieldPathsMatchesCorrectly) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     auto expression = BSON("$expr" << BSON("$gt" << BSON_ARRAY("$a"
                                                                << "$b")));
     auto match = BSON("a" << 10 << "b" << 2);
     auto notMatch = BSON("a" << 2 << "b" << 10);
 
-    const CollatorInterface* kSimpleCollator = nullptr;
     Matcher matcher(expression,
-                    kSimpleCollator,
-                    expCtx,
+                    std::move(expCtx),
                     ExtensionsCallbackNoop(),
                     MatchExpressionParser::kAllowAllSpecialFeatures);
 
@@ -87,25 +81,55 @@ TEST(ExprMatchExpression, ComparisonBetweenTwoFieldPathsMatchesCorrectly) {
 }
 
 TEST(ExprMatchExpression, ComparisonThrowsWithUnboundVariable) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expression = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
                                                                << "$$var")));
-    ASSERT_THROWS(ExprMatchExpression pipelineExpr(expression.firstElement(), expCtx), DBException);
+    ASSERT_THROWS(ExprMatchExpression pipelineExpr(expression.firstElement(), std::move(expCtx)),
+                  DBException);
 }
 
-// TODO SERVER-30991: Uncomment once MatchExpression::optimize() is in place and handles
-// optimization of the Expression held by ExprMatchExpression. Also add a second expression,
-// BSON("$expr" << "$$var"), with $$var bound to 4 to confirm it optimizes to {$const: 4} as
-// well.
-/*
 TEST(ExprMatchExpression, IdenticalPostOptimizedExpressionsAreEquivalent) {
     BSONObj expression = BSON("$expr" << BSON("$multiply" << BSON_ARRAY(2 << 2)));
     BSONObj expressionEquiv = BSON("$expr" << BSON("$const" << 4));
     BSONObj expressionNotEquiv = BSON("$expr" << BSON("$const" << 10));
 
+    // Create and optimize an ExprMatchExpression.
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExprMatchExpression pipelineExpr(expression.firstElement(), expCtx);
-    pipelineExpr::optimize();
+    std::unique_ptr<MatchExpression> matchExpr =
+        stdx::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
+    matchExpr = MatchExpression::optimize(std::move(matchExpr));
+
+    // We expect that the optimized 'matchExpr' is still an ExprMatchExpression.
+    std::unique_ptr<ExprMatchExpression> pipelineExpr(
+        dynamic_cast<ExprMatchExpression*>(matchExpr.release()));
+    ASSERT_TRUE(pipelineExpr);
+
+    ASSERT_TRUE(pipelineExpr->equivalent(pipelineExpr.get()));
+
+    ExprMatchExpression pipelineExprEquiv(expressionEquiv.firstElement(), expCtx);
+    ASSERT_TRUE(pipelineExpr->equivalent(&pipelineExprEquiv));
+
+    ExprMatchExpression pipelineExprNotEquiv(expressionNotEquiv.firstElement(), expCtx);
+    ASSERT_FALSE(pipelineExpr->equivalent(&pipelineExprNotEquiv));
+}
+
+TEST(ExprMatchExpression, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("var");
+    expCtx->variables.setValue(varId, Value(4));
+
+    BSONObj expression = BSON("$expr"
+                              << "$$var");
+    BSONObj expressionEquiv = BSON("$expr" << BSON("$const" << 4));
+    BSONObj expressionNotEquiv = BSON("$expr" << BSON("$const" << 10));
+
+    // Create and optimize an ExprMatchExpression.
+    std::unique_ptr<MatchExpression> matchExpr =
+        stdx::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
+    matchExpr = MatchExpression::optimize(std::move(matchExpr));
+
+    // We expect that the optimized 'matchExpr' is still an ExprMatchExpression.
+    auto& pipelineExpr = dynamic_cast<ExprMatchExpression&>(*matchExpr);
     ASSERT_TRUE(pipelineExpr.equivalent(&pipelineExpr));
 
     ExprMatchExpression pipelineExprEquiv(expressionEquiv.firstElement(), expCtx);
@@ -114,13 +138,12 @@ TEST(ExprMatchExpression, IdenticalPostOptimizedExpressionsAreEquivalent) {
     ExprMatchExpression pipelineExprNotEquiv(expressionNotEquiv.firstElement(), expCtx);
     ASSERT_FALSE(pipelineExpr.equivalent(&pipelineExprNotEquiv));
 }
-*/
 
 TEST(ExprMatchExpression, ShallowClonedExpressionIsEquivalentToOriginal) {
     BSONObj expression = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a" << 5)));
 
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExprMatchExpression pipelineExpr(expression.firstElement(), expCtx);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExprMatchExpression pipelineExpr(expression.firstElement(), std::move(expCtx));
     auto shallowClone = pipelineExpr.shallowClone();
     ASSERT_TRUE(pipelineExpr.equivalent(shallowClone.get()));
 }

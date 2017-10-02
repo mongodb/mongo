@@ -212,7 +212,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                     clientRequest.getTargetingNS().db().toString(),
                                     requests,
-                                    readPref);
+                                    readPref,
+                                    Shard::RetryPolicy::kNoRetry);
             numSent += pendingBatches.size();
 
             //

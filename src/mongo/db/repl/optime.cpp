@@ -41,6 +41,7 @@ namespace repl {
 
 const char OpTime::kTimestampFieldName[] = "ts";
 const char OpTime::kTermFieldName[] = "t";
+const long long OpTime::kInitialTerm = 0;
 
 // static
 OpTime OpTime::max() {

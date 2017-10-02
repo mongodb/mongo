@@ -43,7 +43,7 @@ public:
     PushNode()
         : _slice(std::numeric_limits<long long>::max()),
           _position(std::numeric_limits<long long>::max()) {}
-    Status init(BSONElement modExpr, const CollatorInterface* collator) final;
+    Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) final;
 
     std::unique_ptr<UpdateNode> clone() const final {
         return stdx::make_unique<PushNode>(*this);

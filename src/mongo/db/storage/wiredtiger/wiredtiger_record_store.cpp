@@ -1157,17 +1157,17 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
 
     for (size_t i = 0; i < nRecords; i++) {
         auto& record = records[i];
-        if (_isOplog) {
-            Timestamp ts;
-            if (timestamps[i].isNull()) {
-                // If the timestamp is 0, that probably means someone inserted a document directly
-                // into the oplog.  In this case, use the RecordId as the timestamp, since they are
-                // one and the same.
-                ts = Timestamp(record.id.repr());
-            } else {
-                ts = timestamps[i];
-            }
-            LOG(4) << "inserting record into oplog with timestamp " << ts.asULL();
+        Timestamp ts;
+        if (timestamps[i].isNull() && _isOplog) {
+            // If the timestamp is 0, that probably means someone inserted a document directly
+            // into the oplog.  In this case, use the RecordId as the timestamp, since they are
+            // one and the same.
+            ts = Timestamp(record.id.repr());
+        } else {
+            ts = timestamps[i];
+        }
+        LOG(4) << "inserting record with timestamp " << ts.asULL();
+        if (!ts.isNull()) {
             fassertStatusOK(39001, opCtx->recoveryUnit()->setTimestamp(SnapshotName(ts)));
         }
         setKey(c, record.id);

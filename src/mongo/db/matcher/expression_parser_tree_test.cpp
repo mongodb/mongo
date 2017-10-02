@@ -36,13 +36,14 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 
 namespace mongo {
 
 TEST(MatchExpressionParserTreeTest, OR1) {
     BSONObj query = BSON("$or" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -54,8 +55,8 @@ TEST(MatchExpressionParserTreeTest, OR1) {
 TEST(MatchExpressionParserTreeTest, OREmbedded) {
     BSONObj query1 = BSON("$or" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
     BSONObj query2 = BSON("$or" << BSON_ARRAY(query1));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query2, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query2, expCtx);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -67,8 +68,8 @@ TEST(MatchExpressionParserTreeTest, OREmbedded) {
 
 TEST(MatchExpressionParserTreeTest, AND1) {
     BSONObj query = BSON("$and" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -81,8 +82,8 @@ TEST(MatchExpressionParserTreeTest, AND1) {
 
 TEST(MatchExpressionParserTreeTest, NOREmbedded) {
     BSONObj query = BSON("$nor" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -93,8 +94,8 @@ TEST(MatchExpressionParserTreeTest, NOREmbedded) {
 
 TEST(MatchExpressionParserTreeTest, NOT1) {
     BSONObj query = BSON("x" << BSON("$not" << BSON("$gt" << 5)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -105,8 +106,8 @@ TEST(MatchExpressionParserLeafTest, NotRegex1) {
     BSONObjBuilder b;
     b.appendRegex("$not", "abc", "i");
     BSONObj query = BSON("x" << b.obj());
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x"

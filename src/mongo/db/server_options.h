@@ -35,7 +35,7 @@
 namespace mongo {
 
 const int DEFAULT_UNIX_PERMS = 0700;
-constexpr auto DEFAULT_MAX_CONN = 1000000;
+constexpr size_t DEFAULT_MAX_CONN = 1000000;
 
 enum class ClusterRole { None, ShardServer, ConfigServer };
 
@@ -76,10 +76,10 @@ struct ServerGlobalParams {
     std::string socket = "/tmp";  // UNIX domain socket directory
     std::string transportLayer;   // --transportLayer (must be either "asio" or "legacy")
 
-    // --serviceExecutor ("adaptive", "synchronous", or "fixedForTesting")
+    // --serviceExecutor ("adaptive", "synchronous")
     std::string serviceExecutor;
 
-    int maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
+    size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket
 

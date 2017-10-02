@@ -83,6 +83,8 @@ public:
     }
 
 private:
+    ExpressionOptimizerFunc getOptimizer() const final;
+
     void _doAddDependencies(DepsTracker* deps) const final {
         if (_expression) {
             _expression->addDependencies(deps);
@@ -91,7 +93,6 @@ private:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-    // TODO SERVER-30991: '_expression' should be optimized as part of MatchExpression::optimize().
     boost::intrusive_ptr<Expression> _expression;
 };
 

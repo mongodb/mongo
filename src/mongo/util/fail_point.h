@@ -69,7 +69,7 @@ class FailPoint {
 
 public:
     typedef AtomicUInt32::WordType ValType;
-    enum Mode { off, alwaysOn, random, nTimes };
+    enum Mode { off, alwaysOn, random, nTimes, skip };
     enum RetCode { fastOff = 0, slowOff, slowOn };
 
     /**
@@ -136,6 +136,9 @@ public:
      *           activate.
      *     - nTimes: the number of times this fail point will be active when
      *         #shouldFail or #shouldFailOpenBlock is called.
+     *     - skip: the number of times this failpoint will be inactive when
+     *         #shouldFail or #shouldFailOpenBlock is called. After this number is reached, the
+     *         failpoint will always be active.
      *
      * @param extra arbitrary BSON object that can be stored to this fail point
      *     that can be referenced afterwards with #getData. Defaults to an empty
@@ -155,11 +158,11 @@ private:
     // Bit layout:
     // 31: tells whether this fail point is active.
     // 0~30: unsigned ref counter for active dynamic instances.
-    AtomicUInt32 _fpInfo;
+    AtomicUInt32 _fpInfo{0};
 
     // Invariant: These should be read only if ACTIVE_BIT of _fpInfo is set.
-    Mode _mode;
-    AtomicInt32 _timesOrPeriod;
+    Mode _mode{off};
+    AtomicInt32 _timesOrPeriod{0};
     BSONObj _data;
 
     // protects _mode, _timesOrPeriod, _data

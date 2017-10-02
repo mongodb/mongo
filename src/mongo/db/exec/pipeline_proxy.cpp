@@ -127,6 +127,10 @@ boost::optional<BSONObj> PipelineProxyStage::getNextBson() {
     return boost::none;
 }
 
+Timestamp PipelineProxyStage::getLatestOplogTimestamp() const {
+    return PipelineD::getLatestOplogTimestamp(_pipeline.get());
+}
+
 std::string PipelineProxyStage::getPlanSummaryStr() const {
     return PipelineD::getPlanSummaryStr(_pipeline.get());
 }

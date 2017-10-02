@@ -103,11 +103,17 @@ public:
     }
 
     /**
-     * Add the fields used as input to this expression to 'deps'.
-     *
-     * Expressions are trees, so this is often recursive.
+     * Add the fields and variables used in this expression to 'deps'. References to variables which
+     * are local to a particular expression will be filtered out of the tracker upon return.
      */
-    virtual void addDependencies(DepsTracker* deps) const = 0;
+    void addDependencies(DepsTracker* deps) {
+        _doAddDependencies(deps);
+
+        // Filter out references to any local variables.
+        if (_boundaryVariableId) {
+            deps->vars.erase(deps->vars.upper_bound(*_boundaryVariableId), deps->vars.end());
+        }
+    }
 
     /**
      * Serialize the Expression tree recursively.
@@ -205,7 +211,12 @@ public:
     static void registerExpression(std::string key, Parser parser);
 
 protected:
-    Expression(const boost::intrusive_ptr<ExpressionContext>& expCtx) : _expCtx(expCtx) {}
+    Expression(const boost::intrusive_ptr<ExpressionContext>& expCtx) : _expCtx(expCtx) {
+        auto varIds = _expCtx->variablesParseState.getDefinedVariableIDs();
+        if (!varIds.empty()) {
+            _boundaryVariableId = *std::prev(varIds.end());
+        }
+    }
 
     typedef std::vector<boost::intrusive_ptr<Expression>> ExpressionVector;
 
@@ -213,17 +224,18 @@ protected:
         return _expCtx;
     }
 
+    virtual void _doAddDependencies(DepsTracker* deps) const = 0;
+
 private:
+    boost::optional<Variables::Id> _boundaryVariableId;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
-
-/// Inherit from ExpressionVariadic or ExpressionFixedArity instead of directly from this class.
+// Inherit from ExpressionVariadic or ExpressionFixedArity instead of directly from this class.
 class ExpressionNary : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() override;
     Value serialize(bool explain) const override;
-    void addDependencies(DepsTracker* deps) const override;
 
     /*
       Add an operand to the n-ary expression.
@@ -256,9 +268,15 @@ public:
                                            BSONElement bsonExpr,
                                            const VariablesParseState& vps);
 
+    const ExpressionVector& getOperandList() const {
+        return vpOperand;
+    }
+
 protected:
     explicit ExpressionNary(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : Expression(expCtx) {}
+
+    void _doAddDependencies(DepsTracker* deps) const override;
 
     ExpressionVector vpOperand;
 };
@@ -418,7 +436,6 @@ public:
 class ExpressionConstant final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    void addDependencies(DepsTracker* deps) const final;
     Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
 
@@ -461,6 +478,9 @@ public:
         return _value;
     }
 
+protected:
+    void _doAddDependencies(DepsTracker* deps) const override;
+
 private:
     ExpressionConstant(const boost::intrusive_ptr<ExpressionContext>& expCtx, const Value& value);
 
@@ -502,13 +522,6 @@ public:
         auto timeZone = TimeZoneDatabase::get(getExpressionContext()->opCtx->getServiceContext())
                             ->getTimeZone(timeZoneId.getString());
         return evaluateDate(date, timeZone);
-    }
-
-    void addDependencies(DepsTracker* deps) const final {
-        _date->addDependencies(deps);
-        if (_timeZone) {
-            _timeZone->addDependencies(deps);
-        }
     }
 
     /**
@@ -593,6 +606,13 @@ protected:
     explicit DateExpressionAcceptingTimeZone(StringData opName,
                                              const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : Expression(expCtx), _opName(opName) {}
+
+    void _doAddDependencies(DepsTracker* deps) const final {
+        _date->addDependencies(deps);
+        if (_timeZone) {
+            _timeZone->addDependencies(deps);
+        }
+    }
 
     /**
      * Subclasses should implement this to do their actual date-related logic. Uses 'timezone' to
@@ -729,13 +749,15 @@ public:
 class ExpressionCoerceToBool final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    void addDependencies(DepsTracker* deps) const final;
     Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
 
     static boost::intrusive_ptr<ExpressionCoerceToBool> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& pExpression);
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionCoerceToBool(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -766,6 +788,10 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
+
+    CmpOp getOp() const {
+        return cmpOp;
+    }
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -833,12 +859,14 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document&) const final;
-    void addDependencies(DepsTracker*) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionDateFromString(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -854,12 +882,14 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root) const final;
-    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionDateFromParts(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -905,12 +935,14 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root) const final;
-    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     /**
@@ -933,12 +965,14 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root) const final;
-    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionDateToString(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1006,8 +1040,11 @@ public:
 
 class ExpressionFieldPath final : public Expression {
 public:
+    bool isRootFieldPath() const {
+        return _variable == Variables::kRootId;
+    }
+
     boost::intrusive_ptr<Expression> optimize() final;
-    void addDependencies(DepsTracker* deps) const final;
     Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
 
@@ -1039,6 +1076,9 @@ public:
 
     ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                    Variables::Id renamingVar) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionFieldPath(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1073,12 +1113,14 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root) const final;
-    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1177,7 +1219,6 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root) const final;
-    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1194,6 +1235,9 @@ public:
     };
 
     typedef std::map<Variables::Id, NameAndExpression> VariableMap;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionLet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1236,7 +1280,6 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root) const final;
-    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1245,6 +1288,9 @@ public:
 
     ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                    Variables::Id renamingVar) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionMap(
@@ -1264,12 +1310,14 @@ class ExpressionMeta final : public Expression {
 public:
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root) const final;
-    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     enum MetaType {
@@ -1364,7 +1412,6 @@ public:
 class ExpressionObject final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    void addDependencies(DepsTracker* deps) const final;
     Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
 
@@ -1390,6 +1437,9 @@ public:
 
     ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                    Variables::Id renamingVar) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     ExpressionObject(
@@ -1449,7 +1499,6 @@ public:
     explicit ExpressionReduce(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : Expression(expCtx) {}
 
-    void addDependencies(DepsTracker* deps) const final;
     Value evaluate(const Document& root) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(
@@ -1457,6 +1506,9 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     boost::intrusive_ptr<Expression> _input;
@@ -1676,7 +1728,6 @@ public:
     explicit ExpressionSwitch(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : Expression(expCtx) {}
 
-    void addDependencies(DepsTracker* deps) const final;
     Value evaluate(const Document& root) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(
@@ -1684,6 +1735,9 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     using ExpressionPair =
@@ -1795,7 +1849,6 @@ public:
     explicit ExpressionZip(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : Expression(expCtx) {}
 
-    void addDependencies(DepsTracker* deps) const final;
     Value evaluate(const Document& root) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(
@@ -1803,6 +1856,9 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     bool _useLongestLength = false;

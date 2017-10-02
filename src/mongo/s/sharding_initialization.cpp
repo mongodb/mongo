@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/logical_clock.h"
@@ -98,9 +99,6 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshRequirement
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshTimeoutMS,
                                       int,
                                       ConnectionPool::kDefaultRefreshTimeout.count());
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(KeysRotationIntervalSec,
-                                      int,
-                                      KeysCollectionManager::kKeyValidInterval.count());
 
 namespace {
 
@@ -110,8 +108,6 @@ using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
 
 static constexpr auto kRetryInterval = Seconds{2};
-const std::string kKeyManagerPurposeString = "HMAC";
-const Seconds kKeyValidInterval(3 * 30 * 24 * 60 * 60);  // ~3 months
 
 std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service,
                                                          StringData distLockProcessId) {
@@ -222,13 +218,16 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     // The catalog client must be started after the shard registry has been started up
     grid->catalogClient()->startup();
 
+    auto keysCollectionClient =
+        stdx::make_unique<KeysCollectionClientSharded>(grid->catalogClient());
     auto keyManager = std::make_shared<KeysCollectionManagerSharding>(
-        kKeyManagerPurposeString, grid->catalogClient(), Seconds(KeysRotationIntervalSec));
+        KeysCollectionManager::kKeyManagerPurposeString,
+        std::move(keysCollectionClient),
+        Seconds(KeysRotationIntervalSec));
     keyManager->startMonitoring(opCtx->getServiceContext());
 
     LogicalTimeValidator::set(opCtx->getServiceContext(),
                               stdx::make_unique<LogicalTimeValidator>(keyManager));
-    opCtx->getServiceContext()->setKeyManager(keyManager);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&

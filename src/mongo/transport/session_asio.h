@@ -58,7 +58,7 @@ public:
         : _socket(std::move(socket)), _tl(tl) {
         std::error_code ec;
 
-        _socket.non_blocking(_tl->_listenerOptions.async, ec);
+        _socket.non_blocking(_tl->_listenerOptions.transportMode == Mode::kAsynchronous, ec);
         fassert(40490, ec.value() == 0);
 
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
@@ -73,10 +73,6 @@ public:
         if (ec) {
             LOG(3) << "Unable to get remote endpoint address: " << ec.message();
         }
-    }
-
-    virtual ~ASIOSession() {
-        _tl->_currentConnections.subtractAndFetch(1);
     }
 
     TransportLayer* getTransportLayer() const override {

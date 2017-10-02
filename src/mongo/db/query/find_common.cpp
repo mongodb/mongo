@@ -38,6 +38,8 @@ namespace mongo {
 
 MONGO_FP_DECLARE(keepCursorPinnedDuringGetMore);
 
+MONGO_FP_DECLARE(disableAwaitDataForGetMoreCmd);
+
 bool FindCommon::enoughForFirstBatch(const QueryRequest& qr, long long numDocs) {
     if (!qr.getEffectiveBatchSize()) {
         // We enforce a default batch size for the initial find if no batch size is specified.

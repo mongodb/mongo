@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/platform/basic.h"
 
 #include <memory>
@@ -37,20 +39,22 @@
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/db/sessions_collection_standalone.h"
+#include "mongo/db/transaction_reaper.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
 
-std::unique_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheServer state) {
+std::shared_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheServer state) {
     switch (state) {
         case LogicalSessionCacheServer::kSharded:
-            return stdx::make_unique<SessionsCollectionSharded>();
+            return std::make_shared<SessionsCollectionSharded>();
         case LogicalSessionCacheServer::kReplicaSet:
-            return stdx::make_unique<SessionsCollectionRS>();
+            return std::make_shared<SessionsCollectionRS>();
         case LogicalSessionCacheServer::kStandalone:
-            return stdx::make_unique<SessionsCollectionStandalone>();
+            return std::make_shared<SessionsCollectionStandalone>();
         default:
             MONGO_UNREACHABLE;
     }
@@ -58,13 +62,28 @@ std::unique_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheSe
 
 }  // namespace
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state) {
+std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(ServiceContext* svc,
+                                                              LogicalSessionCacheServer state) {
     auto liason = stdx::make_unique<ServiceLiasonMongod>();
 
     // Set up the logical session cache
     auto sessionsColl = makeSessionsCollection(state);
-    return stdx::make_unique<LogicalSessionCacheImpl>(
-        std::move(liason), std::move(sessionsColl), LogicalSessionCacheImpl::Options{});
+
+    auto reaper = [&]() -> std::shared_ptr<TransactionReaper> {
+        switch (state) {
+            case LogicalSessionCacheServer::kSharded:
+                return TransactionReaper::make(TransactionReaper::Type::kSharded, sessionsColl);
+            case LogicalSessionCacheServer::kReplicaSet:
+                return TransactionReaper::make(TransactionReaper::Type::kReplicaSet, sessionsColl);
+            default:
+                return nullptr;
+        }
+    }();
+
+    return stdx::make_unique<LogicalSessionCacheImpl>(std::move(liason),
+                                                      std::move(sessionsColl),
+                                                      std::move(reaper),
+                                                      LogicalSessionCacheImpl::Options{});
 }
 
 }  // namespace mongo

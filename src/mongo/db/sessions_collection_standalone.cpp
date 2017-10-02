@@ -45,22 +45,32 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 }  // namespace
 
 Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
-                                                     const LogicalSessionRecordSet& sessions,
-                                                     Date_t refreshTime) {
+                                                     const LogicalSessionRecordSet& sessions) {
     DBDirectClient client(opCtx);
-    return doRefresh(sessions, refreshTime, makeSendFnForBatchWrite(&client));
+    return doRefresh(kSessionsNamespaceString,
+                     sessions,
+                     makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
 }
 
 Status SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,
                                                    const LogicalSessionIdSet& sessions) {
     DBDirectClient client(opCtx);
-    return doRemove(sessions, makeSendFnForBatchWrite(&client));
+    return doRemove(kSessionsNamespaceString,
+                    sessions,
+                    makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
 }
 
 StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     DBDirectClient client(opCtx);
-    return doFetch(sessions, makeFindFnForCommand(&client));
+    return doFetch(kSessionsNamespaceString,
+                   sessions,
+                   makeFindFnForCommand(kSessionsNamespaceString, &client));
+}
+
+Status SessionsCollectionStandalone::removeTransactionRecords(OperationContext* opCtx,
+                                                              const LogicalSessionIdSet& sessions) {
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

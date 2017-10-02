@@ -266,7 +266,10 @@ protected:
      */
     void assertDatabaseExists(const DatabaseType& expectedDB) {
         auto foundDB =
-            assertGet(catalogClient()->getDatabase(operationContext(), expectedDB.getName())).value;
+            assertGet(catalogClient()->getDatabase(operationContext(),
+                                                   expectedDB.getName(),
+                                                   repl::ReadConcernLevel::kMajorityReadConcern))
+                .value;
 
         ASSERT_EQUALS(expectedDB.getName(), foundDB.getName());
         ASSERT_EQUALS(expectedDB.getPrimary(), foundDB.getPrimary());
@@ -1065,12 +1068,18 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     assertShardExists(expectedShard);
 
     // Ensure that the databases detected from the shard were *not* added.
-    ASSERT_EQUALS(
-        ErrorCodes::NamespaceNotFound,
-        catalogClient()->getDatabase(operationContext(), discoveredDB1.getName()).getStatus());
-    ASSERT_EQUALS(
-        ErrorCodes::NamespaceNotFound,
-        catalogClient()->getDatabase(operationContext(), discoveredDB2.getName()).getStatus());
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  catalogClient()
+                      ->getDatabase(operationContext(),
+                                    discoveredDB1.getName(),
+                                    repl::ReadConcernLevel::kMajorityReadConcern)
+                      .getStatus());
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  catalogClient()
+                      ->getDatabase(operationContext(),
+                                    discoveredDB2.getName(),
+                                    repl::ReadConcernLevel::kMajorityReadConcern)
+                      .getStatus());
 
     assertChangeWasLogged(expectedShard);
 }

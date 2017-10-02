@@ -39,6 +39,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/platform/atomic_word.h"
@@ -284,10 +285,29 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::onEvent(const E
     return cbHandle;
 }
 
+Status ThreadPoolTaskExecutor::waitForEvent(OperationContext* opCtx, const EventHandle& event) {
+    invariant(opCtx);
+    invariant(event.isValid());
+    auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    try {
+        // std::condition_variable::wait() can wake up spuriously, so provide a callback to detect
+        // when that happens and go back to waiting.
+        opCtx->waitForConditionOrInterrupt(eventState->isSignaledCondition, lk, [&eventState]() {
+            return eventState->isSignaledFlag;
+        });
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+    return Status::OK();
+}
+
 void ThreadPoolTaskExecutor::waitForEvent(const EventHandle& event) {
     invariant(event.isValid());
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+
     while (!eventState->isSignaledFlag) {
         eventState->isSignaledCondition.wait(lk);
     }

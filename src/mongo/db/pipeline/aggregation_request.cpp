@@ -254,13 +254,6 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                     << "' option is required, except for aggregate with the explain argument"};
     }
 
-    if (request.getExplain() && !request.getReadConcern().isEmpty()) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << "Aggregation explain does not support the '"
-                              << repl::ReadConcernArgs::kReadConcernFieldName
-                              << "' option"};
-    }
-
     if (request.getExplain() && cmdObj[WriteConcernOptions::kWriteConcernField]) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "Aggregation explain does not support the'"

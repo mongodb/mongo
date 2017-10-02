@@ -52,7 +52,8 @@ namespace mongo {
 
 void ServiceContextMongoDTest::setUp() {
     Client::initThread(getThreadName());
-    ServiceContext* serviceContext = getServiceContext();
+
+    auto const serviceContext = getServiceContext();
 
     auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
@@ -64,7 +65,8 @@ void ServiceContextMongoDTest::setUp() {
         storageGlobalParams.dbpath = tempDir.path();
         storageGlobalParams.engine = "ephemeralForTest";
         storageGlobalParams.engineSetByUser = true;
-        checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
+
+        checked_cast<ServiceContextMongoD*>(serviceContext)->createLockFile();
         serviceContext->initializeGlobalStorageEngine();
         serviceContext->setOpObserver(stdx::make_unique<OpObserverNoop>());
     }

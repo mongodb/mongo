@@ -40,6 +40,7 @@
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -227,6 +228,12 @@ private:
          */
         std::shared_ptr<Shard> getShard();
 
+        // Used when merging tailable awaitData cursors in sorted order. In order to return any
+        // result to the client we have to know that no shard will ever return anything that sorts
+        // before it. This object represents a promise from the remote that it will never return a
+        // result with a sort key lower than this.
+        boost::optional<BSONObj> promisedMinSortKey;
+
         // The cursor id for the remote cursor. If a remote cursor is not yet exhausted, this member
         // will be set to a valid non-zero cursor id. If a remote cursor is now exhausted, this
         // member will be set to zero.
@@ -270,18 +277,12 @@ private:
     enum LifecycleState { kAlive, kKillStarted, kKillComplete };
 
     /**
-     * Callback run to handle a response from a killCursors command.
-     */
-    static void handleKillCursorsResponse(
-        const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData);
-
-    /**
      * Parses the find or getMore command response object to a CursorResponse.
      *
      * Returns a non-OK response if the response fails to parse or if there is a cursor id mismatch.
      */
-    static StatusWith<CursorResponse> parseCursorResponse(const BSONObj& responseObj,
-                                                          const RemoteCursorData& remote);
+    static StatusWith<CursorResponse> _parseCursorResponse(const BSONObj& responseObj,
+                                                           const RemoteCursorData& remote);
 
     /**
      * Helper to schedule a command asking the remote node for another batch of results.
@@ -291,43 +292,61 @@ private:
      *
      * Returns success if the command to retrieve the next batch was scheduled successfully.
      */
-    Status askForNextBatch_inlock(size_t remoteIndex);
+    Status _askForNextBatch(WithLock, size_t remoteIndex);
 
     /**
      * Checks whether or not the remote cursors are all exhausted.
      */
-    bool remotesExhausted_inlock();
+    bool _remotesExhausted(WithLock);
 
     //
     // Helpers for ready().
     //
 
-    bool ready_inlock();
-    bool readySorted_inlock();
-    bool readyUnsorted_inlock();
+    bool _ready(WithLock);
+    bool _readySorted(WithLock);
+    bool _readySortedTailable(WithLock);
+    bool _readyUnsorted(WithLock);
 
     //
     // Helpers for nextReady().
     //
 
-    ClusterQueryResult nextReadySorted();
-    ClusterQueryResult nextReadyUnsorted();
+    ClusterQueryResult _nextReadySorted(WithLock);
+    ClusterQueryResult _nextReadyUnsorted(WithLock);
+
+    using CbData = executor::TaskExecutor::RemoteCommandCallbackArgs;
+    using CbResponse = executor::TaskExecutor::ResponseStatus;
 
     /**
-     * When nextEvent() schedules remote work, it passes this method as a callback. The TaskExecutor
-     * will call this function, passing the response from the remote.
+     * When nextEvent() schedules remote work, the callback uses this function to process results.
      *
      * 'remoteIndex' is the position of the relevant remote node in '_remotes', and therefore
      * indicates which node the response came from and where the new result documents should be
      * buffered.
      */
-    void handleBatchResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
-                             size_t remoteIndex);
+    void _handleBatchResponse(WithLock, CbData const&, size_t remoteIndex);
+
+    /**
+     * Cleans up if the remote cursor was killed while waiting for a response.
+     */
+    void _cleanUpKilledBatch(WithLock);
+
+    /**
+     * Cleans up after remote query failure.
+     */
+    void _cleanUpFailedBatch(WithLock lk, Status status, size_t remoteIndex);
+
+    /**
+     * Processes results from a remote query.
+     */
+    void _processBatchResults(WithLock, CbResponse const&, size_t remoteIndex);
+
     /**
      * Adds the batch of results to the RemoteCursorData. Returns false if there was an error
      * parsing the batch.
      */
-    bool addBatchToBuffer(size_t remoteIndex, const std::vector<BSONObj>& batch);
+    bool _addBatchToBuffer(WithLock, size_t remoteIndex, const CursorResponse& response);
 
     /**
      * If there is a valid unsignaled event that has been requested via nextReady() and there are
@@ -336,17 +355,22 @@ private:
      * Invalidates the current event, as we must signal the event exactly once and we only keep a
      * handle to a valid event if it is unsignaled.
      */
-    void signalCurrentEventIfReady_inlock();
+    void _signalCurrentEventIfReady(WithLock);
 
     /**
      * Returns true if this async cursor is waiting to receive another batch from a remote.
      */
-    bool haveOutstandingBatchRequests_inlock();
+    bool _haveOutstandingBatchRequests(WithLock);
 
     /**
      * Schedules a killCursors command to be run on all remote hosts that have open cursors.
      */
-    void scheduleKillCursors_inlock(OperationContext* opCtx);
+    void _scheduleKillCursors(WithLock, OperationContext* opCtx);
+
+    /**
+     * Updates 'remote's metadata (e.g. the cursor id) based on information in 'response'.
+     */
+    void updateRemoteMetadata(RemoteCursorData* remote, const CursorResponse& response);
 
     OperationContext* _opCtx;
     executor::TaskExecutor* _executor;
@@ -357,7 +381,6 @@ private:
     BSONObj _metadataObj;
 
     // Must be acquired before accessing any data members (other than _params, which is read-only).
-    // Must also be held when calling any of the '_inlock()' helper functions.
     stdx::mutex _mutex;
 
     // Data tracking the state of our communication with each of the remote nodes.

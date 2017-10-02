@@ -32,7 +32,7 @@
 
     var master = replTest.getPrimary();
     var db = master.getDB("test");
-    var wtimeout = 60 * 1000 * 5;
+    var wtimeout = ReplSetTest.kDefaultTimeoutMS;
 
     assert.writeOK(db.foo.insert({x: 1}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
 

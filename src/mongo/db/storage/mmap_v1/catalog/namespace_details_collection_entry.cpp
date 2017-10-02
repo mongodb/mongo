@@ -386,7 +386,7 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
         return;
 
     RecordData entry = _namespacesRecordStore->dataFor(opCtx, _namespacesRecordId);
-    const BSONObj newEntry = applyUpdateOperators(entry.releaseToBson(), update);
+    const BSONObj newEntry = applyUpdateOperators(opCtx, entry.releaseToBson(), update);
 
     Status result = _namespacesRecordStore->updateRecord(
         opCtx, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);

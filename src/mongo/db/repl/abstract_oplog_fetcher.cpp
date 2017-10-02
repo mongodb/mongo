@@ -36,6 +36,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -49,6 +50,18 @@ namespace {
 Counter64 readersCreatedStats;
 ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
                                                          &readersCreatedStats);
+
+// Number of seconds for the `maxTimeMS` on the initial `find` command.
+MONGO_EXPORT_SERVER_PARAMETER(oplogInitialFindMaxSeconds, int, 60);
+
+// Number of milliseconds to add to the `find` and `getMore` timeouts to calculate the network
+// timeout for the requests.
+const Milliseconds kNetworkTimeoutBufferMS{5000};
+
+// Default `maxTimeMS` timeout for `getMore`s.
+const Milliseconds kDefaultOplogGetMoreMaxMS{5000};
+
+
 }  // namespace
 
 StatusWith<OpTimeWithHash> AbstractOplogFetcher::parseOpTimeWithHash(const BSONObj& oplogEntryObj) {
@@ -66,11 +79,6 @@ StatusWith<OpTimeWithHash> AbstractOplogFetcher::parseOpTimeWithHash(const BSONO
     return OpTimeWithHash{hash, opTime.getValue()};
 }
 
-const Seconds AbstractOplogFetcher::kOplogInitialFindMaxTime{60};
-const Seconds AbstractOplogFetcher::kOplogGetMoreMaxTime{5};
-const Seconds AbstractOplogFetcher::kOplogQueryNetworkTimeout{
-    65};  // 5 seconds past the find command's 1 minute maxTimeMs
-
 AbstractOplogFetcher::AbstractOplogFetcher(executor::TaskExecutor* executor,
                                            OpTimeWithHash lastFetched,
                                            HostAndPort source,
@@ -87,6 +95,14 @@ AbstractOplogFetcher::AbstractOplogFetcher(executor::TaskExecutor* executor,
 
     invariant(!_lastFetched.opTime.isNull());
     invariant(onShutdownCallbackFn);
+}
+
+Milliseconds AbstractOplogFetcher::_getFindMaxTime() const {
+    return Milliseconds(oplogInitialFindMaxSeconds.load() * 1000);
+}
+
+Milliseconds AbstractOplogFetcher::_getGetMoreMaxTime() const {
+    return kDefaultOplogGetMoreMaxMS;
 }
 
 std::string AbstractOplogFetcher::toString() const {
@@ -310,7 +326,8 @@ std::unique_ptr<Fetcher> AbstractOplogFetcher::_makeFetcher(const BSONObj& findC
         stdx::bind(
             &AbstractOplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
         metadataObj,
-        kOplogQueryNetworkTimeout);
+        _getFindMaxTime() + kNetworkTimeoutBufferMS,
+        _getGetMoreMaxTime() + kNetworkTimeoutBufferMS);
 }
 
 }  // namespace repl

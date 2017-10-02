@@ -575,6 +575,32 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
     return false;
 }
 
+void PlanEnumerator::assignToNonMultikeyMandatoryIndex(
+    const IndexEntry& index,
+    const std::vector<MatchExpression*>& predsOverLeadingField,
+    const IndexToPredMap& idxToNotFirst,
+    OneIndexAssignment* indexAssign) {
+    // Text indexes are typically multikey because there is an index key for each token in the
+    // source text. However, the leading and trailing non-text fields of the index cannot be
+    // multikey. As a result, we should use non-multikey predicate assignment rules for such
+    // indexes.
+    invariant(!index.multikey || index.type == IndexType::INDEX_TEXT);
+
+    // Since the index is not multikey, all predicates over the leading field can be assigned.
+    indexAssign->preds = predsOverLeadingField;
+
+    // Since everything in assign.preds prefixes the index, they all go at position '0' in the
+    // index, the first position.
+    indexAssign->positions.resize(indexAssign->preds.size(), 0);
+
+    // And now we begin compound analysis. Find everything that could use assign.index but isn't a
+    // pred over the first field of that index.
+    auto compIt = idxToNotFirst.find(indexAssign->index);
+    if (compIt != idxToNotFirst.end()) {
+        compound(compIt->second, index, indexAssign);
+    }
+}
+
 bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                                              const IndexToPredMap& idxToNotFirst,
                                              MatchExpression* mandatoryPred,
@@ -609,7 +635,12 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
 
         const vector<MatchExpression*>& predsOverLeadingField = it->second;
 
-        if (thisIndex.multikey && !thisIndex.multikeyPaths.empty()) {
+        // Text indexes should be treated like non-multikey indexes, since the non-text fields are
+        // prohibited from containing arrays.
+        if (thisIndex.type == IndexType::INDEX_TEXT) {
+            assignToNonMultikeyMandatoryIndex(
+                thisIndex, predsOverLeadingField, idxToNotFirst, &indexAssign);
+        } else if (thisIndex.multikey && !thisIndex.multikeyPaths.empty()) {
             // 2dsphere indexes are the only special index type that should ever have path-level
             // multikey information.
             invariant(INDEX_2DSPHERE == thisIndex.type);
@@ -721,22 +752,9 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                 }
             }
         } else {
-            // For non-multikey, we don't have to do anything too special.
-            // Just assign all "first" predicates and try to compound like usual.
-            indexAssign.preds = it->second;
-
-            // Since everything in assign.preds prefixes the index, they all go
-            // at position '0' in the index, the first position.
-            indexAssign.positions.resize(indexAssign.preds.size(), 0);
-
-            // And now we begin compound analysis.
-
-            // Find everything that could use assign.index but isn't a pred over
-            // the first field of that index.
-            IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
-            if (compIt != idxToNotFirst.end()) {
-                compound(compIt->second, thisIndex, &indexAssign);
-            }
+            // The index is not multikey.
+            assignToNonMultikeyMandatoryIndex(
+                thisIndex, predsOverLeadingField, idxToNotFirst, &indexAssign);
         }
 
         // The mandatory predicate must be assigned.

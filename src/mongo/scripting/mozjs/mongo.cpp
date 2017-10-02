@@ -84,8 +84,8 @@ const JSFunctionSpec MongoBase::methods[] = {
         getMinWireVersion, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
         getMaxWireVersion, MongoLocalInfo, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getClusterTime, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClusterTime, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getClusterTime, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClusterTime, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoLocalInfo, MongoExternalInfo),
     JS_FS_END,
 };
@@ -195,6 +195,9 @@ BSONObj MongoBase::getClusterTime() {
 }
 
 void MongoBase::setClusterTime(const BSONObj& newTime) {
+    if (newTime["clusterTime"].eoo())
+        uasserted(ErrorCodes::BadValue, "missing clusterTime field in setClusterTime argument");
+
     stdx::lock_guard<stdx::mutex> lk(logicalTimeMutex);
     if (latestlogicalTime.isEmpty() ||
         SimpleBSONElementComparator::kInstance.evaluate(latestlogicalTime["clusterTime"] <
@@ -778,6 +781,12 @@ void MongoBase::Functions::getClusterTime::call(JSContext* cx, JS::CallArgs args
 }
 
 void MongoBase::Functions::setClusterTime::call(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 1)
+        uasserted(ErrorCodes::BadValue, "setClusterTime takes 1 argument");
+
+    if (!args.get(0).isObject())
+        uasserted(ErrorCodes::BadValue, "the parameter to setClusterTime must be an object");
+
     auto newTime = ObjectWrapper(cx, args.get(0)).toBSON();
 
     MongoBase::setClusterTime(newTime);

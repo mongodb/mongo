@@ -1,3 +1,9 @@
+// When checking UUID consistency, the shell attempts to run a command on the node it believes is
+// primary in each shard. However, this test shuts down the primary of the shard. Since whether or
+// not the shell detects the new primary before issuing the command is nondeterministic, skip the
+// consistency check for this test.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     load("jstests/replsets/rslib.js");
 

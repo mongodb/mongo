@@ -84,7 +84,7 @@ Status ModifierCompare::init(const BSONElement& modExpr, const Options& opts, bo
 
     // Store value for later.
     _val = modExpr;
-    _collator = opts.collator;
+    _collator = opts.expCtx->getCollator();
     return Status::OK();
 }
 

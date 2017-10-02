@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
@@ -47,16 +48,16 @@ using mongo::mutablebson::countChildren;
 
 DEATH_TEST(CompareNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$max: {}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    node.init(update["$max"].embeddedObject().firstElement(), collator).ignore();
+    node.init(update["$max"].embeddedObject().firstElement(), expCtx).ignore();
 }
 
 TEST_F(CompareNodeTest, ApplyMaxSameNumber) {
     auto update = fromjson("{$max: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -71,9 +72,9 @@ TEST_F(CompareNodeTest, ApplyMaxSameNumber) {
 
 TEST_F(CompareNodeTest, ApplyMinSameNumber) {
     auto update = fromjson("{$min: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMin);
-    ASSERT_OK(node.init(update["$min"]["a"], collator));
+    ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -88,9 +89,9 @@ TEST_F(CompareNodeTest, ApplyMinSameNumber) {
 
 TEST_F(CompareNodeTest, ApplyMaxNumberIsLess) {
     auto update = fromjson("{$max: {a: 0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -105,9 +106,9 @@ TEST_F(CompareNodeTest, ApplyMaxNumberIsLess) {
 
 TEST_F(CompareNodeTest, ApplyMinNumberIsMore) {
     auto update = fromjson("{$min: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMin);
-    ASSERT_OK(node.init(update["$min"]["a"], collator));
+    ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -122,9 +123,9 @@ TEST_F(CompareNodeTest, ApplyMinNumberIsMore) {
 
 TEST_F(CompareNodeTest, ApplyMaxSameValInt) {
     auto update = BSON("$max" << BSON("a" << 1LL));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1.0}"));
     setPathTaken("a");
@@ -139,9 +140,9 @@ TEST_F(CompareNodeTest, ApplyMaxSameValInt) {
 
 TEST_F(CompareNodeTest, ApplyMaxSameValIntZero) {
     auto update = BSON("$max" << BSON("a" << 0LL));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0.0}"));
     setPathTaken("a");
@@ -156,9 +157,9 @@ TEST_F(CompareNodeTest, ApplyMaxSameValIntZero) {
 
 TEST_F(CompareNodeTest, ApplyMinSameValIntZero) {
     auto update = BSON("$min" << BSON("a" << 0LL));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMin);
-    ASSERT_OK(node.init(update["$min"]["a"], collator));
+    ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0.0}"));
     setPathTaken("a");
@@ -173,9 +174,9 @@ TEST_F(CompareNodeTest, ApplyMinSameValIntZero) {
 
 TEST_F(CompareNodeTest, ApplyMissingFieldMinNumber) {
     auto update = fromjson("{$min: {a: 0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMin);
-    ASSERT_OK(node.init(update["$min"]["a"], collator));
+    ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -190,9 +191,9 @@ TEST_F(CompareNodeTest, ApplyMissingFieldMinNumber) {
 
 TEST_F(CompareNodeTest, ApplyExistingNumberMinNumber) {
     auto update = fromjson("{$min: {a: 0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMin);
-    ASSERT_OK(node.init(update["$min"]["a"], collator));
+    ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -207,9 +208,9 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMinNumber) {
 
 TEST_F(CompareNodeTest, ApplyMissingFieldMaxNumber) {
     auto update = fromjson("{$max: {a: 0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -224,9 +225,9 @@ TEST_F(CompareNodeTest, ApplyMissingFieldMaxNumber) {
 
 TEST_F(CompareNodeTest, ApplyExistingNumberMaxNumber) {
     auto update = fromjson("{$max: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
@@ -241,9 +242,9 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMaxNumber) {
 
 TEST_F(CompareNodeTest, ApplyExistingDateMaxDate) {
     auto update = fromjson("{$max: {a: {$date: 123123123}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {$date: 0}}"));
     setPathTaken("a");
@@ -258,9 +259,9 @@ TEST_F(CompareNodeTest, ApplyExistingDateMaxDate) {
 
 TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
     auto update = fromjson("{$max: {a: {b: 3}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
@@ -275,9 +276,9 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
 
 TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
     auto update = fromjson("{$max: {a: 3}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
@@ -292,9 +293,11 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
 
 TEST_F(CompareNodeTest, ApplyMinRespectsCollation) {
     auto update = fromjson("{$min: {a: 'dba'}}");
-    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     CompareNode node(CompareNode::CompareMode::kMin);
-    ASSERT_OK(node.init(update["$min"]["a"], &collator));
+    ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 'cbc'}"));
     setPathTaken("a");
@@ -309,9 +312,9 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollation) {
 
 TEST_F(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
     auto update = fromjson("{$min: {a: 'dba'}}");
-    const CollatorInterface* binaryComparisonCollator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMin);
-    ASSERT_OK(node.init(update["$min"]["a"], binaryComparisonCollator));
+    ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     const CollatorInterfaceMock reverseStringCollator(
         CollatorInterfaceMock::MockType::kReverseString);
@@ -330,9 +333,9 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
 
 TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
     auto update = fromjson("{$max: {a: 'abd'}}");
-    const CollatorInterface* binaryComparisonCollator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], binaryComparisonCollator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     const CollatorInterfaceMock reverseStringCollator(
         CollatorInterfaceMock::MockType::kReverseString);
@@ -351,18 +354,19 @@ TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
 
 DEATH_TEST(CompareNodeTest, CannotSetCollatorIfCollatorIsNonNull, "Invariant failure !_collator") {
     auto update = fromjson("{$max: {a: 1}}");
-    const CollatorInterfaceMock caseInsensitiveCollator(
-        CollatorInterfaceMock::MockType::kToLowerString);
+    CollatorInterfaceMock caseInsensitiveCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&caseInsensitiveCollator);
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], &caseInsensitiveCollator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
     node.setCollator(&caseInsensitiveCollator);
 }
 
 DEATH_TEST(CompareNodeTest, CannotSetCollatorTwice, "Invariant failure !_collator") {
     auto update = fromjson("{$max: {a: 1}}");
-    const CollatorInterface* binaryComparisonCollator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], binaryComparisonCollator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     const CollatorInterfaceMock caseInsensitiveCollator(
         CollatorInterfaceMock::MockType::kToLowerString);
@@ -372,9 +376,9 @@ DEATH_TEST(CompareNodeTest, CannotSetCollatorTwice, "Invariant failure !_collato
 
 TEST_F(CompareNodeTest, ApplyIndexesNotAffected) {
     auto update = fromjson("{$max: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
@@ -389,9 +393,9 @@ TEST_F(CompareNodeTest, ApplyIndexesNotAffected) {
 
 TEST_F(CompareNodeTest, ApplyNoIndexDataOrLogBuilder) {
     auto update = fromjson("{$max: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
-    ASSERT_OK(node.init(update["$max"]["a"], collator));
+    ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");

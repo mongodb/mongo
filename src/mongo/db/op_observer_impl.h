@@ -61,7 +61,11 @@ public:
                   CollectionShardingState::DeleteState deleteState,
                   bool fromMigrate,
                   const boost::optional<BSONObj>& deletedDoc) override;
-    void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) override;
+    void onInternalOpMessage(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const boost::optional<UUID> uuid,
+                             const BSONObj& msgObj,
+                             const boost::optional<BSONObj> o2MsgObj) override;
     void onCreateCollection(OperationContext* opCtx,
                             Collection* coll,
                             const NamespaceString& collectionName,

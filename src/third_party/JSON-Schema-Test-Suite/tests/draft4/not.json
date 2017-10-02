@@ -1,8 +1,9 @@
 [
     {
         "description": "not",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
-            "not": {"type": "integer"}
+            "not": {"type": "number"}
         },
         "tests": [
             {
@@ -19,8 +20,9 @@
     },
     {
         "description": "not multiple types",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
-            "not": {"type": ["integer", "boolean"]}
+            "not": {"type": ["number", "boolean"]}
         },
         "tests": [
             {

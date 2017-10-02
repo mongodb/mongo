@@ -105,7 +105,7 @@ OplogEntry::OplogEntry(OpTime opTime,
                        NamespaceString nss,
                        int version,
                        const BSONObj& oField,
-                       const BSONObj& o2Field) {
+                       const boost::optional<BSONObj>& o2Field) {
     setTimestamp(opTime.getTimestamp());
     setTerm(opTime.getTerm());
     setHash(hash);
@@ -113,7 +113,9 @@ OplogEntry::OplogEntry(OpTime opTime,
     setNamespace(nss);
     setVersion(version);
     setObject(oField);
-    setObject2(o2Field);
+    if (o2Field) {
+        setObject2(o2Field);
+    }
 
     // This is necessary until we remove `raw` in SERVER-29200.
     raw = toBSON();
@@ -125,18 +127,18 @@ OplogEntry::OplogEntry(OpTime opTime,
                        NamespaceString nss,
                        int version,
                        const BSONObj& oField)
-    : OplogEntry(opTime, hash, opType, nss, version, oField, BSONObj()) {}
+    : OplogEntry(opTime, hash, opType, nss, version, oField, boost::none) {}
 
 OplogEntry::OplogEntry(
     OpTime opTime, long long hash, OpTypeEnum opType, NamespaceString nss, const BSONObj& oField)
-    : OplogEntry(opTime, hash, opType, nss, OplogEntry::kOplogVersion, oField, BSONObj()) {}
+    : OplogEntry(opTime, hash, opType, nss, OplogEntry::kOplogVersion, oField, boost::none) {}
 
 OplogEntry::OplogEntry(OpTime opTime,
                        long long hash,
                        OpTypeEnum opType,
                        NamespaceString nss,
                        const BSONObj& oField,
-                       const BSONObj& o2Field)
+                       const boost::optional<BSONObj>& o2Field)
     : OplogEntry(opTime, hash, opType, nss, OplogEntry::kOplogVersion, oField, o2Field) {}
 
 bool OplogEntry::isCommand() const {

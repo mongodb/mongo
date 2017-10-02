@@ -175,7 +175,7 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* opCtx, CursorId id, bool
     if (CursorManager::isGloballyManagedCursor(id)) {
         auto pin = globalCursorManager->pinCursor(opCtx, id);
         if (!pin.isOK()) {
-            invariant(pin == ErrorCodes::CursorNotFound);
+            invariant(pin == ErrorCodes::CursorNotFound || pin == ErrorCodes::Unauthorized);
             // No such cursor.  TODO: Consider writing to audit log here (even though we don't
             // have a namespace).
             return false;

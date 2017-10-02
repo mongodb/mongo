@@ -68,6 +68,10 @@ struct TestOptions : public ServiceExecutorAdaptive::Options {
     int idlePctThreshold() const final {
         return 0;
     }
+
+    int maxRecursion() const final {
+        return 0;
+    }
 };
 
 class ServiceExecutorAdaptiveFixture : public unittest::Test {

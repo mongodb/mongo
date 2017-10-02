@@ -1,11 +1,12 @@
 [
     {
         "description": "allOf",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
             "allOf": [
                 {
                     "properties": {
-                        "bar": {"type": "integer"}
+                        "bar": {"type": "number"}
                     },
                     "required": ["bar"]
                 },
@@ -42,8 +43,9 @@
     },
     {
         "description": "allOf with base schema",
+        "note": "Instances of 'integer' in this test have been replaced with 'number'.",
         "schema": {
-            "properties": {"bar": {"type": "integer"}},
+            "properties": {"bar": {"type": "number"}},
             "required": ["bar"],
             "allOf" : [
                 {

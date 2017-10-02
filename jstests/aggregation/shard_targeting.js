@@ -68,12 +68,8 @@
     assert.writeOK(mongosColl.insert({_id: 50}));
     assert.writeOK(mongosColl.insert({_id: 150}));
 
-    const shardExceptions = [
-        ErrorCodes.RecvStaleConfig,
-        ErrorCodes.SendStaleConfig,
-        ErrorCodes.StaleShardVersion,
-        ErrorCodes.StaleEpoch
-    ];
+    const shardExceptions =
+        [ErrorCodes.StaleConfig, ErrorCodes.StaleShardVersion, ErrorCodes.StaleEpoch];
 
     // Create an $_internalSplitPipeline stage that forces the merge to occur on the Primary shard.
     const forcePrimaryMerge = [{$_internalSplitPipeline: {mergeType: "primaryShard"}}];

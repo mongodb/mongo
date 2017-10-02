@@ -36,6 +36,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
@@ -44,6 +45,7 @@ namespace {
 
 using mongo::BSONObj;
 using mongo::CollatorInterfaceMock;
+using mongo::ExpressionContextForTest;
 using mongo::LogBuilder;
 using mongo::ModifierAddToSet;
 using mongo::ModifierInterface;
@@ -59,7 +61,8 @@ public:
     Mod() : _mod() {}
 
     explicit Mod(BSONObj modObj,
-                 ModifierInterface::Options options = ModifierInterface::Options::normal())
+                 ModifierInterface::Options options =
+                     ModifierInterface::Options::normal(new ExpressionContextForTest()))
         : _modObj(modObj), _mod() {
         ASSERT_OK(_mod.init(_modObj["$addToSet"].embeddedObject().firstElement(), options));
     }
@@ -401,9 +404,11 @@ TEST(Deduplication, ExistingDuplicatesArePreservedWithRespectToCollation) {
 
 TEST(Collation, AddToSetRespectsCollationFromModifierOptions) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     Document doc(fromjson("{ a : ['not'] }"));
     Mod mod(fromjson("{ $addToSet : { a : 'equal' } }"),
-            ModifierInterface::Options::normal(&collator));
+            ModifierInterface::Options::normal(expCtx));
 
     ModifierInterface::ExecInfo execInfo;
     ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));

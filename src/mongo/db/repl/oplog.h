@@ -64,9 +64,8 @@ public:
     InsertStatement(StmtId statementId, BSONObj toInsert) : stmtId(statementId), doc(toInsert) {}
     InsertStatement(StmtId statementId, BSONObj toInsert, OplogSlot os)
         : stmtId(statementId), oplogSlot(os), doc(toInsert) {}
-    InsertStatement(BSONObj toInsert, SnapshotName ts)
-        : oplogSlot(repl::OpTime(Timestamp(ts.asU64()), repl::OpTime::kUninitializedTerm), 0),
-          doc(toInsert) {}
+    InsertStatement(BSONObj toInsert, SnapshotName ts, long long term)
+        : oplogSlot(repl::OpTime(Timestamp(ts.asU64()), term), 0), doc(toInsert) {}
 
     StmtId stmtId = kUninitializedStmtId;
     OplogSlot oplogSlot;
@@ -104,6 +103,8 @@ extern int OPLOG_VERSION;
 /**
  * Log insert(s) to the local oplog.
  * Returns the OpTime of the last insert.
+ * The timestamps parameter can also be modified and contain the individual timestamps for each
+ * insert after the oplog entries were created.
  */
 OpTime logInsertOps(OperationContext* opCtx,
                     const NamespaceString& nss,
@@ -111,6 +112,7 @@ OpTime logInsertOps(OperationContext* opCtx,
                     Session* session,
                     std::vector<InsertStatement>::const_iterator begin,
                     std::vector<InsertStatement>::const_iterator end,
+                    Timestamp timestamps[],
                     bool fromMigrate);
 
 /**
@@ -215,10 +217,11 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
 
 /**
- * Allocates optimes for new entries in the oplog.  Returns an array of OplogSlots, which contain
- * the new optimes along with their terms and newly calculated hash fields.
+ * Allocates optimes for new entries in the oplog.  Returns an OplogSlot or a vector of OplogSlots,
+ * which contain the new optimes along with their terms and newly calculated hash fields.
  */
-void getNextOpTimes(OperationContext* opCtx, std::size_t count, OplogSlot* slotsOut);
+OplogSlot getNextOpTime(OperationContext* opCtx);
+std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count);
 
 }  // namespace repl
 }  // namespace mongo

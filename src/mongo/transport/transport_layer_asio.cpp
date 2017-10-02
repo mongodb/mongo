@@ -122,15 +122,6 @@ void TransportLayerASIO::asyncWait(Ticket&& ticket, TicketCallback callback) {
           ownedASIOTicket = std::move(ownedASIOTicket) ](Status status) { callback(status); });
 }
 
-TransportLayer::Stats TransportLayerASIO::sessionStats() {
-    TransportLayer::Stats ret;
-    auto sessionCount = _currentConnections.load();
-    ret.numOpenSessions = sessionCount;
-    ret.numCreatedSessions = _createdConnections.load();
-    ret.numAvailableSessions = static_cast<size_t>(_listenerOptions.maxConns) - sessionCount;
-    return ret;
-}
-
 // Must not be called while holding the TransportLayerASIO mutex.
 void TransportLayerASIO::end(const SessionHandle& session) {
     auto asioSession = checked_pointer_cast<ASIOSession>(session);
@@ -306,22 +297,7 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
             return;
         }
 
-        size_t connCount = _currentConnections.addAndFetch(1);
-        if (connCount > _listenerOptions.maxConns) {
-            log() << "connection refused because too many open connections: " << connCount;
-            _currentConnections.subtractAndFetch(1);
-            _acceptConnection(acceptor);
-            return;
-        }
-
         std::shared_ptr<ASIOSession> session(new ASIOSession(this, std::move(peerSocket)));
-
-        _createdConnections.addAndFetch(1);
-        if (!serverGlobalParams.quiet.load()) {
-            const auto word = (connCount == 1 ? " connection"_sd : " connections"_sd);
-            log() << "connection accepted from " << session->remote() << " #" << session->id()
-                  << " (" << connCount << word << " now open)";
-        }
 
         _sep->startSession(std::move(session));
         _acceptConnection(acceptor);

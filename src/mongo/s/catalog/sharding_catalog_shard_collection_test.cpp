@@ -71,6 +71,8 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
+const ShardId testPrimaryShard = ShardId("shard0");
+
 class ShardCollectionTest : public ConfigServerTestFixture {
 public:
     void expectCount(const HostAndPort& receivingHost,
@@ -140,7 +142,8 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
                                              defaultCollation,
                                              false,
                                              vector<BSONObj>{},
-                                             false),
+                                             false,
+                                             testPrimaryShard),
                        AssertionException,
                        ErrorCodes::ManualInterventionRequired);
 }
@@ -180,7 +183,8 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
                               defaultCollation,
                               false,
                               vector<BSONObj>{},
-                              false);
+                              false,
+                              testPrimaryShard);
     });
 
     // Report that no documents exist for the given collection on the primary shard
@@ -309,7 +313,8 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
                               defaultCollation,
                               true,
                               vector<BSONObj>{splitPoint0, splitPoint1, splitPoint2, splitPoint3},
-                              true);
+                              true,
+                              testPrimaryShard);
     });
 
     // Expect the set shard version for that namespace
@@ -408,7 +413,8 @@ TEST_F(ShardCollectionTest, withInitialData) {
                               defaultCollation,
                               false,
                               vector<BSONObj>{},
-                              false);
+                              false,
+                              testPrimaryShard);
     });
 
     // Report that documents exist for the given collection on the primary shard, so that calling

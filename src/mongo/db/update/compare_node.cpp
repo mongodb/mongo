@@ -34,10 +34,11 @@
 
 namespace mongo {
 
-Status CompareNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status CompareNode::init(BSONElement modExpr,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
     _val = modExpr;
-    setCollator(collator);
+    setCollator(expCtx->getCollator());
     return Status::OK();
 }
 

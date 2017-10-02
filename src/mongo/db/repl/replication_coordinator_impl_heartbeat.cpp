@@ -224,7 +224,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     }
 
     // Wake the stepdown waiter when our updated OpTime allows it to finish stepping down.
-    _signalStepDownWaiter_inlock();
+    _signalStepDownWaiterIfReady_inlock();
 
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.
     if (_catchupState) {
@@ -247,7 +247,7 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
             // Update the cached member state if different than the current topology member state
             if (_memberState != _topCoord->getMemberState()) {
                 const PostMemberStateUpdateAction postUpdateAction =
-                    _updateMemberStateFromTopologyCoordinator_inlock();
+                    _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
                 lock.unlock();
                 _performPostMemberStateUpdateAction(postUpdateAction);
                 lock.lock();
@@ -262,10 +262,13 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
             break;
         case HeartbeatResponseAction::StepDownSelf:
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
-            log() << "Stepping down from primary in response to heartbeat";
-            _topCoord->prepareForStepDown();
-            // Don't need to wait for stepdown to finish.
-            _stepDownStart();
+            if (_topCoord->prepareForUnconditionalStepDown()) {
+                log() << "Stepping down from primary in response to heartbeat";
+                _stepDownStart();
+            } else {
+                LOG(2) << "Heartbeat would have triggered a stepdown, but we're already in the "
+                          "process of stepping down";
+            }
             break;
         case HeartbeatResponseAction::StepDownRemotePrimary: {
             invariant(action.getPrimaryConfigIndex() != _selfIndex);
@@ -372,14 +375,12 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalWrite globalExclusiveLock(opCtx.get());
-    // TODO Add invariant that we've got global shared or global exclusive lock, when supported
-    // by lock manager.
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (_topCoord->stepDownIfPending()) {
-        const auto action = _updateMemberStateFromTopologyCoordinator_inlock();
-        lk.unlock();
-        _performPostMemberStateUpdateAction(action);
-    }
+
+    _topCoord->finishUnconditionalStepDown();
+    const auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx.get());
+    lk.unlock();
+    _performPostMemberStateUpdateAction(action);
     _replExecutor->signalEvent(finishedEvent);
 }
 
@@ -579,7 +580,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // If we do not have an index, we should pass -1 as our index to avoid falsely adding ourself to
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
-    const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndexValue);
+    const PostMemberStateUpdateAction action =
+        _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndexValue);
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
@@ -686,18 +688,24 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
     }
 
     auto nextTimeout = earliestDate + _rsConfig.getElectionTimeoutPeriod();
-    if (nextTimeout > _replExecutor->now()) {
-        LOG(3) << "scheduling next check at " << nextTimeout;
-        auto cbh = _scheduleWorkAt(nextTimeout,
-                                   stdx::bind(&ReplicationCoordinatorImpl::_handleLivenessTimeout,
-                                              this,
-                                              stdx::placeholders::_1));
-        if (!cbh) {
-            return;
-        }
-        _handleLivenessTimeoutCbh = cbh;
-        _earliestMemberId = earliestMemberId;
+    LOG(3) << "scheduling next check at " << nextTimeout;
+
+    // It is possible we will schedule the next timeout in the past.
+    // ThreadPoolTaskExecutor::_scheduleWorkAt() schedules its work immediately if it's given a
+    // time <= now().
+    // If we missed the timeout, it means that on our last check the earliest live member was
+    // just barely fresh and it has become stale since then. We must schedule another liveness
+    // check to continue conducting liveness checks and be able to step down from primary if we
+    // lose contact with a majority of nodes.
+    auto cbh = _scheduleWorkAt(nextTimeout,
+                               stdx::bind(&ReplicationCoordinatorImpl::_handleLivenessTimeout,
+                                          this,
+                                          stdx::placeholders::_1));
+    if (!cbh) {
+        return;
     }
+    _handleLivenessTimeoutCbh = cbh;
+    _earliestMemberId = earliestMemberId;
 }
 
 void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId) {

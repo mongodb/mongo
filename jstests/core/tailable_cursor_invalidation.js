@@ -21,8 +21,7 @@
     const isMongos = db.adminCommand({isdbgrid: 1}).isdbgrid;
     if (isMongos) {
         // Mongos will let you establish a cursor with batch size 0 and return to you before it
-        // realizes the shard's cursor is exhausted. The next getMore should return a 0 cursor
-        // id
+        // realizes the shard's cursor is exhausted. The next getMore should return a 0 cursor id
         // though.
         assert.neq(emptyBatchCursorId, 0);
         assert.eq(
@@ -30,8 +29,7 @@
             assert.commandWorked(db.runCommand({getMore: emptyBatchCursorId, collection: collName}))
                 .cursor.id);
     } else {
-        // A mongod should know immediately that the collection doesn't exist, and return a 0
-        // cursor
+        // A mongod should know immediately that the collection doesn't exist, and return a 0 cursor
         // id.
         assert.eq(0, emptyBatchCursorId);
     }

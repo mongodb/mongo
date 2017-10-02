@@ -80,7 +80,7 @@ public:
      *
      * May throw any exception. Known exceptions are:
      *  - InvalidOptions if the operation context is missing shard version
-     *  - SendStaleConfigException if the expected collection version does not match what we find it
+     *  - StaleConfigException if the expected collection version does not match what we find it
      *      to be after acquiring the distributed lock.
      */
     MigrationSourceManager(OperationContext* opCtx,
@@ -222,6 +222,10 @@ private:
 
     // The key pattern of the collection whose chunks are being moved.
     BSONObj _keyPattern;
+
+    // The UUID of the the collection whose chunks are being moved. Default to empty if the
+    // collection doesn't have UUID.
+    UUID _collectionUuid;
 
     // The chunk cloner source. Only available if there is an active migration going on. To set and
     // remove it, global S lock needs to be acquired first in order to block all logOp calls and

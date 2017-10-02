@@ -229,8 +229,7 @@ void execCommandClient(OperationContext* opCtx,
         result.resetToEmpty();
         const int code = e.code();
 
-        // Codes for StaleConfigException
-        if (code == ErrorCodes::RecvStaleConfig || code == ErrorCodes::SendStaleConfig) {
+        if (code == ErrorCodes::StaleConfig) {
             throw;
         }
 
@@ -262,7 +261,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
         return;
     }
 
-    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth());
+    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true);
 
     int loops = 5;
 
@@ -607,17 +606,16 @@ Status Strategy::explainFind(OperationContext* opCtx,
     Timer timer;
 
     BSONObj viewDefinition;
-    auto swShardResponses = scatterGather(opCtx,
-                                          qr.nss().db().toString(),
-                                          qr.nss(),
-                                          explainCmd,
-                                          readPref,
-                                          ShardTargetingPolicy::UseRoutingTable,
-                                          qr.getFilter(),
-                                          qr.getCollation(),
-                                          true,  // do shard versioning
-                                          true,  // retry on stale shard version
-                                          &viewDefinition);
+    auto swShardResponses =
+        scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                   qr.nss().db().toString(),
+                                                   qr.nss(),
+                                                   explainCmd,
+                                                   readPref,
+                                                   Shard::RetryPolicy::kIdempotent,
+                                                   qr.getFilter(),
+                                                   qr.getCollation(),
+                                                   &viewDefinition);
 
     long long millisElapsed = timer.millis();
 

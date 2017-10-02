@@ -151,6 +151,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->filter = query.root()->shallowClone();
     csn->tailable = tailable;
     csn->maxScan = query.getQueryRequest().getMaxScan();
+    csn->shouldTrackLatestOplogTimestamp =
+        params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
 
     // If the hint is {$natural: +-1} this changes the direction of the collection scan.
     if (!query.getQueryRequest().getHint().isEmpty()) {
@@ -689,8 +691,7 @@ std::vector<QuerySolutionNode*> QueryPlannerAccess::collapseEquivalentScans(
             collapsedFilter->add(collapseIntoFetch->filter.release());
 
             // Normalize the filter and add it to 'into'.
-            collapseIntoFetch->filter.reset(
-                CanonicalQuery::normalizeTree(collapsedFilter.release()));
+            collapseIntoFetch->filter = MatchExpression::optimize(std::move(collapsedFilter));
         } else {
             // Scans are not equivalent and can't be collapsed.
             collapsedScans.push_back(std::move(ownedScans[i]));

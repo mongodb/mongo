@@ -66,7 +66,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
         var res = dbPrimary.runCommandWithMetadata(  //
             {
               update: name,
-              writeConcern: {w: 2, wtimeout: 60 * 1000},
+              writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS},
               updates: [{q: {_id: 1}, u: {_id: 1, state: state}, upsert: true}],
             },
             {"$replData": 1});

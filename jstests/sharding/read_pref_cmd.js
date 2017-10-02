@@ -2,6 +2,10 @@ load("jstests/replsets/rslib.js");
 
 var NODE_COUNT = 2;
 
+// Checking UUID consistency involves reading from the config server through mongos, but this test
+// sets an invalid readPreference on the connection to the mongos.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 /**
  * Prepare to call testReadPreference() or assertFailure().
  */

@@ -420,7 +420,8 @@ void State::prepTempCollection() {
             CollectionOptions options;
             options.setNoIdIndex();
             options.temp = true;
-            if (enableCollectionUUIDs) {
+            if (enableCollectionUUIDs &&
+                serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
                 options.uuid.emplace(UUID::gen());
             }
             incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
@@ -504,7 +505,8 @@ void State::prepTempCollection() {
 
         CollectionOptions options = finalOptions;
         options.temp = true;
-        if (enableCollectionUUIDs) {
+        if (enableCollectionUUIDs &&
+            serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
             // If a UUID for the final output collection was sent by mongos (i.e., the final output
             // collection is sharded), use the UUID mongos sent when creating the temp collection.
             // When the temp collection is renamed to the final output collection, the UUID will be
@@ -1654,7 +1656,7 @@ public:
                 errmsg = "there were emits but no data!";
                 return false;
             }
-        } catch (SendStaleConfigException& e) {
+        } catch (StaleConfigException& e) {
             log() << "mr detected stale config, should retry" << redact(e);
             throw e;
         }

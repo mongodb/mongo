@@ -38,12 +38,14 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using mongo::BSONObj;
+using mongo::ExpressionContextForTest;
 using mongo::fromjson;
 using mongo::LogBuilder;
 using mongo::ModifierInterface;
@@ -67,9 +69,10 @@ public:
                    : ModifierSet::SET_NORMAL) {
         _modObj = modObj;
         StringData modName = modObj.firstElement().fieldName();
-        ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
-                            !fromRepl ? ModifierInterface::Options::normal()
-                                      : ModifierInterface::Options::fromRepl()));
+        ASSERT_OK(_mod.init(
+            _modObj[modName].embeddedObject().firstElement(),
+            !fromRepl ? ModifierInterface::Options::normal(new ExpressionContextForTest())
+                      : ModifierInterface::Options::fromRepl(new ExpressionContextForTest())));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -100,8 +103,9 @@ private:
 TEST(Init, EmptyOperation) {
     BSONObj modObj = fromjson("{$set: {}}");
     ModifierSet mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$set"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 //

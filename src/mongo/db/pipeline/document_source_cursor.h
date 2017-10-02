@@ -52,8 +52,12 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
-        constraints.requiredPosition = PositionRequirement::kFirst;
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kFirst,
+                                     HostTypeRequirement::kAnyShard,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed);
+
         constraints.requiresInputDocSource = false;
         return constraints;
     }
@@ -125,6 +129,13 @@ public:
      */
     void shouldProduceEmptyDocs() {
         _shouldProduceEmptyDocs = true;
+    }
+
+    Timestamp getLatestOplogTimestamp() const {
+        if (_exec) {
+            return _exec->getLatestOplogTimestamp();
+        }
+        return Timestamp();
     }
 
     const std::string& getPlanSummaryStr() const {

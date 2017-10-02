@@ -35,7 +35,7 @@ namespace mongo {
 
 class PopNode final : public ModifierNode {
 public:
-    Status init(BSONElement modExpr, const CollatorInterface* collator) final;
+    Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) final;
 
     ModifyResult updateExistingElement(mutablebson::Element* element,
                                        std::shared_ptr<FieldRef> elementPath) const final;

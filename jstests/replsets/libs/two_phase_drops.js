@@ -14,82 +14,84 @@
  * of the replica set.
  *
  */
-let TwoPhaseDropCollectionTest = function(testName, dbName) {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/check_log.js");  // For 'checkLog'.
+load("jstests/libs/check_log.js");  // For 'checkLog'.
 
-    let self = this;
-    let oplogApplicationFailpoint = "rsSyncApplyStop";
+class TwoPhaseDropCollectionTest {
+    constructor(testName, dbName) {
+        this.testName = testName;
+        this.dbName = dbName;
+
+        this.oplogApplicationFailpoint = "rsSyncApplyStop";
+    }
 
     /**
      * Log a message for 'TwoPhaseDropCollectionTest'.
      */
-    function _testLog(msg) {
+    static _testLog(msg) {
         jsTestLog("[TwoPhaseDropCollectionTest] " + msg);
     }
 
     /**
      * Pause oplog application on a specified node.
      */
-    self.pauseOplogApplication = function(node) {
-        assert.commandWorked(
-            node.adminCommand({configureFailPoint: oplogApplicationFailpoint, mode: "alwaysOn"}));
-        checkLog.contains(node, oplogApplicationFailpoint + " fail point enabled");
-    };
+    pauseOplogApplication(node) {
+        assert.commandWorked(node.adminCommand(
+            {configureFailPoint: this.oplogApplicationFailpoint, mode: "alwaysOn"}));
+        checkLog.contains(node, this.oplogApplicationFailpoint + " fail point enabled");
+    }
 
     /**
      * Resume oplog application on a specified node.
      */
-    self.resumeOplogApplication = function(node) {
+    resumeOplogApplication(node) {
         assert.commandWorked(
-            node.adminCommand({configureFailPoint: oplogApplicationFailpoint, mode: "off"}));
-    };
+            node.adminCommand({configureFailPoint: this.oplogApplicationFailpoint, mode: "off"}));
+    }
 
     /**
      * Return a list of all collections in a given database. Use 'args' as the 'listCollections'
      * command arguments.
      */
-    self.listCollections = function(database, args) {
+    static listCollections(database, args) {
         args = args || {};
         let failMsg = "'listCollections' command failed";
         let res = assert.commandWorked(database.runCommand("listCollections", args), failMsg);
         return res.cursor.firstBatch;
-    };
+    }
 
     /**
      * Return a list of all collection names in a given database.
      */
-    self.listCollectionNames = function(database, args) {
-        return self.listCollections(database, args).map(c => c.name);
-    };
+    listCollectionNames(database, args) {
+        return TwoPhaseDropCollectionTest.listCollections(database, args).map(c => c.name);
+    }
 
     /**
      * Initiates a 2 node replica set to be used for the test. Returns the constructed ReplSetTest.
      */
-    self.initReplSet = function() {
+    initReplSet() {
         let nodes = [{}, {rsConfig: {priority: 0}}];
-        self.replTest = new ReplSetTest({name: testName, nodes: nodes});
-
-        self.dbName = dbName;
+        this.replTest = new ReplSetTest({name: this.testName, nodes: nodes});
 
         // Initiate the replica set.
-        self.replTest.startSet();
-        self.replTest.initiate();
-        self.replTest.awaitReplication();
+        this.replTest.startSet();
+        this.replTest.initiate();
+        this.replTest.awaitReplication();
 
-        return self.replTest;
-    };
+        return this.replTest;
+    }
 
     /**
      * Creates a collection with name 'collName' in the test database and then awaits replication.
      */
-    self.createCollection = function(collName) {
+    createCollection(collName) {
         // Create the collection that will be dropped and let it replicate.
-        let primaryDB = self.replTest.getPrimary().getDB(self.dbName);
+        let primaryDB = this.replTest.getPrimary().getDB(this.dbName);
         assert.commandWorked(primaryDB.createCollection(collName));
-        self.replTest.awaitReplication();
-    };
+        this.replTest.awaitReplication();
+    }
 
     /**
      * Return a regex matching a drop-pending namespace string for a collection with name
@@ -99,95 +101,111 @@ let TwoPhaseDropCollectionTest = function(testName, dbName) {
      * 'optime' is the optime of the collection drop operation, encoded as a string, and
      * 'collectionName' is the original collection name.
      */
-    self.pendingDropRegex = function(collName) {
+    static pendingDropRegex(collName) {
         return new RegExp("system\.drop\..*\." + collName + "$");
-    };
+    }
 
     /**
      * Returns true if the collection 'collName' exists on the primary.
      */
-    self.collectionExists = function(collName) {
-        let primaryDB = self.replTest.getPrimary().getDB(self.dbName);
-        let coll = self.listCollections(primaryDB).find(c => c.name === collName);
+    collectionExists(collName) {
+        let primaryDB = this.replTest.getPrimary().getDB(this.dbName);
+        let coll =
+            TwoPhaseDropCollectionTest.listCollections(primaryDB).find(c => c.name === collName);
         return coll !== undefined;
-    };
+    }
 
     /**
      * If 'collName' is in drop pending state on the primary, returns the name of the collection
      * after drop pending rename. If collection is not in drop pending state, returns false.
      */
-    self.collectionIsPendingDrop = function(collName) {
-        let primaryDB = self.replTest.getPrimary().getDB(self.dbName);
-        let collections = self.listCollections(primaryDB, {includePendingDrops: true});
+    collectionIsPendingDrop(collName) {
+        let primaryDB = this.replTest.getPrimary().getDB(this.dbName);
+        return TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(primaryDB, collName);
+    }
 
-        _testLog("Checking presence of drop-pending collection for " + collName +
-                 " in the collection list: " + tojson(collections));
+    /**
+     * If 'collName' in database 'db' is in drop pending state on the primary, returns the name
+     * of the collection after drop pending rename. If collection is not in drop pending state,
+     * returns false.
+     */
+    static collectionIsPendingDropInDatabase(db, collName) {
+        let collections =
+            TwoPhaseDropCollectionTest.listCollections(db, {includePendingDrops: true});
 
-        let pendingDropRegex = self.pendingDropRegex(collName);
+        TwoPhaseDropCollectionTest._testLog("Checking presence of drop-pending collection for " +
+                                            collName + " in the collection list: " +
+                                            tojson(collections));
+
+        let pendingDropRegex = TwoPhaseDropCollectionTest.pendingDropRegex(collName);
         return collections.find(c => pendingDropRegex.test(c.name));
-    };
+    }
 
     /**
      * Puts a collection with name 'collName' into the drop pending state. Returns the name of the
      * collection after it has been renamed to the 'system.drop' namespace.
      */
-    self.prepareDropCollection = function(collName) {
-
-        let primaryDB = self.replTest.getPrimary().getDB(self.dbName);
+    prepareDropCollection(collName) {
+        let primaryDB = this.replTest.getPrimary().getDB(this.dbName);
 
         // Pause application on secondary so that commit point doesn't advance, meaning that a
         // dropped collection on the primary will remain in 'drop-pending' state.
-        _testLog("Pausing oplog application on the secondary node.");
-        self.pauseOplogApplication(self.replTest.getSecondary());
+        TwoPhaseDropCollectionTest._testLog("Pausing oplog application on the secondary node.");
+        this.pauseOplogApplication(this.replTest.getSecondary());
 
         // Drop the collection on the primary.
-        _testLog("Dropping collection '" + collName + "' on primary node.");
+        TwoPhaseDropCollectionTest._testLog("Dropping collection '" + collName +
+                                            "' on primary node.");
         assert.commandWorked(primaryDB.runCommand({drop: collName, writeConcern: {w: 1}}));
 
         // Make sure the collection doesn't appear in the normal collection list and that it is now
         // in 'drop-pending' state.
-        assert(!self.collectionExists(collName));
-        let droppedColl = self.collectionIsPendingDrop(collName);
+        assert(!this.collectionExists(collName));
+        let droppedColl = this.collectionIsPendingDrop(collName);
 
         assert(
             droppedColl,
             "Dropped collection '" + collName + "' was not found in the 'system.drop' namespace");
 
         return droppedColl.name;
-    };
+    }
 
     /**
      * Restarts oplog application on the secondary and waits for the drop of collection 'collName'
      * to be committed (physically dropped).
      */
-    self.commitDropCollection = function(collName) {
+    commitDropCollection(collName) {
         // Let the secondary apply the collection drop operation, so that the replica set commit
         // point will advance, and the 'Commit' phase of the collection drop will complete on the
         // primary.
-        _testLog("Restarting oplog application on the secondary node.");
-        self.resumeOplogApplication(self.replTest.getSecondary());
+        TwoPhaseDropCollectionTest._testLog("Restarting oplog application on the secondary node.");
+        this.resumeOplogApplication(this.replTest.getSecondary());
 
-        _testLog("Waiting for collection drop operation to replicate to all nodes.");
-        self.replTest.awaitReplication();
+        TwoPhaseDropCollectionTest._testLog(
+            "Waiting for collection drop operation to replicate to all nodes.");
+        this.replTest.awaitReplication();
 
         // Make sure the collection has been fully dropped. It should not appear as a normal
         // collection or under the 'system.drop' namespace any longer. Physical collection drops may
         // happen asynchronously, any time after the drop operation is committed, so we wait to make
         // sure the collection is eventually dropped.
-        _testLog("Waiting for collection drop of '" + collName + "' to commit.");
+        TwoPhaseDropCollectionTest._testLog("Waiting for collection drop of '" + collName +
+                                            "' to commit.");
+        // Bind the member functions onto this instead of the anonymous function.
+        const twoPhaseDrop = this;
         assert.soonNoExcept(function() {
-            assert(!self.collectionExists(collName));
-            assert(!self.collectionIsPendingDrop(collName));
+            assert(!twoPhaseDrop.collectionExists(collName));
+            assert(!twoPhaseDrop.collectionIsPendingDrop(collName));
             return true;
         });
-    };
+    }
 
     /**
      * Disable all fail points and shut down the replica set.
      */
-    self.stop = function() {
-        _testLog("Disabling fail points and shutting down replica set.");
-        self.resumeOplogApplication(self.replTest.getSecondary());
-        self.replTest.stopSet();
-    };
-};
+    stop() {
+        TwoPhaseDropCollectionTest._testLog("Disabling fail points and shutting down replica set.");
+        this.resumeOplogApplication(this.replTest.getSecondary());
+        this.replTest.stopSet();
+    }
+}

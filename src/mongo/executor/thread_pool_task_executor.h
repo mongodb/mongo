@@ -73,6 +73,7 @@ public:
     StatusWith<EventHandle> makeEvent() override;
     void signalEvent(const EventHandle& event) override;
     StatusWith<CallbackHandle> onEvent(const EventHandle& event, const CallbackFn& work) override;
+    Status waitForEvent(OperationContext* opCtx, const EventHandle& event) override;
     void waitForEvent(const EventHandle& event) override;
     StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) override;

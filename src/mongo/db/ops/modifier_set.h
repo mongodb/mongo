@@ -97,8 +97,7 @@ private:
     // Element of the $set expression.
     BSONElement _val;
 
-    // See the class comments in modifier_interface.h
-    ModifierInterface::Options _modOptions;
+    bool _fromOplogApplication = false;
 
     // The instance of the field in the provided doc. This state is valid after a
     // prepare() was issued and until a log() is issued. The document this mod is

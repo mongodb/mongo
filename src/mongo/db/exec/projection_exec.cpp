@@ -77,7 +77,8 @@ ProjectionExec::ProjectionExec()
       _queryExpression(NULL),
       _hasReturnKey(false) {}
 
-ProjectionExec::ProjectionExec(const BSONObj& spec,
+ProjectionExec::ProjectionExec(OperationContext* opCtx,
+                               const BSONObj& spec,
                                const MatchExpression* queryExpression,
                                const CollatorInterface* collator)
     : _include(true),
@@ -131,8 +132,10 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                 BSONObj elemMatchObj = e.wrap();
                 verify(elemMatchObj.isOwned());
                 _elemMatchObjs.push_back(elemMatchObj);
+                boost::intrusive_ptr<ExpressionContext> expCtx(
+                    new ExpressionContext(opCtx, _collator));
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, _collator);
+                    MatchExpressionParser::parse(elemMatchObj, std::move(expCtx));
                 verify(statusWithMatcher.isOK());
                 // And store it in _matchers.
                 _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] =

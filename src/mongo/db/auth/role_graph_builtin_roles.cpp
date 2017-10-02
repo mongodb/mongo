@@ -62,6 +62,7 @@ const std::string BUILTIN_ROLE_CLUSTER_MANAGEMENT = "clusterManager";
 const std::string BUILTIN_ROLE_BACKUP = "backup";
 const std::string BUILTIN_ROLE_RESTORE = "restore";
 const std::string BUILTIN_ROLE_ENABLE_SHARDING = "enableSharding";
+const std::string BUILTIN_ROLE_QUERYABLE_BACKUP = "__queryableBackup";
 
 /// Actions that the "read" role may perform on a normal resources of a specific database, and
 /// that the "readAnyDatabase" role may perform on normal resources of any database.
@@ -193,6 +194,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::replSetGetStatus  // clusterManager gets this also
         << ActionType::serverStatus 
         << ActionType::top
+        << ActionType::useUUID
         << ActionType::inprog
         << ActionType::shardingState;
 
@@ -213,7 +215,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::shutdown
         << ActionType::touch
         << ActionType::unlock
-        << ActionType::diagLogging
         << ActionType::flushRouterConfig  // clusterManager gets this also
         << ActionType::fsync
         << ActionType::invalidateUserCache // userAdminAnyDatabase gets this also
@@ -486,7 +487,8 @@ void addClusterAdminPrivileges(PrivilegeVector* privileges) {
         privileges, Privilege(ResourcePattern::forAnyNormalResource(), ActionType::dropDatabase));
 }
 
-void addBackupPrivileges(PrivilegeVector* privileges) {
+
+void addQueryableBackupPrivileges(PrivilegeVector* privileges) {
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forAnyResource(), ActionType::collStats));
     Privilege::addPrivilegeToPrivilegeVector(
@@ -498,7 +500,7 @@ void addBackupPrivileges(PrivilegeVector* privileges) {
 
     ActionSet clusterActions;
     clusterActions << ActionType::getParameter  // To check authSchemaVersion
-                   << ActionType::listDatabases << ActionType::appendOplogNote;  // For BRS
+                   << ActionType::listDatabases << ActionType::useUUID;
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forClusterResource(), clusterActions));
 
@@ -551,12 +553,26 @@ void addBackupPrivileges(PrivilegeVector* privileges) {
             ResourcePattern::forExactNamespace(AuthorizationManager::versionCollectionNamespace),
             ActionType::find));
 
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(ResourcePattern::forExactNamespace(NamespaceString("config", "settings")),
+                  ActionType::find));
+}
+
+void addBackupPrivileges(PrivilegeVector* privileges) {
+    ActionSet clusterActions;
+    clusterActions << ActionType::appendOplogNote;  // For BRS
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forClusterResource(), clusterActions));
+
     ActionSet configSettingsActions;
-    configSettingsActions << ActionType::insert << ActionType::update << ActionType::find;
+    configSettingsActions << ActionType::insert << ActionType::update;
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
         Privilege(ResourcePattern::forExactNamespace(NamespaceString("config", "settings")),
                   configSettingsActions));
+
+    addQueryableBackupPrivileges(privileges);
 }
 
 void addRestorePrivileges(PrivilegeVector* privileges) {
@@ -684,6 +700,8 @@ bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeV
         addClusterManagerPrivileges(result);
     } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
         addClusterAdminPrivileges(result);
+    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_QUERYABLE_BACKUP) {
+        addQueryableBackupPrivileges(result);
     } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_BACKUP) {
         addBackupPrivileges(result);
     } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_RESTORE) {
@@ -751,6 +769,8 @@ bool RoleGraph::isBuiltinRole(const RoleName& role) {
         return true;
     } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_INTERNAL) {
         return true;
+    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_QUERYABLE_BACKUP) {
+        return true;
     }
     return false;
 }
@@ -776,6 +796,7 @@ void RoleGraph::_createBuiltinRolesForDBIfNeeded(const std::string& dbname) {
         _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_RESTORE, dbname));
         _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_ROOT, dbname));
         _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_INTERNAL, dbname));
+        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_QUERYABLE_BACKUP, dbname));
     }
 }
 

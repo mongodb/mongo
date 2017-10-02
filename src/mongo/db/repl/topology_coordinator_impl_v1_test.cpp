@@ -110,9 +110,16 @@ protected:
                              stdx::bind(stringContains, stdx::placeholders::_1, needle));
     }
 
-    void makeSelfPrimary(const Timestamp& electionOpTime = Timestamp(0, 0)) {
-        getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionOpTime);
+    void makeSelfPrimary(const Timestamp& electionTimestamp = Timestamp(0, 0),
+                         const OpTime& firstOpTimeOfTerm = OpTime()) {
+        getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
         getTopoCoord()._setCurrentPrimaryForTest(_selfIndex);
+        getTopoCoord().completeTransitionToPrimary(firstOpTimeOfTerm);
+    }
+
+    void setMyOpTime(const OpTime& opTime) {
+        auto* myMemberData = getTopoCoord().getMyMemberData();
+        myMemberData->setLastAppliedOpTime(opTime, now());
     }
 
     void setSelfMemberState(const MemberState& newState) {
@@ -1751,8 +1758,8 @@ TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) 
                  0);
     HostAndPort target("host2", 27017);
     Date_t requestDate = now();
-    std::pair<ReplSetHeartbeatArgs, Milliseconds> uppingRequest =
-        getTopoCoord().prepareHeartbeatRequest(requestDate, "myset", target);
+    std::pair<ReplSetHeartbeatArgsV1, Milliseconds> uppingRequest =
+        getTopoCoord().prepareHeartbeatRequestV1(requestDate, "myset", target);
     auto action = getTopoCoord().processHeartbeatResponse(
         requestDate, Milliseconds(0), target, makeStatusWith<ReplSetHeartbeatResponse>());
     Date_t expected(now() + Milliseconds(2500));
@@ -4053,6 +4060,329 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp
     ASSERT_STRING_CONTAINS(result.reason(),
                            "member is either not the most up-to-date member or not ahead of the "
                            "primary, and therefore cannot call for catchup takeover");
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptFailsWhenNotPrimary) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    ASSERT_THROWS_CODE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false),
+                       DBException,
+                       ErrorCodes::PrimarySteppedDown);
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptFailsWhenAlreadySteppingDown) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    getTopoCoord().prepareForUnconditionalStepDown();
+
+    ASSERT_THROWS_CODE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false),
+                       DBException,
+                       ErrorCodes::PrimarySteppedDown);
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptFailsForDifferentTerm) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+
+    ASSERT_THROWS_CODE(
+        getTopoCoord().attemptStepDown(term - 1, curTime, futureTime, futureTime, false),
+        DBException,
+        ErrorCodes::PrimarySteppedDown);
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastStepDownUntil) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+
+    ASSERT_THROWS_CODE_AND_WHAT(
+        getTopoCoord().attemptStepDown(term, curTime, futureTime, curTime, false),
+        DBException,
+        ErrorCodes::ExceededTimeLimit,
+        "By the time we were ready to step down, we were already past the time we were supposed to "
+        "step down until");
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastWaitUntil) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+
+    std::string expectedWhat = str::stream()
+        << "No electable secondaries caught up as of " << dateToISOStringLocal(curTime)
+        << "Please use the replSetStepDown command with the argument "
+        << "{force: true} to force node to step down.";
+    ASSERT_THROWS_CODE_AND_WHAT(
+        getTopoCoord().attemptStepDown(term, curTime, curTime, futureTime, false),
+        DBException,
+        ErrorCodes::ExceededTimeLimit,
+        expectedWhat);
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUp) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(5, 0), term));
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
+    heartbeatFromMember(
+        HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
+
+    ASSERT_FALSE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false));
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUpForceIsTrueButNotPastWaitUntil) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(5, 0), term));
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
+    heartbeatFromMember(
+        HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
+
+    ASSERT_FALSE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, true));
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfNoSecondariesCaughtUpForceIsTrueAndPastWaitUntil) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(5, 0), term));
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
+    heartbeatFromMember(
+        HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
+
+    ASSERT_TRUE(getTopoCoord().attemptStepDown(term, curTime, curTime, futureTime, true));
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfSecondariesCaughtUp) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(5, 0), term));
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(5, 0), term));
+    heartbeatFromMember(
+        HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
+
+    ASSERT_TRUE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false));
+}
+
+TEST_F(TopoCoordTest, StepDownAttemptFailsIfSecondaryCaughtUpButNotElectable) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017"
+                                                  << "priority"
+                                                  << 0
+                                                  << "hidden"
+                                                  << true)
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion"
+                      << 1
+                      << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+    const auto term = getTopoCoord().getTerm();
+    Date_t curTime = now();
+    Date_t futureTime = curTime + Seconds(1);
+
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(5, 0), term));
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(5, 0), term));
+    heartbeatFromMember(
+        HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
+
+    ASSERT_FALSE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false));
 }
 
 TEST_F(HeartbeatResponseTestV1,

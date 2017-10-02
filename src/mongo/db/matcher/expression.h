@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -104,6 +105,7 @@ public:
         INTERNAL_SCHEMA_ALLOWED_PROPERTIES,
         INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX,
         INTERNAL_SCHEMA_COND,
+        INTERNAL_SCHEMA_EQ,
         INTERNAL_SCHEMA_FMOD,
         INTERNAL_SCHEMA_MATCH_ARRAY_INDEX,
         INTERNAL_SCHEMA_MAX_ITEMS,
@@ -113,10 +115,25 @@ public:
         INTERNAL_SCHEMA_MIN_LENGTH,
         INTERNAL_SCHEMA_MIN_PROPERTIES,
         INTERNAL_SCHEMA_OBJECT_MATCH,
+        INTERNAL_SCHEMA_ROOT_DOC_EQ,
         INTERNAL_SCHEMA_TYPE,
         INTERNAL_SCHEMA_UNIQUE_ITEMS,
         INTERNAL_SCHEMA_XOR,
     };
+
+    /**
+     * Make simplifying changes to the structure of a MatchExpression tree without altering its
+     * semantics. This function may return:
+     *   - a pointer to the original, unmodified MatchExpression,
+     *   - a pointer to the original MatchExpression that has been mutated, or
+     *   - a pointer to a new MatchExpression.
+     *
+     * The value of 'expression' must not be nullptr.
+     */
+    static std::unique_ptr<MatchExpression> optimize(std::unique_ptr<MatchExpression> expression) {
+        auto optimizer = expression->getOptimizer();
+        return optimizer(std::move(expression));
+    }
 
     MatchExpression(MatchType type);
     virtual ~MatchExpression() {}
@@ -259,6 +276,15 @@ public:
 
 protected:
     /**
+     * An ExpressionOptimizerFunc implements tree simplifications for a MatchExpression tree with a
+     * specific type of MatchExpression at the root. Except for requiring a specific MatchExpression
+     * subclass, an ExpressionOptimizerFunc has the same requirements and functionality as described
+     * in the specification of MatchExpression::getOptimizer(std::unique_ptr<MatchExpression>).
+     */
+    using ExpressionOptimizerFunc =
+        stdx::function<std::unique_ptr<MatchExpression>(std::unique_ptr<MatchExpression>)>;
+
+    /**
      * Subclasses that are collation-aware must implement this method in order to capture changes
      * to the collator that occur after initialization time.
      */
@@ -269,6 +295,23 @@ protected:
     void _debugAddSpace(StringBuilder& debug, int level) const;
 
 private:
+    /**
+     * Subclasses should implement this function to provide an ExpressionOptimizerFunc specific to
+     * the subclass. This function is only called by
+     * MatchExpression::optimize(std::unique_ptr<MatchExpression>), which is responsible for calling
+     * MatchExpression::getOptimizer() on its input MatchExpression and then passing the same
+     * MatchExpression to the resulting ExpressionOptimizerFunc. There should be no other callers
+     * to this function.
+     *
+     * Any MatchExpression subclass that stores child MatchExpression objects is responsible for
+     * returning an ExpressionOptimizerFunc that recursively calls
+     * MatchExpression::optimize(std::unique_ptr<MatchExpression>) on those children.
+     *
+     * See the descriptions of MatchExpression::optimize(std::unique_ptr<MatchExpression>) and
+     * ExpressionOptimizerFunc for additional explanation of their interfaces and functionality.
+     */
+    virtual ExpressionOptimizerFunc getOptimizer() const = 0;
+
     MatchType _matchType;
     std::unique_ptr<TagData> _tagData;
 };

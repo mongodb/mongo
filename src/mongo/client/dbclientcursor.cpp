@@ -254,9 +254,9 @@ BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
     auto commandReply = _client->parseCommandReplyMessage(_client->getServerAddress(), reply);
     auto commandStatus = getStatusFromCommandResult(commandReply->getCommandReply());
 
-    if (ErrorCodes::SendStaleConfig == commandStatus) {
-        throw RecvStaleConfigException("stale config in DBClientCursor::dataReceived()",
-                                       commandReply->getCommandReply());
+    if (ErrorCodes::StaleConfig == commandStatus) {
+        throw StaleConfigException("stale config in DBClientCursor::dataReceived()",
+                                   commandReply->getCommandReply());
     } else if (!commandStatus.isOK()) {
         wasError = true;
     }
@@ -342,7 +342,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
     if (qr.getResultFlags() & ResultFlag_ShardConfigStale) {
         BSONObj error;
         verify(peekError(&error));
-        throw RecvStaleConfigException(
+        throw StaleConfigException(
             (string) "stale config on lazy receive" + causedBy(getErrField(error)), error);
     }
 

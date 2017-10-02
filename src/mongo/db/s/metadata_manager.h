@@ -165,17 +165,23 @@ private:
     void _setActiveMetadata(WithLock, std::unique_ptr<CollectionMetadata> newMetadata);
 
     /**
+     * Finds the most-recently pushed metadata that might depend on `range`, or nullptr if none.
+     * The result is usable until the lock is released.
+     */
+    CollectionMetadata* _newestOverlappingMetadata(WithLock, ChunkRange const& range) const;
+
+    /**
      * Returns true if the specified range overlaps any chunk that might be currently in use by a
      * running query.
      */
 
-    bool _overlapsInUseChunk(WithLock, ChunkRange const& range);
+    bool _overlapsInUseChunk(WithLock, ChunkRange const& range) const;
 
     /**
      * Returns a notification if any range (possibly) still in use, but scheduled for cleanup,
      * overlaps the argument range.
      */
-    auto _overlapsInUseCleanups(WithLock, ChunkRange const& range)
+    auto _overlapsInUseCleanups(WithLock, ChunkRange const& range) const
         -> boost::optional<CleanupNotification>;
 
     /**

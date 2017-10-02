@@ -36,6 +36,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
@@ -54,12 +55,14 @@ public:
 
     explicit Mod(BSONObj modObj) : _modObj(modObj), _mod() {
         ASSERT_OK(_mod.init(_modObj["$pull"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+                            ModifierInterface::Options::normal(new ExpressionContextForTest())));
     }
 
     Mod(BSONObj modObj, const CollatorInterface* collator) : _modObj(modObj), _mod() {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        expCtx->setCollator(collator);
         ASSERT_OK(_mod.init(_modObj["$pull"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal(collator)));
+                            ModifierInterface::Options::normal(std::move(expCtx))));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -85,18 +88,18 @@ private:
 
 TEST(SimpleMod, InitWithTextFails) {
     auto update = fromjson("{$pull: {a: {$text: {$search: 'str'}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ModifierPull node;
-    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(SimpleMod, InitWithWhereFails) {
     auto update = fromjson("{$pull: {a: {$where: 'this.a == this.b'}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ModifierPull node;
-    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -104,9 +107,9 @@ TEST(SimpleMod, InitWithWhereFails) {
 TEST(SimpleMod, InitWithGeoNearElemFails) {
     auto update =
         fromjson("{$pull: {a: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ModifierPull node;
-    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -114,27 +117,27 @@ TEST(SimpleMod, InitWithGeoNearElemFails) {
 TEST(SimpleMod, InitWithGeoNearObjectFails) {
     auto update = fromjson(
         "{$pull: {a: {b: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ModifierPull node;
-    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(SimpleMod, InitWithExprElemFails) {
     auto update = fromjson("{$pull: {a: {$expr: {$eq: ['$a', 5]}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ModifierPull node;
-    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(SimpleMod, InitWithExprObjectFails) {
     auto update = fromjson("{$pull: {a: {$expr: {$eq: ['$a', {$literal: {b: 5}}]}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ModifierPull node;
-    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(collator));
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }

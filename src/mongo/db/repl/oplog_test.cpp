@@ -201,27 +201,27 @@ void _testConcurrentLogOp(const MakeTaskFunction& makeTaskFunction,
 
 /**
  * Inserts noop oplog entry with embedded namespace string.
+ * Inserts optime/namespace pair into map while holding a lock on the mutex.
  * Returns optime of generated oplog entry.
  */
-OpTime _logOpNoopWithMsg(OperationContext* opCtx, const NamespaceString& nss) {
+OpTime _logOpNoopWithMsg(OperationContext* opCtx,
+                         stdx::mutex* mtx,
+                         OpTimeNamespaceStringMap* opTimeNssMap,
+                         const NamespaceString& nss) {
+    stdx::lock_guard<stdx::mutex> lock(*mtx);
+
+    // logOp() must be called while holding lock because ephemeralForTest storage engine does not
+    // support concurrent updates to its internal state.
     const auto msgObj = BSON("msg" << nss.ns());
     auto opTime = logOp(opCtx, "n", nss, {}, msgObj, nullptr, false, {}, kUninitializedStmtId, {});
     ASSERT_FALSE(opTime.isNull());
-    return opTime;
-}
 
-/**
- * Inserts optime/namespace pair into map while holding a lock on the mutex.
- */
-void _insertOpTimeAndNamespaceIntoMap(stdx::mutex* mtx,
-                                      OpTimeNamespaceStringMap* opTimeNssMap,
-                                      const OpTime& opTime,
-                                      const NamespaceString& nss) {
-    stdx::lock_guard<stdx::mutex> lock(*mtx);
     ASSERT(opTimeNssMap->find(opTime) == opTimeNssMap->end())
         << "Unable to add namespace " << nss << " to map - map contains duplicate entry for optime "
         << opTime;
     opTimeNssMap->insert(std::make_pair(opTime, nss));
+
+    return opTime;
 }
 
 TEST_F(OplogTest, ConcurrentLogOpWithoutDocLockingSupport) {
@@ -238,8 +238,7 @@ TEST_F(OplogTest, ConcurrentLogOpWithoutDocLockingSupport) {
                 AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
                 WriteUnitOfWork wunit(opCtx.get());
 
-                auto opTime = _logOpNoopWithMsg(opCtx.get(), nss);
-                _insertOpTimeAndNamespaceIntoMap(mtx, opTimeNssMap, opTime, nss);
+                _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
 
                 // In a storage engine that does not support doc locking, upon returning from
                 // logOp(), this thread still holds an implicit MODE_X lock on the oplog collection
@@ -272,8 +271,7 @@ TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupport) {
                 AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
                 WriteUnitOfWork wunit(opCtx.get());
 
-                auto opTime = _logOpNoopWithMsg(opCtx.get(), nss);
-                _insertOpTimeAndNamespaceIntoMap(mtx, opTimeNssMap, opTime, nss);
+                _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
 
                 // In a storage engine that supports doc locking, it is okay for multiple threads to
                 // maintain uncommitted WUOWs upon returning from logOp() because each thread will
@@ -305,8 +303,7 @@ TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupportRevertFirstOplogEntry) {
                 AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
                 WriteUnitOfWork wunit(opCtx.get());
 
-                auto opTime = _logOpNoopWithMsg(opCtx.get(), nss);
-                _insertOpTimeAndNamespaceIntoMap(mtx, opTimeNssMap, opTime, nss);
+                auto opTime = _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
 
                 // In a storage engine that supports doc locking, it is okay for multiple threads to
                 // maintain uncommitted WUOWs upon returning from logOp() because each thread will
@@ -353,8 +350,7 @@ TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupportRevertLastOplogEntry) {
                 AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
                 WriteUnitOfWork wunit(opCtx.get());
 
-                auto opTime = _logOpNoopWithMsg(opCtx.get(), nss);
-                _insertOpTimeAndNamespaceIntoMap(mtx, opTimeNssMap, opTime, nss);
+                auto opTime = _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
 
                 // In a storage engine that supports doc locking, it is okay for multiple threads to
                 // maintain uncommitted WUOWs upon returning from logOp() because each thread will

@@ -1847,7 +1847,7 @@ TEST(JSONSchemaParserTest, FailsToParseIfUniqueItemsIsNotABoolean) {
     ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::TypeMismatch);
 }
 
-TEST(JSONSchemaParserTest, NoMatchExpressionGeneratedIfUniqueItemsFalse) {
+TEST(JSONSchemaParserTest, UniqueItemsFalseGeneratesAlwaysTrueExpression) {
     auto schema = fromjson("{properties: {a: {uniqueItems: false}}}");
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
@@ -1856,7 +1856,7 @@ TEST(JSONSchemaParserTest, NoMatchExpressionGeneratedIfUniqueItemsFalse) {
         {$and: [
             {$or: [
                 {$nor: [{a: {$exists: true}}]},
-                {}
+                {$and: [{$alwaysTrue: 1}]}
             ]}
         ]}
     ]})"));
@@ -1960,5 +1960,399 @@ TEST(JSONSchemaParserTest, FailsToParseUnsupportedKeywordsWhenIgnoreUnknownParam
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword '$schema' is not currently supported");
 }
+
+TEST(JSONSchemaParserTest, FailsToParseIfItemsIsNotAnArrayOrObject) {
+    auto schema = BSON("items" << 1);
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfItemsIsAnArrayWithANonObject) {
+    auto schema = fromjson("{items: [{type: 'string'}, 'blah']}");
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfItemsIsAnInvalidSchema) {
+    auto schema = BSON("items" << BSON("invalid" << 1));
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfItemsIsAnArrayThatContainsAnInvalidSchema) {
+    auto schema = fromjson("{items: [{type: 'string'}, {invalid: 1}]}");
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, ItemsParsesSuccessfullyAsArrayAtTopLevel) {
+    auto schema = fromjson("{items: [{type: 'string'}]}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson("{$and: [{$alwaysTrue: 1}]}"));
+}
+
+TEST(JSONSchemaParserTest, ItemsParsesSuccessfullyAsObjectAtTopLevel) {
+    auto schema = fromjson("{items: {type: 'string'}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson("{$and: [{$alwaysTrue: 1}]}"));
+}
+
+TEST(JSONSchemaParserTest, ItemsParsesSuccessfullyAsArrayInNestedSchema) {
+    auto schema = fromjson("{properties: {a: {items: [{maxLength: 4}, {minimum: 0}]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson(R"({
+    $and: [{
+        $and: [{
+            $or: [
+                {$nor: [{a: {$exists: true}}]},
+                {
+                  $and: [{
+                      $or: [
+                          {$nor: [{a: {$_internalSchemaType: [4]}}]},
+                          {
+                            $and: [
+                                {
+                                  a: {
+                                      $_internalSchemaMatchArrayIndex: {
+                                          index: 0,
+                                          namePlaceholder: "i",
+                                          expression: {
+                                              $and: [{
+                                                  $or: [
+                                                      {$nor: [{i: {$_internalSchemaType: [2]}}]},
+                                                      {i: {$_internalSchemaMaxLength: 4}}
+                                                  ]
+                                              }]
+                                          }
+                                      }
+                                  }
+                                },
+                                {
+                                  a: {
+                                      $_internalSchemaMatchArrayIndex: {
+                                          index: 1,
+                                          namePlaceholder: "i",
+                                          expression: {
+                                              $and: [{
+                                                  $or: [
+                                                      {
+                                                        $nor: [{
+                                                            i: {
+                                                                $_internalSchemaType: ["number"]
+                                                            }
+                                                        }]
+                                                      },
+                                                      {i: {$gte: 0}}
+                                                  ]
+                                              }]
+                                          }
+                                      }
+                                  }
+                                }
+                            ]
+                          }
+                      ]
+                  }]
+                }
+            ]
+        }]
+    }]})"));
+}
+
+TEST(JSONSchemaParserTest, ItemsParsesSuccessfullyAsObjectInNestedSchema) {
+    auto schema = fromjson("{properties: {a: {items: {type: 'string'}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue(), fromjson(R"( {
+	$and: [{
+	  $and: [{
+	      $or: [
+		  {$nor: [{a: {$exists: true}}]},
+		  {
+		    $and: [{
+			$or: [
+			    {$nor: [{a: {$_internalSchemaType: [4]}}]},
+			    {
+			      a: {
+				  $_internalSchemaAllElemMatchFromIndex:
+				      [0, {$and: [{i: {$_internalSchemaType: [2]}}]}]
+			      }
+			    }
+			]
+		    }]
+		  }
+	      ]
+	  }]
+	}]})"));
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfAdditionalItemsIsNotAnObjectOrBoolean) {
+    auto schema = BSON("items" << BSONObj() << "additionalItems" << 1);
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::TypeMismatch);
+
+    schema = BSON("additionalItems" << 1);
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfAdditionalItemsIsAnInvalidSchema) {
+    auto schema = BSON("items" << BSONObj() << "additionalItems" << BSON("invalid" << 1));
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+
+    schema = BSON("additionalItems" << BSON("invalid" << 1));
+    ASSERT_EQ(JSONSchemaParser::parse(schema).getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, AdditionalItemsTranslatesSucessfullyAsBooleanAtTopLevel) {
+    auto schema = fromjson("{items: [], additionalItems: true}");
+    auto expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson("{$and: [{$alwaysTrue: 1}, {$alwaysTrue: 1}]}"));
+
+    schema = fromjson("{items: [], additionalItems: false}");
+    expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson("{$and: [{$alwaysTrue: 1}, {$alwaysTrue: 1}]}"));
+}
+
+TEST(JSONSchemaParserTest, AdditionalItemsTranslatesSucessfullyAsObjectAtTopLevel) {
+    auto schema = fromjson("{items: [], additionalItems: {multipleOf: 7}}");
+    auto expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson("{$and: [{$alwaysTrue: 1}, {$alwaysTrue: 1}]}"));
+}
+
+TEST(JSONSchemaParserTest, AdditionalItemsTranslatesSucessfullyAsBooleanInNestedSchema) {
+    auto schema = fromjson("{properties: {a: {items: [], additionalItems: true}}}");
+    auto expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson(R"({
+        $and: [{
+            $and: [{
+                $or: [
+                    {$nor: [{a: {$exists: true}}]},
+                    {
+                      $and: [
+                          {$or: [{$nor: [{a: {$_internalSchemaType: [4]}}]}, {}]},
+                          {
+                            $or: [
+                                {$nor: [{a: {$_internalSchemaType: [4]}}]},
+                                {
+                                  a: {
+                                      $_internalSchemaAllElemMatchFromIndex:
+                                          [0, {$alwaysTrue: 1}]
+                                  }
+                                }
+                            ]
+                          }
+                      ]
+                    }
+                ]
+            }]
+        }]})"));
+
+    schema = fromjson("{properties: {a: {items: [], additionalItems: false}}}");
+    expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson(R"({
+        $and: [{
+            $and: [{
+                $or: [
+                    {$nor: [{a: {$exists: true}}]},
+                    {
+                      $and: [
+                          {$or: [{$nor: [{a: {$_internalSchemaType: [4]}}]}, {}]},
+                          {
+                            $or: [
+                                {$nor: [{a: {$_internalSchemaType: [4]}}]},
+                                {
+                                  a: {
+                                      $_internalSchemaAllElemMatchFromIndex:
+                                          [0, {$alwaysFalse: 1}]
+                                  }
+                                }
+                            ]
+                          }
+                      ]
+                    }
+                ]
+            }]
+        }]})"));
+}
+
+TEST(JSONSchemaParserTest, AdditionalItemsGeneratesEmptyExpressionAtTopLevelIfItemsNotPresent) {
+    auto schema = BSON("additionalItems" << true);
+    auto expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), BSONObj());
+
+    schema = BSON("additionalItems" << false);
+    expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), BSONObj());
+
+    schema = BSON("additionalItems" << BSON("minLength" << 1));
+    expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), BSONObj());
+}
+
+TEST(JSONSchemaParserTest, AdditionalItemsGeneratesEmptyExpressionInNestedSchemaIfItemsNotPresent) {
+    auto schema = fromjson("{properties: {foo: {additionalItems: true}}}");
+    auto expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson(R"({
+	$and: [
+            {$and: [
+                {$or: [
+                    {$nor: [{foo: {$exists: true}}]},
+                    {}
+                ]}
+            ]}
+        ]})"));
+
+    schema = fromjson("{properties: {foo: {additionalItems: false}}}");
+    expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson(R"(
+        {$and: [
+            {$and: [
+                {$or: [
+                    {$nor: [{foo: {$exists: true}}]},
+                    {}
+                ]}
+            ]}
+        ]})"));
+}
+
+TEST(JSONSchemaParserTest, AdditionalItemsGeneratesEmptyExpressionIfItemsAnObject) {
+    auto schema = fromjson("{properties: {a: {items: {minimum: 7}, additionalItems: false}}}");
+    auto expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson(R"({
+    $and: [{
+        $and: [{
+            $or: [
+                {$nor: [{a: {$exists: true}}]},
+                {
+                  $and: [{
+                      $or: [
+                          {$nor: [{a: {$_internalSchemaType: [4]}}]},
+                          {
+                            a: {
+                                $_internalSchemaAllElemMatchFromIndex: [
+                                    0,
+                                    {
+                                      $and: [{
+                                          $or: [
+                                              {$nor: [{i: {$_internalSchemaType: ["number"]}}]},
+                                              {i: {$gte: 7}}
+                                          ]
+                                      }]
+                                    }
+                                ]
+                            }
+                          }
+                      ]
+                  }]
+                }
+            ]
+        }]
+    }]})"));
+
+    schema = fromjson("{properties: {a: {items: {minimum: 7}, additionalItems: {minLength: 7}}}}");
+    expr = JSONSchemaParser::parse(schema);
+    ASSERT_OK(expr.getStatus());
+    ASSERT_SERIALIZES_TO(expr.getValue(), fromjson(R"({
+    $and: [{
+        $and: [{
+            $or: [
+                {$nor: [{a: {$exists: true}}]},
+                {
+                  $and: [{
+                      $or: [
+                          {$nor: [{a: {$_internalSchemaType: [4]}}]},
+                          {
+                            a: {
+                                $_internalSchemaAllElemMatchFromIndex: [
+                                    0,
+                                    {
+                                      $and: [{
+                                          $or: [
+                                              {$nor: [{i: {$_internalSchemaType: ["number"]}}]},
+                                              {i: {$gte: 7}}
+                                          ]
+                                      }]
+                                    }
+                                ]
+                            }
+                          }
+                      ]
+                  }]
+                }
+            ]
+        }]
+    }]})"));
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfEnumIsNotAnArray) {
+    BSONObj schema = fromjson("{properties: {foo: {enum: 'foo'}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseEnumIfArrayIsEmpty) {
+    BSONObj schema = fromjson("{properties: {foo: {enum: []}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseEnumIfArrayContainsDuplicateValue) {
+    BSONObj schema = fromjson("{properties: {foo: {enum: [1, 2, 1]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+
+    schema = fromjson("{properties: {foo: {enum: [{a: 1, b: 1}, {b: 1, a: 1}]}}}");
+    result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, EnumTranslatesCorrectly) {
+    BSONObj schema = fromjson("{properties: {foo: {enum: [1, '2', [3]]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson(R"({
+        $and: [{
+            $and: [{
+                $or: [
+                    {$nor: [{foo: {$exists: true}}]},
+                    {
+                      $and: [{
+                          $or: [
+                              {foo: {$_internalSchemaEq: 1}},
+                              {foo: {$_internalSchemaEq: "2"}},
+                              {foo: {$_internalSchemaEq: [3]}}
+                          ]
+                      }]
+                    }
+                ]
+            }]
+        }]
+    })"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelEnumTranslatesCorrectly) {
+    BSONObj schema = fromjson("{enum: [1, {foo: 1}]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(),
+                         fromjson("{$and: [{$or: [{$_internalSchemaRootDocEq: {foo: 1}}]}]}"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelEnumWithZeroObjectsTranslatesCorrectly) {
+    BSONObj schema = fromjson("{enum: [1, 'impossible', true]}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    ASSERT_SERIALIZES_TO(result.getValue().get(), fromjson("{$and: [{$alwaysFalse: 1}]}"));
+}
+
 }  // namespace
 }  // namespace mongo

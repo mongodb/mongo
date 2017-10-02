@@ -32,6 +32,7 @@
 
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
@@ -163,7 +164,15 @@ splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& matc
 
 Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    invariant(*itr == this && (std::next(itr) != container->end()));
+    invariant(*itr == this);
+
+    // If we are at the end of the pipeline, only optimize in the special case of a cache stage.
+    if (std::next(itr) == container->end()) {
+        return dynamic_cast<DocumentSourceSequentialDocumentCache*>(this)
+            ? doOptimizeAt(itr, container)
+            : container->end();
+    }
+
     auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
     if (constraints().canSwapWithMatch && nextMatch && !nextMatch->isTextQuery()) {
         // We're allowed to swap with a $match and the stage after us is a $match. Furthermore, the

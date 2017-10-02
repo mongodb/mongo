@@ -602,6 +602,23 @@ var ReplSetTest = function(opts) {
     };
 
     /**
+     * Blocks until the primary node generates cluster time sign keys.
+     */
+    this.awaitsKeysGenerated = function(timeout) {
+        timeout = timeout || self.kDefaultTimeoutMS;
+
+        print("Waiting for keys to sign $clusterTime to be generated");
+        assert.soonNoExcept(function() {
+            var primary = self.getPrimary(timeout);
+            var keyCnt = primary.getCollection('admin.system.keys')
+                             .find({purpose: 'HMAC'})
+                             .readConcern('local')
+                             .itcount();
+            return keyCnt >= 2;
+        }, "Awaiting keys", timeout);
+    };
+
+    /**
      * Blocking call, which will wait for a primary to be elected and become master for some
      * pre-defined timeout. If a primary is available it will return a connection to it.
      * Otherwise throws an exception.
@@ -779,8 +796,10 @@ var ReplSetTest = function(opts) {
             printjson(cmd);
 
             // replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error
-            // if a heartbeat times out during the quorum check. We retry three times to reduce
-            // the chance of failing this way.
+            // if a heartbeat times out during the quorum check.
+            // They may also fail with NewReplicaSetConfigurationIncompatible on similar timeout
+            // during the config validation stage while deducing isSelf().
+            // We retry three times to reduce the chance of failing this way.
             assert.retry(() => {
                 var res;
                 try {
@@ -799,7 +818,9 @@ var ReplSetTest = function(opts) {
                 }
 
                 assert.commandFailedWithCode(
-                    res, ErrorCodes.NodeNotFound, "replSetReconfig during initiate failed");
+                    res,
+                    [ErrorCodes.NodeNotFound, ErrorCodes.NewReplicaSetConfigurationIncompatible],
+                    "replSetReconfig during initiate failed");
                 return false;
             }, "replSetReconfig during initiate failed", 3, 5 * 1000);
         }
@@ -826,6 +847,10 @@ var ReplSetTest = function(opts) {
         asCluster(this.nodes, function() {
             self.stepUp(self.nodes[0]);
         });
+
+        if (self.waitForKeys) {
+            this.awaitsKeysGenerated();
+        }
     };
 
     /**
@@ -1823,6 +1848,7 @@ var ReplSetTest = function(opts) {
         self.useSeedList = opts.useSeedList || false;
         self.keyFile = opts.keyFile;
         self.protocolVersion = opts.protocolVersion;
+        self.waitForKeys = opts.waitForKeys || false;
 
         _useBridge = opts.useBridge || false;
         _bridgeOptions = opts.bridgeOptions || {};

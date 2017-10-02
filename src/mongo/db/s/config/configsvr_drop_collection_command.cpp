@@ -125,10 +125,9 @@ private:
             dropCommandBSON,
             Shard::RetryPolicy::kIdempotent));
 
-        // Special-case SendStaleVersion errors
-        if (cmdDropResult.commandStatus == ErrorCodes::SendStaleConfig) {
-            throw RecvStaleConfigException(
-                str::stream() << "Stale config while dropping collection", cmdDropResult.response);
+        if (cmdDropResult.commandStatus == ErrorCodes::StaleConfig) {
+            throw StaleConfigException("Stale config while dropping collection",
+                                       cmdDropResult.response);
         }
 
         uassertStatusOK(cmdDropResult.commandStatus);

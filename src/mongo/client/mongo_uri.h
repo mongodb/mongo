@@ -29,12 +29,14 @@
 #pragma once
 
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -43,11 +45,35 @@
 namespace mongo {
 
 /**
+ * Encode a string for embedding in a URI.
+ * Replaces reserved bytes with %xx sequences.
+ */
+void uriEncode(std::ostream& ss, StringData str);
+inline std::string uriEncode(StringData str) {
+    std::ostringstream ss;
+    uriEncode(ss, str);
+    return ss.str();
+}
+
+/**
+ * Decode a URI encoded string.
+ * Replaces + and %xx sequences with their original byte.
+ */
+StatusWith<std::string> uriDecode(StringData str);
+
+/**
  * MongoURI handles parsing of URIs for mongodb, and falls back to old-style
  * ConnectionString parsing. It's used primarily by the shell.
  * It parses URIs with the following format:
  *
  *    mongodb://[usr:pwd@]host1[:port1]...[,hostN[:portN]]][/[db][?options]]
+ *
+ * While this format is generally RFC 3986 compliant, some exceptions do exist:
+ *   1. The 'host' field, as defined by section 3.2.2 is expanded in the following ways:
+ *     a. Multiple hosts may be specified as a comma separated list.
+ *     b. Hosts may take the form of absolute paths for unix domain sockets.
+ *       i. Sockets must end in the suffix '.sock'
+ *   2. The 'fragment' field, as defined by section 3.5 is not permitted.
  *
  * For a complete list of URI string options, see
  * https://wiki.mongodb.com/display/DH/Connection+String+Format
@@ -125,6 +151,9 @@ public:
 
     MongoURI() = default;
 
+    friend std::ostream& operator<<(std::ostream&, const MongoURI&);
+    friend StringBuilder& operator<<(StringBuilder&, const MongoURI&);
+
 private:
     MongoURI(ConnectionString connectString,
              const std::string& user,
@@ -145,5 +174,15 @@ private:
     std::string _database;
     OptionsMap _options;
 };
+
+inline std::ostream& operator<<(std::ostream& ss, const MongoURI& uri) {
+    ss << uri._connectString;
+    return ss;
+}
+
+inline StringBuilder& operator<<(StringBuilder& sb, const MongoURI& uri) {
+    sb << uri._connectString;
+    return sb;
+}
 
 }  // namespace mongo

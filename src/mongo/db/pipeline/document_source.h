@@ -132,19 +132,69 @@ public:
          * A HostTypeRequirement defines where this stage is permitted to be executed when the
          * pipeline is run on a sharded cluster.
          */
-        enum class HostTypeRequirement { kPrimaryShard, kAnyShard, kAnyShardOrMongoS };
+        enum class HostTypeRequirement { kNone, kPrimaryShard, kAnyShard };
 
-        // Set if this stage needs to be in a particular position of the pipeline.
-        PositionRequirement requiredPosition = PositionRequirement::kNone;
+        /**
+         * A DiskUseRequirement indicates whether this stage writes to disk, or whether it may spill
+         * to disk if its memory usage exceeds a given threshold. Note that this only indicates the
+         * *ability* of the stage to spill; if 'allowDiskUse' is set to false, it will be prevented
+         * from doing so.
+         */
+        enum class DiskUseRequirement { kNoDiskUse, kWritesTmpData, kWritesPersistentData };
 
-        // Set if this stage can only be executed on specific components of a sharded cluster.
-        HostTypeRequirement hostRequirement = HostTypeRequirement::kAnyShard;
+        /**
+         * A FacetRequirement indicates whether this stage may be used within a $facet pipeline.
+         */
+        enum class FacetRequirement { kAllowed, kNotAllowed };
 
-        bool isAllowedInsideFacetStage = true;
+        /**
+         * A StreamType defines whether this stage is streaming (can produce output based solely on
+         * the current input document) or blocking (must examine subsequent documents before
+         * producing an output document).
+         */
+        enum class StreamType { kStreaming, kBlocking };
+
+        StageConstraints(StreamType streamType,
+                         PositionRequirement requiredPosition,
+                         HostTypeRequirement hostRequirement,
+                         DiskUseRequirement diskRequirement,
+                         FacetRequirement facetRequirement)
+            : requiredPosition(requiredPosition),
+              hostRequirement(hostRequirement),
+              diskRequirement(diskRequirement),
+              facetRequirement(facetRequirement),
+              streamType(streamType) {
+            // Stages which are allowed to run in $facet pipelines must not have any specific
+            // position requirements.
+            invariant(!isAllowedInsideFacetStage() ||
+                      requiredPosition == PositionRequirement::kNone);
+        }
+
+        // Indicates whether this stage needs to be at a particular position in the pipeline.
+        const PositionRequirement requiredPosition;
+
+        // Indicates whether this stage can only be executed on specific components of a sharded
+        // cluster.
+        const HostTypeRequirement hostRequirement;
+
+        // Indicates whether this stage may write persistent data to disk, or may spill to temporary
+        // files if its memory usage becomes excessive.
+        const DiskUseRequirement diskRequirement;
+
+        // Indicates whether this stage may run inside a $facet stage.
+        const FacetRequirement facetRequirement;
+
+        // Indicates whether this is a streaming or blocking stage.
+        const StreamType streamType;
 
         // True if this stage does not generate results itself, and instead pulls inputs from an
         // input DocumentSource (via 'pSource').
         bool requiresInputDocSource = true;
+
+        // True if this stage should be permitted to run in a $facet pipeline.
+        bool isAllowedInsideFacetStage() const {
+            return facetRequirement == FacetRequirement::kAllowed;
+        }
 
         // True if this stage operates on a global or database level, like $currentOp.
         bool isIndependentOfAnyCollection = false;
@@ -156,10 +206,18 @@ public:
         // must also override getModifiedPaths() to provide information about which particular
         // $match predicates be swapped before itself.
         bool canSwapWithMatch = false;
+
+        // Extends HostTypeRequirement::kAnyShardOrMongos to indicate that a document source
+        // must run on whatever node initially received the pipeline.
+        // This can be a mongod directly, but mongos must not forward to a mongod.
+        bool allowedToForwardFromMongos = true;
     };
 
     using HostTypeRequirement = StageConstraints::HostTypeRequirement;
     using PositionRequirement = StageConstraints::PositionRequirement;
+    using DiskUseRequirement = StageConstraints::DiskUseRequirement;
+    using FacetRequirement = StageConstraints::FacetRequirement;
+    using StreamType = StageConstraints::StreamType;
 
     /**
      * This is what is returned from the main DocumentSource API: getNext(). It is essentially a
@@ -255,9 +313,7 @@ public:
      * Returns a struct containing information about any special constraints imposed on using this
      * stage.
      */
-    virtual StageConstraints constraints() const {
-        return StageConstraints{};
-    }
+    virtual StageConstraints constraints() const = 0;
 
     /**
      * Informs the stage that it is no longer needed and can release its resources. After dispose()
@@ -563,6 +619,19 @@ public:
         enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
         enum class CurrentOpTruncateMode { kNoTruncation, kTruncateOps };
 
+        struct MakePipelineOptions {
+            MakePipelineOptions(){};
+
+            bool optimize = true;
+            bool attachCursorSource = true;
+
+            // Ordinarily, a MongodInterface is injected into the pipeline at the point when the
+            // cursor source is added. If true, 'forceInjectMongod' will inject MongodInterfaces
+            // into the pipeline even if 'attachCursorSource' is false. If 'attachCursorSource' is
+            // true, then the value of 'forceInjectMongod' is irrelevant.
+            bool forceInjectMongod = false;
+        };
+
         virtual ~MongodInterface(){};
 
         /**
@@ -628,14 +697,30 @@ public:
             const std::list<BSONObj>& originalIndexes) = 0;
 
         /**
-         * Parses a Pipeline from a vector of BSONObjs representing DocumentSources and readies it
-         * for execution. The returned pipeline is optimized and has a cursor source prepared.
+         * Parses a Pipeline from a vector of BSONObjs representing DocumentSources. The state of
+         * the returned pipeline will depend upon the supplied MakePipelineOptions:
+         * - The boolean opts.optimize determines whether the pipeline will be optimized.
+         * - If opts.attachCursorSource is false, the pipeline will be returned without attempting
+         * to add an initial cursor source.
+         * - If opts.forceInjectMongod is true, then a MongodInterface will be provided to each
+         * stage which requires one, regardless of whether a cursor source is attached to the
+         * pipeline.
          *
          * This function returns a non-OK status if parsing the pipeline failed.
          */
         virtual StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
             const std::vector<BSONObj>& rawPipeline,
-            const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            const MakePipelineOptions opts = MakePipelineOptions{}) = 0;
+
+        /**
+         * Attaches a cursor source to the start of a pipeline. Performs no further optimization.
+         * This function asserts if the collection to be aggregated is sharded. NamespaceNotFound
+         * will be returned if ExpressionContext has a UUID and that UUID doesn't exist anymore.
+         * That should be the only case where NamespaceNotFound is returned.
+         */
+        virtual Status attachCursorSourceToPipeline(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) = 0;
 
         /**
          * Returns a vector of owned BSONObjs, each of which contains details of an in-progress

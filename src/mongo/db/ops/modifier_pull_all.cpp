@@ -125,7 +125,7 @@ Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts, bo
 
     // store the stuff to remove later
     _elementsToFind = modExpr.Array();
-    setCollator(opts.collator);
+    setCollator(opts.expCtx->getCollator());
 
     return Status::OK();
 }

@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-LogicalSessionIdSet ServiceLiasonMongos::getActiveSessions() const {
+LogicalSessionIdSet ServiceLiasonMongos::getActiveOpSessions() const {
     LogicalSessionIdSet activeSessions;
 
     invariant(hasGlobalServiceContext());
@@ -49,6 +49,12 @@ LogicalSessionIdSet ServiceLiasonMongos::getActiveSessions() const {
     cursorManager->appendActiveSessions(&activeSessions);
 
     return activeSessions;
+}
+
+LogicalSessionIdSet ServiceLiasonMongos::getOpenCursorSessions() const {
+    LogicalSessionIdSet openCursorSessions;
+
+    return openCursorSessions;
 }
 
 void ServiceLiasonMongos::scheduleJob(PeriodicRunner::PeriodicJob job) {
@@ -68,6 +74,12 @@ Date_t ServiceLiasonMongos::now() const {
 
 ServiceContext* ServiceLiasonMongos::_context() {
     return getGlobalServiceContext();
+}
+
+Status ServiceLiasonMongos::killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                            const SessionKiller::Matcher& matcher) {
+    auto cursorManager = Grid::get(getGlobalServiceContext())->getCursorManager();
+    return cursorManager->killCursorsWithMatchingSessions(opCtx, matcher);
 }
 
 }  // namespace mongo

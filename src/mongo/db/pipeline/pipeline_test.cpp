@@ -65,6 +65,21 @@ void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {
         opCtx->getServiceContext(),
         stdx::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext()));
 }
+
+class EnsureFCV {
+public:
+    using Version = ServerGlobalParams::FeatureCompatibility::Version;
+    EnsureFCV(Version version)
+        : _origVersion(serverGlobalParams.featureCompatibility.version.load()) {
+        serverGlobalParams.featureCompatibility.version.store(version);
+    }
+    ~EnsureFCV() {
+        serverGlobalParams.featureCompatibility.version.store(_origVersion);
+    }
+
+private:
+    const Version _origVersion;
+};
 }  // namespace
 
 namespace Optimizations {
@@ -944,21 +959,254 @@ TEST(PipelineOptimizationTest, MatchCannotSwapWithSortLimit) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, inputPipe);
 }
 
-TEST(PipelineOptimizationTest, MatchOnMinItemsShouldNotMoveAcrossRename) {
-    string pipeline =
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnMinItemsShouldNotSwapSinceCategoryIsArrayMatching) {
+    string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaMinItems: 1}}}]";
-    assertPipelineOptimizesTo(pipeline, pipeline);
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaMinItems: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {b: {$_internalSchemaMinItems: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
 }
 
-TEST(PipelineOptimizationTest, MatchOnMaxItemsShouldNotMoveAcrossRename) {
-    string pipeline =
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnMaxItemsShouldNotSwapSinceCategoryIsArrayMatching) {
+    string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaMaxItems: 1}}}]";
-    assertPipelineOptimizesTo(pipeline, pipeline);
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaMaxItems: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {b: {$_internalSchemaMaxItems: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
 }
 
-TEST(PipelineOptimizationTest, MatchOnMinLengthShouldMoveAcrossRename) {
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest,
+     MatchOnAllElemMatchFromIndexShouldNotSwapSinceCategoryIsArrayMatching) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {a: {$_internalSchemaAllElemMatchFromIndex: [1, {b: {$gt: 0}}]}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnArrayIndexShouldNotSwapSinceCategoryIsArrayMatching) {
+    string inputPipe = R"(
+        [{$project: {_id: true, a: '$b'}}, 
+        {$match: {a: {$_internalSchemaMatchArrayIndex: 
+           {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}}])";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe = R"(
+        [{$project: {redacted: false}}, 
+        {$match: {a: {$_internalSchemaMatchArrayIndex: 
+           {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}}])";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe = R"(
+        [{$addFields : {a : {$const: 1}}}, 
+        {$match: {a: {$_internalSchemaMatchArrayIndex: 
+           {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}}])";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnUniqueItemsShouldNotSwapSinceCategoryIsArrayMatching) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaUniqueItems: true}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaUniqueItems: true}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {a: {$_internalSchemaUniqueItems: true}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnObjectMatchShouldNotSwapSinceCategoryIsOther) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnMinPropertiesShouldNotSwapSinceCategoryIsOther) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {$_internalSchemaMinProperties: 2}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {$_internalSchemaMinProperties: 2}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {$_internalSchemaMinProperties: 2}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnMaxPropertiesShouldNotSwapSinceCategoryIsOther) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {$_internalSchemaMaxProperties: 2}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {$_internalSchemaMaxProperties: 2}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {$_internalSchemaMaxProperties: 2}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnAllowedPropertiesShouldNotSwapSinceCategoryIsOther) {
+    string inputPipe = R"(
+        [{$project: {_id: true, a: '$b'}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ['b'], 
+            namePlaceholder: 'i', 
+            patternProperties: [], 
+            otherwise: {i: 1}
+        }}}])";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe = R"(
+        [{$project: {redacted: false}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ['b'], 
+            namePlaceholder: 'i', 
+            patternProperties: [], 
+            otherwise: {i: 1}
+        }}}])";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe = R"(
+        [{$addFields : {a : {$const: 1}}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ['b'], 
+            namePlaceholder: 'i', 
+            patternProperties: [], 
+            otherwise: {i: 1}
+        }}}])";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnCondShouldNotSwapSinceCategoryIsOther) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnRootDocEqShouldNotSwapSinceCategoryIsOther) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {$_internalSchemaRootDocEq: {a: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {$_internalSchemaRootDocEq: {a: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {$_internalSchemaRootDocEq: {a: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+// Descriptive test. The following internal match expression *could* participate in pipeline
+// optimizations, but it currently does not.
+TEST(PipelineOptimizationTest, MatchOnInternalSchemaTypeShouldNotSwapSinceCategoryIsOther) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaType: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaType: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {b: {$_internalSchemaType: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+TEST(PipelineOptimizationTest, MatchOnMinLengthShouldSwapWithAdjacentStage) {
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaMinLength: 1}}}]";
@@ -966,9 +1214,25 @@ TEST(PipelineOptimizationTest, MatchOnMinLengthShouldMoveAcrossRename) {
         "[{$match: {b: {$_internalSchemaMinLength: 1}}},"
         "{$project: {_id: true, a: '$b'}}]";
     assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaMinLength: 1}}}]";
+    outputPipe =
+        "[{$match: {a: {$_internalSchemaMinLength: 1}}},"
+        "{$project: {redacted: false}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {b: {$_internalSchemaMinLength: 1}}}]";
+    outputPipe =
+        "[{$match: {b: {$_internalSchemaMinLength: 1}}},"
+        "{$addFields: {a: {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-TEST(PipelineOptimizationTest, MatchOnMaxLengthShouldMoveAcrossRename) {
+TEST(PipelineOptimizationTest, MatchOnMaxLengthShouldSwapWithAdjacentStage) {
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaMaxLength: 1}}}]";
@@ -976,9 +1240,109 @@ TEST(PipelineOptimizationTest, MatchOnMaxLengthShouldMoveAcrossRename) {
         "[{$match: {b: {$_internalSchemaMaxLength: 1}}},"
         "{$project: {_id: true, a: '$b'}}]";
     assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaMaxLength: 1}}}]";
+    outputPipe =
+        "[{$match: {a: {$_internalSchemaMaxLength: 1}}}, "
+        "{$project: {redacted: false}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {b: {$_internalSchemaMaxLength: 1}}}]";
+    outputPipe =
+        "[{$match: {b: {$_internalSchemaMaxLength: 1}}}, "
+        "{$addFields: {a: {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, MatchOnInternalEqShouldSwapWithAdjacentStage) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaEq: {c: 1}}}}]";
+    string outputPipe =
+        "[{$match: {b: {$_internalSchemaEq: {c: 1}}}}, "
+        "{$project: {_id: true, a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaEq: {c: 1}}}}]";
+    outputPipe =
+        "[{$match: {a: {$_internalSchemaEq: {c: 1}}}}, "
+        "{$project: {redacted: false}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {b: {$_internalSchemaEq: {c: 1}}}}]";
+    outputPipe =
+        "[{$match: {b: {$_internalSchemaEq: {c: 1}}}}, "
+        "{$addFields: {a: {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, MatchOnXorShouldSwapIfEverySubExpressionIsEligible) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b', c: '$d'}}, "
+        "{$match: {$_internalSchemaXor: [{a: 1}, {c: 1}]}}]";
+    string outputPipe =
+        "[{$match: {$_internalSchemaXor: [{b: {$eq: 1}}, {d: {$eq: 1}}]}}, "
+        "{$project: {_id: true, a: '$b', c: '$d'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {$_internalSchemaXor: [{a: 1}, {b: 1}]}}]";
+    outputPipe =
+        "[{$match: {$_internalSchemaXor: [{a: 1}, {b: 1}]}}, "
+        "{$project: {redacted: false}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {$_internalSchemaXor: [{b: 1}, {c: 1}]}}]";
+    outputPipe =
+        "[{$match: {$_internalSchemaXor: [{b: 1}, {c: 1}]}}, "
+        "{$addFields: {a: {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {$_internalSchemaXor: [{b: 1}, {a: 1}]}}]";
+    assertPipelineOptimizesTo(inputPipe, inputPipe);
+}
+
+TEST(PipelineOptimizationTest, MatchOnFmodShouldSwapWithAdjacentStage) {
+    string inputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaFmod: [5, 0]}}}]";
+    string outputPipe =
+        "[{$match: {b: {$_internalSchemaFmod: [5, 0]}}}, "
+        "{$project: {_id: true, a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaFmod: [5, 0]}}}]";
+    outputPipe =
+        "[{$match: {a: {$_internalSchemaFmod: [5, 0]}}}, "
+        "{$project: {redacted: false}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    inputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {b: {$_internalSchemaFmod: [5, 0]}}}]";
+    outputPipe =
+        "[{$match: {b: {$_internalSchemaFmod: [5, 0]}}}, "
+        "{$addFields: {a: {$const: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
 TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     QueryTestServiceContext testServiceContext;
     auto opCtx = testServiceContext.makeOperationContext();
 
@@ -1004,6 +1368,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
 }
 
 TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     QueryTestServiceContext testServiceContext;
     auto opCtx = testServiceContext.makeOperationContext();
 
@@ -1426,7 +1791,7 @@ public:
     DocumentSourceCollectionlessMock() : DocumentSourceMock({}) {}
 
     StageConstraints constraints() const final {
-        StageConstraints constraints;
+        auto constraints = DocumentSourceMock::constraints();
         constraints.isIndependentOfAnyCollection = true;
         return constraints;
     }
@@ -1482,6 +1847,7 @@ TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidForFacetPipelineRegardles
 }
 
 TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsValidAsFirstStage) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
@@ -1490,6 +1856,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsValidAsFirstStage) {
 }
 
 TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStage) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
                                               fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
@@ -1500,6 +1867,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStage) {
 }
 
 TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStageInFacet) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
                                               fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
@@ -1538,7 +1906,12 @@ public:
     DocumentSourceDependencyDummy() : DocumentSourceMock({}) {}
 
     StageConstraints constraints() const final {
-        return StageConstraints{};  // Overrides DocumentSourceMock's required position.
+        // Overrides DocumentSourceMock's required position.
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kAllowed};
     }
 };
 

@@ -32,6 +32,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -64,6 +65,12 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
+
+        if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+            return SessionsCommandFCV34Status(getName());
+        }
+
         return Status::OK();
     }
 
@@ -71,6 +78,12 @@ public:
                      const std::string& db,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
+
+        if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+            return appendCommandStatus(result, SessionsCommandFCV34Status(getName()));
+        }
+
         auto cache = LogicalSessionCache::get(opCtx);
         auto client = opCtx->getClient();
 

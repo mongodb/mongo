@@ -46,6 +46,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/stdx/memory.h"
@@ -288,34 +289,35 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         WriteUnitOfWork wunit(getOpCtx());
 
         RecordId newRecordId;
+        OplogUpdateEntryArgs args;
+        if (!request->isExplain()) {
+            invariant(_collection);
+            auto* css = CollectionShardingState::get(getOpCtx(), _collection->ns());
+            args.nss = _collection->ns();
+            args.uuid = _collection->uuid();
+            args.stmtId = request->getStmtId();
+            args.update = logObj;
+            args.criteria = css->getMetadata().extractDocumentKey(newObj);
+            uassert(16980,
+                    "Multi-update operations require all documents to have an '_id' field",
+                    !request->isMulti() || args.criteria.hasField("_id"_sd));
+            args.fromMigrate = request->isFromMigration();
+            args.storeDocOption = getStoreDocMode(*request);
+            if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
+                args.preImageDoc = oldObj.value().getOwned();
+            }
+        }
 
         if (inPlace) {
-            // Don't actually do the write if this is an explain.
             if (!request->isExplain()) {
-                invariant(_collection);
                 newObj = oldObj.value();
                 const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
-                BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-                OplogUpdateEntryArgs args;
-                args.nss = _collection->ns();
-                args.uuid = _collection->uuid();
-                args.stmtId = request->getStmtId();
-                args.update = logObj;
-                args.criteria = idQuery;
-                args.fromMigrate = request->isFromMigration();
-                args.storeDocOption = getStoreDocMode(*request);
 
-                if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
-                    args.preImageDoc = oldObj.value().getOwned();
-                }
+                Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
                 StatusWith<RecordData> newRecStatus = _collection->updateDocumentWithDamages(
-                    getOpCtx(),
-                    recordId,
-                    Snapshotted<RecordData>(oldObj.snapshotId(), oldRec),
-                    source,
-                    _damages,
-                    &args);
+                    getOpCtx(), recordId, std::move(snap), source, _damages, &args);
+
                 newObj = uassertStatusOK(std::move(newRecStatus)).releaseToBson();
             }
 
@@ -329,23 +331,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                                   << BSONObjMaxUserSize,
                     newObj.objsize() <= BSONObjMaxUserSize);
 
-            // Don't actually do the write if this is an explain.
             if (!request->isExplain()) {
-                invariant(_collection);
-                BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-                OplogUpdateEntryArgs args;
-                args.nss = _collection->ns();
-                args.uuid = _collection->uuid();
-                args.stmtId = request->getStmtId();
-                args.update = logObj;
-                args.criteria = idQuery;
-                args.fromMigrate = request->isFromMigration();
-                args.storeDocOption = getStoreDocMode(*request);
-
-                if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
-                    args.preImageDoc = oldObj.value().getOwned();
-                }
-
                 newRecordId = _collection->updateDocument(getOpCtx(),
                                                           recordId,
                                                           oldObj,

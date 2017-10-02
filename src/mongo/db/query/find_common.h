@@ -38,6 +38,10 @@ class QueryRequest;
 // until the fail point is disabled.
 MONGO_FP_FORWARD_DECLARE(keepCursorPinnedDuringGetMore);
 
+// Failpoint for making getMore not wait for an awaitdata cursor. Allows us to avoid waiting during
+// tests.
+MONGO_FP_FORWARD_DECLARE(disableAwaitDataForGetMoreCmd);
+
 /**
  * Suite of find/getMore related functions used in both the mongod and mongos query paths.
  */

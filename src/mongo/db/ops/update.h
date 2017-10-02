@@ -56,5 +56,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
  *   applyUpdateOperators( BSON( "x" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
  *   returns: { x : 2 }
  */
-BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators);
+BSONObj applyUpdateOperators(OperationContext* opCtx,
+                             const BSONObj& from,
+                             const BSONObj& operators);
 }  // namespace mongo

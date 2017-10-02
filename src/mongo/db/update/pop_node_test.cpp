@@ -32,6 +32,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -44,67 +45,67 @@ using PopNodeTest = UpdateNodeTest;
 
 TEST(PopNodeTest, InitSucceedsPositiveOne) {
     auto update = fromjson("{$pop: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a"], expCtx));
     ASSERT_FALSE(popNode.popFromFront());
 }
 
 TEST(PopNodeTest, InitSucceedsNegativeOne) {
     auto update = fromjson("{$pop: {a: -1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a"], expCtx));
     ASSERT_TRUE(popNode.popFromFront());
 }
 
 TEST(PopNodeTest, InitFailsOnePointOne) {
     auto update = fromjson("{$pop: {a: 1.1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], expCtx));
 }
 
 TEST(PopNodeTest, InitFailsZero) {
     auto update = fromjson("{$pop: {a: 0}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], expCtx));
 }
 
 TEST(PopNodeTest, InitFailsString) {
     auto update = fromjson("{$pop: {a: 'foo'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], expCtx));
 }
 
 TEST(PopNodeTest, InitFailsNestedObject) {
     auto update = fromjson("{$pop: {a: {b: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], expCtx));
 }
 
 TEST(PopNodeTest, InitFailsNestedArray) {
     auto update = fromjson("{$pop: {a: [{b: 1}]}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], expCtx));
 }
 
 TEST(PopNodeTest, InitFailsBool) {
     auto update = fromjson("{$pop: {a: true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], collator));
+    ASSERT_EQ(ErrorCodes::FailedToParse, popNode.init(update["$pop"]["a"], expCtx));
 }
 
 TEST_F(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
 
     mmb::Document doc(fromjson("{b: [1, 2, 3]}"));
     setPathToCreate("a.b");
@@ -118,9 +119,9 @@ TEST_F(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {
 
 TEST_F(PopNodeTest, NoopWhenPathPartiallyExists) {
     auto update = fromjson("{$pop: {'a.b.c': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b.c"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b.c"], expCtx));
 
     mmb::Document doc(fromjson("{a: {}}"));
     setPathToCreate("b.c");
@@ -135,9 +136,9 @@ TEST_F(PopNodeTest, NoopWhenPathPartiallyExists) {
 
 TEST_F(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
     auto update = fromjson("{$pop: {'a.0': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.0"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.0"], expCtx));
 
     mmb::Document doc(fromjson("{a: []}"));
     setPathToCreate("0");
@@ -152,9 +153,9 @@ TEST_F(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
 
 TEST_F(PopNodeTest, ThrowsWhenPathIsBlockedByAScalar) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
 
     mmb::Document doc(fromjson("{a: 'foo'}"));
     setPathToCreate("b");
@@ -171,9 +172,9 @@ DEATH_TEST_F(PopNodeTest,
              NonOkElementWhenPathExistsIsFatal,
              "Invariant failure applyParams.element.ok()") {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
     setPathTaken("a.b");
@@ -183,9 +184,9 @@ DEATH_TEST_F(PopNodeTest,
 
 TEST_F(PopNodeTest, ThrowsWhenPathExistsButDoesNotContainAnArray) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
 
     mmb::Document doc(fromjson("{a: {b: 'foo'}}"));
     setPathTaken("a.b");
@@ -198,9 +199,9 @@ TEST_F(PopNodeTest, ThrowsWhenPathExistsButDoesNotContainAnArray) {
 
 TEST_F(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
 
     mmb::Document doc(fromjson("{a: {b: []}}"));
     setPathTaken("a.b");
@@ -214,9 +215,9 @@ TEST_F(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
 
 TEST_F(PopNodeTest, PopsSingleElementFromTheBack) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
     ASSERT_FALSE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1]}}"));
@@ -231,9 +232,9 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheBack) {
 
 TEST_F(PopNodeTest, PopsSingleElementFromTheFront) {
     auto update = fromjson("{$pop: {'a.b': -1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
     ASSERT_TRUE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [[1]]}}"));
@@ -248,9 +249,9 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheFront) {
 
 TEST_F(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
     ASSERT_FALSE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
@@ -265,9 +266,9 @@ TEST_F(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
 
 TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
     auto update = fromjson("{$pop: {'a.b': -1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
     ASSERT_TRUE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
@@ -282,9 +283,9 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
 
 TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) {
     auto update = fromjson("{$pop: {'a.b': -1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
     ASSERT_TRUE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
@@ -299,9 +300,9 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) 
 
 TEST_F(PopNodeTest, SucceedsWithNullUpdateIndexData) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
     ASSERT_FALSE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
@@ -315,9 +316,9 @@ TEST_F(PopNodeTest, SucceedsWithNullUpdateIndexData) {
 
 TEST_F(PopNodeTest, SucceedsWithNullLogBuilder) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
     ASSERT_FALSE(popNode.popFromFront());
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
@@ -332,9 +333,9 @@ TEST_F(PopNodeTest, SucceedsWithNullLogBuilder) {
 
 TEST_F(PopNodeTest, ThrowsWhenPathIsImmutable) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
 
     mmb::Document doc(fromjson("{a: {b: [0]}}"));
     setPathTaken("a.b");
@@ -354,9 +355,9 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsPrefixOfImmutable) {
     // array in it.
 
     auto update = fromjson("{$pop: {'a': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a"], expCtx));
 
     mmb::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -371,9 +372,9 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsPrefixOfImmutable) {
 
 TEST_F(PopNodeTest, ThrowsWhenPathIsSuffixOfImmutable) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
 
     mmb::Document doc(fromjson("{a: {b: [0]}}"));
     setPathTaken("a.b");
@@ -388,9 +389,9 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsSuffixOfImmutable) {
 
 TEST_F(PopNodeTest, NoopOnImmutablePathSucceeds) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;
-    ASSERT_OK(popNode.init(update["$pop"]["a.b"], collator));
+    ASSERT_OK(popNode.init(update["$pop"]["a.b"], expCtx));
 
     mmb::Document doc(fromjson("{a: {b: []}}"));
     setPathTaken("a.b");

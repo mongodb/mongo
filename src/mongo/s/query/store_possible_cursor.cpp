@@ -46,7 +46,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
-                                        ClusterCursorManager* cursorManager) {
+                                        ClusterCursorManager* cursorManager,
+                                        TailableMode tailableMode) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
     }
@@ -68,6 +69,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                 CursorResponse(incomingCursorResponse.getValue().getNSS(),
                                                incomingCursorResponse.getValue().getCursorId(),
                                                {}));
+    params.tailableMode = tailableMode;
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));
 

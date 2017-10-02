@@ -33,10 +33,13 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_knobs.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
 
@@ -95,6 +98,14 @@ public:
 
         bool _dismissed = false;
     };
+
+    /**
+     * List of supported match expression features in a pipeline.
+     */
+    static constexpr MatchExpressionParser::AllowedFeatureSet kAllowedMatcherFeatures =
+        MatchExpressionParser::AllowedFeatures::kText |
+        MatchExpressionParser::AllowedFeatures::kExpr |
+        MatchExpressionParser::AllowedFeatures::kJSONSchema;
 
     /**
      * Parses a Pipeline from a vector of BSONObjs. Returns a non-OK status if it failed to parse.
@@ -224,6 +235,12 @@ public:
     bool canRunOnMongos() const;
 
     /**
+     * Returns whether or not every DocumentSource in the pipeline is allowed to forward from a
+     * mongos.
+     */
+    bool allowedToForwardFromMongos() const;
+
+    /**
      * Modifies the pipeline, optimizing it by combining and swapping stages.
      */
     void optimizePipeline();
@@ -239,8 +256,10 @@ public:
      */
     std::vector<Value> serialize() const;
 
-    /// The initial source is special since it varies between mongos and mongod.
+    // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
+
+    void addFinalSource(boost::intrusive_ptr<DocumentSource> source);
 
     /**
      * Returns the next result from the pipeline, or boost::none if there are no more results.
@@ -264,10 +283,13 @@ public:
     }
 
     /**
-     * Removes and returns the first stage of the pipeline if its name is 'targetStageName'. Returns
-     * nullptr if there is no first stage, or if the stage's name is not 'targetStageName'.
+     * Removes and returns the first stage of the pipeline if its name is 'targetStageName' and the
+     * given 'predicate' function, if present, returns 'true' when called with a pointer to the
+     * stage. Returns nullptr if there is no first stage which meets these criteria.
      */
-    boost::intrusive_ptr<DocumentSource> popFrontStageWithName(StringData targetStageName);
+    boost::intrusive_ptr<DocumentSource> popFrontWithCriteria(
+        StringData targetStageName,
+        stdx::function<bool(const DocumentSource* const)> predicate = nullptr);
 
     /**
      * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists

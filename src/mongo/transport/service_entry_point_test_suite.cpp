@@ -131,10 +131,6 @@ void ServiceEntryPointTestSuite::MockTLHarness::asyncWait(Ticket&& ticket,
     return _asyncWait(std::move(ticket), std::move(callback));
 }
 
-TransportLayer::Stats ServiceEntryPointTestSuite::MockTLHarness::sessionStats() {
-    return Stats();
-}
-
 void ServiceEntryPointTestSuite::MockTLHarness::end(const SessionHandle& session) {
     return _end(session);
 }

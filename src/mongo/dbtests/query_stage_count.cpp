@@ -149,8 +149,10 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet);
 
         const CollatorInterface* collator = nullptr;
+        const boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContext(&_opCtx, collator));
         StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(request.getQuery(), collator);
+            MatchExpressionParser::parse(request.getQuery(), expCtx);
         ASSERT(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> expression = std::move(statusWithMatcher.getValue());
 

@@ -6,7 +6,7 @@
 (function() {
     "use strict";
 
-    var rs = new ReplSetTest({name: "applyOpsOptimeTest", nodes: 3});
+    var rs = new ReplSetTest({name: "applyOpsOptimeTest", nodes: 3, waitForKeys: true});
     rs.startSet();
     var nodes = rs.nodeList();
     rs.initiate({

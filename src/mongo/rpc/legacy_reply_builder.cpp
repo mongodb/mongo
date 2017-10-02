@@ -54,9 +54,9 @@ LegacyReplyBuilder::~LegacyReplyBuilder() {}
 LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
                                                         BSONObj extraErrorInfo) {
     invariant(_state == State::kCommandReply);
-    if (nonOKStatus == ErrorCodes::SendStaleConfig) {
+    if (nonOKStatus == ErrorCodes::StaleConfig) {
         _staleConfigError = true;
-        // Need to use the special $err format for SendStaleConfig errors to be backwards
+        // Need to use the special $err format for StaleConfig errors to be backwards
         // compatible.
         BSONObjBuilder err;
         // $err must be the first field in object.
@@ -120,7 +120,7 @@ Message LegacyReplyBuilder::done() {
     QueryResult::View qr = _builder.buf();
 
     if (_staleConfigError) {
-        // For compatibility with legacy mongos, we need to set this result flag on SendStaleConfig
+        // For compatibility with legacy mongos, we need to set this result flag on StaleConfig
         qr.setResultFlags(ResultFlag_ErrSet | ResultFlag_ShardConfigStale);
     } else {
         qr.setResultFlagsToOk();

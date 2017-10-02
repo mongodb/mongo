@@ -51,12 +51,12 @@ struct WriteResult {
     std::vector<StatusWith<SingleWriteResult>> results;
 
     /**
-     * If non-null, the SendStaleConfigException that was encountered while processing the op after
+     * If non-null, the StaleConfigException that was encountered while processing the op after
      * the last op reported in results. Processing always stops at the first SCE and nothing is
      * placed in results for the op that triggered it. The whole exception is copied here because it
      * contains additional data not included in the Status.
      */
-    std::unique_ptr<SendStaleConfigException> staleConfigException;
+    std::unique_ptr<StaleConfigException> staleConfigException;
 };
 
 

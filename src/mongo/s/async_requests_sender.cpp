@@ -54,8 +54,13 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          executor::TaskExecutor* executor,
                                          const std::string db,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
-                                         const ReadPreferenceSetting& readPreference)
-    : _opCtx(opCtx), _executor(executor), _db(std::move(db)), _readPreference(readPreference) {
+                                         const ReadPreferenceSetting& readPreference,
+                                         Shard::RetryPolicy retryPolicy)
+    : _opCtx(opCtx),
+      _executor(executor),
+      _db(std::move(db)),
+      _readPreference(readPreference),
+      _retryPolicy(retryPolicy) {
     for (const auto& request : requests) {
         _remotes.emplace_back(request.shardId, request.cmdObj);
     }
@@ -72,7 +77,7 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     // We lock so that no callbacks signal the notification until after we are done scheduling
     // requests, to prevent signaling the notification twice, which is illegal.
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _scheduleRequests_inlock();
+    _scheduleRequests(lk);
 }
 AsyncRequestsSender::~AsyncRequestsSender() {
     _cancelPendingRequests();
@@ -137,7 +142,7 @@ boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
     _notification.emplace();
 
     if (!_stopRetrying) {
-        _scheduleRequests_inlock();
+        _scheduleRequests(lk);
     }
 
     // Check if any remote is ready.
@@ -166,7 +171,7 @@ boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
     return boost::none;
 }
 
-void AsyncRequestsSender::_scheduleRequests_inlock() {
+void AsyncRequestsSender::_scheduleRequests(WithLock lk) {
     invariant(!_stopRetrying);
     // Schedule remote work on hosts for which we have not sent a request or need to retry.
     for (size_t i = 0; i < _remotes.size(); ++i) {
@@ -192,7 +197,7 @@ void AsyncRequestsSender::_scheduleRequests_inlock() {
                     if (remote.shardHostAndPort) {
                         shard->updateReplSetMonitor(*remote.shardHostAndPort, status);
                     }
-                    if (shard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent) &&
+                    if (shard->isRetriableError(status.code(), _retryPolicy) &&
                         remote.retryCount < kMaxNumFailedHostRetryAttempts) {
                         LOG(1) << "Command to remote " << remote.shardId << " at host "
                                << *remote.shardHostAndPort
@@ -207,7 +212,7 @@ void AsyncRequestsSender::_scheduleRequests_inlock() {
 
         // If the remote does not have a response or pending request, schedule remote work for it.
         if (!remote.swResponse && !remote.cbHandle.isValid()) {
-            auto scheduleStatus = _scheduleRequest_inlock(i);
+            auto scheduleStatus = _scheduleRequest(lk, i);
             if (!scheduleStatus.isOK()) {
                 remote.swResponse = std::move(scheduleStatus);
                 // Signal the notification indicating the remote had an error (we need to do this
@@ -221,7 +226,7 @@ void AsyncRequestsSender::_scheduleRequests_inlock() {
     }
 }
 
-Status AsyncRequestsSender::_scheduleRequest_inlock(size_t remoteIndex) {
+Status AsyncRequestsSender::_scheduleRequest(WithLock, size_t remoteIndex) {
     auto& remote = _remotes[remoteIndex];
 
     invariant(!remote.cbHandle.isValid());

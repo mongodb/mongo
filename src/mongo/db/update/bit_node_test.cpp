@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -45,115 +46,115 @@ using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
 TEST(BitNodeTest, InitWithDoubleFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: 0}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, InitWithStringFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: ''}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, InitWithArrayFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: []}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, InitWithEmptyDocumentFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {}}}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, InitWithUnknownOperatorFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {foo: 4}}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, InitWithArrayArgumentToOperatorFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: []}}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, InitWithStringArgumentToOperatorFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: 'foo'}}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, InitWithDoubleArgumentToOperatorFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: 1.0}}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, InitWithDecimalArgumentToOperatorFails) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: NumberDecimal(\"1.0\")}}}");
     BitNode node;
-    ASSERT_NOT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, ParsesAndInt) {
     auto update = fromjson("{$bit: {a: {and: NumberInt(1)}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, ParsesOrInt) {
     auto update = fromjson("{$bit: {a: {or: NumberInt(1)}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, ParsesXorInt) {
     auto update = fromjson("{$bit: {a: {xor: NumberInt(1)}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, ParsesAndLong) {
     auto update = fromjson("{$bit: {a: {and: NumberLong(1)}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, ParsesOrLong) {
     auto update = fromjson("{$bit: {a: {or: NumberLong(1)}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST(BitNodeTest, ParsesXorLong) {
     auto update = fromjson("{$bit: {a: {xor: NumberLong(1)}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentAnd) {
     auto update = fromjson("{$bit: {a: {and: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -166,9 +167,9 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentAnd) {
 
 TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
     auto update = fromjson("{$bit: {a: {or: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -181,9 +182,9 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
 
 TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
     auto update = fromjson("{$bit: {a: {xor: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -196,9 +197,9 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
     auto update = BSON("$bit" << BSON("a" << BSON("and" << 0b0110)));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
@@ -211,9 +212,9 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
     auto update = BSON("$bit" << BSON("a" << BSON("or" << 0b0110)));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
@@ -226,9 +227,9 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
     auto update = BSON("$bit" << BSON("a" << BSON("xor" << 0b0110)));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
@@ -241,9 +242,9 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
 
 TEST_F(BitNodeTest, ApplyShouldReportNoOp) {
     auto update = BSON("$bit" << BSON("a" << BSON("and" << static_cast<int>(1))));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 1));
     setPathTaken("a");
@@ -261,9 +262,9 @@ TEST_F(BitNodeTest, ApplyMultipleBitOps) {
                                                   "or" << 0b1100110011001100   //
                                                         <<                     //
                                                   "xor" << 0b1010101010101010)));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b1111111100000000));
     setPathTaken("a");
@@ -276,9 +277,9 @@ TEST_F(BitNodeTest, ApplyMultipleBitOps) {
 
 TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
     auto update = BSON("$bit" << BSON("a" << BSON("xor" << 0b11001100 << "xor" << 0b10101010)));
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
-    ASSERT_OK(node.init(update["$bit"]["a"], collator));
+    ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b11110000));
     setPathTaken("a");

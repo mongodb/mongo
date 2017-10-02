@@ -32,6 +32,8 @@
 
 #include "mongo/s/commands/cluster_write.h"
 
+#include <algorithm>
+
 #include "mongo/base/status.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/lasterror.h"
@@ -183,7 +185,7 @@ void ClusterWriter::write(OperationContext* opCtx,
     LastError::Disabled disableLastError(&LastError::get(opCtx->getClient()));
 
     // Config writes and shard writes are done differently
-    if (nss.db() == NamespaceString::kConfigDb || nss.db() == NamespaceString::kAdminDb) {
+    if (nss.db() == NamespaceString::kAdminDb) {
         Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
     } else {
         TargeterStats targeterStats;
@@ -194,12 +196,38 @@ void ClusterWriter::write(OperationContext* opCtx,
             Status targetInitStatus = targeter.init(opCtx);
             if (!targetInitStatus.isOK()) {
                 toBatchError({targetInitStatus.code(),
-                              str::stream() << "unable to target"
+                              str::stream() << "unable to initialize targeter for"
                                             << (request.isInsertIndexRequest() ? " index" : "")
                                             << " write op for collection "
                                             << request.getTargetingNS().ns()
                                             << causedBy(targetInitStatus)},
                              response);
+                return;
+            }
+
+            std::vector<std::unique_ptr<ShardEndpoint>> endpoints;
+            auto targetStatus = targeter.targetCollection(&endpoints);
+            if (!targetStatus.isOK()) {
+                toBatchError({targetStatus.code(),
+                              str::stream() << "unable to target"
+                                            << (request.isInsertIndexRequest() ? " index" : "")
+                                            << " write op for collection "
+                                            << request.getTargetingNS().ns()
+                                            << causedBy(targetStatus)},
+                             response);
+                return;
+            }
+
+            // Handle sharded config server writes differently.
+            if (std::any_of(endpoints.begin(), endpoints.end(), [](const auto& it) {
+                    return it->shardName == ShardRegistry::kConfigServerShardId;
+                })) {
+                // There should be no namespaces that partially target config servers.
+                invariant(endpoints.size() == 1);
+
+                // For config servers, we do direct writes.
+                Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(
+                    opCtx, request, response);
                 return;
             }
 

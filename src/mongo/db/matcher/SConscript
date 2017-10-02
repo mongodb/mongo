@@ -30,6 +30,7 @@ env.Library(
     target='expressions',
     source=[
         'expression.cpp',
+        'expression_algo.cpp',
         'expression_array.cpp',
         'expression_expr.cpp',
         'expression_geo.cpp',
@@ -49,14 +50,17 @@ env.Library(
         'matchable.cpp',
         'matcher.cpp',
         'matcher_type_set.cpp',
+        'rewrite_expr.cpp',
         'schema/expression_internal_schema_all_elem_match_from_index.cpp',
         'schema/expression_internal_schema_allowed_properties.cpp',
         'schema/expression_internal_schema_cond.cpp',
+        'schema/expression_internal_schema_eq.cpp',
         'schema/expression_internal_schema_fmod.cpp',
         'schema/expression_internal_schema_match_array_index.cpp',
         'schema/expression_internal_schema_num_array_items.cpp',
         'schema/expression_internal_schema_num_properties.cpp',
         'schema/expression_internal_schema_object_match.cpp',
+        'schema/expression_internal_schema_root_doc_eq.cpp',
         'schema/expression_internal_schema_str_length.cpp',
         'schema/expression_internal_schema_unique_items.cpp',
         'schema/expression_internal_schema_xor.cpp',
@@ -85,6 +89,7 @@ env.CppUnitTest(
         'expression_expr_test.cpp',
         'expression_geo_test.cpp',
         'expression_leaf_test.cpp',
+        'expression_optimize_test.cpp',
         'expression_parser_geo_test.cpp',
         'expression_test.cpp',
         'expression_tree_test.cpp',
@@ -94,6 +99,7 @@ env.CppUnitTest(
         'schema/expression_internal_schema_all_elem_match_from_index_test.cpp',
         'schema/expression_internal_schema_allowed_properties_test.cpp',
         'schema/expression_internal_schema_cond_test.cpp',
+        'schema/expression_internal_schema_eq_test.cpp',
         'schema/expression_internal_schema_fmod_test.cpp',
         'schema/expression_internal_schema_match_array_index_test.cpp',
         'schema/expression_internal_schema_max_items_test.cpp',
@@ -103,11 +109,14 @@ env.CppUnitTest(
         'schema/expression_internal_schema_min_length_test.cpp',
         'schema/expression_internal_schema_min_properties_test.cpp',
         'schema/expression_internal_schema_object_match_test.cpp',
+        'schema/expression_internal_schema_root_doc_eq_test.cpp',
         'schema/expression_internal_schema_unique_items_test.cpp',
         'schema/expression_internal_schema_xor_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'expressions',
     ],
 )
@@ -125,16 +134,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        'expressions',
-    ],
-)
-
-env.Library(
-    target='expression_algo',
-    source=[
-        'expression_algo.cpp',
-    ],
-    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'expressions',
     ],
 )
@@ -143,10 +143,12 @@ env.CppUnitTest(
     target='expression_algo_test',
     source=[
         'expression_algo_test.cpp',
+        'rewrite_expr_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        'expression_algo',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        'expressions',
     ],
 )
 
@@ -176,6 +178,7 @@ env.CppUnitTest(
         'expression_serialization_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'expressions',
     ],
 )

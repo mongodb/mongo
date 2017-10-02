@@ -79,6 +79,7 @@ tlEnv.Library(
     target='service_executor',
     source=[
         'service_executor_adaptive.cpp',
+        'service_executor_synchronous.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
@@ -175,7 +176,7 @@ env.CppUnitTest(
 
 
 zlibEnv = env.Clone()
-zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
+zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib', 'snappy'])
 zlibEnv.Library(
     target='message_compressor',
     source=[

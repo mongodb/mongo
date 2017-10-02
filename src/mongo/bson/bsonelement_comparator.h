@@ -55,21 +55,21 @@ public:
      */
     BSONElementComparator(FieldNamesMode fieldNamesMode,
                           const StringData::ComparatorInterface* stringComparator)
-        : _fieldNamesMode(fieldNamesMode), _stringComparator(stringComparator) {}
+        : _stringComparator(stringComparator),
+          _rules((fieldNamesMode == FieldNamesMode::kConsider) ? ComparisonRules::kConsiderFieldName
+                                                               : 0) {}
 
     int compare(const BSONElement& lhs, const BSONElement& rhs) const final {
-        const bool considerFieldName = (_fieldNamesMode == FieldNamesMode::kConsider);
-        return lhs.woCompare(rhs, considerFieldName, _stringComparator);
+        return lhs.woCompare(rhs, _rules, _stringComparator);
     }
 
     void hash_combine(size_t& seed, const BSONElement& toHash) const final {
-        const bool considerFieldName = (_fieldNamesMode == FieldNamesMode::kConsider);
-        hashCombineBSONElement(seed, toHash, considerFieldName, _stringComparator);
+        hashCombineBSONElement(seed, toHash, _rules, _stringComparator);
     }
 
 private:
-    FieldNamesMode _fieldNamesMode;
     const StringData::ComparatorInterface* _stringComparator;
+    ComparisonRulesSet _rules;
 };
 
 }  // namespace mongo

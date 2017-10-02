@@ -43,7 +43,7 @@
     };
     assert.commandWorked(a_conn.getDB(name).createCollection('foo', originalCollectionOptions));
 
-    var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
+    var options = {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}, upsert: true};
     assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
 
     assert.eq(getOptions(a_conn), originalCollectionOptions);
@@ -72,7 +72,7 @@
     b_conn = master;
 
     // Do a write on B so that A will have to roll back.
-    options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
+    options = {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}, upsert: true};
     assert.writeOK(b_conn.getDB(name).foo.insert({x: 2}, options));
 
     // Restart A, which should rollback the collMod before becoming primary.

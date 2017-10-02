@@ -59,7 +59,8 @@ public:
     MockServiceLiasonImpl();
 
     // Forwarding methods from the MockServiceLiason
-    LogicalSessionIdSet getActiveSessions() const;
+    LogicalSessionIdSet getActiveOpSessions() const;
+    LogicalSessionIdSet getOpenCursorSessions() const;
     Date_t now() const;
     void scheduleJob(PeriodicRunner::PeriodicJob job);
     void join();
@@ -68,15 +69,27 @@ public:
     void add(LogicalSessionId lsid);
     void remove(LogicalSessionId lsid);
     void clear();
+
+    void addCursorSession(LogicalSessionId lsid);
+    void removeCursorSession(LogicalSessionId lsid);
+    void clearCursorSession();
+
     void fastForward(Milliseconds time);
     int jobs();
+
+    const KillAllSessionsByPattern* matchKilled(const LogicalSessionId& lsid);
+    Status killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                           const SessionKiller::Matcher& matcher);
 
 private:
     executor::AsyncTimerFactoryMock* _timerFactory;
     std::unique_ptr<PeriodicRunnerASIO> _runner;
 
+    boost::optional<SessionKiller::Matcher> _matcher;
+
     mutable stdx::mutex _mutex;
     LogicalSessionIdSet _activeSessions;
+    LogicalSessionIdSet _cursorSessions;
 };
 
 /**
@@ -87,8 +100,12 @@ public:
     explicit MockServiceLiason(std::shared_ptr<MockServiceLiasonImpl> impl)
         : _impl(std::move(impl)) {}
 
-    LogicalSessionIdSet getActiveSessions() const override {
-        return _impl->getActiveSessions();
+    LogicalSessionIdSet getActiveOpSessions() const override {
+        return _impl->getActiveOpSessions();
+    }
+
+    LogicalSessionIdSet getOpenCursorSessions() const override {
+        return _impl->getOpenCursorSessions();
     }
 
     Date_t now() const override {
@@ -101,6 +118,11 @@ public:
 
     void join() override {
         return _impl->join();
+    }
+
+    Status killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                           const SessionKiller::Matcher& matcher) {
+        return _impl->killCursorsWithMatchingSessions(opCtx, matcher);
     }
 
 protected:

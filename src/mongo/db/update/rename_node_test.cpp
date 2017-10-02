@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -46,36 +47,36 @@ using mongo::mutablebson::countChildren;
 
 TEST(RenameNodeTest, PositionalNotAllowedInFromField) {
     auto update = fromjson("{$rename: {'a.$': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    Status status = node.init(update["$rename"]["a.$"], collator);
+    Status status = node.init(update["$rename"]["a.$"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(RenameNodeTest, PositionalNotAllowedInToField) {
     auto update = fromjson("{$rename: {'a': 'b.$'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    Status status = node.init(update["$rename"]["a"], collator);
+    Status status = node.init(update["$rename"]["a"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(RenameNodeTest, ArrayFilterNotAllowedInFromField) {
     auto update = fromjson("{$rename: {'a.$[i]': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    Status status = node.init(update["$rename"]["a.$[i]"], collator);
+    Status status = node.init(update["$rename"]["a.$[i]"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(RenameNodeTest, ArrayFilterNotAllowedInToField) {
     auto update = fromjson("{$rename: {'a': 'b.$[i]'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    Status status = node.init(update["$rename"]["a"], collator);
+    Status status = node.init(update["$rename"]["a"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -83,36 +84,36 @@ TEST(RenameNodeTest, ArrayFilterNotAllowedInToField) {
 
 TEST(RenameNodeTest, MoveUpNotAllowed) {
     auto update = fromjson("{$rename: {'b.a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    Status status = node.init(update["$rename"]["b.a"], collator);
+    Status status = node.init(update["$rename"]["b.a"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(RenameNodeTest, MoveDownNotAllowed) {
     auto update = fromjson("{$rename: {'b': 'b.a'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    Status status = node.init(update["$rename"]["b"], collator);
+    Status status = node.init(update["$rename"]["b"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(RenameNodeTest, MoveToSelfNotAllowed) {
     auto update = fromjson("{$rename: {'b.a': 'b.a'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    Status status = node.init(update["$rename"]["b.a"], collator);
+    Status status = node.init(update["$rename"]["b.a"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST_F(RenameNodeTest, SimpleNumberAtRoot) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2}"));
     setPathToCreate("b");
@@ -126,9 +127,9 @@ TEST_F(RenameNodeTest, SimpleNumberAtRoot) {
 
 TEST_F(RenameNodeTest, ToExistsAtSameLevel) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2, b: 1}"));
     setPathTaken("b");
@@ -142,9 +143,9 @@ TEST_F(RenameNodeTest, ToExistsAtSameLevel) {
 
 TEST_F(RenameNodeTest, ToAndFromHaveSameValue) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2, b: 2}"));
     setPathTaken("b");
@@ -158,9 +159,9 @@ TEST_F(RenameNodeTest, ToAndFromHaveSameValue) {
 
 TEST_F(RenameNodeTest, FromDottedElement) {
     auto update = fromjson("{$rename: {'a.c': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.c"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {c: {d: 6}}, b: 1}"));
     setPathTaken("b");
@@ -174,9 +175,9 @@ TEST_F(RenameNodeTest, FromDottedElement) {
 
 TEST_F(RenameNodeTest, RenameToExistingNestedFieldDoesNotReorderFields) {
     auto update = fromjson("{$rename: {'c.d': 'a.b.c'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["c.d"], collator));
+    ASSERT_OK(node.init(update["$rename"]["c.d"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 1, d: 2}}, b: 3, c: {d: 4}}"));
     setPathTaken("a.b.c");
@@ -190,9 +191,9 @@ TEST_F(RenameNodeTest, RenameToExistingNestedFieldDoesNotReorderFields) {
 
 TEST_F(RenameNodeTest, MissingCompleteTo) {
     auto update = fromjson("{$rename: {a: 'c.r.d'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2, b: 1, c: {}}"));
     setPathToCreate("r.d");
@@ -207,9 +208,9 @@ TEST_F(RenameNodeTest, MissingCompleteTo) {
 
 TEST_F(RenameNodeTest, ToIsCompletelyMissing) {
     auto update = fromjson("{$rename: {a: 'b.c.d'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2}"));
     setPathToCreate("b.c.d");
@@ -223,9 +224,9 @@ TEST_F(RenameNodeTest, ToIsCompletelyMissing) {
 
 TEST_F(RenameNodeTest, ToMissingDottedField) {
     auto update = fromjson("{$rename: {a: 'b.c.d'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{a:2, b:1}]}"));
     setPathToCreate("b.c.d");
@@ -239,9 +240,9 @@ TEST_F(RenameNodeTest, ToMissingDottedField) {
 
 TEST_F(RenameNodeTest, MoveIntoArray) {
     auto update = fromjson("{$rename: {b: 'a.2'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["b"], collator));
+    ASSERT_OK(node.init(update["$rename"]["b"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: [1, 2], b: 2}"));
     setPathToCreate("2");
@@ -256,9 +257,9 @@ TEST_F(RenameNodeTest, MoveIntoArray) {
 
 TEST_F(RenameNodeTest, MoveIntoArrayNoId) {
     auto update = fromjson("{$rename: {b: 'a.2'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["b"], collator));
+    ASSERT_OK(node.init(update["$rename"]["b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [1, 2], b: 2}"));
     setPathToCreate("2");
@@ -273,9 +274,9 @@ TEST_F(RenameNodeTest, MoveIntoArrayNoId) {
 
 TEST_F(RenameNodeTest, MoveToArrayElement) {
     auto update = fromjson("{$rename: {b: 'a.1'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["b"], collator));
+    ASSERT_OK(node.init(update["$rename"]["b"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: [1, 2], b: 2}"));
     setPathTaken("a.1");
@@ -289,9 +290,9 @@ TEST_F(RenameNodeTest, MoveToArrayElement) {
 
 TEST_F(RenameNodeTest, MoveOutOfArray) {
     auto update = fromjson("{$rename: {'a.0': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.0"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.0"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: [1, 2]}"));
     setPathToCreate("b");
@@ -305,9 +306,9 @@ TEST_F(RenameNodeTest, MoveOutOfArray) {
 
 TEST_F(RenameNodeTest, MoveNonexistentEmbeddedFieldOut) {
     auto update = fromjson("{$rename: {'a.a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{a: 1}, {b: 2}]}"));
     setPathToCreate("b");
@@ -321,9 +322,9 @@ TEST_F(RenameNodeTest, MoveNonexistentEmbeddedFieldOut) {
 
 TEST_F(RenameNodeTest, MoveEmbeddedFieldOutWithElementNumber) {
     auto update = fromjson("{$rename: {'a.0.a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.0.a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.0.a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: [{a: 1}, {b: 2}]}"));
     setPathToCreate("b");
@@ -337,9 +338,9 @@ TEST_F(RenameNodeTest, MoveEmbeddedFieldOutWithElementNumber) {
 
 TEST_F(RenameNodeTest, ReplaceArrayField) {
     auto update = fromjson("{$rename: {a: 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2, b: []}"));
     setPathTaken("b");
@@ -353,9 +354,9 @@ TEST_F(RenameNodeTest, ReplaceArrayField) {
 
 TEST_F(RenameNodeTest, ReplaceWithArrayField) {
     auto update = fromjson("{$rename: {a: 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [], b: 2}"));
     setPathTaken("b");
@@ -369,9 +370,9 @@ TEST_F(RenameNodeTest, ReplaceWithArrayField) {
 
 TEST_F(RenameNodeTest, CanRenameFromInvalidFieldName) {
     auto update = fromjson("{$rename: {'$a': 'a'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["$a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["$a"], expCtx));
 
     mutablebson::Document doc(fromjson("{$a: 2}"));
     setPathToCreate("a");
@@ -385,9 +386,9 @@ TEST_F(RenameNodeTest, CanRenameFromInvalidFieldName) {
 
 TEST_F(RenameNodeTest, RenameWithoutLogBuilderOrIndexData) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2}"));
     setPathToCreate("b");
@@ -399,9 +400,9 @@ TEST_F(RenameNodeTest, RenameWithoutLogBuilderOrIndexData) {
 
 TEST_F(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
     auto update = fromjson("{$rename: {'a': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{b: 2}"));
     setPathTaken("b");
@@ -415,9 +416,9 @@ TEST_F(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
 
 TEST_F(RenameNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
     auto update = fromjson("{$rename: {'a.$id': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.$id"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.$id"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
     setPathToCreate("b");
@@ -429,9 +430,9 @@ TEST_F(RenameNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
 
 TEST_F(RenameNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {
     auto update = fromjson("{$rename: {'a.$id': 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.$id"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.$id"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
     setPathToCreate("b");
@@ -451,9 +452,9 @@ TEST_F(RenameNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFa
 
 TEST_F(RenameNodeTest, ApplyCannotRemoveImmutablePath) {
     auto update = fromjson("{$rename: {'a.b': 'c'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathToCreate("c");
@@ -467,9 +468,9 @@ TEST_F(RenameNodeTest, ApplyCannotRemoveImmutablePath) {
 
 TEST_F(RenameNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
     auto update = fromjson("{$rename: {a: 'c'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathToCreate("c");
@@ -483,9 +484,9 @@ TEST_F(RenameNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
 
 TEST_F(RenameNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
     auto update = fromjson("{$rename: {'a.b.c': 'd'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 1}}}"));
     setPathToCreate("d");
@@ -499,9 +500,9 @@ TEST_F(RenameNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
 
 TEST_F(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
     auto update = fromjson("{$rename: {'a.b.c': 'd'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {}}}"));
     setPathToCreate("d");
@@ -517,9 +518,9 @@ TEST_F(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
 
 TEST_F(RenameNodeTest, ApplyCannotCreateDollarPrefixedField) {
     auto update = fromjson("{$rename: {a: '$bad'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathToCreate("$bad");
@@ -532,9 +533,9 @@ TEST_F(RenameNodeTest, ApplyCannotCreateDollarPrefixedField) {
 
 TEST_F(RenameNodeTest, ApplyCannotOverwriteImmutablePath) {
     auto update = fromjson("{$rename: {a: 'b'}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], collator));
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0, b: 1}"));
     setPathTaken("b");

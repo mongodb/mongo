@@ -43,8 +43,12 @@ namespace mongo {
  */
 class ResolvedView {
 public:
-    ResolvedView(const NamespaceString& collectionNs, const std::vector<BSONObj>& pipeline)
-        : _namespace(collectionNs), _pipeline(pipeline) {}
+    ResolvedView(const NamespaceString& collectionNs,
+                 std::vector<BSONObj> pipeline,
+                 BSONObj defaultCollation)
+        : _namespace(collectionNs),
+          _pipeline(std::move(pipeline)),
+          _defaultCollation(std::move(defaultCollation)) {}
 
     /**
      * Returns whether 'commandResponseObj' contains a CommandOnShardedViewNotSupportedOnMongod
@@ -53,6 +57,8 @@ public:
     static bool isResolvedViewErrorResponse(BSONObj commandResponseObj);
 
     static ResolvedView fromBSON(BSONObj commandResponseObj);
+
+    BSONObj toBSON() const;
 
     /**
      * Convert an aggregation command on a view to the equivalent command against the view's
@@ -68,9 +74,21 @@ public:
         return _pipeline;
     }
 
+    const BSONObj& getDefaultCollation() const {
+        return _defaultCollation;
+    }
+
 private:
     NamespaceString _namespace;
     std::vector<BSONObj> _pipeline;
+
+    // The default collation associated with this view. An empty object means that the default is
+    // the simple collation.
+    //
+    // Currently all operations which run over a view must use the default collation. This means
+    // that operations on the view which do not specify a collation inherit the default. Operations
+    // on the view which specify any other collation fail with a user error.
+    BSONObj _defaultCollation;
 };
 
 }  // namespace mongo

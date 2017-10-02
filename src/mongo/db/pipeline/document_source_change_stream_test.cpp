@@ -68,11 +68,34 @@ static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
 static const NamespaceString nss("unittests.change_stream");
 
-using ChangeStreamStageTestNoSetup = AggregationContextFixture;
-
-class ChangeStreamStageTest : public AggregationContextFixture {
+class EnsureFCV {
 public:
-    ChangeStreamStageTest() : AggregationContextFixture(nss) {
+    using Version = ServerGlobalParams::FeatureCompatibility::Version;
+    EnsureFCV(Version version)
+        : _origVersion(serverGlobalParams.featureCompatibility.version.load()) {
+        serverGlobalParams.featureCompatibility.version.store(version);
+    }
+    ~EnsureFCV() {
+        serverGlobalParams.featureCompatibility.version.store(_origVersion);
+    }
+
+private:
+    const Version _origVersion;
+};
+
+class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
+public:
+    ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
+    ChangeStreamStageTestNoSetup(NamespaceString nsString)
+        : AggregationContextFixture(nsString), _ensureFCV(EnsureFCV::Version::k36) {}
+
+private:
+    EnsureFCV _ensureFCV;
+};
+
+class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
+public:
+    ChangeStreamStageTest() : ChangeStreamStageTestNoSetup() {
         repl::ReplicationCoordinator::set(getExpCtx()->opCtx->getServiceContext(),
                                           stdx::make_unique<repl::ReplicationCoordinatorMock>(
                                               getExpCtx()->opCtx->getServiceContext()));
@@ -444,6 +467,26 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
 
     // Throw an exception on the call of getNext().
     ASSERT_THROWS_CODE(match->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
+}
+
+TEST_F(ChangeStreamStageTest, CloseCursorOnRetryNeededEntries) {
+    auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
+    OplogEntry retryNeeded(optime, 1, OpTypeEnum::kNoop, nss, BSONObj(), o2Field.toBson());
+    retryNeeded.setUuid(testUuid());
+    auto stages = makeStages(retryNeeded);
+    auto closeCursor = stages.back();
+
+    Document expectedRetryNeeded{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), o2Field)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kRetryNeededOpType},
+    };
+
+    auto next = closeCursor->getNext();
+    // Transform into RetryNeeded entry.
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedRetryNeeded);
+    // Then throw an exception on the next call of getNext().
+    ASSERT_THROWS_CODE(
+        closeCursor->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
 }
 
 }  // namespace

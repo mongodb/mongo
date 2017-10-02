@@ -125,8 +125,10 @@ public:
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - database does not exist
      */
-    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
-                                                                   const std::string& dbName) = 0;
+    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
+        OperationContext* opCtx,
+        const std::string& dbName,
+        repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
      * Retrieves the metadata for a given collection, if it exists.
@@ -363,15 +365,6 @@ public:
                                          const std::string& ns,
                                          const BSONObj& query,
                                          const WriteConcernOptions& writeConcern) = 0;
-
-    /**
-     * Appends the information about the config and admin databases in the config server with the
-     * format for listDatabases, based on the listDatabases command parameters in
-     * 'listDatabasesCmd'.
-     */
-    virtual Status appendInfoForConfigServerDatabases(OperationContext* opCtx,
-                                                      const BSONObj& listDatabasesCmd,
-                                                      BSONArrayBuilder* builder) = 0;
 
     /**
      * Obtains a reference to the distributed lock manager instance to use for synchronizing

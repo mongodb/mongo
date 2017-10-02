@@ -144,6 +144,8 @@ public:
 
     virtual Role getRole() const;
     virtual MemberState getMemberState() const;
+    virtual bool canAcceptWrites() const override;
+    virtual bool isSteppingDown() const override;
     virtual HostAndPort getSyncSourceAddress() const;
     virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
     virtual int getMaintenanceCount() const;
@@ -166,7 +168,7 @@ public:
     virtual bool updateLastCommittedOpTime();
     virtual bool advanceLastCommittedOpTime(const OpTime& committedOpTime);
     virtual OpTime getLastCommittedOpTime() const;
-    virtual void setFirstOpTimeOfMyTerm(const OpTime& newOpTime);
+    virtual void completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm);
     virtual void adjustMaintenanceCountBy(int inc);
     virtual void prepareSyncFromResponse(const HostAndPort& target,
                                          BSONObjBuilder* response,
@@ -215,9 +217,16 @@ public:
     virtual void processLoseElection();
     virtual Status checkShouldStandForElection(Date_t now) const;
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
-    virtual bool stepDown(Date_t until, bool force);
-    virtual bool stepDownIfPending();
-    virtual bool isStepDownPending() const;
+    virtual bool attemptStepDown(long long termAtStart,
+                                 Date_t now,
+                                 Date_t waitUntil,
+                                 Date_t stepDownUntil,
+                                 bool force) override;
+    virtual bool isSafeToStepDown() override;
+    virtual bool prepareForUnconditionalStepDown() override;
+    virtual Status prepareForStepDownAttempt() override;
+    virtual void abortAttemptedStepDownIfNeeded() override;
+    virtual void finishUnconditionalStepDown() override;
     virtual Date_t getStepDownTime() const;
     virtual rpc::ReplSetMetadata prepareReplSetMetadata(const OpTime& lastVisibleOpTime) const;
     virtual rpc::OplogQueryMetadata prepareOplogQueryMetadata(int rbid) const;
@@ -226,7 +235,6 @@ public:
     virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
     virtual void loadLastVote(const LastVote& lastVote);
     virtual void voteForMyselfV1();
-    virtual void prepareForStepDown();
     virtual void setPrimaryIndex(long long primaryIndex);
     virtual int getCurrentPrimaryIndex() const;
     virtual bool haveNumNodesReachedOpTime(const OpTime& opTime, int numNodes, bool durablyWritten);
@@ -236,7 +244,7 @@ public:
     virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op,
                                                        bool durablyWritten,
                                                        bool skipSelf);
-    virtual HeartbeatResponseAction setMemberAsDown(Date_t now, const int memberIndex);
+    virtual bool setMemberAsDown(Date_t now, const int memberIndex) override;
     virtual std::pair<int, Date_t> getStalestLiveMember() const;
     virtual HeartbeatResponseAction checkMemberTimeouts(Date_t now);
     virtual void resetAllMemberTimeouts(Date_t now);
@@ -296,6 +304,10 @@ private:
         NotFreshEnoughForCatchupTakeover = 1 << 11,
     };
     typedef int UnelectableReasonMask;
+
+
+    // Set what type of PRIMARY this node currently is.
+    void _setLeaderMode(LeaderMode mode);
 
     // Returns the number of heartbeat pings which have occurred.
     int _getTotalPings();
@@ -385,6 +397,12 @@ private:
      */
     void _updateHeartbeatDataForReconfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now);
 
+    /**
+     * Returns whether a stepdown attempt should be allowed to proceed.  See the comment for
+     * attemptStepDown() for more details on the rules of when stepdown attempts succeed or fail.
+     */
+    bool _canCompleteStepDownAttempt(Date_t now, Date_t waitUntil, bool force);
+
     void _stepDownSelfAndReplaceWith(int newPrimary);
 
     /**
@@ -450,9 +468,6 @@ private:
     // well.
     std::vector<MemberData> _memberData;
 
-    // Indicates that we've received a request to stepdown from PRIMARY (likely via a heartbeat)
-    bool _stepDownPending;
-
     // Time when stepDown command expires
     Date_t _stepDownUntil;
 
@@ -478,6 +493,10 @@ private:
     // Rather than accesing this variable direclty, one should use the getMemberState() method,
     // which computes the replica set node state on the fly.
     MemberState::MS _followerMode;
+
+    // What type of PRIMARY this node currently is.  Don't set this directly, call _setLeaderMode
+    // instead.
+    LeaderMode _leaderMode = LeaderMode::kNotLeader;
 
     typedef std::map<HostAndPort, PingStats> PingMap;
     // Ping stats for each member by HostAndPort;

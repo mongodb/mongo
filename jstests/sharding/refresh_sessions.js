@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    var sessionsDb = "admin";
+    var sessionsDb = "config";
     var refresh = {refreshLogicalSessionCacheNow: 1};
     var startSession = {startSession: 1};
 

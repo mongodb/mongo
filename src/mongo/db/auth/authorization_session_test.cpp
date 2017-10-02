@@ -1278,5 +1278,34 @@ TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege)
     ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
 }
 
+TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
+    BSONObj stringObj = BSON("a"
+                             << "string");
+    BSONObj uuidObj = BSON("a" << UUID::gen());
+    BSONObj invalidObj = BSON("a" << 12);
+
+    // Strings require no privileges
+    ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(stringObj.firstElement()));
+
+    // UUIDs cannot be parsed with default privileges
+    ASSERT_FALSE(authzSession->isAuthorizedToParseNamespaceElement(uuidObj.firstElement()));
+
+    // Element must be either a string, or a UUID
+    ASSERT_THROWS_CODE(authzSession->isAuthorizedToParseNamespaceElement(invalidObj.firstElement()),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
+
+    // The useUUID privilege allows UUIDs to be parsed
+    authzSession->assumePrivilegesForDB(
+        Privilege(ResourcePattern::forClusterResource(), {ActionType::useUUID}));
+
+    ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(stringObj.firstElement()));
+    ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(uuidObj.firstElement()));
+    ASSERT_THROWS_CODE(authzSession->isAuthorizedToParseNamespaceElement(invalidObj.firstElement()),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
+}
+
+
 }  // namespace
 }  // namespace mongo

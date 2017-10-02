@@ -164,7 +164,9 @@ Listener::~Listener() {
 }
 
 bool Listener::setupSockets() {
-    checkTicketNumbers();
+    if (!_setAsServiceCtxDecoration) {
+        checkTicketNumbers();
+    }
 
 #if !defined(_WIN32)
     _mine = ipToAddrs(_ip.c_str(), _port, (!serverGlobalParams.noUnixSocket && useUnixSockets()));
@@ -345,7 +347,7 @@ void Listener::initAndListen() {
 
             long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
-            if (_logConnect && !serverGlobalParams.quiet.load()) {
+            if (_logConnect && !_setAsServiceCtxDecoration && !serverGlobalParams.quiet.load()) {
                 int conns = globalTicketHolder.used() + 1;
                 const char* word = (conns == 1 ? " connection" : " connections");
                 log() << "connection accepted from " << from.toString() << " #"
@@ -563,7 +565,7 @@ void Listener::initAndListen() {
 
         long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
-        if (_logConnect && !serverGlobalParams.quiet.load()) {
+        if (_logConnect && !_setAsServiceCtxDecoration && !serverGlobalParams.quiet.load()) {
             int conns = globalTicketHolder.used() + 1;
             const char* word = (conns == 1 ? " connection" : " connections");
             log() << "connection accepted from " << from.toString() << " #" << myConnectionNumber

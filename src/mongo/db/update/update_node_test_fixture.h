@@ -56,7 +56,7 @@ protected:
         _pathTaken = std::make_shared<FieldRef>();
         _matchedField = StringData();
         _insert = false;
-        _fromReplication = false;
+        _fromOplogApplication = false;
         _validateForStorage = true;
         _indexData.reset();
         _logDoc.reset();
@@ -69,7 +69,7 @@ protected:
         applyParams.pathTaken = _pathTaken;
         applyParams.matchedField = _matchedField;
         applyParams.insert = _insert;
-        applyParams.fromReplication = _fromReplication;
+        applyParams.fromOplogApplication = _fromOplogApplication;
         applyParams.validateForStorage = _validateForStorage;
         applyParams.indexData = _indexData.get();
         applyParams.logBuilder = _logBuilder.get();
@@ -100,8 +100,8 @@ protected:
         _insert = insert;
     }
 
-    void setFromReplication(bool fromReplication) {
-        _fromReplication = fromReplication;
+    void setFromOplogApplication(bool fromOplogApplication) {
+        _fromOplogApplication = fromOplogApplication;
     }
 
     void setValidateForStorage(bool validateForStorage) {
@@ -130,7 +130,7 @@ private:
     std::shared_ptr<FieldRef> _pathTaken;
     StringData _matchedField;
     bool _insert;
-    bool _fromReplication;
+    bool _fromOplogApplication;
     bool _validateForStorage;
     std::unique_ptr<UpdateIndexData> _indexData;
     mutablebson::Document _logDoc;

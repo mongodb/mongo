@@ -41,6 +41,7 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -125,7 +126,8 @@ public:
                         executor::TaskExecutor* executor,
                         const std::string db,
                         const std::vector<AsyncRequestsSender::Request>& requests,
-                        const ReadPreferenceSetting& readPreference);
+                        const ReadPreferenceSetting& readPreference,
+                        Shard::RetryPolicy retryPolicy);
 
     /**
      * Ensures pending network I/O for any outstanding requests has been canceled and waits for
@@ -226,7 +228,7 @@ private:
      *
      * On failure to schedule a request, signals the notification.
      */
-    void _scheduleRequests_inlock();
+    void _scheduleRequests(WithLock);
 
     /**
      * Helper to schedule a command to a remote.
@@ -236,7 +238,7 @@ private:
      *
      * Returns success if the command was scheduled successfully.
      */
-    Status _scheduleRequest_inlock(size_t remoteIndex);
+    Status _scheduleRequest(WithLock, size_t remoteIndex);
 
     /**
      * The callback for a remote command.
@@ -263,6 +265,9 @@ private:
     // The readPreference to use for all requests.
     ReadPreferenceSetting _readPreference;
 
+    // The policy to use when deciding whether to retry on an error.
+    Shard::RetryPolicy _retryPolicy;
+
     // Is set to a non-OK status if the client operation is interrupted.
     // When waiting for a remote to be ready, we only check for interrupt if the _interruptStatus
     // has not already been set to an error (so we can wait for callbacks for (canceled) outstanding
@@ -272,7 +277,6 @@ private:
     Status _interruptStatus = Status::OK();
 
     // Must be acquired before accessing the below data members.
-    // Must also be held when calling any of the '_inlock()' helper functions.
     stdx::mutex _mutex;
 
     // Data tracking the state of our communication with each of the remote nodes.

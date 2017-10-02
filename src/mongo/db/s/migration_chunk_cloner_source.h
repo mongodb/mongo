@@ -36,6 +36,7 @@ namespace mongo {
 class BSONObj;
 class OperationContext;
 class Status;
+class Timestamp;
 
 /**
  * This class is responsible for producing chunk documents to be moved from donor to a recipient
@@ -118,7 +119,9 @@ public:
      *
      * NOTE: Must be called with at least IX lock held on the collection.
      */
-    virtual void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc) = 0;
+    virtual void onInsertOp(OperationContext* opCtx,
+                            const BSONObj& insertedDoc,
+                            const Timestamp& oplogTs) = 0;
 
     /**
      * Notifies this cloner that an update happened to the collection, which it owns. It is up to
@@ -127,7 +130,10 @@ public:
      *
      * NOTE: Must be called with at least IX lock held on the collection.
      */
-    virtual void onUpdateOp(OperationContext* opCtx, const BSONObj& updatedDoc) = 0;
+    virtual void onUpdateOp(OperationContext* opCtx,
+                            const BSONObj& updatedDoc,
+                            const Timestamp& oplogTs,
+                            const Timestamp& prePostImageTs) = 0;
 
     /**
      * Notifies this cloner that a delede happened to the collection, which it owns. It is up to the
@@ -136,7 +142,10 @@ public:
      *
      * NOTE: Must be called with at least IX lock held on the collection.
      */
-    virtual void onDeleteOp(OperationContext* opCtx, const BSONObj& deletedDocId) = 0;
+    virtual void onDeleteOp(OperationContext* opCtx,
+                            const BSONObj& deletedDocId,
+                            const Timestamp& oplogTs,
+                            const Timestamp& preImageTs) = 0;
 
 protected:
     MigrationChunkClonerSource();

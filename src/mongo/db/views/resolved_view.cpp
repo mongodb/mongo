@@ -62,7 +62,27 @@ ResolvedView ResolvedView::fromBSON(BSONObj commandResponseObj) {
         pipeline.push_back(item.Obj().getOwned());
     }
 
-    return {ResolvedView(NamespaceString(viewDef["ns"].valueStringData()), pipeline)};
+    BSONObj collationSpec;
+    if (auto collationElt = viewDef["collation"]) {
+        uassert(40639,
+                "View definition 'collation' field must be an object",
+                collationElt.type() == BSONType::Object);
+        collationSpec = collationElt.embeddedObject().getOwned();
+    }
+
+    return {NamespaceString(viewDef["ns"].valueStringData()),
+            std::move(pipeline),
+            std::move(collationSpec)};
+}
+
+BSONObj ResolvedView::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append("ns", _namespace.ns());
+    builder.append("pipeline", _pipeline);
+    if (!_defaultCollation.isEmpty()) {
+        builder.append("collation", _defaultCollation);
+    }
+    return builder.obj();
 }
 
 AggregationRequest ResolvedView::asExpandedViewAggregation(
@@ -90,7 +110,11 @@ AggregationRequest ResolvedView::asExpandedViewAggregation(
     expandedRequest.setUnwrappedReadPref(request.getUnwrappedReadPref());
     expandedRequest.setBypassDocumentValidation(request.shouldBypassDocumentValidation());
     expandedRequest.setAllowDiskUse(request.shouldAllowDiskUse());
-    expandedRequest.setCollation(request.getCollation());
+
+    // Operations on a view must always use the default collation of the view. We must have already
+    // checked that if the user's request specifies a collation, it matches the collation of the
+    // view.
+    expandedRequest.setCollation(_defaultCollation);
 
     return expandedRequest;
 }

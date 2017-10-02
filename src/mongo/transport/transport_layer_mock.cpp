@@ -89,10 +89,6 @@ void TransportLayerMock::asyncWait(Ticket&& ticket, TicketCallback callback) {
     callback(wait(std::move(ticket)));
 }
 
-TransportLayer::Stats TransportLayerMock::sessionStats() {
-    return Stats();
-}
-
 SessionHandle TransportLayerMock::createSession() {
     auto session = MockSession::create(this);
     Session::Id sessionId = session->id();

@@ -10,8 +10,8 @@
                                                  // restartReplicationOnSecondaries
     var name = "operation_time_read_and_write_concern";
 
-    var replTest =
-        new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}});
+    var replTest = new ReplSetTest(
+        {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}, waitForKeys: true});
 
     if (!startSetIfSupportsReadMajority(replTest)) {
         jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
@@ -104,8 +104,11 @@
 
     stopReplicationOnSecondaries(replTest);
 
-    res = testDB.runCommand(
-        {insert: collectionName, documents: [failedDoc], writeConcern: {w: "majority"}});
+    res = testDB.runCommand({
+        insert: collectionName,
+        documents: [failedDoc],
+        writeConcern: {w: "majority", wtimeout: 1000}
+    });
     assert.eq(res.writeErrors[0].code, ErrorCodes.DuplicateKey);
     var failedWriteOperationTime = res.operationTime;
 
@@ -115,6 +118,5 @@
         "the operationTime of the failed majority write, " + failedWriteOperationTime +
             ", should be the cluster time of the last successful write at the time it failed, " +
             majorityWriteOperationTime);
-
     replTest.stopSet();
 })();

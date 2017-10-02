@@ -38,6 +38,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
@@ -46,6 +47,7 @@ namespace {
 
 using mongo::BSONObj;
 using mongo::Decimal128;
+using mongo::ExpressionContextForTest;
 using mongo::LogBuilder;
 using mongo::ModifierInc;
 using mongo::ModifierInterface;
@@ -68,7 +70,7 @@ public:
                    : ModifierInc::MODE_INC) {
         StringData modName = modObj.firstElement().fieldName();
         ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+                            ModifierInterface::Options::normal(new ExpressionContextForTest())));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -95,21 +97,22 @@ private:
 TEST(Init, FailToInitWithInvalidValue) {
     BSONObj modObj;
     ModifierInc mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     // String is an invalid increment argument
     modObj = fromjson("{ $inc : { a : '' } }");
     ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // Object is an invalid increment argument
     modObj = fromjson("{ $inc : { a : {} } }");
     ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 
     // Array is an invalid increment argument
     modObj = fromjson("{ $inc : { a : [] } }");
     ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, InitParsesNumberInt) {

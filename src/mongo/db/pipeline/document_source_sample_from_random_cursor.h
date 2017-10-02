@@ -44,6 +44,14 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
+    StageConstraints constraints() const final {
+        return {StreamType::kStreaming,
+                PositionRequirement::kFirst,
+                HostTypeRequirement::kAnyShard,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
+    }
+
     static boost::intrusive_ptr<DocumentSourceSampleFromRandomCursor> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long size,

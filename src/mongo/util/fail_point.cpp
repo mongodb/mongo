@@ -76,7 +76,7 @@ void FailPoint::setThreadPRNGSeed(int32_t seed) {
     FailPointPRNG::current()->resetSeed(seed);
 }
 
-FailPoint::FailPoint() : _fpInfo(0), _mode(off), _timesOrPeriod(0) {}
+FailPoint::FailPoint() = default;
 
 void FailPoint::shouldFailCloseBlock() {
     _fpInfo.subtractAndFetch(1);
@@ -151,24 +151,28 @@ FailPoint::RetCode FailPoint::slowShouldFailOpenBlock() {
     switch (_mode) {
         case alwaysOn:
             return slowOn;
-
         case random: {
             const AtomicInt32::WordType maxActivationValue = _timesOrPeriod.load();
-            if (FailPointPRNG::current()->nextPositiveInt32() < maxActivationValue) {
+            if (FailPointPRNG::current()->nextPositiveInt32() < maxActivationValue)
                 return slowOn;
-            }
+
             return slowOff;
         }
         case nTimes: {
-            AtomicInt32::WordType newVal = _timesOrPeriod.subtractAndFetch(1);
-
-            if (newVal <= 0) {
+            if (_timesOrPeriod.subtractAndFetch(1) <= 0)
                 disableFailPoint();
-            }
 
             return slowOn;
         }
+        case skip: {
+            // Ensure that once the skip counter reaches within some delta from 0 we don't continue
+            // decrementing it unboundedly because at some point it will roll over and become
+            // positive again
+            if (_timesOrPeriod.load() <= 0 || _timesOrPeriod.subtractAndFetch(1) < 0)
+                return slowOn;
 
+            return slowOff;
+        }
         default:
             error() << "FailPoint Mode not supported: " << static_cast<int>(_mode);
             fassertFailed(16444);
@@ -210,6 +214,23 @@ StatusWith<std::tuple<FailPoint::Mode, FailPoint::ValType, BSONObj>> FailPoint::
 
             if (longVal > std::numeric_limits<int>::max()) {
                 return {ErrorCodes::BadValue, "'times' option to 'mode' is too large"};
+            }
+            val = static_cast<int>(longVal);
+        } else if (modeObj.hasField("skip")) {
+            mode = FailPoint::skip;
+
+            long long longVal;
+            auto status = bsonExtractIntegerField(modeObj, "skip", &longVal);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (longVal < 0) {
+                return {ErrorCodes::BadValue, "'skip' option to 'mode' must be positive"};
+            }
+
+            if (longVal > std::numeric_limits<int>::max()) {
+                return {ErrorCodes::BadValue, "'skip' option to 'mode' is too large"};
             }
             val = static_cast<int>(longVal);
         } else if (modeObj.hasField("activationProbability")) {

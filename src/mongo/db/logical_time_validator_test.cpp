@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/logical_clock.h"
@@ -66,13 +67,14 @@ protected:
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
-        auto catalogClient = Grid::get(operationContext())->catalogClient();
+        auto catalogClient = stdx::make_unique<KeysCollectionClientSharded>(
+            Grid::get(operationContext())->catalogClient());
 
         const LogicalTime currentTime(LogicalTime(Timestamp(1, 0)));
         LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
 
-        _keyManager =
-            std::make_shared<KeysCollectionManagerSharding>("dummy", catalogClient, Seconds(1000));
+        _keyManager = std::make_shared<KeysCollectionManagerSharding>(
+            "dummy", std::move(catalogClient), Seconds(1000));
         _validator = stdx::make_unique<LogicalTimeValidator>(_keyManager);
         _validator->init(operationContext()->getServiceContext());
     }

@@ -590,7 +590,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     }
 
     for (const auto& dbName : dbNamesStatus.getValue()) {
-        auto dbt = Grid::get(opCtx)->catalogClient()->getDatabase(opCtx, dbName);
+        auto dbt = Grid::get(opCtx)->catalogClient()->getDatabase(
+            opCtx, dbName, repl::ReadConcernLevel::kLocalReadConcern);
         if (dbt.isOK()) {
             const auto& dbDoc = dbt.getValue().value;
             return Status(ErrorCodes::OperationFailed,

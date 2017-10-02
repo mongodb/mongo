@@ -66,8 +66,8 @@ doTest = function(signal) {
     master = reconfig(replTest, config);
     master = master.getSisterDB(name);
 
-    assert.writeOK(
-        master.foo.insert({_id: 123, x: 'foo'}, {writeConcern: {w: 2, wtimeout: 10 * 60 * 1000}}));
+    assert.writeOK(master.foo.insert(
+        {_id: 123, x: 'foo'}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     for (var i = 0; i < 8; i++) {
         assert.eq(conn.getDB(name).foo.findOne({_id: 123}), null);

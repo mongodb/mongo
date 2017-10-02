@@ -3,8 +3,9 @@
 (function() {
     'use strict';
 
+    const admin = db.getSisterDB('admin');
     const listAllLocalSessions = function() {
-        return db.aggregate([{'$listLocalSessions': {allUsers: true}}]);
+        return admin.aggregate([{'$listLocalSessions': {allUsers: true}}]);
     };
 
     // Start a new session and capture its sessionId.

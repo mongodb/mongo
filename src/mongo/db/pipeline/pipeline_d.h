@@ -81,9 +81,16 @@ public:
                                     const AggregationRequest* aggRequest,
                                     Pipeline* pipeline);
 
+    /**
+     * Injects a MongodInterface into stages which require access to mongod-specific functionality.
+     */
+    static void injectMongodInterface(Pipeline* pipeline);
+
     static std::string getPlanSummaryStr(const Pipeline* pipeline);
 
     static void getPlanSummaryStats(const Pipeline* pipeline, PlanSummaryStats* statsOut);
+
+    static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
 
 private:
     PipelineD();  // does not exist:  prevent instantiation

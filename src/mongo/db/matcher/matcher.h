@@ -55,8 +55,7 @@ public:
      * 'collator' must outlive the returned Matcher and any MatchExpression cloned from it.
      */
     Matcher(const BSONObj& pattern,
-            const CollatorInterface* collator,
-            const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
             const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                 MatchExpressionParser::kDefaultSpecialFeatures);

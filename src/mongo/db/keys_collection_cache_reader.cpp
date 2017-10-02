@@ -30,14 +30,15 @@
 
 #include "mongo/db/keys_collection_cache_reader.h"
 
-#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/db/keys_collection_client.h"
+#include "mongo/db/keys_collection_document.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 KeysCollectionCacheReader::KeysCollectionCacheReader(std::string purpose,
-                                                     ShardingCatalogClient* client)
-    : _purpose(std::move(purpose)), _catalogClient(client) {}
+                                                     KeysCollectionClient* client)
+    : _purpose(std::move(purpose)), _client(client) {}
 
 StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationContext* opCtx) {
     LogicalTime newerThanThis;
@@ -50,8 +51,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationC
         }
     }
 
-    auto refreshStatus = _catalogClient->getNewKeys(
-        opCtx, _purpose, newerThanThis, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto refreshStatus = _client->getNewKeys(opCtx, _purpose, newerThanThis);
 
     if (!refreshStatus.isOK()) {
         return refreshStatus.getStatus();
@@ -82,7 +82,8 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKeyById(
     }
 
     return {ErrorCodes::KeyNotFound,
-            str::stream() << "No keys found for " << _purpose << " that is valid for time: "
+            str::stream() << "Cache Reader No keys found for " << _purpose
+                          << " that is valid for time: "
                           << forThisTime.toString()
                           << " with id: "
                           << keyId};
@@ -100,6 +101,13 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKey(
     }
 
     return iter->second;
+}
+
+void KeysCollectionCacheReader::resetCache() {
+    // keys that read with non majority readConcern level can be rolled back.
+    if (!_client->supportsMajorityReads()) {
+        _cache.clear();
+    }
 }
 
 }  // namespace mongo

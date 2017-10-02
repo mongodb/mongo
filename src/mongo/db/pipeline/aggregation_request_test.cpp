@@ -126,6 +126,19 @@ TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArgAn
     ASSERT_EQ(request.getBatchSize(), 10);
 }
 
+TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
+    NamespaceString nss("a.collection");
+    // Non-local readConcern should not be allowed with the explain flag, but this is checked
+    // elsewhere to avoid having to parse the readConcern in AggregationRequest.
+    const BSONObj inputBson =
+        fromjson("{pipeline: [], explain: true, readConcern: {level: 'majority'}}");
+    auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
+    ASSERT_TRUE(request.getExplain());
+    ASSERT_BSONOBJ_EQ(request.getReadConcern(),
+                      BSON("level"
+                           << "majority"));
+}
+
 //
 // Serialization
 //
@@ -397,13 +410,6 @@ TEST(AggregationRequestTest, ShouldRejectExplainFalseWithSeparateExplainArg) {
     ASSERT_NOT_OK(
         AggregationRequest::parseFromBSON(nss, inputBson, ExplainOptions::Verbosity::kExecStats)
             .getStatus());
-}
-
-TEST(AggregationRequestTest, ShouldRejectExplainWithReadConcernMajority) {
-    NamespaceString nss("a.collection");
-    const BSONObj inputBson =
-        fromjson("{pipeline: [], explain: true, readConcern: {level: 'majority'}}");
-    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithReadConcernMajority) {

@@ -104,14 +104,24 @@ public:
      * Returns a reference to the specified cached session regardless of whether it is checked-out
      * or not. The returned session is not returned checked-out and is allowed to be checked-out
      * concurrently.
+     *
+     * The intended usage for this method is to allow migrations to run in parallel with writes for
+     * the same session without blocking it. Because of this, it may not be used from operations
+     * which run on a session.
      */
     ScopedSession getOrCreateSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
-     * Resets all created sessions and increments their generation, forcing each to be reloaded by
-     * subsequent write commands. Invoked after rollback.
+     * Callback to be invoked when it is suspected that the on-disk session contents might not be in
+     * sync with what is in the sessions cache.
+     *
+     * If no specific document is available, the method will invalidate all sessions. Otherwise if
+     * one is avaiable (which is the case for insert/update/delete), it must contain _id field with
+     * a valid session entry, in which case only that particular session will be invalidated. If the
+     * _id field is missing or doesn't contain a valid serialization of logical session, the method
+     * will throw. This prevents invalid entries from making it in the collection.
      */
-    void resetSessions();
+    void invalidateSessions(OperationContext* opCtx, boost::optional<BSONObj> singleSessionDoc);
 
 private:
     struct SessionRuntimeInfo {
@@ -203,10 +213,9 @@ private:
 class ScopedCheckedOutSession {
     MONGO_DISALLOW_COPYING(ScopedCheckedOutSession);
 
-public:
-    ScopedCheckedOutSession(OperationContext* opCtx, ScopedSession scopedSession)
-        : _opCtx(opCtx), _scopedSession(std::move(scopedSession)) {}
+    friend ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext*);
 
+public:
     ScopedCheckedOutSession(ScopedCheckedOutSession&&) = default;
 
     ~ScopedCheckedOutSession() {
@@ -232,6 +241,9 @@ public:
     }
 
 private:
+    ScopedCheckedOutSession(OperationContext* opCtx, ScopedSession scopedSession)
+        : _opCtx(opCtx), _scopedSession(std::move(scopedSession)) {}
+
     OperationContext* const _opCtx;
 
     ScopedSession _scopedSession;
@@ -246,7 +258,7 @@ class OperationContextSession {
     MONGO_DISALLOW_COPYING(OperationContextSession);
 
 public:
-    OperationContextSession(OperationContext* opCtx);
+    OperationContextSession(OperationContext* opCtx, bool checkOutSession);
     ~OperationContextSession();
 
     static Session* get(OperationContext* opCtx);

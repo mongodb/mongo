@@ -64,7 +64,13 @@ Value DocumentSourceMatch::serialize(boost::optional<ExplainOptions::Verbosity> 
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
-    return getQuery().isEmpty() ? nullptr : this;
+    if (getQuery().isEmpty()) {
+        return nullptr;
+    }
+
+    _expression = MatchExpression::optimize(std::move(_expression));
+
+    return this;
 }
 
 DocumentSource::GetNextResult DocumentSourceMatch::getNext() {
@@ -258,6 +264,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::GEO_INTERSECTS:
             case PathAcceptingKeyword::GEO_NEAR:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+            case PathAcceptingKeyword::INTERNAL_SCHEMA_EQ:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_ITEMS:
@@ -363,7 +370,6 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
 
     StatusWithMatchExpression status = uassertStatusOK(
         MatchExpressionParser::parse(_predicate,
-                                     pExpCtx->getCollator(),
                                      pExpCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::AllowedFeatures::kText |
@@ -470,6 +476,9 @@ BSONObj DocumentSourceMatch::getQuery() const {
 }
 
 DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* deps) const {
+    // Get all field or variable dependencies.
+    _expression->addDependencies(deps);
+
     if (isTextQuery()) {
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
         // know what field it will be searching without examining indices.
@@ -478,7 +487,6 @@ DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* 
         return EXHAUSTIVE_FIELDS;
     }
 
-    _expression->addDependencies(deps);
     return SEE_NEXT;
 }
 
@@ -489,13 +497,8 @@ DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
       _isTextQuery(isTextQuery(query)),
       _dependencies(_isTextQuery ? DepsTracker::MetadataAvailable::kTextScore
                                  : DepsTracker::MetadataAvailable::kNoMetadata) {
-    StatusWithMatchExpression status = uassertStatusOK(
-        MatchExpressionParser::parse(_predicate,
-                                     pExpCtx->getCollator(),
-                                     pExpCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::AllowedFeatures::kText |
-                                         MatchExpressionParser::AllowedFeatures::kExpr));
+    StatusWithMatchExpression status = uassertStatusOK(MatchExpressionParser::parse(
+        _predicate, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
 
     _expression = std::move(status.getValue());
     getDependencies(&_dependencies);

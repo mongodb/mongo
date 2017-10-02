@@ -60,7 +60,7 @@ public:
         UpdateObjectNode* root,
         modifiertable::ModifierType type,
         BSONElement modExpr,
-        const CollatorInterface* collator,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
         std::set<std::string>& foundIdentifiers);
 

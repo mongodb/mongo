@@ -39,7 +39,7 @@ constexpr StringData InternalSchemaAllElemMatchFromIndexMatchExpression::kName;
 std::unique_ptr<MatchExpression> InternalSchemaAllElemMatchFromIndexMatchExpression::shallowClone()
     const {
     auto clone = stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>();
-    invariantOK(clone->init(path(), _index, _query->shallowClone()));
+    invariantOK(clone->init(path(), _index, _expression->shallowClone()));
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }
@@ -53,7 +53,7 @@ bool InternalSchemaAllElemMatchFromIndexMatchExpression::equivalent(
     }
     const InternalSchemaAllElemMatchFromIndexMatchExpression* realOther =
         static_cast<const InternalSchemaAllElemMatchFromIndexMatchExpression*>(other);
-    return (_index == realOther->_index && _query->equivalent(realOther->_query.get()));
+    return (_index == realOther->_index && _expression->equivalent(realOther->_expression.get()));
 }
 
 void InternalSchemaAllElemMatchFromIndexMatchExpression::debugString(StringBuilder& debug,
@@ -61,19 +61,19 @@ void InternalSchemaAllElemMatchFromIndexMatchExpression::debugString(StringBuild
     _debugAddSpace(debug, level);
     debug << kName << "\n";
     debug << " index: " << _index << ", query:\n";
-    _query->debugString(debug, level + 1);
+    _expression->getFilter()->debugString(debug, level + 1);
 }
 
 void InternalSchemaAllElemMatchFromIndexMatchExpression::serialize(BSONObjBuilder* out) const {
-    BSONObjBuilder objMatchBob(out->subobjStart(path()));
-    BSONArrayBuilder subArray(objMatchBob.subarrayStart(kName));
+    BSONObjBuilder allElemMatchBob(out->subobjStart(path()));
+    BSONArrayBuilder subArray(allElemMatchBob.subarrayStart(kName));
     subArray.append(_index);
     {
         BSONObjBuilder eBuilder(subArray.subobjStart());
-        _query->serialize(&eBuilder);
+        _expression->getFilter()->serialize(&eBuilder);
         eBuilder.doneFast();
     }
     subArray.doneFast();
-    objMatchBob.doneFast();
+    allElemMatchBob.doneFast();
 }
 }  //  namespace mongo

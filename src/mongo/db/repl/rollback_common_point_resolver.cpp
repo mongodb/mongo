@@ -123,8 +123,7 @@ BSONObj RollbackCommonPointResolver::_makeFindCommandObject(const NamespaceStrin
     cmdBob.append("find", nss.coll());
     cmdBob.append("filter", BSON("ts" << BSON("$lt" << lastOpTimeFetched.getTimestamp())));
     cmdBob.append("sort", BSON("$natural" << -1));
-    cmdBob.append("maxTimeMS",
-                  durationCount<Milliseconds>(AbstractOplogFetcher::kOplogInitialFindMaxTime));
+    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(_getFindMaxTime()));
     return cmdBob.obj();
 }
 
@@ -250,7 +249,7 @@ StatusWith<BSONObj> RollbackCommonPointResolver::_onSuccessfulBatch(
     resetLocalOplogIteratorGuard.Dismiss();
 
     return makeGetMoreCommandObject(
-        queryResponse.nss, queryResponse.cursorId, AbstractOplogFetcher::kOplogGetMoreMaxTime);
+        queryResponse.nss, queryResponse.cursorId, _getGetMoreMaxTime());
 }
 
 }  // namespace repl

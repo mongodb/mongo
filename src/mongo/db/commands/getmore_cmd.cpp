@@ -68,10 +68,6 @@ namespace {
 
 MONGO_FP_DECLARE(rsStopGetMoreCmd);
 
-// Failpoint for making getMore not wait for an awaitdata cursor. Allows us to avoid waiting during
-// tests.
-MONGO_FP_DECLARE(disableAwaitDataForGetMoreCmd);
-
 /**
  * A command for running getMore() against an existing cursor registered with a CursorManager.
  * Used to generate the next batch of results for a ClientCursor.
@@ -322,9 +318,6 @@ public:
         CursorId respondWithId = 0;
         CursorResponseBuilder nextBatch(/*isInitialResponse*/ false, &result);
         BSONObj obj;
-        // generateBatch() will not initialize 'state' if it exceeds the time limiting generating
-        // the next batch for an awaitData cursor. In this case, 'state' should be
-        // PlanExecutor::ADVANCED, so we do not attempt to get another batch.
         PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
         long long numResults = 0;
 
@@ -443,6 +436,7 @@ public:
                 // As soon as we get a result, this operation no longer waits.
                 shouldWaitForInserts(opCtx) = false;
                 // Add result to output buffer.
+                nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
                 nextBatch->append(obj);
                 (*numResults)++;
             }
@@ -467,6 +461,10 @@ public:
             return Status(ErrorCodes::QueryPlanKilled,
                           str::stream() << "PlanExecutor killed: "
                                         << WorkingSetCommon::toStatusString(obj));
+        } else if (PlanExecutor::IS_EOF == *state) {
+            // This causes the reported latest oplog timestamp to advance even when there are
+            // no results for this particular query.
+            nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
         }
 
         return Status::OK();

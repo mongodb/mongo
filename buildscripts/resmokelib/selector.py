@@ -14,329 +14,521 @@ import os.path
 import subprocess
 import sys
 
+import buildscripts.ciconfig.tags as _tags
 from . import config
 from . import errors
 from . import utils
 from .utils import globstar
 from .utils import jscomment
-from ..ciconfig import tags as _tags
 
 
-def _parse_tag_file(test_kind):
+########################
+#  Test file explorer  #
+########################
+
+
+class TestFileExplorer(object):
+    """A component that can perform file system related operations.
+
+    The file related code has been confined to this class for testability.
     """
-    Parse the tag file and return a dict of tagged tests, with the key the filename and
-    a list of tags, i.e., {'file1.js': ['tag1', 'tag2'], 'file2.js': ['tag2', 'tag3']}
+    def is_glob_pattern(self, path):
+        """Indicates if the provided path is a glob pattern.
+
+        See buildscripts.resmokelib.utils.globstar.is_glob_pattern().
+        """
+        return globstar.is_glob_pattern(path)
+
+    def iglob(self, pattern):
+        """Expands the given glob pattern with regard to the current working directory.
+
+        See buildscripts.resmokelib.utils.globstar.iglob().
+        Returns:
+            A list of paths as a list(str).
+        """
+        return globstar.iglob(pattern)
+
+    def jstest_tags(self, file_path):
+        """Extracts the tags from a JavaScript test file.
+
+        See buildscripts.resmokelib.utils.jscomment.get_tags().
+        Returns:
+            A list of tags.
+        """
+        return jscomment.get_tags(file_path)
+
+    def read_root_file(self, root_file_path):
+        """Reads a file containing the list of root test files.
+
+        Args:
+            root_file_path: the path to a file containing the path of each test on a separate line.
+        Returns:
+            A list of paths as a list(str).
+        """
+        tests = []
+        with open(root_file_path, "rb") as filep:
+            for test_path in filep:
+                test_path = test_path.strip()
+                tests.append(test_path)
+        return tests
+
+    def fnmatchcase(self, name, pattern):
+        """Indicates if the given name matches the given pattern.
+
+        See buildscripts.resmokelib.utils.fnmatch.fnmatchcase().
+        """
+        return fnmatch.fnmatchcase(name, pattern)
+
+    def isfile(self, path):
+        """Indicates if the given path corresponds to an existing file."""
+        return os.path.isfile(path)
+
+    def list_dbtests(self, dbtest_binary):
+        """Lists the available dbtests suites."""
+        returncode, stdout = self._run_program(dbtest_binary, ["--list"])
+
+        if returncode != 0:
+            raise errors.ResmokeError("Getting list of dbtest suites failed")
+
+        return stdout.splitlines()
+
+    def _run_program(self, binary, args):
+        """Runs a program.
+
+        Args:
+            binary: the binary to run.
+            args: a list of arguments for the binary.
+        Returns:
+            A tuple consisting of the program return code and its output.
+        """
+        command = [binary]
+        command.extend(args)
+        program = subprocess.Popen(command, stdout=subprocess.PIPE)
+        stdout = program.communicate()[0]
+
+        return program.returncode, stdout
+
+    def parse_tag_file(self, test_kind):
+        """
+        Parses the tag file and return a dict of tagged tests, with the key the filename and the
+        value a list of tags, i.e., {'file1.js': ['tag1', 'tag2'], 'file2.js': ['tag2', 'tag3']}.
+        """
+        tagged_tests = collections.defaultdict(list)
+        if config.TAG_FILE:
+            tags_conf = _tags.TagsConfig.from_file(config.TAG_FILE)
+            tagged_roots = tags_conf.get_test_patterns(test_kind)
+            for tagged_root in tagged_roots:
+                # Multiple tests could be returned for a set of tags.
+                tests = globstar.iglob(tagged_root)
+                test_tags = tags_conf.get_tags(test_kind, tagged_root)
+                for test in tests:
+                    # A test could have a tag in more than one place, due to wildcards in the
+                    # selector.
+                    tagged_tests[test].extend(test_tags)
+        return tagged_tests
+
+
+class _TestList(object):
     """
-    if config.TAG_FILE:
-        tags_conf = _tags.TagsConfig.from_file(config.TAG_FILE)
-        tagged_roots = tags_conf.get_test_patterns(test_kind)
-    else:
-        tagged_roots = []
-    tagged_tests = collections.defaultdict(list)
-    for tagged_root in tagged_roots:
-        # Multiple tests could be returned for a set of tags.
-        tests = globstar.iglob(tagged_root)
-        test_tags = tags_conf.get_tags(test_kind, tagged_root)
+    A list of tests on which filtering operations can be applied.
+
+    The tests will often be file paths but they do not need to be.
+    The are following tests are assumed to be file paths:
+    - an element of the 'roots' argument to __init__() that is a glob pattern,
+    - an element of the 'include_files' argument to include_files(),
+    - an element of the 'exclude_files' argument to exclude_files().
+    """
+    def __init__(self, test_file_explorer, roots):
+        """Initializes the _TestList with a TestFileExplorer component and a list of root tests."""
+        self._test_file_explorer = test_file_explorer
+        self._roots = self._expand(roots)
+        self._filtered = set(self._roots)
+
+    def _expand(self, tests):
+        expanded_tests = []
         for test in tests:
-            # A test could have a tag in more than one place, due to wildcards in the selector.
-            tagged_tests[test].extend(test_tags)
-    return tagged_tests
+            if self._test_file_explorer.is_glob_pattern(test):
+                expanded_tests.extend(self._test_file_explorer.iglob(test))
+            else:
+                expanded_tests.append(test)
+        return expanded_tests
+
+    def include_files(self, include_files, force=False):
+        """Filters the test list so that it only includes files matching 'include_files'.
+
+         Args:
+             include_files: a list of paths or glob patterns that match the files to include.
+             force: if True include the matching files that were previously excluded, otherwise
+                only include files that match and were not previously excluded from this _TestList.
+        """
+        expanded_include_files = set()
+        for path in include_files:
+            if self._test_file_explorer.is_glob_pattern(path):
+                expanded_include_files.update(set(self._test_file_explorer.iglob(path)))
+            else:
+                expanded_include_files.add(os.path.normpath(path))
+        self._filtered = self._filtered & expanded_include_files
+        if force:
+            self._filtered |= set(self._roots) & expanded_include_files
+
+    def exclude_files(self, exclude_files):
+        """Excludes from the test list the files that match elements from 'exclude_files'.
+
+        Args:
+            exclude_files: a list of paths or glob patterns that match the files to exclude.
+        Raises:
+            ValueError: if exclude_files contains a non-globbed path that does not correspond to
+                an existing file.
+        """
+        for path in exclude_files:
+            if self._test_file_explorer.is_glob_pattern(path):
+                paths = self._test_file_explorer.iglob(path)
+                for expanded_path in paths:
+                    self._filtered.discard(expanded_path)
+            else:
+                path = os.path.normpath(path)
+                if path not in self._roots:
+                    raise ValueError("Unrecognized test file: {}".format(path))
+                self._filtered.discard(path)
+
+    def match_tag_expression(self, tag_expression, get_tags):
+        """Filters the test list to only include tests that match the tag expression.
+
+        Args:
+            tag_expression: a callable object that takes a list of tags and indicate if the required
+                condition is met by returning a boolean.
+            get_tags: a callable object that takes a test and returns the corresponding list of
+                tags.
+        """
+        self._filtered = {test for test in self._filtered
+                          if tag_expression(get_tags(test))}
+
+    def match_pattern(self, pattern):
+        """Filters the test list to only include tests that match the given glob pattern."""
+        self._filtered = {test_file for test_file in self._filtered
+                          if test_file == pattern or fnmatch.fnmatchcase(test_file, pattern)}
+
+    def get_tests(self):
+        """Returns the test list as a list(str)."""
+        return [f for f in self._roots if f in self._filtered]
 
 
-def _tags_from_list(tags):
+##############################
+#  Tag matching expressions  #
+##############################
+
+class _AllOfExpression(object):
+    """A tag matching expression that requires all child expressions to match."""
+
+    def __init__(self, children):
+        self.__children = children
+
+    def __call__(self, file_tags):
+        return all(child(file_tags) for child in self.__children)
+
+
+class _AnyOfExpression(object):
+    """A tag matching expression that requires at least one of the child expressions."""
+
+    def __init__(self, children):
+        self.__children = children
+
+    def __call__(self, file_tags):
+        return any(child(file_tags) for child in self.__children)
+
+
+class _NotExpression(object):
+    """A tag matching expression that matches if and only if the child expression does not match."""
+    def __init__(self, child):
+        self.__child = child
+
+    def __call__(self, file_tags):
+        return not self.__child(file_tags)
+
+
+class _MatchExpression(object):
+    """A tag matching expression that matches when a specific tag is present."""
+    def __init__(self, tag):
+        self.__tag = tag
+
+    def __call__(self, file_tags):
+        return self.__tag in file_tags
+
+
+def make_expression(conf):
+    """Creates a tag matching expression from an expression configuration.
+
+    The syntax for the expression configuration is:
+    - expr: str_expr | dict_expr
+    - str_expr: "<tagname>"
+    - dict_expr: allof_expr | anyof_expr | not_expr
+    - allof_expr: {"$allOf": [expr, ...]}
+    - anyof_expr: {"$anyOf": [expr, ...]}
+    - not_expr: {"$not": expr}
     """
-    Returns list of tags from tag list.
-    Each tag in the list may be a list of comma separated tags, with empty strings ignored.
-    """
+    if isinstance(conf, str):
+        return _MatchExpression(conf)
+    elif isinstance(conf, dict):
+        if len(conf) != 1:
+            raise ValueError("Tag matching expressions should only contain one key")
+        key = conf.keys()[0]
+        value = conf[key]
+        if key == "$allOf":
+            return _AllOfExpression(_make_expression_list(value))
+        elif key == "$anyOf":
+            return _AnyOfExpression(_make_expression_list(value))
+        elif key == "$not":
+            return _NotExpression(make_expression(value))
+    raise ValueError("Invalid tag matching expression: {}".format(conf))
 
-    if tags is not None:
-        for tag in tags:
-            return [t for t in tag.split(",") if t != ""]
-    return []
+
+def _make_expression_list(configs):
+    return [make_expression(conf) for conf in configs]
 
 
-def _filter_cpp_tests(kind, root, include_files, exclude_files):
-    """
-    Generic filtering logic for C++ tests that are sourced from a list
-    of test executables.
-    """
+####################
+#  Test Selectors  #
+####################
 
-    # TODO: SERVER-22170 Implement full tagging support
-    # If --includeWithAnyTags is supplied, then no tests should be run since
-    # C++ tests cannot be tagged.
-    if _tags_from_list(config.INCLUDE_WITH_ANY_TAGS):
+
+class _SelectorConfig(object):
+    """Base object to represent the configuration for test selection."""
+    def __init__(self, root=None, roots=None,
+                 include_files=None, exclude_files=None,
+                 include_tags=None, exclude_tags=None,
+                 include_with_any_tags=None, exclude_with_any_tags=None):
+        """
+        Initializes the _SelectorConfig from the configuration elements.
+
+        Args:
+            root: the path to a file containing the list of root tests. Incompatible with 'roots'.
+            roots: a list of root tests. Incompatible with 'root'.
+            include_files: a list of paths or glob patterns the tests must be included in.
+            exclude_files: a list of paths or glob patterns the tests must not be included in.
+            include_tags: a str or dict representing a tag matching expression that the tags of the
+                selected tests must match. Incompatible with 'exclude_tags'.
+            exclude_tags: a str or dict representing a tag matching expression that the tags of the
+                selected tests must not match. Incompatible with 'include_tags'.
+            include_with_any_tags: a list of tags. All selected tests must have at least one them.
+            exclude_with_any_tags: a list of tags. No selected tests can have any of them.
+        """
+        # Incompatible arguments check.
+        if root and roots:
+            raise ValueError("root and roots cannot be specified at the same time")
+        if include_tags and exclude_tags:
+            raise ValueError("include_tags and exclude_tags cannot be specified at the same time")
+        self.root = root
+        self.roots = roots
+        self.include_files = utils.default_if_none(include_files, [])
+        self.exclude_files = utils.default_if_none(exclude_files, [])
+        include_with_any_tags = self.__merge_lists(include_with_any_tags,
+                                                   config.INCLUDE_WITH_ANY_TAGS)
+        exclude_with_any_tags = self.__merge_lists(exclude_with_any_tags,
+                                                   config.EXCLUDE_WITH_ANY_TAGS)
+
+        self.tags_expression = self.__make_tags_expression(include_tags,
+                                                           exclude_tags,
+                                                           include_with_any_tags,
+                                                           exclude_with_any_tags)
+
+    @staticmethod
+    def __merge_lists(list_a, list_b):
+        if list_a or list_b:
+            if list_a is None:
+                return set(list_b)
+            elif list_b is None:
+                return set(list_a)
+            else:
+                return set(list_a) | set(list_b)
+        else:
+            return None
+
+    @staticmethod
+    def __make_tags_expression(include_tags, exclude_tags,
+                               include_with_any_tags, exclude_with_any_tags):
+        expressions = []
+        if include_tags:
+            expressions.append(make_expression(include_tags))
+        elif exclude_tags:
+            expressions.append(_NotExpression(make_expression(exclude_tags)))
+        if include_with_any_tags:
+            include_with_any_expr = make_expression(
+                {"$anyOf": include_with_any_tags})
+            expressions.append(include_with_any_expr)
+        if exclude_with_any_tags:
+            exclude_with_any_expr = make_expression(
+                {"$not": {"$anyOf": exclude_with_any_tags}})
+            expressions.append(exclude_with_any_expr)
+
+        if expressions:
+            return _AllOfExpression(expressions)
+        else:
+            return None
+
+
+class _Selector(object):
+    """Selection algorithm to select tests matching a selector configuration."""
+    def __init__(self, test_file_explorer):
+        """
+        Initializes the _Selector.
+
+        Args:
+            test_file_explorer: a TestFileExplorer instance.
+        """
+        self._test_file_explorer = test_file_explorer
+
+    def select(self, selector_config):
+        """Select the test files that match the given configuration.
+
+        Args:
+            selector_config: a _SelectorConfig instance.
+        """
+
+        # 1. Find the root files.
+        if selector_config.roots:
+            roots = selector_config.roots
+        else:
+            roots = self._test_file_explorer.read_root_file(selector_config.root)
+
+        # 2. Create a _TestList.
+        test_list = _TestList(self._test_file_explorer, roots)
+        # 3. Apply the exclude_files.
+        if selector_config.exclude_files:
+            test_list.exclude_files(selector_config.exclude_files)
+        # 4. Apply the tag filters.
+        if selector_config.tags_expression:
+            test_list.match_tag_expression(selector_config.tags_expression, self.get_tags)
+        # 5. Apply the include files last with force=True to take precedence over the tags.
+        if selector_config.include_files:
+            test_list.include_files(selector_config.include_files, force=True)
+        return test_list.get_tests()
+
+    def get_tags(self, test_file):
+        """Retrieves the tags associated with the give test file."""
         return []
 
-    include_files = utils.default_if_none(include_files, [])
-    exclude_files = utils.default_if_none(exclude_files, [])
 
-    tests = []
-    with open(root, "r") as fp:
-        for test_path in fp:
-            test_path = test_path.rstrip()
-            tests.append(test_path)
+class _JSTestSelectorConfig(_SelectorConfig):
+    """_SelectorConfig subclass for js_test tests."""
+    def __init__(self, roots=None,
+                 include_files=None, exclude_files=None,
+                 include_with_any_tags=None, exclude_with_any_tags=None,
+                 include_tags=None, exclude_tags=None):
+        _SelectorConfig.__init__(self, roots=roots,
+                                 include_files=include_files, exclude_files=exclude_files,
+                                 include_with_any_tags=include_with_any_tags,
+                                 exclude_with_any_tags=exclude_with_any_tags,
+                                 include_tags=include_tags, exclude_tags=exclude_tags)
 
-    return list(_filter_by_filename(kind, tests, include_files, exclude_files))
+
+class _JSTestSelector(_Selector):
+    """_Selector subclass for js_test tests."""
+    def __init__(self, test_file_explorer):
+        _Selector.__init__(self, test_file_explorer)
+        self._tags = self._test_file_explorer.parse_tag_file("js_test")
+
+    def get_tags(self, test_file):
+        file_tags = self._test_file_explorer.jstest_tags(test_file)
+        if test_file in self._tags:
+            return list(set(file_tags) | set(self._tags[test_file]))
+        return file_tags
 
 
-def filter_cpp_unit_tests(root=config.DEFAULT_UNIT_TEST_LIST,
-                          roots=None,
-                          include_files=None,
-                          exclude_files=None):
+class _CppTestSelectorConfig(_SelectorConfig):
+    """_SelectorConfig subclass for cpp_integration_test and cpp_unit_test tests."""
+    def __init__(self, root=config.DEFAULT_INTEGRATION_TEST_LIST,
+                 include_files=None, exclude_files=None):
+        _SelectorConfig.__init__(self, root=root,
+                                 include_files=include_files, exclude_files=exclude_files)
+
+
+class _CppTestSelector(_Selector):
+    """_Selector subclass for cpp_integration_test and cpp_unit_test tests."""
+    def __init__(self, test_file_explorer):
+        _Selector.__init__(self, test_file_explorer)
+
+    def select(self, selector_config):
+        if selector_config.roots:
+            return selector_config.roots
+        return _Selector.select(self, selector_config)
+
+
+class _DbTestSelectorConfig(_SelectorConfig):
+    """_Selector config subclass for db_test tests."""
+    def __init__(self, binary=None, roots=None, include_suites=None):
+        _SelectorConfig.__init__(self, roots=roots)
+        self.include_suites = utils.default_if_none(include_suites, [])
+
+        # Command line option overrides the YAML configuration.
+        binary = utils.default_if_none(config.DBTEST_EXECUTABLE, binary)
+        # Use the default if nothing specified.
+        binary = utils.default_if_none(binary, config.DEFAULT_DBTEST_EXECUTABLE)
+        # Ensure that executable files on Windows have a ".exe" extension.
+        if sys.platform == "win32" and os.path.splitext(binary)[1] != ".exe":
+            binary += ".exe"
+        self.binary = binary
+
+
+class _DbTestSelector(_Selector):
+    """_Selector subclass for db_test tests."""
+    def __init__(self, test_file_explorer):
+        _Selector.__init__(self, test_file_explorer)
+
+    def select(self, selector_config):
+        if selector_config.roots:
+            return selector_config.roots
+
+        if not self._test_file_explorer.isfile(selector_config.binary):
+            raise IOError(errno.ENOENT, "File not found", selector_config.binaryy)
+
+        dbtests = self._test_file_explorer.list_dbtests(selector_config.binary)
+
+        if not selector_config.include_suites:
+            return dbtests
+
+        test_files = _TestList(self._test_file_explorer, dbtests)
+        for suite_pattern in selector_config.include_suites:
+            test_files.match_pattern(suite_pattern)
+
+        return test_files.get_tests()
+
+
+class _JsonSchemaTestSelectorConfig(_SelectorConfig):
+    """_SelectorConfig subclass for json_schema_test tests."""
+    def __init__(self, roots, include_files=None, exclude_files=None):
+        _SelectorConfig.__init__(self, roots=roots,
+                                 include_files=include_files, exclude_files=exclude_files)
+
+
+##########################################
+# Module entry point for filtering tests #
+##########################################
+
+_DEFAULT_TEST_FILE_EXPLORER = TestFileExplorer()
+
+
+_SELECTOR_REGISTRY = {
+    "cpp_integration_test": (_CppTestSelectorConfig, _CppTestSelector),
+    "cpp_unit_test": (_CppTestSelectorConfig, _CppTestSelector),
+    "db_test": (_DbTestSelectorConfig, _DbTestSelector),
+    "json_schema_test": (_JsonSchemaTestSelectorConfig, _Selector),
+    "js_test": (_JSTestSelectorConfig, _JSTestSelector),
+}
+
+
+def filter_tests(test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FILE_EXPLORER):
+    """Filters the tests according to a specified configuration.
+
+    Args:
+        test_kind: the test kind, one of 'cpp_integration_test', 'cpp_unit_test', 'db_test',
+            'json_schema_test', 'js_test'.
+        selector_config: a dict containing the selector configuration.
+        test_file_explorer: the TestFileExplorer to use. Using a TestFileExplorer other than
+        the default one should not be needed except for mocking purposes.
     """
-    Filters out what C++ unit tests to run.
-    """
-    # 'roots' is provided only if a file list is given from the command line.
-    if roots is not None:
-        return roots
-    return _filter_cpp_tests("C++ unit test", root, include_files, exclude_files)
-
-
-def filter_cpp_integration_tests(root=config.DEFAULT_INTEGRATION_TEST_LIST,
-                                 roots=None,
-                                 include_files=None,
-                                 exclude_files=None):
-    """
-    Filters out what C++ integration tests to run.
-    """
-    # 'roots' is provided only if a file list is given from the command line.
-    if roots is not None:
-        return roots
-    return _filter_cpp_tests("C++ integration test", root, include_files, exclude_files)
-
-
-def filter_dbtests(binary=None, roots=None, include_suites=None):
-    """
-    Filters out what dbtests to run.
-    """
-    # 'roots' is provided only if a file list is given from the command line.
-    if roots is not None:
-        return roots
-
-    # TODO: SERVER-22170 Implement full tagging support
-    # If --includeWithAnyTags is supplied, then no tests should be run since
-    # dbtests tests cannot be tagged.
-    if _tags_from_list(config.INCLUDE_WITH_ANY_TAGS):
-        return []
-
-    # Command line option overrides the YAML configuration.
-    binary = utils.default_if_none(config.DBTEST_EXECUTABLE, binary)
-    # Use the default if nothing specified.
-    binary = utils.default_if_none(binary, config.DEFAULT_DBTEST_EXECUTABLE)
-
-    include_suites = utils.default_if_none(include_suites, [])
-
-    if not utils.is_string_list(include_suites):
-        raise TypeError("include_suites must be a list of strings")
-
-    # Ensure that executable files on Windows have a ".exe" extension.
-    if sys.platform == "win32" and os.path.splitext(binary)[1] != ".exe":
-        binary += ".exe"
-
-    if not os.path.isfile(binary):
-        raise IOError(errno.ENOENT, "File not found", binary)
-
-    program = subprocess.Popen([binary, "--list"], stdout=subprocess.PIPE)
-    stdout = program.communicate()[0]
-
-    if program.returncode != 0:
-        raise errors.ResmokeError("Getting list of dbtest suites failed")
-
-    dbtests = stdout.splitlines()
-
-    if not include_suites:
-        return dbtests
-
-    dbtests = set(dbtests)
-
-    (verbatim, globbed) = _partition(include_suites, normpath=False)
-    included = _pop_all("dbtest suite", dbtests, verbatim)
-
-    for suite_pattern in globbed:
-        for suite_name in dbtests:
-            if fnmatch.fnmatchcase(suite_name, suite_pattern):
-                included.add(suite_name)
-
-    return list(included)
-
-
-def filter_jstests(roots,
-                   include_files=None,
-                   include_with_any_tags=None,
-                   exclude_files=None,
-                   exclude_with_any_tags=None):
-    """
-    Filters out what jstests to run.
-    """
-    include_files = utils.default_if_none(include_files, [])
-    exclude_files = utils.default_if_none(exclude_files, [])
-
-    # Command line options are merged with YAML options.
-    tags = {
-        # The constructor for an empty set does not accept "None".
-        "exclude_with_any_tags": set(utils.default_if_none(exclude_with_any_tags, [])),
-        "include_with_any_tags": set(utils.default_if_none(include_with_any_tags, [])),
-    }
-
-    for name in tags:
-        if not utils.is_string_set(tags[name]):
-            raise TypeError("%s must be a YAML list of strings" % (name))
-
-    cmd_line_lists = (
-        ("exclude_with_any_tags", config.EXCLUDE_WITH_ANY_TAGS),
-        ("include_with_any_tags", config.INCLUDE_WITH_ANY_TAGS),
-    )
-
-    # Merge command line options with YAML options.
-    for (tag_category, cmd_line_list) in cmd_line_lists:
-        if cmd_line_list is not None:
-            # Ignore the empty string when it is used as a tag. Specifying an empty string on the
-            # command line has no effect and allows a user to more easily synthesize a resmoke.py
-            # invocation in their Evergreen project configuration.
-            for cmd_line_tags in cmd_line_list:
-                tags[tag_category] |= set(_tags_from_list([cmd_line_tags]))
-
-    jstests_list = []
-    for root in roots:
-        jstests_list.extend(globstar.iglob(root))
-
-    using_tags = False
-    for tag in tags.values():
-        if tag:
-            using_tags = True
-
-    # Skip converting 'jstests_list' to a set when it isn't being filtered in order to retain its
-    # ordering.
-    if not include_files and not exclude_files and not using_tags:
-        return jstests_list
-
-    jstests_set = _filter_by_filename("jstest", jstests_list, include_files, exclude_files)
-
-    # Skip parsing comments if not using tags.
-    if not using_tags:
-        return list(jstests_set)
-
-    excluded = set()
-
-    # Tags can also be specified in an external file.
-    tagged_js_tests = _parse_tag_file("js_test")
-
-    for filename in jstests_set:
-        file_tags = set(jscomment.get_tags(filename))
-        if filename in tagged_js_tests:
-            file_tags.update(tagged_js_tests[filename])
-        if tags["include_with_any_tags"] and not tags["include_with_any_tags"] & file_tags:
-            excluded.add(filename)
-        if tags["exclude_with_any_tags"] and tags["exclude_with_any_tags"] & file_tags:
-            excluded.add(filename)
-
-    # Specifying include_files overrides tags.
-    return list((jstests_set - excluded) | set(include_files))
-
-def filter_json_schema_tests(roots,
-                             include_files=None,
-                             exclude_files=None):
-    """
-    Filters out what json test cases to load.
-    """
-    include_files = utils.default_if_none(include_files, [])
-    exclude_files = utils.default_if_none(exclude_files, [])
-
-    # TODO: SERVER-22170 Implement full tagging support
-    # If --includeWithAnyTags is supplied, then no tests should be run since
-    # JSON Schema tests cannot be tagged.
-    if _tags_from_list(config.INCLUDE_WITH_ANY_TAGS):
-        return []
-
-    tests = []
-    for root in roots:
-        tests.extend(globstar.iglob(root))
-
-    return list(_filter_by_filename("JSON Schema Test", tests, include_files, exclude_files))
-
-def _filter_by_filename(kind, universe, include_files, exclude_files):
-    """
-    Filters out what tests to run solely by filename.
-
-    Returns either the set of files from 'universe' that are present in 'include_files', or the
-    set of files from 'universe' that aren't present in 'exclude_files', depending on which of
-    'include_files' and 'exclude_files' is non-empty.
-
-    An error is raised if both 'include_files' and 'exclude_files' are specified.
-    """
-
-    if not utils.is_string_list(include_files):
-        raise TypeError("include_files must be a list of strings")
-    elif not utils.is_string_list(exclude_files):
-        raise TypeError("exclude_files must be a list of strings")
-    elif include_files and exclude_files:
-        raise ValueError("Cannot specify both include_files and exclude_files")
-
-    universe = set(universe)
-    files = include_files if include_files else exclude_files
-
-    (verbatim, globbed) = _partition(files)
-    # Remove all matching files of 'verbatim' from 'universe'.
-    files_verbatim = _pop_all(kind, universe, verbatim)
-    files_globbed = set()
-
-    for file_pattern in globbed:
-        files_globbed.update(globstar.iglob(file_pattern))
-
-    # Remove all matching files of 'files_globbed' from 'universe' without checking whether
-    # the same file is expanded to multiple times. This implicitly takes an intersection
-    # between 'files_globbed' and 'universe'.
-    files_globbed = _pop_all(kind, universe, files_globbed, validate=False)
-
-    if include_files:
-        return files_verbatim | files_globbed
-
-    return universe
-
-
-def _partition(pathnames, normpath=True):
-    """
-    Splits 'pathnames' into two separate lists based on whether they
-    use a glob pattern.
-
-    Returns the pair (non-globbed pathnames, globbed pathnames).
-    """
-
-    verbatim = []
-    globbed = []
-
-    for pathname in pathnames:
-        if globstar.is_glob_pattern(pathname):
-            globbed.append(pathname)
-            continue
-
-        # Normalize 'pathname' so exact string comparison can be used later.
-        if normpath:
-            pathname = os.path.normpath(pathname)
-        verbatim.append(pathname)
-
-    return (verbatim, globbed)
-
-
-def _pop_all(kind, universe, iterable, validate=True):
-    """
-    Removes all elements of 'iterable' from 'universe' and returns them.
-
-    If 'validate' is true, then a ValueError is raised if a element
-    would be removed multiple times, or if an element of 'iterable' does
-    not appear in 'universe' at all.
-    """
-
-    members = set()
-
-    for elem in iterable:
-        if validate and elem in members:
-            raise ValueError("%s '%s' specified multiple times" % (kind, elem))
-
-        if elem in universe:
-            universe.remove(elem)
-            members.add(elem)
-        elif validate:
-            raise ValueError("Unrecognized %s '%s'" % (kind, elem))
-
-    return members
+    if test_kind not in _SELECTOR_REGISTRY:
+        raise ValueError("Unknown test kind '{}'".format(test_kind))
+    selector_config_class, selector_class = _SELECTOR_REGISTRY[test_kind]
+    selector = selector_class(test_file_explorer)
+    selector_config = selector_config_class(**selector_config)
+    return selector.select(selector_config)

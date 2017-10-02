@@ -58,7 +58,8 @@ const char* getModifierNameForOp(ArithmeticNode::ArithmeticOp op) {
 }
 }  // namespace
 
-Status ArithmeticNode::init(BSONElement modExpr, const CollatorInterface* collator) {
+Status ArithmeticNode::init(BSONElement modExpr,
+                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
     if (!modExpr.isNumber()) {

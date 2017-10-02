@@ -325,14 +325,12 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorStillUsableAfterTimeout)
     collScanParams.collection = readLock.getCollection();
     collScanParams.tailable = true;
     auto filter = BSON("a" << 1);
-    auto matchExpression =
-        uassertStatusOK(MatchExpressionParser::parse(filter, ctx()->getCollator()));
+    auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
-    queryRequest->setTailable(true);
-    queryRequest->setAwaitData(true);
+    queryRequest->setTailableMode(TailableMode::kTailableAndAwaitData);
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
     auto planExecutor =
@@ -344,7 +342,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorStillUsableAfterTimeout)
                                            PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT));
 
     // Make a DocumentSourceCursor.
-    ctx()->tailableMode = ExpressionContext::TailableMode::kTailableAndAwaitData;
+    ctx()->tailableMode = TailableMode::kTailableAndAwaitData;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
     auto cursor =
@@ -365,8 +363,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     CollectionScanParams collScanParams;
     collScanParams.collection = readLock.getCollection();
     auto filter = BSON("a" << 1);
-    auto matchExpression =
-        uassertStatusOK(MatchExpressionParser::parse(filter, ctx()->getCollator()));
+    auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
@@ -382,7 +379,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
                                            PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT));
 
     // Make a DocumentSourceCursor.
-    ctx()->tailableMode = ExpressionContext::TailableMode::kNormal;
+    ctx()->tailableMode = TailableMode::kNormal;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
     auto cursor =
@@ -406,12 +403,12 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     collScanParams.collection = readLock.getCollection();
     collScanParams.tailable = true;
     auto filter = BSON("a" << 1);
-    auto matchExpression =
-        uassertStatusOK(MatchExpressionParser::parse(filter, ctx()->getCollator()));
+    auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
+    queryRequest->setTailableMode(TailableMode::kTailableAndAwaitData);
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
     auto planExecutor =
@@ -423,7 +420,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
                                            PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED));
 
     // Make a DocumentSourceCursor.
-    ctx()->tailableMode = ExpressionContext::TailableMode::kTailableAndAwaitData;
+    ctx()->tailableMode = TailableMode::kTailableAndAwaitData;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
     auto cursor =
@@ -444,8 +441,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     CollectionScanParams collScanParams;
     collScanParams.collection = readLock.getCollection();
     auto filter = BSON("a" << 1);
-    auto matchExpression =
-        uassertStatusOK(MatchExpressionParser::parse(filter, ctx()->getCollator()));
+    auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
@@ -461,7 +457,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
                                            PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED));
 
     // Make a DocumentSourceCursor.
-    ctx()->tailableMode = ExpressionContext::TailableMode::kNormal;
+    ctx()->tailableMode = TailableMode::kNormal;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
     auto cursor =

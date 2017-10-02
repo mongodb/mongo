@@ -697,6 +697,10 @@ DBCollection.prototype.createIndex = function(keys, options) {
 };
 
 DBCollection.prototype.createIndexes = function(keys, options) {
+    if (!Array.isArray(keys)) {
+        throw new Error("createIndexes first argument should be an array");
+    }
+
     var indexSpecs = Array(keys.length);
     for (var i = 0; i < indexSpecs.length; i++) {
         indexSpecs[i] = this._indexSpec(keys[i], options);

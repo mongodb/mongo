@@ -63,7 +63,11 @@ void OpObserverNoop::onDelete(OperationContext*,
                               bool fromMigrate,
                               const boost::optional<BSONObj>& deletedDoc) {}
 
-void OpObserverNoop::onOpMessage(OperationContext*, const BSONObj&) {}
+void OpObserverNoop::onInternalOpMessage(OperationContext*,
+                                         const NamespaceString&,
+                                         const boost::optional<UUID>,
+                                         const BSONObj&,
+                                         const boost::optional<BSONObj>) {}
 
 void OpObserverNoop::onCreateCollection(OperationContext* opCtx,
                                         Collection* coll,

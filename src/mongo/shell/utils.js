@@ -39,7 +39,8 @@ function _getErrorWithCode(codeOrObj, message) {
 
 // Checks if a javascript exception is a network error.
 function isNetworkError(error) {
-    return error.message.indexOf("error doing query") >= 0 ||
+    return error.message.indexOf("network error") >= 0 ||
+        error.message.indexOf("error doing query") >= 0 ||
         error.message.indexOf("socket exception") >= 0;
 }
 
@@ -158,6 +159,18 @@ print.captureAllOutput = function(fn, args) {
     return res;
 };
 
+var indentStr = function(indent, s) {
+    if (typeof(s) === "undefined") {
+        s = indent;
+        indent = 0;
+    }
+    if (indent > 0) {
+        indent = (new Array(indent + 1)).join(" ");
+        s = indent + s.replace(/\n/g, "\n" + indent);
+    }
+    return s;
+};
+
 if (typeof TestData == "undefined") {
     TestData = undefined;
 }
@@ -203,6 +216,7 @@ jsTestOptions = function() {
             setParametersMongos: TestData.setParametersMongos,
             storageEngine: TestData.storageEngine,
             storageEngineCacheSizeGB: TestData.storageEngineCacheSizeGB,
+            transportLayer: TestData.transportLayer,
             wiredTigerEngineConfigString: TestData.wiredTigerEngineConfigString,
             wiredTigerCollectionConfigString: TestData.wiredTigerCollectionConfigString,
             wiredTigerIndexConfigString: TestData.wiredTigerIndexConfigString,
@@ -229,6 +243,7 @@ jsTestOptions = function() {
             mongosBinVersion: TestData.mongosBinVersion || "",
             shardMixedBinVersions: TestData.shardMixedBinVersions || false,
             networkMessageCompressors: TestData.networkMessageCompressors,
+            skipRetryOnNetworkError: TestData.skipRetryOnNetworkError,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
             // We default skipValidationOnNamespaceNotFound to true because mongod can end up
@@ -238,6 +253,8 @@ jsTestOptions = function() {
                 TestData.hasOwnProperty("skipValidationOnNamespaceNotFound")
                 ? TestData.skipValidationOnNamespaceNotFound
                 : true,
+            skipCheckingUUIDsConsistentAcrossCluster:
+                TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
         });

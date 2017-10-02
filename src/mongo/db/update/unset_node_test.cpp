@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -46,16 +47,16 @@ using mongo::mutablebson::countChildren;
 
 DEATH_TEST(UnsetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$unset: {}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    node.init(update["$unset"].embeddedObject().firstElement(), collator).transitional_ignore();
+    node.init(update["$unset"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
 DEATH_TEST_F(UnsetNodeTest, ApplyToRootFails, "Invariant failure !applyParams.pathTaken->empty()") {
     auto update = fromjson("{$unset: {}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"], collator));
+    ASSERT_OK(node.init(update["$unset"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     node.apply(getApplyParams(doc.root()));
@@ -63,17 +64,17 @@ DEATH_TEST_F(UnsetNodeTest, ApplyToRootFails, "Invariant failure !applyParams.pa
 
 TEST(UnsetNodeTest, InitSucceedsForNonemptyElement) {
     auto update = fromjson("{$unset: {a: 5}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a"], expCtx));
 }
 
 /* This is a no-op because we are unsetting a field that does not exit. */
 TEST_F(UnsetNodeTest, UnsetNoOp) {
     auto update = fromjson("{$unset: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{b: 5}"));
     setPathToCreate("a");
@@ -88,9 +89,9 @@ TEST_F(UnsetNodeTest, UnsetNoOp) {
 
 TEST_F(UnsetNodeTest, UnsetNoOpDottedPath) {
     auto update = fromjson("{$unset: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
@@ -106,9 +107,9 @@ TEST_F(UnsetNodeTest, UnsetNoOpDottedPath) {
 
 TEST_F(UnsetNodeTest, UnsetNoOpThroughArray) {
     auto update = fromjson("{$unset: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a:[{b:1}]}"));
     setPathToCreate("b");
@@ -124,9 +125,9 @@ TEST_F(UnsetNodeTest, UnsetNoOpThroughArray) {
 
 TEST_F(UnsetNodeTest, UnsetNoOpEmptyDoc) {
     auto update = fromjson("{$unset: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -141,9 +142,9 @@ TEST_F(UnsetNodeTest, UnsetNoOpEmptyDoc) {
 
 TEST_F(UnsetNodeTest, UnsetTopLevelPath) {
     auto update = fromjson("{$unset: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -158,9 +159,9 @@ TEST_F(UnsetNodeTest, UnsetTopLevelPath) {
 
 TEST_F(UnsetNodeTest, UnsetNestedPath) {
     auto update = fromjson("{$unset: {'a.b.c': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 6}}}}"));
     setPathTaken("a.b.c");
@@ -175,9 +176,9 @@ TEST_F(UnsetNodeTest, UnsetNestedPath) {
 
 TEST_F(UnsetNodeTest, UnsetObject) {
     auto update = fromjson("{$unset: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 6}}}}"));
     setPathTaken("a.b");
@@ -192,9 +193,9 @@ TEST_F(UnsetNodeTest, UnsetObject) {
 
 TEST_F(UnsetNodeTest, UnsetArrayElement) {
     auto update = fromjson("{$unset: {'a.0': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.0"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.0"], expCtx));
 
     mutablebson::Document doc(fromjson("{a:[1], b:1}"));
     setPathTaken("a.0");
@@ -209,9 +210,9 @@ TEST_F(UnsetNodeTest, UnsetArrayElement) {
 
 TEST_F(UnsetNodeTest, UnsetPositional) {
     auto update = fromjson("{$unset: {'a.$': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.$"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.$"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
     setPathTaken("a.1");
@@ -227,9 +228,9 @@ TEST_F(UnsetNodeTest, UnsetPositional) {
 
 TEST_F(UnsetNodeTest, UnsetEntireArray) {
     auto update = fromjson("{$unset: {'a': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
     setPathTaken("a");
@@ -244,9 +245,9 @@ TEST_F(UnsetNodeTest, UnsetEntireArray) {
 
 TEST_F(UnsetNodeTest, UnsetFromObjectInArray) {
     auto update = fromjson("{$unset: {'a.0.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.0.b"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.0.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 1}]}"));
     setPathTaken("a.0.b");
@@ -261,9 +262,9 @@ TEST_F(UnsetNodeTest, UnsetFromObjectInArray) {
 
 TEST_F(UnsetNodeTest, CanUnsetInvalidField) {
     auto update = fromjson("{$unset: {'a.$.$b': true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.$.$b"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.$.$b"], expCtx));
 
     mutablebson::Document doc(fromjson("{b: 1, a: [{$b: 1}]}"));
     setPathTaken("a.0.$b");
@@ -278,9 +279,9 @@ TEST_F(UnsetNodeTest, CanUnsetInvalidField) {
 
 TEST_F(UnsetNodeTest, ApplyNoIndexDataNoLogBuilder) {
     auto update = fromjson("{$unset: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -294,9 +295,9 @@ TEST_F(UnsetNodeTest, ApplyNoIndexDataNoLogBuilder) {
 
 TEST_F(UnsetNodeTest, ApplyDoesNotAffectIndexes) {
     auto update = fromjson("{$unset: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
@@ -311,9 +312,9 @@ TEST_F(UnsetNodeTest, ApplyDoesNotAffectIndexes) {
 
 TEST_F(UnsetNodeTest, ApplyFieldWithDot) {
     auto update = fromjson("{$unset: {'a.b': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{'a.b':4, a: {b: 2}}"));
     setPathTaken("a.b");
@@ -328,9 +329,9 @@ TEST_F(UnsetNodeTest, ApplyFieldWithDot) {
 
 TEST_F(UnsetNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
     auto update = fromjson("{$unset: {'a.$id': true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.$id"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.$id"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
     setPathTaken("a.$id");
@@ -342,9 +343,9 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
 
 TEST_F(UnsetNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {
     auto update = fromjson("{$unset: {'a.$id': true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.$id"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.$id"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
     setPathTaken("a.$id");
@@ -362,9 +363,9 @@ TEST_F(UnsetNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFal
 
 TEST_F(UnsetNodeTest, ApplyCannotRemoveImmutablePath) {
     auto update = fromjson("{$unset: {'a.b': true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.b"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a.b");
@@ -378,9 +379,9 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveImmutablePath) {
 
 TEST_F(UnsetNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
     auto update = fromjson("{$unset: {a: true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathTaken("a");
@@ -394,9 +395,9 @@ TEST_F(UnsetNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
 
 TEST_F(UnsetNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
     auto update = fromjson("{$unset: {'a.b.c': true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 1}}}"));
     setPathTaken("a.b.c");
@@ -410,9 +411,9 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
 
 TEST_F(UnsetNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
     auto update = fromjson("{$unset: {'a.b.c': true}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
-    ASSERT_OK(node.init(update["$unset"]["a.b.c"], collator));
+    ASSERT_OK(node.init(update["$unset"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
     setPathToCreate("c");

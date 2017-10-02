@@ -27,4 +27,10 @@
         // Automatically start the continuous stepdown thread on the config server replica set.
         this.startContinuousFailover();
     };
+
+    // The checkUUIDsConsistentAcrossCluster() function is defined on ShardingTest's prototype, but
+    // ShardingTest's prototype gets reset when ShardingTest is reassigned. We reload the override
+    // to redefine checkUUIDsConsistentAcrossCluster() on the new ShardingTest's prototype.
+    load('jstests/libs/override_methods/check_uuids_consistent_across_cluster.js');
+
 })();

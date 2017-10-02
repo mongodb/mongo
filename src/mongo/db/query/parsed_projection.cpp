@@ -46,7 +46,8 @@ using std::string;
  * Returns a Status indicating how it's invalid otherwise.
  */
 // static
-Status ParsedProjection::make(const BSONObj& spec,
+Status ParsedProjection::make(OperationContext* opCtx,
+                              const BSONObj& spec,
                               const MatchExpression* const query,
                               ParsedProjection** out) {
     // Whether we're including or excluding fields.
@@ -129,8 +130,10 @@ Status ParsedProjection::make(const BSONObj& spec,
                 // Match expression extensions such as $text, $where, $geoNear, $near, $nearSphere,
                 // and $expr are not allowed in $elemMatch projections.
                 const CollatorInterface* collator = nullptr;
+                boost::intrusive_ptr<ExpressionContext> expCtx(
+                    new ExpressionContext(opCtx, collator));
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, collator);
+                    MatchExpressionParser::parse(elemMatchObj, std::move(expCtx));
                 if (!statusWithMatcher.isOK()) {
                     return statusWithMatcher.getStatus();
                 }

@@ -96,6 +96,18 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool shutdown(Milliseconds timeout) override {
+        return true;
+    }
+
+    Stats sessionStats() const override {
+        return {};
+    }
+
+    size_t numOpenSessions() const override {
+        return 0ULL;
+    }
+
     void setReplyDelay(Milliseconds delay) {
         _replyDelay = delay;
     }

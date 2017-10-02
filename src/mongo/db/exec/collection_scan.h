@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+struct Record;
 class SeekableRecordCursor;
 class WorkingSet;
 class OperationContext;
@@ -67,6 +68,10 @@ public:
         return STAGE_COLLSCAN;
     }
 
+    Timestamp getLatestOplogTimestamp() const {
+        return _latestOplogEntryTimestamp;
+    }
+
     std::unique_ptr<PlanStageStats> getStats() final;
 
     const SpecificStats* getSpecificStats() const final;
@@ -79,6 +84,13 @@ private:
      * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
      */
     StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
+
+    /**
+     * Extracts the timestamp from the 'ts' field of 'record', and sets '_latestOplogEntryTimestamp'
+     * to that time if it isn't already greater.  Returns an error if the 'ts' field cannot be
+     * extracted.
+     */
+    Status setLatestOplogEntryTimestamp(const Record& record);
 
     // WorkingSet is not owned by us.
     WorkingSet* _workingSet;
@@ -98,6 +110,10 @@ private:
     // all fetch requests. This should only be used for passing up the Fetcher for a NEED_YIELD, and
     // should remain in the INVALID state.
     const WorkingSetID _wsidForFetch;
+
+    // If _params.shouldTrackLatestOplogTimestamp is set and the collection is the oplog, the latest
+    // timestamp seen in the collection.  Otherwise, this is a null timestamp.
+    Timestamp _latestOplogEntryTimestamp;
 
     // Stats
     CollectionScanStats _specificStats;

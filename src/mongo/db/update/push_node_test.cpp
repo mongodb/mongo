@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
@@ -47,123 +48,123 @@ using mongo::mutablebson::countChildren;
 
 TEST(PushNodeTest, EachClauseWithNonArrayObjectFails) {
     auto update = fromjson("{$push: {x: {$each: {'0': 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, EachClauseWithPrimitiveFails) {
     auto update = fromjson("{$push: {x: {$each: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, PositionClauseWithObjectFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $position: {a: 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, PositionClauseWithNonIntegerFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $position: -2.1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, PositionClauseWithIntegerDoubleSucceeds) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $position: -2.0}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_OK(status);
 }
 
 TEST(PushNodeTest, SliceClauseWithObjectFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: {a: 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, SliceClauseWithNonIntegerFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: -2.1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, SliceClauseWithIntegerDoubleSucceeds) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: 2.0}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["x"], collator));
+    ASSERT_OK(node.init(update["$push"]["x"], expCtx));
 }
 
 TEST(PushNodeTest, SliceClauseWithArrayFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: [1, 2]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, SliceClauseWithStringFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: '-1'}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, SortClauseWithArrayFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: [{a: 1}]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, SortClauseWithInvalidSortPatternFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {a: 100}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, SortClauseWithEmptyPathFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'': 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, SortClauseWithEmptyFieldNamesFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'.': 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -171,9 +172,9 @@ TEST(PushNodeTest, SortClauseWithEmptyFieldNamesFails) {
 TEST(PushNodeTest, SortClauseWithEmptyFieldSuffixFails) {
     auto update =
         fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'a.': 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -181,9 +182,9 @@ TEST(PushNodeTest, SortClauseWithEmptyFieldSuffixFails) {
 TEST(PushNodeTest, SortClauseWithEmptyFieldPrefixFails) {
     auto update =
         fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'.b': 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -191,27 +192,27 @@ TEST(PushNodeTest, SortClauseWithEmptyFieldPrefixFails) {
 TEST(PushNodeTest, SortClauseWithEmptyFieldInfixFails) {
     auto update =
         fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'a..b': 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, SortClauseWithEmptyObjectFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, PushEachWithInvalidClauseFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1}, {a: 2}], $xxx: -1, $sort: {a: 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -219,9 +220,9 @@ TEST(PushNodeTest, PushEachWithInvalidClauseFails) {
 TEST(PushNodeTest, PushEachWithDuplicateSortClauseFails) {
     auto update = fromjson(
         "{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {a: 1}, $sort: {a: 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -229,9 +230,9 @@ TEST(PushNodeTest, PushEachWithDuplicateSortClauseFails) {
 TEST(PushNodeTest, PushEachWithDuplicateSliceClauseFails) {
     auto update =
         fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $slice: -2, $sort: {a: 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
@@ -239,27 +240,27 @@ TEST(PushNodeTest, PushEachWithDuplicateSliceClauseFails) {
 TEST(PushNodeTest, PushEachWithDuplicateEachClauseFails) {
     auto update =
         fromjson("{$push: {x: {$each:[{a: 1}], $each:[{a: 2}], $slice: -3, $sort: {a: 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(PushNodeTest, PushEachWithDuplicatePositionClauseFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1}], $position: 1, $position: 2}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    auto status = node.init(update["$push"]["x"], collator);
+    auto status = node.init(update["$push"]["x"], expCtx);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST_F(PushNodeTest, ApplyToNonArrayFails) {
     auto update = fromjson("{$push: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: 1}"));
     setPathTaken("a");
@@ -273,9 +274,9 @@ TEST_F(PushNodeTest, ApplyToNonArrayFails) {
 
 TEST_F(PushNodeTest, ApplyToEmptyArray) {
     auto update = fromjson("{$push: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -290,9 +291,9 @@ TEST_F(PushNodeTest, ApplyToEmptyArray) {
 
 TEST_F(PushNodeTest, ApplyToEmptyDocument) {
     auto update = fromjson("{$push: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -307,9 +308,9 @@ TEST_F(PushNodeTest, ApplyToEmptyDocument) {
 
 TEST_F(PushNodeTest, ApplyToArrayWithOneElement) {
     auto update = fromjson("{$push: {a: 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -324,9 +325,9 @@ TEST_F(PushNodeTest, ApplyToArrayWithOneElement) {
 
 TEST_F(PushNodeTest, ApplyToDottedPathElement) {
     auto update = fromjson("{$push: {'choices.first.votes': 1}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["choices.first.votes"], collator));
+    ASSERT_OK(node.init(update["$push"]["choices.first.votes"], expCtx));
 
     mutablebson::Document doc(
         fromjson("{_id : 1 , "
@@ -352,9 +353,9 @@ TEST_F(PushNodeTest, ApplyToDottedPathElement) {
 
 TEST_F(PushNodeTest, ApplySimpleEachToEmptyArray) {
     auto update = fromjson("{$push: {a: {$each: [1]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -369,9 +370,9 @@ TEST_F(PushNodeTest, ApplySimpleEachToEmptyArray) {
 
 TEST_F(PushNodeTest, ApplySimpleEachToEmptyDocument) {
     auto update = fromjson("{$push: {a: {$each: [1]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -386,9 +387,9 @@ TEST_F(PushNodeTest, ApplySimpleEachToEmptyDocument) {
 
 TEST_F(PushNodeTest, ApplyMultipleEachToEmptyDocument) {
     auto update = fromjson("{$push: {a: {$each: [1, 2]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -403,9 +404,9 @@ TEST_F(PushNodeTest, ApplyMultipleEachToEmptyDocument) {
 
 TEST_F(PushNodeTest, ApplySimpleEachToArrayWithOneElement) {
     auto update = fromjson("{$push: {a: {$each: [1]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -420,9 +421,9 @@ TEST_F(PushNodeTest, ApplySimpleEachToArrayWithOneElement) {
 
 TEST_F(PushNodeTest, ApplyMultipleEachToArrayWithOneElement) {
     auto update = fromjson("{$push: {a: {$each: [1, 2]}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -437,9 +438,9 @@ TEST_F(PushNodeTest, ApplyMultipleEachToArrayWithOneElement) {
 
 TEST_F(PushNodeTest, ApplyEmptyEachToEmptyArray) {
     auto update = fromjson("{$push: {a: {$each: []}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -454,9 +455,9 @@ TEST_F(PushNodeTest, ApplyEmptyEachToEmptyArray) {
 
 TEST_F(PushNodeTest, ApplyEmptyEachToEmptyDocument) {
     auto update = fromjson("{$push: {a: {$each: []}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
@@ -471,9 +472,9 @@ TEST_F(PushNodeTest, ApplyEmptyEachToEmptyDocument) {
 
 TEST_F(PushNodeTest, ApplyEmptyEachToArrayWithOneElement) {
     auto update = fromjson("{$push: {a: {$each: []}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -488,9 +489,9 @@ TEST_F(PushNodeTest, ApplyEmptyEachToArrayWithOneElement) {
 
 TEST_F(PushNodeTest, ApplyToArrayWithSlice) {
     auto update = fromjson("{$push: {a: {$each: [2, -1], $slice: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [3]}"));
     setPathTaken("a");
@@ -505,9 +506,9 @@ TEST_F(PushNodeTest, ApplyToArrayWithSlice) {
 
 TEST_F(PushNodeTest, ApplyWithNumericSort) {
     auto update = fromjson("{$push: {a: {$each: [2, -1], $sort: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [3]}"));
     setPathTaken("a");
@@ -522,9 +523,9 @@ TEST_F(PushNodeTest, ApplyWithNumericSort) {
 
 TEST_F(PushNodeTest, ApplyWithReverseNumericSort) {
     auto update = fromjson("{$push: {a: {$each: [4, -1], $sort: -1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [3]}"));
     setPathTaken("a");
@@ -539,9 +540,9 @@ TEST_F(PushNodeTest, ApplyWithReverseNumericSort) {
 
 TEST_F(PushNodeTest, ApplyWithMixedSort) {
     auto update = fromjson("{$push: {a: {$each: [4, -1], $sort: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
     setPathTaken("a");
@@ -556,9 +557,9 @@ TEST_F(PushNodeTest, ApplyWithMixedSort) {
 
 TEST_F(PushNodeTest, ApplyWithReverseMixedSort) {
     auto update = fromjson("{$push: {a: {$each: [4, -1], $sort: -1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
     setPathTaken("a");
@@ -573,9 +574,9 @@ TEST_F(PushNodeTest, ApplyWithReverseMixedSort) {
 
 TEST_F(PushNodeTest, ApplyWithEmbeddedFieldSort) {
     auto update = fromjson("{$push: {a: {$each: [4, -1], $sort: {a: 1}}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [3, 't', {b: 1}, {a: 1}]}"));
     setPathTaken("a");
@@ -591,8 +592,10 @@ TEST_F(PushNodeTest, ApplyWithEmbeddedFieldSort) {
 TEST_F(PushNodeTest, ApplySortWithCollator) {
     auto update = fromjson("{$push: {a: {$each: ['ha'], $sort: 1}}}");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], &collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: ['dd', 'fc', 'gb']}"));
     setPathTaken("a");
@@ -607,9 +610,9 @@ TEST_F(PushNodeTest, ApplySortWithCollator) {
 
 TEST_F(PushNodeTest, ApplySortAfterSetCollator) {
     auto update = fromjson("{$push: {a: {$each: ['ha'], $sort: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: ['dd', 'fc', 'gb']}"));
     setPathTaken("a");
@@ -666,9 +669,9 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithSliceValues) {
     for (const auto& data : testDataList) {
         auto update = BSON(
             "$push" << BSON("a" << BSON("$each" << BSON_ARRAY(1) << "$slice" << data.sliceValue)));
-        const CollatorInterface* collator = nullptr;
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         PushNode node;
-        ASSERT_OK(node.init(update["$push"]["a"], collator));
+        ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
         mutablebson::Document doc(fromjson("{a: []}"));
         setPathTaken("a");
@@ -698,9 +701,9 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithSliceValues) {
     for (const auto& data : testDataList) {
         auto update = BSON(
             "$push" << BSON("a" << BSON("$each" << BSON_ARRAY(1) << "$slice" << data.sliceValue)));
-        const CollatorInterface* collator = nullptr;
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         PushNode node;
-        ASSERT_OK(node.init(update["$push"]["a"], collator));
+        ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
         mutablebson::Document doc(fromjson("{a: [2, 3]}"));
         setPathTaken("a");
@@ -799,9 +802,9 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithSortAndSliceValues) {
                                                      << data.sliceValue
                                                      << "$sort"
                                                      << data.sortOrder)));
-        const CollatorInterface* collator = nullptr;
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         PushNode node;
-        ASSERT_OK(node.init(update["$push"]["a"], collator));
+        ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
         mutablebson::Document doc(fromjson("{a: [{a: 2, b: 3}, {a: 3, b: 1}]}"));
         setPathTaken("a");
@@ -813,9 +816,9 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithSortAndSliceValues) {
 
 TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionZero) {
     auto update = fromjson("{$push: {a: {$each: [1], $position: 0}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -830,9 +833,9 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionZero) {
 
 TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionOne) {
     auto update = fromjson("{$push: {a: {$each: [1], $position: 1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -847,9 +850,9 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionOne) {
 
 TEST_F(PushNodeTest, ApplyToEmptyArrayWithLargePosition) {
     auto update = fromjson("{$push: {a: {$each: [1], $position: 1000}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -864,9 +867,9 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithLargePosition) {
 
 TEST_F(PushNodeTest, ApplyToSingletonArrayWithPositionZero) {
     auto update = fromjson("{$push: {a: {$each: [1], $position: 0}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -881,9 +884,9 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithPositionZero) {
 
 TEST_F(PushNodeTest, ApplyToSingletonArrayWithLargePosition) {
     auto update = fromjson("{$push: {a: {$each: [1], $position: 1000}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -898,9 +901,9 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithLargePosition) {
 
 TEST_F(PushNodeTest, ApplyToEmptyArrayWithNegativePosition) {
     auto update = fromjson("{$push: {a: {$each: [1], $position: -1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
@@ -915,9 +918,9 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithNegativePosition) {
 
 TEST_F(PushNodeTest, ApplyToSingletonArrayWithNegativePosition) {
     auto update = fromjson("{$push: {a: {$each: [1], $position: -1}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
@@ -932,9 +935,9 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithNegativePosition) {
 
 TEST_F(PushNodeTest, ApplyToPopulatedArrayWithNegativePosition) {
     auto update = fromjson("{$push: {a: {$each: [5], $position: -2}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
     setPathTaken("a");
@@ -949,9 +952,9 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithNegativePosition) {
 
 TEST_F(PushNodeTest, ApplyToPopulatedArrayWithOutOfBoundsNegativePosition) {
     auto update = fromjson("{$push: {a: {$each: [5], $position: -1000}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
     setPathTaken("a");
@@ -966,9 +969,9 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithOutOfBoundsNegativePosition) {
 
 TEST_F(PushNodeTest, ApplyMultipleElementsPushWithNegativePosition) {
     auto update = fromjson("{$push: {a: {$each: [5, 6, 7], $position: -2}}}");
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
-    ASSERT_OK(node.init(update["$push"]["a"], collator));
+    ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
     setPathTaken("a");

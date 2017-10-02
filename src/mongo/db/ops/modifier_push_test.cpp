@@ -42,6 +42,7 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
@@ -53,6 +54,7 @@ using mongo::BSONObj;
 using mongo::BSONObjBuilder;
 using mongo::BSONArrayBuilder;
 using mongo::CollatorInterfaceMock;
+using mongo::ExpressionContextForTest;
 using mongo::fromjson;
 using mongo::LogBuilder;
 using mongo::ModifierInterface;
@@ -165,8 +167,9 @@ void combineAndSortVec(const vector<BSONObj>& origVec,
 TEST(Init, SimplePush) {
     BSONObj modObj = fromjson("{$push: {x: 0}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 //
@@ -176,46 +179,52 @@ TEST(Init, SimplePush) {
 TEST(Init, PushEachNormal) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2]}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachMixed) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, {a: 2}]}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachObject) {
     // $each must be an array
     BSONObj modObj = fromjson("{$push: {x: {$each: {'0': 1}}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachSimpleType) {
     // $each must be an array.
     BSONObj modObj = fromjson("{$push: {x: {$each: 1}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachEmpty) {
     BSONObj modObj = fromjson("{$push: {x: {$each: []}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachInvalidType) {
     // $each must be an array.
     BSONObj modObj = fromjson("{$push: {x: {$each: {b: 1}}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 //
@@ -225,50 +234,57 @@ TEST(Init, PushEachInvalidType) {
 TEST(Init, PushEachWithSliceBottom) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: -3}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithSliceTop) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: 3}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithInvalidSliceObject) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: {a: 1}}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithInvalidSliceDouble) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: -2.1}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithValidSliceDouble) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: -2.0}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithUnsupportedFullSlice) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: [1,2]}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithWrongTypeSlice) {
     BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: '-1'}}}");
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 //
@@ -279,88 +295,99 @@ TEST(Init, PushEachWithObjectSort) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {a:1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithNumbericSort) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort:1 }}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithInvalidSortType) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: [{a:1}]}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachDuplicateSortPattern) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: [{a:1,a:1}]}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithInvalidSortValue) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {a:100}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithEmptySortField) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'':1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithEmptyDottedSortField) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'.':1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithMissingSortFieldSuffix) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'a.':1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithMissingSortFieldPreffix) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'.b':1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithMissingSortFieldMiddle) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'a..b':1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithEmptySort) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort:{} }}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 //
@@ -371,64 +398,72 @@ TEST(Init, PushEachWithSortMissingSlice) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $sort:{a:1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachInvalidClause) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $xxx: -1, $sort:{a:1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachExtraField) {
     const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {a:1}, b: 1}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachDuplicateSortClause) {
     const char* c = "{$push: {x:{$each:[{a:1},{a:2}], $slice:-2.0, $sort:{a:1}, $sort:{a:1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachDuplicateSliceClause) {
     const char* c = "{$push: {x: {$each:[{a:1},{a:2}], $slice:-2.0, $slice:-2, $sort:{a:1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachDuplicateEachClause) {
     const char* c = "{$push: {x: {$each:[{a:1}], $each:[{a:2}], $slice:-3, $sort:{a:1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
+                           ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithSliceFirst) {
     const char* c = "{$push: {x: {$slice: -2.0, $each: [{a:1},{a:2}], $sort: {a:1}}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 TEST(Init, PushEachWithSortFirst) {
     const char* c = "{$push: {x: {$sort: {a:1}, $slice: -2.0, $each: [{a:1},{a:2}]}}}";
     BSONObj modObj = fromjson(c);
     ModifierPush mod;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                       ModifierInterface::Options::normal()));
+                       ModifierInterface::Options::normal(expCtx)));
 }
 
 //
@@ -441,7 +476,8 @@ public:
     Mod() : _mod() {}
 
     explicit Mod(BSONObj modObj,
-                 ModifierInterface::Options options = ModifierInterface::Options::normal())
+                 ModifierInterface::Options options =
+                     ModifierInterface::Options::normal(new ExpressionContextForTest()))
         : _mod() {
         _modObj = modObj;
         StringData modName = modObj.firstElement().fieldName();
@@ -904,8 +940,10 @@ TEST(SortPushEach, MixedSortEmbeddedField) {
 TEST(SortPushEach, SortRespectsCollationFromOptions) {
     Document doc(fromjson("{a: ['dd', 'fc', 'gb'] }"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
     Mod pushMod(fromjson("{$push: {a: {$each: ['ha'], $sort: 1}}}"),
-                ModifierInterface::Options::normal(&collator));
+                ModifierInterface::Options::normal(expCtx));
     const BSONObj expectedObj = fromjson("{a: ['ha', 'gb', 'fc', 'dd']}");
 
     ModifierInterface::ExecInfo execInfo;
@@ -967,8 +1005,9 @@ public:
         _modObj =
             BSON("$push" << BSON("a" << BSON("$each" << arrBuilder.arr() << "$slice" << slice)));
 
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         ASSERT_OK(_mod.init(_modObj["$push"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+                            ModifierInterface::Options::normal(expCtx)));
     }
 
     /** Sets up the mod to be {$push: {a: {$each:[<Obj>,...], $slice:<slice>, $sort:<Obj>}}} */
@@ -982,8 +1021,9 @@ public:
             "$push" << BSON(
                 "a" << BSON("$each" << arrBuilder.arr() << "$slice" << slice << "$sort" << sort)));
 
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         ASSERT_OK(_mod.init(_modObj["$push"].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+                            ModifierInterface::Options::normal(expCtx)));
     }
 
     /** Returns an object {a: [<'vec's content>]} */
@@ -1190,6 +1230,8 @@ TEST_F(SlicedMod, ObjectArrayFromExisting) {
 // Push to position tests
 
 TEST(ToPosition, BadInputs) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
     const char* const bad[] = {
         "{$push: {a: { $each: [1], $position:'s'}}}",
         "{$push: {a: { $each: [1], $position:{}}}}",
@@ -1209,7 +1251,7 @@ TEST(ToPosition, BadInputs) {
         ModifierPush pushMod;
         BSONObj modObj = fromjson(bad[i]);
         ASSERT_NOT_OK(pushMod.init(modObj.firstElement().embeddedObject().firstElement(),
-                                   ModifierInterface::Options::normal()));
+                                   ModifierInterface::Options::normal(expCtx)));
         i++;
     }
 }

@@ -33,6 +33,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -76,6 +77,7 @@ constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
 constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
 constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
+constexpr StringData DocumentSourceChangeStream::kRetryNeededOpType;
 
 namespace {
 
@@ -95,10 +97,11 @@ const char* DocumentSourceOplogMatch::getSourceName() const {
 }
 
 DocumentSource::StageConstraints DocumentSourceOplogMatch::constraints() const {
-    StageConstraints constraints;
-    constraints.requiredPosition = PositionRequirement::kFirst;
-    constraints.isAllowedInsideFacetStage = false;
-    return constraints;
+    return {StreamType::kStreaming,
+            PositionRequirement::kFirst,
+            HostTypeRequirement::kAnyShard,
+            DiskUseRequirement::kNoDiskUse,
+            FacetRequirement::kNotAllowed};
 }
 
 /**
@@ -140,6 +143,14 @@ public:
         return "$changeStream";
     }
 
+    StageConstraints constraints() const final {
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
+    }
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         // This stage is created by the DocumentSourceChangeStream stage, so serializing it
         // here would result in it being created twice.
@@ -176,7 +187,9 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
     auto doc = nextInput.getDocument();
     const auto& kOperationTypeField = DocumentSourceChangeStream::kOperationTypeField;
     checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
-    if (doc[kOperationTypeField].getString() == DocumentSourceChangeStream::kInvalidateOpType) {
+    auto operationType = doc[kOperationTypeField].getString();
+    if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||
+        operationType == DocumentSourceChangeStream::kRetryNeededOpType) {
         // Pass the invalidation forward, so that it can be included in the results, or
         // filtered/transformed by further stages in the pipeline, then throw an exception
         // to close the cursor on the next call to getNext().
@@ -207,10 +220,18 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
                                 << "c"
                                 << OR(commandsOnTargetDb, renameDropTarget));
 
-    // 2) Normal CRUD ops on the target collection.
-    auto opMatch = BSON("ns" << target);
+    // 2.1) Normal CRUD ops on the target collection.
+    auto normalOpTypeMatch = BSON("op" << NE << "n");
 
-    // Match oplog entries after "start" and are either (1) supported commands or (2) CRUD ops,
+    // 2.2) A chunk gets migrated to a new shard that doesn't have any chunks.
+    auto chunkMigratedMatch = BSON("op"
+                                   << "n"
+                                   << "o2.type"
+                                   << "migrateChunkToNewShard");
+    // 2) Supported operations on the target namespace.
+    auto opMatch = BSON("ns" << target << OR(normalOpTypeMatch, chunkMigratedMatch));
+
+    // Match oplog entries after "start" and are either supported (1) commands or (2) operations,
     // excepting those tagged "fromMigrate".
     // Include the resume token, if resuming, so we can verify it was still present in the oplog.
     return BSON("$and" << BSON_ARRAY(BSON("ts" << (isResume ? GTE : GT) << startFrom)
@@ -220,6 +241,14 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(
+        ErrorCodes::InvalidOptions,
+        str::stream()
+            << "The featureCompatibilityVersion must be 3.6 to use the $changeStream stage. See "
+            << feature_compatibility_version::kDochubLink
+            << ".",
+        serverGlobalParams.featureCompatibility.version.load() !=
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
     // TODO: Add sharding support here (SERVER-29141).
     uassert(
         40470, "The $changeStream stage is not supported on sharded systems.", !expCtx->inMongos);
@@ -299,8 +328,9 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     Value ns = input[repl::OplogEntry::kNamespaceFieldName];
     checkValueType(ns, repl::OplogEntry::kNamespaceFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
-    if (!uuid.missing())
+    if (!uuid.missing()) {
         checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
+    }
     NamespaceString nss(ns.getString());
     Value id = input.getNestedField("o._id");
     // Non-replace updates have the _id in field "o2".
@@ -354,6 +384,13 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
             documentId = Value();
             break;
         }
+        case repl::OpTypeEnum::kNoop: {
+            operationType = kRetryNeededOpType;
+            // Generate a fake document Id for RetryNeeded operation so that we can resume after
+            // this operation.
+            documentId = input[repl::OplogEntry::kObject2FieldName];
+            break;
+        }
         default: { MONGO_UNREACHABLE; }
     }
 
@@ -371,13 +408,13 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
                          {kDocumentKeyField, documentKey}};
     doc.addField(kIdField, Value(resumeToken));
     doc.addField(kOperationTypeField, Value(operationType));
-    doc.addField(kFullDocumentField, fullDocument);
 
-    // "invalidate" entry has fewer fields.
-    if (opType == repl::OpTypeEnum::kCommand) {
+    // "invalidate" and "retryNeeded" entries have fewer fields.
+    if (opType == repl::OpTypeEnum::kCommand || opType == repl::OpTypeEnum::kNoop) {
         return doc.freeze();
     }
 
+    doc.addField(kFullDocumentField, fullDocument);
     doc.addField(kNamespaceField, Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
     doc.addField(kDocumentKeyField, documentKey);
 

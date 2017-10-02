@@ -32,8 +32,8 @@
 
     // Start a w:2 write that will block until replication is resumed.
     var waitForReplStart = startParallelShell(function() {
-        printjson(assert.writeOK(
-            db.getCollection('side').insert({}, {writeConcern: {w: 2, wtimeout: 30 * 60 * 1000}})));
+        printjson(assert.writeOK(db.getCollection('side').insert(
+            {}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}})));
     }, primary.host.split(':')[1]);
 
     // Insert a lot of data in increasing order to test.coll.

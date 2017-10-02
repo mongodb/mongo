@@ -249,7 +249,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     qr->setMin(minObj);
     qr->setMax(maxObj);
     qr->setSnapshot(snapshot);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
                                      std::move(qr),
@@ -333,7 +333,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     qr->setMin(minObj);
     qr->setMax(maxObj);
     qr->setSnapshot(snapshot);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
                                      std::move(qr),
@@ -359,7 +359,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     std::unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
                                      std::move(qr),
@@ -385,7 +385,7 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     std::unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
                                      std::move(qr),
@@ -472,7 +472,9 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
 
 std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(
     const BSONObj& obj, const CollatorInterface* collator) {
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(collator);
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, std::move(expCtx));
     if (!status.isOK()) {
         FAIL(str::stream() << "failed to parse query: " << obj.toString() << ". Reason: "
                            << status.getStatus().toString());

@@ -60,7 +60,7 @@ public:
     //
     // This is also the initial term for nodes that were recently started up but have not
     // yet joined the cluster, all in protocol version 1.
-    static const long long kInitialTerm = 0;
+    static const long long kInitialTerm;
 
     /**
      * Returns maximum OpTime value.

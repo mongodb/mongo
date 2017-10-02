@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {
+ShardLocal::ShardLocal(const ShardId& id) : Shard(id), _rsLocalClient() {
     // Currently ShardLocal only works for config servers. If we ever start using ShardLocal on
     // shards we'll need to consider how to handle shards.
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
@@ -92,55 +92,12 @@ bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
     }
 }
 
-void ShardLocal::_updateLastOpTimeFromClient(OperationContext* opCtx,
-                                             const repl::OpTime& previousOpTimeOnClient) {
-    repl::OpTime lastOpTimeFromClient =
-        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    invariant(lastOpTimeFromClient >= previousOpTimeOnClient);
-    if (lastOpTimeFromClient.isNull() || lastOpTimeFromClient == previousOpTimeOnClient) {
-        return;
-    }
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (lastOpTimeFromClient >= _lastOpTime) {
-        // It's always possible for lastOpTimeFromClient to be less than _lastOpTime if another
-        // thread started and completed a write through this ShardLocal (updating _lastOpTime)
-        // after this operation had completed its write but before it got here.
-        _lastOpTime = lastOpTimeFromClient;
-    }
-}
-
-repl::OpTime ShardLocal::_getLastOpTime() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _lastOpTime;
-}
-
 StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opCtx,
                                                            const ReadPreferenceSetting& unused,
                                                            const std::string& dbName,
                                                            Milliseconds maxTimeMSOverrideUnused,
                                                            const BSONObj& cmdObj) {
-    repl::OpTime currentOpTimeFromClient =
-        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    ON_BLOCK_EXIT([this, &opCtx, &currentOpTimeFromClient] {
-        _updateLastOpTimeFromClient(opCtx, currentOpTimeFromClient);
-    });
-
-    try {
-        DBDirectClient client(opCtx);
-
-        rpc::UniqueReply commandResponse =
-            client.runCommand(OpMsgRequest::fromDBAndBody(dbName, cmdObj));
-
-        auto result = commandResponse->getCommandReply().getOwned();
-        return Shard::CommandResponse(boost::none,
-                                      result,
-                                      commandResponse->getMetadata().getOwned(),
-                                      getStatusFromCommandResult(result),
-                                      getWriteConcernStatusFromCommandResult(result));
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
+    return _rsLocalClient.runCommandOnce(opCtx, dbName, cmdObj);
 }
 
 StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
@@ -151,57 +108,7 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-
-    if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
-        // Set up operation context with majority read snapshot so correct optime can be retrieved.
-        Status status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-
-        // Wait for any writes performed by this ShardLocal instance to be committed and visible.
-        Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
-            opCtx, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
-        if (!readConcernStatus.isOK()) {
-            return readConcernStatus;
-        }
-
-        // Inform the storage engine to read from the committed snapshot for the rest of this
-        // operation.
-        status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-        if (!status.isOK()) {
-            return status;
-        }
-    } else {
-        invariant(readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
-    }
-
-    DBDirectClient client(opCtx);
-    Query fullQuery(query);
-    if (!sort.isEmpty()) {
-        fullQuery.sort(sort);
-    }
-    fullQuery.readPref(readPref.pref, BSONArray());
-
-    try {
-        std::unique_ptr<DBClientCursor> cursor =
-            client.query(nss.ns().c_str(), fullQuery, limit.get_value_or(0));
-
-        if (!cursor) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to establish a cursor for reading " << nss.ns()
-                                  << " from local storage"};
-        }
-
-        std::vector<BSONObj> documentVector;
-        while (cursor->more()) {
-            BSONObj document = cursor->nextSafe().getOwned();
-            documentVector.push_back(std::move(document));
-        }
-
-        return Shard::QueryResponse{std::move(documentVector),
-                                    replCoord->getCurrentCommittedSnapshotOpTime()};
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
+    return _rsLocalClient.queryOnce(opCtx, readPref, readConcernLevel, nss, query, sort, limit);
 }
 
 Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,

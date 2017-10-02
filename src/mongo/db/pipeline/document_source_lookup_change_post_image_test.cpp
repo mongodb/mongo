@@ -52,7 +52,27 @@ using std::deque;
 using std::vector;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
-using DocumentSourceLookupChangePostImageTest = AggregationContextFixture;
+class DocumentSourceLookupChangePostImageTest : public AggregationContextFixture {
+public:
+    /**
+     * This method is required to avoid a static initialization fiasco resulting from calling
+     * UUID::gen() in file static scope.
+     */
+    static const UUID& testUuid() {
+        static const UUID* uuid_gen = new UUID(UUID::gen());
+        return *uuid_gen;
+    }
+
+    Document makeResumeToken(ImplicitValue id = Value()) {
+        const Timestamp ts(100, 1);
+        if (id.missing()) {
+            return {{"clusterTime", Document{{"ts", ts}}}, {"uuid", testUuid()}};
+        }
+        return {{"clusterTime", Document{{"ts", ts}}},
+                {"uuid", testUuid()},
+                {"documentKey", Document{{"_id", id}}}};
+    }
+};
 
 /**
  * A mock MongodInterface which allows mocking a foreign pipeline.
@@ -68,16 +88,28 @@ public:
 
     StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const MakePipelineOptions opts) final {
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
         if (!pipeline.isOK()) {
             return pipeline.getStatus();
         }
 
-        pipeline.getValue()->addInitialSource(DocumentSourceMock::create(_mockResults));
-        pipeline.getValue()->optimizePipeline();
+        if (opts.optimize) {
+            pipeline.getValue()->optimizePipeline();
+        }
+
+        if (opts.attachCursorSource) {
+            uassertStatusOK(attachCursorSourceToPipeline(expCtx, pipeline.getValue().get()));
+        }
 
         return pipeline;
+    }
+
+    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        Pipeline* pipeline) final {
+        pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
+        return Status::OK();
     }
 
 private:
@@ -92,7 +124,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyO
 
     // Mock its input with a document without a "documentKey" field.
     auto mockLocalSource = DocumentSourceMock::create(
-        Document{{"operationType", "update"_sd},
+        Document{{"_id", makeResumeToken(0)},
+                 {"operationType", "update"_sd},
                  {"fullDocument", Document{{"_id", 0}}},
                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}});
 
@@ -113,7 +146,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationTyp
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource = DocumentSourceMock::create(
-        Document{{"documentKey", Document{{"_id", 0}}},
+        Document{{"_id", makeResumeToken(0)},
+                 {"documentKey", Document{{"_id", 0}}},
                  {"fullDocument", Document{{"_id", 0}}},
                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}});
 
@@ -134,7 +168,9 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource = DocumentSourceMock::create(Document{
-        {"documentKey", Document{{"_id", 0}}}, {"operationType", "update"_sd},
+        {"_id", makeResumeToken(0)},
+        {"documentKey", Document{{"_id", 0}}},
+        {"operationType", "update"_sd},
     });
 
     lookupChangeStage->setSource(mockLocalSource.get());
@@ -153,8 +189,11 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::create(
-        Document{{"documentKey", Document{{"_id", 0}}}, {"operationType", "update"_sd}, {"ns", 4}});
+    auto mockLocalSource =
+        DocumentSourceMock::create(Document{{"_id", makeResumeToken(0)},
+                                            {"documentKey", Document{{"_id", 0}}},
+                                            {"operationType", "update"_sd},
+                                            {"ns", 4}});
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -173,7 +212,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatch
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource = DocumentSourceMock::create(
-        Document{{"documentKey", Document{{"_id", 0}}},
+        Document{{"_id", makeResumeToken(0)},
+                 {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
                  {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", expCtx->ns.coll()}}}});
 
@@ -194,7 +234,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
 
     // Mock its input with an update document.
     auto mockLocalSource = DocumentSourceMock::create(
-        Document{{"documentKey", Document{{"_id", 0}}},
+        Document{{"_id", makeResumeToken(0)},
+                 {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}});
 
@@ -217,12 +258,14 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
 
     // Mock its input, pausing every other result.
     auto mockLocalSource = DocumentSourceMock::create(
-        {Document{{"documentKey", Document{{"_id", 0}}},
+        {Document{{"_id", makeResumeToken(0)},
+                  {"documentKey", Document{{"_id", 0}}},
                   {"operationType", "insert"_sd},
                   {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
                   {"fullDocument", Document{{"_id", 0}}}},
          DocumentSource::GetNextResult::makePauseExecution(),
-         Document{{"documentKey", Document{{"_id", 1}}},
+         Document{{"_id", makeResumeToken(1)},
+                  {"documentKey", Document{{"_id", 1}}},
                   {"operationType", "update"_sd},
                   {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
          DocumentSource::GetNextResult::makePauseExecution()});
@@ -239,7 +282,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(
         next.releaseDocument(),
-        (Document{{"documentKey", Document{{"_id", 0}}},
+        (Document{{"_id", makeResumeToken(0)},
+                  {"documentKey", Document{{"_id", 0}}},
                   {"operationType", "insert"_sd},
                   {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
                   {"fullDocument", Document{{"_id", 0}}}}));
@@ -250,7 +294,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(
         next.releaseDocument(),
-        (Document{{"documentKey", Document{{"_id", 1}}},
+        (Document{{"_id", makeResumeToken(1)},
+                  {"documentKey", Document{{"_id", 1}}},
                   {"operationType", "update"_sd},
                   {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
                   {"fullDocument", Document{{"_id", 1}}}}));

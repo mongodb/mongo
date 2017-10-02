@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/death_test.h"
@@ -47,12 +48,12 @@ using std::string;
 TEST(MatchExpressionParserLeafTest, NullCollation) {
     BSONObj query = BSON("x"
                          << "string");
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == collator);
+    ASSERT_TRUE(match->getCollator() == nullptr);
 }
 
 
@@ -60,7 +61,9 @@ TEST(MatchExpressionParserLeafTest, Collation) {
     BSONObj query = BSON("x"
                          << "string");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
@@ -69,8 +72,8 @@ TEST(MatchExpressionParserLeafTest, Collation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
     BSONObj query = BSON("x" << BSON("$eq" << 2));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -80,20 +83,20 @@ TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
 
 TEST(MatchExpressionParserLeafTest, SimpleEQUndefined) {
     BSONObj query = BSON("x" << BSON("$eq" << BSONUndefined));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, EQNullCollation) {
     BSONObj query = BSON("x" << BSON("$eq"
                                      << "string"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == collator);
+    ASSERT_TRUE(match->getCollator() == nullptr);
 }
 
 
@@ -101,7 +104,9 @@ TEST(MatchExpressionParserLeafTest, EQCollation) {
     BSONObj query = BSON("x" << BSON("$eq"
                                      << "string"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
@@ -110,8 +115,8 @@ TEST(MatchExpressionParserLeafTest, EQCollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleGT1) {
     BSONObj query = BSON("x" << BSON("$gt" << 2));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -121,12 +126,12 @@ TEST(MatchExpressionParserLeafTest, SimpleGT1) {
 TEST(MatchExpressionParserLeafTest, GTNullCollation) {
     BSONObj query = BSON("x" << BSON("$gt"
                                      << "abc"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GT, result.getValue()->matchType());
     GTMatchExpression* match = static_cast<GTMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == collator);
+    ASSERT_TRUE(match->getCollator() == nullptr);
 }
 
 
@@ -134,7 +139,9 @@ TEST(MatchExpressionParserLeafTest, GTCollation) {
     BSONObj query = BSON("x" << BSON("$gt"
                                      << "abc"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GT, result.getValue()->matchType());
     GTMatchExpression* match = static_cast<GTMatchExpression*>(result.getValue().get());
@@ -143,8 +150,8 @@ TEST(MatchExpressionParserLeafTest, GTCollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleLT1) {
     BSONObj query = BSON("x" << BSON("$lt" << 2));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -155,12 +162,12 @@ TEST(MatchExpressionParserLeafTest, SimpleLT1) {
 TEST(MatchExpressionParserLeafTest, LTNullCollation) {
     BSONObj query = BSON("x" << BSON("$lt"
                                      << "abc"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LT, result.getValue()->matchType());
     LTMatchExpression* match = static_cast<LTMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == collator);
+    ASSERT_TRUE(match->getCollator() == nullptr);
 }
 
 
@@ -168,7 +175,9 @@ TEST(MatchExpressionParserLeafTest, LTCollation) {
     BSONObj query = BSON("x" << BSON("$lt"
                                      << "abc"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LT, result.getValue()->matchType());
     LTMatchExpression* match = static_cast<LTMatchExpression*>(result.getValue().get());
@@ -177,8 +186,8 @@ TEST(MatchExpressionParserLeafTest, LTCollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
     BSONObj query = BSON("x" << BSON("$gte" << 2));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -189,12 +198,12 @@ TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
 TEST(MatchExpressionParserLeafTest, GTENullCollation) {
     BSONObj query = BSON("x" << BSON("$gte"
                                      << "abc"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GTE, result.getValue()->matchType());
     GTEMatchExpression* match = static_cast<GTEMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == collator);
+    ASSERT_TRUE(match->getCollator() == nullptr);
 }
 
 
@@ -202,7 +211,9 @@ TEST(MatchExpressionParserLeafTest, GTECollation) {
     BSONObj query = BSON("x" << BSON("$gte"
                                      << "abc"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::GTE, result.getValue()->matchType());
     GTEMatchExpression* match = static_cast<GTEMatchExpression*>(result.getValue().get());
@@ -211,8 +222,8 @@ TEST(MatchExpressionParserLeafTest, GTECollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
     BSONObj query = BSON("x" << BSON("$lte" << 2));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -223,12 +234,12 @@ TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
 TEST(MatchExpressionParserLeafTest, LTENullCollation) {
     BSONObj query = BSON("x" << BSON("$lte"
                                      << "abc"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LTE, result.getValue()->matchType());
     LTEMatchExpression* match = static_cast<LTEMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == collator);
+    ASSERT_TRUE(match->getCollator() == nullptr);
 }
 
 
@@ -236,7 +247,9 @@ TEST(MatchExpressionParserLeafTest, LTECollation) {
     BSONObj query = BSON("x" << BSON("$lte"
                                      << "abc"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::LTE, result.getValue()->matchType());
     LTEMatchExpression* match = static_cast<LTEMatchExpression*>(result.getValue().get());
@@ -245,8 +258,8 @@ TEST(MatchExpressionParserLeafTest, LTECollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleNE1) {
     BSONObj query = BSON("x" << BSON("$ne" << 2));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -257,14 +270,14 @@ TEST(MatchExpressionParserLeafTest, SimpleNE1) {
 TEST(MatchExpressionParserLeafTest, NENullCollation) {
     BSONObj query = BSON("x" << BSON("$ne"
                                      << "string"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::EQ, child->matchType());
     EqualityMatchExpression* eqMatch = static_cast<EqualityMatchExpression*>(child);
-    ASSERT_TRUE(eqMatch->getCollator() == collator);
+    ASSERT_TRUE(eqMatch->getCollator() == nullptr);
 }
 
 
@@ -272,7 +285,9 @@ TEST(MatchExpressionParserLeafTest, NECollation) {
     BSONObj query = BSON("x" << BSON("$ne"
                                      << "string"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
@@ -283,35 +298,35 @@ TEST(MatchExpressionParserLeafTest, NECollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleModBad1) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << BSON_ARRAY(3)));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2 << 4)));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << BSON_ARRAY("q" << 2)));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << 3));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$mod" << BSON("a" << 1 << "b" << 2)));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleMod1) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5)));
@@ -321,8 +336,8 @@ TEST(MatchExpressionParserLeafTest, SimpleMod1) {
 
 TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(2 << "r")));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -335,19 +350,21 @@ TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
 TEST(MatchExpressionParserLeafTest, IdCollation) {
     BSONObj query = BSON("$id"
                          << "string");
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == collator);
+    ASSERT_TRUE(match->getCollator() == nullptr);
 }
 
 TEST(MatchExpressionParserLeafTest, IdNullCollation) {
     BSONObj query = BSON("$id"
                          << "string");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
@@ -358,7 +375,9 @@ TEST(MatchExpressionParserLeafTest, RefCollation) {
     BSONObj query = BSON("$ref"
                          << "coll");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
@@ -369,7 +388,9 @@ TEST(MatchExpressionParserLeafTest, DbCollation) {
     BSONObj query = BSON("$db"
                          << "db");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::EQ, result.getValue()->matchType());
     EqualityMatchExpression* match = static_cast<EqualityMatchExpression*>(result.getValue().get());
@@ -378,8 +399,8 @@ TEST(MatchExpressionParserLeafTest, DbCollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleIN1) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(2 << 3)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -389,18 +410,20 @@ TEST(MatchExpressionParserLeafTest, SimpleIN1) {
 
 TEST(MatchExpressionParserLeafTest, INNullCollation) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY("string")));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::MATCH_IN, result.getValue()->matchType());
     InMatchExpression* match = static_cast<InMatchExpression*>(result.getValue().get());
-    ASSERT_TRUE(match->getCollator() == collator);
+    ASSERT_TRUE(match->getCollator() == nullptr);
 }
 
 TEST(MatchExpressionParserLeafTest, INCollation) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY("string")));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::MATCH_IN, result.getValue()->matchType());
     InMatchExpression* match = static_cast<InMatchExpression*>(result.getValue().get());
@@ -415,8 +438,8 @@ TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
                                                               << oid
                                                               << "$db"
                                                               << "db"))));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
@@ -497,8 +520,8 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
                                                                  << oid
                                                                  << "$db"
                                                                  << "db"))));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
@@ -638,8 +661,8 @@ TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
                                                               << oid
                                                               << "foo"
                                                               << 12345))));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
@@ -673,23 +696,23 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
     // missing $id
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
                                                               << "coll"))));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
-    result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    result = MatchExpressionParser::parse(query, expCtx);
 
     // second field is not $id
     query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
                                                       << "coll"
                                                       << "$foo"
                                                       << 1))));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     OID oid = OID::gen();
 
     // missing $ref field
     query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$id" << oid << "foo" << 3))));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     // missing $id and $ref field
@@ -697,35 +720,35 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
                                                       << "test"
                                                       << "foo"
                                                       << 3))));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INExpressionDocument) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$foo" << 1))));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INNotArray) {
     BSONObj query = BSON("x" << BSON("$in" << 5));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INUndefined) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSONUndefined)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INNotElemMatch) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$elemMatch" << 1))));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
@@ -736,16 +759,16 @@ TEST(MatchExpressionParserLeafTest, INRegexTooLong) {
     BSONObjBuilder operand;
     operand.appendArray("$in", inArray.obj());
     BSONObj query = BSON("x" << operand.obj());
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, INRegexTooLong2) {
     string tooLargePattern(50 * 1000, 'z');
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$regex" << tooLargePattern))));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
@@ -758,8 +781,8 @@ TEST(MatchExpressionParserLeafTest, INRegexStuff) {
     operand.appendArray("$in", inArray.obj());
 
     BSONObj query = BSON("a" << operand.obj());
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     BSONObj matchFirst = BSON("a"
@@ -784,8 +807,8 @@ TEST(MatchExpressionParserLeafTest, INRegexStuff) {
 
 TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
     BSONObj query = BSON("x" << BSON("$nin" << BSON_ARRAY(2 << 3)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
@@ -795,27 +818,29 @@ TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
 
 TEST(MatchExpressionParserLeafTest, NINNotArray) {
     BSONObj query = BSON("x" << BSON("$nin" << 5));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, NINNullCollation) {
     BSONObj query = BSON("x" << BSON("$nin" << BSON_ARRAY("string")));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::MATCH_IN, child->matchType());
     InMatchExpression* inMatch = static_cast<InMatchExpression*>(child);
-    ASSERT_TRUE(inMatch->getCollator() == collator);
+    ASSERT_TRUE(inMatch->getCollator() == nullptr);
 }
 
 TEST(MatchExpressionParserLeafTest, NINCollation) {
     BSONObj query = BSON("x" << BSON("$nin" << BSON_ARRAY("string")));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, &collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->setCollator(&collator);
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(MatchExpression::NOT, result.getValue()->matchType());
     MatchExpression* child = result.getValue()->getChild(0);
@@ -828,8 +853,8 @@ TEST(MatchExpressionParserLeafTest, Regex1) {
     BSONObjBuilder b;
     b.appendRegex("x", "abc", "i");
     BSONObj query = b.obj();
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
@@ -845,8 +870,8 @@ TEST(MatchExpressionParserLeafTest, Regex2) {
                                      << "abc"
                                      << "$options"
                                      << "i"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
@@ -862,8 +887,8 @@ TEST(MatchExpressionParserLeafTest, Regex3) {
                                      << "i"
                                      << "$regex"
                                      << "abc"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
@@ -880,35 +905,35 @@ TEST(MatchExpressionParserLeafTest, RegexBad) {
                                      << "abc"
                                      << "$optionas"
                                      << "i"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     // $regex does not with numbers
     query = BSON("x" << BSON("$regex" << 123));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$regex" << BSON_ARRAY("abc")));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$optionas"
                              << "i"));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     query = BSON("x" << BSON("$options"
                              << "i"));
-    result = MatchExpressionParser::parse(query, collator);
+    result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, RegexEmbeddedNULByte) {
     BSONObj query = BSON("x" << BSON("$regex"
                                      << "^a\\x00b"));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     const auto value = "a\0b"_sd;
@@ -921,8 +946,8 @@ TEST(MatchExpressionParserLeafTest, ExistsYes1) {
     BSONObjBuilder b;
     b.appendBool("$exists", true);
     BSONObj query = BSON("x" << b.obj());
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
@@ -935,8 +960,8 @@ TEST(MatchExpressionParserLeafTest, ExistsNO1) {
     BSONObjBuilder b;
     b.appendBool("$exists", false);
     BSONObj query = BSON("x" << b.obj());
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x"
@@ -947,8 +972,8 @@ TEST(MatchExpressionParserLeafTest, ExistsNO1) {
 
 TEST(MatchExpressionParserLeafTest, Type1) {
     BSONObj query = BSON("x" << BSON("$type" << String));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
@@ -958,8 +983,8 @@ TEST(MatchExpressionParserLeafTest, Type1) {
 
 TEST(MatchExpressionParserLeafTest, Type2) {
     BSONObj query = BSON("x" << BSON("$type" << (double)NumberDouble));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5.3)));
@@ -968,8 +993,8 @@ TEST(MatchExpressionParserLeafTest, Type2) {
 
 TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
     BSONObj query = BSON("x" << BSON("$type" << 1.5));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5.3)));
@@ -978,8 +1003,8 @@ TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
 
 TEST(MatchExpressionParserLeafTest, TypeDecimalOperator) {
     BSONObj query = BSON("x" << BSON("$type" << mongo::NumberDecimal));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT_FALSE(result.getValue()->matchesBSON(BSON("x" << 5.3)));
@@ -988,8 +1013,8 @@ TEST(MatchExpressionParserLeafTest, TypeDecimalOperator) {
 
 TEST(MatchExpressionParserLeafTest, TypeNull) {
     BSONObj query = BSON("x" << BSON("$type" << jstNULL));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
     ASSERT(!result.getValue()->matchesBSON(BSONObj()));
@@ -1003,36 +1028,33 @@ TEST(MatchExpressionParserLeafTest, TypeBadType) {
     BSONObjBuilder b;
     b.append("$type", (JSTypeMax + 1));
     BSONObj query = BSON("x" << b.obj());
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeBad) {
     BSONObj query = BSON("x" << BSON("$type" << BSON("x" << 1)));
-    const CollatorInterface* collator = nullptr;
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, collator);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeBadString) {
-    const CollatorInterface* collator = nullptr;
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$type: null}}"), collator).getStatus());
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$type: true}}"), collator).getStatus());
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$type: {}}}}"), collator).getStatus());
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: null}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: true}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: {}}}}"), expCtx).getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      fromjson("{a: {$type: ObjectId('000000000000000000000000')}}"), collator)
+                      fromjson("{a: {$type: ObjectId('000000000000000000000000')}}"), expCtx)
                       .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: []}}"), collator).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: []}}"), expCtx).getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumberDouble =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'double'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'double'}}"), expCtx);
     ASSERT_OK(typeNumberDouble.getStatus());
     TypeMatchExpression* tmeNumberDouble =
         static_cast<TypeMatchExpression*>(typeNumberDouble.getValue().get());
@@ -1044,9 +1066,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringNameNumberDecimal) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumberDecimal =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'decimal'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'decimal'}}"), expCtx);
     ASSERT_OK(typeNumberDecimal.getStatus());
     TypeMatchExpression* tmeNumberDecimal =
         static_cast<TypeMatchExpression*>(typeNumberDecimal.getValue().get());
@@ -1058,9 +1080,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringNameNumberDecimal) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumberInt =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'int'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'int'}}"), expCtx);
     ASSERT_OK(typeNumberInt.getStatus());
     TypeMatchExpression* tmeNumberInt =
         static_cast<TypeMatchExpression*>(typeNumberInt.getValue().get());
@@ -1072,9 +1094,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumberLong =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'long'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'long'}}"), expCtx);
     ASSERT_OK(typeNumberLong.getStatus());
     TypeMatchExpression* tmeNumberLong =
         static_cast<TypeMatchExpression*>(typeNumberLong.getValue().get());
@@ -1086,9 +1108,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeString =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'string'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'string'}}"), expCtx);
     ASSERT_OK(typeString.getStatus());
     TypeMatchExpression* tmeString = static_cast<TypeMatchExpression*>(typeString.getValue().get());
     ASSERT_FALSE(tmeString->typeSet().allNumbers);
@@ -1099,9 +1121,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typejstOID =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'objectId'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'objectId'}}"), expCtx);
     ASSERT_OK(typejstOID.getStatus());
     TypeMatchExpression* tmejstOID = static_cast<TypeMatchExpression*>(typejstOID.getValue().get());
     ASSERT_FALSE(tmejstOID->typeSet().allNumbers);
@@ -1112,9 +1134,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typejstNULL =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'null'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'null'}}"), expCtx);
     ASSERT_OK(typejstNULL.getStatus());
     TypeMatchExpression* tmejstNULL =
         static_cast<TypeMatchExpression*>(typejstNULL.getValue().get());
@@ -1126,9 +1148,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeBool =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'bool'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'bool'}}"), expCtx);
     ASSERT_OK(typeBool.getStatus());
     TypeMatchExpression* tmeBool = static_cast<TypeMatchExpression*>(typeBool.getValue().get());
     ASSERT_FALSE(tmeBool->typeSet().allNumbers);
@@ -1139,9 +1161,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeObject =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'object'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'object'}}"), expCtx);
     ASSERT_OK(typeObject.getStatus());
     TypeMatchExpression* tmeObject = static_cast<TypeMatchExpression*>(typeObject.getValue().get());
     ASSERT_FALSE(tmeObject->typeSet().allNumbers);
@@ -1152,9 +1174,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeArray =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'array'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'array'}}"), expCtx);
     ASSERT_OK(typeArray.getStatus());
     TypeMatchExpression* tmeArray = static_cast<TypeMatchExpression*>(typeArray.getValue().get());
     ASSERT_FALSE(tmeArray->typeSet().allNumbers);
@@ -1165,9 +1187,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumber =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 'number'}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 'number'}}"), expCtx);
     ASSERT_OK(typeNumber.getStatus());
     TypeMatchExpression* tmeNumber = static_cast<TypeMatchExpression*>(typeNumber.getValue().get());
     ASSERT_TRUE(tmeNumber->typeSet().allNumbers);
@@ -1179,9 +1201,9 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
 }
 
 TEST(MatchExpressionParserLeafTest, CanParseArrayOfTypes) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumber =
-        MatchExpressionParser::parse(fromjson("{a: {$type: ['number', 2, 'object']}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: ['number', 2, 'object']}}"), expCtx);
     ASSERT_OK(typeNumber.getStatus());
     TypeMatchExpression* tme = static_cast<TypeMatchExpression*>(typeNumber.getValue().get());
     ASSERT_TRUE(tme->typeSet().allNumbers);
@@ -1191,30 +1213,30 @@ TEST(MatchExpressionParserLeafTest, CanParseArrayOfTypes) {
 }
 
 TEST(MatchExpressionParserLeafTest, EmptyArrayFailsToParse) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumber =
-        MatchExpressionParser::parse(fromjson("{a: {$type: []}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: []}}"), expCtx);
     ASSERT_NOT_OK(typeNumber.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, InvalidTypeCodeLessThanMinKeyFailsToParse) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumber =
-        MatchExpressionParser::parse(fromjson("{a: {$type: -20}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: -20}}"), expCtx);
     ASSERT_NOT_OK(typeNumber.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, InvalidTypeCodeGreaterThanMaxKeyFailsToParse) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumber =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 400}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 400}}"), expCtx);
     ASSERT_NOT_OK(typeNumber.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, InvalidTypeCodeUnusedBetweenMinAndMaxFailsToParse) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression typeNumber =
-        MatchExpressionParser::parse(fromjson("{a: {$type: 62}}"), collator);
+        MatchExpressionParser::parse(fromjson("{a: {$type: 62}}"), expCtx);
     ASSERT_NOT_OK(typeNumber.getStatus());
 }
 
@@ -1226,8 +1248,8 @@ TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
 
     for (auto type : validTypes) {
         BSONObj predicate = BSON("a" << BSON("$type" << type));
-        const CollatorInterface* collator = nullptr;
-        auto expression = MatchExpressionParser::parse(predicate, collator);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expression = MatchExpressionParser::parse(predicate, expCtx);
         ASSERT_OK(expression.getStatus());
         auto typeExpression = static_cast<TypeMatchExpression*>(expression.getValue().get());
         ASSERT_FALSE(typeExpression->typeSet().allNumbers);
@@ -1240,55 +1262,51 @@ TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidMask) {
     const double k2Power53 = scalbn(1, 32);
 
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << 54)), collator).getStatus());
-    ASSERT_OK(
-        MatchExpressionParser::parse(
-            BSON("a" << BSON("$bitsAllSet" << std::numeric_limits<long long>::max())), collator)
-            .getStatus());
-    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << k2Power53)), collator)
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << 54)), expCtx).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAllSet" << std::numeric_limits<long long>::max())), expCtx)
+                  .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << k2Power53)), expCtx)
                   .getStatus());
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << k2Power53 - 1)), collator)
-            .getStatus());
-
-    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << 54)), collator)
-                  .getStatus());
-    ASSERT_OK(
-        MatchExpressionParser::parse(
-            BSON("a" << BSON("$bitsAllClear" << std::numeric_limits<long long>::max())), collator)
-            .getStatus());
-    ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << k2Power53)), collator)
-            .getStatus());
-    ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << k2Power53 - 1)), collator)
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << k2Power53 - 1)), expCtx)
             .getStatus());
 
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << 54)), collator).getStatus());
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << 54)), expCtx).getStatus());
     ASSERT_OK(
         MatchExpressionParser::parse(
-            BSON("a" << BSON("$bitsAnySet" << std::numeric_limits<long long>::max())), collator)
+            BSON("a" << BSON("$bitsAllClear" << std::numeric_limits<long long>::max())), expCtx)
             .getStatus());
-    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << k2Power53)), collator)
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << k2Power53)), expCtx)
                   .getStatus());
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << k2Power53 - 1)), collator)
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << k2Power53 - 1)), expCtx)
             .getStatus());
 
-    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << 54)), collator)
+    ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << 54)), expCtx).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAnySet" << std::numeric_limits<long long>::max())), expCtx)
+                  .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << k2Power53)), expCtx)
                   .getStatus());
     ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << k2Power53 - 1)), expCtx)
+            .getStatus());
+
+    ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << 54)), expCtx).getStatus());
+    ASSERT_OK(
         MatchExpressionParser::parse(
-            BSON("a" << BSON("$bitsAnyClear" << std::numeric_limits<long long>::max())), collator)
+            BSON("a" << BSON("$bitsAnyClear" << std::numeric_limits<long long>::max())), expCtx)
             .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << k2Power53)), expCtx)
+                  .getStatus());
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << k2Power53)), collator)
-            .getStatus());
-    ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << k2Power53 - 1)), collator)
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << k2Power53 - 1)), expCtx)
             .getStatus());
 }
 
@@ -1299,392 +1317,391 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionValidArray) {
     ASSERT_EQ(BSONType::NumberLong, bsonArrayLongLong[2].type());
     ASSERT_EQ(BSONType::NumberLong, bsonArrayLongLong[3].type());
 
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0))), collator)
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0))), expCtx)
             .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
-                  BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0 << 1 << 2 << 3))), collator)
+                  BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0 << 1 << 2 << 3))), expCtx)
                   .getStatus());
-    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << bsonArrayLongLong)),
-                                           collator)
-                  .getStatus());
-    ASSERT_OK(MatchExpressionParser::parse(
-                  BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<int>::max()))),
-                  collator)
-                  .getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << bsonArrayLongLong)), expCtx)
+            .getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<int>::max()))), expCtx)
+            .getStatus());
 
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(0))), collator)
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(0))), expCtx)
             .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
-                  BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(0 << 1 << 2 << 3))), collator)
+                  BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(0 << 1 << 2 << 3))), expCtx)
                   .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << bsonArrayLongLong)),
-                                           collator)
+                                           expCtx)
                   .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(std::numeric_limits<int>::max()))),
-                  collator)
+                  expCtx)
                   .getStatus());
 
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(0))), collator)
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(0))), expCtx)
             .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
-                  BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(0 << 1 << 2 << 3))), collator)
+                  BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(0 << 1 << 2 << 3))), expCtx)
                   .getStatus());
-    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << bsonArrayLongLong)),
-                                           collator)
-                  .getStatus());
-    ASSERT_OK(MatchExpressionParser::parse(
-                  BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<int>::max()))),
-                  collator)
-                  .getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << bsonArrayLongLong)), expCtx)
+            .getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<int>::max()))), expCtx)
+            .getStatus());
 
     ASSERT_OK(
-        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(0))), collator)
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(0))), expCtx)
             .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
-                  BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(0 << 1 << 2 << 3))), collator)
+                  BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(0 << 1 << 2 << 3))), expCtx)
                   .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << bsonArrayLongLong)),
-                                           collator)
+                                           expCtx)
                   .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(std::numeric_limits<int>::max()))),
-                  collator)
+                  expCtx)
                   .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidBinData) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(
         MatchExpressionParser::parse(
             fromjson("{a: {$bitsAllSet: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
-            collator)
+            expCtx)
             .getStatus());
 
     ASSERT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAllClear: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
-            collator)
+            expCtx)
             .getStatus());
 
     ASSERT_OK(
         MatchExpressionParser::parse(
             fromjson("{a: {$bitsAnySet: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
-            collator)
+            expCtx)
             .getStatus());
 
     ASSERT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAnyClear: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
-            collator)
+            expCtx)
             .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskType) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: null}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: null}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: true}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: true}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: {}}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: {}}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: ''}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: ''}}"), expCtx).getStatus());
 
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: null}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: null}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: true}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: true}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: {}}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: {}}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: ''}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: ''}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
-            fromjson("{a: {$bitsAllClear: ObjectId('000000000000000000000000')}}"), collator)
+            fromjson("{a: {$bitsAllClear: ObjectId('000000000000000000000000')}}"), expCtx)
             .getStatus());
 
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: null}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: null}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: true}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: true}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: {}}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: {}}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: ''}}"), collator).getStatus());
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(
-            fromjson("{a: {$bitsAnySet: ObjectId('000000000000000000000000')}}"), collator)
-            .getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: ''}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(
+                      fromjson("{a: {$bitsAnySet: ObjectId('000000000000000000000000')}}"), expCtx)
+                      .getStatus());
 
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: null}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: null}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: true}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: true}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: {}}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: {}}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: ''}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: ''}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
-            fromjson("{a: {$bitsAnyClear: ObjectId('000000000000000000000000')}}"), collator)
+            fromjson("{a: {$bitsAnyClear: ObjectId('000000000000000000000000')}}"), expCtx)
             .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
     const double kLongLongMaxAsDouble = scalbn(1, std::numeric_limits<long long>::digits);
 
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: NaN}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: NaN}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: -54}}"), collator).getStatus());
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(
-            BSON("a" << BSON("$bitsAllSet" << std::numeric_limits<double>::max())), collator)
-            .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      BSON("a" << BSON("$bitsAllSet" << kLongLongMaxAsDouble)), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: 2.5}}"), collator).getStatus());
-
-    ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      BSON("a" << BSON("$bitsAllSet" << Decimal128("2.5"))), collator)
-                      .getStatus());
-
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: NaN}}"), collator).getStatus());
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: -54}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: -54}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
-            BSON("a" << BSON("$bitsAllClear" << std::numeric_limits<double>::max())), collator)
+            BSON("a" << BSON("$bitsAllSet" << std::numeric_limits<double>::max())), expCtx)
             .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      BSON("a" << BSON("$bitsAllClear" << kLongLongMaxAsDouble)), collator)
+                      BSON("a" << BSON("$bitsAllSet" << kLongLongMaxAsDouble)), expCtx)
                       .getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: 2.5}}"), collator).getStatus());
-
-    ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      BSON("a" << BSON("$bitsAllClear" << Decimal128("2.5"))), collator)
-                      .getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: 2.5}}"), expCtx).getStatus());
 
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: NaN}}"), collator).getStatus());
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << Decimal128("2.5"))), expCtx)
+            .getStatus());
+
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: -54}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: NaN}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: -54}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
-            BSON("a" << BSON("$bitsAnySet" << std::numeric_limits<double>::max())), collator)
+            BSON("a" << BSON("$bitsAllClear" << std::numeric_limits<double>::max())), expCtx)
             .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      BSON("a" << BSON("$bitsAnySet" << kLongLongMaxAsDouble)), collator)
+                      BSON("a" << BSON("$bitsAllClear" << kLongLongMaxAsDouble)), expCtx)
                       .getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: 2.5}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: 2.5}}"), expCtx).getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      BSON("a" << BSON("$bitsAnySet" << Decimal128("2.5"))), collator)
+                      BSON("a" << BSON("$bitsAllClear" << Decimal128("2.5"))), expCtx)
                       .getStatus());
 
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: NaN}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: NaN}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: -54}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: -54}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
-            BSON("a" << BSON("$bitsAnyClear" << std::numeric_limits<double>::max())), collator)
+            BSON("a" << BSON("$bitsAnySet" << std::numeric_limits<double>::max())), expCtx)
             .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      BSON("a" << BSON("$bitsAnyClear" << kLongLongMaxAsDouble)), collator)
+                      BSON("a" << BSON("$bitsAnySet" << kLongLongMaxAsDouble)), expCtx)
                       .getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: 2.5}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: 2.5}}"), expCtx).getStatus());
+
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << Decimal128("2.5"))), expCtx)
+            .getStatus());
+
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: NaN}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: -54}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAnyClear" << std::numeric_limits<double>::max())), expCtx)
+            .getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(
+                      BSON("a" << BSON("$bitsAnyClear" << kLongLongMaxAsDouble)), expCtx)
+                      .getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: 2.5}}"), expCtx).getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(
-                      BSON("a" << BSON("$bitsAnyClear" << Decimal128("2.5"))), collator)
+                      BSON("a" << BSON("$bitsAnyClear" << Decimal128("2.5"))), expCtx)
                       .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArray) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [null]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [null]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [true]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [true]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: ['']}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: ['']}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [{}]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [{}]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [[]]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [[]]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-1]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-1]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [2.5]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [2.5]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAllSet: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"),
-            collator)
+            expCtx)
             .getStatus());
 
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [null]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [true]}}"), collator)
-                      .getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: ['']}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [null]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [{}]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [true]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [[]]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: ['']}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-1]}}"), collator).getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [2.5]}}"), collator)
-                      .getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [{}]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [[]]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-1]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [2.5]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAllClear: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"),
-            collator)
+            expCtx)
             .getStatus());
 
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [null]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [null]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [true]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [true]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: ['']}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: ['']}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [{}]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [{}]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [[]]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [[]]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-1]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-1]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [2.5]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [2.5]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAnySet: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"),
-            collator)
+            expCtx)
             .getStatus());
 
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [null]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [true]}}"), collator)
-                      .getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: ['']}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [null]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [{}]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [true]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [[]]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: ['']}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-1]}}"), collator).getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [2.5]}}"), collator)
-                      .getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [{}]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [[]]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-1]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [2.5]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAnyClear: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"),
-            collator)
+            expCtx)
             .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArrayValue) {
-    const CollatorInterface* collator = nullptr;
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-54]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-54]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [NaN]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [NaN]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [2.5]}}"), collator).getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [1e100]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-1e100]}}"), collator)
-                      .getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [2.5]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [1e100]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-1e100]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<long long>::max()))),
-            collator)
+            expCtx)
             .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<long long>::min()))),
-            collator)
+            expCtx)
             .getStatus());
 
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-54]}}"), collator)
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-54]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [NaN]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [2.5]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [1e100]}}"), expCtx)
                       .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [NaN]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [2.5]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [1e100]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-1e100]}}"), collator)
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-1e100]}}"), expCtx)
                       .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(std::numeric_limits<long long>::max()))),
-            collator)
+            expCtx)
             .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(std::numeric_limits<long long>::min()))),
-            collator)
+            expCtx)
             .getStatus());
 
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-54]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-54]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [NaN]}}"), collator).getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [NaN]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
-        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [2.5]}}"), collator).getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [1e100]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-1e100]}}"), collator)
-                      .getStatus());
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [2.5]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [1e100]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-1e100]}}"), expCtx).getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<long long>::max()))),
-            collator)
+            expCtx)
             .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<long long>::min()))),
-            collator)
+            expCtx)
             .getStatus());
 
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-54]}}"), collator)
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-54]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [NaN]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [2.5]}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [1e100]}}"), expCtx)
                       .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [NaN]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [2.5]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [1e100]}}"), collator)
-                      .getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-1e100]}}"), collator)
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-1e100]}}"), expCtx)
                       .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(std::numeric_limits<long long>::max()))),
-            collator)
+            expCtx)
             .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(std::numeric_limits<long long>::min()))),
-            collator)
+            expCtx)
             .getStatus());
 }
 }  // namespace mongo

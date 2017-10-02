@@ -266,27 +266,37 @@ Status ShardingCatalogClientImpl::_log(OperationContext* opCtx,
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabase(
-    OperationContext* opCtx, const std::string& dbName) {
+    OperationContext* opCtx, const std::string& dbName, repl::ReadConcernLevel readConcernLevel) {
     if (!NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow)) {
         return {ErrorCodes::InvalidNamespace, stream() << dbName << " is not a valid db name"};
     }
 
-    // The two databases that are hosted on the config server are config and admin
-    if (dbName == "config" || dbName == "admin") {
+    // The admin database is always hosted on the config server.
+    if (dbName == "admin") {
         DatabaseType dbt;
         dbt.setName(dbName);
         dbt.setSharded(false);
-        dbt.setPrimary(ShardId("config"));
+        dbt.setPrimary(ShardRegistry::kConfigServerShardId);
 
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 
-    auto result = _fetchDatabaseMetadata(opCtx, dbName, kConfigReadSelector);
+    // The config database's primary shard is always config, and it is always sharded.
+    if (dbName == "config") {
+        DatabaseType dbt;
+        dbt.setName(dbName);
+        dbt.setSharded(true);
+        dbt.setPrimary(ShardRegistry::kConfigServerShardId);
+
+        return repl::OpTimeWith<DatabaseType>(dbt);
+    }
+
+    auto result = _fetchDatabaseMetadata(opCtx, dbName, kConfigReadSelector, readConcernLevel);
     if (result == ErrorCodes::NamespaceNotFound) {
         // If we failed to find the database metadata on the 'nearest' config server, try again
         // against the primary, in case the database was recently created.
         result = _fetchDatabaseMetadata(
-            opCtx, dbName, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+            opCtx, dbName, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, readConcernLevel);
         if (!result.isOK() && (result != ErrorCodes::NamespaceNotFound)) {
             return {result.getStatus().code(),
                     str::stream() << "Could not confirm non-existence of database " << dbName
@@ -299,12 +309,15 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchDatabaseMetadata(
-    OperationContext* opCtx, const std::string& dbName, const ReadPreferenceSetting& readPref) {
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const ReadPreferenceSetting& readPref,
+    repl::ReadConcernLevel readConcernLevel) {
     dassert(dbName != "admin" && dbName != "config");
 
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               readPref,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              readConcernLevel,
                                               NamespaceString(DatabaseType::ConfigNS),
                                               BSON(DatabaseType::name(dbName)),
                                               BSONObj(),
@@ -1237,49 +1250,6 @@ void ShardingCatalogClientImpl::_appendReadConcern(BSONObjBuilder* builder) {
     repl::ReadConcernArgs readConcern(grid.configOpTime(),
                                       repl::ReadConcernLevel::kMajorityReadConcern);
     readConcern.appendInfo(builder);
-}
-
-Status ShardingCatalogClientImpl::appendInfoForConfigServerDatabases(
-    OperationContext* opCtx, const BSONObj& listDatabasesCmd, BSONArrayBuilder* builder) {
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto resultStatus =
-        configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                      kConfigPrimaryPreferredSelector,
-                                                      "admin",
-                                                      listDatabasesCmd,
-                                                      Shard::RetryPolicy::kIdempotent);
-
-    if (!resultStatus.isOK()) {
-        return resultStatus.getStatus();
-    }
-    if (!resultStatus.getValue().commandStatus.isOK()) {
-        return resultStatus.getValue().commandStatus;
-    }
-
-    auto listDBResponse = std::move(resultStatus.getValue().response);
-    BSONElement dbListArray;
-    auto dbListStatus = bsonExtractTypedField(listDBResponse, "databases", Array, &dbListArray);
-    if (!dbListStatus.isOK()) {
-        return dbListStatus;
-    }
-
-    BSONObjIterator iter(dbListArray.Obj());
-
-    while (iter.more()) {
-        auto dbEntry = iter.next().Obj();
-        string name;
-        auto parseStatus = bsonExtractStringField(dbEntry, "name", &name);
-
-        if (!parseStatus.isOK()) {
-            return parseStatus;
-        }
-
-        if (name == "config" || name == "admin") {
-            builder->append(dbEntry);
-        }
-    }
-
-    return Status::OK();
 }
 
 StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNewKeys(

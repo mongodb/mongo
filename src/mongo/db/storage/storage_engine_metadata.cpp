@@ -42,7 +42,9 @@
 
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -61,6 +63,17 @@ bool containsMMapV1LocalNsFile(const std::string& directory) {
     boost::filesystem::path directoryPath(directory);
     return boost::filesystem::exists(directoryPath / "local.ns") ||
         boost::filesystem::exists((directoryPath / "local") / "local.ns");
+}
+
+bool fsyncFile(boost::filesystem::path path) {
+    invariant(path.has_filename());
+    File file;
+    file.open(path.string().c_str(), /*read-only*/ false, /*direct-io*/ false);
+    if (!file.is_open()) {
+        return false;
+    }
+    file.fsync();
+    return true;
 }
 
 }  // namespace
@@ -240,7 +253,16 @@ Status StorageEngineMetadata::write() const {
     // Rename temporary file to actual metadata file.
     boost::filesystem::path metadataPath = boost::filesystem::path(_dbpath) / kMetadataBasename;
     try {
+        // Renaming a file (at least on POSIX) should:
+        // 1) fsync the temporary file.
+        // 2) perform the rename.
+        // 3) fsync the to and from directory (in this case, both to and from are the same).
+        if (!fsyncFile(metadataTempPath)) {
+            return Status(ErrorCodes::FileRenameFailed,
+                          str::stream() << "Failed to fsync new `storage.bson` file.");
+        }
         boost::filesystem::rename(metadataTempPath, metadataPath);
+        flushMyDirectory(metadataPath.parent_path());
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::FileRenameFailed,
                       str::stream() << "Unexpected error while renaming temporary metadata file "

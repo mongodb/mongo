@@ -58,7 +58,7 @@
         oplogEntries.forEach((num) => {
             assert.writeOK(oplog.insert({
                 ts: ts(num),
-                t: term,
+                t: NumberLong(term),
                 h: 1,
                 op: 'i',
                 ns: ns,
@@ -76,7 +76,7 @@
             // appliedThrough
             begin: {
                 ts: ts(begin),
-                t: term,
+                t: NumberLong(term),
             },
 
             // minvalid:

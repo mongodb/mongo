@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-class ShardingCatalogClient;
+class KeysCollectionClient;
 
 /**
  * Keeps a local cache of the keys with the ability to refresh.
@@ -44,7 +44,7 @@ class ShardingCatalogClient;
  */
 class KeysCollectionCacheReader : public KeysCollectionCache {
 public:
-    KeysCollectionCacheReader(std::string purpose, ShardingCatalogClient* client);
+    KeysCollectionCacheReader(std::string purpose, KeysCollectionClient* client);
     ~KeysCollectionCacheReader() = default;
 
     /**
@@ -56,9 +56,15 @@ public:
     StatusWith<KeysCollectionDocument> getKeyById(long long keyId,
                                                   const LogicalTime& forThisTime) override;
 
+    /**
+     * Resets the cache of keys if the client doesnt allow readConcern level:majority reads.
+     * This method intended to be called on the rollback of the node.
+     */
+    void resetCache();
+
 private:
     const std::string _purpose;
-    ShardingCatalogClient* const _catalogClient;
+    KeysCollectionClient* const _client;
 
     stdx::mutex _cacheMutex;
     std::map<LogicalTime, KeysCollectionDocument> _cache;  // expiresAt -> KeysDocument

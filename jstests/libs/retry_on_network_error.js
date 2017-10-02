@@ -10,8 +10,7 @@ function retryOnNetworkError(func, numRetries = 1) {
         try {
             return func();
         } catch (e) {
-            if ((isNetworkError(e) || e.toString().indexOf("network error") > -1) &&
-                numRetries > 0) {
+            if (isNetworkError(e) && numRetries > 0) {
                 print("Network error occurred and the call will be retried: " +
                       tojson({error: e.toString(), stack: e.stack}));
                 numRetries--;

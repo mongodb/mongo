@@ -49,6 +49,7 @@ struct ChunkVersion;
 class CollectionMetadata;
 class MigrationSourceManager;
 class OperationContext;
+class Timestamp;
 
 /**
  * Contains all sharding-related runtime state for a given collection. One such object is assigned
@@ -181,10 +182,10 @@ public:
 
     /**
      * Checks whether the shard version in the context is compatible with the shard version of the
-     * collection locally and if not throws SendStaleConfigException populated with the expected and
+     * collection locally and if not throws StaleConfigException populated with the expected and
      * actual versions.
      *
-     * Because SendStaleConfigException has special semantics in terms of how a sharded command's
+     * Because StaleConfigException has special semantics in terms of how a sharded command's
      * response is constructed, this function should be the only means of checking for shard version
      * match.
      */
@@ -223,12 +224,17 @@ public:
      *
      * The global exclusive lock is expected to be held by the caller of any of these functions.
      */
-    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc);
+    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc, const Timestamp& oplogTs);
     void onUpdateOp(OperationContext* opCtx,
                     const BSONObj& query,
                     const BSONObj& update,
-                    const BSONObj& updatedDoc);
-    void onDeleteOp(OperationContext* opCtx, const DeleteState& deleteState);
+                    const BSONObj& updatedDoc,
+                    const Timestamp& oplogTs,
+                    const Timestamp& prePostImageTs);
+    void onDeleteOp(OperationContext* opCtx,
+                    const DeleteState& deleteState,
+                    const Timestamp& oplogTs,
+                    const Timestamp& preImageTs);
     void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName);
 
 private:
