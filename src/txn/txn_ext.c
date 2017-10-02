@@ -41,9 +41,9 @@ __wt_ext_transaction_isolation_level(
 	txn = &session->txn;
 
 	if (txn->isolation == WT_ISO_READ_COMMITTED)
-	    return (WT_TXN_ISO_READ_COMMITTED);
+		return (WT_TXN_ISO_READ_COMMITTED);
 	if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
-	    return (WT_TXN_ISO_READ_UNCOMMITTED);
+		return (WT_TXN_ISO_READ_UNCOMMITTED);
 	return (WT_TXN_ISO_SNAPSHOT);
 }
 

@@ -2,6 +2,7 @@
 
 # Check the style of WiredTiger C code.
 import re, sys
+from dist import source_files
 
 # Display lines that could be joined.
 def lines_could_join():

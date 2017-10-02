@@ -213,7 +213,8 @@ check_values(WT_CURSOR *cursor, int v0, int v1, int v2, char *big)
  * create_big_string --
  *	Create and fill the "reference" big array.
  */
-static int create_big_string(char **bigp)
+static int
+create_big_string(char **bigp)
 {
 	size_t i, mod;
 	char *big;

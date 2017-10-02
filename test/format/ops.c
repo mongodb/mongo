@@ -125,7 +125,7 @@ wts_ops(int lastrun)
 	 * after threaded operations start, there's no point.
 	 */
 	if (!SINGLETHREADED)
-		g.rand_log_stop = 1;
+		g.rand_log_stop = true;
 
 	/* Open a session. */
 	if (g.logging != 0) {
@@ -224,7 +224,7 @@ wts_ops(int lastrun)
 					static char *core = NULL;
 					*core = 0;
 				}
-				tinfo->quit = 1;
+				tinfo->quit = true;
 			}
 		}
 		track("ops", 0ULL, &total);
@@ -242,7 +242,7 @@ wts_ops(int lastrun)
 	}
 
 	/* Wait for the other threads. */
-	g.workers_finished = 1;
+	g.workers_finished = true;
 	if (g.c_alter)
 		testutil_check(__wt_thread_join(NULL, alter_tid));
 	if (g.c_backups)
@@ -253,7 +253,7 @@ wts_ops(int lastrun)
 		testutil_check(__wt_thread_join(NULL, lrt_tid));
 	if (g.c_txn_timestamps)
 		testutil_check(__wt_thread_join(NULL, timestamp_tid));
-	g.workers_finished = 0;
+	g.workers_finished = false;
 
 	if (g.logging != 0) {
 		(void)g.wt_api->msg_printf(g.wt_api, session,
@@ -1813,7 +1813,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, bool positioned)
 	 */
 	if (g.type == FIX) {
 		key_gen(key, keyno);
-		bdb_update(key->data, key->size, "\0", 1);
+		bdb_update(key->data, key->size, "", 1);
 	} else {
 		int notfound;
 

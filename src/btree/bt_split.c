@@ -315,8 +315,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 	WT_MEM_TRANSFER(*decrp, *incrp, sizeof(WT_REF));
 
 err:	if (addr != NULL) {
-		if (addr->addr != NULL)
-			__wt_free(session, addr->addr);
+		__wt_free(session, addr->addr);
 		__wt_free(session, addr);
 	}
 	return (ret);
