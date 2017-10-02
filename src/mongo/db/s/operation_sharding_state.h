@@ -64,12 +64,12 @@ public:
      * since the collection options will not be propagated. Such requests specify to disallow
      * collection creation, which is saved here.
      */
-    void setDisallowCollectionCreationIfNeeded(const BSONElement& disallowCollectionCreationElt);
+    void setAllowImplicitCollectionCreation(const BSONElement& allowImplicitCollectionCreationElem);
 
     /**
-     * Returns false if the request specified not to allow collection creation.
+     * Specifies whether the request is allowed to create database/collection implicitly.
      */
-    bool allowCollectionCreation();
+    bool allowImplicitCollectionCreation() const;
 
     /**
      * Parses shard version from the command parameters 'cmdObj' and stores the results in this
@@ -131,8 +131,8 @@ private:
      */
     void _clear();
 
-    // This value is set if a request specifies not to allow collection creation.
-    bool _disallowCollectionCreation = false;
+    // Specifies whether the request is allowed to create database/collection implicitly
+    bool _allowImplicitCollectionCreation{true};
 
     bool _hasVersion = false;
     ChunkVersion _shardVersion{ChunkVersion::UNSHARDED()};

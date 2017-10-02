@@ -254,7 +254,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherOnlyVersionI
         // options. So, we signal to shards that they should not implicitly create the collection.
         BSONObjBuilder augmentedCmdBob;
         augmentedCmdBob.appendElementsUnique(cmdObj);
-        augmentedCmdBob.append("disallowCollectionCreation", true);
+        augmentedCmdBob.append("allowImplicitCollectionCreation", false);
         requests = buildUnversionedRequestsForAllShards(opCtx, augmentedCmdBob.obj());
     } else {
         requests = buildVersionedRequestsForTargetedShards(

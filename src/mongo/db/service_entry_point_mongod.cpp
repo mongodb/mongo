@@ -555,7 +555,7 @@ void execCommandDatabase(OperationContext* opCtx,
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 
         BSONElement cmdOptionMaxTimeMSField;
-        BSONElement disallowCollectionCreationField;
+        BSONElement allowImplicitCollectionCreationField;
         BSONElement helpField;
         BSONElement shardVersionFieldIdx;
         BSONElement queryOptionMaxTimeMSField;
@@ -565,8 +565,8 @@ void execCommandDatabase(OperationContext* opCtx,
             StringData fieldName = element.fieldNameStringData();
             if (fieldName == QueryRequest::cmdOptionMaxTimeMS) {
                 cmdOptionMaxTimeMSField = element;
-            } else if (fieldName == "disallowCollectionCreation") {
-                disallowCollectionCreationField = element;
+            } else if (fieldName == "allowImplicitCollectionCreation") {
+                allowImplicitCollectionCreationField = element;
             } else if (fieldName == Command::kHelpFieldName) {
                 helpField = element;
             } else if (fieldName == ChunkVersion::kShardVersionField) {
@@ -698,7 +698,7 @@ void execCommandDatabase(OperationContext* opCtx,
             uassertStatusOK(shardingState->updateConfigServerOpTimeFromMetadata(opCtx));
         }
 
-        oss.setDisallowCollectionCreationIfNeeded(disallowCollectionCreationField);
+        oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
 
         // Can throw
         opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.

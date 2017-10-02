@@ -409,7 +409,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
 
     _dbEntry->appendExtraStats(opCtx, output, scale);
 
-    if (!getGlobalServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+    if (!opCtx->getServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
         boost::filesystem::path dbpath(storageGlobalParams.dbpath);
         if (storageGlobalParams.directoryperdb) {
             dbpath /= _name;
@@ -431,7 +431,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
 
 Status DatabaseImpl::dropView(OperationContext* opCtx, StringData fullns) {
     Status status = _views.dropView(opCtx, NamespaceString(fullns));
-    Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(fullns);
+    Top::get(opCtx->getServiceContext()).collectionDropped(fullns);
     return status;
 }
 
@@ -497,7 +497,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     audit::logDropCollection(&cc(), fullns.toString());
 
-    Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(fullns.toString());
+    Top::get(opCtx->getServiceContext()).collectionDropped(fullns.toString());
 
     auto uuid = collection->uuid();
 
@@ -506,7 +506,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // Under master/slave, collections are always dropped immediately. This is because drop-pending
     // collections support the rollback process which is not applicable to master/slave.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    auto opObserver = getGlobalServiceContext()->getOpObserver();
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, fullns);
     auto isMasterSlave =
         repl::ReplicationCoordinator::modeMasterSlave == replCoord->getReplicationMode();
@@ -682,7 +682,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         _clearCollectionCache(opCtx, fromNS, clearCacheReason, /*collectionGoingAway*/ true);
         _clearCollectionCache(opCtx, toNS, clearCacheReason, /*collectionGoingAway*/ false);
 
-        Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(fromNS.toString());
+        Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
     }
 
     opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, toNS));
@@ -759,8 +759,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     NamespaceString nss(ns);
 
     uassert(ErrorCodes::CannotImplicitlyCreateCollection,
-            "request was sent with 'disallowCollectionCreation' field",
-            OperationShardingState::get(opCtx).allowCollectionCreation());
+            "request doesn't allow collection to be created implicitly",
+            OperationShardingState::get(opCtx).allowImplicitCollectionCreation());
 
     CollectionOptions optionsWithUUID = options;
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
@@ -807,7 +807,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         }
     }
 
-    getGlobalServiceContext()->getOpObserver()->onCreateCollection(
+    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
         opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec);
 
     return collection;
@@ -830,17 +830,17 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
 
     audit::logDropDatabase(opCtx->getClient(), name);
 
+    auto const serviceContext = opCtx->getServiceContext();
+
     for (auto&& coll : *db) {
-        Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(coll->ns().ns(), true);
+        Top::get(serviceContext).collectionDropped(coll->ns().ns(), true);
     }
 
     dbHolder().close(opCtx, name, "database dropped");
 
+    auto const storageEngine = serviceContext->getGlobalStorageEngine();
     writeConflictRetry(opCtx, "dropDatabase", name, [&] {
-        getGlobalServiceContext()
-            ->getGlobalStorageEngine()
-            ->dropDatabase(opCtx, name)
-            .transitional_ignore();
+        storageEngine->dropDatabase(opCtx, name).transitional_ignore();
     });
 }
 
@@ -928,14 +928,14 @@ void mongo::dropAllDatabasesExceptLocalImpl(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
 
     vector<string> n;
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
     storageEngine->listDatabases(&n);
 
     if (n.size() == 0)
         return;
     log() << "dropAllDatabasesExceptLocal " << n.size();
 
-    repl::getGlobalReplicationCoordinator()->dropAllSnapshots();
+    repl::ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
 
     for (const auto& dbName : n) {
         if (dbName != "local") {
