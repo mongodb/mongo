@@ -73,7 +73,12 @@
     let getMoreResponse = iterateCursor(cursorResponse);
     const getMoreOplogTimestamp = getMoreResponse.$_internalLatestOplogTimestamp;
     assert.neq(undefined, getMoreOplogTimestamp, tojson(getMoreResponse));
-    assert.gt(getMoreOplogTimestamp, firstBatchOplogTimestamp);
+    // SERVER-21861 Use bsonWoCompare to avoid the shell's flawed comparison of timestamps.
+    assert.eq(
+        bsonWoCompare(getMoreOplogTimestamp, firstBatchOplogTimestamp),
+        1,
+        `Expected oplog timestamp from getMore (${getMoreOplogTimestamp}) to be larger than the` +
+            ` oplog timestamp from the first batch (${firstBatchOplogTimestamp})`);
 
     // Now make sure that the reported operation time advances if there are writes to an unrelated
     // collection.
@@ -92,5 +97,10 @@
     getMoreResponse = iterateCursor(cursorResponse);
     const oplogTimeAfterUnrelatedInsert = getMoreResponse.$_internalLatestOplogTimestamp;
     assert.neq(undefined, oplogTimeAtExhaust, tojson(getMoreResponse));
-    assert.gt(oplogTimeAfterUnrelatedInsert, oplogTimeAtExhaust);
+    // SERVER-21861 Use bsonWoCompare to avoid the shell's flawed comparison of timestamps.
+    assert.eq(
+        bsonWoCompare(oplogTimeAfterUnrelatedInsert, oplogTimeAtExhaust),
+        1,
+        `Expected oplog timestamp from after unrelated insert (${oplogTimeAfterUnrelatedInsert})` +
+            ` to be larger than the oplog timestamp at time of exhaust (${oplogTimeAtExhaust})`);
 })();
