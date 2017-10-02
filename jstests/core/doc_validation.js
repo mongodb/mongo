@@ -98,4 +98,22 @@
     assert.writeOK(coll.update({_id: 'invalid2'}, {$set: {a: 1}}));
     coll.drop();
 
+    // The validator is allowed to contain $expr.
+    assert.commandWorked(db.createCollection(collName, {validator: {$expr: {$eq: ["$a", 5]}}}));
+    assert.writeOK(coll.insert({a: 5}));
+    assertFailsValidation(coll.insert({a: 4}));
+    assert.commandWorked(
+        db.runCommand({"collMod": collName, "validator": {$expr: {$eq: ["$a", 4]}}}));
+    assert.writeOK(coll.insert({a: 4}));
+    assertFailsValidation(coll.insert({a: 5}));
+
+    // The validator can contain an $expr that may throw at runtime.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(collName, {validator: {$expr: {$eq: ["$a", {$divide: [1, "$b"]}]}}}));
+    assert.writeOK(coll.insert({a: 1, b: 1}));
+    let res = coll.insert({a: 1, b: 0});
+    assert.writeError(res);
+    assert.eq(res.getWriteError().code, 16608);
+    assert.writeOK(coll.insert({a: -1, b: -1}));
 })();

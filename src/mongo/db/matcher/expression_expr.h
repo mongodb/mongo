@@ -85,6 +85,8 @@ public:
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
 
+    void _doSetCollator(const CollatorInterface* collator) final;
+
     void _doAddDependencies(DepsTracker* deps) const final {
         if (_expression) {
             _expression->addDependencies(deps);

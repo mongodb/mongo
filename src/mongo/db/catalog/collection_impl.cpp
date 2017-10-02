@@ -159,11 +159,8 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
       _indexCatalog(_this_init, this->getCatalogEntry()->getMaxAllowedIndexes()),
       _collator(parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation)),
       _validatorDoc(_details->getCollectionOptions(opCtx).validator.getOwned()),
-      _validator(
-          uassertStatusOK(parseValidator(opCtx,
-                                         _validatorDoc,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures &
-                                             ~MatchExpressionParser::AllowedFeatures::kExpr))),
+      _validator(uassertStatusOK(
+          parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures))),
       _validationAction(uassertStatusOK(
           parseValidationAction(_details->getCollectionOptions(opCtx).validationAction))),
       _validationLevel(uassertStatusOK(
@@ -898,10 +895,8 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
 
     // Note that, by the time we reach this, we should have already done a pre-parse that checks for
     // banned features, so we don't need to include that check again.
-    auto statusWithMatcher = parseValidator(opCtx,
-                                            validatorDoc,
-                                            MatchExpressionParser::kAllowAllSpecialFeatures &
-                                                ~MatchExpressionParser::AllowedFeatures::kExpr);
+    auto statusWithMatcher =
+        parseValidator(opCtx, validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 

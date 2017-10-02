@@ -245,6 +245,15 @@ TEST(ExpressionWithPlaceholderTest, ExprExpressionFailsToParse) {
     auto rawFilter = fromjson("{$expr: {$eq: ['$i', 5]}}");
     auto status = ExpressionWithPlaceholder::parse(rawFilter, expCtx);
     ASSERT_NOT_OK(status.getStatus());
+    ASSERT_EQ(status.getStatus().code(), ErrorCodes::QueryFeatureNotAllowed);
+}
+
+TEST(ExpressionWithPlaceholderTest, JSONSchemaExpressionFailsToParse) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto rawFilter = fromjson("{$jsonSchema: {}}");
+    auto status = ExpressionWithPlaceholder::parse(rawFilter, expCtx);
+    ASSERT_NOT_OK(status.getStatus());
+    ASSERT_EQ(status.getStatus().code(), ErrorCodes::QueryFeatureNotAllowed);
 }
 
 TEST(ExpressionWithPlaceholderTest, EquivalentIfPlaceholderAndExpressionMatch) {

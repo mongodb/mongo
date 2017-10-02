@@ -32,11 +32,14 @@
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 namespace {
+
+using unittest::assertGet;
 
 TEST(ExprMatchExpression, ComparisonToConstantMatchesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -146,6 +149,26 @@ TEST(ExprMatchExpression, ShallowClonedExpressionIsEquivalentToOriginal) {
     ExprMatchExpression pipelineExpr(expression.firstElement(), std::move(expCtx));
     auto shallowClone = pipelineExpr.shallowClone();
     ASSERT_TRUE(pipelineExpr.equivalent(shallowClone.get()));
+}
+
+TEST(ExprMatchExpression, SetCollatorChangesCollationUsedForComparisons) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto match = BSON("a"
+                      << "abc");
+    auto notMatch = BSON("a"
+                         << "ABC");
+
+    auto expression = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
+                                                               << "abc")));
+    auto matchExpression = assertGet(MatchExpressionParser::parse(expression, expCtx));
+    ASSERT_TRUE(matchExpression->matchesBSON(match));
+    ASSERT_FALSE(matchExpression->matchesBSON(notMatch));
+
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    matchExpression->setCollator(&collator);
+
+    ASSERT_TRUE(matchExpression->matchesBSON(match));
+    ASSERT_TRUE(matchExpression->matchesBSON(notMatch));
 }
 
 }  // namespace

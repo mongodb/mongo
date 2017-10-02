@@ -30,8 +30,6 @@ selector:
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
   # TODO: Remove after SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
-  # TODO SERVER-30731: Remove once ChunkManager::getShardIdsForQuery() supports query with $expr.
-  - jstests/aggregation/sources/match/expr_match.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop

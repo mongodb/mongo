@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/initialize_operation_session_info.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
@@ -209,33 +210,21 @@ void execCommandClient(OperationContext* opCtx,
         return;
     }
 
-    try {
-        bool ok = false;
-        if (!supportsWriteConcern) {
-            ok = c->publicRun(opCtx, request, result);
-        } else {
-            // Change the write concern while running the command.
-            const auto oldWC = opCtx->getWriteConcern();
-            ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
-            opCtx->setWriteConcern(wcResult.getValue());
+    bool ok = false;
+    if (!supportsWriteConcern) {
+        ok = c->publicRun(opCtx, request, result);
+    } else {
+        // Change the write concern while running the command.
+        const auto oldWC = opCtx->getWriteConcern();
+        ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
+        opCtx->setWriteConcern(wcResult.getValue());
 
-            ok = c->publicRun(opCtx, request, result);
-        }
-        if (!ok) {
-            c->incrementCommandsFailed();
-        }
-        Command::appendCommandStatus(result, ok);
-    } catch (const DBException& e) {
-        result.resetToEmpty();
-        const int code = e.code();
-
-        if (code == ErrorCodes::StaleConfig) {
-            throw;
-        }
-
-        c->incrementCommandsFailed();
-        Command::appendCommandStatus(result, e.toStatus());
+        ok = c->publicRun(opCtx, request, result);
     }
+    if (!ok) {
+        c->incrementCommandsFailed();
+    }
+    Command::appendCommandStatus(result, ok);
 }
 
 void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder&& builder) {
@@ -295,7 +284,9 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
             continue;
         } catch (const DBException& e) {
             builder.resetToEmpty();
+            command->incrementCommandsFailed();
             Command::appendCommandStatus(builder, e.toStatus());
+            LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
             return;
         }
 
@@ -341,8 +332,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
                                      q,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kExpr));
+                                     MatchExpressionParser::kAllowAllSpecialFeatures));
 
     // If the $explain flag was set, we must run the operation on the shards as an explain command
     // rather than a find command.

@@ -316,8 +316,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
                                          std::move(qr),
                                          expCtx,
                                          extensionsCallback,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures &
-                                             ~MatchExpressionParser::AllowedFeatures::kExpr);
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
         invariantOK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

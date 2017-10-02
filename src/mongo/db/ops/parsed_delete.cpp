@@ -96,8 +96,7 @@ Status ParsedDelete::parseQueryToCQ() {
                                      std::move(qr),
                                      expCtx,
                                      extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
 
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());

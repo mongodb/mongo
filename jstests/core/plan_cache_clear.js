@@ -37,6 +37,17 @@ assert.eq(1, getShapes().length, 'unexpected cache size after running 2nd query'
 assert.commandWorked(t.runCommand('planCacheClear', {query: {a: 1, b: 1}}));
 assert.eq(0, getShapes().length, 'unexpected cache size after dropping 2nd query from cache');
 
+// planCacheClear can clear $expr queries.
+assert.eq(1, t.find({a: 1, b: 1, $expr: {$eq: ['$a', 1]}}).itcount(), 'unexpected document count');
+assert.eq(1, getShapes().length, 'unexpected cache size after running 2nd query');
+assert.commandWorked(
+    t.runCommand('planCacheClear', {query: {a: 1, b: 1, $expr: {$eq: ['$a', 1]}}}));
+assert.eq(0, getShapes().length, 'unexpected cache size after dropping 2nd query from cache');
+
+// planCacheClear fails with an $expr query with an unbound variable.
+assert.commandFailed(
+    t.runCommand('planCacheClear', {query: {a: 1, b: 1, $expr: {$eq: ['$a', '$$unbound']}}}));
+
 // Insert two more shapes into the cache.
 assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
 assert.eq(1, t.find({a: 1, b: 1}, {_id: 0, a: 1}).itcount(), 'unexpected document count');

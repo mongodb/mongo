@@ -130,7 +130,7 @@ TEST(SimpleMod, InitWithExprElemFails) {
     ModifierPull node;
     auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_EQUALS(ErrorCodes::QueryFeatureNotAllowed, status);
 }
 
 TEST(SimpleMod, InitWithExprObjectFails) {
@@ -139,7 +139,16 @@ TEST(SimpleMod, InitWithExprObjectFails) {
     ModifierPull node;
     auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_EQUALS(ErrorCodes::QueryFeatureNotAllowed, status);
+}
+
+TEST(SimpleMod, InitWithJSONSchemaFails) {
+    auto update = fromjson("{$pull: {a: {$jsonSchema: {}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ModifierPull node;
+    auto status = node.init(update["$pull"]["a"], ModifierInterface::Options::normal(expCtx));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::QueryFeatureNotAllowed, status);
 }
 
 TEST(SimpleMod, PrepareOKTargetNotFound) {

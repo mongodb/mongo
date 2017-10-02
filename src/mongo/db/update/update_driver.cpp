@@ -288,6 +288,8 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
     qr->setFilter(query);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
+    // $expr is not allowed in the query for an upsert, since it is not clear what the equality
+    // extraction behavior for $expr should be.
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx,
                                      std::move(qr),

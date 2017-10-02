@@ -598,7 +598,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 root->add(maxPropsExpr.getValue().release());
             } else if (mongoutils::str::equals("jsonSchema", rest)) {
                 if ((allowedFeatures & AllowedFeatures::kJSONSchema) == 0u) {
-                    return Status(ErrorCodes::JSONSchemaNotAllowed,
+                    return Status(ErrorCodes::QueryFeatureNotAllowed,
                                   "$jsonSchema is not allowed in this context");
                 }
 
@@ -1692,7 +1692,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseExpr(
     AllowedFeatureSet allowedFeatures,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if ((allowedFeatures & AllowedFeatures::kExpr) == 0u) {
-        return {Status(ErrorCodes::BadValue, "$expr is not allowed in this context")};
+        return {Status(ErrorCodes::QueryFeatureNotAllowed, "$expr is not allowed in this context")};
     }
 
     invariant(expCtx);

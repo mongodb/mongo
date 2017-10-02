@@ -302,10 +302,10 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
             connectToField: "a",
             connectFromField: "b",
             as: "output",
-            restrictSearchWithMatch: {$expr: {$eq: ["$x", 5]}}
+            restrictSearchWithMatch: {$expr: {$eq: ["$x", "$$unbound"]}}
         }
     };
-    assertErrorCode(local, pipeline, 40186, "cannot use $expr inside $graphLookup");
+    assertErrorCode(local, pipeline, 17276, "cannot use $expr with unbound variable");
 
     // $graphLookup can only consume at most 100MB of memory.
     var foreign = db.foreign;

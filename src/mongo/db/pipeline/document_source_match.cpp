@@ -368,12 +368,8 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
 void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other) {
     _predicate = BSON("$and" << BSON_ARRAY(_predicate << other->getQuery()));
 
-    StatusWithMatchExpression status = uassertStatusOK(
-        MatchExpressionParser::parse(_predicate,
-                                     pExpCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::AllowedFeatures::kText |
-                                         MatchExpressionParser::AllowedFeatures::kExpr));
+    StatusWithMatchExpression status = uassertStatusOK(MatchExpressionParser::parse(
+        _predicate, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
     _expression = std::move(status.getValue());
     _dependencies = DepsTracker(_dependencies.getMetadataAvailable());
     getDependencies(&_dependencies);

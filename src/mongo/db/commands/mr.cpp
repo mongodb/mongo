@@ -1122,8 +1122,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
                                      std::move(qr),
                                      expCtx,
                                      extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -1489,13 +1488,12 @@ public:
                 const ExtensionsCallbackReal extensionsCallback(opCtx, &config.nss);
 
                 const boost::intrusive_ptr<ExpressionContext> expCtx;
-                auto statusWithCQ = CanonicalQuery::canonicalize(
-                    opCtx,
-                    std::move(qr),
-                    expCtx,
-                    extensionsCallback,
-                    MatchExpressionParser::kAllowAllSpecialFeatures &
-                        ~MatchExpressionParser::AllowedFeatures::kExpr);
+                auto statusWithCQ =
+                    CanonicalQuery::canonicalize(opCtx,
+                                                 std::move(qr),
+                                                 expCtx,
+                                                 extensionsCallback,
+                                                 MatchExpressionParser::kAllowAllSpecialFeatures);
                 if (!statusWithCQ.isOK()) {
                     uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                     return 0;

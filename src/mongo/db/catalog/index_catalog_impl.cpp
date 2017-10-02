@@ -668,7 +668,10 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(opCtx, collator.get()));
         StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(filterElement.Obj(), std::move(expCtx));
+            MatchExpressionParser::parse(filterElement.Obj(),
+                                         std::move(expCtx),
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kBanAllSpecialFeatures);
         if (!statusWithMatcher.isOK()) {
             return statusWithMatcher.getStatus();
         }

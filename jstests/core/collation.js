@@ -646,6 +646,14 @@
                       .collation({locale: "en_US", strength: 3})
                       .sort({a: 1});
         assert.eq(res.toArray(), [{a: "a"}, {a: "A"}, {a: "b"}, {a: "B"}]);
+
+        // Find should return correct results when collation specified and query contains $expr.
+        coll.drop();
+        assert.writeOK(coll.insert([{a: "A"}, {a: "B"}]));
+        assert.eq(1,
+                  coll.find({$expr: {$eq: ["$a", "a"]}})
+                      .collation({locale: "en_US", strength: 2})
+                      .itcount());
     }
 
     // Find should return correct results when no collation specified and collection has a default
@@ -691,6 +699,14 @@
               coll.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}})
                   .addOption(DBQuery.Option.oplogReplay)
                   .itcount());
+
+    // Find should return correct results for query containing $expr when no collation specified and
+    // collection has a default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert([{a: "A"}, {a: "B"}]));
+    assert.eq(1, coll.find({$expr: {$eq: ["$a", "a"]}}).itcount());
 
     if (db.getMongo().useReadCommands()) {
         // Find should return correct results when "simple" collation specified and collection has a

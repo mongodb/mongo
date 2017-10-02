@@ -367,33 +367,27 @@ TEST(MatchExpressionParserTest, NearParsesSuccessfullyWhenAllowed) {
 TEST(MatchExpressionParserTest, ExprFailsToParseWhenDisallowed) {
     auto query = fromjson("{$expr: {$eq: ['$a', 5]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kBanAllSpecialFeatures)
+            .getStatus());
 }
 
 TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWhenAllowed) {
     auto query = fromjson("{$expr: {$eq: ['$a', 5]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_OK(
-        MatchExpressionParser::parse(
-            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
-            .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
 }
 
 TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWithAdditionalTopLevelPredicates) {
     auto query = fromjson("{x: 1, $expr: {$eq: ['$a', 5]}, y: 1}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_OK(
-        MatchExpressionParser::parse(
-            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
-            .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
 }
 
 TEST(MatchExpressionParserTest, ExprFailsToParseWithinTopLevelOr) {
     auto query = fromjson("{$or: [{x: 1}, {$expr: {$eq: ['$a', 5]}}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_NOT_OK(
-        MatchExpressionParser::parse(
-            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
-            .getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
 }
 }

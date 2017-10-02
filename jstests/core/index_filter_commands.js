@@ -234,3 +234,42 @@ assert.commandWorked(
 
 explain = t.find(queryAA).collation(collationEN).explain();
 assert(isCollscan(explain.queryPlanner.winningPlan), "Expected collscan: " + tojson(explain));
+
+//
+// Test that planCacheSetFilter and planCacheClearFilters allow queries containing $expr.
+//
+
+t.drop();
+assert.writeOK(t.insert({a: "a"}));
+assert.commandWorked(t.createIndex(indexA1, {name: "a_1"}));
+
+assert.commandWorked(t.runCommand(
+    "planCacheSetFilter", {query: {a: "a", $expr: {$eq: ["$a", "a"]}}, indexes: [indexA1]}));
+filters = getFilters();
+assert.eq(1, filters.length, tojson(filters));
+assert.eq({a: "a", $expr: {$eq: ["$a", "a"]}}, filters[0].query, tojson(filters[0]));
+
+assert.commandWorked(
+    t.runCommand("planCacheClearFilters", {query: {a: "a", $expr: {$eq: ["$a", "a"]}}}));
+filters = getFilters();
+assert.eq(0, filters.length, tojson(filters));
+
+//
+// Test that planCacheSetFilter and planCacheClearFilters do not allow queries containing $expr with
+// unbound variables.
+//
+
+t.drop();
+assert.writeOK(t.insert({a: "a"}));
+assert.commandWorked(t.createIndex(indexA1, {name: "a_1"}));
+
+assert.commandFailed(
+    t.runCommand("planCacheSetFilter",
+                 {query: {a: "a", $expr: {$eq: ["$a", "$$unbound"]}}, indexes: [indexA1]}));
+filters = getFilters();
+assert.eq(0, filters.length, tojson(filters));
+
+assert.commandFailed(
+    t.runCommand("planCacheClearFilters", {query: {a: "a", $expr: {$eq: ["$a", "$$unbound"]}}}));
+filters = getFilters();
+assert.eq(0, filters.length, tojson(filters));

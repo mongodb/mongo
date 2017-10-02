@@ -533,8 +533,7 @@ std::string runQuery(OperationContext* opCtx,
                                      q,
                                      expCtx,
                                      ExtensionsCallbackReal(opCtx, &nss),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!statusWithCQ.isOK()) {
         uasserted(17287,
                   str::stream() << "Can't canonicalize query: "

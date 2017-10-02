@@ -75,4 +75,20 @@
               .toArray()[0];
 
     assert.eq(res.results.length, 1);
+
+    // $expr is allowed inside the 'restrictSearchWithMatch' match expression.
+    // TODO SERVER-31029: This should not throw once support is added for top-level $expr within $or
+    // and $and.
+    assert.throws(function() {
+        local.aggregate({
+            $graphLookup: {
+                from: "foreign",
+                startWith: "$starting",
+                connectFromField: "to",
+                connectToField: "from",
+                as: "results",
+                restrictSearchWithMatch: {$expr: {$eq: ["$shouldBeIncluded", true]}}
+            }
+        });
+    });
 })();

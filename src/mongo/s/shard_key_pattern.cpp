@@ -289,8 +289,7 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
                                      std::move(qr),
                                      expCtx,
                                      ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!statusWithCQ.isOK()) {
         return StatusWith<BSONObj>(statusWithCQ.getStatus());
     }

@@ -127,13 +127,17 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 // is ok because the parsed MatchExpression is not used after being created. We are
                 // only parsing here in order to ensure that the elemMatch projection is valid.
                 //
-                // Match expression extensions such as $text, $where, $geoNear, $near, $nearSphere,
-                // and $expr are not allowed in $elemMatch projections.
+                // Match expression extensions such as $text, $where, $geoNear, $near, and
+                // $nearSphere are not allowed in $elemMatch projections. $expr and $jsonSchema are
+                // not allowed because the matcher is not applied to the root of the document.
                 const CollatorInterface* collator = nullptr;
                 boost::intrusive_ptr<ExpressionContext> expCtx(
                     new ExpressionContext(opCtx, collator));
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, std::move(expCtx));
+                    MatchExpressionParser::parse(elemMatchObj,
+                                                 std::move(expCtx),
+                                                 ExtensionsCallbackNoop(),
+                                                 MatchExpressionParser::kBanAllSpecialFeatures);
                 if (!statusWithMatcher.isOK()) {
                     return statusWithMatcher.getStatus();
                 }

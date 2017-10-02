@@ -64,6 +64,10 @@ bool ExprMatchExpression::equivalent(const MatchExpression* other) const {
                                       realOther->_expression->serialize(false));
 }
 
+void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
+    _expCtx->setCollator(collator);
+}
+
 
 std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
     // TODO SERVER-31003: Replace Expression clone via serialization with Expression::clone().

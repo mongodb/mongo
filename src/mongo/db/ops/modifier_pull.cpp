@@ -122,8 +122,12 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
         }
 
         // Build the matcher around the object we built above. Currently, we do not allow $pull
-        // operations to contain $text/$where/$geoNear/$near/$nearSphere/$expr clauses.
-        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(_exprObj, opts.expCtx);
+        // operations to contain $text/$where/$geoNear/$near/$nearSphere/$expr/$jsonSchema clauses.
+        StatusWithMatchExpression parseResult =
+            MatchExpressionParser::parse(_exprObj,
+                                         opts.expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kBanAllSpecialFeatures);
         if (!parseResult.isOK()) {
             return parseResult.getStatus();
         }

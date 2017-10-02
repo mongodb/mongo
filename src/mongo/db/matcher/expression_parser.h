@@ -99,7 +99,8 @@ public:
     static constexpr AllowedFeatureSet kBanAllSpecialFeatures = 0;
     static constexpr AllowedFeatureSet kAllowAllSpecialFeatures =
         std::numeric_limits<unsigned long long>::max();
-    static constexpr AllowedFeatureSet kDefaultSpecialFeatures = AllowedFeatures::kJSONSchema;
+    static constexpr AllowedFeatureSet kDefaultSpecialFeatures =
+        AllowedFeatures::kExpr | AllowedFeatures::kJSONSchema;
 
     /**
      * Constant double representation of 2^63.

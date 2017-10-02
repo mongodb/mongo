@@ -175,19 +175,20 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             if (!serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() ||
                 serverGlobalParams.featureCompatibility.version.load() !=
                     ServerGlobalParams::FeatureCompatibility::Version::k34) {
-                // Allow $jsonSchema only if the feature compatibility version is newer than 3.4.
-                // Note that we don't enforce this restriction on the secondary or on backup
-                // instances, as indicated by !validateFeaturesAsMaster.
+                // Allow $jsonSchema and $expr only if the feature compatibility version is newer
+                // than 3.4. Note that we don't enforce this restriction on secondary instances, as
+                // indicated by !validateFeaturesAsMaster.
                 allowedFeatures |= MatchExpressionParser::kJSONSchema;
+                allowedFeatures |= MatchExpressionParser::kExpr;
             }
             auto statusW = coll->parseValidator(opCtx, e.Obj(), allowedFeatures);
             if (!statusW.isOK()) {
-                if (statusW.getStatus().code() == ErrorCodes::JSONSchemaNotAllowed) {
-                    // The default error message for disallowed $jsonSchema is not descriptive
-                    // enough, so we rewrite it here.
-                    return {ErrorCodes::JSONSchemaNotAllowed,
+                if (statusW.getStatus().code() == ErrorCodes::QueryFeatureNotAllowed) {
+                    // The default error message for disallowed $jsonSchema and $expr is not
+                    // descriptive enough, so we rewrite it here.
+                    return {ErrorCodes::QueryFeatureNotAllowed,
                             str::stream() << "The featureCompatibilityVersion must be 3.6 to add a "
-                                             "$jsonSchema validator to a collection. See "
+                                             "collection validator using 3.6 query features. See "
                                           << feature_compatibility_version::kDochubLink
                                           << "."};
                 } else {

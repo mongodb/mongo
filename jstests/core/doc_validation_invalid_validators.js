@@ -22,6 +22,8 @@
     assert.commandFailed(db.createCollection(collName, {validator: {$geoNear: {place: "holder"}}}));
     assert.commandFailed(
         db.createCollection(collName, {validator: {$nearSphere: {place: "holder"}}}));
+    assert.commandFailed(
+        db.createCollection(collName, {validator: {$expr: {$eq: ["$a", "$$unbound"]}}}));
 
     // Verify we fail on admin, local and config databases.
     assert.commandFailed(
@@ -47,9 +49,8 @@
         db.runCommand({"collMod": collName, "validator": {$geoNear: {place: "holder"}}}));
     assert.commandFailed(
         db.runCommand({"collMod": collName, "validator": {$nearSphere: {place: "holder"}}}));
-
     assert.commandFailed(
-        db.runCommand({"collMod": collName, "validator": {$expr: {$eq: ["$a", 5]}}}));
+        db.runCommand({"collMod": collName, "validator": {$expr: {$eq: ["$a", "$$unbound"]}}}));
 
     coll.drop();
 
