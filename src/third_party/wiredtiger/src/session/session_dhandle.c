@@ -321,8 +321,8 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	bool last_ckpt;
 	const char *checkpoint;
+	bool last_ckpt;
 
 	last_ckpt = false;
 	checkpoint = NULL;
@@ -601,7 +601,9 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	 * the underlying file are visible to the in-memory pages.
 	 */
 	WT_ERR(__wt_evict_file_exclusive_on(session));
-	WT_ERR(__wt_cache_op(session, WT_SYNC_DISCARD));
+	ret = __wt_cache_op(session, WT_SYNC_DISCARD);
+	__wt_evict_file_exclusive_off(session);
+	WT_ERR(ret);
 
 	/*
 	 * We lock checkpoint handles that we are overwriting, so the handle

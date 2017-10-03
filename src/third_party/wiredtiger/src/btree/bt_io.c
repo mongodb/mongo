@@ -24,8 +24,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_ENCRYPTOR *encryptor;
 	WT_ITEM *ip;
 	const WT_PAGE_HEADER *dsk;
-	const char *fail_msg;
 	size_t result_len;
+	const char *fail_msg;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -177,12 +177,12 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_DECL_ITEM(ctmp);
 	WT_DECL_ITEM(etmp);
 	WT_DECL_RET;
-	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_ITEM *ip;
+	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_PAGE_HEADER *dsk;
 	size_t dst_len, len, result_len, size, src_len;
-	int compression_failed;		/* Extension API, so not a bool. */
 	uint8_t *dst, *src;
+	int compression_failed;		/* Extension API, so not a bool. */
 	bool data_checksum, encrypted, timer;
 
 	btree = S2BT(session);
@@ -222,6 +222,11 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		WT_ASSERT(session, dsk->mem_size == buf->size);
 		ip = buf;
 	}
+
+	/*
+	 * Verify the disk image in diagnostic mode. Return an error instead of
+	 * asserting because the static test suite tests that the error hits.
+	 */
 	WT_ERR(__wt_verify_dsk(session, "[write-check]", ip));
 	__wt_scr_free(session, &ctmp);
 #endif

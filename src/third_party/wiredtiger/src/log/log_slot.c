@@ -294,8 +294,8 @@ __log_slot_switch_internal(
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	bool free_slot, release;
 	uint32_t joined;
+	bool free_slot, release;
 
 	log = S2C(session)->log;
 	release = false;

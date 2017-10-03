@@ -10,14 +10,16 @@
 
 /* State maintained during recovery. */
 typedef struct {
+	const char *uri;		/* File URI. */
+	WT_CURSOR *c;			/* Cursor used for recovery. */
+	WT_LSN ckpt_lsn;		/* File's checkpoint LSN. */
+} WT_RECOVERY_FILE;
+
+typedef struct {
 	WT_SESSION_IMPL *session;
 
 	/* Files from the metadata, indexed by file ID. */
-	struct WT_RECOVERY_FILE {
-		const char *uri;	/* File URI. */
-		WT_CURSOR *c;		/* Cursor used for recovery. */
-		WT_LSN ckpt_lsn;	/* File's checkpoint LSN. */
-	} *files;
+	WT_RECOVERY_FILE *files;
 	size_t file_alloc;		/* Allocated size of files array. */
 	u_int max_fileid;		/* Maximum file ID seen. */
 	WT_LSN max_lsn;			/* Maximum checkpoint LSN seen. */
@@ -457,7 +459,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_CURSOR *metac;
 	WT_DECL_RET;
 	WT_RECOVERY r;
-	struct WT_RECOVERY_FILE *metafile;
+	WT_RECOVERY_FILE *metafile;
 	char *config;
 	bool eviction_started, needs_rec, was_backup;
 

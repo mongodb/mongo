@@ -19,8 +19,8 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 {
 	WT_CURSOR *c;
 	WT_DECL_ITEM(buf);
-	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_PACK(pack);
+	WT_DECL_PACK_VALUE(pv);
 	WT_PACK_VALUE old_pv;
 	size_t len, offset, old_len;
 	u_long arg;
@@ -398,10 +398,10 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
     WT_CURSOR **cp, const char *proj_arg, const char *vformat, WT_ITEM *value)
 {
 	WT_CURSOR *c;
-	WT_ITEM *buf;
 	WT_DECL_PACK(pack);
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_PACK_VALUE(vpv);
+	WT_ITEM *buf;
 	WT_PACK vpack;
 	u_long arg;
 	char *proj;

@@ -15,8 +15,8 @@
 static int
 __clsm_close_bulk(WT_CURSOR *cursor)
 {
-	WT_CURSOR_LSM *clsm;
 	WT_CURSOR *bulk_cursor;
+	WT_CURSOR_LSM *clsm;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;

@@ -74,7 +74,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             session.begin_transaction(txn_config)
         c = session.open_cursor(self.uri + self.tablename, None)
         actual = dict((k, v) for k, v in c if v != 0)
-        self.assertEqual(actual, expected)
+        self.assertTrue(actual == expected)
         # Search for the expected items as well as iterating
         for k, v in expected.iteritems():
             self.assertEqual(c[k], v, "for key " + str(k))
@@ -203,6 +203,9 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # whether value2 appears in a copy of that data or not.
         valcnt2 = valcnt3 = self.nkeys
         valcnt = 0
+        # If logging is disabled then value2 should not appear in logged table.
+        if self.using_log == False:
+            valcnt3 = 0
         self.ckpt_backup(self.value2, valcnt, valcnt2, valcnt3)
         # Update the stable timestamp to the latest, but not the oldest
         # timestamp and make sure we can see the data.  Once the stable

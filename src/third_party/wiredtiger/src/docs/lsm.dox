@@ -111,18 +111,12 @@ session.create("table:T", "type=lsm");
 @m_endif
 @endcode
 
-The default type for all schema objects will continue to be btree.
-
 @section lsm_caveats Caveats
 
-@subsection lsm_hazard Hazard configuration
+@subsection lsm_key_format Key_format configuration
 
-Reads from an LSM cursor may need to position a cursor in each active chunk.
-The number of chunks depends on the chunk size, and how many chunks have
-been merged.  There must be at least as many hazard pointers available as
-there are chunks in the tree for each cursor that is open on the LSM tree.
-The number of hazard pointers is configured with the \c "hazard_max"
-configuration key to ::wiredtiger_open.
+LSM does not support column-store trees, \c key_format may not be set
+to type \c 'r'.
 
 @subsection lsm_checkpoints Named checkpoints
 

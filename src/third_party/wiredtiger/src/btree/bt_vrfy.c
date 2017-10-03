@@ -118,8 +118,8 @@ __verify_config_offsets(
 static int
 __verify_layout(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 {
-	uint64_t total;
 	size_t i;
+	uint64_t total;
 
 	for (i = 0, total = 0; i < WT_ELEMENTS(vs->depth_internal); ++i)
 		total += vs->depth_internal[i];

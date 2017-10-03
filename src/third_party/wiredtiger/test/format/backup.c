@@ -97,8 +97,8 @@ backup(void *arg)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	u_int incremental, period;
-	bool full;
 	const char *config, *key;
+	bool full;
 
 	(void)(arg);
 
@@ -121,7 +121,7 @@ backup(void *arg)
 		/* Sleep for short periods so we don't make the run wait. */
 		while (period > 0 && !g.workers_finished) {
 			--period;
-			sleep(1);
+			__wt_sleep(1, 0);
 		}
 
 		/*

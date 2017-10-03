@@ -201,8 +201,8 @@ __wt_session_compact_check_timeout(WT_SESSION_IMPL *session)
 static int
 __compact_checkpoint(WT_SESSION_IMPL *session)
 {
-	WT_TXN_GLOBAL *txn_global;
 	WT_DECL_RET;
+	WT_TXN_GLOBAL *txn_global;
 	uint64_t txn_gen;
 
 	/*

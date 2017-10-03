@@ -271,6 +271,9 @@ __statlog_print_table_name(
 
 	conn = S2C(session);
 
+	if (!FLD_ISSET(conn->stat_flags, WT_STAT_JSON))
+		return (0);
+
 	/*
 	 * If printing the connection stats, write that header and we are done.
 	 */
@@ -282,8 +285,8 @@ __statlog_print_table_name(
 
 	/*
 	 * If this is the first table we are printing stats for print the header
-	 * for the wiredTigerTables section. Otherwise print a comma as this
-	 * is a subsequent table.
+	 * for the wiredTigerTables section. Otherwise print a comma as this is
+	 * a subsequent table.
 	 */
 	if (conn->stat_json_tables)
 		WT_RET(__wt_fprintf(session, conn->stat_fs,","));
@@ -330,8 +333,8 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	int64_t val;
 	size_t prefixlen;
+	int64_t val;
 	const char *desc, *endprefix, *valstr, *uri;
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
@@ -386,11 +389,10 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 			    "%s\"%s\":%" PRId64,
 			    groupfirst ? "" : ",", endprefix + 2, val));
 			groupfirst = false;
-		} else {
+		} else
 			WT_ERR(__wt_fprintf(session, conn->stat_fs,
 			    "%s %" PRId64 " %s %s\n",
 			    conn->stat_stamp, val, name, desc));
-		}
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 	if (FLD_ISSET(conn->stat_flags, WT_STAT_JSON))
@@ -567,8 +569,8 @@ static int
 __statlog_on_close(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 
 	conn = S2C(session);
 

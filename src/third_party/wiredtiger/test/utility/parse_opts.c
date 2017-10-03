@@ -36,8 +36,8 @@ extern char *__wt_optarg;		/* argument associated with option */
 int
 testutil_parse_opts(int argc, char * const *argv, TEST_OPTS *opts)
 {
-	int ch;
 	size_t len;
+	int ch;
 
 	opts->preserve = false;
 	opts->running = true;

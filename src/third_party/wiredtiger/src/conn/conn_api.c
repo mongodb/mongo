@@ -872,9 +872,9 @@ __conn_load_extension_int(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_DLH *dlh;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
-	bool is_local;
-	const char *ext_config, *init_name, *terminate_name;
 	const char *ext_cfg[2];
+	const char *ext_config, *init_name, *terminate_name;
+	bool is_local;
 
 	dlh = NULL;
 	ext_config = init_name = terminate_name = NULL;
@@ -1083,6 +1083,43 @@ err:	/*
 				    s->event_handler, wt_session, NULL));
 			WT_TRET(wt_session->close(wt_session, config));
 		}
+
+	/*
+	 * Perform a system-wide checkpoint so that all tables are consistent
+	 * with each other.  All transactions are resolved but ignore
+	 * timestamps to make sure all data gets to disk.  Do this before
+	 * shutting down all the subsystems.  We have shut down all user
+	 * sessions, but send in true for waiting for internal races.
+	 */
+	if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
+		s = NULL;
+		WT_TRET(__wt_open_internal_session(
+		    conn, "close_ckpt", true, 0, &s));
+		if (s != NULL) {
+			const char *checkpoint_cfg[] = {
+			    WT_CONFIG_BASE(session, WT_SESSION_checkpoint),
+			    "use_timestamp=false",
+			    NULL
+			};
+			wt_session = &s->iface;
+			WT_TRET(__wt_txn_checkpoint(s, checkpoint_cfg, true));
+
+			/*
+			 * Mark the metadata dirty so we flush it on close,
+			 * allowing recovery to be skipped.
+			 */
+			WT_WITH_DHANDLE(s, WT_SESSION_META_DHANDLE(s),
+			    __wt_tree_modify_set(s));
+
+			WT_TRET(wt_session->close(wt_session, config));
+		}
+	}
+
+	if (ret != 0) {
+		__wt_err(session, ret,
+		    "failure during close, disabling further writes");
+		F_SET(conn, WT_CONN_PANIC);
+	}
 
 	WT_TRET(__wt_connection_close(conn));
 
@@ -1311,10 +1348,10 @@ __conn_config_file(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_FH *fh;
-	size_t len;
 	wt_off_t size;
-	bool exist, quoted;
+	size_t len;
 	char *p, *t;
+	bool exist, quoted;
 
 	fh = NULL;
 
@@ -1450,8 +1487,8 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	const char *env_config;
 	size_t len;
+	const char *env_config;
 
 	/* Only use the environment variable if configured. */
 	WT_RET(__wt_config_gets(session, cfg, "use_environment", &cval));
@@ -1546,10 +1583,10 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn, *t;
 	WT_DECL_RET;
 	WT_FH *fh;
-	size_t len;
 	wt_off_t size;
-	bool bytelock, exist, is_create, match;
+	size_t len;
 	char buf[256];
+	bool bytelock, exist, is_create, match;
 
 	conn = S2C(session);
 	fh = NULL;
@@ -1981,12 +2018,12 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_FSTREAM *fs;
 	WT_CONFIG parser;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
-	bool exist;
+	WT_FSTREAM *fs;
 	const char *base_config;
+	bool exist;
 
 	fs = NULL;
 	base_config = NULL;
@@ -2381,7 +2418,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	cfg[1] = NULL;
 	WT_ERR(__wt_snprintf(version, sizeof(version),
 	    "version=(major=%d,minor=%d)",
-	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR));
+	    conn->compat_major, conn->compat_minor));
 	__conn_config_append(cfg, version);
 
 	/* Ignore the base_config file if config_base_set is false. */

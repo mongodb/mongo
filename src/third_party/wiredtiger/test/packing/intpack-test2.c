@@ -31,10 +31,10 @@
 int
 main(void)
 {
-	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
-	uint8_t *p, *end;
-	int64_t i;
 	size_t used_len;
+	int64_t i;
+	uint8_t *end, *p;
+	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
 
 	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
 

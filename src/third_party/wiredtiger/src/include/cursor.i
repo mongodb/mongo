@@ -361,9 +361,9 @@ static inline int
 __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 {
 	WT_BTREE *btree;
-	WT_ITEM *kb, *vb;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_ITEM *kb, *vb;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	void *copy;

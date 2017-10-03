@@ -19,8 +19,8 @@ static WT_THREAD_RET __lsm_worker_manager(void *);
 int
 __wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
 
@@ -292,8 +292,8 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *current;
 	WT_SESSION *wt_session;
-	uint32_t i;
 	uint64_t removed;
+	uint32_t i;
 
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
@@ -384,11 +384,11 @@ __lsm_manager_worker_shutdown(WT_SESSION_IMPL *session)
 static int
 __lsm_manager_run_server(WT_SESSION_IMPL *session)
 {
+	struct timespec now;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	struct timespec now;
-	uint64_t fillms, pushms;
+	uint64_t fillms, idlems;
 	bool dhandle_locked;
 
 	conn = S2C(session);
@@ -405,8 +405,18 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			if (!lsm_tree->active)
 				continue;
 			__wt_epoch(session, &now);
-			pushms = lsm_tree->work_push_time.tv_sec == 0 ? 0 :
-			    WT_TIMEDIFF_MS(now, lsm_tree->work_push_time);
+			/*
+			 * If work was added reset our counts and time.
+			 * Otherwise compute an idle time.
+			 */
+			if (lsm_tree->work_count != lsm_tree->mgr_work_count ||
+			    lsm_tree->work_count == 0) {
+				idlems = 0;
+				lsm_tree->mgr_work_count = lsm_tree->work_count;
+				lsm_tree->last_active = now;
+			} else
+				idlems =
+				    WT_TIMEDIFF_MS(now, lsm_tree->last_active);
 			fillms = 3 * lsm_tree->chunk_fill_ms;
 			if (fillms == 0)
 				fillms = 10000;
@@ -434,7 +444,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			    (lsm_tree->merge_aggressiveness >
 			    WT_LSM_AGGRESSIVE_THRESHOLD &&
 			     !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) ||
-			    pushms > fillms) {
+			    idlems > fillms) {
 				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 				WT_ERR(__wt_lsm_manager_push_entry(
@@ -448,13 +458,13 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				    "MGR %s: queue %" PRIu32 " mod %d "
 				    "nchunks %" PRIu32
 				    " flags %#" PRIx32 " aggressive %" PRIu32
-				    " pushms %" PRIu64
+				    " idlems %" PRIu64
 				    " fillms %" PRIu64,
 				    lsm_tree->name, lsm_tree->queue_ref,
 				    lsm_tree->modified, lsm_tree->nchunks,
 				    lsm_tree->flags,
 				    lsm_tree->merge_aggressiveness,
-				    pushms, fillms);
+				    idlems, fillms);
 				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 			}
@@ -661,7 +671,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-	__wt_epoch(session, &lsm_tree->work_push_time);
+	(void)__wt_atomic_add64(&lsm_tree->work_count, 1);
 	WT_RET(__wt_calloc_one(session, &entry));
 	entry->type = type;
 	entry->flags = flags;

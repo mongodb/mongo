@@ -327,8 +327,8 @@ static inline int
 __pack_write(
     WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, uint8_t **pp, size_t maxlen)
 {
-	uint8_t *oldp;
 	size_t s, pad;
+	uint8_t *oldp;
 
 	switch (pv->type) {
 	case 'x':

@@ -39,10 +39,10 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_COLGROUP *colgroup;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
-	WT_DECL_RET;
 	WT_DECL_ITEM(buf);
-	char *cgconfig;
+	WT_DECL_RET;
 	u_int i;
+	char *cgconfig;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
 
@@ -106,6 +106,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	}
 
 	table->cg_complete = true;
+	table->is_simple_file = (table->is_simple &&
+	    WT_PREFIX_MATCH(table->cgroups[0]->source, "file:"));
 
 err:	__wt_scr_free(session, &buf);
 	__wt_schema_destroy_colgroup(session, &colgroup);
@@ -272,8 +274,8 @@ __schema_open_index(WT_SESSION_IMPL *session,
 	WT_INDEX *idx;
 	u_int i;
 	int cmp;
-	bool match;
 	const char *idxconf, *name, *tablename, *uri;
+	bool match;
 
 	/* Check if we've already done the work. */
 	if (idxname == NULL && table->idx_complete)
@@ -421,8 +423,8 @@ __schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM ckey, cval;
 	WT_DECL_RET;
 	WT_TABLE *table;
-	const char *tablename;
 	const char **table_cfg;
+	const char *tablename;
 
 	table = (WT_TABLE *)session->dhandle;
 	table_cfg = table->iface.cfg;
@@ -487,8 +489,8 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 {
 	WT_COLGROUP *colgroup;
 	WT_TABLE *table;
-	const char *tablename, *tend;
 	u_int i;
+	const char *tablename, *tend;
 
 	if (tablep != NULL)
 		*tablep = NULL;
@@ -534,8 +536,8 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_TABLE *table;
-	const char *tablename, *tend;
 	u_int i;
+	const char *tablename, *tend;
 
 	*indexp = NULL;
 

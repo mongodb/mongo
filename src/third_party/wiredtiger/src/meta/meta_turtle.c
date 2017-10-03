@@ -148,8 +148,8 @@ int
 __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	bool exist_backup, exist_incr, exist_isrc, exist_turtle, load;
 	char *metaconf;
+	bool exist_backup, exist_incr, exist_isrc, exist_turtle, load;
 
 	metaconf = NULL;
 	load = false;
@@ -298,8 +298,8 @@ err:	WT_TRET(__wt_fclose(session, &fs));
 int
 __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
 {
-	WT_FSTREAM *fs;
 	WT_DECL_RET;
+	WT_FSTREAM *fs;
 	int vmajor, vminor, vpatch;
 	const char *version;
 

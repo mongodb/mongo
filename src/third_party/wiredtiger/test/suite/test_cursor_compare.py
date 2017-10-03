@@ -28,23 +28,25 @@
 
 import wiredtiger, wttest, exceptions
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
-from wtscenario import make_scenarios
+from wtscenario import filter_scenarios, make_scenarios
 
 # Test cursor comparisons.
 class test_cursor_comparison(wttest.WiredTigerTestCase):
     name = 'test_compare'
 
     types = [
-        ('file', dict(type='file:', dataset=SimpleDataSet)),
-        ('lsm', dict(type='table:', dataset=ComplexLSMDataSet)),
-        ('table', dict(type='table:', dataset=ComplexDataSet))
+        ('file', dict(type='file:', lsm=False, dataset=SimpleDataSet)),
+        ('lsm', dict(type='table:', lsm=True, dataset=ComplexLSMDataSet)),
+        ('table', dict(type='table:', lsm=False, dataset=ComplexDataSet))
     ]
     keyfmt = [
         ('integer', dict(keyfmt='i')),
         ('recno', dict(keyfmt='r')),
         ('string', dict(keyfmt='S'))
     ]
-    scenarios = make_scenarios(types, keyfmt)
+    # Skip record number keys with LSM.
+    scenarios = filter_scenarios(make_scenarios(types, keyfmt),
+        lambda name, d: not (d['lsm'] and d['keyfmt'] == 'r'))
 
     def test_cursor_comparison(self):
         uri = self.type + 'compare'

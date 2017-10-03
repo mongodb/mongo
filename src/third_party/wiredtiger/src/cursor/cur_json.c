@@ -66,8 +66,8 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
     u_char *buf, size_t bufsz, WT_CONFIG_ITEM *name, size_t *retsizep)
 {
 	WT_PACK_VALUE *pv;
-	const u_char *p, *end;
 	size_t s, n;
+	const u_char *p, *end;
 
 	pv = (WT_PACK_VALUE *)voidpv;
 
@@ -185,8 +185,8 @@ __json_struct_size(WT_SESSION_IMPL *session, const void *buffer,
 	WT_PACK pack;
 	WT_PACK_NAME packname;
 	size_t result;
-	bool needcr;
 	const uint8_t *p, *end;
+	bool needcr;
 
 	p = buffer;
 	end = p + size;
@@ -229,8 +229,8 @@ __json_struct_unpackv(WT_SESSION_IMPL *session,
 	WT_PACK pack;
 	WT_PACK_NAME packname;
 	size_t jsize;
-	bool needcr;
 	const uint8_t *p, *end;
+	bool needcr;
 
 	p = buffer;
 	end = p + size;
@@ -380,8 +380,8 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
     const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
 {
 	WT_CURSOR_JSON *json;
-	const char *beginkey, *end, *lparen, *p;
 	uint32_t keycnt, nkeys;
+	const char *beginkey, *end, *lparen, *p;
 
 	json = (WT_CURSOR_JSON *)cursor->json_private;
 	beginkey = colconf->str;
@@ -471,9 +471,9 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 {
 	WT_SESSION_IMPL *session;
 	int result;
-	bool backslash, isalph, isfloat;
 	const char *bad;
 	char ch;
+	bool backslash, isalph, isfloat;
 
 	result = -1;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -648,10 +648,10 @@ json_string_arg(WT_SESSION_IMPL *session, const char **jstr, WT_ITEM *item)
 static int
 json_int_arg(WT_SESSION_IMPL *session, const char **jstr, int64_t *ip)
 {
-	char *end;
-	const char *tokstart;
 	size_t toksize;
 	int tok;
+	char *end;
+	const char *tokstart;
 
 	WT_RET(__wt_json_token((WT_SESSION *)session, *jstr, &tok, &tokstart,
 		&toksize));
@@ -678,8 +678,8 @@ json_uint_arg(WT_SESSION_IMPL *session, const char **jstr, uint64_t *up)
 {
 	size_t toksize;
 	int tok;
-	const char *tokstart;
 	char *end;
+	const char *tokstart;
 
 	WT_RET(__wt_json_token((WT_SESSION *)session, *jstr, &tok, &tokstart,
 		&toksize));
@@ -726,9 +726,9 @@ __json_pack_struct(WT_SESSION_IMPL *session, void *buffer, size_t size,
 	WT_DECL_RET;
 	WT_PACK pack;
 	size_t toksize;
-	bool multi;
 	uint8_t *p, *end;
 	const char *tokstart;
+	bool multi;
 
 	p = buffer;
 	end = p + size;
@@ -781,8 +781,8 @@ __json_pack_size(
 	WT_PACK pack;
 	WT_PACK_NAME packname;
 	size_t toksize, total;
-	bool multi;
 	const char *tokstart;
+	bool multi;
 
 	__pack_name_init(session, names, iskey, &packname);
 	multi = false;
@@ -837,9 +837,9 @@ ssize_t
 __wt_json_strlen(const char *src, size_t srclen)
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	const char *srcend;
 	size_t dstlen;
 	u_char hi, lo;
+	const char *srcend;
 
 	dstlen = 0;
 	srcend = src + srclen;
@@ -881,9 +881,9 @@ __wt_json_strncpy(WT_SESSION *wt_session,
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_SESSION_IMPL *session;
+	u_char hi, lo;
 	char ch, *dst;
 	const char *dstend, *srcend;
-	u_char hi, lo;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 

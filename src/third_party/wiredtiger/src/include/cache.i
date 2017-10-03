@@ -320,8 +320,8 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, u_int *pct_fullp)
 static inline bool
 __wt_cache_full(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
 	cache = conn->cache;

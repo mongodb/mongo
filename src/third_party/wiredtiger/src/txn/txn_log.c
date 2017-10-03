@@ -186,9 +186,9 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
 	WT_DECL_ITEM(logrec);
 	WT_DECL_RET;
 	WT_TXN *txn;
-	const char *fmt = WT_UNCHECKED_STRING(Iq);
-	uint32_t rectype = WT_LOGREC_COMMIT;
 	size_t header_size;
+	uint32_t rectype = WT_LOGREC_COMMIT;
+	const char *fmt = WT_UNCHECKED_STRING(Iq);
 
 	txn = &session->txn;
 	if (txn->logrec != NULL)
@@ -297,8 +297,8 @@ __txn_log_file_sync(WT_SESSION_IMPL *session, uint32_t flags, WT_LSN *lsnp)
 	size_t header_size;
 	uint32_t rectype = WT_LOGREC_FILE_SYNC;
 	int start;
-	bool need_sync;
 	const char *fmt = WT_UNCHECKED_STRING(III);
+	bool need_sync;
 
 	btree = S2BT(session);
 	start = LF_ISSET(WT_TXN_LOG_CKPT_START);
@@ -358,9 +358,9 @@ __wt_txn_checkpoint_log(
 	WT_LSN *ckpt_lsn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	uint8_t *end, *p;
 	size_t recsize;
 	uint32_t i, rectype;
+	uint8_t *end, *p;
 	const char *fmt;
 
 	conn = S2C(session);
@@ -571,11 +571,11 @@ __txn_printlog(WT_SESSION_IMPL *session,
 {
 	WT_LOG_RECORD *logrec;
 	WT_TXN_PRINTLOG_ARGS *args;
-	const uint8_t *end, *p;
-	const char *msg;
 	uint64_t txnid;
 	uint32_t fileid, lsnfile, lsnoffset, rectype;
 	int32_t start;
+	const uint8_t *end, *p;
+	const char *msg;
 	bool compressed;
 
 	WT_UNUSED(next_lsnp);

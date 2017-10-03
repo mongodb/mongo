@@ -24,8 +24,8 @@ __curstat_lsm_init(
 	WT_LSM_TREE *lsm_tree;
 	int64_t bloom_count;
 	u_int i;
-	bool locked;
 	char config[64];
+	bool locked;
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL };
 	const char *disk_cfg[] = {

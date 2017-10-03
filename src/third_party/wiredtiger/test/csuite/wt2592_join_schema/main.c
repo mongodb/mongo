@@ -70,7 +70,7 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	const char *country, *tablename;
 	char countryuri[256], joinuri[256], yearuri[256];
-	uint64_t recno, population;
+	uint64_t population, recno;
 	uint16_t year;
 	int count, ret;
 

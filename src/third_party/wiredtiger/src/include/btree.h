@@ -110,17 +110,22 @@ struct __wt_btree {
 	 */
 	u_int dictionary;		/* Dictionary slots */
 	bool  internal_key_truncate;	/* Internal key truncate */
-	int   maximum_depth;		/* Maximum tree depth */
 	bool  prefix_compression;	/* Prefix compression */
 	u_int prefix_compression_min;	/* Prefix compression min */
+
 #define	WT_SPLIT_DEEPEN_MIN_CHILD_DEF	10000
 	u_int split_deepen_min_child;	/* Minimum entries to deepen tree */
 #define	WT_SPLIT_DEEPEN_PER_CHILD_DEF	100
 	u_int split_deepen_per_child;	/* Entries per child when deepened */
 	int   split_pct;		/* Split page percent */
+
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 	WT_KEYED_ENCRYPTOR *kencryptor;	/* Page encryptor */
+
 	WT_RWLOCK ovfl_lock;		/* Overflow lock */
+
+	int	maximum_depth;		/* Maximum tree depth during search */
+	u_int	rec_multiblock_max;	/* Maximum blocks written for a page */
 
 	uint64_t last_recno;		/* Column-store last record number */
 
@@ -147,12 +152,30 @@ struct __wt_btree {
 	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
 	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
 
+	/*
+	 * We flush pages from the tree (in order to make checkpoint faster),
+	 * without a high-level lock.  To avoid multiple threads flushing at
+	 * the same time, lock the tree.
+	 */
+	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
+
+	/*
+	 * All of the following fields live at the end of the structure so it's
+	 * easier to clear everything but the fields that persist.
+	 */
+#define	WT_BTREE_CLEAR_SIZE	(offsetof(WT_BTREE, evict_ref))
+
+	/*
+	 * Eviction information is maintained in the btree handle, but owned by
+	 * eviction, not the btree code.
+	 */
 	WT_REF	   *evict_ref;		/* Eviction thread's location */
 	uint64_t    evict_priority;	/* Relative priority of cached pages */
 	u_int	    evict_walk_period;	/* Skip this many LRU walks */
 	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
 	u_int	    evict_walk_skips;	/* Number of walks skipped */
 	int32_t	    evict_disabled;	/* Eviction disabled count */
+	bool	    evict_disabled_open;/* Eviction disabled on open */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
 	enum {				/* Start position for eviction walk */
 		WT_EVICT_WALK_NEXT,
@@ -162,13 +185,8 @@ struct __wt_btree {
 	} evict_start_type;
 
 	/*
-	 * We flush pages from the tree (in order to make checkpoint faster),
-	 * without a high-level lock.  To avoid multiple threads flushing at
-	 * the same time, lock the tree.
+	 * Flag values up to 0xff are reserved for WT_DHANDLE_XXX.
 	 */
-	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
-
-	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_ALTER		0x000100 /* Handle is for alter */
 #define	WT_BTREE_BULK		0x000200 /* Bulk-load handle */
 #define	WT_BTREE_CLOSED		0x000400 /* Handle closed */

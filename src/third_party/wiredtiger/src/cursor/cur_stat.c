@@ -84,10 +84,10 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
-	va_list ap;
 	size_t size;
 	uint64_t *v;
 	const char *desc, **p;
+	va_list ap;
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	va_start(ap, cursor);
@@ -466,10 +466,10 @@ __curstat_join_next_set(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst,
 static int
 __curstat_join_desc(WT_CURSOR_STAT *cst, int slot, const char **resultp)
 {
-	size_t len;
-	const char *static_desc;
 	WT_JOIN_STATS_GROUP *sgrp;
 	WT_SESSION_IMPL *session;
+	size_t len;
+	const char *static_desc;
 
 	sgrp = &cst->u.join_stats_group;
 	session = (WT_SESSION_IMPL *)sgrp->join_cursor->iface.session;

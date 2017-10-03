@@ -72,8 +72,8 @@ json_column_group_index(WT_SESSION *session,
     JSON_INPUT_STATE *ins, CONFIG_LIST *clp, int idx)
 {
 	WT_DECL_RET;
-	bool isconfig;
 	char *config, *p, *uri;
+	bool isconfig;
 
 	uri = NULL;
 	config = NULL;
@@ -221,9 +221,9 @@ json_data(WT_SESSION *session,
 	size_t gotnolen, keystrlen;
 	uint64_t gotno, recno;
 	int nfield, nkeys, toktype, tret;
-	bool isrec;
 	char config[64], *endp, *uri;
 	const char *keyformat;
+	bool isrec;
 
 	cursor = NULL;
 	uri = NULL;

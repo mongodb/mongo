@@ -223,15 +223,14 @@ __wt_conn_dhandle_close(
 
 		/*
 		 * Mark the handle dead (letting the tree be discarded later) if
-		 * it's not already marked dead, our caller allows it, it's not
-		 * a final close, and it's not a memory-mapped tree. (We can't
-		 * mark memory-mapped tree handles dead because we close the
-		 * underlying file handle to allow the file to be removed and
-		 * memory-mapped trees contain pointers into memory that become
-		 * invalid if the mapping is closed.)
+		 * it's not already marked dead, and it's not a memory-mapped
+		 * tree. (We can't mark memory-mapped tree handles dead because
+		 * we close the underlying file handle to allow the file to be
+		 * removed and memory-mapped trees contain pointers into memory
+		 * that become invalid if the mapping is closed.)
 		 */
 		bm = btree->bm;
-		if (!discard && mark_dead && !final &&
+		if (!discard && mark_dead &&
 		    (bm == NULL || !bm->is_mapped(bm, session)))
 			marked_dead = true;
 
@@ -413,6 +412,10 @@ __wt_conn_dhandle_open(
 	WT_ASSERT(session,
 	     !F_ISSET(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
 
+	/* Turn off eviction. */
+	if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
+		WT_RET(__wt_evict_file_exclusive_on(session));
+
 	/*
 	 * If the handle is already open, it has to be closed so it can be
 	 * reopened with a new configuration.
@@ -426,11 +429,11 @@ __wt_conn_dhandle_open(
 	 * in the tree that can block the close.
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-		WT_RET(__wt_conn_dhandle_close(session, false, false));
+		WT_ERR(__wt_conn_dhandle_close(session, false, false));
 
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_dhandle_config_clear(session);
-	WT_RET(__conn_dhandle_config_set(session));
+	WT_ERR(__conn_dhandle_config_set(session));
 
 	switch (dhandle->type) {
 	case WT_DHANDLE_TYPE_BTREE:
@@ -478,6 +481,9 @@ __wt_conn_dhandle_open(
 err:		if (btree != NULL)
 			F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 	}
+
+	if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
+		__wt_evict_file_exclusive_off(session);
 
 	return (ret);
 }
@@ -779,7 +785,7 @@ restart:
 
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, false)));
+		    session, true, F_ISSET(conn, WT_CONN_PANIC))));
 		goto restart;
 	}
 
@@ -805,7 +811,7 @@ restart:
 	WT_TAILQ_SAFE_REMOVE_BEGIN(dhandle, &conn->dhqh, q, dhandle_tmp) {
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, false)));
+		    session, true, F_ISSET(conn, WT_CONN_PANIC))));
 	} WT_TAILQ_SAFE_REMOVE_END
 
 	return (ret);

@@ -18,8 +18,8 @@ __wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session,
 {
 	WT_FILE_HANDLE_POSIX *pfh;
 	WT_SESSION_IMPL *session;
-	size_t len;
 	wt_off_t file_size;
+	size_t len;
 	void *map;
 
 	WT_UNUSED(mapped_cookiep);

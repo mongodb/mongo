@@ -49,7 +49,7 @@ main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
 	WT_CURSOR *maincur;
-	WT_CURSOR *postcur, *balancecur, *flagcur, *joincur;
+	WT_CURSOR *balancecur, *flagcur, *joincur, *postcur;
 	WT_SESSION *session;
 	int balance, count, flag, key, key2, post, ret;
 	char cfg[128];

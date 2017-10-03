@@ -156,8 +156,8 @@ static int
 __verify_set_file_size(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 {
 	WT_BLOCK_CKPT *ci, _ci;
-	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
@@ -221,8 +221,8 @@ int
 __wt_verify_ckpt_load(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_CKPT *ci)
 {
-	WT_EXTLIST *el;
 	WT_EXT *ext;
+	WT_EXTLIST *el;
 	uint64_t frag, frags;
 
 	/* Set the maximum file size for this checkpoint. */

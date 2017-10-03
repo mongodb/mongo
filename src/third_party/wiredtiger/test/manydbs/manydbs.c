@@ -76,8 +76,8 @@ static int
 get_stat(WT_SESSION *stat_session, int stat_field, uint64_t *valuep)
 {
 	WT_CURSOR *statc;
-	const char *desc, *pvalue;
 	int ret;
+	const char *desc, *pvalue;
 
 	testutil_check(stat_session->open_cursor(stat_session,
 	    "statistics:", NULL, NULL, &statc));
@@ -94,9 +94,9 @@ static void
 run_ops(int dbs)
 {
 	WT_ITEM data;
-	int db_set, i, key;
 	uint32_t db;
 	uint8_t buf[MAX_VAL];
+	int db_set, i, key;
 
 	memset(buf, 0, sizeof(buf));
 	for (i = 0; i < MAX_VAL; ++i)
@@ -124,9 +124,9 @@ main(int argc, char *argv[])
 	uint64_t cond_reset, cond_wait;
 	uint64_t *cond_reset_orig;
 	int cfg, ch, dbs, i;
-	bool idle;
-	const char *working_dir, *wt_cfg;
 	char cmd[128];
+	const char *working_dir, *wt_cfg;
+	bool idle;
 
 	(void)testutil_set_progname(argv);
 

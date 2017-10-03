@@ -212,9 +212,11 @@ struct __wt_lsm_tree {
 	struct timespec last_flush_time;/* Time last flush finished */
 	uint64_t chunks_flushed;	/* Count of chunks flushed since open */
 	struct timespec merge_aggressive_time;/* Time for merge aggression */
-	struct timespec work_push_time;	/* Time last work unit added */
 	uint64_t merge_progressing;	/* Bumped when merges are active */
 	uint32_t merge_syncing;		/* Bumped when merges are syncing */
+	struct timespec last_active;	/* Time last work unit added */
+	uint64_t mgr_work_count;	/* Manager work count */
+	uint64_t work_count;		/* Work units added */
 
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;

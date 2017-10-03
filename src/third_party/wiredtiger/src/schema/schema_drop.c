@@ -18,8 +18,8 @@ __drop_file(
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	bool remove_files;
 	const char *filename;
+	bool remove_files;
 
 	WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
 	remove_files = cval.val != 0;
@@ -81,8 +81,8 @@ static int
 __drop_index(
     WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
-	WT_INDEX *idx;
 	WT_DECL_RET;
+	WT_INDEX *idx;
 
 	/* If we can get the index, detach it from the table. */
 	if ((ret = __wt_schema_get_index(session, uri, true, force, &idx)) == 0)
@@ -104,8 +104,8 @@ __drop_table(
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_TABLE *table;
-	const char *name;
 	u_int i;
+	const char *name;
 	bool tracked;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));

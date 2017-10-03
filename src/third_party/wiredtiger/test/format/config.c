@@ -33,9 +33,9 @@ static void	   config_checksum(void);
 static void	   config_compression(const char *);
 static void	   config_encryption(void);
 static const char *config_file_type(u_int);
-static CONFIG	  *config_find(const char *, size_t);
+static void	   config_helium_reset(void);
 static void	   config_in_memory(void);
-static void	   config_in_memory_check(void);
+static void	   config_in_memory_reset(void);
 static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
 static void	   config_lrt(void);
@@ -143,13 +143,12 @@ config_setup(void)
 
 	/* Required shared libraries. */
 	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
-		testutil_die(errno,
-		    "Levyx/helium shared library: %s", HELIUM_PATH);
+		testutil_die(errno, "Helium shared library: %s", HELIUM_PATH);
 	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
 		testutil_die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
 
 	/* Some data-sources don't support user-specified collations. */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb"))
 		config_single("reverse=off", 0);
 
 	/*
@@ -179,21 +178,37 @@ config_setup(void)
 			g.c_cache = g.c_threads;
 	}
 
+	/* Give Helium configuration a final review. */
+	if (DATASOURCE("helium"))
+		config_helium_reset();
+
 	/* Give in-memory configuration a final review. */
-	config_in_memory_check();
+	if (g.c_in_memory != 0)
+		config_in_memory_reset();
 
 	/*
-	 * Run-length configured by a number of operations and a timer. If the
-	 * operation count and the timer are both set by a configuration, there
-	 * isn't anything to do. If only the operation count was configured,
-	 * set a default maximum-run of 20 minutes. If only the timer is set,
-	 * clear the operations count (which was set randomly).
+	 * Run-length is configured by a number of operations and a timer.
+	 *
+	 * If the operation count and the timer are both configured, do nothing.
+	 * If only the timer is configured, clear the operations count.
+	 * If only the operation count is configured, limit the run to 6 hours.
+	 * If neither is configured, leave the operations count alone and limit
+	 * the run to 30 minutes.
+	 *
+	 * In other words, if we rolled the dice on everything, do a short run.
+	 * If we chose a number of operations but the rest of the configuration
+	 * means operations take a long time to complete (for example, a small
+	 * cache and many worker threads), don't let it run forever.
 	 */
 	if (config_is_perm("timer")) {
 		if (!config_is_perm("ops"))
 			config_single("ops=0", 0);
-	} else
-		config_single("timer=20", 0);
+	} else {
+		if (!config_is_perm("ops"))
+			config_single("timer=30", 0);
+		else
+			config_single("timer=360", 0);
+	}
 
 	/*
 	 * Key/value minimum/maximum are related, correct unless specified by
@@ -247,8 +262,8 @@ config_checksum(void)
 static void
 config_compression(const char *conf_name)
 {
-	const char *cstr;
 	char confbuf[128];
+	const char *cstr;
 
 	/* Return if already specified. */
 	if (config_is_perm(conf_name))
@@ -338,6 +353,36 @@ config_encryption(void)
 }
 
 /*
+ * config_helium_reset --
+ *	Helium configuration review.
+ */
+static void
+config_helium_reset(void)
+{
+	/* Turn off a lot of stuff. */
+	if (!config_is_perm("alter"))
+		config_single("alter=off", 0);
+	if (!config_is_perm("backups"))
+		config_single("backups=off", 0);
+	if (!config_is_perm("checkpoints"))
+		config_single("checkpoints=off", 0);
+	if (!config_is_perm("compression"))
+		config_single("compression=none", 0);
+	if (!config_is_perm("in_memory"))
+		config_single("in_memory=off", 0);
+	if (!config_is_perm("logging"))
+		config_single("logging=off", 0);
+	if (!config_is_perm("rebalance"))
+		config_single("rebalance=off", 0);
+	if (!config_is_perm("reverse"))
+		config_single("reverse=off", 0);
+	if (!config_is_perm("salvage"))
+		config_single("salvage=off", 0);
+	if (!config_is_perm("transaction_timestamps"))
+		config_single("transaction_timestamps=off", 0);
+}
+
+/*
  * config_in_memory --
  *	Periodically set up an in-memory configuration.
  */
@@ -372,16 +417,13 @@ config_in_memory(void)
 }
 
 /*
- * config_in_memory_check --
+ * config_in_memory_reset --
  *	In-memory configuration review.
  */
 static void
-config_in_memory_check(void)
+config_in_memory_reset(void)
 {
 	uint32_t cache;
-
-	if (g.c_in_memory == 0)
-		return;
 
 	/* Turn off a lot of stuff. */
 	if (!config_is_perm("alter"))
@@ -651,7 +693,7 @@ void
 config_file(const char *name)
 {
 	FILE *fp;
-	char *p, buf[256];
+	char buf[256], *p;
 
 	if ((fp = fopen(name, "r")) == NULL)
 		testutil_die(errno, "fopen: %s", name);
@@ -707,6 +749,35 @@ config_reset(void)
 }
 
 /*
+ * config_find
+ *	Find a specific configuration entry.
+ */
+static CONFIG *
+config_find(const char *s, size_t len, bool fatal)
+{
+	CONFIG *cp;
+
+	for (cp = c; cp->name != NULL; ++cp)
+		if (strncmp(s, cp->name, len) == 0 && cp->name[len] == '\0')
+			return (cp);
+
+	/*
+	 * Optionally ignore unknown keywords, it makes it easier to run old
+	 * CONFIG files.
+	 */
+	if (fatal) {
+		fprintf(stderr,
+		    "%s: %s: unknown required configuration keyword\n",
+		    progname, s);
+		exit(EXIT_FAILURE);
+	}
+	fprintf(stderr,
+	    "%s: %s: WARNING, ignoring unknown configuration keyword\n",
+	    progname, s);
+	return (NULL);
+}
+
+/*
  * config_single --
  *	Set a single configuration structure value.
  */
@@ -725,7 +796,9 @@ config_single(const char *s, int perm)
 		exit(EXIT_FAILURE);
 	}
 
-	cp = config_find(s, (size_t)(ep - s));
+	if ((cp = config_find(s, (size_t)(ep - s), false)) == NULL)
+		return;
+
 	F_SET(cp, perm ? C_PERM : C_TEMP);
 	++ep;
 
@@ -911,25 +984,6 @@ config_map_isolation(const char *s, u_int *vp)
 }
 
 /*
- * config_find
- *	Find a specific configuration entry.
- */
-static CONFIG *
-config_find(const char *s, size_t len)
-{
-	CONFIG *cp;
-
-	for (cp = c; cp->name != NULL; ++cp)
-		if (strncmp(s, cp->name, len) == 0 && cp->name[len] == '\0')
-			return (cp);
-
-	fprintf(stderr,
-	    "%s: %s: unknown configuration keyword\n", progname, s);
-	config_error();
-	exit(EXIT_FAILURE);
-}
-
-/*
  * config_is_perm
  *	Return if a specific configuration entry was permanently set.
  */
@@ -938,7 +992,7 @@ config_is_perm(const char *s)
 {
 	CONFIG *cp;
 
-	cp = config_find(s, strlen(s));
+	cp = config_find(s, strlen(s), true);
 	return (F_ISSET(cp, C_PERM) ? 1 : 0);
 }
 
