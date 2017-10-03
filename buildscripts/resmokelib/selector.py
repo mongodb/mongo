@@ -203,14 +203,29 @@ class _TestList(object):
         self._filtered = {test for test in self._filtered
                           if tag_expression(get_tags(test))}
 
-    def match_pattern(self, pattern):
-        """Filters the test list to only include tests that match the given glob pattern."""
-        self._filtered = {test_file for test_file in self._filtered
-                          if test_file == pattern or fnmatch.fnmatchcase(test_file, pattern)}
+    def include_any_pattern(self, patterns):
+        """
+        Filters the test list to only include tests that match any of the given glob patterns.
+        """
+        def match(test):
+            for pattern in patterns:
+                if test == pattern or fnmatch.fnmatchcase(test, pattern):
+                    return True
+            return False
+
+        self._filtered = {test for test in self._filtered if match(test)}
 
     def get_tests(self):
-        """Returns the test list as a list(str)."""
-        return [f for f in self._roots if f in self._filtered]
+        """
+        Returns the test list as a list(str).
+
+        The tests are returned in the same order as they are found in the root tests.
+        """
+        tests = []
+        for test in self._roots:
+            if test in self._filtered and test not in tests:
+                tests.append(test)
+        return tests
 
 
 ##############################
@@ -475,6 +490,11 @@ class _DbTestSelector(_Selector):
         _Selector.__init__(self, test_file_explorer)
 
     def select(self, selector_config):
+        if config.INCLUDE_WITH_ANY_TAGS:
+            # The db_tests do not currently support tags so we always return an empty array when the
+            # --includeWithAnyTags option is used.
+            return []
+
         if selector_config.roots:
             return selector_config.roots
 
@@ -487,8 +507,7 @@ class _DbTestSelector(_Selector):
             return dbtests
 
         test_files = _TestList(self._test_file_explorer, dbtests)
-        for suite_pattern in selector_config.include_suites:
-            test_files.match_pattern(suite_pattern)
+        test_files.include_any_pattern(selector_config.include_suites)
 
         return test_files.get_tests()
 

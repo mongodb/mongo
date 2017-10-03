@@ -219,11 +219,30 @@ class TestTestList(unittest.TestCase):
         self.assertEqual(["dir/subdir1/test11.js",
                           "dir/subdir1/test12.js"], test_list.get_tests())
 
-    def test_match_pattern(self):
+    def test_include_any_pattern(self):
         roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*", "dir/subdir3/a/test3a1.js"]
+        # 1 pattern and 1 matching
         test_list = selector._TestList(self.test_file_explorer, roots)
-        test_list.match_pattern("dir/*3/a/*")
+        test_list.include_any_pattern(["dir/*3/a/*"])
         self.assertEqual(["dir/subdir3/a/test3a1.js"], test_list.get_tests())
+        # 1 pattern and 0 matching
+        test_list = selector._TestList(self.test_file_explorer, roots)
+        test_list.include_any_pattern(["dir/*4/a/*"])
+        self.assertEqual([], test_list.get_tests())
+        # 3 patterns and 1 matching
+        test_list = selector._TestList(self.test_file_explorer, roots)
+        test_list.include_any_pattern(["dir/*3/a/*", "notmaching/*", "notmatching2/*.js"])
+        self.assertEqual(["dir/subdir3/a/test3a1.js"], test_list.get_tests())
+        # 3 patterns and 0 matching
+        test_list = selector._TestList(self.test_file_explorer, roots)
+        test_list.include_any_pattern(["dir2/*3/a/*", "notmaching/*", "notmatching2/*.js"])
+        self.assertEqual([], test_list.get_tests())
+        # 3 patterns and 3 matching
+        test_list = selector._TestList(self.test_file_explorer, roots)
+        test_list.include_any_pattern(["dir/*1/*11*", "dir/subdir3/**", "dir/subdir2/*.js"])
+        self.assertEqual(["dir/subdir1/test11.js", "dir/subdir2/test21.js",
+                          "dir/subdir3/a/test3a1.js"],
+                         test_list.get_tests())
 
     def test_include_tests_no_force(self):
         roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*"]
