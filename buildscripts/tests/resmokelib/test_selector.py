@@ -329,6 +329,16 @@ class TestFilterTests(unittest.TestCase):
         selected = selector.filter_tests("cpp_integration_test", config, self.test_file_explorer)
         self.assertEqual(["dir/root/testA.cpp", "dir/root/testB.cpp"], selected)
 
+    def test_cpp_roots_override(self):
+        # When roots are specified for cpp tests they override all filtering since
+        # 'roots' are populated with the command line arguments.
+        config = {"include_files": "unknown_file",
+                  "roots": ["cpptestOverride"]}
+        selected = selector.filter_tests("cpp_unit_test", config, self.test_file_explorer)
+        self.assertEqual(["cpptestOverride"], selected)
+        selected = selector.filter_tests("cpp_integration_test", config, self.test_file_explorer)
+        self.assertEqual(["cpptestOverride"], selected)
+
     def test_cpp_with_any_tags(self):
         buildscripts.resmokelib.config.INCLUDE_WITH_ANY_TAGS = ["tag1"]
         try:
@@ -396,6 +406,15 @@ class TestFilterTests(unittest.TestCase):
         config = {"binary": self.test_file_explorer.binary}
         selected = selector.filter_tests("db_test", config, self.test_file_explorer)
         self.assertEqual(["dbtestA", "dbtestB", "dbtestC"], selected)
+
+    def test_db_tests_roots_override(self):
+        # When roots are specified for db_tests they override all filtering since
+        # 'roots' are populated with the command line arguments.
+        config = {"binary": self.test_file_explorer.binary,
+                  "include_suites": ["dbtestB"],
+                  "roots": ["dbtestOverride"]}
+        selected = selector.filter_tests("db_test", config, self.test_file_explorer)
+        self.assertEqual(["dbtestOverride"], selected)
 
     def test_db_tests_include_suites(self):
         config = {"binary": self.test_file_explorer.binary,

@@ -451,10 +451,16 @@ class _JSTestSelector(_Selector):
 
 class _CppTestSelectorConfig(_SelectorConfig):
     """_SelectorConfig subclass for cpp_integration_test and cpp_unit_test tests."""
-    def __init__(self, root=config.DEFAULT_INTEGRATION_TEST_LIST,
+    def __init__(self, root=config.DEFAULT_INTEGRATION_TEST_LIST, roots=None,
                  include_files=None, exclude_files=None):
-        _SelectorConfig.__init__(self, root=root,
-                                 include_files=include_files, exclude_files=exclude_files)
+        if roots:
+            # The 'roots' argument is only present when tests are specified on the command line
+            # and in that case they take precedence over the tests in the root file.
+            _SelectorConfig.__init__(self, roots=roots,
+                                     include_files=include_files, exclude_files=exclude_files)
+        else:
+            _SelectorConfig.__init__(self, root=root,
+                                     include_files=include_files, exclude_files=exclude_files)
 
 
 class _CppTestSelector(_Selector):
@@ -464,6 +470,8 @@ class _CppTestSelector(_Selector):
 
     def select(self, selector_config):
         if selector_config.roots:
+            # Tests have been specified on the command line. We use them without additional
+            # filtering.
             return selector_config.roots
         return _Selector.select(self, selector_config)
 
@@ -496,6 +504,8 @@ class _DbTestSelector(_Selector):
             return []
 
         if selector_config.roots:
+            # Tests have been specified on the command line. We use them without additional
+            # filtering.
             return selector_config.roots
 
         if not self._test_file_explorer.isfile(selector_config.binary):
