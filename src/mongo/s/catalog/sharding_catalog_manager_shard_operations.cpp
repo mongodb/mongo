@@ -339,9 +339,12 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                     << " as a shard: "
                                     << status.reason());
     }
-    if (serverGlobalParams.featureCompatibility.version.load() !=
-            ServerGlobalParams::FeatureCompatibility::Version::k34 &&
-        maxWireVersion < WireVersion::LATEST_WIRE_VERSION) {
+    if ((serverGlobalParams.featureCompatibility.version.load() ==
+             ServerGlobalParams::FeatureCompatibility::Version::k36 &&
+         maxWireVersion < WireVersion::LATEST_WIRE_VERSION) ||
+        (serverGlobalParams.featureCompatibility.version.load() ==
+             ServerGlobalParams::FeatureCompatibility::Version::k34 &&
+         maxWireVersion < WireVersion::LATEST_WIRE_VERSION - 1)) {
         return {ErrorCodes::IncompatibleServerVersion,
                 str::stream() << "Cannot add " << connectionString.toString()
                               << " as a shard because its binary version is not compatible with "

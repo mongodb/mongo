@@ -583,12 +583,12 @@ TEST_F(AddShardTest, AddMongosAsShard) {
             ShardingCatalogManager::get(operationContext())
                 ->addShard(
                     operationContext(), &expectedShardName, ConnectionString(shardTarget), 100);
-        ASSERT_EQUALS(ErrorCodes::RPCProtocolNegotiationFailed, status);
+        ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
     });
 
-    Status rpcProtocolNegFailedStatus =
-        Status(ErrorCodes::RPCProtocolNegotiationFailed, "Unable to communicate");
-    expectIsMaster(shardTarget, rpcProtocolNegFailedStatus);
+    expectIsMaster(shardTarget,
+                   BSON("msg"
+                        << "isdbgrid"));
 
     future.timed_get(kLongFutureTimeout);
 }
