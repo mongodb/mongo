@@ -401,7 +401,7 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session,
  *	Initialize the slot array.
  */
 int
-__wt_log_slot_init(WT_SESSION_IMPL *session)
+__wt_log_slot_init(WT_SESSION_IMPL *session, bool alloc)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -423,15 +423,17 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 * switch log files very aggressively.  Scale back the buffer for
 	 * small log file sizes.
 	 */
-	log->slot_buf_size = (uint32_t)WT_MIN(
-	    (size_t)conn->log_file_max / 10, WT_LOG_SLOT_BUF_SIZE);
-	for (i = 0; i < WT_SLOT_POOL; i++) {
-		WT_ERR(__wt_buf_init(session,
-		    &log->slot_pool[i].slot_buf, log->slot_buf_size));
-		F_SET(&log->slot_pool[i], WT_SLOT_INIT_FLAGS);
+	if (alloc) {
+		log->slot_buf_size = (uint32_t)WT_MIN(
+		    (size_t)conn->log_file_max / 10, WT_LOG_SLOT_BUF_SIZE);
+		for (i = 0; i < WT_SLOT_POOL; i++) {
+			WT_ERR(__wt_buf_init(session,
+			    &log->slot_pool[i].slot_buf, log->slot_buf_size));
+			F_SET(&log->slot_pool[i], WT_SLOT_INIT_FLAGS);
+		}
+		WT_STAT_CONN_SET(session,
+		    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
 	}
-	WT_STAT_CONN_SET(session,
-	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
 	/*
 	 * Set up the available slot from the pool the first time.
 	 */

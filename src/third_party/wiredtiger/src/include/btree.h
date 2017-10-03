@@ -142,25 +142,36 @@ struct __wt_btree {
 	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
 	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
 
-	WT_REF	   *evict_ref;		/* Eviction thread's location */
-	uint64_t    evict_priority;	/* Relative priority of cached pages */
-	u_int	    evict_walk_period;	/* Skip this many LRU walks */
-	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
-	u_int	    evict_walk_skips;	/* Number of walks skipped */
-	int	    evict_disabled;	/* Eviction disabled count */
-	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-	int	    evict_start_type;	/* Start position for eviction walk
-					   (see WT_EVICT_WALK_START). */
-	enum {
-		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
-	} checkpointing;		/* Checkpoint in progress */
-
 	/*
 	 * We flush pages from the tree (in order to make checkpoint faster),
 	 * without a high-level lock.  To avoid multiple threads flushing at
 	 * the same time, lock the tree.
 	 */
 	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
+
+	/*
+	 * All of the following fields live at the end of the structure so it's
+	 * easier to clear everything but the fields that persist.
+	 */
+#define	WT_BTREE_CLEAR_SIZE	(offsetof(WT_BTREE, evict_ref))
+
+	/*
+	 * Eviction information is maintained in the btree handle, but owned by
+	 * eviction, not the btree code.
+	 */
+	WT_REF	   *evict_ref;		/* Eviction thread's location */
+	uint64_t    evict_priority;	/* Relative priority of cached pages */
+	u_int	    evict_walk_period;	/* Skip this many LRU walks */
+	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
+	u_int	    evict_walk_skips;	/* Number of walks skipped */
+	int	    evict_disabled;	/* Eviction disabled count */
+	bool	    evict_disabled_open;/* Eviction disabled on open */
+	volatile uint32_t evict_busy;	/* Count of threads in eviction */
+	int	    evict_start_type;	/* Start position for eviction walk
+					   (see WT_EVICT_WALK_START). */
+	enum {
+		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
+	} checkpointing;		/* Checkpoint in progress */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_ALLOW_SPLITS	0x000100 /* Allow splits, even with no evict */

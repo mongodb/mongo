@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn02.py
-#   Transactions: commits and rollbacks
+# test_txn09.py
+#   Transactions: recovery toggling logging
 #
 
 import fnmatch, os, shutil, time

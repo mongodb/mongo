@@ -8,6 +8,7 @@
 
 #include "wt_internal.h"
 
+static int __log_newfile(WT_SESSION_IMPL *, bool, bool *);
 static int __log_openfile(
 	WT_SESSION_IMPL *, WT_FH **, const char *, uint32_t, uint32_t);
 static int __log_write_internal(
@@ -439,6 +440,59 @@ __wt_log_extract_lognum(
 	    sscanf(++p, "%" SCNu32, id) != 1)
 		WT_RET_MSG(session, WT_ERROR, "Bad log file name '%s'", name);
 	return (0);
+}
+
+/*
+ * __wt_log_reset --
+ *	Reset the existing log file to after the given file number.
+ *	Called from recovery when toggling logging back on, it was off
+ *	the previous open but it was on earlier before that toggle.
+ */
+int
+__wt_log_reset(WT_SESSION_IMPL *session, uint32_t lognum)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	uint32_t old_lognum;
+	u_int i, logcount;
+	char **logfiles;
+
+	conn = S2C(session);
+	log = conn->log;
+
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||
+	    log->fileid > lognum)
+		return (0);
+
+	WT_ASSERT(session, F_ISSET(conn, WT_CONN_RECOVERING));
+	WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY));
+	/*
+	 * We know we're single threaded and called from recovery only when
+	 * toggling logging back on.  Therefore the only log files we have are
+	 * old and outdated and the new one created when logging opened before
+	 * recovery.  We have to remove all old log files first and then create
+	 * the new one so that log file numbers are contiguous in the file
+	 * system.
+	 */
+	WT_RET(__wt_close(session, &log->log_fh));
+	WT_RET(__log_get_files(session,
+	    WT_LOG_FILENAME, &logfiles, &logcount));
+	for (i = 0; i < logcount; i++) {
+		WT_ERR(__wt_log_extract_lognum(
+		    session, logfiles[i], &old_lognum));
+		WT_ASSERT(session, old_lognum < lognum || lognum == 1);
+		WT_ERR(__wt_log_remove(session, WT_LOG_FILENAME, old_lognum));
+	}
+	log->fileid = lognum;
+
+	/* Send in true to update connection creation LSNs. */
+	WT_WITH_SLOT_LOCK(session, log,
+	    ret = __log_newfile(session, true, NULL));
+	WT_ERR(__wt_log_slot_init(session, false));
+err:	WT_TRET(
+	    __wt_fs_directory_list_free(session, &logfiles, logcount));
+	return (ret);
 }
 
 /*
