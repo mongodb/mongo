@@ -778,6 +778,9 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     audit::logCreateCollection(&cc(), ns);
 
+    std::string uuidString =
+        (optionsWithUUID.uuid) ? optionsWithUUID.uuid.get().toString() : "none";
+    log() << "createCollection: " << ns << " with UUID: " << uuidString;
     massertStatusOK(
         _dbEntry->createCollection(opCtx, ns, optionsWithUUID, true /*allocateDefaultSpace*/));
 
