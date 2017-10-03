@@ -42,7 +42,6 @@ test/huge
 test/manydbs
 test/packing
 test/readonly
-test/recovery
 test/salvage
 test/syscall
 test/thread

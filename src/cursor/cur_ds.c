@@ -12,11 +12,17 @@
  * __curds_txn_enter --
  *	Do transactional initialization when starting an operation.
  */
-static void
-__curds_txn_enter(WT_SESSION_IMPL *session)
+static int
+__curds_txn_enter(WT_SESSION_IMPL *session, bool update)
 {
+	/* Check if we need to start an autocommit transaction. */
+	if (update)
+		WT_RET(__wt_txn_autocommit_check(session));
+
 	session->ncursors++;				/* XXX */
 	__wt_txn_cursor_op(session);
+
+	return (0);
 }
 
 /*
@@ -183,7 +189,7 @@ __curds_next(WT_CURSOR *cursor)
 	WT_STAT_CONN_INCR(session, cursor_next);
 	WT_STAT_DATA_INCR(session, cursor_next);
 
-	__curds_txn_enter(session);
+	WT_ERR(__curds_txn_enter(session, false));
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	ret = __curds_cursor_resolve(cursor, source->next(source));
@@ -211,7 +217,7 @@ __curds_prev(WT_CURSOR *cursor)
 	WT_STAT_CONN_INCR(session, cursor_prev);
 	WT_STAT_DATA_INCR(session, cursor_prev);
 
-	__curds_txn_enter(session);
+	WT_ERR(__curds_txn_enter(session, false));
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	ret = __curds_cursor_resolve(cursor, source->prev(source));
@@ -263,7 +269,7 @@ __curds_search(WT_CURSOR *cursor)
 	WT_STAT_CONN_INCR(session, cursor_search);
 	WT_STAT_DATA_INCR(session, cursor_search);
 
-	__curds_txn_enter(session);
+	WT_ERR(__curds_txn_enter(session, false));
 
 	WT_ERR(__curds_key_set(cursor));
 	ret = __curds_cursor_resolve(cursor, source->search(source));
@@ -291,7 +297,7 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 	WT_STAT_CONN_INCR(session, cursor_search_near);
 	WT_STAT_DATA_INCR(session, cursor_search_near);
 
-	__curds_txn_enter(session);
+	WT_ERR(__curds_txn_enter(session, false));
 
 	WT_ERR(__curds_key_set(cursor));
 	ret =
@@ -317,7 +323,7 @@ __curds_insert(WT_CURSOR *cursor)
 
 	CURSOR_UPDATE_API_CALL(cursor, session, insert);
 
-	__curds_txn_enter(session);
+	WT_ERR(__curds_txn_enter(session, true));
 
 	WT_STAT_CONN_INCR(session, cursor_insert);
 	WT_STAT_DATA_INCR(session, cursor_insert);
@@ -354,7 +360,7 @@ __curds_update(WT_CURSOR *cursor)
 	WT_STAT_DATA_INCR(session, cursor_update);
 	WT_STAT_DATA_INCRV(session, cursor_update_bytes, cursor->value.size);
 
-	__curds_txn_enter(session);
+	WT_ERR(__curds_txn_enter(session, true));
 
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
@@ -385,10 +391,39 @@ __curds_remove(WT_CURSOR *cursor)
 	WT_STAT_DATA_INCR(session, cursor_remove);
 	WT_STAT_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
-	__curds_txn_enter(session);
+	WT_ERR(__curds_txn_enter(session, true));
 
 	WT_ERR(__curds_key_set(cursor));
 	ret = __curds_cursor_resolve(cursor, source->remove(source));
+
+err:	__curds_txn_leave(session);
+
+	CURSOR_UPDATE_API_END(session, ret);
+	return (ret);
+}
+
+/*
+ * __curds_reserve --
+ *	WT_CURSOR.reserve method for the data-source cursor type.
+ */
+static int
+__curds_reserve(WT_CURSOR *cursor)
+{
+	WT_CURSOR *source;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+
+	CURSOR_UPDATE_API_CALL(cursor, session, reserve);
+
+	WT_STAT_CONN_INCR(session, cursor_reserve);
+	WT_STAT_DATA_INCR(session, cursor_reserve);
+
+	WT_ERR(__curds_txn_enter(session, true));
+
+	WT_ERR(__curds_key_set(cursor));
+	ret = __curds_cursor_resolve(cursor, source->reserve(source));
 
 err:	__curds_txn_leave(session);
 
@@ -459,7 +494,7 @@ __wt_curds_open(
 	    __wt_cursor_modify_notsup,		/* modify */
 	    __curds_update,			/* update */
 	    __curds_remove,			/* remove */
-	    __wt_cursor_notsup,			/* reserve */
+	    __curds_reserve,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
 	    __curds_close);			/* close */
 	WT_CONFIG_ITEM cval, metadata;
@@ -495,12 +530,15 @@ __wt_curds_open(
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
 	/* Data-source cursors may have a custom collator. */
-	WT_ERR(
-	    __wt_config_getones(session, metaconf, "app_metadata", &metadata));
-	WT_ERR(__wt_config_gets_none(session, cfg, "collator", &cval));
-	if (cval.len != 0)
+	ret = __wt_config_getones(session, metaconf, "collator", &cval);
+	if (ret == 0 && cval.len != 0) {
+		WT_CLEAR(metadata);
+		WT_ERR_NOTFOUND_OK(__wt_config_getones(
+		    session, metaconf, "app_metadata", &metadata));
 		WT_ERR(__wt_collator_config(session, uri, &cval, &metadata,
 		    &data_source->collator, &data_source->collator_owned));
+	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 	WT_ERR(dsrc->open_cursor(dsrc,
 	    &session->iface, uri, (WT_CONFIG_ARG *)cfg, &data_source->source));

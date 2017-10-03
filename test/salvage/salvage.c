@@ -472,8 +472,8 @@ build(int ikey, int ivalue, int cnt)
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
 	WT_SESSION *session;
-	char config[256], kbuf[64], vbuf[64];
 	int new_slvg;
+	char config[256], kbuf[64], vbuf[64];
 
 	/*
 	 * Disable logging: we're modifying files directly, we don't want to

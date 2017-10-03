@@ -224,11 +224,12 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 		if (mmrand(NULL, 0, 5) == 1 &&
 		    memcmp(g.uri, "file:", strlen("file:")) == 0)
 			CONFIG_APPEND(p,
-			    ",statistics=(fast)"
-			    ",statistics_log=(wait=5,sources=(\"file:\"))");
+			    ",statistics=(fast),statistics_log="
+			    "(json,on_close,wait=5,sources=(\"file:\"))");
 		else
 			CONFIG_APPEND(p,
-			    ",statistics=(fast),statistics_log=(wait=5)");
+			    ",statistics=(fast),statistics_log="
+			    "(json,on_close,wait=5)");
 	} else
 		CONFIG_APPEND(p,
 		    ",statistics=(%s)", g.c_statistics ? "fast" : "none");
@@ -581,7 +582,7 @@ wts_stats(void)
 	FILE *fp;
 	size_t len;
 	char *stat_name;
-	const char *pval, *desc;
+	const char *desc, *pval;
 	uint64_t v;
 
 	/* Ignore statistics if they're not configured. */

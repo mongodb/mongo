@@ -115,7 +115,7 @@ check_results(TEST_OPTS *opts, uint64_t *foundp)
 	uint64_t count, idxcount, nrecords;
 	uint32_t rndint;
 	int key, key_got, ret, v0, v1, v2;
-	char *bigref, *big;
+	char *big, *bigref;
 
 	testutil_check(create_big_string(&bigref));
 	nrecords = opts->nrecords;
@@ -213,7 +213,8 @@ check_values(WT_CURSOR *cursor, int v0, int v1, int v2, char *big)
  * create_big_string --
  *	Create and fill the "reference" big array.
  */
-static int create_big_string(char **bigp)
+static int
+create_big_string(char **bigp)
 {
 	size_t i, mod;
 	char *big;

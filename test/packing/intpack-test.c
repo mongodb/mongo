@@ -32,8 +32,8 @@ int
 main(void)
 {
 	uint64_t ncalls, r, r2, s;
-	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
 	uint8_t *p;
+	uint8_t buf[WT_INTPACK64_MAXSIZE + 8];	/* -Werror=array-bounds */
 	const uint8_t *cp;
 	size_t used_len;
 	int i;

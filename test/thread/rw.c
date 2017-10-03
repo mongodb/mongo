@@ -186,7 +186,7 @@ reader(void *arg)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	u_int i;
-	int id, ret;
+	int id;
 	char tid[128];
 
 	id = (int)(uintptr_t)arg;
@@ -201,27 +201,20 @@ reader(void *arg)
 
 	if (session_per_op) {
 		for (i = 0; i < s->nops; ++i, ++s->reads, __wt_yield()) {
-			if ((ret = conn->open_session(
-			    conn, NULL, NULL, &session)) != 0)
-				testutil_die(ret, "conn.open_session");
-			if ((ret = session->open_cursor(
-			    session, s->name, NULL, NULL, &cursor)) != 0)
-				testutil_die(ret, "session.open_cursor");
+			testutil_check(
+			    conn->open_session(conn, NULL, NULL, &session));
+			testutil_check(session->open_cursor(
+			    session, s->name, NULL, NULL, &cursor));
 			reader_op(session, cursor, s);
-			if ((ret = session->close(session, NULL)) != 0)
-				testutil_die(ret, "session.close");
+			testutil_check(session->close(session, NULL));
 		}
 	} else {
-		if ((ret = conn->open_session(
-		    conn, NULL, NULL, &session)) != 0)
-			testutil_die(ret, "conn.open_session");
-		if ((ret = session->open_cursor(
-		    session, s->name, NULL, NULL, &cursor)) != 0)
-			testutil_die(ret, "session.open_cursor");
+		testutil_check(conn->open_session(conn, NULL, NULL, &session));
+		testutil_check(session->open_cursor(
+		    session, s->name, NULL, NULL, &cursor));
 		for (i = 0; i < s->nops; ++i, ++s->reads, __wt_yield())
 			reader_op(session, cursor, s);
-		if ((ret = session->close(session, NULL)) != 0)
-			testutil_die(ret, "session.close");
+		testutil_check(session->close(session, NULL));
 	}
 
 	printf(" read thread %2d stopping: tid: %s, file: %s\n",
@@ -238,8 +231,8 @@ static inline void
 writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *key, _key, *value, _value;
-	uint64_t keyno;
 	size_t len;
+	uint64_t keyno;
 	int ret;
 	char keybuf[64], valuebuf[64];
 
@@ -257,8 +250,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 		cursor->set_key(cursor, keyno);
 	if (keyno % 5 == 0) {
 		++s->remove;
-		if ((ret =
-		    cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND)
+		if ((ret = cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND)
 			testutil_die(ret, "cursor.remove");
 	} else {
 		++s->update;
@@ -272,8 +264,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 			value->size = (uint32_t)len;
 			cursor->set_value(cursor, value);
 		}
-		if ((ret = cursor->update(cursor)) != 0)
-			testutil_die(ret, "cursor.update");
+		testutil_check(cursor->update(cursor));
 	}
 	if (log_print)
 		testutil_check(session->log_printf(session,
@@ -291,7 +282,7 @@ writer(void *arg)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	u_int i;
-	int id, ret;
+	int id;
 	char tid[128];
 
 	id = (int)(uintptr_t)arg;
@@ -306,27 +297,20 @@ writer(void *arg)
 
 	if (session_per_op) {
 		for (i = 0; i < s->nops; ++i, __wt_yield()) {
-			if ((ret = conn->open_session(
-			    conn, NULL, NULL, &session)) != 0)
-				testutil_die(ret, "conn.open_session");
-			if ((ret = session->open_cursor(
-			    session, s->name, NULL, NULL, &cursor)) != 0)
-				testutil_die(ret, "session.open_cursor");
+			testutil_check(conn->open_session(
+			    conn, NULL, NULL, &session));
+			testutil_check(session->open_cursor(
+			    session, s->name, NULL, NULL, &cursor));
 			writer_op(session, cursor, s);
-			if ((ret = session->close(session, NULL)) != 0)
-				testutil_die(ret, "session.close");
+			testutil_check(session->close(session, NULL));
 		}
 	} else {
-		if ((ret = conn->open_session(
-		    conn, NULL, NULL, &session)) != 0)
-			testutil_die(ret, "conn.open_session");
-		if ((ret = session->open_cursor(
-		    session, s->name, NULL, NULL, &cursor)) != 0)
-			testutil_die(ret, "session.open_cursor");
+		testutil_check(conn->open_session(conn, NULL, NULL, &session));
+		testutil_check(session->open_cursor(
+		    session, s->name, NULL, NULL, &cursor));
 		for (i = 0; i < s->nops; ++i, __wt_yield())
 			writer_op(session, cursor, s);
-		if ((ret = session->close(session, NULL)) != 0)
-			testutil_die(ret, "session.close");
+		testutil_check(session->close(session, NULL));
 	}
 
 	printf("write thread %2d stopping: tid: %s, file: %s\n",

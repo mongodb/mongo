@@ -70,8 +70,8 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	WT_DECL_RET;
-	va_list ap;
 	size_t len;
+	va_list ap;
 
 	for (;;) {
 		va_start(ap, fmt);
@@ -104,9 +104,9 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	WT_DECL_RET;
-	va_list ap;
 	size_t len, space;
 	char *p;
+	va_list ap;
 
 	/*
 	 * If we're appending data to an existing buffer, any data field should

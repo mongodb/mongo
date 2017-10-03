@@ -41,9 +41,9 @@ lrt(void *arg)
 	WT_SESSION *session;
 	size_t buf_len, buf_size;
 	uint64_t keyno, saved_keyno;
+	uint8_t bitfield;
 	u_int period;
 	int pinned, ret;
-	uint8_t bitfield;
 	void *buf;
 
 	(void)(arg);			/* Unused parameter */
@@ -109,7 +109,7 @@ lrt(void *arg)
 			 * most of the named snapshot logic under load.
 			 */
 			testutil_check(session->snapshot(session, "name=test"));
-			sleep(1);
+			__wt_sleep(1, 0);
 			testutil_check(session->begin_transaction(
 			    session, "snapshot=test"));
 			testutil_check(session->snapshot(
@@ -176,7 +176,7 @@ lrt(void *arg)
 		/* Sleep for short periods so we don't make the run wait. */
 		while (period > 0 && !g.workers_finished) {
 			--period;
-			sleep(1);
+			__wt_sleep(1, 0);
 		}
 		if (g.workers_finished)
 			break;

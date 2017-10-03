@@ -141,8 +141,8 @@ static inline int
 __wt_vunpack_posint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
 	uint64_t x;
-	const uint8_t *p;
 	uint8_t len;
+	const uint8_t *p;
 
 	/* There are four length bits in the first byte. */
 	p = *pp;
@@ -165,8 +165,8 @@ static inline int
 __wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
 	uint64_t x;
-	const uint8_t *p;
 	uint8_t len;
+	const uint8_t *p;
 
 	/* There are four length bits in the first byte. */
 	p = *pp;

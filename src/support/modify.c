@@ -18,8 +18,8 @@ __wt_modify_pack(WT_SESSION_IMPL *session,
 {
 	WT_ITEM *modify;
 	size_t len, *p;
-	int i;
 	uint8_t *data;
+	int i;
 
 	/*
 	 * Build the in-memory modify value. It's the entries count, followed
@@ -59,8 +59,8 @@ static int
 __modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value,
     size_t data_size, size_t offset, size_t size, const uint8_t *data)
 {
-	uint8_t *from, *to;
 	size_t len;
+	uint8_t *from, *to;
 
 	/*
 	 * Grow the buffer to the maximum size we'll need. This is pessimistic
@@ -178,8 +178,8 @@ __wt_modify_apply_api(
 int
 __wt_modify_apply(WT_SESSION_IMPL *session, WT_ITEM *value, const void *modify)
 {
+	size_t data_size, nentries, offset, size;
 	const size_t *p;
-	size_t nentries, data_size, offset, size;
 	const uint8_t *data;
 
 	/*

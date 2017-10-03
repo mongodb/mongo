@@ -440,22 +440,12 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_config_gets_def(session, cfg, "read_timestamp", 0, &cval));
 	if (cval.len > 0) {
 #ifdef HAVE_TIMESTAMPS
-		WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
-		wt_timestamp_t oldest_timestamp, stable_timestamp;
+		wt_timestamp_t ts;
 
-		WT_RET(__wt_txn_parse_timestamp(
-		    session, "read", &txn->read_timestamp, &cval));
-		WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
-		    __wt_timestamp_set(
-			&oldest_timestamp, &txn_global->oldest_timestamp);
-		    __wt_timestamp_set(
-			&stable_timestamp, &txn_global->stable_timestamp));
-		if (__wt_timestamp_cmp(
-		    &txn->read_timestamp, &oldest_timestamp) < 0)
-			WT_RET_MSG(session, EINVAL,
-			    "read timestamp %.*s older than oldest timestamp",
-			    (int)cval.len, cval.str);
-
+		WT_RET(__wt_txn_parse_timestamp(session, "read", &ts, &cval));
+		WT_RET(__wt_timestamp_validate(session,
+		    &ts, &cval, true, false, false));
+		__wt_timestamp_set(&txn->read_timestamp, &ts);
 		__wt_txn_set_read_timestamp(session);
 		txn->isolation = WT_ISO_SNAPSHOT;
 #else
@@ -572,7 +562,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	u_int i;
 	bool did_update, locked;
 #ifdef HAVE_TIMESTAMPS
-	wt_timestamp_t prev_commit_timestamp;
+	wt_timestamp_t prev_commit_timestamp, ts;
 	bool update_timestamp;
 #endif
 
@@ -592,8 +582,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	    __wt_config_gets_def(session, cfg, "commit_timestamp", 0, &cval));
 	if (cval.len != 0) {
 #ifdef HAVE_TIMESTAMPS
-		WT_ERR(__wt_txn_parse_timestamp(
-		    session, "commit", &txn->commit_timestamp, &cval));
+		WT_ERR(__wt_txn_parse_timestamp(session, "commit", &ts, &cval));
+		WT_ERR(__wt_timestamp_validate(session,
+		    &ts, &cval, true, true, true));
+		__wt_timestamp_set(&txn->commit_timestamp, &ts);
 		__wt_txn_set_commit_timestamp(session);
 #else
 		WT_ERR_MSG(session, EINVAL, "commit_timestamp requires a "
@@ -877,9 +869,9 @@ __wt_txn_init(WT_SESSION_IMPL *session, WT_SESSION_IMPL *session_ret)
 void
 __wt_txn_stats_update(WT_SESSION_IMPL *session)
 {
-	WT_TXN_GLOBAL *txn_global;
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS **stats;
+	WT_TXN_GLOBAL *txn_global;
 	uint64_t checkpoint_pinned, snapshot_pinned;
 
 	conn = S2C(session);
@@ -907,6 +899,10 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	    session, stats, txn_checkpoint_time_recent, conn->ckpt_time_recent);
 	WT_STAT_SET(
 	    session, stats, txn_checkpoint_time_total, conn->ckpt_time_total);
+	WT_STAT_SET(session,
+	    stats, txn_commit_queue_len, txn_global->commit_timestampq_len);
+	WT_STAT_SET(session,
+	    stats, txn_read_queue_len, txn_global->read_timestampq_len);
 }
 
 /*

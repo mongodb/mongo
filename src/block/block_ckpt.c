@@ -210,6 +210,33 @@ __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
 }
 
 /*
+ * __wt_block_checkpoint_start --
+ *	Start a checkpoint.
+ */
+int
+__wt_block_checkpoint_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
+{
+	WT_DECL_RET;
+
+	__wt_spin_lock(session, &block->live_lock);
+	switch (block->ckpt_state) {
+	case WT_CKPT_INPROGRESS:
+	case WT_CKPT_PANIC_ON_FAILURE:
+	case WT_CKPT_SALVAGE:
+		ret = __wt_block_panic(session, EINVAL,
+		    "%s: an unexpected checkpoint start: the checkpoint "
+		    "has already started or was configured for salvage",
+		    block->name);
+		break;
+	case WT_CKPT_NONE:
+		block->ckpt_state = WT_CKPT_INPROGRESS;
+		break;
+	}
+	__wt_spin_unlock(session, &block->live_lock);
+	return (ret);
+}
+
+/*
  * __wt_block_checkpoint --
  *	Create a new checkpoint.
  */
@@ -402,11 +429,21 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 * to stable storage.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	if (block->ckpt_inprogress)
+	switch (block->ckpt_state) {
+	case WT_CKPT_INPROGRESS:
+		block->ckpt_state = WT_CKPT_PANIC_ON_FAILURE;
+		break;
+	case WT_CKPT_NONE:
+	case WT_CKPT_PANIC_ON_FAILURE:
 		ret = __wt_block_panic(session, EINVAL,
-		    "%s: unexpected checkpoint ordering", block->name);
-	else
-		block->ckpt_inprogress = true;
+		    "%s: an unexpected checkpoint attempt: the checkpoint "
+		    "was never started or has already completed",
+		    block->name);
+		break;
+	case WT_CKPT_SALVAGE:
+		/* Salvage doesn't use the standard checkpoint APIs. */
+		break;
+	}
 	__wt_spin_unlock(session, &block->live_lock);
 	WT_RET(ret);
 
@@ -790,7 +827,8 @@ err:	__wt_scr_free(session, &tmp);
  *	Resolve a checkpoint.
  */
 int
-__wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wt_block_checkpoint_resolve(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, bool failed)
 {
 	WT_BLOCK_CKPT *ci;
 	WT_DECL_RET;
@@ -802,15 +840,32 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * information to stable storage.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	if (!block->ckpt_inprogress)
-		WT_ERR(__wt_block_panic(session, WT_ERROR,
-		    "%s: checkpoint resolution with no checkpoint in progress",
-		    block->name));
+	switch (block->ckpt_state) {
+	case WT_CKPT_INPROGRESS:
+		/* Something went wrong, but it's recoverable at our level. */
+		goto done;
+	case WT_CKPT_NONE:
+	case WT_CKPT_SALVAGE:
+		ret = __wt_block_panic(session, EINVAL,
+		    "%s: an unexpected checkpoint resolution: the checkpoint "
+		    "was never started or completed, or configured for salvage",
+		    block->name);
+		break;
+	case WT_CKPT_PANIC_ON_FAILURE:
+		if (!failed)
+			break;
+		ret = __wt_block_panic(session, EINVAL,
+		    "%s: the checkpoint failed, the system must restart",
+		    block->name);
+		break;
+	}
+	WT_ERR(ret);
 
 	if ((ret = __wt_block_extlist_merge(
 	    session, block, &ci->ckpt_avail, &ci->avail)) != 0)
 		WT_ERR(__wt_block_panic(session, ret,
-		    "%s: fatal checkpoint failure", block->name));
+		    "%s: fatal checkpoint failure during extent list merge",
+		    block->name));
 	__wt_spin_unlock(session, &block->live_lock);
 
 	/* Discard the lists remaining after the checkpoint call. */
@@ -819,7 +874,7 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	__wt_block_extlist_free(session, &ci->ckpt_discard);
 
 	__wt_spin_lock(session, &block->live_lock);
-	block->ckpt_inprogress = 0;
+done:	block->ckpt_state = WT_CKPT_NONE;
 err:	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);

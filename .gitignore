@@ -102,8 +102,11 @@ _wiredtiger.pyd
 **/examples/c/ex_thread
 **/test/bloom/t
 **/test/checkpoint/t
+**/test/csuite/test_random_abort
 **/test/csuite/test_rwlock
 **/test/csuite/test_scope
+**/test/csuite/test_timestamp_abort
+**/test/csuite/test_truncated_log
 **/test/csuite/test_wt1965_col_efficiency
 **/test/csuite/test_wt2246_col_append
 **/test/csuite/test_wt2323_join_visibility
@@ -133,9 +136,6 @@ _wiredtiger.pyd
 **/test/packing/intpack-test3
 **/test/packing/packing-test
 **/test/readonly/t
-**/test/recovery/random-abort
-**/test/recovery/timestamp-abort
-**/test/recovery/truncated-log
 **/test/salvage/t
 **/test/syscall/test_wt2336_base
 **/test/thread/t

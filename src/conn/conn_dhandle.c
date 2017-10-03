@@ -412,6 +412,10 @@ __wt_conn_dhandle_open(
 	WT_ASSERT(session,
 	     !F_ISSET(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
 
+	/* Turn off eviction. */
+	if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
+		WT_RET(__wt_evict_file_exclusive_on(session));
+
 	/*
 	 * If the handle is already open, it has to be closed so it can be
 	 * reopened with a new configuration.
@@ -425,11 +429,11 @@ __wt_conn_dhandle_open(
 	 * in the tree that can block the close.
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-		WT_RET(__wt_conn_dhandle_close(session, false, false));
+		WT_ERR(__wt_conn_dhandle_close(session, false, false));
 
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_dhandle_config_clear(session);
-	WT_RET(__conn_dhandle_config_set(session));
+	WT_ERR(__conn_dhandle_config_set(session));
 
 	switch (dhandle->type) {
 	case WT_DHANDLE_TYPE_BTREE:
@@ -477,6 +481,9 @@ __wt_conn_dhandle_open(
 err:		if (btree != NULL)
 			F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 	}
+
+	if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
+		__wt_evict_file_exclusive_off(session);
 
 	return (ret);
 }

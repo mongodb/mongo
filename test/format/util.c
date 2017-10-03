@@ -501,6 +501,68 @@ fclose_and_clear(FILE **fpp)
 }
 
 /*
+ * timestamp --
+ *	Periodically update the oldest timestamp.
+ */
+WT_THREAD_RET
+timestamp(void *arg)
+{
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	TINFO **tinfo_list, *tinfo;
+	time_t last, now;
+	uint64_t oldest_timestamp, usecs;
+	uint32_t i;
+	char config_buf[64];
+
+	tinfo_list = arg;
+
+	conn = g.wts_conn;
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+	__wt_seconds((WT_SESSION_IMPL *)session, &last);
+
+	/*
+	 * Update the oldest timestamp every 100 transactions, but at least
+	 * once every 15 seconds.
+	 */
+	while (!g.workers_finished) {
+		/* Find the lowest committed timestamp. */
+		oldest_timestamp = UINT64_MAX;
+		for (i = 0; i < g.c_threads; ++i) {
+			tinfo = tinfo_list[i];
+			if (tinfo->timestamp != 0 &&
+			    tinfo->timestamp < oldest_timestamp)
+				oldest_timestamp = tinfo->timestamp;
+		}
+
+		/*
+		 * Don't get more than 100 transactions or more than 15 seconds
+		 * out of date.
+		 */
+		if (oldest_timestamp >= g.timestamp ||
+		    g.timestamp - oldest_timestamp < 100) {
+			__wt_seconds((WT_SESSION_IMPL *)session, &now);
+			if (g.timestamp == 0 || difftime(now, last) < 15) {
+				__wt_sleep(1, 0);
+				continue;
+			}
+		}
+
+		testutil_check(__wt_snprintf(
+		    config_buf, sizeof(config_buf),
+		    "oldest_timestamp=%" PRIx64, oldest_timestamp));
+		testutil_check(conn->set_timestamp(conn, config_buf));
+
+		usecs = mmrand(NULL, 5, 40);
+		__wt_sleep(0, usecs);
+	}
+
+	testutil_check(session->close(session, NULL));
+	return (WT_THREAD_RET_VALUE);
+}
+
+/*
  * alter --
  *	Periodically alter a table's metadata.
  */
@@ -511,8 +573,8 @@ alter(void *arg)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	u_int period;
-	bool access_value;
 	char buf[32];
+	bool access_value;
 
 	(void)(arg);
 	conn = g.wts_conn;
@@ -542,7 +604,7 @@ alter(void *arg)
 			testutil_die(ret, "session.alter");
 		while (period > 0 && !g.workers_finished) {
 			--period;
-			sleep(1);
+			__wt_sleep(1, 0);
 		}
 	}
 

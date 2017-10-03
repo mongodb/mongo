@@ -17,9 +17,9 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	WT_DECL_RET;
 	size_t urilen;
 	int ch;
-	bool objname_free;
-	const char *config, *pval, *desc;
+	const char *config, *desc, *pval;
 	char *objname, *uri;
+	bool objname_free;
 
 	objname_free = false;
 	objname = uri = NULL;

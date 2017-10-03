@@ -227,8 +227,8 @@ __stash_discard(WT_SESSION_IMPL *session, int which)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_STASH *session_stash;
 	WT_STASH *stash;
-	uint64_t oldest;
 	size_t i;
+	uint64_t oldest;
 
 	conn = S2C(session);
 	session_stash = &session->stash[which];
@@ -333,8 +333,8 @@ __wt_stash_discard_all(WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session)
 {
 	WT_SESSION_STASH *session_stash;
 	WT_STASH *stash;
-	int which;
 	size_t i;
+	int which;
 
 	/*
 	 * This function is called during WT_CONNECTION.close to discard any

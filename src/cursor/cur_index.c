@@ -350,8 +350,8 @@ err:		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 static int
 __curindex_close(WT_CURSOR *cursor)
 {
-	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR **cp;
+	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
@@ -398,8 +398,8 @@ static int
 __curindex_open_colgroups(
     WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *cfg_arg[])
 {
-	WT_TABLE *table;
 	WT_CURSOR **cp;
+	WT_TABLE *table;
 	u_long arg;
 	/* Child cursors are opened with dump disabled. */
 	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL };

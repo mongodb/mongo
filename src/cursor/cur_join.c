@@ -451,9 +451,9 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 {
 	WT_COLLATOR *collator;
 	WT_CURSOR_JOIN_ENDPOINT *end, *endmax;
-	bool disjunction, passed;
 	u_int pos;
 	int cmp;
+	bool disjunction, passed;
 
 	collator = (entry->index != NULL) ? entry->index->collator : NULL;
 	endmax = &entry->ends[entry->ends_next];
@@ -1369,10 +1369,10 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_CURSOR_JOIN *child;
 	WT_CURSOR_JOIN_ENDPOINT *end;
 	WT_CURSOR_JOIN_ENTRY *entry;
-	bool hasins, needbloom, nested, range_eq;
 	size_t len;
-	u_int i, ins, nonbloom;
 	uint8_t endrange;
+	u_int i, ins, nonbloom;
+	bool hasins, needbloom, nested, range_eq;
 
 	entry = NULL;
 	hasins = needbloom = false;

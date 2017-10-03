@@ -22,8 +22,8 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie, bool old_chunks)
 {
 	WT_DECL_RET;
-	u_int i, nchunks;
 	size_t alloc;
+	u_int i, nchunks;
 
 	/* Always return zero chunks on error. */
 	cookie->nchunks = 0;
@@ -413,12 +413,12 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/* Now the file is written, get the chunk size. */
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 
-	/* Update the flush timestamp to help track ongoing progress. */
-	__wt_epoch(session, &lsm_tree->last_flush_time);
 	++lsm_tree->chunks_flushed;
 
 	/* Lock the tree, mark the chunk as on disk and update the metadata. */
 	__wt_lsm_tree_writelock(session, lsm_tree);
+	/* Update the flush timestamp to help track ongoing progress. */
+	__wt_epoch(session, &lsm_tree->last_flush_time);
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 	ret = __wt_lsm_meta_write(session, lsm_tree, NULL);
 	++lsm_tree->dsk_gen;

@@ -50,9 +50,9 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	WT_CONFIG_ITEM cval, cval_cache_size;
 	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
+	uint64_t chunk, quota, reserve, size, used_cache;
 	char *pool_name;
 	bool created, updating;
-	uint64_t chunk, quota, reserve, size, used_cache;
 
 	conn = S2C(session);
 	created = updating = false;
@@ -472,8 +472,8 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 static void
 __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 {
-	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
+	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *entry;
 	uint64_t app_evicts, app_waits, reads;
 	uint64_t balanced_size, entries, highest, tmp;
@@ -567,8 +567,8 @@ static void
 __cache_pool_adjust(WT_SESSION_IMPL *session,
     uint64_t highest, uint64_t bump_threshold, bool forward, bool *adjustedp)
 {
-	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
+	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *entry;
 	uint64_t adjustment, highest_percentile, pressure, reserved, smallest;
 	u_int pct_full;

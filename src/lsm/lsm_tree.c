@@ -329,6 +329,7 @@ int
 __wt_lsm_tree_create(WT_SESSION_IMPL *session,
     const char *uri, bool exclusive, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	const char *cfg[] =
@@ -345,6 +346,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (!F_ISSET(S2C(session), WT_CONN_READONLY)) {
+		/* LSM doesn't yet support the 'r' format. */
+		WT_ERR(__wt_config_gets(session, cfg, "key_format", &cval));
+		if (WT_STRING_MATCH("r", cval.str, cval.len))
+			WT_ERR_MSG(session, EINVAL,
+			    "LSM trees do not support a key format of 'r'");
+
 		WT_ERR(__wt_config_merge(session, cfg, NULL, &metadata));
 		WT_ERR(__wt_metadata_insert(session, uri, metadata));
 	}
@@ -455,7 +462,7 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    "must be at least %" PRIu64 " (%" PRIu64 "MB)",
 		    S2C(session)->cache_size,
 		    S2C(session)->cache_size / WT_MEGABYTE,
-		    required, required / WT_MEGABYTE);
+		    required, (required + (WT_MEGABYTE - 1))/ WT_MEGABYTE);
 	return (0);
 }
 
@@ -876,8 +883,8 @@ __wt_lsm_tree_drop(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
-	int tret;
 	u_int i;
+	int tret;
 	bool locked;
 
 	locked = false;
@@ -933,9 +940,9 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
-	const char *old;
-	int tret;
 	u_int i;
+	int tret;
+	const char *old;
 	bool locked;
 
 	old = NULL;

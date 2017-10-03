@@ -209,8 +209,8 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR **cp, *primary;
 	WT_CURSOR_TABLE *ctable;
-	va_list ap;
 	u_int i;
+	va_list ap;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	cp = ctable->cg_cursors;
@@ -244,8 +244,8 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	WT_DECL_RET;
 	WT_ITEM *item, *tmp;
 	WT_SESSION_IMPL *session;
-	va_list ap;
 	u_int i;
+	va_list ap;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
@@ -447,8 +447,8 @@ err:	API_END_RET(session, ret);
 static int
 __curtable_search_near(WT_CURSOR *cursor, int *exact)
 {
-	WT_CURSOR_TABLE *ctable;
 	WT_CURSOR *primary, **cp;
+	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
@@ -792,8 +792,8 @@ err:	__wt_scr_free(session, &key);
 static int
 __curtable_close(WT_CURSOR *cursor)
 {
-	WT_CURSOR_TABLE *ctable;
 	WT_CURSOR **cp;
+	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
@@ -866,9 +866,9 @@ __curtable_complete(WT_SESSION_IMPL *session, WT_TABLE *table)
 static int
 __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 {
+	WT_CURSOR **cp;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
-	WT_CURSOR **cp;
 	/*
 	 * Underlying column groups are always opened without dump or readonly,
 	 * and only the primary is opened with next_random.
@@ -987,15 +987,22 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	if (table->is_simple) {
 		/* Just return a cursor on the underlying data source. */
-		ret = __wt_open_cursor(session,
-		    table->cgroups[0]->source, NULL, cfg, cursorp);
+		if (table->is_simple_file)
+			ret = __wt_curfile_open(session,
+			    table->cgroups[0]->source, NULL, cfg, cursorp);
+		else
+			ret = __wt_open_cursor(session,
+			    table->cgroups[0]->source, NULL, cfg, cursorp);
 
 		WT_TRET(__wt_schema_release_table(session, table));
 		if (ret == 0) {
 			/* Fix up the public URI to match what was passed in. */
 			cursor = *cursorp;
-			__wt_free(session, cursor->uri);
-			WT_TRET(__wt_strdup(session, uri, &cursor->uri));
+			if (!F_ISSET(cursor, WT_CURSTD_URI_SHARED))
+				__wt_free(session, cursor->uri);
+			cursor->uri = table->iface.name;
+			WT_ASSERT(session, strcmp(uri, cursor->uri) == 0);
+			F_SET(cursor, WT_CURSTD_URI_SHARED);
 		}
 		return (ret);
 	}

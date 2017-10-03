@@ -207,8 +207,8 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 static void
 __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
 {
-	WT_EXTLIST *el;
 	WT_EXT *ext;
+	WT_EXTLIST *el;
 	wt_off_t decile[10], percentile[100], size, v;
 	u_int i;
 

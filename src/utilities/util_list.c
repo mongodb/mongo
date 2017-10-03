@@ -18,8 +18,8 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
 	int ch;
-	bool cflag, vflag;
 	char *uri;
+	bool cflag, vflag;
 
 	cflag = vflag = false;
 	uri = NULL;
@@ -102,8 +102,8 @@ list_print(WT_SESSION *session, const char *uri, bool cflag, bool vflag)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	bool found;
 	const char *key, *value;
+	bool found;
 
 	/* Open the metadata file. */
 	if ((ret = session->open_cursor(
@@ -175,8 +175,8 @@ static int
 list_print_checkpoint(WT_SESSION *session, const char *key)
 {
 	WT_BLOCK_CKPT ci;
-	WT_DECL_RET;
 	WT_CKPT *ckpt, *ckptbase;
+	WT_DECL_RET;
 	size_t allocsize, len;
 	time_t t;
 	uint64_t v;

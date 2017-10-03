@@ -36,8 +36,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	WT_DECL_RET;
 	size_t len;
 	int ch, i;
-	bool hex, json, reverse;
 	char *checkpoint, *config, *p, *simpleuri, *uri;
+	bool hex, json, reverse;
 
 	hex = json = reverse = false;
 	checkpoint = config = simpleuri = uri = NULL;
@@ -281,14 +281,14 @@ static int
 dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor,
     char **newconfigp)
 {
-	WT_DECL_RET;
 	WT_CONFIG_ITEM key, value;
 	WT_CONFIG_PARSER *parser;
+	WT_DECL_RET;
 	WT_EXTENSION_API *wt_api;
 	size_t len, vallen;
 	int nkeys;
-	char *newconfig;
 	const char *keyformat, *p;
+	char *newconfig;
 
 	len = strlen(config) + strlen(cursor->value_format) +
 	    strlen(cursor->uri) + 20;
@@ -367,8 +367,8 @@ dump_table_config(
     const char *uri, bool json)
 {
 	WT_DECL_RET;
-	char *proj_config;
 	const char *name, *v;
+	char *proj_config;
 
 	proj_config = NULL;
 	/* Get the table name. */
@@ -412,12 +412,12 @@ dump_table_parts_config(WT_SESSION *session, WT_CURSOR *cursor,
     const char *name, const char *entry, bool json)
 {
 	WT_DECL_RET;
-	bool multiple;
-	const char *groupname, *key, *sep;
 	size_t len;
 	int exact;
-	const char *v;
+	const char *groupname, *key, *sep;
 	char *uriprefix;
+	const char *v;
+	bool multiple;
 
 	multiple = false;
 	sep = "";

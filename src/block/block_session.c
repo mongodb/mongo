@@ -46,8 +46,8 @@ __block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 int
 __wt_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 {
-	WT_EXT *ext;
 	WT_BLOCK_MGR_SESSION *bms;
+	WT_EXT *ext;
 	u_int i;
 
 	bms = session->block_manager;

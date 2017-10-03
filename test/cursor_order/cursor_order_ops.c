@@ -49,8 +49,8 @@ void
 ops_start(SHARED_CONFIG *cfg)
 {
 	struct timeval start, stop;
-	double seconds;
 	wt_thread_t *tids;
+	double seconds;
 	uint64_t i, name_index, offset, total_nops;
 
 	tids = NULL;	/* Keep GCC 4.1 happy. */
@@ -170,8 +170,7 @@ reverse_scan_op(
 	prev_key = this_key = 0;
 
 	/* Reset the cursor */
-	if ((ret = cursor->reset(cursor)) != 0)
-		testutil_die(ret, "cursor.reset");
+	testutil_check(cursor->reset(cursor));
 
 	/* Save the key range. */
 	initial_key_range = cfg->key_range - cfg->append_inserters;
@@ -184,13 +183,11 @@ reverse_scan_op(
 		}
 
 		if (cfg->ftype == ROW) {
-			if ((ret = cursor->get_key(cursor, &strkey)) != 0)
-				testutil_die(ret, "cursor.get_key");
+			testutil_check(cursor->get_key(cursor, &strkey));
 			this_key = (uint64_t)atol(strkey);
 		} else
-			if ((ret = cursor->get_key(
-			    cursor, (uint64_t *)&this_key)) != 0)
-				testutil_die(ret, "cursor.get_key");
+			testutil_check(cursor->get_key(
+			    cursor, (uint64_t *)&this_key));
 
 		if (i == 0 && this_key < initial_key_range)
 			testutil_die(ret,
@@ -219,7 +216,6 @@ reverse_scan(void *arg)
 	WT_SESSION *session;
 	uintmax_t id;
 	uint64_t i;
-	int ret;
 	char tid[128];
 
 	id = (uintmax_t)arg;
@@ -234,17 +230,14 @@ reverse_scan(void *arg)
 
 	__wt_yield();		/* Get all the threads created. */
 
-	if ((ret = cfg->conn->open_session(
-	    cfg->conn, NULL, "isolation=snapshot", &session)) != 0)
-		testutil_die(ret, "conn.open_session");
-	if ((ret = session->open_cursor(
-	    session, s->name, NULL, NULL, &cursor)) != 0)
-		testutil_die(ret, "session.open_cursor");
+	testutil_check(cfg->conn->open_session(
+	    cfg->conn, NULL, "isolation=snapshot", &session));
+	testutil_check(session->open_cursor(
+	    session, s->name, NULL, NULL, &cursor));
 	for (i = 0; i < s->nops && !cfg->thread_finish;
 	    ++i, ++s->reverse_scans, __wt_yield())
 		reverse_scan_op(cfg, session, cursor, s);
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 
 	printf(" reverse scan thread %2" PRIuMAX
 	    " stopping: tid: %s, file: %s\n",
@@ -265,9 +258,8 @@ append_insert_op(
     SHARED_CONFIG *cfg, WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *value, _value;
-	uint64_t keyno;
 	size_t len;
-	int ret;
+	uint64_t keyno;
 	char keybuf[64], valuebuf[64];
 
 	WT_UNUSED(session);
@@ -292,8 +284,7 @@ append_insert_op(
 		value->size = (uint32_t)len;
 		cursor->set_value(cursor, value);
 	}
-	if ((ret = cursor->insert(cursor)) != 0)
-		testutil_die(ret, "cursor.insert");
+	testutil_check(cursor->insert(cursor));
 }
 
 /*
@@ -309,7 +300,6 @@ append_insert(void *arg)
 	WT_SESSION *session;
 	uintmax_t id;
 	uint64_t i;
-	int ret;
 	char tid[128];
 
 	id = (uintmax_t)arg;
@@ -323,16 +313,13 @@ append_insert(void *arg)
 
 	__wt_yield();		/* Get all the threads created. */
 
-	if ((ret = cfg->conn->open_session(
-	    cfg->conn, NULL, "isolation=snapshot", &session)) != 0)
-		testutil_die(ret, "conn.open_session");
-	if ((ret = session->open_cursor(
-	    session, s->name, NULL, NULL, &cursor)) != 0)
-		testutil_die(ret, "session.open_cursor");
+	testutil_check(cfg->conn->open_session(
+	    cfg->conn, NULL, "isolation=snapshot", &session));
+	testutil_check(session->open_cursor(
+	    session, s->name, NULL, NULL, &cursor));
 	for (i = 0; i < s->nops && !cfg->thread_finish; ++i, __wt_yield())
 		append_insert_op(cfg, session, cursor, s);
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 
 	printf("write thread %2" PRIuMAX " stopping: tid: %s, file: %s\n",
 	    id, tid, s->name);

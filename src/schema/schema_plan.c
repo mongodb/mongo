@@ -180,8 +180,8 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CONFIG_ITEM k, v;
 	WT_DECL_RET;
 	u_int cg, col, current_cg, current_col, i, start_cg, start_col;
-	bool have_it;
 	char coltype, current_coltype;
+	bool have_it;
 
 	start_cg = start_col = UINT_MAX;	/* -Wuninitialized */
 

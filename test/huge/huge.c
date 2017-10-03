@@ -84,10 +84,9 @@ static void
 run(CONFIG *cp, int bigkey, size_t bytes)
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	uint64_t keyno;
-	int ret;
 	void *p;
 
 	big[bytes - 1] = '\0';
@@ -108,17 +107,12 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	 * Open/create the database, connection, session and cursor; set the
 	 * cache size large, we don't want to try and evict anything.
 	 */
-	if ((ret = wiredtiger_open(
-	    home, NULL, "create,cache_size=10GB", &conn)) != 0)
-		testutil_die(ret, "wiredtiger_open");
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "WT_CONNECTION.open_session");
-	if ((ret = session->create(session, cp->uri, cp->config)) != 0)
-		testutil_die(ret,
-		    "WT_SESSION.create: %s %s", cp->uri, cp->config);
-	if ((ret =
-	    session->open_cursor(session, cp->uri, NULL, NULL, &cursor)) != 0)
-		testutil_die(ret, "WT_SESSION.open_cursor: %s", cp->uri);
+	testutil_check(
+	    wiredtiger_open(home, NULL, "create,cache_size=10GB", &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->create(session, cp->uri, cp->config));
+	testutil_check(
+	    session->open_cursor(session, cp->uri, NULL, NULL, &cursor));
 
 	/* Set the key/value. */
 	if (bigkey)
@@ -131,26 +125,21 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	cursor->set_value(cursor, big);
 
 	/* Insert the record (use update, insert discards the key). */
-	if ((ret = cursor->update(cursor)) != 0)
-		testutil_die(ret, "WT_CURSOR.insert");
+	testutil_check(cursor->update(cursor));
 
 	/* Retrieve the record and check it. */
-	if ((ret = cursor->search(cursor)) != 0)
-		testutil_die(ret, "WT_CURSOR.search");
-	if (bigkey && (ret = cursor->get_key(cursor, &p)) != 0)
-		testutil_die(ret, "WT_CURSOR.get_key");
-	if ((ret = cursor->get_value(cursor, &p)) != 0)
-		testutil_die(ret, "WT_CURSOR.get_value");
+	testutil_check(cursor->search(cursor));
+	if (bigkey)
+		testutil_check(cursor->get_key(cursor, &p));
+	testutil_check(cursor->get_value(cursor, &p));
 	if (memcmp(p, big, bytes) != 0)
 		testutil_die(0,
 		    "retrieved big key/value item did not match original");
 
 	/* Remove the record. */
-	if ((ret = cursor->remove(cursor)) != 0)
-		testutil_die(ret, "WT_CURSOR.remove");
+	testutil_check(cursor->remove(cursor));
 
-	if ((ret = conn->close(conn, NULL)) != 0)
-		testutil_die(ret, "WT_CONNECTION.close");
+	testutil_check(conn->close(conn, NULL));
 
 	big[bytes - 1] = 'a';
 }

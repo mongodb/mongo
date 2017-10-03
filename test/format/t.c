@@ -99,7 +99,7 @@ main(int argc, char *argv[])
 			g.c_quiet = 1;
 			break;
 		case 'r':			/* Replay a run */
-			g.replay = 1;
+			g.replay = true;
 			break;
 		default:
 			usage();

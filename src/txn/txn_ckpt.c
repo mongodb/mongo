@@ -229,8 +229,8 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 static int
 __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_NAMED_DATA_SOURCE *ndsrc;
 	WT_DATA_SOURCE *dsrc;
+	WT_NAMED_DATA_SOURCE *ndsrc;
 
 	/*
 	 * A place-holder, to support Helium devices: we assume calling the
@@ -376,10 +376,10 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 static void
 __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 {
+	struct timespec last, start, stop;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	struct timespec start, last, stop;
-	double current_dirty, delta;
+	double current_dirty, delta, scrub_min;
 	uint64_t bytes_written_last, bytes_written_start, bytes_written_total;
 	uint64_t cache_size, max_write;
 	uint64_t current_us, stepdown_us, total_ms, work_us;
@@ -405,6 +405,25 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	 */
 	if (cache_size < 10 * WT_MEGABYTE)
 		return;
+
+	/*
+	 * Skip scrubbing if it won't perform at-least some minimum amount of
+	 * work. Scrubbing is supposed to bring down the dirty data to eviction
+	 * checkpoint target before the actual checkpoint starts. Do not perform
+	 * scrubbing if the dirty data to scrub is less than a pre-configured
+	 * size. This size is to an extent based on the configured cache size
+	 * without being too large or too small for large cache sizes. For the
+	 * values chosen, for instance, 100 GB cache will require at-least
+	 * 200 MB of dirty data above eviction checkpoint target, which should
+	 * equate to a scrub phase a few seconds long. That said, the value of
+	 * 0.2% and 500 MB are still somewhat arbitrary.
+	 */
+	scrub_min = WT_MIN((0.2 * conn->cache_size) / 100, 500 * WT_MEGABYTE);
+	if (__wt_cache_dirty_leaf_inuse(cache) <
+	    ((cache->eviction_checkpoint_target * conn->cache_size) / 100) +
+	    scrub_min)
+		return;
+
 	stepdown_us = 10000;
 	work_us = 0;
 	progress = false;
@@ -708,10 +727,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
-	void *saved_meta_next;
-	u_int i;
 	uint64_t fsync_duration_usecs, generation;
+	u_int i;
 	bool failed, full, idle, logging, tracking;
+	void *saved_meta_next;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -1161,8 +1180,8 @@ __checkpoint_lock_dirty_tree(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	char *name_alloc;
 	const char *name;
+	char *name_alloc;
 	bool hot_backup_locked;
 
 	btree = S2BT(session);
@@ -1354,8 +1373,8 @@ __checkpoint_mark_skip(
 {
 	WT_BTREE *btree;
 	WT_CKPT *ckpt;
-	const char *name;
 	int deleted;
+	const char *name;
 
 	btree = S2BT(session);
 
@@ -1427,7 +1446,7 @@ __checkpoint_tree(
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_LSN ckptlsn;
-	bool fake_ckpt;
+	bool fake_ckpt, resolve_bm;
 
 	WT_UNUSED(cfg);
 
@@ -1436,7 +1455,7 @@ __checkpoint_tree(
 	ckptbase = btree->ckpt;
 	conn = S2C(session);
 	dhandle = session->dhandle;
-	fake_ckpt = false;
+	fake_ckpt = resolve_bm = false;
 
 	/*
 	 * Set the checkpoint LSN to the maximum LSN so that if logging is
@@ -1500,6 +1519,10 @@ __checkpoint_tree(
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, false, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
+	/* Tell the block manager that a file checkpoint is starting. */
+	WT_ERR(bm->checkpoint_start(bm, session));
+	resolve_bm = true;
+
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
 		WT_ERR(__wt_cache_op(session, WT_SYNC_CHECKPOINT));
@@ -1544,17 +1567,18 @@ fake:	/*
 	    session, dhandle->name, ckptbase, &ckptlsn));
 
 	/*
-	 * If we wrote a checkpoint (rather than faking one), pages may be
-	 * available for re-use.  If tracking is enabled, defer making pages
-	 * available until transaction end.  The exception is if the handle is
-	 * being discarded, in which case the handle will be gone by the time
-	 * we try to apply or unroll the meta tracking event.
+	 * If we wrote a checkpoint (rather than faking one), we have to resolve
+	 * it. Normally, tracking is enabled and resolution deferred until
+	 * transaction end. The exception is if the handle is being discarded,
+	 * in which case the handle will be gone by the time we try to apply or
+	 * unroll the meta tracking event.
 	 */
 	if (!fake_ckpt) {
+		resolve_bm = false;
 		if (WT_META_TRACKING(session) && is_checkpoint)
 			WT_ERR(__wt_meta_track_checkpoint(session));
 		else
-			WT_ERR(bm->checkpoint_resolve(bm, session));
+			WT_ERR(bm->checkpoint_resolve(bm, session, false));
 	}
 
 	/* Tell logging that the checkpoint is complete. */
@@ -1562,7 +1586,11 @@ fake:	/*
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, false, WT_TXN_LOG_CKPT_STOP, NULL));
 
-err:	/*
+err:	/* Resolved the checkpoint for the block manager in the error path. */
+	if (resolve_bm)
+		WT_TRET(bm->checkpoint_resolve(bm, session, ret != 0));
+
+	/*
 	 * If the checkpoint didn't complete successfully, make sure the
 	 * tree is marked dirty.
 	 */
@@ -1618,7 +1646,7 @@ __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
 	 * For tables with immediate durability (indicated by having logging
 	 * enabled), ignore any read timestamp configured for the checkpoint.
 	 */
-	if (!F_ISSET(btree, WT_BTREE_NO_LOGGING))
+	if (__wt_btree_immediately_durable(session))
 		F_CLR(txn, WT_TXN_HAS_TS_READ);
 
 	ret = __checkpoint_tree(session, true, cfg);

@@ -17,8 +17,8 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	WT_DECL_RET;
 	uint64_t recno;
 	int ch;
-	bool append, overwrite, rkey;
 	char *uri, config[100];
+	bool append, overwrite, rkey;
 
 	append = overwrite = false;
 	uri = NULL;

@@ -302,8 +302,8 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn, tmp_conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	bool run;
 	uint32_t i, session_flags;
+	bool run;
 
 	conn = S2C(session);
 	async = conn->async;

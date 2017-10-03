@@ -148,8 +148,8 @@ __value_return_upd(
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_UPDATE **listp, *list[WT_MODIFY_ARRAY_SIZE];
-	u_int i;
 	size_t allocated_bytes;
+	u_int i;
 
 	cursor = &cbt->iface;
 	allocated_bytes = 0;

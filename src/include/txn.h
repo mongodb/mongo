@@ -110,10 +110,12 @@ struct __wt_txn_global {
 	/* List of transactions sorted by commit timestamp. */
 	WT_RWLOCK commit_timestamp_rwlock;
 	TAILQ_HEAD(__wt_txn_cts_qh, __wt_txn) commit_timestamph;
+	uint32_t commit_timestampq_len;
 
 	/* List of transactions sorted by read timestamp. */
 	WT_RWLOCK read_timestamp_rwlock;
 	TAILQ_HEAD(__wt_txn_rts_qh, __wt_txn) read_timestamph;
+	uint32_t read_timestampq_len;
 
 	/*
 	 * Track information about the running checkpoint. The transaction

@@ -49,8 +49,8 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
     const char *name, size_t namelen, bool ok_incomplete, uint32_t flags,
     WT_TABLE **tablep)
 {
-	WT_DECL_RET;
 	WT_DECL_ITEM(namebuf);
+	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, namelen + 1, &namebuf));
 	WT_ERR(__wt_buf_fmt(

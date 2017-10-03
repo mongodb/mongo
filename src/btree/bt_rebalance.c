@@ -255,8 +255,8 @@ static int
 __rebalance_row_leaf_key(WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_len, WT_ITEM *key, WT_REBALANCE_STUFF *rs)
 {
-	WT_PAGE *page;
 	WT_DECL_RET;
+	WT_PAGE *page;
 
 	/*
 	 * We need the first key from a leaf page. Leaf pages are relatively

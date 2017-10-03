@@ -785,6 +785,7 @@ iS
 iSh
 ibackup
 icount
+idlems
 idx
 ifdef
 ifdef's
@@ -1057,7 +1058,6 @@ psp
 pthread
 ptr
 ptrdiff
-pushms
 putK
 putV
 pv
@@ -1089,6 +1089,7 @@ rebalancing
 recno
 recnos
 reconfig
+reconfigures
 reconfiguring
 recsize
 rectype
@@ -1178,6 +1179,7 @@ sublicense
 subtest
 subtree
 sunique
+supd
 superset
 sw
 sx

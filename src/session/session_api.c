@@ -675,8 +675,8 @@ static int
 __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
-	WT_SESSION_IMPL *session;
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -937,10 +937,10 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
-	bool nested;
 	uint64_t count;
 	uint32_t bloom_bit_count, bloom_hash_count;
 	uint8_t flags, range;
+	bool nested;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, join, config, cfg);
@@ -1549,12 +1549,12 @@ __transaction_sync_run_chk(WT_SESSION_IMPL *session)
 static int
 __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 {
+	struct timespec now, start;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	struct timespec now, start;
 	uint64_t remaining_usec, timeout_ms, waited_ms;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -1936,8 +1936,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
     bool open_metadata, WT_SESSION_IMPL **sessionp)
 {
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *session;
 
 	*sessionp = NULL;
 

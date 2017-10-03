@@ -35,8 +35,7 @@ file_create(const char *name)
 	int ret;
 	char config[128];
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "conn.session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "key_format=%s,"
@@ -50,8 +49,7 @@ file_create(const char *name)
 		if (ret != EEXIST)
 			testutil_die(ret, "session.create");
 
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }
 
 void
@@ -60,19 +58,16 @@ load(const char *name)
 	WT_CURSOR *cursor;
 	WT_ITEM *key, _key, *value, _value;
 	WT_SESSION *session;
-	uint64_t keyno;
 	size_t len;
-	int ret;
+	uint64_t keyno;
 	char keybuf[64], valuebuf[64];
 
 	file_create(name);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "conn.session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	if ((ret =
-	    session->open_cursor(session, name, NULL, "bulk", &cursor)) != 0)
-		testutil_die(ret, "cursor.open");
+	testutil_check(
+	    session->open_cursor(session, name, NULL, "bulk", &cursor));
 
 	key = &_key;
 	value = &_value;
@@ -96,26 +91,20 @@ load(const char *name)
 			value->size = (uint32_t)len;
 			cursor->set_value(cursor, value);
 		}
-		if ((ret = cursor->insert(cursor)) != 0)
-			testutil_die(ret, "cursor.insert");
+		testutil_check(cursor->insert(cursor));
 	}
 
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }
 
 void
 verify(const char *name)
 {
 	WT_SESSION *session;
-	int ret;
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "conn.session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	if ((ret = session->verify(session, name, NULL)) != 0)
-		testutil_die(ret, "session.create");
+	testutil_check(session->verify(session, name, NULL));
 
-	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }
