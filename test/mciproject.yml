@@ -167,20 +167,6 @@ buildvariants:
     - name: unit-test
     - name: fops
 
-- name: solaris
-  display_name: Solaris
-  run_on:
-  - solaris
-  expansions:
-    make_command: PATH=/opt/mongodbtoolchain/bin:$PATH gmake
-    test_env_vars: LD_LIBRARY_PATH=`pwd`/.libs
-    smp_command: -j $(kstat cpu | sort -u | grep -c "^module")
-    configure_env_vars: PATH=/opt/mongodbtoolchain/bin:$PATH CFLAGS="-m64"
-  tasks:
-    - name: compile
-    - name: unit-test
-    - name: fops
-
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
