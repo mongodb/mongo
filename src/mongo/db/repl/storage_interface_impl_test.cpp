@@ -2160,6 +2160,26 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterRemoveDocumentsThatMatchFilter) {
     _assertDocumentsInCollectionEquals(opCtx, nss, docsRemaining);
 }
 
+TEST_F(StorageInterfaceImplTest, DeleteByFilterExpandsDottedFieldNamesAsPaths) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    std::vector<TimestampedBSONObj> docs = {
+        {BSON("_id" << 0 << "x" << BSON("y" << 0)), SnapshotName(0)},
+        {BSON("_id" << 1 << "x" << BSON("y" << 1)), SnapshotName(0)},
+        {BSON("_id" << 2 << "x" << BSON("y" << 2)), SnapshotName(0)},
+        {BSON("_id" << 3 << "x" << BSON("y" << 3)), SnapshotName(0)}};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(docs)));
+
+    auto filter = BSON("x.y" << BSON("$gte" << 1));
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    auto docsRemaining = {BSON("_id" << 0 << "x" << BSON("y" << 0))};
+    _assertDocumentsInCollectionEquals(opCtx, nss, docsRemaining);
+}
+
 TEST_F(StorageInterfaceImplTest, DeleteByFilterUsesIdHackIfFilterContainsIdFieldOnly) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

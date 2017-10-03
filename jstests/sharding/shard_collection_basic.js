@@ -81,6 +81,16 @@
     assert.commandFailed(
         mongos.adminCommand({shardCollection: kDbName + '.foo', key: {aKey: "hahahashed"}}));
 
+    // Shard key cannot contain embedded objects.
+    assert.commandFailed(
+        mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: {a: 1}}}));
+    assert.commandFailed(
+        mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: {'a.b': 1}}}));
+
+    // Shard key can contain dotted path to embedded element.
+    assert.commandWorked(mongos.adminCommand(
+        {shardCollection: kDbName + '.shard_key_dotted_path', key: {'_id.a': 1}}));
+
     //
     // Test shardCollection's idempotency
     //

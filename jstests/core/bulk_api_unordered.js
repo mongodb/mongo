@@ -23,15 +23,12 @@ var executeTests = function() {
     coll.remove({});
 
     /**
-     * find() requires selector and $key is disallowed as field name
+     * find() requires selector.
      */
     var bulkOp = coll.initializeUnorderedBulkOp();
 
     assert.throws(function() {
         bulkOp.find();
-    });
-    assert.throws(function() {
-        bulkOp.insert({$key: 1});
     });
 
     /**

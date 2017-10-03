@@ -1,35 +1,30 @@
+(function() {
+    "use strict";
 
-t = db.drop_undefined.js;
+    const coll = db.remove_undefined;
+    coll.drop();
 
-t.insert({_id: 1});
-t.insert({_id: 2});
-t.insert({_id: null});
+    assert.writeOK(coll.insert({_id: 1}));
+    assert.writeOK(coll.insert({_id: 2}));
+    assert.writeOK(coll.insert({_id: null}));
 
-z = {
-    foo: 1,
-    x: null
-};
+    const obj = {foo: 1, nullElem: null};
 
-t.remove({x: z.bar});
-assert.eq(3, t.count(), "A1");
+    coll.remove({x: obj.bar});
+    assert.eq(3, coll.count());
 
-t.remove({x: undefined});
-assert.eq(3, t.count(), "A2");
+    coll.remove({x: undefined});
+    assert.eq(3, coll.count());
 
-assert.throws(function() {
-    t.remove({_id: z.bar});
-}, [], "B1");
-assert.throws(function() {
-    t.remove({_id: undefined});
-}, [], "B2");
+    assert.writeErrorWithCode(coll.remove({_id: obj.bar}), ErrorCodes.BadValue);
+    assert.writeErrorWithCode(coll.remove({_id: undefined}), ErrorCodes.BadValue);
 
-t.remove({_id: z.x});
-assert.eq(2, t.count(), "C1");
+    coll.remove({_id: obj.nullElem});
+    assert.eq(2, coll.count());
 
-t.insert({_id: null});
-assert.eq(3, t.count(), "C2");
+    assert.writeOK(coll.insert({_id: null}));
+    assert.eq(3, coll.count());
 
-assert.throws(function() {
-    t.remove({_id: undefined});
-}, [], "C3");
-assert.eq(3, t.count(), "C4");
+    assert.writeErrorWithCode(coll.remove({_id: undefined}), ErrorCodes.BadValue);
+    assert.eq(3, coll.count());
+})();

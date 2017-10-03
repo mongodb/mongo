@@ -703,29 +703,21 @@ doc = dotColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, {x: {a: 100, b: 2}}), 'doc did not change: ' + tojson(doc));
 
-// Dotted field names in the resulting objects should not be allowed.
-// This check currently resides in the client drivers.
+// Dotted field names in the update object do not represent paths. The path must be expanded
+// since single document updates require a match on the shard key.
+// (e.g. 'x.a' will not work, but x: {a: ...} will work).
 dotColl.remove({}, false);
 dotColl.insert({x: {a: 100}});
-assert.throws(function() {
-    dotColl.update({'x.a': 100}, {x: {'a.z': 100}});
-});
+assert.writeErrorWithCode(dotColl.update({'x.a': 100}, {x: {'a.z': 100}}),
+                          ErrorCodes.ShardKeyNotFound);
 
-// Dotted field names in the resulting objects should not be allowed.
-// This check currently resides in the client drivers.
 dotColl.remove({}, false);
 dotColl.insert({x: {a: 100}});
-assert.throws(function() {
-    dotColl.update({'x.a': 100}, {'x.a': 100});
-});
+assert.writeErrorWithCode(dotColl.update({'x.a': 100}, {'x.a': 100}), ErrorCodes.ShardKeyNotFound);
 
-// Dotted field names in the resulting objects should not be allowed.
-// This check currently resides in the client drivers.
 dotColl.remove({}, false);
 dotColl.insert({x: {a: 100}});
-assert.throws(function() {
-    dotColl.update({'x.a': 100}, {'x.a.z': 100});
-});
+assert.writeOK(dotColl.update({'x.a': 100}, {x: {a: 100}, b: 1}));
 
 dotColl.remove({}, false);
 dotColl.insert({x: {a: 100}});
@@ -762,6 +754,7 @@ doc = dotColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, {x: {a: 100}}), 'doc changed: ' + tojson(doc));
 
+// Dotted field names within $set are treated as paths.
 dotColl.remove({}, false);
 dotColl.insert({x: {a: 100}});
 assert.writeOK(dotColl.update({'x.a': 100}, {$set: {'x.a': 100, b: 2}}, false, true));
@@ -806,26 +799,14 @@ assert.writeOK(dotColl.update({'x.a': 100}, {x: {a: 100, b: 2}}, true));
 doc = dotColl.findOne();
 assert(doc != null, 'doc was not upserted: ' + tojson(doc));
 
-// Dotted field names in the resulting objects should not be allowed.
-// This check currently resides in the client drivers.
 dotColl.remove({}, false);
-assert.throws(function() {
-    dotColl.update({'x.a': 100}, {x: {'a.z': 100}}, true);
-});
+assert.writeError(dotColl.update({'x.a': 100}, {x: {z: 100}}, true));
 
-// Dotted field names in the resulting objects should not be allowed.
-// This check currently resides in the client drivers.
 dotColl.remove({}, false);
-assert.throws(function() {
-    dotColl.update({'x.a': 100}, {'x.a': 100}, true);
-});
+assert.writeError(dotColl.update({'x.a': 100}, {'x.a': 100}, true));
 
-// Dotted field names in the resulting objects should not be allowed.
-// This check currently resides in the client drivers.
 dotColl.remove({}, false);
-assert.throws(function() {
-    dotColl.update({'x.a': 100}, {'x.a.z': 100}, true);
-});
+assert.writeError(dotColl.update({'x.a': 100}, {'x.a.z': 100}, true));
 
 dotColl.remove({}, false);
 assert.writeError(dotColl.update({'x.a': 100}, {x: 100}, true));

@@ -215,45 +215,6 @@ DBCollection.prototype._massageObject = function(q) {
 
 };
 
-DBCollection.prototype._validateObject = function(o) {
-    // Hidden property for testing purposes.
-    if (this.getMongo()._skipValidation)
-        return;
-
-    if (typeof(o) != "object")
-        throw Error("attempted to save a " + typeof(o) + " value.  document expected.");
-
-    if (o._ensureSpecial && o._checkModify)
-        throw Error("can't save a DBQuery object");
-};
-
-DBCollection._allowedFields = {
-    $id: 1,
-    $ref: 1,
-    $db: 1
-};
-
-DBCollection.prototype._validateForStorage = function(o) {
-    // Hidden property for testing purposes.
-    if (this.getMongo()._skipValidation)
-        return;
-
-    this._validateObject(o);
-    for (var k in o) {
-        if (k.indexOf(".") >= 0) {
-            throw Error("can't have . in field names [" + k + "]");
-        }
-
-        if (k.indexOf("$") == 0 && !DBCollection._allowedFields[k]) {
-            throw Error("field names cannot start with $ [" + k + "]");
-        }
-
-        if (o[k] !== null && typeof(o[k]) === "object") {
-            this._validateForStorage(o[k]);
-        }
-    }
-};
-
 DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, options) {
     var cursor = new DBQuery(this._mongo,
                              this._db,
@@ -304,7 +265,7 @@ DBCollection.prototype.findOne = function(query, fields, options, readConcern, c
     return ret;
 };
 
-DBCollection.prototype.insert = function(obj, options, _allow_dot) {
+DBCollection.prototype.insert = function(obj, options) {
     if (!obj)
         throw Error("no object passed to insert!");
 
@@ -367,10 +328,6 @@ DBCollection.prototype.insert = function(obj, options, _allow_dot) {
             }
         }
     } else {
-        if (!_allow_dot) {
-            this._validateForStorage(obj);
-        }
-
         if (typeof(obj._id) == "undefined" && !Array.isArray(obj)) {
             var tmp = obj;  // don't want to modify input
             obj = {_id: new ObjectId()};
@@ -389,18 +346,6 @@ DBCollection.prototype.insert = function(obj, options, _allow_dot) {
     this._lastID = obj._id;
     this._printExtraInfo("Inserted", startTime);
     return result;
-};
-
-DBCollection.prototype._validateRemoveDoc = function(doc) {
-    // Hidden property for testing purposes.
-    if (this.getMongo()._skipValidation)
-        return;
-
-    for (var k in doc) {
-        if (k == "_id" && typeof(doc[k]) == "undefined") {
-            throw new Error("can't have _id set to undefined in a remove expression");
-        }
-    }
 };
 
 /**
@@ -473,7 +418,6 @@ DBCollection.prototype.remove = function(t, justOne) {
             throw new Error("collation requires use of write commands");
         }
 
-        this._validateRemoveDoc(t);
         this.getMongo().remove(this._fullName, query, justOne);
 
         // enforce write concern, if required
@@ -483,26 +427,6 @@ DBCollection.prototype.remove = function(t, justOne) {
 
     this._printExtraInfo("Removed", startTime);
     return result;
-};
-
-DBCollection.prototype._validateUpdateDoc = function(doc) {
-    // Hidden property for testing purposes.
-    if (this.getMongo()._skipValidation)
-        return;
-
-    var firstKey = null;
-    for (var key in doc) {
-        firstKey = key;
-        break;
-    }
-
-    if (firstKey != null && firstKey[0] == '$') {
-        // for mods we only validate partially, for example keys may have dots
-        this._validateObject(doc);
-    } else {
-        // we're basically inserting a brand new object, do full validation
-        this._validateForStorage(doc);
-    }
 };
 
 /**
@@ -610,7 +534,6 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
             throw new Error("arrayFilters requires use of write commands");
         }
 
-        this._validateUpdateDoc(obj);
         this.getMongo().update(this._fullName, query, obj, upsert, multi);
 
         // Enforce write concern, if required
@@ -714,7 +637,7 @@ DBCollection.prototype.createIndexes = function(keys, options) {
     } else if (this.getMongo().writeMode() == "compatibility") {
         // Use the downconversion machinery of the bulk api to do a safe write, report response as a
         // command response
-        var result = this._db.getCollection("system.indexes").insert(indexSpecs, 0, true);
+        var result = this._db.getCollection("system.indexes").insert(indexSpecs, 0);
 
         if (result.hasWriteErrors() || result.hasWriteConcernError()) {
             // Return the first error
@@ -725,7 +648,7 @@ DBCollection.prototype.createIndexes = function(keys, options) {
             return {ok: 1.0};
         }
     } else {
-        this._db.getCollection("system.indexes").insert(indexSpecs, 0, true);
+        this._db.getCollection("system.indexes").insert(indexSpecs, 0);
     }
 };
 
