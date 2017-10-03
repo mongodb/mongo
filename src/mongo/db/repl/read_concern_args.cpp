@@ -97,10 +97,6 @@ bool ReadConcernArgs::hasLevel() const {
     return _level.is_initialized();
 }
 
-bool ReadConcernArgs::isLevelAvailable() const {
-    return hasLevel() && _level.get() == ReadConcernLevel::kAvailableReadConcern;
-}
-
 boost::optional<OpTime> ReadConcernArgs::getArgsOpTime() const {
     return _opTime;
 }

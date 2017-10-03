@@ -230,19 +230,25 @@ void _generateErrorResponse(OperationContext* opCtx,
  * elsewhere.
  */
 class MaintenanceModeSetter {
+    MONGO_DISALLOW_COPYING(MaintenanceModeSetter);
+
 public:
-    MaintenanceModeSetter()
-        : maintenanceModeSet(
-              repl::getGlobalReplicationCoordinator()->setMaintenanceMode(true).isOK()) {}
+    MaintenanceModeSetter(OperationContext* opCtx)
+        : _opCtx(opCtx),
+          _maintenanceModeSet(
+              repl::ReplicationCoordinator::get(_opCtx)->setMaintenanceMode(true).isOK()) {}
+
     ~MaintenanceModeSetter() {
-        if (maintenanceModeSet)
-            repl::getGlobalReplicationCoordinator()
+        if (_maintenanceModeSet) {
+            repl::ReplicationCoordinator::get(_opCtx)
                 ->setMaintenanceMode(false)
                 .transitional_ignore();
+        }
     }
 
 private:
-    bool maintenanceModeSet;
+    OperationContext* const _opCtx;
+    const bool _maintenanceModeSet;
 };
 
 void appendReplyMetadata(OperationContext* opCtx,
@@ -250,7 +256,7 @@ void appendReplyMetadata(OperationContext* opCtx,
                          BSONObjBuilder* metadataBob) {
     const bool isShardingAware = ShardingState::get(opCtx)->enabled();
     const bool isConfig = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
-    repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool isReplSet =
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
 
@@ -346,8 +352,7 @@ void _waitForWriteConcernAndAddToCommandResponse(OperationContext* opCtx,
  * uninitialized cluster time.
  */
 LogicalTime getClientOperationTime(OperationContext* opCtx) {
-    repl::ReplicationCoordinator* replCoord =
-        repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool isReplSet =
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
     LogicalTime operationTime;
@@ -367,8 +372,7 @@ LogicalTime getClientOperationTime(OperationContext* opCtx) {
 LogicalTime computeOperationTime(OperationContext* opCtx,
                                  LogicalTime startOperationTime,
                                  repl::ReadConcernLevel level) {
-    repl::ReplicationCoordinator* replCoord =
-        repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool isReplSet =
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
 
@@ -538,15 +542,14 @@ void execCommandDatabase(OperationContext* opCtx,
         rpc::readRequestMetadata(opCtx, request.body);
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
-        repl::ReplicationCoordinator* replCoord =
-            repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+        auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
         initializeOperationSessionInfo(opCtx,
                                        request.body,
                                        command->requiresAuth(),
                                        replCoord->getReplicationMode() ==
                                            repl::ReplicationCoordinator::modeReplSet);
 
-        std::string dbname = request.getDatabase().toString();
+        const auto dbname = request.getDatabase().toString();
         uassert(
             ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid database name: '" << dbname << "'",
@@ -645,7 +648,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         if (command->maintenanceMode()) {
-            mmSetter.reset(new MaintenanceModeSetter);
+            mmSetter.reset(new MaintenanceModeSetter(opCtx));
         }
 
         if (command->shouldAffectCommandCounter()) {
@@ -667,29 +670,22 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
         }
 
-        repl::ReadConcernArgs::get(opCtx) = uassertStatusOK(_extractReadConcern(
-            request.body,
-            command->supportsNonLocalReadConcern(request.getDatabase().toString(), request.body)));
+        auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        readConcernArgs = uassertStatusOK(_extractReadConcern(
+            request.body, command->supportsNonLocalReadConcern(dbname, request.body)));
 
         auto& oss = OperationShardingState::get(opCtx);
 
-        // Don't handle the shard version that may have been sent along with the command iff
-        //   fcv==3.4: This is a secondary.
-        //   fcv==3.6: The 'available' rc-level is specified, or this is a secondary and neither the
-        //             clusterTime nor rc-level was specified -- secondaries default to 'available'
-        //             when neither clusterTime nor rc-level is set.
-        //   or this command was issued via the direct client.
-        if ((iAmPrimary || (serverGlobalParams.featureCompatibility.version.load() ==
-                                ServerGlobalParams::FeatureCompatibility::Version::k36 &&
-                            (repl::ReadConcernArgs::get(opCtx).hasLevel() ||
-                             repl::ReadConcernArgs::get(opCtx).getArgsClusterTime()))) &&
-            !opCtx->getClient()->isInDirectClient() &&
-            (serverGlobalParams.featureCompatibility.version.load() ==
-                 ServerGlobalParams::FeatureCompatibility::Version::k34 ||
-             !repl::ReadConcernArgs::get(opCtx).isLevelAvailable())) {
-            auto commandNS = NamespaceString(command->parseNs(dbname, request.body));
-            oss.initializeShardVersion(commandNS, shardVersionFieldIdx);
-            auto shardingState = ShardingState::get(opCtx);
+        if (!opCtx->getClient()->isInDirectClient() &&
+            readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
+            (iAmPrimary ||
+             (serverGlobalParams.featureCompatibility.version.load() ==
+                  ServerGlobalParams::FeatureCompatibility::Version::k36 &&
+              (readConcernArgs.hasLevel() || readConcernArgs.getArgsClusterTime())))) {
+            oss.initializeShardVersion(NamespaceString(command->parseNs(dbname, request.body)),
+                                       shardVersionFieldIdx);
+
+            auto const shardingState = ShardingState::get(opCtx);
             if (oss.hasShardVersion()) {
                 uassertStatusOK(shardingState->canAcceptShardedCommands());
             }
@@ -716,6 +712,7 @@ void execCommandDatabase(OperationContext* opCtx,
                 << rpc::TrackingMetadata::get(opCtx).toString();
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
+
         retval = runCommandImpl(opCtx, command, request, replyBuilder, startOperationTime);
 
         if (!retval) {
