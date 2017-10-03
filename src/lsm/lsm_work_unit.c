@@ -320,11 +320,12 @@ int
 __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_TXN_ISOLATION saved_isolation;
-	bool flush_set, release_btree;
+	bool flush_set, release_dhandle;
 
-	flush_set = release_btree = false;
+	flush_set = release_dhandle = false;
 
 	/*
 	 * If the chunk is already checkpointed, make sure it is also evicted.
@@ -374,7 +375,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * take a long time.
 	 */
 	WT_ERR(__wt_session_get_dhandle(session, chunk->uri, NULL, NULL, 0));
-	release_btree = true;
+	release_dhandle = true;
 
 	/*
 	 * Set read-uncommitted: we have already checked that all of the updates
@@ -407,9 +408,6 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
 
-	release_btree = false;
-	WT_ERR(__wt_session_release_dhandle(session));
-
 	/* Now the file is written, get the chunk size. */
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 
@@ -428,6 +426,19 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	__wt_lsm_tree_writeunlock(session, lsm_tree);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "LSM metadata write");
+
+	/*
+	 * Enable eviction on the live chunk so it doesn't block the cache.
+	 * Future reads should direct to the on-disk chunk anyway.
+	 */
+	btree = session->dhandle->handle;
+	if (btree->evict_disabled_open) {
+		btree->evict_disabled_open = false;
+		__wt_evict_file_exclusive_off(session);
+	}
+
+	release_dhandle = false;
+	WT_ERR(__wt_session_release_dhandle(session));
 
 	WT_PUBLISH(chunk->flushing, 0);
 	flush_set = false;
@@ -448,7 +459,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 
 err:	if (flush_set)
 		WT_PUBLISH(chunk->flushing, 0);
-	if (release_btree)
+	if (release_dhandle)
 		WT_TRET(__wt_session_release_dhandle(session));
 
 	return (ret);

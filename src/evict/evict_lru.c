@@ -2424,6 +2424,7 @@ static int
 __verbose_dump_cache_single(WT_SESSION_IMPL *session,
     uint64_t *total_bytesp, uint64_t *total_dirty_bytesp)
 {
+	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_PAGE *page;
 	WT_REF *next_walk;
@@ -2469,11 +2470,12 @@ __verbose_dump_cache_single(WT_SESSION_IMPL *session,
 	}
 
 	dhandle = session->dhandle;
-	if (dhandle->checkpoint == NULL)
-		WT_RET(__wt_msg(session, "%s(<live>):", dhandle->name));
-	else
-		WT_RET(__wt_msg(session, "%s(checkpoint=%s):",
-		    dhandle->name, dhandle->checkpoint));
+	btree = dhandle->handle;
+	WT_RET(__wt_msg(session, "%s(%s%s)%s%s:",
+	    dhandle->name, dhandle->checkpoint != NULL ? "checkpoint=" : "",
+	    dhandle->checkpoint != NULL ? dhandle->checkpoint : "<live>",
+	    btree->evict_disabled != 0 ?  "eviction disabled" : "",
+	    btree->evict_disabled_open ? " at open" : ""));
 	if (intl_pages != 0)
 		WT_RET(__wt_msg(session,
 		    "internal: "
