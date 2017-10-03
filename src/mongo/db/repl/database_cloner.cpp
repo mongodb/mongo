@@ -44,6 +44,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -70,6 +71,10 @@ MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListCollectionsAttempts, int, 3);
 
 // The number of cursors to use in the collection cloning process.
 MONGO_EXPORT_SERVER_PARAMETER(maxNumInitialSyncCollectionClonerCursors, int, 1);
+
+// Failpoint which causes initial sync to hang right after listCollections, but before cloning
+// any colelctions in the 'database' database.
+MONGO_FP_DECLARE(initialSyncHangAfterListCollections);
 
 /**
  * Default listCollections predicate.
@@ -278,6 +283,17 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
     if (_collectionInfos.empty()) {
         _finishCallback_inlock(lk, Status::OK());
         return;
+    }
+
+    MONGO_FAIL_POINT_BLOCK(initialSyncHangAfterListCollections, options) {
+        const BSONObj& data = options.getData();
+        if (data["database"].String() == _dbname) {
+            log() << "initial sync - initialSyncHangAfterListCollections fail point "
+                     "enabled. Blocking until fail point is disabled.";
+            while (MONGO_FAIL_POINT(initialSyncHangAfterListCollections)) {
+                mongo::sleepsecs(1);
+            }
+        }
     }
 
     _collectionNamespaces.reserve(_collectionInfos.size());

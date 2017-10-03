@@ -70,6 +70,10 @@ MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListIndexesAttempts, int, 3);
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionFindAttempts, int, 3);
 }  // namespace
 
+// Failpoint which causes initial sync to hang before establishing its cursor to clone the
+// 'namespace' collection.
+MONGO_FP_DECLARE(initialSyncHangBeforeCollectionClone);
+
 // Failpoint which causes initial sync to hang when it has cloned 'numDocsToClone' documents to
 // collection 'namespace'.
 MONGO_FP_DECLARE(initialSyncHangDuringCollectionClone);
@@ -295,8 +299,12 @@ void CollectionCloner::_countCallback(
         return;
     }
 
+    long long count = 0;
     Status commandStatus = getStatusFromCommandResult(args.response.data);
-    if (!commandStatus.isOK()) {
+    if (commandStatus == ErrorCodes::NamespaceNotFound && _options.uuid) {
+        // Querying by a non-existing collection by UUID returns an error. Treat same as
+        // behavior of find by namespace and use count == 0.
+    } else if (!commandStatus.isOK()) {
         _finishCallback({commandStatus.code(),
                          str::stream() << "During count call on collection '" << _sourceNss.ns()
                                        << "' from "
@@ -305,21 +313,21 @@ void CollectionCloner::_countCallback(
                                        << commandStatus.reason()
                                        << "'"});
         return;
-    }
-
-    long long count = 0;
-    auto countStatus =
-        bsonExtractIntegerField(args.response.data, kCountResponseDocumentCountFieldName, &count);
-    if (!countStatus.isOK()) {
-        _finishCallback({countStatus.code(),
-                         str::stream() << "There was an error parsing document count from count "
-                                          "command result on collection "
-                                       << _sourceNss.ns()
-                                       << " from "
-                                       << _source.toString()
-                                       << ": "
-                                       << countStatus.reason()});
-        return;
+    } else {
+        auto countStatus = bsonExtractIntegerField(
+            args.response.data, kCountResponseDocumentCountFieldName, &count);
+        if (!countStatus.isOK()) {
+            _finishCallback({countStatus.code(),
+                             str::stream()
+                                 << "There was an error parsing document count from count "
+                                    "command result on collection "
+                                 << _sourceNss.ns()
+                                 << " from "
+                                 << _source.toString()
+                                 << ": "
+                                 << countStatus.reason()});
+            return;
+        }
     }
 
     if (count < 0) {
@@ -473,6 +481,17 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
     Client::initThreadIfNotAlready();
     auto opCtx = cc().getOperationContext();
 
+    MONGO_FAIL_POINT_BLOCK(initialSyncHangBeforeCollectionClone, options) {
+        const BSONObj& data = options.getData();
+        if (data["namespace"].String() == _destNss.ns()) {
+            log() << "initial sync - initialSyncHangBeforeCollectionClone fail point "
+                     "enabled. Blocking until fail point is disabled.";
+            while (MONGO_FAIL_POINT(initialSyncHangBeforeCollectionClone) && !_isShuttingDown()) {
+                mongo::sleepsecs(1);
+            }
+        }
+    }
+
     _establishCollectionCursorsScheduler = stdx::make_unique<RemoteCommandRetryScheduler>(
         _executor,
         RemoteCommandRequest(_source,
@@ -567,6 +586,10 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
         return;
     }
     Status commandStatus = getStatusFromCommandResult(response.data);
+    if (commandStatus == ErrorCodes::NamespaceNotFound) {
+        _finishCallback(Status::OK());
+        return;
+    }
     if (!commandStatus.isOK()) {
         Status newStatus{commandStatus.code(),
                          str::stream() << "While querying collection '" << _sourceNss.ns()
