@@ -126,6 +126,75 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectFieldsWithSharedPrefix) {
                   AssertionException);
 }
 
+TEST(ParsedAggregationProjectionErrors, ShouldRejectPathConflictsWithNonAlphaNumericCharacters) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    // Include/exclude non-alphanumeric fields with a shared prefix. First assert that the non-
+    // alphanumeric fields are accepted when no prefixes are present.
+    ASSERT(ParsedAggregationProjection::create(
+        expCtx, BSON("a.b-c" << true << "a.b" << true << "a.b?c" << true << "a.b c" << true)));
+    ASSERT(ParsedAggregationProjection::create(
+        expCtx, BSON("a.b c" << false << "a.b?c" << false << "a.b" << false << "a.b-c" << false)));
+
+    // Then assert that we throw when we introduce a prefixed field.
+    ASSERT_THROWS(
+        ParsedAggregationProjection::create(
+            expCtx,
+            BSON("a.b-c" << true << "a.b" << true << "a.b?c" << true << "a.b c" << true << "a.b.d"
+                         << true)),
+        AssertionException);
+    ASSERT_THROWS(
+        ParsedAggregationProjection::create(
+            expCtx,
+            BSON("a.b.d" << false << "a.b c" << false << "a.b?c" << false << "a.b" << false
+                         << "a.b-c"
+                         << false)),
+        AssertionException);
+
+    // Adding the same field twice.
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx, BSON("a.b?c" << wrapInLiteral(1) << "a.b?c" << wrapInLiteral(0))),
+                  AssertionException);
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx, BSON("a.b c" << wrapInLiteral(0) << "a.b c" << wrapInLiteral(1))),
+                  AssertionException);
+
+    // Mix of include/exclude and adding a shared prefix.
+    ASSERT_THROWS(
+        ParsedAggregationProjection::create(
+            expCtx,
+            BSON("a.b-c" << true << "a.b" << wrapInLiteral(1) << "a.b?c" << true << "a.b c" << true
+                         << "a.b.d"
+                         << true)),
+        AssertionException);
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx,
+                      BSON("a.b.d" << false << "a.b c" << false << "a.b?c" << false << "a.b"
+                                   << wrapInLiteral(0)
+                                   << "a.b-c"
+                                   << false)),
+                  AssertionException);
+
+    // Adding a shared prefix twice.
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx,
+                      BSON("a.b-c" << wrapInLiteral(1) << "a.b" << wrapInLiteral(1) << "a.b?c"
+                                   << wrapInLiteral(1)
+                                   << "a.b c"
+                                   << wrapInLiteral(1)
+                                   << "a.b.d"
+                                   << wrapInLiteral(0))),
+                  AssertionException);
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx,
+                      BSON("a.b.d" << wrapInLiteral(1) << "a.b c" << wrapInLiteral(1) << "a.b?c"
+                                   << wrapInLiteral(1)
+                                   << "a.b"
+                                   << wrapInLiteral(0)
+                                   << "a.b-c"
+                                   << wrapInLiteral(1))),
+                  AssertionException);
+}
+
 TEST(ParsedAggregationProjectionErrors, ShouldRejectMixOfIdAndSubFieldsOfId) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Include/exclude _id twice.

@@ -49,6 +49,8 @@ namespace parsed_aggregation_projection {
 using TransformerType =
     DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType;
 
+using expression::isPathPrefixOf;
+
 //
 // ProjectionSpecValidator
 //
@@ -62,21 +64,34 @@ void ProjectionSpecValidator::uassertValid(const BSONObj& spec, StringData stage
     }
 }
 
-void ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(StringData path) {
-    for (auto&& seenPath : _seenPaths) {
-        if ((path == seenPath) || (expression::isPathPrefixOf(path, seenPath)) ||
-            (expression::isPathPrefixOf(seenPath, path))) {
-            uasserted(40176,
-                      str::stream() << "specification contains two conflicting paths. "
-                                       "Cannot specify both '"
-                                    << path
-                                    << "' and '"
-                                    << seenPath
-                                    << "': "
-                                    << _rawObj.toString());
-        }
+void ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(const std::string& path) {
+    auto result = _seenPaths.emplace(path);
+    auto pos = result.first;
+
+    // Check whether the path was a duplicate of an existing path.
+    auto conflictingPath = boost::make_optional(!result.second, *pos);
+
+    // Check whether the preceding path prefixes this path.
+    if (!conflictingPath && pos != _seenPaths.begin()) {
+        conflictingPath =
+            boost::make_optional(isPathPrefixOf(*std::prev(pos), path), *std::prev(pos));
     }
-    _seenPaths.emplace_back(path.toString());
+
+    // Check whether this path prefixes the subsequent path.
+    if (!conflictingPath && std::next(pos) != _seenPaths.end()) {
+        conflictingPath =
+            boost::make_optional(isPathPrefixOf(path, *std::next(pos)), *std::next(pos));
+    }
+
+    uassert(40176,
+            str::stream() << "specification contains two conflicting paths. "
+                             "Cannot specify both '"
+                          << path
+                          << "' and '"
+                          << *conflictingPath
+                          << "': "
+                          << _rawObj.toString(),
+            !conflictingPath);
 }
 
 void ProjectionSpecValidator::validate() {

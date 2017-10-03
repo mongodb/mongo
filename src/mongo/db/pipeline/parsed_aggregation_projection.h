@@ -67,7 +67,7 @@ private:
      * For example, a user is not allowed to specify {'a': 1, 'a.b': 1}, or some similar conflicting
      * paths.
      */
-    void ensurePathDoesNotConflictOrThrow(StringData path);
+    void ensurePathDoesNotConflictOrThrow(const std::string& path);
 
     /**
      * Throws if an invalid projection specification is detected.
@@ -96,9 +96,40 @@ private:
     // The original object. Used to generate more helpful error messages.
     const BSONObj& _rawObj;
 
+    // Custom comparator that orders fieldpath strings by path prefix first, then by field.
+    struct PathPrefixComparator {
+        static constexpr char dot = '.';
+
+        // Returns true if the lhs value should sort before the rhs, false otherwise.
+        bool operator()(const std::string& lhs, const std::string& rhs) const {
+            for (size_t pos = 0, len = std::min(lhs.size(), rhs.size()); pos < len; ++pos) {
+                auto &lchar = lhs[pos], &rchar = rhs[pos];
+                if (lchar == rchar) {
+                    continue;
+                }
+
+                // Consider the path delimiter '.' as being less than all other characters, so that
+                // paths sort directly before any paths they prefix and directly after any paths
+                // which prefix them.
+                if (lchar == dot) {
+                    return true;
+                } else if (rchar == dot) {
+                    return false;
+                }
+
+                // Otherwise, default to normal character comparison.
+                return lchar < rchar;
+            }
+
+            // If we get here, then we have reached the end of lhs and/or rhs and all of their path
+            // segments up to this point match. If lhs is shorter than rhs, then lhs prefixes rhs
+            // and should sort before it.
+            return lhs.size() < rhs.size();
+        }
+    };
+
     // Tracks which paths we've seen to ensure no two paths conflict with each other.
-    // Can be a vector since we iterate through it.
-    std::vector<std::string> _seenPaths;
+    std::set<std::string, PathPrefixComparator> _seenPaths;
 };
 
 /**
