@@ -383,7 +383,7 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         }
         case repl::OpTypeEnum::kCommand: {
             operationType = kInvalidateOpType;
-            // Make sure the result doesn't have a document id.
+            // Make sure the result doesn't have a document key.
             documentKey = Value();
             break;
         }
@@ -397,8 +397,19 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         default: { MONGO_UNREACHABLE; }
     }
 
-    // UUID should always be present except for invalidate entries.
-    invariant(operationType == kInvalidateOpType || !uuid.missing());
+    // UUID should always be present except for invalidate entries.  It will not be under
+    // FCV 3.4, so we should close the stream as invalid.
+    if (operationType != kInvalidateOpType && uuid.missing()) {
+        warning() << "Saw a CRUD op without a UUID.  Did Feature Compatibility Version get "
+                     "downgraded after opening the stream?";
+        operationType = kInvalidateOpType;
+        fullDocument = Value();
+        updateDescription = Value();
+        documentKey = Value();
+    }
+
+    // Note that 'documentKey' and/or 'uuid' might be missing, in which case the missing fields will
+    // not appear in the output.
     Document resumeToken{{kClusterTimeField, Document{{kTimestampField, ts}}},
                          {kUuidField, uuid},
                          {kDocumentKeyField, documentKey}};
@@ -406,7 +417,7 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     doc.addField(kOperationTypeField, Value(operationType));
 
     // "invalidate" and "retryNeeded" entries have fewer fields.
-    if (opType == repl::OpTypeEnum::kCommand || opType == repl::OpTypeEnum::kNoop) {
+    if (operationType == kInvalidateOpType || operationType == kRetryNeededOpType) {
         return doc.freeze();
     }
 
