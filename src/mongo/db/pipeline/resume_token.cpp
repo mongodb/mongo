@@ -28,51 +28,128 @@
 
 #include "mongo/db/pipeline/resume_token.h"
 
+#include <boost/optional/optional_io.hpp>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_sources_gen.h"
 #include "mongo/db/pipeline/value_comparator.h"
+#include "mongo/db/storage/key_string.h"
 
 namespace mongo {
+constexpr StringData ResumeToken::kDataFieldName;
+constexpr StringData ResumeToken::kTypeBitsFieldName;
 
-ResumeToken::ResumeToken(const BSONObj& resumeBson) {
-    auto token =
-        ResumeTokenInternal::parse(IDLParserErrorContext("$changeStream.resumeAfter"), resumeBson);
-    _timestamp = token.getClusterTime().getTimestamp();
-    _uuid = token.getUuid();
-    _documentId = token.getDocumentKey();
+bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
+    return clusterTime == other.clusterTime &&
+        (Value::compare(this->documentKey, other.documentKey, nullptr) == 0) && uuid == other.uuid;
 }
 
-ResumeToken::ResumeToken(const Value& resumeValue) {
-    Document resumeTokenDoc = resumeValue.getDocument();
-    Value clusterTime = resumeTokenDoc[ResumeTokenInternal::kClusterTimeFieldName];
-    Value timestamp = clusterTime[ResumeTokenClusterTime::kTimestampFieldName];
-    _timestamp = timestamp.getTimestamp();
-    Value uuid = resumeTokenDoc[ResumeTokenInternal::kUuidFieldName];
-    _uuid = uuid.getUuid();
-    _documentId = resumeTokenDoc[ResumeTokenInternal::kDocumentKeyFieldName];
+std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
+    return out << "{clusterTime: " << tokenData.clusterTime.toString()
+               << "  documentKey: " << tokenData.documentKey << "  uuid: " << tokenData.uuid << "}";
 }
 
-bool ResumeToken::operator==(const ResumeToken& other) {
-    return _timestamp == other._timestamp && _uuid == other._uuid &&
-        ValueComparator::kInstance.evaluate(_documentId == other._documentId);
+ResumeToken::ResumeToken(const Document& resumeDoc) {
+    _keyStringData = resumeDoc[kDataFieldName];
+    _typeBits = resumeDoc[kTypeBitsFieldName];
+    uassert(40647,
+            str::stream() << "Bad resume token: _data of missing or of wrong type"
+                          << resumeDoc.toString(),
+            _keyStringData.getType() == BinData &&
+                _keyStringData.getBinData().type == BinDataGeneral);
+    uassert(40648,
+            str::stream() << "Bad resume token: _typeBits of wrong type" << resumeDoc.toString(),
+            _typeBits.missing() ||
+                (_typeBits.getType() == BinData && _typeBits.getBinData().type == BinDataGeneral));
+}
+
+// We encode the resume token as a KeyString with the sequence: clusterTime, documentKey, uuid.
+// Only the clusterTime is required.
+ResumeToken::ResumeToken(const ResumeTokenData& data) {
+    BSONObjBuilder builder;
+    builder.append("", data.clusterTime);
+    data.documentKey.addToBsonObj(&builder, "");
+    if (data.uuid) {
+        if (data.documentKey.missing()) {
+            // Never allow a missing document key with a UUID present, as that will mess up
+            // the field order.
+            builder.appendNull("");
+        }
+        data.uuid->appendToBuilder(&builder, "");
+    }
+    auto keyObj = builder.obj();
+    KeyString encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
+    _keyStringData = Value(
+        BSONBinData(encodedToken.getBuffer(), encodedToken.getSize(), BinDataType::BinDataGeneral));
+    const auto& typeBits = encodedToken.getTypeBits();
+    if (!typeBits.isAllZeros())
+        _typeBits = Value(
+            BSONBinData(typeBits.getBuffer(), typeBits.getSize(), BinDataType::BinDataGeneral));
+}
+
+ResumeTokenData ResumeToken::getData() const {
+    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    if (!_typeBits.missing()) {
+        BSONBinData typeBitsBinData = _typeBits.getBinData();
+        BufReader typeBitsReader(typeBitsBinData.data, typeBitsBinData.length);
+        typeBits.resetFromBuffer(&typeBitsReader);
+    }
+    BSONBinData keyStringBinData = _keyStringData.getBinData();
+    auto internalBson = KeyString::toBson(static_cast<const char*>(keyStringBinData.data),
+                                          keyStringBinData.length,
+                                          Ordering::make(BSONObj()),
+                                          typeBits);
+
+    BSONObjIterator i(internalBson);
+    ResumeTokenData result;
+    uassert(40649, "invalid empty resume token", i.more());
+    result.clusterTime = i.next().timestamp();
+    if (i.more())
+        result.documentKey = Value(i.next());
+    if (i.more())
+        result.uuid = uassertStatusOK(UUID::parse(i.next()));
+    uassert(40646, "invalid oversized resume token", !i.more());
+    return result;
+}
+
+int ResumeToken::compare(const ResumeToken& other) const {
+    BSONBinData thisData = _keyStringData.getBinData();
+    BSONBinData otherData = other._keyStringData.getBinData();
+    return StringData(static_cast<const char*>(thisData.data), thisData.length)
+        .compare(StringData(static_cast<const char*>(otherData.data), otherData.length));
+}
+
+bool ResumeToken::operator==(const ResumeToken& other) const {
+    return compare(other) == 0;
+}
+
+bool ResumeToken::operator!=(const ResumeToken& other) const {
+    return compare(other) != 0;
+}
+
+bool ResumeToken::operator<(const ResumeToken& other) const {
+    return compare(other) < 0;
+}
+
+bool ResumeToken::operator<=(const ResumeToken& other) const {
+    return compare(other) <= 0;
+}
+
+bool ResumeToken::operator>(const ResumeToken& other) const {
+    return compare(other) > 0;
+}
+
+bool ResumeToken::operator>=(const ResumeToken& other) const {
+    return compare(other) >= 0;
 }
 
 Document ResumeToken::toDocument() const {
-    ResumeTokenClusterTime clusterTime;
-    clusterTime.setTimestamp(_timestamp);
-    return Document({{ResumeTokenInternal::kClusterTimeFieldName, clusterTime.toBSON()},
-                     {{ResumeTokenInternal::kUuidFieldName}, _uuid},
-                     {{ResumeTokenInternal::kDocumentKeyFieldName}, _documentId}});
+    return Document{{kDataFieldName, _keyStringData}, {kTypeBitsFieldName, _typeBits}};
 }
 
-BSONObj ResumeToken::toBSON() const {
-    return toDocument().toBson();
-}
-
-ResumeToken ResumeToken::parse(const BSONObj& resumeBson) {
-    return ResumeToken(resumeBson);
+ResumeToken ResumeToken::parse(const Document& resumeDoc) {
+    return ResumeToken(resumeDoc);
 }
 
 }  // namespace mongo

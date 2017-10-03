@@ -66,11 +66,12 @@ public:
     Document makeResumeToken(ImplicitValue id = Value()) {
         const Timestamp ts(100, 1);
         if (id.missing()) {
-            return {{"clusterTime", Document{{"ts", ts}}}, {"uuid", testUuid()}};
+            ResumeTokenData tokenData;
+            tokenData.clusterTime = ts;
+            return ResumeToken(tokenData).toDocument();
         }
-        return {{"clusterTime", Document{{"ts", ts}}},
-                {"uuid", testUuid()},
-                {"documentKey", Document{{"_id", id}}}};
+        return ResumeToken(ResumeTokenData(ts, Value(Document{{"_id", id}}), testUuid()))
+            .toDocument();
     }
 };
 

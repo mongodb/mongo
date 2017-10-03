@@ -28,17 +28,48 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+struct ResumeTokenData {
+    ResumeTokenData(){};
+    ResumeTokenData(Timestamp clusterTimeIn,
+                    Value documentKeyIn,
+                    const boost::optional<UUID>& uuidIn)
+        : clusterTime(clusterTimeIn), documentKey(std::move(documentKeyIn)), uuid(uuidIn){};
+
+    bool operator==(const ResumeTokenData& other) const;
+    bool operator!=(const ResumeTokenData& other) const {
+        return !(*this == other);
+    };
+
+    Timestamp clusterTime;
+    Value documentKey;
+    boost::optional<UUID> uuid;
+};
+
+std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
+
 /**
  * A token passed in by the user to indicate where in the oplog we should start for
- * $changeStream.
+ * $changeStream.  This token has the following format:
+ * {
+ *   _data: <binary data>,
+ *   _typeBits: <binary data>
+ * }
+ * The _data field data is encoded such that byte by byte comparisons provide the correct
+ * ordering of tokens.  The _typeBits field may be missing and should not affect token
+ * comparison.
  */
+
 class ResumeToken {
 public:
     /**
@@ -46,35 +77,49 @@ public:
      * fields.
      */
     ResumeToken() = default;
-    explicit ResumeToken(const Value& resumeValue);
-    bool operator==(const ResumeToken&);
 
-    Timestamp getTimestamp() const {
-        return _timestamp;
-    }
+    explicit ResumeToken(const ResumeTokenData& resumeValue);
 
-    UUID getUuid() const {
-        return _uuid;
-    }
+    bool operator==(const ResumeToken&) const;
+    bool operator!=(const ResumeToken&) const;
+    bool operator<(const ResumeToken&) const;
+    bool operator<=(const ResumeToken&) const;
+    bool operator>(const ResumeToken&) const;
+    bool operator>=(const ResumeToken&) const;
+
+    /** Three way comparison, returns 0 if *this is equal to other, < 0 if *this is less than
+     * other, and > 0 if *this is greater than other.
+     */
+    int compare(const ResumeToken& other) const;
 
     Document toDocument() const;
 
-    BSONObj toBSON() const;
+    BSONObj toBSON() const {
+        return toDocument().toBson();
+    }
+
+    ResumeTokenData getData() const;
 
     /**
      * Parse a resume token from a BSON object; used as an interface to the IDL parser.
      */
-    static ResumeToken parse(const BSONObj& obj);
+    static ResumeToken parse(const BSONObj& resumeBson) {
+        return ResumeToken::parse(Document(resumeBson));
+    }
+
+    static ResumeToken parse(const Document& document);
+
+    friend std::ostream& operator<<(std::ostream& out, const ResumeToken& token) {
+        return out << token.getData();
+    }
+
+    constexpr static StringData kDataFieldName = "_data"_sd;
+    constexpr static StringData kTypeBitsFieldName = "_typeBits"_sd;
 
 private:
-    /**
-     * Construct from a BSON object.
-     * External callers should use the static ResumeToken::parse(const BSONObj&) method instead.
-     */
-    explicit ResumeToken(const BSONObj& resumeBson);
+    explicit ResumeToken(const Document& resumeData);
 
-    Timestamp _timestamp;
-    UUID _uuid;
-    Value _documentId;
+    Value _keyStringData;
+    Value _typeBits;
 };
 }  // namespace mongo

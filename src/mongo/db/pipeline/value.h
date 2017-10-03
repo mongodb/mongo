@@ -192,6 +192,8 @@ public:
     int getInt() const;
     long long getLong() const;
     UUID getUuid() const;
+    // The returned BSONBinData remains owned by this Value.
+    BSONBinData getBinData() const;
     const std::vector<Value>& getArray() const {
         return _storage.getArray();
     }
@@ -459,5 +461,11 @@ inline UUID Value::getUuid() const {
     verify(_storage.binDataType() == BinDataType::newUUID);
     auto stringData = _storage.getString();
     return UUID::fromCDR({stringData.rawData(), stringData.size()});
+}
+
+inline BSONBinData Value::getBinData() const {
+    verify(getType() == BinData);
+    auto stringData = _storage.getString();
+    return BSONBinData(stringData.rawData(), stringData.size(), _storage.binDataType());
 }
 };

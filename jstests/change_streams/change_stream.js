@@ -16,10 +16,6 @@
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
     const t1Uuid = getUUIDFromListCollections(db, db.t1.getName());
     let expected = {
-        _id: {
-            documentKey: {_id: 0},
-            uuid: t1Uuid,
-        },
         documentKey: {_id: 0},
         fullDocument: {_id: 0, a: 1},
         ns: {db: "test", coll: "t1"},
@@ -35,10 +31,6 @@
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     assert.writeOK(db.t1.insert({_id: 1, a: 2}));
     expected = {
-        _id: {
-            documentKey: {_id: 1},
-            uuid: t1Uuid,
-        },
         documentKey: {_id: 1},
         fullDocument: {_id: 1, a: 2},
         ns: {db: "test", coll: "t1"},
@@ -50,7 +42,6 @@
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     assert.writeOK(db.t1.update({_id: 0}, {a: 3}));
     expected = {
-        _id: {documentKey: {_id: 0}, uuid: t1Uuid},
         documentKey: {_id: 0},
         fullDocument: {_id: 0, a: 3},
         ns: {db: "test", coll: "t1"},
@@ -62,7 +53,6 @@
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     assert.writeOK(db.t1.update({_id: 0}, {b: 3}));
     expected = {
-        _id: {documentKey: {_id: 0}, uuid: t1Uuid},
         documentKey: {_id: 0},
         fullDocument: {_id: 0, b: 3},
         ns: {db: "test", coll: "t1"},
@@ -74,10 +64,6 @@
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     assert.writeOK(db.t1.update({_id: 2}, {a: 4}, {upsert: true}));
     expected = {
-        _id: {
-            documentKey: {_id: 2},
-            uuid: t1Uuid,
-        },
         documentKey: {_id: 2},
         fullDocument: {_id: 2, a: 4},
         ns: {db: "test", coll: "t1"},
@@ -90,7 +76,6 @@
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     assert.writeOK(db.t1.update({_id: 3}, {$inc: {b: 2}}));
     expected = {
-        _id: {documentKey: {_id: 3}, uuid: t1Uuid},
         documentKey: {_id: 3},
         ns: {db: "test", coll: "t1"},
         operationType: "update",
@@ -102,7 +87,6 @@
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     assert.writeOK(db.t1.remove({_id: 1}));
     expected = {
-        _id: {documentKey: {_id: 1}, uuid: t1Uuid},
         documentKey: {_id: 1},
         ns: {db: "test", coll: "t1"},
         operationType: "delete",
@@ -116,10 +100,6 @@
     const t2Uuid = getUUIDFromListCollections(db, db.t2.getName());
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: []});
     expected = {
-        _id: {
-            documentKey: {_id: 100},
-            uuid: t2Uuid,
-        },
         documentKey: {_id: 100},
         fullDocument: {_id: 100, c: 1},
         ns: {db: "test", coll: "t2"},
@@ -136,7 +116,7 @@
     db.t3.drop();
     t2cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t2});
     assert.writeOK(db.t2.renameCollection("t3"));
-    expected = {_id: {uuid: t2Uuid}, operationType: "invalidate"};
+    expected = {operationType: "invalidate"};
     cst.assertNextChangesEqual(
         {cursor: t2cursor, expectedChanges: [expected], expectInvalidate: true});
 
@@ -169,7 +149,7 @@
 
     // Note we do not project away 'id.ts' as it is part of the resume token.
     let resumeCursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: db.resume1, includeTs: true});
+        {pipeline: [{$changeStream: {}}], collection: db.resume1, includeToken: true});
 
     // Insert a document and save the resulting change stream.
     assert.writeOK(db.resume1.insert({_id: 1}));
@@ -180,7 +160,7 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeTs: true,
+        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
 
@@ -196,7 +176,7 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeTs: true,
+        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     assert.docEq(cst.getOneChange(resumeCursor), secondInsertChangeDoc);
@@ -206,7 +186,7 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: secondInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeTs: true,
+        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);

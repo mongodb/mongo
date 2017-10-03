@@ -112,8 +112,8 @@ eventFn();`,
     const wholeCollectionStreamComment = "change stream on entire collection";
     let res = assert.commandWorked(db.runCommand({
         aggregate: changesCollection.getName(),
-        // Project out the timestamp, since that's subject to change unpredictably.
-        pipeline: [{$changeStream: {}}, {$project: {"_id.clusterTime": 0}}],
+        // Project out the resume token, since that's subject to change unpredictably.
+        pipeline: [{$changeStream: {}}, {$project: {"_id": 0}}],
         cursor: {},
         comment: wholeCollectionStreamComment
     }));
@@ -132,7 +132,6 @@ eventFn();`,
     assert.eq(getMoreResponse.cursor.nextBatch.length, 1);
     const changesCollectionUuid = getUUIDFromListCollections(db, changesCollection.getName());
     assert.docEq(getMoreResponse.cursor.nextBatch[0], {
-        _id: {documentKey: {_id: "wake up"}, uuid: changesCollectionUuid},
         documentKey: {_id: "wake up"},
         fullDocument: {_id: "wake up"},
         ns: {db: db.getName(), coll: changesCollection.getName()},

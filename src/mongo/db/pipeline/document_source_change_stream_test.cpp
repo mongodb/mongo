@@ -155,10 +155,12 @@ public:
     Document makeResumeToken(Timestamp ts,
                              ImplicitValue uuid = Value(),
                              ImplicitValue docKey = Value()) {
-        if (docKey.missing()) {
-            return {{"clusterTime", D{{"ts", ts}}}, {"uuid", uuid}};
-        }
-        return {{"clusterTime", D{{"ts", ts}}}, {"uuid", uuid}, {"documentKey", docKey}};
+        ResumeTokenData tokenData;
+        tokenData.clusterTime = ts;
+        tokenData.documentKey = docKey;
+        if (!uuid.missing())
+            tokenData.uuid = uuid.getUuid();
+        return ResumeToken(tokenData).toDocument();
     }
 
     /**

@@ -98,11 +98,12 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     auto matchSpec = BSON("$match" << documentKey);
 
     // Extract the UUID from resume token and do change stream lookups by UUID.
-    ResumeToken resumeToken(updateOp[DocumentSourceChangeStream::kIdField]);
+    auto resumeToken =
+        ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument());
 
     // TODO SERVER-29134 we need to extract the namespace from the document and set them on the new
     // ExpressionContext if we're getting notifications from an entire database.
-    auto foreignExpCtx = pExpCtx->copyWith(nss, resumeToken.getUuid());
+    auto foreignExpCtx = pExpCtx->copyWith(nss, resumeToken.getData().uuid);
     auto pipelineStatus = _mongoProcessInterface->makePipeline({matchSpec}, foreignExpCtx);
     if (pipelineStatus.getStatus() == ErrorCodes::NamespaceNotFound) {
         // We couldn't find the collection with UUID, it may have been dropped.

@@ -42,7 +42,7 @@
     assert.eq(change.operationType, "delete", tojson(change));
     cst.assertNextChangesEqual({
         cursor: aggcursor,
-        expectedChanges: [{_id: {uuid: collGetMoreUuid}, operationType: "invalidate"}],
+        expectedChanges: [{operationType: "invalidate"}],
         expectInvalidate: true
     });
 
@@ -51,7 +51,8 @@
     db.createCollection(collAgg.getName());
     const collAggUuid = getUUIDFromListCollections(db, collAgg.getName());
     // Get a valid resume token that the next aggregate command can use.
-    aggcursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collAgg});
+    aggcursor = cst.startWatchingChanges(
+        {pipeline: [{$changeStream: {}}], collection: collAgg, includeToken: true});
 
     assert.writeOK(collAgg.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 

@@ -272,19 +272,20 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
                                                       elem.embeddedObject());
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
-        auto resumeNamespace = UUIDCatalog::get(expCtx->opCtx).lookupNSSByUUID(token.getUuid());
+        ResumeTokenData tokenData = token.getData();
+        uassert(40645,
+                "The resume token is invalid (no UUID), possibly from an invalidate.",
+                tokenData.uuid);
+        auto resumeNamespace =
+            UUIDCatalog::get(expCtx->opCtx).lookupNSSByUUID(tokenData.uuid.get());
         uassert(40615,
                 "The resume token UUID does not exist. Has the collection been dropped?",
                 !resumeNamespace.isEmpty());
-        startFrom = token.getTimestamp();
+        startFrom = tokenData.clusterTime;
         if (expCtx->needsMerge) {
-            DocumentSourceShardCheckResumabilitySpec spec;
-            spec.setResumeToken(std::move(token));
-            resumeStage = DocumentSourceShardCheckResumability::create(expCtx, std::move(spec));
+            resumeStage = DocumentSourceShardCheckResumability::create(expCtx, std::move(token));
         } else {
-            DocumentSourceEnsureResumeTokenPresentSpec spec;
-            spec.setResumeToken(std::move(token));
-            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(spec));
+            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
         }
     }
     const bool changeStreamIsResuming = resumeStage != nullptr;
@@ -414,10 +415,12 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
 
     // Note that 'documentKey' and/or 'uuid' might be missing, in which case the missing fields will
     // not appear in the output.
-    Document resumeToken{{kClusterTimeField, Document{{kTimestampField, ts}}},
-                         {kUuidField, uuid},
-                         {kDocumentKeyField, documentKey}};
-    doc.addField(kIdField, Value(resumeToken));
+    ResumeTokenData resumeTokenData;
+    resumeTokenData.clusterTime = ts.getTimestamp();
+    resumeTokenData.documentKey = documentKey;
+    if (!uuid.missing())
+        resumeTokenData.uuid = uuid.getUuid();
+    doc.addField(kIdField, Value(ResumeToken(resumeTokenData).toDocument()));
     doc.addField(kOperationTypeField, Value(operationType));
 
     // "invalidate" and "retryNeeded" entries have fewer fields.

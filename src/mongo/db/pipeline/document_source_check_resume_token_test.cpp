@@ -64,10 +64,9 @@ protected:
      * namespace in the mock queue.
      */
     void addDocument(Timestamp ts, std::string id, UUID uuid = testUuid()) {
-        _mock->queue.push_back(Document{{"_id",
-                                         Document{{"clusterTime", Document{{"ts", ts}}},
-                                                  {"uuid", uuid},
-                                                  {"documentKey", Document{{"_id", id}}}}}});
+        _mock->queue.push_back(Document{
+            {"_id",
+             ResumeToken(ResumeTokenData(ts, Value(Document{{"_id", id}}), uuid)).toDocument()}});
     }
 
     void addPause() {
@@ -79,12 +78,8 @@ protected:
      */
     intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createCheckResumeToken(
         Timestamp ts, StringData id, UUID uuid = testUuid()) {
-        auto token = ResumeToken::parse(BSON("clusterTime" << BSON("ts" << ts) << "uuid" << uuid
-                                                           << "documentKey"
-                                                           << BSON("_id" << id)));
-        DocumentSourceEnsureResumeTokenPresentSpec spec;
-        spec.setResumeToken(token);
-        auto checkResumeToken = DocumentSourceEnsureResumeTokenPresent::create(getExpCtx(), spec);
+        ResumeToken token(ResumeTokenData(ts, Value(Document{{"_id", id}}), uuid));
+        auto checkResumeToken = DocumentSourceEnsureResumeTokenPresent::create(getExpCtx(), token);
         checkResumeToken->setSource(_mock.get());
         return checkResumeToken;
     }
@@ -105,13 +100,9 @@ class ShardCheckResumabilityTest : public CheckResumeTokenTest {
 protected:
     intrusive_ptr<DocumentSourceShardCheckResumability> createShardCheckResumability(
         Timestamp ts, StringData id, UUID uuid = testUuid()) {
-        auto token = ResumeToken::parse(BSON("clusterTime" << BSON("ts" << ts) << "uuid" << uuid
-                                                           << "documentKey"
-                                                           << BSON("_id" << id)));
-        DocumentSourceShardCheckResumabilitySpec spec;
-        spec.setResumeToken(token);
+        ResumeToken token(ResumeTokenData(ts, Value(Document{{"_id", id}}), uuid));
         auto shardCheckResumability =
-            DocumentSourceShardCheckResumability::create(getExpCtx(), spec);
+            DocumentSourceShardCheckResumability::create(getExpCtx(), token);
         shardCheckResumability->setSource(_mock.get());
         return shardCheckResumability;
     }
@@ -153,8 +144,7 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithPausesAfterResumeToken) {
     auto result1 = checkResumeToken->getNext();
     ASSERT_TRUE(result1.isAdvanced());
     auto& doc1 = result1.getDocument();
-    ASSERT_VALUE_EQ(Value(Document{{"ts", doc1Timestamp}}),
-                    doc1["_id"].getDocument()["clusterTime"]);
+    ASSERT_EQ(doc1Timestamp, ResumeToken::parse(doc1["_id"].getDocument()).getData().clusterTime);
     ASSERT_TRUE(checkResumeToken->getNext().isEOF());
 }
 
@@ -172,13 +162,11 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithMultipleDocumentsAfterResumeToken)
     auto result1 = checkResumeToken->getNext();
     ASSERT_TRUE(result1.isAdvanced());
     auto& doc1 = result1.getDocument();
-    ASSERT_VALUE_EQ(Value(Document{{"ts", doc1Timestamp}}),
-                    doc1["_id"].getDocument()["clusterTime"]);
+    ASSERT_EQ(doc1Timestamp, ResumeToken::parse(doc1["_id"].getDocument()).getData().clusterTime);
     auto result2 = checkResumeToken->getNext();
     ASSERT_TRUE(result2.isAdvanced());
     auto& doc2 = result2.getDocument();
-    ASSERT_VALUE_EQ(Value(Document{{"ts", doc2Timestamp}}),
-                    doc2["_id"].getDocument()["clusterTime"]);
+    ASSERT_EQ(doc2Timestamp, ResumeToken::parse(doc2["_id"].getDocument()).getData().clusterTime);
     ASSERT_TRUE(checkResumeToken->getNext().isEOF());
 }
 
@@ -278,7 +266,7 @@ TEST_F(ShardCheckResumabilityTest,
     auto result = shardCheckResumability->getNext();
     ASSERT_TRUE(result.isAdvanced());
     auto& doc = result.getDocument();
-    ASSERT_VALUE_EQ(Value(resumeTimestamp), doc["_id"]["clusterTime"]["ts"]);
+    ASSERT_EQ(resumeTimestamp, ResumeToken::parse(doc["_id"].getDocument()).getData().clusterTime);
 }
 
 TEST_F(ShardCheckResumabilityTest,
@@ -295,7 +283,7 @@ TEST_F(ShardCheckResumabilityTest,
     auto result = shardCheckResumability->getNext();
     ASSERT_TRUE(result.isAdvanced());
     auto& doc = result.getDocument();
-    ASSERT_VALUE_EQ(Value(resumeTimestamp), doc["_id"]["clusterTime"]["ts"]);
+    ASSERT_EQ(resumeTimestamp, ResumeToken::parse(doc["_id"].getDocument()).getData().clusterTime);
 }
 
 TEST_F(ShardCheckResumabilityTest, ShouldSucceedIfResumeTokenIsPresentAndOplogIsEmpty) {
@@ -310,7 +298,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldSucceedIfResumeTokenIsPresentAndOplogIs
     auto result = shardCheckResumability->getNext();
     ASSERT_TRUE(result.isAdvanced());
     auto& doc = result.getDocument();
-    ASSERT_VALUE_EQ(Value(resumeTimestamp), doc["_id"]["clusterTime"]["ts"]);
+    ASSERT_EQ(resumeTimestamp, ResumeToken::parse(doc["_id"].getDocument()).getData().clusterTime);
 }
 
 TEST_F(ShardCheckResumabilityTest,
@@ -363,7 +351,7 @@ TEST_F(ShardCheckResumabilityTest,
     auto result = shardCheckResumability->getNext();
     ASSERT_TRUE(result.isAdvanced());
     auto& doc = result.getDocument();
-    ASSERT_VALUE_EQ(Value(docTimestamp), doc["_id"]["clusterTime"]["ts"]);
+    ASSERT_EQ(docTimestamp, ResumeToken::parse(doc["_id"].getDocument()).getData().clusterTime);
 }
 
 TEST_F(ShardCheckResumabilityTest,
@@ -394,7 +382,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstDoc) {
     auto result1 = shardCheckResumability->getNext();
     ASSERT_TRUE(result1.isAdvanced());
     auto& doc1 = result1.getDocument();
-    ASSERT_VALUE_EQ(Value(docTimestamp), doc1["_id"]["clusterTime"]["ts"]);
+    ASSERT_EQ(docTimestamp, ResumeToken::parse(doc1["_id"].getDocument()).getData().clusterTime);
 
     mockOplog = {Document{{"ts", oplogFutureTimestamp}}};
     shardCheckResumability->injectMongoProcessInterface(
@@ -418,7 +406,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldSucceedWhenOplogEntriesExistBeforeAndAf
     auto result1 = shardCheckResumability->getNext();
     ASSERT_TRUE(result1.isAdvanced());
     auto& doc1 = result1.getDocument();
-    ASSERT_VALUE_EQ(Value(docTimestamp), doc1["_id"]["clusterTime"]["ts"]);
+    ASSERT_EQ(docTimestamp, ResumeToken::parse(doc1["_id"].getDocument()).getData().clusterTime);
     auto result2 = shardCheckResumability->getNext();
     ASSERT_TRUE(result2.isEOF());
 }

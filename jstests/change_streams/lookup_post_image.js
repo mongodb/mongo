@@ -17,7 +17,7 @@
     // Test that not specifying 'fullDocument' does include a 'fullDocument' in the result for an
     // insert.
     let cursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: coll, includeTs: true});
+        {pipeline: [{$changeStream: {}}], collection: coll, includeToken: true});
     assert.writeOK(coll.insert({_id: "fullDocument not specified"}));
     let latestChange = cst.getOneChange(cursor);
     assert.eq(latestChange.operationType, "insert");
@@ -45,7 +45,7 @@
     cursor = cst.startWatchingChanges({
         collection: coll,
         pipeline: [{$changeStream: {fullDocument: "default"}}],
-        includeTs: true
+        includeToken: true
     });
     assert.writeOK(coll.insert({_id: "fullDocument is default"}));
     latestChange = cst.getOneChange(cursor);
@@ -74,7 +74,7 @@
     cursor = cst.startWatchingChanges({
         collection: coll,
         pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
-        includeTs: true
+        includeToken: true
     });
     assert.writeOK(coll.insert({_id: "fullDocument is lookup"}));
     latestChange = cst.getOneChange(cursor);
@@ -103,7 +103,7 @@
         collection: coll,
         pipeline:
             [{$changeStream: {fullDocument: "updateLookup"}}, {$match: {operationType: "update"}}],
-        includeTs: true
+        includeToken: true
     });
     assert.writeOK(coll.update({_id: "fullDocument is lookup"}, {$set: {updatedAgain: true}}));
     assert.writeOK(coll.remove({_id: "fullDocument is lookup"}));

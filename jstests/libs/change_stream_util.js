@@ -12,19 +12,19 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     // Prevent accidental usages of the default db.
     const db = null;
 
-    self.oplogProjection = {$project: {"_id.clusterTime": 0}};
+    self.oplogProjection = {$project: {"_id": 0}};
 
     /**
      * Starts a change stream cursor with the given pipeline on the given collection. It uses
-     * the 'aggregateOptions' if provided and elides the clusterTime if 'includeTs' is not set.
+     * the 'aggregateOptions' if provided and elides the resume token if 'includeToken' is not set.
      * This saves the cursor so that it can be cleaned up later.
      *
      * Returns the cursor returned by the 'aggregate' command.
      */
-    self.startWatchingChanges = function({pipeline, collection, includeTs, aggregateOptions}) {
+    self.startWatchingChanges = function({pipeline, collection, includeToken, aggregateOptions}) {
         aggregateOptions = aggregateOptions || {cursor: {batchSize: 1}};
 
-        if (!includeTs) {
+        if (!includeToken) {
             // Strip the oplog fields we aren't testing.
             pipeline.push(self.oplogProjection);
         }

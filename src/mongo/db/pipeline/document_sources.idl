@@ -35,8 +35,9 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 types:
-    # A resume token could be parsed as a struct, but since we may make it opaque in the future, we
-    # parse it as a type with a custom class now.
+    # A resume token is an opaque document we return to the user that contains all the information
+    # needed to resume a stream where they left off.  It also provides the ordering of streams
+    # from multiple shards.
     resumeToken:
         bson_serialization_type: object
         description: An object representing a resume token for a change stream
@@ -72,16 +73,6 @@ structs:
               description: A string '"updateLookup"' or '"default"', indicating whether or not we
                            should return a full document or just changes for an update.
 
-
-  DocumentSourceEnsureResumeTokenPresentSpec:
-      description: A document used to specify the internal stage which checks the presence of the
-                   resume token.
-      fields:
-          resumeToken:
-              cpp_name: resumeToken
-              type: resumeToken
-              description: The resume token which is required to be present in the pipeline.
-
   ResumeTokenClusterTime:
       description: The IDL type of cluster time
       fields:
@@ -107,23 +98,3 @@ structs:
       users:
         type: array<ListSessionsUser>
         optional: true
-
-  ResumeTokenInternal:
-      description: The internal format of a resume token.  For use by the ResumeToken class
-                   only.
-      fields:
-          clusterTime:
-              cpp_name: clusterTime
-              type: ResumeTokenClusterTime
-              description: The timestamp of the oplog entry represented by this resume token.
-
-          uuid:
-              cpp_name: uuid
-              type: uuid
-              description: The UUID of the oplog entry represented by this resume token.
-
-          documentKey:
-              cpp_name: documentKey
-              type: resumeTokenDocumentKey
-              description: The document key of the document in the oplog entry represented by this
-                           resume token.
