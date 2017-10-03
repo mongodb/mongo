@@ -220,7 +220,14 @@ typedef struct {
 	 * There's some trickiness here, see the code for comments on how
 	 * these fields work.
 	 */
-	bool	 cell_zero;		/* Row-store internal page 0th key */
+	bool	cell_zero;		/* Row-store internal page 0th key */
+
+	/*
+	 * We calculate checksums to find previously written identical blocks,
+	 * but once a match fails during an eviction, there's no point trying
+	 * again.
+	 */
+	bool	evict_matching_checksum_failed;
 
 	/*
 	 * WT_DICTIONARY --
@@ -972,6 +979,8 @@ __rec_init(WT_SESSION_IMPL *session,
 
 	r->wrapup_checkpoint = NULL;
 	r->wrapup_checkpoint_compressed = false;
+
+	r->evict_matching_checksum_failed = false;
 
 	/*
 	 * Dictionary compression only writes repeated values once.  We grow
@@ -3345,6 +3354,91 @@ __rec_split_write_header(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __rec_split_write_reuse --
+ *	Check if a previously written block can be reused.
+ */
+static bool
+__rec_split_write_reuse(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, WT_MULTI *multi, WT_ITEM *image, bool last_block)
+{
+	WT_MULTI *multi_match;
+	WT_PAGE_MODIFY *mod;
+
+	mod = r->page->modify;
+
+	/*
+	 * Don't bother calculating checksums for bulk loads, there's no reason
+	 * to believe they'll be useful. Check because LSM does bulk-loads as
+	 * part of normal operations and the check is cheap.
+	 */
+	if (r->is_bulk_load)
+		return (false);
+
+	/*
+	 * Calculating the checksum is the expensive part, try to avoid it.
+	 *
+	 * Ignore the last block of any reconciliation. Pages are written in the
+	 * same block order every time, so the last block written for a page is
+	 * unlikely to match any previously written block or block written in
+	 * the future, (absent a point-update earlier in the page which didn't
+	 * change the size of the on-page object in any way).
+	 */
+	if (last_block)
+		return (false);
+
+	/*
+	 * Quit if evicting with no previously written block to compare against.
+	 * (In other words, if there's eviction pressure and the page was never
+	 * written by a checkpoint, calculating a checksum is worthless.)
+	 *
+	 * Quit if evicting and a previous check failed, once there's a miss no
+	 * future block will match.
+	 */
+	if (F_ISSET(r, WT_EVICTING)) {
+		if (mod->rec_result != WT_PM_REC_MULTIBLOCK ||
+		    mod->mod_multi_entries < r->multi_next)
+			return (false);
+		if (r->evict_matching_checksum_failed)
+			return (false);
+	}
+
+	/* Calculate the checksum for this block. */
+	multi->checksum = __wt_checksum(image->data, image->size);
+
+	/*
+	 * Don't check for a block match when writing blocks during compaction,
+	 * the whole idea is to move those blocks. Check after calculating the
+	 * checksum, we don't distinguish between pages written solely as part
+	 * of the compaction and pages written at around the same time, and so
+	 * there's a possibility the calculated checksum will be useful in the
+	 * future.
+	 */
+	if (session->compact_state != WT_COMPACT_NONE)
+		return (false);
+
+	/*
+	 * Pages are written in the same block order every time, only check the
+	 * appropriate slot.
+	 */
+	if (mod->rec_result != WT_PM_REC_MULTIBLOCK ||
+	    mod->mod_multi_entries < r->multi_next)
+		return (false);
+
+	multi_match = &mod->mod_multi[r->multi_next - 1];
+	if (multi_match->size != multi->size ||
+	    multi_match->checksum != multi->checksum) {
+		r->evict_matching_checksum_failed = true;
+		return (false);
+	}
+
+	multi_match->addr.reuse = 1;
+	multi->addr = multi_match->addr;
+
+	WT_STAT_DATA_INCR(session, rec_page_match);
+	return (true);
+}
+
+/*
  * __rec_split_write --
  *	Write a disk block out for the split helper functions.
  */
@@ -3353,9 +3447,8 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_CHUNK *chunk, WT_ITEM *compressed_image, bool last_block)
 {
 	WT_BTREE *btree;
-	WT_MULTI *multi, *multi_mod;
+	WT_MULTI *multi;
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
 	size_t addr_size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 #ifdef HAVE_DIAGNOSTIC
@@ -3364,7 +3457,6 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 	btree = S2BT(session);
 	page = r->page;
-	mod = page->modify;
 #ifdef HAVE_DIAGNOSTIC
 	verify_image = true;
 #endif
@@ -3447,41 +3539,13 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	}
 
 	/*
-	 * If we wrote this block before, re-use it.  Pages get written in the
-	 * same block order every time, only check the appropriate slot.  The
-	 * expensive part of this test is the checksum, only do that work when
-	 * there has been or will be a reconciliation of this page involving
-	 * split pages.  This test isn't perfect: we're doing a checksum if a
-	 * previous reconciliation of the page split or if we will split this
-	 * time, but that test won't calculate a checksum on the first block
-	 * the first time the page splits.
+	 * If we wrote this block before, re-use it. Prefer a checksum of the
+	 * compressed image. It's an identical test and should be faster.
 	 */
-	if (r->multi_next > 1 ||
-	    (mod->rec_result == WT_PM_REC_MULTIBLOCK &&
-	    mod->mod_multi != NULL)) {
-		multi->checksum =
-		    __wt_checksum(chunk->image.data, chunk->image.size);
-
-		/*
-		 * One last check: don't reuse blocks if compacting, the reason
-		 * for compaction is to move blocks to different locations. We
-		 * do this check after calculating the checksums, hopefully the
-		 * next write can be skipped.
-		 */
-		if (session->compact_state == WT_COMPACT_NONE &&
-		    mod->rec_result == WT_PM_REC_MULTIBLOCK &&
-		    mod->mod_multi_entries > r->multi_next) {
-			multi_mod = &mod->mod_multi[r->multi_next - 1];
-			if (multi_mod->size == multi->size &&
-			    multi_mod->checksum == multi->checksum) {
-				multi_mod->addr.reuse = 1;
-				multi->addr = multi_mod->addr;
-
-				WT_STAT_DATA_INCR(session, rec_page_match);
-				goto copy_image;
-			}
-		}
-	}
+	if (__rec_split_write_reuse(session, r, multi,
+	    compressed_image == NULL ? &chunk->image : compressed_image,
+	    last_block))
+		goto copy_image;
 
 	WT_RET(__wt_bt_write(session,
 	    compressed_image == NULL ? &chunk->image : compressed_image,
