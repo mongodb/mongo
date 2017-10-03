@@ -39,6 +39,8 @@ obj_bulk(void)
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
 	if ((ret = session->create(session, uri, config)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
 			testutil_die(ret, "session.create");
@@ -50,6 +52,21 @@ obj_bulk(void)
 			testutil_check(c->close(c));
 		} else if (ret != ENOENT && ret != EBUSY && ret != EINVAL)
 			testutil_die(ret, "session.open_cursor bulk");
+	}
+
+	if (use_txn) {
+		/*
+		 * As the operations are being performed concurrently,
+		 * return value can be ENOENT, EBUSY or EINVAL will set
+		 * error to transaction opened by session. In these
+		 * cases the transaction has to be aborted.
+		 */
+		if (ret != ENOENT && ret != EBUSY && ret != EINVAL)
+			ret = session->commit_transaction(session, NULL);
+		else
+			ret = session->rollback_transaction(session, NULL);
+		if (ret == EINVAL)
+			testutil_die(ret, "session.commit bulk");
 	}
 	testutil_check(session->close(session, NULL));
 }
@@ -70,6 +87,8 @@ obj_bulk_unique(int force)
 	    new_uri, sizeof(new_uri), "%s.%u", uri, ++uid));
 	testutil_check(pthread_rwlock_unlock(&single));
 
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
 	testutil_check(session->create(session, new_uri, config));
 
 	__wt_yield();
@@ -89,6 +108,10 @@ obj_bulk_unique(int force)
 		if (ret != EBUSY)
 			testutil_die(ret, "session.drop: %s", new_uri);
 
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit bulk unique");
 	testutil_check(session->close(session, NULL));
 }
 
@@ -101,12 +124,19 @@ obj_cursor(void)
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
 	if ((ret =
 	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0) {
 		if (ret != ENOENT && ret != EBUSY)
 			testutil_die(ret, "session.open_cursor");
 	} else
 		testutil_check(cursor->close(cursor));
+
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit cursor");
 	testutil_check(session->close(session, NULL));
 }
 
@@ -118,10 +148,16 @@ obj_create(void)
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
 	if ((ret = session->create(session, uri, config)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
 			testutil_die(ret, "session.create");
 
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit create");
 	testutil_check(session->close(session, NULL));
 }
 
@@ -140,13 +176,25 @@ obj_create_unique(int force)
 	    new_uri, sizeof(new_uri), "%s.%u", uri, ++uid));
 	testutil_check(pthread_rwlock_unlock(&single));
 
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
 	testutil_check(session->create(session, new_uri, config));
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit create unique");
 
 	__wt_yield();
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
 	while ((ret = session->drop(
 	    session, new_uri, force ? "force" : NULL)) != 0)
 		if (ret != EBUSY)
 			testutil_die(ret, "session.drop: %s", new_uri);
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit create unique");
 
 	testutil_check(session->close(session, NULL));
 }
@@ -159,10 +207,26 @@ obj_drop(int force)
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
 	if ((ret = session->drop(session, uri, force ? "force" : NULL)) != 0)
 		if (ret != ENOENT && ret != EBUSY)
 			testutil_die(ret, "session.drop");
 
+	if (use_txn) {
+		/*
+		 * As the operations are being performed concurrently,
+		 * return value can be ENOENT or EBUSY will set
+		 * error to transaction opened by session. In these
+		 * cases the transaction has to be aborted.
+		 */
+		if (ret != ENOENT && ret != EBUSY)
+			ret = session->commit_transaction(session, NULL);
+		else
+			ret = session->rollback_transaction(session, NULL);
+		if (ret == EINVAL)
+			testutil_die(ret, "session.commit drop");
+	}
 	testutil_check(session->close(session, NULL));
 }
 
