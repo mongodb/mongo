@@ -204,6 +204,8 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());
 
+    _sessionCatalogSource.init(opCtx);
+
     // Load the ids of the currently available documents
     auto storeCurrentLocsStatus = _storeCurrentLocs(opCtx);
     if (!storeCurrentLocsStatus.isOK()) {
@@ -729,18 +731,31 @@ void MigrationChunkClonerSourceLegacy::_xfer(OperationContext* opCtx,
     arr.done();
 }
 
-void MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(OperationContext* opCtx,
-                                                                 BSONArrayBuilder* arrBuilder) {
-    while (_sessionCatalogSource.hasMoreOplog()) {
-        auto oplog = _sessionCatalogSource.getLastFetchedOplog();
+repl::OpTime MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
+    OperationContext* opCtx, BSONArrayBuilder* arrBuilder) {
+    repl::OpTime opTimeToWait;
+    auto seenOpTimeTerm = repl::OpTime::kUninitializedTerm;
 
-        if (!oplog) {
+    while (_sessionCatalogSource.hasMoreOplog()) {
+        auto result = _sessionCatalogSource.getLastFetchedOplog();
+
+        if (!result.oplog) {
             // Last fetched turned out empty, try to see if there are more
             _sessionCatalogSource.fetchNextOplog(opCtx);
             continue;
         }
 
-        auto oplogDoc = oplog->toBSON();
+        auto newOpTime = result.oplog->getOpTime();
+        if (seenOpTimeTerm == repl::OpTime::kUninitializedTerm) {
+            seenOpTimeTerm = newOpTime.getTerm();
+        } else {
+            uassert(40650,
+                    str::stream() << "detected change of term from " << seenOpTimeTerm << " to "
+                                  << newOpTime.getTerm(),
+                    seenOpTimeTerm == newOpTime.getTerm());
+        }
+
+        auto oplogDoc = result.oplog->toBSON();
 
         // Use the builder size instead of accumulating the document sizes directly so that we
         // take into consideration the overhead of BSONArray indices.
@@ -751,7 +766,15 @@ void MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(OperationContex
 
         arrBuilder->append(oplogDoc);
         _sessionCatalogSource.fetchNextOplog(opCtx);
+
+        if (result.shouldWaitForMajority) {
+            if (opTimeToWait < newOpTime) {
+                opTimeToWait = newOpTime;
+            }
+        }
     }
+
+    return opTimeToWait;
 }
 
 }  // namespace mongo

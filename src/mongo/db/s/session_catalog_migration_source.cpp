@@ -30,11 +30,16 @@
 
 #include "mongo/db/s/session_catalog_migration_source.h"
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -69,17 +74,17 @@ bool SessionCatalogMigrationSource::hasMoreOplog() {
     return _hasMoreOplogFromSessionCatalog() || _hasNewWrites();
 }
 
-boost::optional<repl::OplogEntry> SessionCatalogMigrationSource::getLastFetchedOplog() {
+SessionCatalogMigrationSource::OplogResult SessionCatalogMigrationSource::getLastFetchedOplog() {
     {
         stdx::lock_guard<stdx::mutex> _lk(_sessionCloneMutex);
         if (_lastFetchedOplog) {
-            return _lastFetchedOplog;
+            return OplogResult(_lastFetchedOplog, false);
         }
     }
 
     {
         stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
-        return _lastFetchedNewWriteOplog;
+        return OplogResult(_lastFetchedNewWriteOplog, true);
     }
 }
 
@@ -135,6 +140,7 @@ repl::OplogEntry SessionCatalogMigrationSource::_getLastFetchedOplogFromSessionC
 bool SessionCatalogMigrationSource::_fetchNextOplogFromSessionCatalog(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_sessionCloneMutex);
 
+    invariant(_alreadyInitialized);
     if (!_lastFetchedOplogBuffer.empty()) {
         _lastFetchedOplog = _lastFetchedOplogBuffer.back();
         _lastFetchedOplogBuffer.pop_back();
@@ -146,8 +152,6 @@ bool SessionCatalogMigrationSource::_fetchNextOplogFromSessionCatalog(OperationC
     if (_handleWriteHistory(lk, opCtx)) {
         return true;
     }
-
-    _initIfNotYet(lk, opCtx);
 
     while (!_sessionLastWriteOpTimes.empty()) {
         auto lowestOpTimeIter = _sessionLastWriteOpTimes.begin();
@@ -180,6 +184,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     {
         stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
 
+        invariant(_alreadyInitialized);
         if (_newWriteOpTimeList.empty()) {
             _lastFetchedNewWriteOplog.reset();
             return false;
@@ -211,21 +216,46 @@ void SessionCatalogMigrationSource::notifyNewWriteOpTime(repl::OpTime opTime) {
     _newWriteOpTimeList.push_back(opTime);
 }
 
-void SessionCatalogMigrationSource::_initIfNotYet(WithLock, OperationContext* opCtx) {
-    if (_alreadyInitialized) {
-        return;
-    }
+void SessionCatalogMigrationSource::init(OperationContext* opCtx) {
+    invariant(!_alreadyInitialized);
 
     DBDirectClient client(opCtx);
     auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), {});
 
+    std::set<repl::OpTime> opTimes;
     while (cursor->more()) {
         auto nextSession = SessionTxnRecord::parse(
             IDLParserErrorContext("Session migration cloning"), cursor->next());
-        _sessionLastWriteOpTimes.insert(nextSession.getLastWriteOpTime());
+        auto opTime = nextSession.getLastWriteOpTime();
+        if (!opTime.isNull()) {
+            opTimes.insert(nextSession.getLastWriteOpTime());
+        }
     }
 
+    {
+        auto message = BSON("sessionMigrateCloneStart" << _ns.ns());
+        AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
+        writeConflictRetry(
+            opCtx,
+            "session migration initialization majority commit barrier",
+            NamespaceString::kRsOplogNamespace.ns(),
+            [&] {
+                WriteUnitOfWork wuow(opCtx);
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                    opCtx, _ns, {}, {}, message);
+                wuow.commit();
+            });
+    }
+
+    auto opTimeToWait = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    WriteConcernResult result;
+    WriteConcernOptions majority(
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);
+    uassertStatusOK(waitForWriteConcern(opCtx, opTimeToWait, majority, &result));
+
+    stdx::lock_guard<stdx::mutex> lk(_sessionCloneMutex);
     _alreadyInitialized = true;
+    _sessionLastWriteOpTimes.swap(opTimes);
 }
 
 }  // namespace mongo

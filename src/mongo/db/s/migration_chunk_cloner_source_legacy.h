@@ -35,6 +35,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_source.h"
@@ -130,7 +131,13 @@ public:
      */
     Status nextModsBatch(OperationContext* opCtx, Database* db, BSONObjBuilder* builder);
 
-    void nextSessionMigrationBatch(OperationContext* opCtx, BSONArrayBuilder* arrBuilder);
+    /**
+     * Appends to the buffer oplogs that contain session information for this migration.
+     * If this function returns a valid OpTime, this means that the oplog appended are
+     * not guaranteed to be majority committed and the caller has to use wait for the
+     * returned opTime to be majority committed.
+     */
+    repl::OpTime nextSessionMigrationBatch(OperationContext* opCtx, BSONArrayBuilder* arrBuilder);
 
 private:
     friend class DeleteNotificationStage;

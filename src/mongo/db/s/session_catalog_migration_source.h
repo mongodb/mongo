@@ -48,12 +48,43 @@ class ServiceContext;
 /**
  * Provides facilities for extracting oplog entries of writes in a particular namespace that needs
  * to be migrated.
+ *
+ * This also ensures that oplog returned are majority committed. This is achieved by calling
+ * waitForWriteConcern. However, waitForWriteConcern does not support waiting for opTimes of
+ * previous terms. To get around this, the waitForWriteConcern is performed in two phases:
+ *
+ * During init() call phase:
+ * 1. Scan the entire config.transactions and extract all the lastWriteOpTime.
+ * 2. Insert a no-op oplog entry and wait for it to be majority committed.
+ * 3. At this point any writes before should be majority committed (including all the oplog
+ *    entries that the collected lastWriteOpTime points to). If the particular oplog with the
+ *    opTime cannot be found: it either means that the oplog was truncated or rolled back.
+ *
+ * New writes/xfer mods phase oplog entries:
+ * In this case, caller is responsible for calling waitForWriteConcern. If getLastFetchedOplog
+ * returns shouldWaitForMajority == true, it should wait for the highest opTime it has got from
+ * getLastFetchedOplog. It should also error if it detects a change of term within a batch since
+ * it would be wrong to wait for the highest opTime in this case.
  */
 class SessionCatalogMigrationSource {
     MONGO_DISALLOW_COPYING(SessionCatalogMigrationSource);
 
 public:
+    struct OplogResult {
+        OplogResult(boost::optional<repl::OplogEntry> _oplog, bool _shouldWaitForMajority)
+            : oplog(std::move(_oplog)), shouldWaitForMajority(_shouldWaitForMajority) {}
+
+        // The oplog fetched.
+        boost::optional<repl::OplogEntry> oplog;
+
+        // If this is set to true, oplog returned is not confirmed to be majority committed,
+        // so the caller has to explicitly wait for it to be committed to majority.
+        bool shouldWaitForMajority = false;
+    };
+
     explicit SessionCatalogMigrationSource(NamespaceString ns);
+
+    void init(OperationContext* opCtx);
 
     /**
      * Returns true if there are more oplog entries to fetch at this moment. Note that new writes
@@ -72,7 +103,7 @@ public:
      * Returns the oplog document that was last fetched by the fetchNextOplog call.
      * Returns an empty object if there are no oplog to fetch.
      */
-    boost::optional<repl::OplogEntry> getLastFetchedOplog();
+    OplogResult getLastFetchedOplog();
 
     /**
      * Remembers the oplog timestamp of a new write that just occurred.
@@ -82,8 +113,6 @@ public:
 private:
     ///////////////////////////////////////////////////////////////////////////
     // Methods for extracting the oplog entries from session information.
-
-    void _initIfNotYet(WithLock, OperationContext* opCtx);
 
     /**
      * If this returns false, it just means that there are no more oplog entry in the buffer that
