@@ -118,6 +118,8 @@ var BackupRestoreTest = function(options) {
                 'auth_drop_role.js',
                 'auth_drop_user.js',
                 'create_index_background.js',
+                'create_index_background_unique_capped.js',
+                'create_index_background_unique.js',
                 'findAndModify_update_grow.js',  // can cause OOM kills on test hosts
                 'reindex_background.js',
                 'rename_capped_collection_chain.js',
