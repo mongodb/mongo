@@ -99,7 +99,7 @@ public:
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             dbname,
-            BSON("_configsvrSetFeatureCompatibilityVersion" << version),
+            BSON("setFeatureCompatibilityVersion" << version),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(response.commandStatus);
 

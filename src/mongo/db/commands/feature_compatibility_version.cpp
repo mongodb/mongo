@@ -144,34 +144,32 @@ StatusWith<FeatureCompatibilityVersionInfo> FeatureCompatibilityVersion::parse(
     return versionInfo;
 }
 
-void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData version) {
-    // Upgrades to a version, which sets the 'version' field only.
-    _runUpdateCommand(opCtx, version, [version](auto updateMods) {
-        BSONObjBuilder setOp(updateMods.subobjStart("$set"));
-        setOp.append(FeatureCompatibilityVersion::kVersionField, version);
+void FeatureCompatibilityVersion::setTargetUpgrade(OperationContext* opCtx) {
+    // Sets both 'version' and 'targetVersion' fields.
+    _runUpdateCommand(opCtx, [](auto updateMods) {
+        updateMods.append(FeatureCompatibilityVersion::kVersionField,
+                          FeatureCompatibilityVersionCommandParser::kVersion34);
+        updateMods.append(FeatureCompatibilityVersion::kTargetVersionField,
+                          FeatureCompatibilityVersionCommandParser::kVersion36);
     });
 }
 
-void FeatureCompatibilityVersion::setTargetUpgrade(OperationContext* opCtx, StringData version) {
-    // Only set 'targetVersion' field.
-    _runUpdateCommand(opCtx, version, [version](auto updateMods) {
-        BSONObjBuilder setOp(updateMods.subobjStart("$set"));
-        setOp.append(FeatureCompatibilityVersion::kTargetVersionField, version);
-    });
-}
-
-void FeatureCompatibilityVersion::setTargetDowngrade(OperationContext* opCtx, StringData version) {
-    // Set both 'version' and 'targetVersion' fields.
-    _runUpdateCommand(opCtx, version, [version](auto updateMods) {
-        updateMods.append(FeatureCompatibilityVersion::kVersionField, version);
-        updateMods.append(FeatureCompatibilityVersion::kTargetVersionField, version);
+void FeatureCompatibilityVersion::setTargetDowngrade(OperationContext* opCtx) {
+    // Sets both 'version' and 'targetVersion' fields.
+    _runUpdateCommand(opCtx, [](auto updateMods) {
+        updateMods.append(FeatureCompatibilityVersion::kVersionField,
+                          FeatureCompatibilityVersionCommandParser::kVersion34);
+        updateMods.append(FeatureCompatibilityVersion::kTargetVersionField,
+                          FeatureCompatibilityVersionCommandParser::kVersion34);
     });
 }
 
 void FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(OperationContext* opCtx,
                                                                 StringData version) {
+    _validateVersion(version);
+
     // Updates 'version' field, while also unsetting the 'targetVersion' field.
-    _runUpdateCommand(opCtx, version, [version](auto updateMods) {
+    _runUpdateCommand(opCtx, [version](auto updateMods) {
         updateMods.append(FeatureCompatibilityVersion::kVersionField, version);
     });
 }
@@ -301,10 +299,7 @@ void FeatureCompatibilityVersion::_validateVersion(StringData version) {
 }
 
 void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
-                                                    StringData version,
                                                     UpdateBuilder builder) {
-    _validateVersion(version);
-
     DBDirectClient client(opCtx);
     NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 

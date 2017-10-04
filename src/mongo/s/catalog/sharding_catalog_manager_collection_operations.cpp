@@ -64,6 +64,7 @@
 
 namespace mongo {
 
+using CollectionUUID = UUID;
 using std::string;
 using std::vector;
 using std::set;
@@ -320,6 +321,37 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                     BSON("version" << collVersion.toString()),
                     ShardingCatalogClient::kMajorityWriteConcern)
         .transitional_ignore();
+}
+
+void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(OperationContext* opCtx) {
+    // Retrieve all collections in config.collections that do not have a UUID. Some collections
+    // may already have a UUID if an earlier upgrade attempt failed after making some progress.
+    auto shardedColls =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                            opCtx,
+                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                            repl::ReadConcernLevel::kLocalReadConcern,
+                            NamespaceString(CollectionType::ConfigNS),
+                            BSON(CollectionType::uuid.name() << BSON("$exists" << false)),  // query
+                            BSONObj(),                                                      // sort
+                            boost::none                                                     // limit
+                            ))
+            .docs;
+
+    // Generate and persist a new UUID for each collection that did not have a UUID.
+    LOG(0) << "generating UUIDs for all sharded collections that do not yet have one";
+    for (auto& coll : shardedColls) {
+        auto collType = uassertStatusOK(CollectionType::fromBSON(coll));
+        invariant(!collType.getUUID());
+
+        auto uuid = CollectionUUID::gen();
+        collType.setUUID(uuid);
+
+        uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
+            opCtx, collType.getNs().ns(), collType, false /* upsert */));
+        LOG(2) << "updated entry in config.collections for sharded collection " << collType.getNs()
+               << " with generated UUID " << uuid;
+    }
 }
 
 }  // namespace mongo

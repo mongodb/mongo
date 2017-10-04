@@ -5,6 +5,23 @@
     load("jstests/replsets/rslib.js");
     load("jstests/libs/get_index_helpers.js");
 
+    let checkFCV = function(adminDB, version, targetVersion) {
+        let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        assert.commandWorked(res);
+        assert.eq(res.featureCompatibilityVersion, version);
+
+        let doc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
+        assert.eq(doc.version, version);
+
+        // The 'targetVersion' field only exists on v3.6+ binaries, and is only present while an
+        // upgrade or downgrade is in progress.
+        if (targetVersion) {
+            assert.eq(doc.targetVersion, targetVersion);
+        } else {
+            assert.eq(null, doc.targetVersion);
+        }
+    };
+
     let res;
     const latest = "latest";
     const downgrade = "3.4";
@@ -25,10 +42,7 @@
     adminDB = conn.getDB("admin");
 
     // Initially featureCompatibilityVersion is 3.6.
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.6");
+    checkFCV(adminDB, "3.6");
 
     // featureCompatibilityVersion cannot be set to invalid value.
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: 5}));
@@ -46,17 +60,11 @@
 
     // featureCompatibilityVersion can be set to 3.4.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.4");
+    checkFCV(adminDB, "3.4");
 
     // featureCompatibilityVersion can be set to 3.6.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.6");
+    checkFCV(adminDB, "3.6");
 
     MongoRunner.stopMongod(conn);
 
@@ -66,6 +74,7 @@
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
+    checkFCV(adminDB, "3.4");
     MongoRunner.stopMongod(conn);
 
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
@@ -74,10 +83,7 @@
                "mongod was unable to start up with version=" + latest +
                    " and featureCompatibilityVersion=3.4");
     adminDB = conn.getDB("admin");
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.4");
+    checkFCV(adminDB, "3.4");
     MongoRunner.stopMongod(conn);
 
     // If you upgrade from 3.4 to 3.6 and have non-local databases, featureCompatibilityVersion is
@@ -87,10 +93,7 @@
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     assert.writeOK(conn.getDB("test").coll.insert({a: 5}));
     adminDB = conn.getDB("admin");
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.4");
+    checkFCV(adminDB, "3.4");
     MongoRunner.stopMongod(conn);
 
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
@@ -99,9 +102,7 @@
                "mongod was unable to start up with version=" + latest +
                    " and featureCompatibilityVersion=3.4");
     adminDB = conn.getDB("admin");
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
+    checkFCV(adminDB, "3.4");
     MongoRunner.stopMongod(conn);
 
     //
@@ -122,31 +123,15 @@
     secondaryAdminDB = rst.getSecondary().getDB("admin");
 
     // Initially featureCompatibilityVersion is 3.6 on primary and secondary.
-    res = primaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(primaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-              "3.6");
+    checkFCV(primaryAdminDB, "3.6");
     rst.awaitReplication();
-    res = secondaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(secondaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-              "3.6");
+    checkFCV(secondaryAdminDB, "3.6");
 
     // featureCompatibilityVersion propagates to secondary.
     assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-    res = primaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(primaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-              "3.4");
+    checkFCV(primaryAdminDB, "3.4");
     rst.awaitReplication();
-    res = secondaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(secondaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-              "3.4");
+    checkFCV(secondaryAdminDB, "3.4");
 
     // setFeatureCompatibilityVersion cannot be run on secondary.
     assert.commandFailed(secondaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
@@ -162,9 +147,7 @@
     rst.initiate(replSetConfig);
     rst.waitForState(rstConns[0], ReplSetTest.State.PRIMARY);
     secondaryAdminDB = rst.getSecondary().getDB("admin");
-    res = secondaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
+    checkFCV(secondaryAdminDB, "3.4");
     rst.stopSet();
 
     // Test that a 3.4 secondary can successfully perform initial sync from a 3.6 primary with
@@ -217,6 +200,7 @@
     replSetConfig.members[1].priority = 0;
     replSetConfig.members[1].votes = 0;
     rst.initiate(replSetConfig);
+
     primaryAdminDB = rst.getPrimary().getDB("admin");
     secondaryAdminDB = rst.getSecondary().getDB("admin");
     assert.writeOK(primaryAdminDB.system.version.remove({_id: "featureCompatibilityVersion"},
@@ -248,18 +232,8 @@
     shardPrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
 
     // Initially featureCompatibilityVersion is 3.6 on config and shard.
-    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(
-        configPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.6");
-    res = shardPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(
-        shardPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.6");
+    checkFCV(configPrimaryAdminDB, "3.6");
+    checkFCV(shardPrimaryAdminDB, "3.6");
 
     // featureCompatibilityVersion cannot be set to invalid value on mongos.
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: 5}));
@@ -278,15 +252,12 @@
         mongosAdminDB.runCommand({setParameter: 1, featureCompatibilityVersion: "3.4"}));
 
     // Prevent the shard primary from receiving messages from the config server primary. When we try
-    // to set the featureCompatibilityVersion to "3.4", it should fail because the shard cannot be
-    // contacted. The config server primary should still report "3.6", since setting the version to
-    // "3.4" did not succeed.
+    // to set the featureCompatibilityVersion to "3.4", the command should fail because the shard
+    // cannot be contacted.
     st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 1.0);
     assert.commandFailed(
         mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4", maxTimeMS: 1000}));
-    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
+    checkFCV(configPrimaryAdminDB, "3.4", "3.4" /* indicates downgrade in progress */);
     st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 0.0);
 
     // featureCompatibilityVersion can be set to 3.4 on mongos.
@@ -302,18 +273,8 @@
     });
 
     // featureCompatibilityVersion propagates to config and shard.
-    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(
-        configPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.4");
-    res = shardPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(
-        shardPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.4");
+    checkFCV(configPrimaryAdminDB, "3.4");
+    checkFCV(shardPrimaryAdminDB, "3.4");
 
     // A 3.6 shard added to a cluster with featureCompatibilityVersion=3.4 gets
     // featureCompatibilityVersion=3.4.
@@ -327,9 +288,7 @@
     latestShard.initiate();
     assert.commandWorked(mongosAdminDB.runCommand({addShard: latestShard.getURL()}));
     let latestShardPrimaryAdminDB = latestShard.getPrimary().getDB("admin");
-    res = latestShardPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
+    checkFCV(latestShardPrimaryAdminDB, "3.4");
 
     // Shard some collections before upgrade, to ensure UUIDs are generated for them on upgrade.
     // This specifically tests 3.4 -> 3.6 upgrade behavior.
@@ -363,19 +322,16 @@
 
     // featureCompatibilityVersion can be set to 3.6 on mongos.
     assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
-    res = st.configRS.getPrimary().getDB("admin").runCommand(
-        {getParameter: 1, featureCompatibilityVersion: 1});
+    checkFCV(st.configRS.getPrimary().getDB("admin"), "3.6");
+    checkFCV(shardPrimaryAdminDB, "3.6");
+
+    // Ensure the storage engine's schema was upgraded on the config server to include UUIDs.
+    // This specifically tests 3.4 -> 3.6 upgrade behavior.
+    res = st.s.getDB("config").runCommand({listCollections: 1});
     assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(
-        configPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.6");
-    res = shardPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(
-        shardPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.6");
+    for (let coll of res.cursor.firstBatch) {
+        assert(coll.info.hasOwnProperty("uuid"), tojson(res));
+    }
 
     // Check that the existing sharded collections that did not have UUIDs were assigned new UUIDs,
     // and existing sharded collections that already had a UUID (from the simulated earlier failed
@@ -401,14 +357,9 @@
     st = new ShardingTest({shards: 0, other: {mongosOptions: {binVersion: downgrade}}});
     mongosAdminDB = st.s.getDB("admin");
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
+    checkFCV(configPrimaryAdminDB, "3.4");
 
     // Adding a 3.4 shard to a cluster with featureCompatibilityVersion=3.4 succeeds.
-    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(
-        configPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.4");
     let downgradeShard = new ReplSetTest({
         name: "downgradeShard",
         nodes: [{binVersion: downgrade}, {binVersion: downgrade}],
@@ -418,10 +369,7 @@
     downgradeShard.startSet();
     downgradeShard.initiate();
     assert.commandWorked(mongosAdminDB.runCommand({addShard: downgradeShard.getURL()}));
-    res =
-        downgradeShard.getPrimary().adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
+    checkFCV(downgradeShard.getPrimary().getDB("admin"), "3.4");
 
     // call ShardingTest.stop before shutting down downgradeShard, so that the UUID check in
     // ShardingTest.stop can talk to downgradeShard.
@@ -432,35 +380,26 @@
     st = new ShardingTest({shards: 1, mongos: 1});
     mongosAdminDB = st.s.getDB("admin");
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
+    checkFCV(configPrimaryAdminDB, "3.6");
     shardPrimaryAdminDB = st.shard0.getDB("admin");
-    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(
-        configPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.6");
-    res = shardPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.6");
-    assert.eq(
-        shardPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.6");
+    checkFCV(shardPrimaryAdminDB, "3.6");
 
     // Ensure that a 3.4 mongos can be added to a featureCompatibilityVersion=3.4 cluster.
+
     assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    checkFCV(configPrimaryAdminDB, "3.4");
+    checkFCV(shardPrimaryAdminDB, "3.4");
+
+    // Ensure the storage engine's schema was downgraded on the config server to remove UUIDs.
+    // This specifically tests 3.4 -> 3.6 downgrade behavior.
+    res = st.s.getDB("config").runCommand({listCollections: 1});
     assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(
-        configPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.4");
+    for (let coll of res.cursor.firstBatch) {
+        assert(!coll.info.hasOwnProperty("uuid"), tojson(res));
+    }
+
     st.configRS.awaitReplication();
-    res = shardPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.eq(
-        shardPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-        "3.4");
+
     let downgradeMongos =
         MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: downgrade});
     assert.neq(null,

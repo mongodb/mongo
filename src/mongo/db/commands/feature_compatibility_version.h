@@ -88,30 +88,24 @@ public:
     }
 
     /**
-     * Sets the minimum allowed version in the cluster, which determines what features are
-     * available.
-     * 'version' should be '3.4' or '3.6'.
+     * Records intent to perform a 3.4 -> 3.6 upgrade by updating the on-disk feature
+     * compatibility version document to have 'version'=3.4, 'targetVersion'=3.6.
+     * Should be called before schemas are modified.
      */
-    static void set(OperationContext* opCtx, StringData version);
+    static void setTargetUpgrade(OperationContext* opCtx);
 
     /**
-     * Indicate intent to perform an upgrade. Should be set before schemas are modified.
-     * This sets the 'targetVersion' field only.
-     * Use unsetTargetUpgradeOrDowngrade to indicate that the schemas have completed the upgrading.
+     * Records intent to perform a 3.6 -> 3.4 downgrade by updating the on-disk feature
+     * compatibility version document to have 'version'=3.4, 'targetVersion'=3.4.
+     * Should be called before schemas are modified.
      */
-    static void setTargetUpgrade(OperationContext* opCtx, StringData version);
+    static void setTargetDowngrade(OperationContext* opCtx);
 
     /**
-     * Indicate intent to perform a downgrade. Should be set before schemas are modified.
-     * This atomically updates both the 'version' and 'targetVersion' fields.
-     * Use unsetTargetUpgradeOrDowngrade to indicate that the schemas have completed downgrading.
-     */
-    static void setTargetDowngrade(OperationContext* opCtx, StringData version);
-
-    /**
-     * Indicate the completion of an upgrade or downgrade. Should be set only when schemas are
-     * done being upgraded or modified.
-     * Unsets the 'targetVersion' field and updates the 'version' field.
+     * Records the completion of a 3.4 <-> 3.6 upgrade or downgrade by updating the on-disk
+     * feature compatibility version document to have 'version'=version and unsetting the
+     * 'targetVersion' field.
+     * Should be called after schemas are modified.
      */
     static void unsetTargetUpgradeOrDowngrade(OperationContext* opCtx, StringData version);
 
@@ -151,9 +145,7 @@ private:
      * Build update command.
      */
     typedef stdx::function<void(BSONObjBuilder)> UpdateBuilder;
-    static void _runUpdateCommand(OperationContext* opCtx,
-                                  StringData version,
-                                  UpdateBuilder callback);
+    static void _runUpdateCommand(OperationContext* opCtx, UpdateBuilder callback);
 };
 
 
