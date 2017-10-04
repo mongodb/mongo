@@ -149,6 +149,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::dropRole
         << ActionType::grantRole
         << ActionType::revokeRole
+        << ActionType::setAuthenticationRestriction
         << ActionType::viewUser
         << ActionType::viewRole;
 

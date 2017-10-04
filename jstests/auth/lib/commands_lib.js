@@ -111,6 +111,20 @@ var roles_read = {
     root: 1,
     __system: 1
 };
+var roles_userAdmin = {
+    userAdmin: 1,
+    dbOwner: 1,
+    userAdminAnyDatabase: 1,
+    restore: 1,
+    root: 1,
+    __system: 1,
+};
+var roles_userAdminAny = {
+    userAdminAnyDatabase: 1,
+    restore: 1,
+    root: 1,
+    __system: 1,
+};
 var roles_readAny = {readAnyDatabase: 1, readWriteAnyDatabase: 1, backup: 1, root: 1, __system: 1};
 var roles_dbAdmin = {dbAdmin: 1, dbAdminAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1};
 var roles_dbAdminAny = {dbAdminAnyDatabase: 1, root: 1, __system: 1};
@@ -1701,6 +1715,67 @@ var authCommandsLib = {
                 ]
               },
           ]
+        },
+        {
+          testname: "createRole_authenticationRestrictions",
+          command: {
+              createRole: "testRole",
+              roles: [],
+              privileges: [],
+              authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
+          },
+          teardown: function(db) {
+              db.runCommand({dropRole: "testRole"});
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_userAdmin,
+                privileges: [{
+                    resource: {db: firstDbName, collection: ""},
+                    actions: ["createRole", "setAuthenticationRestriction"]
+                }],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_userAdminAny,
+                privileges: [{
+                    resource: {db: secondDbName, collection: ""},
+                    actions: ["createRole", "setAuthenticationRestriction"]
+                }],
+              }
+
+          ],
+        },
+        {
+          testname: "createUser_authenticationRestrictions",
+          command: {
+              createUser: "testUser",
+              pwd: "test",
+              roles: [],
+              authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
+          },
+          teardown: function(db) {
+              db.runCommand({dropUser: "testUser"});
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_userAdmin,
+                privileges: [{
+                    resource: {db: firstDbName, collection: ""},
+                    actions: ["createUser", "setAuthenticationRestriction"]
+                }],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_userAdminAny,
+                privileges: [{
+                    resource: {db: secondDbName, collection: ""},
+                    actions: ["createUser", "setAuthenticationRestriction"]
+                }],
+              }
+          ],
         },
         {
           testname: "balancerStart",
@@ -4450,6 +4525,79 @@ var authCommandsLib = {
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
           ]
+        },
+        {
+          testname: "updateRole_authenticationRestrictions",
+          command: {updateRole: "testRole", authenticationRestrictions: []},
+          setup: function(db) {
+              db.runCommand({
+                  createRole: "testRole",
+                  roles: [],
+                  privileges: [],
+                  authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
+              });
+          },
+          teardown: function(db) {
+              db.runCommand({dropRole: "testRole"});
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_userAdminAny,
+                privileges: [
+                    {resource: {db: "", collection: ""}, actions: ["revokeRole"]},
+                    {
+                      resource: {db: firstDbName, collection: ""},
+                      actions: ["setAuthenticationRestriction"]
+                    }
+                ],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_userAdminAny,
+                privileges: [
+                    {resource: {db: "", collection: ""}, actions: ["revokeRole"]},
+                    {
+                      resource: {db: secondDbName, collection: ""},
+                      actions: ["setAuthenticationRestriction"]
+                    }
+                ],
+              }
+
+          ],
+        },
+        {
+          testname: "updateUser_authenticationRestrictions",
+          command: {updateUser: "testUser", authenticationRestrictions: []},
+          setup: function(db) {
+              db.runCommand({
+                  createUser: "testUser",
+                  pwd: "test",
+                  roles: [],
+                  authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
+              });
+          },
+          teardown: function(db) {
+              db.runCommand({dropUser: "testUser"});
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_userAdmin,
+                privileges: [{
+                    resource: {db: firstDbName, collection: ""},
+                    actions: ["setAuthenticationRestriction"]
+                }],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_userAdminAny,
+                privileges: [{
+                    resource: {db: secondDbName, collection: ""},
+                    actions: ["setAuthenticationRestriction"]
+                }],
+              }
+          ],
         },
         {
           testname: "validate",

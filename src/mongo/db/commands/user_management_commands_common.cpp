@@ -110,6 +110,20 @@ Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
     return Status::OK();
 }
 
+Status checkAuthorizedToSetRestrictions(AuthorizationSession* authzSession,
+                                        bool hasAuthRestriction,
+                                        StringData dbname) {
+    if (hasAuthRestriction) {
+        if (!authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(dbname),
+                ActionType::setAuthenticationRestriction)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+    }
+
+    return Status::OK();
+}
+
 Status checkAuthForCreateUserCommand(Client* client,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj) {
@@ -127,7 +141,18 @@ Status checkAuthForCreateUserCommand(Client* client,
                                     << args.userName.getDB());
     }
 
-    return checkAuthorizedToGrantRoles(authzSession, args.roles);
+    status = checkAuthorizedToGrantRoles(authzSession, args.roles);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = checkAuthorizedToSetRestrictions(
+        authzSession, static_cast<bool>(args.authenticationRestrictions), args.userName.getDB());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
 }
 
 Status checkAuthForUpdateUserCommand(Client* client,
@@ -172,7 +197,16 @@ Status checkAuthForUpdateUserCommand(Client* client,
                           "authorized to revoke any role in the system");
         }
 
-        return checkAuthorizedToGrantRoles(authzSession, args.roles);
+        status = checkAuthorizedToGrantRoles(authzSession, args.roles);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    status = checkAuthorizedToSetRestrictions(
+        authzSession, static_cast<bool>(args.authenticationRestrictions), args.userName.getDB());
+    if (!status.isOK()) {
+        return status;
     }
 
     return Status::OK();
@@ -214,7 +248,18 @@ Status checkAuthForCreateRoleCommand(Client* client,
         return status;
     }
 
-    return checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
+    status = checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = checkAuthorizedToSetRestrictions(
+        authzSession, static_cast<bool>(args.authenticationRestrictions), args.roleName.getDB());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
 }
 
 Status checkAuthForUpdateRoleCommand(Client* client,
@@ -241,7 +286,18 @@ Status checkAuthForUpdateRoleCommand(Client* client,
         return status;
     }
 
-    return checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
+    status = checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = checkAuthorizedToSetRestrictions(
+        authzSession, static_cast<bool>(args.authenticationRestrictions), args.roleName.getDB());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
 }
 
 Status checkAuthForGrantRolesToRoleCommand(Client* client,
