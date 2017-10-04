@@ -8,6 +8,7 @@
         function testGeoWithinCenterSphere(centerSphere, expected) {
             let result = coll.find({geoField: {$geoWithin: {$centerSphere: centerSphere}}},
                                    {"name": 1, "_id": 0})
+                             .sort({"name": 1})
                              .toArray();
             assert.eq(result, expected);
         }
@@ -25,7 +26,7 @@
         // The second parameter of $centerSphere is in radian and the angle between [1, 1] and [2,2]
         // is about 0.0246 radian, much less than 1.
         testGeoWithinCenterSphere([[1, 1], 1],
-                                  [{name: 'Point1'}, {name: 'LineString1'}, {name: 'Polygon1'}]);
+                                  [{name: 'LineString1'}, {name: 'Point1'}, {name: 'Polygon1'}]);
 
         let geoDoc = {
             "name": "LineString2",
@@ -175,14 +176,14 @@
         // Test for centerSphere as big as earth radius (should return all).
         testGeoWithinCenterSphere(
             [[151.20936119647115, -33.875266834633265], 3.14159265358979323846], [
-                {name: "Point1"},
                 {name: "LineString1"},
-                {name: "Polygon1"},
                 {name: "LineString2"},
                 {name: "LineString3"},
-                {name: "Polygon2"},
                 {name: "MultiPolygon1"},
-                {name: "MultiPolygon2"}
+                {name: "MultiPolygon2"},
+                {name: "Point1"},
+                {name: "Polygon1"},
+                {name: "Polygon2"}
             ]);
 
         // Test for a MultiPolygon with holes intersecting with geowithin sphere (should not return
@@ -236,7 +237,7 @@
         // (should not return a match).
         testGeoWithinCenterSphere([[-61.52266094410311, 17.79937981451866], 2.9592242752161573],
                                   []);
-    };
+    }
 
     // Test $geowithin $centerSphere for LineString and Polygon without index.
     let coll = db.geo_s2within_line_polygon_sphere;
