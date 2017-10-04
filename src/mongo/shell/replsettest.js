@@ -549,6 +549,82 @@ var ReplSetTest = function(opts) {
     };
 
     /**
+     * Blocks until each node agrees that all other nodes have applied the most recent oplog entry.
+     */
+    this.awaitNodesAgreeOnAppliedOpTime = function(timeout, nodes) {
+        timeout = timeout || self.kDefaultTimeoutMS;
+        nodes = nodes || self.nodes;
+
+        assert.soon(function() {
+            let appliedOpTimeConsensus = undefined;
+            for (let i = 0; i < nodes.length; i++) {
+                let replSetGetStatus;
+                try {
+                    replSetGetStatus = nodes[i].adminCommand({replSetGetStatus: 1});
+                } catch (e) {
+                    print("AwaitNodesAgreeOnAppliedOpTime: Retrying because node " + nodes[i].name +
+                          " failed to execute replSetGetStatus: " + tojson(e));
+                    return false;
+                }
+                assert.commandWorked(replSetGetStatus);
+
+                if (appliedOpTimeConsensus === undefined) {
+                    if (replSetGetStatus.optimes) {
+                        appliedOpTimeConsensus = replSetGetStatus.optimes.appliedOpTime;
+                    } else {
+                        // Older versions of mongod do not include an 'optimes' field in the
+                        // replSetGetStatus response. We instead pull an optime from the first
+                        // replica set member that includes one in its status. All we need here is
+                        // any initial value that we can compare to all the other optimes.
+                        let optimeMembers = replSetGetStatus.members.filter(m => m.optime);
+                        assert(optimeMembers.length > 0,
+                               "AwaitNodesAgreeOnAppliedOpTime: replSetGetStatus did not " +
+                                   "include optimes for any members: " + tojson(replSetGetStatus));
+                        appliedOpTimeConsensus = optimeMembers[0].optime;
+                    }
+
+                    assert(appliedOpTimeConsensus,
+                           "AwaitNodesAgreeOnAppliedOpTime: missing appliedOpTime in " +
+                               "replSetGetStatus: " + tojson(replSetGetStatus));
+                }
+
+                if (replSetGetStatus.optimes &&
+                    !friendlyEqual(replSetGetStatus.optimes.appliedOpTime,
+                                   appliedOpTimeConsensus)) {
+                    print("AwaitNodesAgreeOnAppliedOpTime: Retrying because node " + nodes[i].name +
+                          " has appliedOpTime " + tojson(replSetGetStatus.optimes.appliedOpTime) +
+                          " that does not match the previously observed appliedOpTime " +
+                          tojson(appliedOpTimeConsensus));
+                    return false;
+                }
+
+                for (let j = 0; j < replSetGetStatus.members.length; j++) {
+                    if (replSetGetStatus.members[j].state == ReplSetTest.State.ARBITER) {
+                        // ARBITER nodes do not apply oplog entries and do not have an 'optime'
+                        // field.
+                        continue;
+                    }
+
+                    if (!friendlyEqual(replSetGetStatus.members[j].optime,
+                                       appliedOpTimeConsensus)) {
+                        print("AwaitNodesAgreeOnAppliedOpTime: Retrying because node " +
+                              nodes[i].name + " sees optime " +
+                              tojson(replSetGetStatus.members[j].optime) + " on node " +
+                              replSetGetStatus.members[j].name + " but expects to see optime " +
+                              tojson(appliedOpTimeConsensus));
+                        return false;
+                    }
+                }
+            }
+
+            print(
+                "AwaitNodesAgreeOnAppliedOpTime: All nodes agree that all ops are applied up to " +
+                tojson(appliedOpTimeConsensus));
+            return true;
+        }, "Awaiting nodes to agree that all ops are applied across replica set", timeout);
+    };
+
+    /**
      * Blocks until all nodes agree on who the primary is.
      * If 'expectedPrimaryNodeId' is provided, ensure that every node is seeing this node as the
      * primary. Otherwise, ensure that all the nodes in the set agree with the first node on the
@@ -896,6 +972,7 @@ var ReplSetTest = function(opts) {
      */
     this.stepUp = function(node) {
         this.awaitReplication();
+        this.awaitNodesAgreeOnAppliedOpTime();
         this.awaitNodesAgreeOnPrimary();
         if (this.getPrimary() === node) {
             return;
@@ -917,6 +994,7 @@ var ReplSetTest = function(opts) {
                           "': " + tojson(ex));
                 }
                 this.awaitReplication();
+                this.awaitNodesAgreeOnAppliedOpTime();
                 this.awaitNodesAgreeOnPrimary();
             }
 

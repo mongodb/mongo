@@ -29,7 +29,6 @@ const testName = "updates_in_heterogeneous_repl_set";
     // Give each member a chance to be primary while updating documents.
     let collIndex = 0;
     replTest.nodes.forEach(function(node) {
-        replTest.awaitReplication();
         replTest.stepUp(node);
 
         let coll = node.getDB("test")["coll" + (collIndex++)];
