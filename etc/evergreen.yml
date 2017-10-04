@@ -660,7 +660,7 @@ functions:
         eval $run_promote_silent_failures
 
         # Combine reliable and unreliable reports.
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -m -o report.json report_reliable.json report_unreliable.json
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -o report.json report_reliable.json report_unreliable.json
 
         # We mask any errors from the resmoke runs above (by disabling errexit) until both have
         # completed. If any of the resmoke runs failed due to non-test failures
@@ -1416,7 +1416,7 @@ post:
     params:
       working_dir: src
       script: |
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -m -x -o report.json report_reliable.json report_unreliable.json
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -x -o report.json report_reliable.json report_unreliable.json
   - command: attach.results
     params:
       file_location: src/report.json
