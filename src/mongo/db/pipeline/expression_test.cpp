@@ -4541,19 +4541,19 @@ TEST_F(ExpressionDateFromPartsTest, OptimizesToConstantIfAllInputsAreConstant) {
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 
-    // Test that it becomes a constant if both isoYear, and isoWeekYear are provided, and are both
+    // Test that it becomes a constant if both isoWeekYear, and isoWeek are provided, and are both
     // constants.
-    spec = BSON("$dateFromParts" << BSON("isoYear" << 2017 << "isoWeekYear" << 26));
+    spec = BSON("$dateFromParts" << BSON("isoWeekYear" << 2017 << "isoWeek" << 26));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 
-    // Test that it becomes a constant if both isoYear, isoWeekYear and isoDayOfWeek are provided,
+    // Test that it becomes a constant if both isoWeekYear, isoWeek and isoDayOfWeek are provided,
     // and are both expressions which evaluate to constants.
-    spec = BSON("$dateFromParts" << BSON("isoYear" << BSON("$add" << BSON_ARRAY(1017 << 1000))
-                                                   << "isoWeekYear"
-                                                   << BSON("$add" << BSON_ARRAY(20 << 6))
-                                                   << "isoDayOfWeek"
-                                                   << BSON("$add" << BSON_ARRAY(3 << 2))));
+    spec = BSON("$dateFromParts" << BSON("isoWeekYear" << BSON("$add" << BSON_ARRAY(1017 << 1000))
+                                                       << "isoWeek"
+                                                       << BSON("$add" << BSON_ARRAY(20 << 6))
+                                                       << "isoDayOfWeek"
+                                                       << BSON("$add" << BSON_ARRAY(3 << 2))));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 
@@ -4573,10 +4573,11 @@ TEST_F(ExpressionDateFromPartsTest, OptimizesToConstantIfAllInputsAreConstant) {
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 
-    // Test that it does *not* become a constant if both isoYear and isoDayOfWeek are provided, but
+    // Test that it does *not* become a constant if both isoWeekYear and isoDayOfWeek are provided,
+    // but
     // isoDayOfWeek is not a constant.
-    spec = BSON("$dateFromParts" << BSON("isoYear" << 2017 << "isoDayOfWeek"
-                                                   << "$isoDayOfWeekday"));
+    spec = BSON("$dateFromParts" << BSON("isoWeekYear" << 2017 << "isoDayOfWeek"
+                                                       << "$isoDayOfWeekday"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 }

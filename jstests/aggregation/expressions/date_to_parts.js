@@ -184,8 +184,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           {
             _id: 0,
             date: {
-                isoYear: 2017,
-                isoWeekYear: 25,
+                isoWeekYear: 2017,
+                isoWeek: 25,
                 isoDayOfWeek: 1,
                 hour: 15,
                 minute: 13,
@@ -196,8 +196,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           {
             _id: 1,
             date: {
-                isoYear: 2017,
-                isoWeekYear: 25,
+                isoWeekYear: 2017,
+                isoWeek: 25,
                 isoDayOfWeek: 1,
                 hour: 16,
                 minute: 13,
@@ -208,8 +208,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           {
             _id: 2,
             date: {
-                isoYear: 2017,
-                isoWeekYear: 25,
+                isoWeekYear: 2017,
+                isoWeek: 25,
                 isoDayOfWeek: 1,
                 hour: 11,
                 minute: 13,
@@ -220,8 +220,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           {
             _id: 3,
             date: {
-                isoYear: 2017,
-                isoWeekYear: 25,
+                isoWeekYear: 2017,
+                isoWeek: 25,
                 isoDayOfWeek: 1,
                 hour: 11,
                 minute: 13,
@@ -241,8 +241,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           {
             _id: 2,
             date: {
-                isoYear: 2017,
-                isoWeekYear: 25,
+                isoWeekYear: 2017,
+                isoWeek: 25,
                 isoDayOfWeek: 1,
                 hour: 11,
                 minute: 13,
@@ -349,8 +349,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           {
             _id: ObjectId("58c7cba47bbadf523cf2c313"),
             date: {
-                isoYear: 2017,
-                isoWeekYear: 25,
+                isoWeekYear: 2017,
+                isoWeek: 25,
                 isoDayOfWeek: 1,
                 hour: 16,
                 minute: 13,

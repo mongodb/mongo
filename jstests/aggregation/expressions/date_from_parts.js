@@ -401,9 +401,12 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         [{'$project': {date: {'$dateFromParts': {year: 2017, minute: "$minute"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: "$second"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: "$millisecond"}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: "$isoYear"}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoWeekYear: "$isoWeekYear"}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoDayOfWeek: "$isoDayOfWeek"}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: "$isoWeekYear"}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoWeek: "$isoWeek"}}}}],
+        [{
+           '$project':
+               {date: {'$dateFromParts': {isoWeekYear: 2017, isoDayOfWeek: "$isoDayOfWeek"}}}
+        }],
     ];
 
     pipelines.forEach(function(pipeline) {
@@ -430,9 +433,12 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         [{'$project': {date: {'$dateFromParts': {year: 2017, minute: "$falseValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: "$falseValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: "$falseValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: "$falseValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoWeekYear: "$falseValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoDayOfWeek: "$falseValue"}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: "$falseValue"}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoWeek: "$falseValue"}}}}],
+        [{
+           '$project':
+               {date: {'$dateFromParts': {isoWeekYear: 2017, isoDayOfWeek: "$falseValue"}}}
+        }],
     ];
 
     pipelines.forEach(function(pipeline) {
@@ -459,14 +465,14 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         [{'$project': {date: {'$dateFromParts': {year: 2017, minute: "$outOfRangeValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: "$outOfRangeValue"}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: "$outOfRangeValue"}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: "$outOfRangeValue"}}}}],
         [{
            '$project':
-               {date: {'$dateFromParts': {isoYear: 2017, isoWeekYear: "$outOfRangeValue"}}}
+               {date: {'$dateFromParts': {isoWeekYear: 2017, isoWeek: "$outOfRangeValue"}}}
         }],
         [{
            '$project':
-               {date: {'$dateFromParts': {isoYear: 2017, isoDayOfWeek: "$outOfRangeValue"}}}
+               {date: {'$dateFromParts': {isoWeekYear: 2017, isoDayOfWeek: "$outOfRangeValue"}}}
         }],
 
         [{'$project': {date: {'$dateFromParts': {year: -1}}}}],
@@ -483,12 +489,12 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         [{'$project': {date: {'$dateFromParts': {year: 2017, second: 60}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: -1}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: 1000}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 10000}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoWeekYear: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoWeekYear: 54}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoDayOfWeek: 0}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoYear: 2017, isoDayOfWeek: 8}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: -1}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 10000}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoWeek: -1}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoWeek: 54}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoDayOfWeek: 0}}}}],
+        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoDayOfWeek: 8}}}}],
     ];
 
     pipelines.forEach(function(pipeline) {
@@ -514,26 +520,26 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
 
         {
           code: 40489,
-          pipeline: {'$project': {date: {'$dateFromParts': {year: 2017, isoYear: 2017}}}}
+          pipeline: {'$project': {date: {'$dateFromParts': {year: 2017, isoWeekYear: 2017}}}}
         },
-        {
-          code: 40489,
-          pipeline: {'$project': {date: {'$dateFromParts': {year: 2017, isoWeekYear: 3}}}}
-        },
+        {code: 40489, pipeline: {'$project': {date: {'$dateFromParts': {year: 2017, isoWeek: 3}}}}},
         {
           code: 40489,
           pipeline: {'$project': {date: {'$dateFromParts': {year: 2017, isoDayOfWeek: 5}}}}
         },
         {
           code: 40489,
-          pipeline: {'$project': {date: {'$dateFromParts': {isoYear: 2017, year: 2017}}}}
+          pipeline: {'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, year: 2017}}}}
         },
 
         {
           code: 40525,
-          pipeline: {'$project': {date: {'$dateFromParts': {isoYear: 2017, month: 12}}}}
+          pipeline: {'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, month: 12}}}}
         },
-        {code: 40525, pipeline: {'$project': {date: {'$dateFromParts': {isoYear: 2017, day: 17}}}}},
+        {
+          code: 40525,
+          pipeline: {'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, day: 17}}}}
+        },
     ];
 
     pipelines.forEach(function(item) {
@@ -577,7 +583,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
           second: NumberInt(19),
           millisecond: NumberLong(15)
         },
-        {_id: 2, isoYear: NumberDecimal("2017"), isoWeekYear: 6.0, isoDayOfWeek: NumberInt(4)},
+        {_id: 2, isoWeekYear: NumberDecimal("2017"), isoWeek: 6.0, isoDayOfWeek: NumberInt(4)},
     ]));
 
     assert.eq(
@@ -634,8 +640,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                   $project: {
                       date: {
                           '$dateFromParts': {
-                              isoYear: "$isoYear",
                               isoWeekYear: "$isoWeekYear",
+                              isoWeek: "$isoWeek",
                               isoDayOfWeek: "$isoDayOfWeek"
                           }
                       }
@@ -701,8 +707,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
     assert.writeOK(coll.insert([
         {
           _id: 0,
-          isoYear: NumberDecimal("2017"),
-          isoWeekYear: 25.0,
+          isoWeekYear: NumberDecimal("2017"),
+          isoWeek: 25.0,
           isoDayOfWeek: NumberInt(1),
           hour: NumberLong(15),
           minute: NumberDecimal(1),
@@ -728,8 +734,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                     $project: {
                         date: {
                             "$dateFromParts": {
-                                isoYear: "$isoYear",
                                 isoWeekYear: "$isoWeekYear",
+                                isoWeek: "$isoWeek",
                                 isoDayOfWeek: "$isoDayOfWeek",
                                 hour: "$hour",
                                 minute: "$minute",

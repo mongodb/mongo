@@ -900,8 +900,8 @@ private:
                             boost::intrusive_ptr<Expression> minute,
                             boost::intrusive_ptr<Expression> second,
                             boost::intrusive_ptr<Expression> millisecond,
-                            boost::intrusive_ptr<Expression> isoYear,
                             boost::intrusive_ptr<Expression> isoWeekYear,
+                            boost::intrusive_ptr<Expression> isoWeek,
                             boost::intrusive_ptr<Expression> isoDayOfWeek,
                             boost::intrusive_ptr<Expression> timeZone);
 
@@ -924,8 +924,8 @@ private:
     boost::intrusive_ptr<Expression> _minute;
     boost::intrusive_ptr<Expression> _second;
     boost::intrusive_ptr<Expression> _millisecond;
-    boost::intrusive_ptr<Expression> _isoYear;
     boost::intrusive_ptr<Expression> _isoWeekYear;
+    boost::intrusive_ptr<Expression> _isoWeek;
     boost::intrusive_ptr<Expression> _isoDayOfWeek;
     boost::intrusive_ptr<Expression> _timeZone;
 };

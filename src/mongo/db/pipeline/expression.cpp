@@ -1007,8 +1007,8 @@ intrusive_ptr<Expression> ExpressionDateFromParts::parse(
     BSONElement minuteElem;
     BSONElement secondElem;
     BSONElement millisecondElem;
-    BSONElement isoYearElem;
     BSONElement isoWeekYearElem;
+    BSONElement isoWeekElem;
     BSONElement isoDayOfWeekElem;
     BSONElement timeZoneElem;
 
@@ -1030,10 +1030,10 @@ intrusive_ptr<Expression> ExpressionDateFromParts::parse(
             secondElem = arg;
         } else if (field == "millisecond"_sd) {
             millisecondElem = arg;
-        } else if (field == "isoYear"_sd) {
-            isoYearElem = arg;
         } else if (field == "isoWeekYear"_sd) {
             isoWeekYearElem = arg;
+        } else if (field == "isoWeek"_sd) {
+            isoWeekElem = arg;
         } else if (field == "isoDayOfWeek"_sd) {
             isoDayOfWeekElem = arg;
         } else if (field == "timezone"_sd) {
@@ -1045,15 +1045,15 @@ intrusive_ptr<Expression> ExpressionDateFromParts::parse(
         }
     }
 
-    if (!yearElem && !isoYearElem) {
-        uasserted(40516, "$dateFromParts requires either 'year' or 'isoYear' to be present");
+    if (!yearElem && !isoWeekYearElem) {
+        uasserted(40516, "$dateFromParts requires either 'year' or 'isoWeekYear' to be present");
     }
 
-    if (yearElem && (isoYearElem || isoWeekYearElem || isoDayOfWeekElem)) {
+    if (yearElem && (isoWeekYearElem || isoWeekElem || isoDayOfWeekElem)) {
         uasserted(40489, "$dateFromParts does not allow mixing natural dates with ISO dates");
     }
 
-    if (isoYearElem && (yearElem || monthElem || dayElem)) {
+    if (isoWeekYearElem && (yearElem || monthElem || dayElem)) {
         uasserted(40525, "$dateFromParts does not allow mixing ISO dates with natural dates");
     }
 
@@ -1066,8 +1066,8 @@ intrusive_ptr<Expression> ExpressionDateFromParts::parse(
         minuteElem ? parseOperand(expCtx, minuteElem, vps) : nullptr,
         secondElem ? parseOperand(expCtx, secondElem, vps) : nullptr,
         millisecondElem ? parseOperand(expCtx, millisecondElem, vps) : nullptr,
-        isoYearElem ? parseOperand(expCtx, isoYearElem, vps) : nullptr,
         isoWeekYearElem ? parseOperand(expCtx, isoWeekYearElem, vps) : nullptr,
+        isoWeekElem ? parseOperand(expCtx, isoWeekElem, vps) : nullptr,
         isoDayOfWeekElem ? parseOperand(expCtx, isoDayOfWeekElem, vps) : nullptr,
         timeZoneElem ? parseOperand(expCtx, timeZoneElem, vps) : nullptr);
 }
@@ -1081,8 +1081,8 @@ ExpressionDateFromParts::ExpressionDateFromParts(
     intrusive_ptr<Expression> minute,
     intrusive_ptr<Expression> second,
     intrusive_ptr<Expression> millisecond,
-    intrusive_ptr<Expression> isoYear,
     intrusive_ptr<Expression> isoWeekYear,
+    intrusive_ptr<Expression> isoWeek,
     intrusive_ptr<Expression> isoDayOfWeek,
     intrusive_ptr<Expression> timeZone)
     : Expression(expCtx),
@@ -1093,8 +1093,8 @@ ExpressionDateFromParts::ExpressionDateFromParts(
       _minute(minute),
       _second(second),
       _millisecond(millisecond),
-      _isoYear(isoYear),
       _isoWeekYear(isoWeekYear),
+      _isoWeek(isoWeek),
       _isoDayOfWeek(isoDayOfWeek),
       _timeZone(timeZone) {}
 
@@ -1120,11 +1120,11 @@ intrusive_ptr<Expression> ExpressionDateFromParts::optimize() {
     if (_millisecond) {
         _millisecond = _millisecond->optimize();
     }
-    if (_isoYear) {
-        _isoYear = _isoYear->optimize();
-    }
     if (_isoWeekYear) {
         _isoWeekYear = _isoWeekYear->optimize();
+    }
+    if (_isoWeek) {
+        _isoWeek = _isoWeek->optimize();
     }
     if (_isoDayOfWeek) {
         _isoDayOfWeek = _isoDayOfWeek->optimize();
@@ -1140,8 +1140,8 @@ intrusive_ptr<Expression> ExpressionDateFromParts::optimize() {
                                                _minute,
                                                _second,
                                                _millisecond,
-                                               _isoYear,
                                                _isoWeekYear,
+                                               _isoWeek,
                                                _isoDayOfWeek,
                                                _timeZone})) {
         // Everything is a constant, so we can turn into a constant.
@@ -1161,8 +1161,8 @@ Value ExpressionDateFromParts::serialize(bool explain) const {
                   {"minute", _minute ? _minute->serialize(explain) : Value()},
                   {"second", _second ? _second->serialize(explain) : Value()},
                   {"millisecond", _millisecond ? _millisecond->serialize(explain) : Value()},
-                  {"isoYear", _isoYear ? _isoYear->serialize(explain) : Value()},
                   {"isoWeekYear", _isoWeekYear ? _isoWeekYear->serialize(explain) : Value()},
+                  {"isoWeek", _isoWeek ? _isoWeek->serialize(explain) : Value()},
                   {"isoDayOfWeek", _isoDayOfWeek ? _isoDayOfWeek->serialize(explain) : Value()},
                   {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()}}}});
 }
@@ -1250,19 +1250,19 @@ Value ExpressionDateFromParts::evaluate(const Document& root) const {
             timeZone->createFromDateParts(year, month, day, hour, minute, second, millisecond));
     }
 
-    if (_isoYear) {
-        int isoYear, isoWeekYear, isoDayOfWeek;
+    if (_isoWeekYear) {
+        int isoWeekYear, isoWeek, isoDayOfWeek;
 
-        if (!evaluateNumberWithinRange(root, _isoYear, "isoYear"_sd, 1970, 0, 9999, &isoYear) ||
-            !evaluateNumberWithinRange(
-                root, _isoWeekYear, "isoWeekYear"_sd, 1, 1, 53, &isoWeekYear) ||
+        if (!evaluateNumberWithinRange(
+                root, _isoWeekYear, "isoWeekYear"_sd, 1970, 0, 9999, &isoWeekYear) ||
+            !evaluateNumberWithinRange(root, _isoWeek, "isoWeek"_sd, 1, 1, 53, &isoWeek) ||
             !evaluateNumberWithinRange(
                 root, _isoDayOfWeek, "isoDayOfWeek"_sd, 1, 1, 7, &isoDayOfWeek)) {
             return Value(BSONNULL);
         }
 
         return Value(timeZone->createFromIso8601DateParts(
-            isoYear, isoWeekYear, isoDayOfWeek, hour, minute, second, millisecond));
+            isoWeekYear, isoWeek, isoDayOfWeek, hour, minute, second, millisecond));
     }
 
     MONGO_UNREACHABLE;
@@ -1290,11 +1290,11 @@ void ExpressionDateFromParts::_doAddDependencies(DepsTracker* deps) const {
     if (_millisecond) {
         _millisecond->addDependencies(deps);
     }
-    if (_isoYear) {
-        _isoYear->addDependencies(deps);
-    }
     if (_isoWeekYear) {
         _isoWeekYear->addDependencies(deps);
+    }
+    if (_isoWeek) {
+        _isoWeek->addDependencies(deps);
     }
     if (_isoDayOfWeek) {
         _isoDayOfWeek->addDependencies(deps);
@@ -1513,8 +1513,8 @@ Value ExpressionDateToParts::evaluate(const Document& root) const {
 
     if (*iso8601) {
         auto parts = timeZone->dateIso8601Parts(dateValue);
-        return Value(Document{{"isoYear", parts.year},
-                              {"isoWeekYear", parts.weekOfYear},
+        return Value(Document{{"isoWeekYear", parts.year},
+                              {"isoWeek", parts.weekOfYear},
                               {"isoDayOfWeek", parts.dayOfWeek},
                               {"hour", parts.hour},
                               {"minute", parts.minute},
