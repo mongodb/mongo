@@ -473,6 +473,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         }
     }
 
+    bool shouldStartDataReplication = false;
     if (!myIndex.getStatus().isOK() && myIndex.getStatus() != ErrorCodes::NodeNotFound) {
         warning() << "Not persisting new configuration in heartbeat response to disk because "
                      "it is invalid: "
@@ -504,14 +505,21 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         bool isArbiter = myIndex.isOK() && myIndex.getValue() != -1 &&
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
         if (!isArbiter && isFirstConfig) {
-            _externalState->startThreads(_settings);
-            _startDataReplication(opCtx.get());
+            shouldStartDataReplication = true;
         }
+
+        LOG_FOR_HEARTBEATS(2) << "New configuration with version " << newConfig.getConfigVersion()
+                              << " persisted to local storage; installing new config in memory";
     }
 
-    LOG_FOR_HEARTBEATS(2) << "New configuration with version " << newConfig.getConfigVersion()
-                          << " persisted to local storage; installing new config in memory";
     _heartbeatReconfigFinish(cbd, newConfig, myIndex);
+
+    // Start data replication after the config has been installed.
+    if (shouldStartDataReplication) {
+        _externalState->startThreads(_settings);
+        auto opCtx = cc().makeOperationContext();
+        _startDataReplication(opCtx.get());
+    }
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(

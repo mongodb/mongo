@@ -691,6 +691,7 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx, ReplicationCoordinator* re
     // This needs to happen after the attempt so readers can be sure we've already tried.
     ON_BLOCK_EXIT([] { attemptsToBecomeSecondary.increment(); });
 
+    // TODO(SERVER-27892): Change to GlobalWrite
     Lock::GlobalRead readLock(opCtx);
 
     if (replCoord->getMaintenanceMode()) {

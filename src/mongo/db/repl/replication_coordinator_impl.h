@@ -1142,6 +1142,12 @@ private:
      */
     int64_t _nextRandomInt64_inlock(int64_t limit);
 
+    /**
+     * Set follower mode. The caller should acquire the mutex first.
+     * The parameter *lock may be unlocked when this method returns.
+     */
+    Status _setFollowerMode(stdx::unique_lock<stdx::mutex>* lock, const MemberState& newState);
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

@@ -72,55 +72,18 @@ void RSDataSync::_run() {
     if (replSettings.isPrefetchIndexModeSet())
         _replCoord->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
 
-    while (!_bgsync->inShutdown()) {
-        // After a reconfig, we may not be in the replica set anymore, so
-        // check that we are in the set (and not an arbiter) before
-        // trying to sync with other replicas.
-        // TODO(spencer): Use a condition variable to await loading a config
-        if (_replCoord->getMemberState().startup()) {
-            warning() << "did not receive a valid config yet";
-            sleepsecs(1);
-            continue;
-        }
+    // We don't start data replication for arbiters at all and it's not allowed to reconfig
+    // arbiterOnly field for any member.
+    invariant(!_replCoord->getMemberState().arbiter());
 
-        const MemberState memberState = _replCoord->getMemberState();
-
-        // TODO(siyuan) Control the behavior using applier state.
-        // An arbiter can never transition to any other state, and doesn't replicate, ever
-        if (memberState.arbiter()) {
-            break;
-        }
-
-        // If we are removed then we don't belong to the set anymore
-        if (memberState.removed()) {
-            sleepsecs(5);
-            continue;
-        }
-
-        try {
-            if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
-                sleepsecs(1);
-                continue;
-            }
-
-            auto status = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
-            if (!status.isOK()) {
-                LOG(2) << "Failed to transition to RECOVERING to start data replication"
-                       << causedBy(status);
-                continue;
-            }
-
-            // Once we call into SyncTail::oplogApplication we never return, so this code only runs
-            // at startup.  It is not valid to transition from PRIMARY to RECOVERING ever, or from
-            // SECONDARY to RECOVERING without holding a global X lock, so we invariant to make
-            // sure this never happens.
-            invariant(!memberState.primary() && !memberState.secondary());
-            SyncTail(_bgsync, multiSyncApply).oplogApplication(_replCoord);
-        } catch (...) {
-            auto status = exceptionToStatus();
-            severe() << "Exception thrown in RSDataSync: " << redact(status);
-            std::terminate();
-        }
+    try {
+        // Once we call into SyncTail::oplogApplication we never return, so this code only runs at
+        // startup.
+        SyncTail(_bgsync, multiSyncApply).oplogApplication(_replCoord);
+    } catch (...) {
+        auto status = exceptionToStatus();
+        severe() << "Exception thrown in RSDataSync: " << redact(status);
+        std::terminate();
     }
 }
 

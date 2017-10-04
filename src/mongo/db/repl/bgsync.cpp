@@ -248,15 +248,9 @@ void BackgroundSync::_runProducer() {
         return;
     }
 
-    // TODO(spencer): Use a condition variable to await loading a config.
-    // TODO(siyuan): Control bgsync with producer state.
-    if (_replCoord->getMemberState().startup()) {
-        // Wait for a config to be loaded
-        sleepsecs(1);
-        return;
-    }
-
-    invariant(!_replCoord->getMemberState().rollback());
+    auto memberState = _replCoord->getMemberState();
+    invariant(!memberState.rollback());
+    invariant(!memberState.startup());
 
     // We need to wait until initial sync has started.
     if (_replCoord->getMyLastAppliedOpTime().isNull()) {
