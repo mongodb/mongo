@@ -90,6 +90,7 @@
 namespace mongo {
 namespace repl {
 
+MONGO_FP_DECLARE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
 MONGO_FP_DECLARE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -1692,6 +1693,22 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
         auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx);
         lk.unlock();
+
+        if (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
+            log() << "stepping down from primary - "
+                     "stepdownHangBeforePerformingPostMemberStateUpdateActions fail point enabled. "
+                     "Blocking until fail point is disabled.";
+            while (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
+                mongo::sleepsecs(1);
+                {
+                    stdx::lock_guard<stdx::mutex> lock(_mutex);
+                    if (_inShutdown) {
+                        break;
+                    }
+                }
+            }
+        }
+
         _performPostMemberStateUpdateAction(action);
     };
     ScopeGuard onExitGuard = MakeGuard([&] {

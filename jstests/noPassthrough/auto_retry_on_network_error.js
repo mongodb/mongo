@@ -6,6 +6,7 @@
     "use strict";
 
     load("jstests/libs/override_methods/auto_retry_on_network_error.js");
+    load("jstests/replsets/rslib.js");
 
     function stepDownPrimary(rst) {
         // Since we expect the mongo shell's connection to get severed as a result of running the
@@ -19,12 +20,20 @@
             });
             assert(isNetworkError(error),
                    "replSetStepDown did not disconnect client; failed with " + tojson(error));
+
+            // We use the reconnect() function to run a command against the former primary that
+            // acquires the global lock to ensure that it has finished stepping down and has
+            // therefore closed all of its client connections. This ensures commands sent on other
+            // connections to the former primary trigger a network error rather than potentially
+            // returning a "not master" error while the server is in the midst of closing client
+            // connections.
+            reconnect(primary);
         } finally {
             TestData.skipRetryOnNetworkError = false;
         }
     }
 
-    const rst = new ReplSetTest({nodes: 2});
+    const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
 
