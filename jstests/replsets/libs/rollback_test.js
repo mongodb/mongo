@@ -159,6 +159,13 @@ function RollbackTest(name = "RollbackTest") {
         // should never be possible with 2 electable nodes and the sequence of operations thus far.
         assert.eq(newPrimary, curSecondary, "Did not elect a new node as primary");
 
+        // Add a sleep and a dummy write to ensure the new primary has an optime greater than
+        // the last optime on the node that will undergo rollback. This greater optime ensures that
+        // the new primary is eligible to become a sync source in pv0.
+        sleep(1000);
+        var dbName = "ensureEligiblePV0";
+        assert.writeOK(newPrimary.getDB(dbName).testColl.insert({id: 0}));
+
         // The old primary is the new secondary; the old secondary just got elected as the new
         // primary, so we update the topology to reflect this change.
         curSecondary = curPrimary;

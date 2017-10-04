@@ -669,7 +669,7 @@ void rollbackDropIndexes(OperationContext* opCtx,
         updatedNss.append("ns", nss.ns());
 
         BSONObj updatedNssObj = updatedNss.obj();
-        indexSpec.addField(updatedNssObj.firstElement());
+        indexSpec = indexSpec.addField(updatedNssObj.firstElement());
 
         createIndexForApplyOps(opCtx, indexSpec, nss, {});
 
