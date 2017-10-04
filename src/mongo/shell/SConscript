@@ -6,8 +6,12 @@ env = env.Clone()
 
 generateJSErrorCodes = env.Command(
     target=['error_codes.js'],
-    source=['$BUILD_DIR/mongo/base/generate_error_codes.py', '$BUILD_DIR/mongo/base/error_codes.err'],
-    action=['$PYTHON ${SOURCES[0]} js ${SOURCES[1]} --js-source=${TARGETS[0]}'])
+    source=[
+        '$BUILD_DIR/mongo/base/generate_error_codes.py',
+        '$BUILD_DIR/mongo/base/error_codes.err',
+        'error_codes.tpl.js',
+    ],
+    action=['$PYTHON ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[2]}=${TARGETS[0]}'])
 env.Alias('generated-sources', generateJSErrorCodes)
 
 # Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.

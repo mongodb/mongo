@@ -4,10 +4,29 @@ Import("env")
 
 env = env.Clone()
 
-generateErrorCodes = env.Command(
-    target=['error_codes.h', 'error_codes.cpp'],
-    source=['generate_error_codes.py', 'error_codes.err'],
-    action=['$PYTHON ${SOURCES[0]} cpp ${SOURCES[1]} --cpp-header=${TARGETS[0]} --cpp-source=${TARGETS[1]}'])
+
+# This needs to use its own env to tell scons to suppress scanning the .tpl.h and .tpl.cpp inputs
+# for #includes since they aren't directly preprocessed. Scons will still scan the generated files
+# to produce the correct implicit dependencies when they are compiled.
+env_for_error_codes = env.Clone()
+env_for_error_codes['SCANNERS'] = []
+generateErrorCodes = env_for_error_codes.Command(
+    target=[
+        'error_codes.h',
+        'error_codes.cpp'
+    ],
+    source=[
+        'generate_error_codes.py',
+        'error_codes.err',
+        'error_codes.tpl.h',
+        'error_codes.tpl.cpp',
+    ],
+    action=['$PYTHON ${SOURCES[0]} ${SOURCES[1]} '
+            '${SOURCES[2]}=${TARGETS[0]} '
+            '${SOURCES[3]}=${TARGETS[1]}'
+    ],
+)
+
 env.Alias('generated-sources', generateErrorCodes)
 
 env.CppUnitTest('base_test',
