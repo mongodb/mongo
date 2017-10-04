@@ -226,10 +226,12 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     BSONObj sortOrder,
     long long limit,
-    uint64_t maxMemoryUsageBytes) {
+    uint64_t maxMemoryUsageBytes,
+    bool mergingPresorted) {
     intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx));
     pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes;
     pSort->_rawSort = sortOrder.getOwned();
+    pSort->_mergingPresorted = mergingPresorted;
 
     for (auto&& keyField : sortOrder) {
         auto fieldName = keyField.fieldNameStringData();
@@ -513,7 +515,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::getShardSource() {
     return this;
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceSort::getMergeSource() {
+std::list<intrusive_ptr<DocumentSource>> DocumentSourceSort::getMergeSources() {
     verify(!_mergingPresorted);
     intrusive_ptr<DocumentSourceSort> other = new DocumentSourceSort(pExpCtx);
     other->_sortPattern = _sortPattern;
@@ -525,7 +527,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::getMergeSource() {
     other->_maxMemoryUsageBytes = _maxMemoryUsageBytes;
     other->_mergingPresorted = true;
     other->_rawSort = _rawSort;
-    return other;
+    return {other};
 }
 }
 

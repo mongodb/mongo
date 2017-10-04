@@ -182,3 +182,22 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
 
     };
 }
+
+/**
+ * Asserts that the given pipeline will eventually return an error with the provided code,
+ * either in the initial aggregate, or a subsequent getMore. Throws an exception if there are
+ * any results from running the pipeline, or if it doesn't throw an error within the window of
+ * assert.soon().
+ */
+ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrowsCode(
+    {collection, pipeline, expectedCode}) {
+    try {
+        const changeStream = collection.aggregate(pipeline);
+        assert.soon(() => changeStream.hasNext());
+        assert(false, `Unexpected result from cursor: ${tojson(changeStream.next())}`);
+    } catch (error) {
+        assert.eq(error.code, expectedCode, `Caught unexpected error: ${tojson(error)}`);
+        return true;
+    }
+    assert(false, "expected this to be unreachable");
+}

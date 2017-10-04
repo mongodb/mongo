@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -137,6 +138,10 @@ Status appendCursorResponseToCommandResult(const ShardId& shardId,
     return getStatusFromCommandResult(result->asTempObj());
 }
 
+bool mustRunOnAllShards(const NamespaceString& nss, const LiteParsedPipeline& litePipe) {
+    return nss.isCollectionlessAggregateNS() || litePipe.hasChangeStream();
+}
+
 StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
                                                                   const NamespaceString& execNss,
                                                                   CatalogCache* catalogCache) {
@@ -160,12 +165,12 @@ StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationConte
 
 std::set<ShardId> getTargetedShards(OperationContext* opCtx,
                                     const NamespaceString& nss,
+                                    const LiteParsedPipeline& litePipe,
                                     const CachedCollectionRoutingInfo& routingInfo,
                                     const BSONObj shardQuery,
                                     const BSONObj collation) {
-    if (nss.isCollectionlessAggregateNS()) {
-        // The pipeline begins with a stage which produces its own input and does not use an
-        // underlying collection. It should be run on all shards.
+    if (mustRunOnAllShards(nss, litePipe)) {
+        // The pipeline begins with a stage which must be run on all shards.
         std::vector<ShardId> shardIds;
         Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
         return {shardIds.begin(), shardIds.end()};
@@ -242,6 +247,7 @@ BSONObj createCommandForMergingShard(
 StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishShardCursors(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const LiteParsedPipeline& litePipe,
     CachedCollectionRoutingInfo* routingInfo,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
@@ -249,12 +255,13 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishShardC
     const BSONObj& collation) {
     LOG(1) << "Dispatching command " << redact(cmdObj) << " to establish cursors on shards";
 
-    std::set<ShardId> shardIds = getTargetedShards(opCtx, nss, *routingInfo, shardQuery, collation);
+    std::set<ShardId> shardIds =
+        getTargetedShards(opCtx, nss, litePipe, *routingInfo, shardQuery, collation);
     std::vector<std::pair<ShardId, BSONObj>> requests;
 
-    if (nss.isCollectionlessAggregateNS()) {
-        // The pipeline begins with a stage which produces its own input and does not use an
-        // underlying collection. It should be run unversioned on all shards.
+    if (mustRunOnAllShards(nss, litePipe)) {
+        // The pipeline contains a stage which must be run on all shards. Skip versioning and
+        // enqueue the raw command objects.
         for (auto&& shardId : shardIds) {
             requests.emplace_back(std::move(shardId), cmdObj);
         }
@@ -333,6 +340,7 @@ BSONObj establishMergingMongosCursor(
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
         ReadPreferenceSetting::get(opCtx));
 
+    params.tailableMode = pipelineForMerging->getContext()->tailableMode;
     params.mergePipeline = std::move(pipelineForMerging);
     params.remotes = std::move(cursors);
 
@@ -352,11 +360,26 @@ BSONObj establishMergingMongosCursor(
     CursorResponseBuilder responseBuilder(true, &cursorResponse);
 
     for (long long objCount = 0; objCount < request.getBatchSize(); ++objCount) {
-        auto next = uassertStatusOK(ccc->next(RouterExecStage::ExecContext::kInitialFind));
+        ClusterQueryResult next;
+        try {
+            next = uassertStatusOK(ccc->next(RouterExecStage::ExecContext::kInitialFind));
+        } catch (const CloseChangeStreamException& ex) {
+            // This exception is thrown when a $changeStream stage encounters an event
+            // that invalidates the cursor. We should close the cursor and return without
+            // error.
+            cursorState = ClusterCursorManager::CursorState::Exhausted;
+            break;
+        }
 
         // Check whether we have exhausted the pipeline's results.
         if (next.isEOF()) {
-            cursorState = ClusterCursorManager::CursorState::Exhausted;
+            // We reached end-of-stream. If the cursor is not tailable, then we mark it as
+            // exhausted. If it is tailable, usually we keep it open (i.e. "NotExhausted") even when
+            // we reach end-of-stream. However, if all the remote cursors are exhausted, there is no
+            // hope of returning data and thus we need to close the mongos cursor as well.
+            if (!ccc->isTailable() || ccc->remotesExhausted()) {
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+            }
             break;
         }
 
@@ -431,9 +454,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
 
-    // If this pipeline is on an unsharded collection, is allowed to be forwarded on to shards, and
-    // doesn't need transformation via DocumentSoruce::serialize(), then go ahead and pass it
-    // through to the owning shard unmodified.
+    // If this pipeline is on an unsharded collection, is allowed to be forwarded to shards, is not
+    // a collectionless aggregation that needs to run on all shards, and doesn't need transformation
+    // via DocumentSoruce::serialize(), then go ahead and pass it through to the owning shard
+    // unmodified.
     if (!executionNsRoutingInfo.cm() && !namespaces.executionNss.isCollectionlessAggregateNS() &&
         liteParsedPipeline.allowedToForwardFromMongos() &&
         liteParsedPipeline.allowedToPassthroughFromMongos()) {
@@ -445,10 +469,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                               liteParsedPipeline,
                               result);
     }
-    // TODO SERVER-29141 support $changeStream on sharded collections.
-    uassert(40622,
-            "$changeStream is not yet supported on sharded collections",
-            !liteParsedPipeline.hasChangeStream());
 
     std::unique_ptr<CollatorInterface> collation;
     if (!request.getCollation().isEmpty()) {
@@ -514,6 +534,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // Determine whether we can run the entire aggregation on a single shard.
         std::set<ShardId> shardIds = getTargetedShards(opCtx,
                                                        namespaces.executionNss,
+                                                       liteParsedPipeline,
                                                        executionNsRoutingInfo,
                                                        shardQuery,
                                                        request.getCollation());
@@ -547,10 +568,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
         if (mergeCtx->explain) {
-            if (namespaces.executionNss.isCollectionlessAggregateNS()) {
-                // Some commands, such as $currentOp, are implemented as aggregation stages on a
-                // "collectionless" namespace. Currently, all such commands should be broadcast to
-                // all shards, and should not participate in the shard version protocol.
+            if (mustRunOnAllShards(namespaces.executionNss, liteParsedPipeline)) {
+                // Some stages (such as $currentOp) need to be broadcast to all shards, and should
+                // not participate in the shard version protocol.
                 swShardResults =
                     scatterGatherUnversionedTargetAllShards(opCtx,
                                                             namespaces.executionNss.db().toString(),
@@ -575,6 +595,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         } else {
             swCursors = establishShardCursors(opCtx,
                                               namespaces.executionNss,
+                                              liteParsedPipeline,
                                               &executionNsRoutingInfo,
                                               targetedCommand,
                                               ReadPreferenceSetting::get(opCtx),
@@ -619,7 +640,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             cursors[0].cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse),
             namespaces.requestedNss,
             executorPool->getArbitraryExecutor(),
-            Grid::get(opCtx)->getCursorManager()));
+            Grid::get(opCtx)->getCursorManager(),
+            mergeCtx->tailableMode));
 
         return appendCursorResponseToCommandResult(cursors[0].shardId, reply, result);
     }

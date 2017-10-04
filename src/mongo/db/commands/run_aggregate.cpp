@@ -437,10 +437,6 @@ Status runAggregate(OperationContext* opCtx,
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request))));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
-        if (liteParsedPipeline.hasChangeStream()) {
-            expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
-        }
-
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
 
         // Check that the view's collation matches the collation of any views involved in the

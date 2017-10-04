@@ -62,8 +62,10 @@ StatusWith<ClusterQueryResult> RouterStagePipeline::next(RouterExecStage::ExecCo
     }
 
     // If we reach this point, we have hit EOF.
-    _mergePipeline.get_deleter().dismissDisposal();
-    _mergePipeline->dispose(getOpCtx());
+    if (!_mergePipeline->getContext()->isTailable()) {
+        _mergePipeline.get_deleter().dismissDisposal();
+        _mergePipeline->dispose(getOpCtx());
+    }
 
     return {ClusterQueryResult()};
 }
@@ -86,7 +88,7 @@ bool RouterStagePipeline::remotesExhausted() {
 }
 
 Status RouterStagePipeline::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    return {ErrorCodes::InvalidOptions, "maxTimeMS is not valid for aggregation getMore"};
+    return _routerAdapter->setAwaitDataTimeout(awaitDataTimeout);
 }
 
 boost::intrusive_ptr<RouterStagePipeline::DocumentSourceRouterAdapter>

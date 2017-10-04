@@ -125,8 +125,8 @@ public:
         return nullptr;
     }
 
-    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
-        return this;
+    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+        return {this};
     }
 
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {

@@ -351,23 +351,30 @@ void Pipeline::Optimizations::Sharded::findSplitPoint(Pipeline* shardPipe, Pipel
         intrusive_ptr<DocumentSource> current = mergePipe->_sources.front();
         mergePipe->_sources.pop_front();
 
-        // Check if this source is splittable
+        // Check if this source is splittable.
         SplittableDocumentSource* splittable =
             dynamic_cast<SplittableDocumentSource*>(current.get());
 
         if (!splittable) {
-            // move the source from the merger _sources to the shard _sources
+            // Move the source from the merger _sources to the shard _sources.
             shardPipe->_sources.push_back(current);
         } else {
-            // split this source into Merge and Shard _sources
+            // Split this source into 'merge' and 'shard' _sources.
             intrusive_ptr<DocumentSource> shardSource = splittable->getShardSource();
-            intrusive_ptr<DocumentSource> mergeSource = splittable->getMergeSource();
-            invariant(shardSource != mergeSource);
+            auto mergeSources = splittable->getMergeSources();
+
+            // A source may not simultaneously be present on both sides of the split.
+            invariant(std::find(mergeSources.begin(), mergeSources.end(), shardSource) ==
+                      mergeSources.end());
 
             if (shardSource)
                 shardPipe->_sources.push_back(shardSource);
-            if (mergeSource)
-                mergePipe->_sources.push_front(mergeSource);
+
+            // Add the stages in reverse order, so that they appear in the pipeline in the same
+            // order as they were returned by the stage.
+            for (auto it = mergeSources.rbegin(); it != mergeSources.rend(); ++it) {
+                mergePipe->_sources.push_front(*it);
+            }
 
             break;
         }

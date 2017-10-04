@@ -79,6 +79,10 @@ constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 constexpr StringData DocumentSourceChangeStream::kRetryNeededOpType;
 
+const BSONObj DocumentSourceChangeStream::kSortSpec =
+    BSON("_id.clusterTime.ts" << 1 << "_id.uuid" << 1 << "_id.documentKey" << 1);
+
+
 namespace {
 
 static constexpr StringData kOplogMatchExplainName = "$_internalOplogMatch"_sd;
@@ -135,7 +139,7 @@ namespace {
  * "invalidate" entries.
  * It is not intended to be created by the user.
  */
-class DocumentSourceCloseCursor final : public DocumentSource {
+class DocumentSourceCloseCursor final : public DocumentSource, public SplittableDocumentSource {
 public:
     GetNextResult getNext() final;
 
@@ -164,6 +168,26 @@ public:
     static boost::intrusive_ptr<DocumentSourceCloseCursor> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
         return new DocumentSourceCloseCursor(expCtx);
+    }
+
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return nullptr;
+    }
+
+    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+        // This stage must run on mongos to ensure it sees any invalidation in the correct order,
+        // and to ensure that all remote cursors are cleaned up properly. We also must include a
+        // mergingPresorted $sort stage to communicate to the AsyncResultsMerger that we need to
+        // merge the streams in a particular order.
+        const bool mergingPresorted = true;
+        const long long noLimit = -1;
+        auto sortMergingPresorted =
+            DocumentSourceSort::create(pExpCtx,
+                                       DocumentSourceChangeStream::kSortSpec,
+                                       noLimit,
+                                       DocumentSourceSort::kMaxMemoryUsageBytes,
+                                       mergingPresorted);
+        return {sortMergingPresorted, this};
     }
 
 private:
@@ -252,19 +276,24 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             << feature_compatibility_version::kDochubLink
             << ".",
         serverGlobalParams.featureCompatibility.isFullyUpgradedTo36());
-    // TODO: Add sharding support here (SERVER-29141).
-    uassert(
-        40470, "The $changeStream stage is not supported on sharded systems.", !expCtx->inMongos);
+
+    // A change stream is a tailable + awaitData cursor.
+    expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
+
     uassert(40471,
             "Only default collation is allowed when using a $changeStream stage.",
             !expCtx->getCollator());
 
-    auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-    uassert(40573,
-            "The $changeStream stage is only supported on replica sets",
-            replCoord &&
-                replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet);
-    Timestamp startFrom = replCoord->getMyLastAppliedOpTime().getTimestamp();
+    boost::optional<Timestamp> startFrom;
+    if (!expCtx->inMongos) {
+        auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
+        uassert(40573,
+                "The $changeStream stage is only supported on replica sets",
+                replCoord &&
+                    replCoord->getReplicationMode() ==
+                        repl::ReplicationCoordinator::Mode::modeReplSet);
+        startFrom = replCoord->getMyLastAppliedOpTime().getTimestamp();
+    }
 
     intrusive_ptr<DocumentSource> resumeStage = nullptr;
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
@@ -277,9 +306,11 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
                 tokenData.uuid);
         auto resumeNamespace =
             UUIDCatalog::get(expCtx->opCtx).lookupNSSByUUID(tokenData.uuid.get());
-        uassert(40615,
-                "The resume token UUID does not exist. Has the collection been dropped?",
-                !resumeNamespace.isEmpty());
+        if (!expCtx->inMongos) {
+            uassert(40615,
+                    "The resume token UUID does not exist. Has the collection been dropped?",
+                    !resumeNamespace.isEmpty());
+        }
         startFrom = tokenData.clusterTime;
         if (expCtx->needsMerge) {
             resumeStage = DocumentSourceShardCheckResumability::create(expCtx, std::move(token));
@@ -287,7 +318,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
         }
     }
-    const bool changeStreamIsResuming = resumeStage != nullptr;
+    const bool changeStreamIsResuming = (resumeStage != nullptr);
 
     auto fullDocOption = spec.getFullDocument();
     uassert(40575,
@@ -299,16 +330,31 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             fullDocOption == "updateLookup"_sd || fullDocOption == "default"_sd);
     const bool shouldLookupPostImage = (fullDocOption == "updateLookup"_sd);
 
-    auto oplogMatch = DocumentSourceOplogMatch::create(
-        buildMatchFilter(expCtx->ns, startFrom, changeStreamIsResuming), expCtx);
-    auto transformation = createTransformationStage(elem.embeddedObject(), expCtx);
-    list<intrusive_ptr<DocumentSource>> stages = {oplogMatch, transformation};
+    list<intrusive_ptr<DocumentSource>> stages;
+
+    // There might not be a starting point if we're on mongos, otherwise we should either have a
+    // 'resumeAfter' starting point, or should start from the latest majority committed operation.
+    invariant(expCtx->inMongos || static_cast<bool>(startFrom));
+    if (startFrom) {
+        stages.push_back(DocumentSourceOplogMatch::create(
+            buildMatchFilter(expCtx->ns, *startFrom, changeStreamIsResuming), expCtx));
+    }
+
+    stages.push_back(createTransformationStage(elem.embeddedObject(), expCtx));
     if (resumeStage) {
         stages.push_back(resumeStage);
     }
-    auto closeCursorSource = DocumentSourceCloseCursor::create(expCtx);
-    stages.push_back(closeCursorSource);
+    if (!expCtx->needsMerge) {
+        // There should only be one close cursor stage. If we're on the shards and producing input
+        // to be merged, do not add a close cursor stage, since the mongos will already have one.
+        stages.push_back(DocumentSourceCloseCursor::create(expCtx));
+    }
     if (shouldLookupPostImage) {
+        uassert(
+            40470,
+            str::stream() << "looking up the full document after an update is not yet supported on "
+                             "sharded collections",
+            !expCtx->inMongos);
         stages.push_back(DocumentSourceLookupChangePostImage::create(expCtx));
     }
     return stages;
@@ -317,7 +363,9 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(
     BSONObj changeStreamSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
     return intrusive_ptr<DocumentSource>(new DocumentSourceSingleDocumentTransformation(
-        expCtx, stdx::make_unique<Transformation>(changeStreamSpec), kStageName.toString()));
+        expCtx,
+        stdx::make_unique<Transformation>(expCtx, changeStreamSpec),
+        kStageName.toString()));
 }
 
 Document DocumentSourceChangeStream::Transformation::applyTransformation(const Document& input) {
@@ -421,6 +469,13 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         resumeTokenData.uuid = uuid.getUuid();
     doc.addField(kIdField, Value(ResumeToken(resumeTokenData).toDocument()));
     doc.addField(kOperationTypeField, Value(operationType));
+
+    // If we're in a sharded environment, we'll need to merge the results by their sort key, so add
+    // that as metadata.
+    if (_expCtx->needsMerge) {
+        auto change = doc.peek();
+        doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
+    }
 
     // "invalidate" and "retryNeeded" entries have fewer fields.
     if (operationType == kInvalidateOpType || operationType == kRetryNeededOpType) {

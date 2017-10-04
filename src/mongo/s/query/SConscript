@@ -71,8 +71,11 @@ env.Library(
         "$BUILD_DIR/mongo/executor/task_executor_interface",
         "$BUILD_DIR/mongo/s/async_requests_sender",
         "$BUILD_DIR/mongo/s/client/sharding_client",
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/s/coreshard",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/pipeline/document_source_lookup",
     ],
 )
 

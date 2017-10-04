@@ -203,11 +203,11 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {
 /**
  * We should _error_ on the no-document case, because that means the resume token was not found.
  */
-TEST_F(CheckResumeTokenTest, ShouldFailWithNoDocuments) {
+TEST_F(CheckResumeTokenTest, ShouldSucceedWithNoDocuments) {
     Timestamp resumeTimestamp(100, 1);
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, "0");
-    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40584);
+    ASSERT_TRUE(checkResumeToken->getNext().isEOF());
 }
 
 /**

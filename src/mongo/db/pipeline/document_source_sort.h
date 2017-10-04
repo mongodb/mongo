@@ -82,7 +82,7 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;
 
     /**
      * Write out a Document whose contents are the sort key pattern.
@@ -102,7 +102,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         BSONObj sortOrder,
         long long limit = -1,
-        uint64_t maxMemoryUsageBytes = kMaxMemoryUsageBytes);
+        uint64_t maxMemoryUsageBytes = kMaxMemoryUsageBytes,
+        bool mergingPresorted = false);
 
     /**
      * Returns true if this $sort stage is merging presorted streams.

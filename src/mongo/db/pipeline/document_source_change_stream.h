@@ -71,7 +71,9 @@ public:
 
     class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
     public:
-        Transformation(BSONObj changeStreamSpec) : _changeStreamSpec(changeStreamSpec.getOwned()) {}
+        Transformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       BSONObj changeStreamSpec)
+            : _expCtx(expCtx), _changeStreamSpec(changeStreamSpec.getOwned()) {}
         ~Transformation() = default;
         Document applyTransformation(const Document& input) final;
         TransformerType getType() const final {
@@ -84,8 +86,12 @@ public:
         DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
     private:
+        boost::intrusive_ptr<ExpressionContext> _expCtx;
         BSONObj _changeStreamSpec;
     };
+
+    // The sort pattern used to merge results from multiple change streams on a mongos.
+    static const BSONObj kSortSpec;
 
     // The name of the field where the document key (_id and shard key, if present) will be found
     // after the transformation.

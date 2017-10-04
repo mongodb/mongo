@@ -131,7 +131,7 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
         ASSERT_BSONOBJ_EQ(arr[0].getDocument().toBson(), BSON("$sort" << BSON("a" << 1)));
 
         ASSERT(sort()->getShardSource() != nullptr);
-        ASSERT(sort()->getMergeSource() != nullptr);
+        ASSERT(!sort()->getMergeSources().empty());
     }
 
     container.push_back(DocumentSourceLimit::create(expCtx, 10));
@@ -158,7 +158,7 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
         DOC_ARRAY(DOC("$sort" << DOC("a" << 1)) << DOC("$limit" << sort()->getLimit())));
 
     ASSERT(sort()->getShardSource() != nullptr);
-    ASSERT(sort()->getMergeSource() != nullptr);
+    ASSERT(!sort()->getMergeSources().empty());
 }
 
 TEST_F(DocumentSourceSortTest, Dependencies) {

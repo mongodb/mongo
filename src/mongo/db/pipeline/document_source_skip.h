@@ -86,8 +86,8 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
         return NULL;
     }
-    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
-        return this;
+    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+        return {this};
     }
 
     long long getSkip() const {

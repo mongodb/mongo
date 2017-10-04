@@ -57,10 +57,6 @@ DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::getNext() 
     pExpCtx->checkForInterrupt();
 
     auto nextInput = pSource->getNext();
-    uassert(40584,
-            "resume of change stream was not possible, as no change data was found. ",
-            _seenDoc || !nextInput.isEOF());
-
     if (_seenDoc || !nextInput.isAdvanced())
         return nextInput;
 
@@ -83,7 +79,7 @@ const char* DocumentSourceShardCheckResumability::getSourceName() const {
 
 Value DocumentSourceShardCheckResumability::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    // This stage is created by the DocumentSourceChangeNotification stage, so serializing it here
+    // This stage is created by the DocumentSourceChangeStream stage, so serializing it here
     // would result in it being created twice.
     return Value();
 }
@@ -120,7 +116,7 @@ DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
     }
     // If we make it here, we need to look up the first document in the oplog and compare it
     // with the resume token.
-    auto firstEntryExpCtx = pExpCtx->copyWith(pExpCtx->ns);
+    auto firstEntryExpCtx = pExpCtx->copyWith(NamespaceString::kRsOplogNamespace);
     auto matchSpec = BSON("$match" << BSONObj());
     auto pipeline =
         uassertStatusOK(_mongoProcessInterface->makePipeline({matchSpec}, firstEntryExpCtx));

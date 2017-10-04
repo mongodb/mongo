@@ -245,7 +245,9 @@ public:
         // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
         // state.
         auto css = CollectionShardingState::get(_ctx->opCtx, expCtx->ns);
-        uassert(4567, "from collection cannot be sharded", !bool(css->getMetadata()));
+        uassert(4567,
+                str::stream() << "from collection (" << expCtx->ns.ns() << ") cannot be sharded",
+                !bool(css->getMetadata()));
 
         PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 

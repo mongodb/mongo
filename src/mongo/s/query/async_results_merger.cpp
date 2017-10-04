@@ -34,6 +34,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/killcursors_request.h"
@@ -70,9 +71,6 @@ int compareSortKeys(BSONObj leftSortKey, BSONObj rightSortKey, BSONObj sortKeyPa
     const bool considerFieldName = false;
     return leftSortKey.woCompare(rightSortKey, sortKeyPattern, considerFieldName);
 }
-
-const BSONObj kChangeStreamSortSpec =
-    BSON("_id.clusterTime.ts" << 1 << "_id.uuid" << 1 << "_id.documentKey" << 1);
 
 }  // namespace
 
@@ -141,6 +139,7 @@ bool AsyncResultsMerger::ready() {
 }
 
 void AsyncResultsMerger::detachFromOperationContext() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _opCtx = nullptr;
     // If we were about ready to return a boost::none because a tailable cursor reached the end of
     // the batch, that should no longer apply to the next use - when we are reattached to a
@@ -150,6 +149,7 @@ void AsyncResultsMerger::detachFromOperationContext() {
 }
 
 void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_opCtx);
     _opCtx = opCtx;
 }
@@ -430,17 +430,25 @@ void AsyncResultsMerger::updateRemoteMetadata(RemoteCursorData* remote,
     remote->cursorId = response.getCursorId();
     if (response.getLastOplogTimestamp() && !response.getLastOplogTimestamp()->isNull()) {
         // We only expect to see this for change streams.
-        invariant(
-            SimpleBSONObjComparator::kInstance.evaluate(_params->sort == kChangeStreamSortSpec));
+        invariant(SimpleBSONObjComparator::kInstance.evaluate(
+            _params->sort == DocumentSourceChangeStream::kSortSpec));
+
+        auto newLatestTimestamp = *response.getLastOplogTimestamp();
+        if (remote->promisedMinSortKey) {
+            auto existingLatestTimestamp = remote->promisedMinSortKey->firstElement().timestamp();
+            if (existingLatestTimestamp == newLatestTimestamp) {
+                // Nothing to update.
+                return;
+            }
+            // The most recent oplog timestamp should never be smaller than the timestamp field of
+            // the previous min sort key for this remote, if one exists.
+            invariant(existingLatestTimestamp < newLatestTimestamp);
+        }
 
         // Our new minimum promised sort key is the first key whose timestamp matches the most
-        // recent reported oplog timestamp. It should never be smaller than the previous min sort
-        // key for this remote, if one exists.
+        // recent reported oplog timestamp.
         auto newPromisedMin =
             BSON("" << *response.getLastOplogTimestamp() << "" << MINKEY << "" << MINKEY);
-        invariant(!remote->promisedMinSortKey ||
-                  compareSortKeys(
-                      *remote->promisedMinSortKey, newPromisedMin, kChangeStreamSortSpec) <= 0);
 
         // The promised min sort key should never be smaller than any results returned. If the
         // last entry in the batch is also the most recent entry in the oplog, then its sort key
@@ -450,7 +458,8 @@ void AsyncResultsMerger::updateRemoteMetadata(RemoteCursorData* remote,
             (response.getBatch().empty() ? BSONObj() : extractSortKey(response.getBatch().back()));
 
         remote->promisedMinSortKey =
-            (compareSortKeys(newPromisedMin, maxSortKeyFromResponse, kChangeStreamSortSpec) < 0
+            (compareSortKeys(
+                 newPromisedMin, maxSortKeyFromResponse, DocumentSourceChangeStream::kSortSpec) < 0
                  ? maxSortKeyFromResponse.getOwned()
                  : newPromisedMin.getOwned());
     }
@@ -543,7 +552,7 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     if (_params->tailableMode == TailableMode::kTailable && !remote.hasNext()) {
         invariant(_remotes.size() == 1);
         _eofNext = true;
-    } else if (!remote.hasNext() && !remote.exhausted()) {
+    } else if (!remote.hasNext() && !remote.exhausted() && _lifecycleState == kAlive) {
         // If this is normal or tailable-awaitData cursor and we still don't have anything buffered
         // after receiving this batch, we can schedule work to retrieve the next batch right away.
         remote.status = _askForNextBatch(lk, remoteIndex);

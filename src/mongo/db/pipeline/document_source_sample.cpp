@@ -119,13 +119,13 @@ intrusive_ptr<DocumentSource> DocumentSourceSample::getShardSource() {
     return this;
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceSample::getMergeSource() {
+std::list<intrusive_ptr<DocumentSource>> DocumentSourceSample::getMergeSources() {
     // Just need to merge the pre-sorted documents by their random values.
     BSONObjBuilder randMergeSortSpec;
 
     randMergeSortSpec.appendElements(randSortSpec);
     randMergeSortSpec.append("$mergePresorted", true);
 
-    return DocumentSourceSort::create(pExpCtx, randMergeSortSpec.obj(), _size);
+    return {DocumentSourceSort::create(pExpCtx, randMergeSortSpec.obj(), _size)};
 }
 }  // mongo

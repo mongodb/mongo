@@ -832,7 +832,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getShardSource() {
     return this;  // No modifications necessary when on shard
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
+std::list<intrusive_ptr<DocumentSource>> DocumentSourceGroup::getMergeSources() {
     intrusive_ptr<DocumentSourceGroup> pMerger(new DocumentSourceGroup(pExpCtx));
     pMerger->setDoingMerge(true);
 
@@ -851,7 +851,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
         pMerger->addAccumulator(copiedAccumuledField);
     }
 
-    return pMerger;
+    return {pMerger};
 }
 }
 

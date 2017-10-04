@@ -87,6 +87,10 @@ private:
             _execContext = execContext;
         }
 
+        Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) const {
+            return _child->setAwaitDataTimeout(awaitDataTimeout);
+        }
+
     private:
         DocumentSourceRouterAdapter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     std::unique_ptr<RouterExecStage> childStage);

@@ -28,32 +28,37 @@ selector:
   # New feature in v3.6 mongos
   - jstests/sharding/logical_time_metadata.js
   # New feature in v3.6 mongos and mongod.
-  - jstests/sharding/logical_time_api.js
-  - jstests/sharding/operation_time_api.js
+  - jstests/sharding/advance_logical_time_with_valid_signature.js
   - jstests/sharding/after_cluster_time.js
-  - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
+  - jstests/sharding/change_stream_invalidation.js
+  - jstests/sharding/change_stream_remove_shard.js
+  - jstests/sharding/change_streams.js
+  - jstests/sharding/close_cursor_on_chunk_migration_to_new_shards.js
+  - jstests/sharding/close_cursor_on_chunk_migration_to_new_shards.js
+  - jstests/sharding/enable_sharding_basic.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/kill_sessions.js
-  - jstests/sharding/advance_logical_time_with_valid_signature.js
+  - jstests/sharding/logical_time_api.js
+  - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
+  - jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
+  - jstests/sharding/move_chunk_insert_with_write_retryability.js
+  - jstests/sharding/move_chunk_remove_with_write_retryability.js
+  - jstests/sharding/move_chunk_update_with_write_retryability.js
+  - jstests/sharding/operation_time_api.js
   - jstests/sharding/refresh_sessions.js
+  - jstests/sharding/resume_change_stream.js
+  - jstests/sharding/retryable_writes.js
   - jstests/sharding/safe_secondary_reads_drop_recreate.js
   - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
   - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
-  - jstests/sharding/secondary_shard_versioning.js
   - jstests/sharding/secondary_shard_version_protocol_with_causal_consistency.js
   - jstests/sharding/secondary_shard_version_protocol_with_fcv.js
+  - jstests/sharding/secondary_shard_versioning.js
   - jstests/sharding/session_info_in_oplog.js
   - jstests/sharding/shard_config_db_collections.js
-  - jstests/sharding/enable_sharding_basic.js
-  - jstests/sharding/retryable_writes.js
   - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
   - jstests/sharding/uuid_propagated_to_recipient_shard_on_recvChunkStart.js
   - jstests/sharding/uuid_propagated_to_shards_on_setFCV_3_6.js
-  - jstests/sharding/close_cursor_on_chunk_migration_to_new_shards.js
-  - jstests/sharding/move_chunk_insert_with_write_retryability.js
-  - jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
-  - jstests/sharding/move_chunk_remove_with_write_retryability.js
-  - jstests/sharding/move_chunk_update_with_write_retryability.js
   - jstests/sharding/write_transactions_during_migration.js
   - jstests/sharding/json_schema.js
   # New feature in v3.6 mongo shell.

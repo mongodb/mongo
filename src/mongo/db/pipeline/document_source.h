@@ -635,12 +635,13 @@ public:
     virtual boost::intrusive_ptr<DocumentSource> getShardSource() = 0;
 
     /**
-     * Returns a source that combines results from the shards, or NULL if no work should be done in
-     * the merge pipeline for this stage. Must not mutate the existing source object; if different
-     * behaviour is required, a new source should be created and configured appropriately. It is an
-     * error for getMergeSource() to return a pointer to the same object as getShardSource().
+     * Returns a list of stages that combine results from the shards, or an empty list if no work
+     * should be done in the merge pipeline for this stage. Must not mutate the existing source
+     * object; if different behaviour is required, a new source should be created and configured
+     * appropriately. It is an error for getMergeSources() to return a pointer to the same object as
+     * getShardSource().
      */
-    virtual boost::intrusive_ptr<DocumentSource> getMergeSource() = 0;
+    virtual std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() = 0;
 
 protected:
     // It is invalid to delete through a SplittableDocumentSource-typed pointer.

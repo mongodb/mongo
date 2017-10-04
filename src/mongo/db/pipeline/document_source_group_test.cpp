@@ -544,9 +544,10 @@ protected:
         // case only one shard is in use.
         SplittableDocumentSource* splittable = dynamic_cast<SplittableDocumentSource*>(group());
         ASSERT(splittable);
-        intrusive_ptr<DocumentSource> routerSource = splittable->getMergeSource();
-        ASSERT_NOT_EQUALS(group(), routerSource.get());
-        return routerSource;
+        auto routerSources = splittable->getMergeSources();
+        ASSERT_EQ(routerSources.size(), 1UL);
+        ASSERT_NOT_EQUALS(group(), routerSources.front().get());
+        return routerSources.front();
     }
     void checkResultSet(const intrusive_ptr<DocumentSource>& sink) {
         // Load the results from the DocumentSourceGroup and sort them by _id.

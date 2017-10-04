@@ -3,6 +3,7 @@ var wait;
 var occasionally;
 var reconnect;
 var getLatestOp;
+var getLeastRecentOp;
 var waitForAllMembers;
 var reconfig;
 var awaitOpTime;
@@ -138,6 +139,16 @@ var getLastOpTime;
         server.getDB("admin").getMongo().setSlaveOk();
         var log = server.getDB("local")['oplog.rs'];
         var cursor = log.find({}).sort({'$natural': -1}).limit(1);
+        if (cursor.hasNext()) {
+            return cursor.next();
+        }
+        return null;
+    };
+
+    getLeastRecentOp = function({server, readConcern}) {
+        server.getDB("admin").getMongo().setSlaveOk();
+        const oplog = server.getDB("local").oplog.rs;
+        const cursor = oplog.find().sort({$natural: 1}).limit(1).readConcern(readConcern);
         if (cursor.hasNext()) {
             return cursor.next();
         }

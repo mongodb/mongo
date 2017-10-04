@@ -98,9 +98,9 @@ intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getShardSource() {
     return this;
 }
 // On mongoS this becomes a merge sort by distance (nearest-first) with limit.
-intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getMergeSource() {
-    return DocumentSourceSort::create(
-        pExpCtx, BSON(distanceField->fullPath() << 1 << "$mergePresorted" << true), limit);
+std::list<intrusive_ptr<DocumentSource>> DocumentSourceGeoNear::getMergeSources() {
+    return {DocumentSourceSort::create(
+        pExpCtx, BSON(distanceField->fullPath() << 1 << "$mergePresorted" << true), limit)};
 }
 
 Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
