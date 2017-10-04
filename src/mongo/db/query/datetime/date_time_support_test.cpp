@@ -952,10 +952,17 @@ TEST(DateFormat, ThrowsUserExceptionIfGivenUnmatchedPercent) {
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenDateBeforeYear0) {
     const long long kMillisPerYear = 31556926000;
+
     ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().formatDate(
                            "%Y", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1971))),
                        AssertionException,
                        18537);
+
+    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().formatDate(
+                           "%G", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1971))),
+                       AssertionException,
+                       18537);
+
     ASSERT_EQ("0000",
               TimeZoneDatabase::utcZone().formatDate(
                   "%Y", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1970))));
@@ -964,6 +971,9 @@ TEST(DateFormat, ThrowsUserExceptionIfGivenDateBeforeYear0) {
 TEST(DateFormat, ThrowsUserExceptionIfGivenDateAfterYear9999) {
     ASSERT_THROWS_CODE(
         TimeZoneDatabase::utcZone().formatDate("%Y", Date_t::max()), AssertionException, 18537);
+
+    ASSERT_THROWS_CODE(
+        TimeZoneDatabase::utcZone().formatDate("%G", Date_t::max()), AssertionException, 18537);
 }
 
 }  // namespace
