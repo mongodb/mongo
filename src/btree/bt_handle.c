@@ -398,6 +398,29 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	else
 		btree->checksum = CKSUM_UNCOMPRESSED;
 
+	/* Debugging information */
+	WT_RET(__wt_config_gets(session,
+	    cfg, "assert.commit_timestamp", &cval));
+	if (WT_STRING_MATCH("always", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS);
+		FLD_CLR(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER);
+	} else if (WT_STRING_MATCH("never", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER);
+		FLD_CLR(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS);
+	} else
+		FLD_CLR(btree->assert_flags,
+		    WT_ASSERT_COMMIT_TS_ALWAYS | WT_ASSERT_COMMIT_TS_NEVER);
+	WT_RET(__wt_config_gets(session, cfg, "assert.read_timestamp", &cval));
+	if (WT_STRING_MATCH("always", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS);
+		FLD_CLR(btree->assert_flags, WT_ASSERT_READ_TS_NEVER);
+	} else if (WT_STRING_MATCH("never", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_READ_TS_NEVER);
+		FLD_CLR(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS);
+	} else
+		FLD_CLR(btree->assert_flags,
+		    WT_ASSERT_READ_TS_ALWAYS | WT_ASSERT_READ_TS_NEVER);
+
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session));
 

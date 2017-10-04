@@ -97,6 +97,12 @@ struct __wt_btree {
 	uint64_t maxmempage;		/* In-memory page max size */
 	uint64_t splitmempage;		/* In-memory split trigger size */
 
+#define	WT_ASSERT_COMMIT_TS_ALWAYS	0x0001
+#define	WT_ASSERT_COMMIT_TS_NEVER	0x0002
+#define	WT_ASSERT_READ_TS_ALWAYS	0x0004
+#define	WT_ASSERT_READ_TS_NEVER		0x0008
+	uint32_t assert_flags;		/* Debugging assertion information */
+
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
