@@ -4,7 +4,7 @@ Building MongoDB
 To build MongoDB, you will need:
 
 * A modern C++ compiler. One of the following is required.
-    * GCC 4.8.2 or newer
+    * GCC 5.3.0 or newer
     * Clang 3.4 (or Apple XCode 5.1.1 Clang) or newer
     * Visual Studio 2013 Update 2 or newer
 * Python 2.7
