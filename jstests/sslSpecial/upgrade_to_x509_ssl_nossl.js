@@ -37,7 +37,8 @@ opts = {
     keyFile: KEYFILE
 };
 var NUM_NODES = 3;
-var rst = new ReplSetTest({name: 'sslSet', nodes: NUM_NODES, nodeOptions: opts});
+var rst =
+    new ReplSetTest({name: 'sslSet', nodes: NUM_NODES, waitForKeys: false, nodeOptions: opts});
 rst.startSet();
 
 // ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.

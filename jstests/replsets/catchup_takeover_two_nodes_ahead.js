@@ -19,9 +19,7 @@
     var replSet = new ReplSetTest({name: name, nodes: 5});
     var nodes = replSet.startSet();
     replSet.initiate();
-
-    // Wait until all nodes get the "no-op" of "new primary" after initial sync.
-    waitUntilAllNodesCaughtUp(nodes);
+    replSet.awaitReplication();
 
     // Write something so that nodes 0 and 1 are ahead.
     stopServerReplication(nodes.slice(2, 5));

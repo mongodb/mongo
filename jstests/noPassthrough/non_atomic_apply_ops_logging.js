@@ -28,7 +28,7 @@
         ]
     }));
     assert.eq(oplogColl.find({"o.applyOps": {"$exists": true}}).count(), 1);
-    assert.eq(oplogColl.find({"op": "i"}).count(), 0);
+    assert.eq(oplogColl.find({op: "i", ns: testColl.getFullName()}).count(), 0);
     // Ensure non-atomic apply ops logging produces an oplog entry for
     // each operation in the apply ops call and no record of applyOps
     // appears for these operations.
@@ -73,7 +73,7 @@
         allowAtomic: false,
     }));
     assert.eq(oplogColl.find({"o.applyOps": {"$exists": true}}).count(), 1);
-    assert.eq(oplogColl.find({"op": "i"}).count(), 2);
+    assert.eq(oplogColl.find({op: "i", ns: testColl.getFullName()}).count(), 2);
 
     rst.stopSet();
 })();

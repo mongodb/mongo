@@ -1158,6 +1158,7 @@ var ShardingTest = function(params) {
                 bridgeOptions: otherParams.bridgeOptions,
                 keyFile: keyFile,
                 protocolVersion: protocolVersion,
+                waitForKeys: false,
                 settings: rsSettings
             });
 
@@ -1280,6 +1281,7 @@ var ShardingTest = function(params) {
         useBridge: otherParams.useBridge,
         bridgeOptions: otherParams.bridgeOptions,
         keyFile: keyFile,
+        waitForKeys: false,
         name: testName + "-configRS",
     };
 

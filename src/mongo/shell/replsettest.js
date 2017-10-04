@@ -491,6 +491,10 @@ var ReplSetTest = function(opts) {
             self.keyFile = options.keyFile;
         }
 
+        if (options) {
+            self.startOptions = options;
+        }
+
         var nodes = [];
         for (var n = 0; n < this.ports.length; n++) {
             nodes.push(this.start(n, options));
@@ -601,23 +605,6 @@ var ReplSetTest = function(opts) {
             print("AwaitNodesAgreeOnPrimary: Nodes agreed on primary " + nodes[primary].name);
             return true;
         }, "Awaiting nodes to agree on primary", timeout);
-    };
-
-    /**
-     * Blocks until the primary node generates cluster time sign keys.
-     */
-    this.awaitsKeysGenerated = function(timeout) {
-        timeout = timeout || self.kDefaultTimeoutMS;
-
-        print("Waiting for keys to sign $clusterTime to be generated");
-        assert.soonNoExcept(function() {
-            var primary = self.getPrimary(timeout);
-            var keyCnt = primary.getCollection('admin.system.keys')
-                             .find({purpose: 'HMAC'})
-                             .readConcern('local')
-                             .itcount();
-            return keyCnt >= 2;
-        }, "Awaiting keys", timeout);
     };
 
     /**
@@ -834,6 +821,48 @@ var ReplSetTest = function(opts) {
         }
 
         this.awaitSecondaryNodes();
+
+        let shouldWaitForKeys = true;
+        if (self.waitForKeys != undefined) {
+            shouldWaitForKeys = self.waitForKeys;
+            print("Set shouldWaitForKeys from RS options: " + shouldWaitForKeys);
+        } else {
+            Object.keys(self.nodeOptions).forEach(function(key, index) {
+                let val = self.nodeOptions[key];
+                if (typeof(val) === "object" &&
+                    (val.hasOwnProperty("shardsvr") ||
+                     // TODO: SERVER-31376
+                     val.hasOwnProperty("binVersion") && val.binVersion != "latest")) {
+                    shouldWaitForKeys = false;
+                    print("Set shouldWaitForKeys from node options: " + shouldWaitForKeys);
+                }
+            });
+            if (self.startOptions != undefined) {
+                let val = self.startOptions;
+                if (typeof(val) === "object" &&
+                    (val.hasOwnProperty("shardsvr") ||
+                     val.hasOwnProperty("binVersion") && val.binVersion != "latest")) {
+                    shouldWaitForKeys = false;
+                    print("Set shouldWaitForKeys from start options: " + shouldWaitForKeys);
+                }
+            }
+        }
+        /**
+         * Blocks until the primary node generates cluster time sign keys.
+         */
+        if (shouldWaitForKeys) {
+            var timeout = self.kDefaultTimeoutMS;
+            asCluster(this.nodes, function(timeout) {
+                print("Waiting for keys to sign $clusterTime to be generated");
+                assert.soonNoExcept(function(timeout) {
+                    var keyCnt = self.getPrimary(timeout)
+                                     .getCollection('admin.system.keys')
+                                     .find({purpose: 'HMAC'})
+                                     .itcount();
+                    return keyCnt >= 2;
+                }, "Awaiting keys", timeout);
+            });
+        }
     };
 
     /**
@@ -849,10 +878,6 @@ var ReplSetTest = function(opts) {
         asCluster(this.nodes, function() {
             self.stepUp(self.nodes[0]);
         });
-
-        if (self.waitForKeys) {
-            this.awaitsKeysGenerated();
-        }
     };
 
     /**
@@ -1850,7 +1875,7 @@ var ReplSetTest = function(opts) {
         self.useSeedList = opts.useSeedList || false;
         self.keyFile = opts.keyFile;
         self.protocolVersion = opts.protocolVersion;
-        self.waitForKeys = opts.waitForKeys || false;
+        self.waitForKeys = opts.waitForKeys;
 
         _useBridge = opts.useBridge || false;
         _bridgeOptions = opts.bridgeOptions || {};
@@ -1909,6 +1934,7 @@ var ReplSetTest = function(opts) {
         var existingNodes = conf.members.map(member => member.host);
         self.ports = existingNodes.map(node => node.split(':')[1]);
         self.nodes = existingNodes.map(node => new Mongo(node));
+        self.waitForKeys = false;
     }
 
     if (typeof opts === 'string' || opts instanceof String) {

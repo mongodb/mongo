@@ -66,7 +66,7 @@
     s.restartMongos(0);
     login(adminUser);
 
-    var d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true});
+    var d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true, waitForKeys: false});
     d1.startSet({keyFile: "jstests/libs/key2", shardsvr: ""});
     d1.initiate();
 
@@ -147,7 +147,7 @@
 
     logout(testUser);
 
-    var d2 = new ReplSetTest({name: "d2", nodes: 3, useHostName: true});
+    var d2 = new ReplSetTest({name: "d2", nodes: 3, useHostName: true, waitForKeys: false});
     d2.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
     d2.initiate();
     d2.awaitSecondaryNodes();

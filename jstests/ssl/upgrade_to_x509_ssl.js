@@ -44,6 +44,7 @@ var rst = new ReplSetTest({
     name: 'sslSet',
     nodes: NUM_NODES,
     nodeOptions: opts,
+    waitForKeys: false,
 });
 rst.startSet();
 

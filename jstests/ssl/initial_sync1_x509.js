@@ -26,6 +26,7 @@ function runInitialSyncTest() {
     var replTest = new ReplSetTest({
         name: "jstests_initsync1_x509",
         nodes: {node0: x509_options1, node1: x509_options2},
+        waitForKeys: false
     });
     var conns = replTest.startSet();
 

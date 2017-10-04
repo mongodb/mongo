@@ -146,7 +146,7 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
         assert(options.ns1, 'collection 1 namespace not provided');
         assert(options.ns2, 'collection 2 namespace not provided');
 
-        const replTest = new ReplSetTest({nodes: 1});
+        const replTest = new ReplSetTest({nodes: 1, waitForKeys: true});
         replTest.startSet();
         replTest.initiate();
 
@@ -225,7 +225,8 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
         primary.setLogLevel(previousLogLevel, 'replication');
 
         const serverStatus = adminDb.serverStatus();
-        assert.eq(200,
+        // insert opCount will include insertions of two HMAC signing keys generated at RS initiate.
+        assert.eq(202,
                   getInsertOpCount(serverStatus),
                   'incorrect number of insert operations in server status after applyOps: ' +
                       tojson(serverStatus));
