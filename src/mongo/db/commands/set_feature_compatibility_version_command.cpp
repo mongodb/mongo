@@ -102,10 +102,8 @@ public:
     }
 
     bool isFCVUpgrade(StringData version) {
-        const auto existingVersion = FeatureCompatibilityVersion::toString(
-            serverGlobalParams.featureCompatibility.version.load());
         return version == FeatureCompatibilityVersionCommandParser::kVersion36 &&
-            existingVersion == FeatureCompatibilityVersionCommandParser::kVersion34;
+            !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36();
     }
 
 
@@ -116,7 +114,7 @@ public:
         const auto version = uassertStatusOK(
             FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
         auto existingVersion = FeatureCompatibilityVersion::toString(
-                                   serverGlobalParams.featureCompatibility.version.load())
+                                   serverGlobalParams.featureCompatibility.getVersion())
                                    .toString();
 
         // Wait for majority commit in case we're upgrading simultaneously with another session.

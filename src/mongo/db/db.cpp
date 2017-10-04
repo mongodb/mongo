@@ -411,8 +411,8 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                         fassertFailedNoTrace(40283);
                     }
                     auto versionInfo = swVersionInfo.getValue();
-                    serverGlobalParams.featureCompatibility.version.store(versionInfo.version);
-                    serverGlobalParams.featureCompatibility.targetVersion.store(
+                    serverGlobalParams.featureCompatibility.setVersion(versionInfo.version);
+                    serverGlobalParams.featureCompatibility.setTargetVersion(
                         versionInfo.targetVersion);
 
                     // On startup, if the targetVersion field exists, then an upgrade/downgrade
@@ -1050,8 +1050,7 @@ void shutdownTask() {
             opCtx = uniqueOpCtx.get();
         }
 
-        if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+        if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
             log(LogComponent::kReplication) << "shutdown: removing all drop-pending collections...";
             repl::DropPendingCollectionReaper::get(serviceContext)
                 ->dropCollectionsOlderThan(opCtx, repl::OpTime::max());

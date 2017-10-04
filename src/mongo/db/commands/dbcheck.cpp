@@ -538,8 +538,7 @@ public:
 
 private:
     bool _hasCorrectFCV(void) {
-        const auto fcv = serverGlobalParams.featureCompatibility.version.load();
-        return fcv >= ServerGlobalParams::FeatureCompatibility::Version::k36;
+        return serverGlobalParams.featureCompatibility.isFullyUpgradedTo36();
     }
 };
 

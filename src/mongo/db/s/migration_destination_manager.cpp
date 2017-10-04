@@ -550,10 +550,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 info = entry["info"].Obj();
             }
 
-            // If in featureCompatibilityVersion >= 3.6, require the donor to return the
-            // collection's UUID.
-            if (serverGlobalParams.featureCompatibility.version.load() >=
-                ServerGlobalParams::FeatureCompatibility::Version::k36) {
+            if (serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
                 if (info["uuid"].eoo()) {
                     setStateFailWarn(str::stream()
                                      << "The donor shard did not return a UUID for collection "

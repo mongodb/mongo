@@ -679,8 +679,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             opCtx, source, &localOplog, storageInterface, getConnection);
 
     } else if (rollbackMethod != kRollbackViaRefetchNoUUID &&
-               (serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k36)) {
+               (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36())) {
         // If the user is in FCV 3.6 and the user did not specify to fall back on "roll back via
         // refetch" without UUID support, then we use "roll back via refetch" with UUIDs.
 
@@ -698,14 +697,12 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     } else {
         if (rollbackMethod == kRollbackToCheckpoint) {
             invariant(!supportsCheckpointRollback);
-            invariant(serverGlobalParams.featureCompatibility.version.load() ==
-                      ServerGlobalParams::FeatureCompatibility::Version::k34);
+            invariant(!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36());
             log() << "Rollback using the 'rollbackViaRefetchNoUUID' method because this storage "
                      "engine does not support 'roll back to a checkpoint' and we are "
                      "in featureCompatibilityVersion 3.4.";
         } else if (rollbackMethod == kRollbackViaRefetch) {
-            invariant(serverGlobalParams.featureCompatibility.version.load() ==
-                      ServerGlobalParams::FeatureCompatibility::Version::k34);
+            invariant(!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36());
             log() << "Rollback using the 'rollbackViaRefetchNoUUID' method. 'rollbackViaRefetch' "
                      "with UUID support is not feature compatible with featureCompatabilityVersion "
                      "3.4.";

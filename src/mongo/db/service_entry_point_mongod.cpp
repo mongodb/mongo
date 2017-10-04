@@ -272,8 +272,7 @@ void appendReplyMetadata(OperationContext* opCtx,
                 .writeToMetadata(metadataBob)
                 .transitional_ignore();
         }
-        if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
             if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
                 // No need to sign cluster times for internal clients.
                 SignedLogicalTime currentTime(
@@ -500,8 +499,7 @@ bool runCommandImpl(OperationContext* opCtx,
     // An uninitialized operation time means the cluster time is not propagated, so the operation
     // time should not be attached to the response.
     if (operationTime != LogicalTime::kUninitialized &&
-        serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
         operationTime.appendAsOperationTime(&inPlaceReplyBob);
     }
 
@@ -679,8 +677,7 @@ void execCommandDatabase(OperationContext* opCtx,
         if (!opCtx->getClient()->isInDirectClient() &&
             readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
             (iAmPrimary ||
-             (serverGlobalParams.featureCompatibility.version.load() ==
-                  ServerGlobalParams::FeatureCompatibility::Version::k36 &&
+             (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36() &&
               (readConcernArgs.hasLevel() || readConcernArgs.getArgsClusterTime())))) {
             oss.initializeShardVersion(NamespaceString(command->parseNs(dbname, request.body)),
                                        shardVersionFieldIdx);
@@ -748,8 +745,7 @@ void execCommandDatabase(OperationContext* opCtx,
         // An uninitialized operation time means the cluster time is not propagated, so the
         // operation time should not be attached to the error response.
         if (operationTime != LogicalTime::kUninitialized &&
-            serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k36) {
+            serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
                    << "with arguments '" << command->getRedactedCopyForLogging(request.body)

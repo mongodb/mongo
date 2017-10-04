@@ -1738,8 +1738,7 @@ public:
         Config config(dbname, cmdObj.firstElement().embeddedObjectUserCheck());
 
         if (cmdObj["finalOutputCollIsSharded"].trueValue() &&
-            serverGlobalParams.featureCompatibility.version.load() >=
-                ServerGlobalParams::FeatureCompatibility::Version::k36) {
+            serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
             uassert(ErrorCodes::InvalidOptions,
                     "This shard has feature compatibility version 3.6, so it expects mongos to "
                     "send the UUID to use for the sharded output collection. Was the mapReduce "

@@ -367,8 +367,7 @@ BSONObj OplogFetcher::_makeFindCommandObject(const NamespaceString& nss,
     // TODO(SERVER-30977): Remove the term comparison when this ticket is fixed.
     if (term == lastOpTimeFetched.getTerm()) {
         cmdBob.append("readConcern",
-                      serverGlobalParams.featureCompatibility.version.load() ==
-                              ServerGlobalParams::FeatureCompatibility::Version::k34
+                      !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()
                           ? BSON("afterOpTime" << lastOpTimeFetched)
                           : BSON("afterClusterTime" << lastOpTimeFetched.getTimestamp()));
     }

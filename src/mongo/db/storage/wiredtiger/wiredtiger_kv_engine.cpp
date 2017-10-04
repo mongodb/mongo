@@ -495,9 +495,8 @@ void WiredTigerKVEngine::cleanShutdown() {
             closeConfig = "leak_memory=true";
         }
 
-        const bool needsDowngrade = !_readOnly &&
-            serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k34;
+        const bool needsDowngrade =
+            !_readOnly && !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36();
 
         invariantWTOK(_conn->close(_conn, closeConfig));
         _conn = nullptr;

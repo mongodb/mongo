@@ -167,25 +167,36 @@ struct ServerGlobalParams {
          */
         enum class Version { k34, k36, kUnset };
 
-        AtomicWord<Version> version{Version::k34};
+        const Version getVersion() const {
+            return _version.load();
+        }
 
-        // If set, an upgrade or downgrade is in progress to the set version.
-        AtomicWord<Version> targetVersion{Version::kUnset};
+        void setVersion(Version version) {
+            return _version.store(version);
+        }
+
+        const Version getTargetVersion() const {
+            return _targetVersion.load();
+        }
+
+        void setTargetVersion(Version version) {
+            return _targetVersion.store(version);
+        }
 
         const bool isFullyUpgradedTo36() {
-            return (version.load() == Version::k36 && targetVersion.load() == Version::kUnset);
+            return (_version.load() == Version::k36 && _targetVersion.load() == Version::kUnset);
         }
 
         const bool isUpgradingTo36() {
-            return (version.load() == Version::k34 && targetVersion.load() == Version::k36);
+            return (_version.load() == Version::k34 && _targetVersion.load() == Version::k36);
         }
 
         const bool isFullyDowngradedTo34() {
-            return (version.load() == Version::k34 && targetVersion.load() == Version::kUnset);
+            return (_version.load() == Version::k34 && _targetVersion.load() == Version::kUnset);
         }
 
         const bool isDowngradingTo34() {
-            return (version.load() == Version::k34 && targetVersion.load() == Version::k34);
+            return (_version.load() == Version::k34 && _targetVersion.load() == Version::k34);
         }
 
         // This determines whether to give Collections UUIDs upon creation.
@@ -199,6 +210,13 @@ struct ServerGlobalParams {
         // a master) always validates in "3.4" mode so that it can sync 3.4 features, even when in
         // "3.2" feature compatibility mode.
         AtomicWord<bool> validateFeaturesAsMaster{true};
+
+    private:
+        AtomicWord<Version> _version{Version::k34};
+
+        // If set, an upgrade or downgrade is in progress to the set version.
+        AtomicWord<Version> _targetVersion{Version::kUnset};
+
     } featureCompatibility;
 
     std::vector<std::string> disabledSecureAllocatorDomains;

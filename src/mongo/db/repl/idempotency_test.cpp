@@ -193,13 +193,13 @@ void RandomizedIdempotencyTest::runIdempotencyTestCase() {
 }
 
 TEST_F(RandomizedIdempotencyTest, CheckUpdateSequencesAreIdempotentWhenFCV34) {
-    serverGlobalParams.featureCompatibility.version.store(
+    serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::k34);
     runIdempotencyTestCase();
 }
 
 TEST_F(RandomizedIdempotencyTest, CheckUpdateSequencesAreIdempotentWhenFCV36) {
-    serverGlobalParams.featureCompatibility.version.store(
+    serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::k36);
     runIdempotencyTestCase();
 }

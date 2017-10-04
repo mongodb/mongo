@@ -54,7 +54,7 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        serverGlobalParams.featureCompatibility.version.store(
+        serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k36);
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(true);
 
@@ -457,7 +457,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
 }
 
 TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeysInFeatureCompatiblityVersion34) {
-    serverGlobalParams.featureCompatibility.version.store(
+    serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::k34);
 
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
@@ -474,7 +474,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeysInFeatureCompatiblityVersion34) {
     }
 
     // Increase the feature compatibility version and verify keys are found after refresh.
-    serverGlobalParams.featureCompatibility.version.store(
+    serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::k36);
 
     {

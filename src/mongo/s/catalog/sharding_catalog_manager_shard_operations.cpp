@@ -339,11 +339,9 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                     << " as a shard: "
                                     << status.reason());
     }
-    if ((serverGlobalParams.featureCompatibility.version.load() ==
-             ServerGlobalParams::FeatureCompatibility::Version::k36 &&
+    if ((serverGlobalParams.featureCompatibility.isFullyUpgradedTo36() &&
          maxWireVersion < WireVersion::LATEST_WIRE_VERSION) ||
-        (serverGlobalParams.featureCompatibility.version.load() ==
-             ServerGlobalParams::FeatureCompatibility::Version::k34 &&
+        (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36() &&
          maxWireVersion < WireVersion::LATEST_WIRE_VERSION - 1)) {
         return {ErrorCodes::IncompatibleServerVersion,
                 str::stream() << "Cannot add " << connectionString.toString()
@@ -629,7 +627,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         targeter.get(),
         "admin",
         BSON(FeatureCompatibilityVersion::kCommandName << FeatureCompatibilityVersion::toString(
-                 serverGlobalParams.featureCompatibility.version.load())));
+                 serverGlobalParams.featureCompatibility.getVersion())));
     if (!versionResponse.isOK()) {
         return versionResponse.getStatus();
     }

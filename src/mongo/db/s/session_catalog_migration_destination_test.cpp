@@ -83,7 +83,7 @@ repl::OplogEntry extractInnerOplog(const repl::OplogEntry& oplog) {
 class SessionCatalogMigrationDestinationTest : public ShardingMongodTestFixture {
 public:
     void setUp() override {
-        serverGlobalParams.featureCompatibility.version.store(
+        serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k36);
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         ShardingMongodTestFixture::setUp();

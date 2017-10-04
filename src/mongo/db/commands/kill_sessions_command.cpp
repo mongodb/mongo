@@ -102,8 +102,7 @@ public:
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
 
-        if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+        if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
             return SessionsCommandFCV34Status(getName());
         }
 
@@ -115,8 +114,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
 
-        if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k34) {
+        if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
             return appendCommandStatus(result, SessionsCommandFCV34Status(getName()));
         }
 

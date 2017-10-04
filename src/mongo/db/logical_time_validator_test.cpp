@@ -61,7 +61,7 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        serverGlobalParams.featureCompatibility.version.store(
+        serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k36);
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(true);
 

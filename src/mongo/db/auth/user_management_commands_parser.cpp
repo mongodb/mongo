@@ -192,8 +192,7 @@ Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
     validFieldNames.insert("digestPassword");
     validFieldNames.insert("pwd");
     validFieldNames.insert("roles");
-    if (serverGlobalParams.featureCompatibility.version.load() >=
-        ServerGlobalParams::FeatureCompatibility::Version::k36) {
+    if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
         validFieldNames.insert("authenticationRestrictions");
     }
 
@@ -508,8 +507,7 @@ Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
     validFieldNames.insert(cmdName.toString());
     validFieldNames.insert("privileges");
     validFieldNames.insert("roles");
-    if (serverGlobalParams.featureCompatibility.version.load() >=
-        ServerGlobalParams::FeatureCompatibility::Version::k36) {
+    if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
         validFieldNames.insert("authenticationRestrictions");
     }
 

@@ -173,11 +173,9 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                 MatchExpressionParser::kBanAllSpecialFeatures;
             if (!serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() ||
-                serverGlobalParams.featureCompatibility.version.load() !=
-                    ServerGlobalParams::FeatureCompatibility::Version::k34) {
-                // Allow $jsonSchema and $expr only if the feature compatibility version is newer
-                // than 3.4. Note that we don't enforce this restriction on secondary instances, as
-                // indicated by !validateFeaturesAsMaster.
+                serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+                // Note that we don't enforce this restriction on the secondary or on backup
+                // instances, as indicated by !validateFeaturesAsMaster.
                 allowedFeatures |= MatchExpressionParser::kJSONSchema;
                 allowedFeatures |= MatchExpressionParser::kExpr;
             }

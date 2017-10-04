@@ -231,7 +231,7 @@ public:
     V2UserDocumentParser v2parser;
 
     void setUp() {
-        serverGlobalParams.featureCompatibility.version.store(
+        serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k36);
         user.reset(new User(UserName("spencer", "test")));
         adminUser.reset(new User(UserName("admin", "admin")));
@@ -645,7 +645,7 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtraction) {
 }
 
 TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtractionAndRetreival) {
-    serverGlobalParams.featureCompatibility.version.store(
+    serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::k36);
     enableIPv6(true);
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(

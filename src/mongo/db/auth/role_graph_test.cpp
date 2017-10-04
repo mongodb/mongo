@@ -774,7 +774,7 @@ TEST(RoleGraphTest, AddRoleFromDocument) {
         return builder.obj();
     };
 
-    serverGlobalParams.featureCompatibility.version.store(
+    serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::k36);
 
     RoleGraph graph;

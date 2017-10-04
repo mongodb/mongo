@@ -485,7 +485,7 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 // usages of new features if their featureCompatibilityVersion is lower.
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion36, ("EndStartupOptionStorage"))
 (InitializerContext* context) {
-    mongo::serverGlobalParams.featureCompatibility.version.store(
+    mongo::serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::k36);
     return Status::OK();
 }

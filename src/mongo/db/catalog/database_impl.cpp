@@ -767,8 +767,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         auto coordinator = repl::ReplicationCoordinator::get(opCtx);
         bool okayCreation =
             (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-             serverGlobalParams.featureCompatibility.version.load() !=
-                 ServerGlobalParams::FeatureCompatibility::Version::k36 ||
+             !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36() ||
              coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) ||
              nss.isSystemDotProfile());  // system.profile is special as it's not replicated
         if (!okayCreation) {
@@ -799,7 +798,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
             if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
                 optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
                 const auto featureCompatibilityVersion =
-                    serverGlobalParams.featureCompatibility.version.load();
+                    serverGlobalParams.featureCompatibility.getVersion();
                 IndexCatalog* ic = collection->getIndexCatalog();
                 fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
                     opCtx,
@@ -1019,11 +1018,9 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
             MatchExpressionParser::kBanAllSpecialFeatures;
         if (!serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() ||
-            serverGlobalParams.featureCompatibility.version.load() !=
-                ServerGlobalParams::FeatureCompatibility::Version::k34) {
-            // $jsonSchema and $expr are only permitted when the feature compatibility version is
-            // newer than 3.4. Note that we don't enforce this feature compatibility check when we
-            // are on the secondary, as indicated by !validateFeaturesAsMaster.
+            serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+            // Note that we don't enforce this feature compatibility check when we are on
+            // the secondary or on a backup instance, as indicated by !validateFeaturesAsMaster.
             allowedFeatures |= MatchExpressionParser::kJSONSchema;
             allowedFeatures |= MatchExpressionParser::kExpr;
         }

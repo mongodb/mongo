@@ -59,7 +59,7 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        serverGlobalParams.featureCompatibility.version.store(
+        serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k36);
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(true);
 
@@ -375,7 +375,7 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
 }
 
 TEST_F(KeysManagerShardedTest, ShouldNotReturnKeysInFeatureCompatibilityVersion34) {
-    serverGlobalParams.featureCompatibility.version.store(
+    serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::k34);
 
     keyManager()->startMonitoring(getServiceContext());

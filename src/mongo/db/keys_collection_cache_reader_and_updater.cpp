@@ -83,8 +83,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::refresh(
         return {ErrorCodes::FailPointEnabled, "key generation disabled"};
     }
 
-    if (serverGlobalParams.featureCompatibility.version.load() ==
-        ServerGlobalParams::FeatureCompatibility::Version::k34) {
+    if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
         return KeysCollectionCacheReader::refresh(opCtx);
     }
 

@@ -202,7 +202,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 
             // We update the value of the version server parameter so that the admin.system.version
             // collection gets a UUID.
-            serverGlobalParams.featureCompatibility.targetVersion.store(
+            serverGlobalParams.featureCompatibility.setTargetVersion(
                 ServerGlobalParams::FeatureCompatibility::Version::k36);
 
             uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
@@ -238,7 +238,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
 
     // To avoid extra log messages when the targetVersion is set/unset, only log when the version
     // changes.
-    auto oldVersion = serverGlobalParams.featureCompatibility.version.load();
+    auto oldVersion = serverGlobalParams.featureCompatibility.getVersion();
     auto newVersion = versionInfo.version;
     if (oldVersion != newVersion) {
         log() << "setting featureCompatibilityVersion to " << toString(newVersion);
@@ -247,8 +247,8 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
     // On commit, update the server parameters, and close any incoming connections with a wire
     // version that is below the minimum.
     opCtx->recoveryUnit()->onCommit([opCtx, versionInfo]() {
-        serverGlobalParams.featureCompatibility.version.store(versionInfo.version);
-        serverGlobalParams.featureCompatibility.targetVersion.store(versionInfo.targetVersion);
+        serverGlobalParams.featureCompatibility.setVersion(versionInfo.version);
+        serverGlobalParams.featureCompatibility.setTargetVersion(versionInfo.targetVersion);
 
         // Close all connections from internal clients with binary versions lower than 3.6.
         if (versionInfo.version == ServerGlobalParams::FeatureCompatibility::Version::k36 ||
@@ -269,9 +269,9 @@ void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONOb
     log() << "setting featureCompatibilityVersion to "
           << FeatureCompatibilityVersionCommandParser::kVersion34;
     opCtx->recoveryUnit()->onCommit([]() {
-        serverGlobalParams.featureCompatibility.version.store(
+        serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k34);
-        serverGlobalParams.featureCompatibility.targetVersion.store(
+        serverGlobalParams.featureCompatibility.setTargetVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kUnset);
     });
 }
@@ -280,9 +280,9 @@ void FeatureCompatibilityVersion::onDropCollection(OperationContext* opCtx) {
     log() << "setting featureCompatibilityVersion to "
           << FeatureCompatibilityVersionCommandParser::kVersion34;
     opCtx->recoveryUnit()->onCommit([]() {
-        serverGlobalParams.featureCompatibility.version.store(
+        serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k34);
-        serverGlobalParams.featureCompatibility.targetVersion.store(
+        serverGlobalParams.featureCompatibility.setTargetVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kUnset);
     });
 }
@@ -349,7 +349,7 @@ public:
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         b.append(name,
                  FeatureCompatibilityVersion::toString(
-                     serverGlobalParams.featureCompatibility.version.load()));
+                     serverGlobalParams.featureCompatibility.getVersion()));
     }
 
     virtual Status set(const BSONElement& newValueElement) {

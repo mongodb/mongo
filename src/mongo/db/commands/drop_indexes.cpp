@@ -141,7 +141,7 @@ public:
         BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNs.ns());
 
         const auto featureCompatibilityVersion =
-            serverGlobalParams.featureCompatibility.version.load();
+            serverGlobalParams.featureCompatibility.getVersion();
         const auto defaultIndexVersion =
             IndexDescriptor::getDefaultIndexVersion(featureCompatibilityVersion);
 

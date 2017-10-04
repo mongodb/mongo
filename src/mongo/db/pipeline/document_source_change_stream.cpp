@@ -251,8 +251,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             << "The featureCompatibilityVersion must be 3.6 to use the $changeStream stage. See "
             << feature_compatibility_version::kDochubLink
             << ".",
-        serverGlobalParams.featureCompatibility.version.load() !=
-            ServerGlobalParams::FeatureCompatibility::Version::k34);
+        serverGlobalParams.featureCompatibility.isFullyUpgradedTo36());
     // TODO: Add sharding support here (SERVER-29141).
     uassert(
         40470, "The $changeStream stage is not supported on sharded systems.", !expCtx->inMongos);

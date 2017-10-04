@@ -70,7 +70,7 @@ public:
     AuthorizationSessionForTest* authzSession;
 
     void setUp() {
-        serverGlobalParams.featureCompatibility.version.store(
+        serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k36);
         session = transportLayer.createSession();
         client = serviceContext.makeClient("testClient", session);

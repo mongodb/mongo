@@ -363,7 +363,7 @@ public:
         // Then if the connection is from a mongod/mongos of an earlier version, it will fail to
         // connect.
         if (internalClientElement &&
-            serverGlobalParams.featureCompatibility.version.load() ==
+            serverGlobalParams.featureCompatibility.getVersion() ==
                 ServerGlobalParams::FeatureCompatibility::Version::k36) {
             result.append("minWireVersion", WireSpec::instance().incoming.maxWireVersion);
         } else {

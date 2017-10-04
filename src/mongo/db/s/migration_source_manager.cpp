@@ -230,8 +230,7 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
 
     const ShardId& recipientId = _args.getToShardId();
     if (!_collectionMetadata->getChunkManager()->getVersion(recipientId).isSet() &&
-        serverGlobalParams.featureCompatibility.version.load() >=
-            ServerGlobalParams::FeatureCompatibility::Version::k36) {
+        serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
         // The recipient didn't have any chunks of this collection. Write the no-op message so that
         // change stream will notice that and close cursor to notify mongos to target to the new
         // shard.
