@@ -102,13 +102,16 @@
         mongosDB.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: true}));
     let tempCursor = assert.doesNotThrow(() => mongosColl.aggregate([{$changeStream: {}}]));
     tempCursor.close();
-    // TODO SERVER-29137: $sort and $group should be banned.
-    tempCursor = assert.doesNotThrow(
-        () => mongosColl.aggregate(
-            [{$changeStream: {}}, {$sort: {operationType: 1}}, {$group: {_id: "$documentKey"}}]));
-    tempCursor.close();
     assert.commandWorked(
         mongosDB.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: false}));
+
+    // Test that $sort and $group are banned from running in a $changeStream pipeline.
+    assertErrorCode(mongosColl,
+                    [{$changeStream: {}}, {$sort: {operationType: 1}}],
+                    ErrorCodes.IllegalOperation);
+    assertErrorCode(mongosColl,
+                    [{$changeStream: {}}, {$group: {_id: "$documentKey"}}],
+                    ErrorCodes.IllegalOperation);
 
     assert.writeOK(mongosColl.remove({}));
     // We awaited the replication of the first write, so the change stream shouldn't return it.

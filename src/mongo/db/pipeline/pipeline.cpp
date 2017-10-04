@@ -62,6 +62,7 @@ using std::vector;
 
 namespace dps = ::mongo::dotted_path_support;
 
+using ChangeStreamRequirement = DocumentSource::StageConstraints::ChangeStreamRequirement;
 using HostTypeRequirement = DocumentSource::StageConstraints::HostTypeRequirement;
 using PositionRequirement = DocumentSource::StageConstraints::PositionRequirement;
 using DiskUseRequirement = DocumentSource::StageConstraints::DiskUseRequirement;
@@ -144,21 +145,32 @@ void Pipeline::validatePipeline() const {
     } else if (!dynamic_cast<DocumentSourceMergeCursors*>(_sources.front().get())) {
         // The $mergeCursors stage can take {aggregate: 1} or a normal namespace. Aside from this,
         // {aggregate: 1} is only valid for collectionless sources, and vice-versa.
-        const auto firstStage = _sources.front().get();
+        const auto firstStageConstraints = _sources.front()->constraints(_splitState);
 
         if (nss.isCollectionlessAggregateNS() &&
-            !firstStage->constraints(_splitState).isIndependentOfAnyCollection) {
+            !firstStageConstraints.isIndependentOfAnyCollection) {
             uasserted(ErrorCodes::InvalidNamespace,
                       str::stream() << "{aggregate: 1} is not valid for '"
-                                    << firstStage->getSourceName()
+                                    << _sources.front()->getSourceName()
                                     << "'; a collection is required.");
         }
 
         if (!nss.isCollectionlessAggregateNS() &&
-            firstStage->constraints(_splitState).isIndependentOfAnyCollection) {
+            firstStageConstraints.isIndependentOfAnyCollection) {
             uasserted(ErrorCodes::InvalidNamespace,
-                      str::stream() << "'" << firstStage->getSourceName()
+                      str::stream() << "'" << _sources.front()->getSourceName()
                                     << "' can only be run with {aggregate: 1}");
+        }
+
+        // If the first stage is a $changeStream stage, then all stages in the pipeline must be
+        // either $changeStream stages or whitelisted as being able to run in a change stream.
+        if (firstStageConstraints.isChangeStreamStage()) {
+            for (auto&& source : _sources) {
+                uassert(ErrorCodes::IllegalOperation,
+                        str::stream() << source->getSourceName()
+                                      << " is not permitted in a $changeStream pipeline",
+                        source->constraints(_splitState).isAllowedInChangeStream());
+            }
         }
     }
 

@@ -174,24 +174,49 @@ public:
         enum class DiskUseRequirement { kNoDiskUse, kWritesTmpData, kWritesPersistentData };
 
         /**
+         * A ChangeStreamRequirement determines whether a particular stage is itself a ChangeStream
+         * stage, whether it is allowed to exist in a $changeStream pipeline, or whether it is
+         * blacklisted from $changeStream.
+         */
+        enum class ChangeStreamRequirement { kChangeStreamStage, kWhitelist, kBlacklist };
+
+        /**
          * A FacetRequirement indicates whether this stage may be used within a $facet pipeline.
          */
         enum class FacetRequirement { kAllowed, kNotAllowed };
 
-        StageConstraints(StreamType streamType,
-                         PositionRequirement requiredPosition,
-                         HostTypeRequirement hostRequirement,
-                         DiskUseRequirement diskRequirement,
-                         FacetRequirement facetRequirement)
+        StageConstraints(
+            StreamType streamType,
+            PositionRequirement requiredPosition,
+            HostTypeRequirement hostRequirement,
+            DiskUseRequirement diskRequirement,
+            FacetRequirement facetRequirement,
+            ChangeStreamRequirement changeStreamRequirement = ChangeStreamRequirement::kBlacklist)
             : requiredPosition(requiredPosition),
               hostRequirement(hostRequirement),
               diskRequirement(diskRequirement),
+              changeStreamRequirement(changeStreamRequirement),
               facetRequirement(facetRequirement),
               streamType(streamType) {
-            // Stages which are allowed to run in $facet pipelines must not have any specific
-            // position requirements.
-            invariant(!isAllowedInsideFacetStage() ||
-                      requiredPosition == PositionRequirement::kNone);
+            // Stages which are allowed to run in $facet must not have any position requirements.
+            invariant(
+                !(isAllowedInsideFacetStage() && requiredPosition != PositionRequirement::kNone));
+
+            // No change stream stages are permitted to run in a $facet pipeline.
+            invariant(!(isChangeStreamStage() && isAllowedInsideFacetStage()));
+
+            // Only streaming stages are permitted in $changeStream pipelines.
+            invariant(!(isAllowedInChangeStream() && streamType == StreamType::kBlocking));
+
+            // A stage which is whitelisted for $changeStream cannot have a requirement to run on a
+            // shard, since it needs to be able to run on mongoS in a cluster.
+            invariant(!(changeStreamRequirement == ChangeStreamRequirement::kWhitelist &&
+                        (hostRequirement == HostTypeRequirement::kAnyShard ||
+                         hostRequirement == HostTypeRequirement::kPrimaryShard)));
+
+            // A stage which is whitelisted for $changeStream cannot have a position requirement.
+            invariant(!(changeStreamRequirement == ChangeStreamRequirement::kWhitelist &&
+                        requiredPosition != PositionRequirement::kNone));
         }
 
         /**
@@ -214,10 +239,25 @@ public:
         }
 
         /**
-         * True if this stage should be permitted to run in a $facet pipeline.
+         * True if this stage is permitted to run in a $facet pipeline.
          */
         bool isAllowedInsideFacetStage() const {
             return facetRequirement == FacetRequirement::kAllowed;
+        }
+
+        /**
+         * True if this stage is permitted to run in a pipeline which starts with $changeStream.
+         */
+        bool isAllowedInChangeStream() const {
+            return changeStreamRequirement != ChangeStreamRequirement::kBlacklist;
+        }
+
+        /**
+         * True if this stage is itself a $changeStream stage, and is therefore implicitly allowed
+         * to run in a pipeline which begins with $changeStream.
+         */
+        bool isChangeStreamStage() const {
+            return changeStreamRequirement == ChangeStreamRequirement::kChangeStreamStage;
         }
 
         // Indicates whether this stage needs to be at a particular position in the pipeline.
@@ -230,6 +270,10 @@ public:
         // Indicates whether this stage may write persistent data to disk, or may spill to temporary
         // files if its memory usage becomes excessive.
         const DiskUseRequirement diskRequirement;
+
+        // Indicates whether this stage is itself a $changeStream stage, or if not whether it may
+        // exist in a pipeline which begins with $changeStream.
+        const ChangeStreamRequirement changeStreamRequirement;
 
         // Indicates whether this stage may run inside a $facet stage.
         const FacetRequirement facetRequirement;
@@ -253,6 +297,7 @@ public:
         bool canSwapWithMatch = false;
     };
 
+    using ChangeStreamRequirement = StageConstraints::ChangeStreamRequirement;
     using HostTypeRequirement = StageConstraints::HostTypeRequirement;
     using PositionRequirement = StageConstraints::PositionRequirement;
     using DiskUseRequirement = StageConstraints::DiskUseRequirement;

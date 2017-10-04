@@ -64,7 +64,8 @@ public:
                 PositionRequirement::kNone,
                 HostTypeRequirement::kAnyShard,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed};
+                FacetRequirement::kNotAllowed,
+                ChangeStreamRequirement::kChangeStreamStage};
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
@@ -101,7 +102,8 @@ public:
                 (pipeState == Pipeline::SplitState::kUnsplit ? HostTypeRequirement::kNone
                                                              : HostTypeRequirement::kMongoS),
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed};
+                FacetRequirement::kNotAllowed,
+                ChangeStreamRequirement::kChangeStreamStage};
     }
 
     /**
