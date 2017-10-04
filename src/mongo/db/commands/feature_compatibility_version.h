@@ -148,13 +148,6 @@ private:
     static void _validateVersion(StringData version);
 
     /**
-     * Close incoming connections from interal clients who cannot speak our highest wire protocol
-     * version.
-     */
-    static void _closeConnectionsBelowVersion(OperationContext* opCtx,
-                                              FeatureCompatibilityVersionInfo versionInfo);
-
-    /**
      * Build update command.
      */
     typedef stdx::function<void(BSONObjBuilder)> UpdateBuilder;

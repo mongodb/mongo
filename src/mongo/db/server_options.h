@@ -146,33 +146,51 @@ struct ServerGlobalParams {
     BSONObj overrideShardIdentity;
 
     struct FeatureCompatibility {
-        enum class Version {
-            /**
-             * In this mode, the cluster will expose a 3.4-like API. Attempts by a client to use new
-             * features in 3.6 will be rejected.
-             */
-            k34,
+        /**
+         * The combination of the version and targetVersion determine this node's behavior.
+         *
+         * The legal (version, targetVersion) states are:
+         *
+         * (3.4, Unset) aka fully 3.4: only 3.4 features are available, and new and existing storage
+         *                             engine entries use the 3.4 format
+         *
+         * (3.4, 3.6) aka upgrading: only 3.4 features are available, but new storage engine entries
+         *                           use the 3.6 format, and existing entries may have either the
+         *                           3.4 or 3.6 format
+         *
+         * (3.6, Unset) aka fully 3.6: 3.6 features are available, and new and existing storage
+         *                             engine entries use the 3.6 format
+         *
+         * (3.4, 3.4) aka downgrading: only 3.4 features are available and new storage engine
+         *                             entries use the 3.4 format, but existing entries may have
+         *                             either the 3.4 or 3.6 format
+         */
+        enum class Version { k34, k36, kUnset };
 
-            /**
-             * In this mode, new features in 3.6 are allowed. The system should guarantee that no
-             * 3.4 node can participate in a cluster whose feature compatibility version is 3.6.
-             */
-            k36,
-            /**
-             * This is only used for targetVersion to indicate that no upgrade is in progress.
-             */
-            kUnset
-        };
-
-        // Read-only parameter featureCompatibilityVersion.
         AtomicWord<Version> version{Version::k34};
 
         // If set, an upgrade or downgrade is in progress to the set version.
         AtomicWord<Version> targetVersion{Version::kUnset};
 
+        const bool isFullyUpgradedTo36() {
+            return (version.load() == Version::k36 && targetVersion.load() == Version::kUnset);
+        }
+
+        const bool isUpgradingTo36() {
+            return (version.load() == Version::k34 && targetVersion.load() == Version::k36);
+        }
+
+        const bool isFullyDowngradedTo34() {
+            return (version.load() == Version::k34 && targetVersion.load() == Version::kUnset);
+        }
+
+        const bool isDowngradingTo34() {
+            return (version.load() == Version::k34 && targetVersion.load() == Version::k34);
+        }
+
         // This determines whether to give Collections UUIDs upon creation.
-        bool isSchemaVersion36() {
-            return (version.load() == Version::k36 || targetVersion.load() == Version::k36);
+        const bool isSchemaVersion36() {
+            return (isFullyUpgradedTo36() || isUpgradingTo36());
         }
 
         // Feature validation differs depending on the role of a mongod in a replica set or

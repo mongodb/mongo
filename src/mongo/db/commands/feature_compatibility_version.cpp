@@ -249,7 +249,14 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
     opCtx->recoveryUnit()->onCommit([opCtx, versionInfo]() {
         serverGlobalParams.featureCompatibility.version.store(versionInfo.version);
         serverGlobalParams.featureCompatibility.targetVersion.store(versionInfo.targetVersion);
-        _closeConnectionsBelowVersion(opCtx, versionInfo);
+
+        // Close all connections from internal clients with binary versions lower than 3.6.
+        if (versionInfo.version == ServerGlobalParams::FeatureCompatibility::Version::k36 ||
+            versionInfo.targetVersion == ServerGlobalParams::FeatureCompatibility::Version::k36) {
+            opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
+                transport::Session::kLatestVersionInternalClientKeepOpen |
+                transport::Session::kExternalClientKeepOpen);
+        }
     });
 }
 
@@ -291,18 +298,6 @@ void FeatureCompatibilityVersion::_validateVersion(StringData version) {
                           << ".",
             version == FeatureCompatibilityVersionCommandParser::kVersion36 ||
                 version == FeatureCompatibilityVersionCommandParser::kVersion34);
-}
-
-void FeatureCompatibilityVersion::_closeConnectionsBelowVersion(
-    OperationContext* opCtx, FeatureCompatibilityVersionInfo versionInfo) {
-
-    // Close all internal connections to versions lower than 3.6.
-    if (versionInfo.version == ServerGlobalParams::FeatureCompatibility::Version::k36 ||
-        versionInfo.targetVersion == ServerGlobalParams::FeatureCompatibility::Version::k36) {
-        opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
-            transport::Session::kLatestVersionInternalClientKeepOpen |
-            transport::Session::kExternalClientKeepOpen);
-    }
 }
 
 void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
