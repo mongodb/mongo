@@ -212,13 +212,7 @@ public:
                     break;
                 case 'Y':  // Year
                 {
-                    auto year = parts.year;
-                    uassert(18537,
-                            str::stream() << "$dateToString is only defined on year 0-9999,"
-                                          << " tried to use year "
-                                          << year,
-                            (year >= 0) && (year <= 9999));
-                    insertPadded(os, year, 4);
+                    insertPadded(os, parts.year, 4);
                     break;
                 }
                 case 'm':  // Month
@@ -292,8 +286,12 @@ private:
     void insertPadded(OutputStream& os, int number, int width) const {
         invariant(width >= 1);
         invariant(width <= 4);
-        invariant(number >= 0);
-        invariant(number <= 9999);
+
+        uassert(18537,
+                str::stream() << "Could not convert date to string: date component was outside "
+                              << "the supported range of 0-9999: "
+                              << number,
+                (number >= 0) && (number <= 9999));
 
         int digits = 1;
 
