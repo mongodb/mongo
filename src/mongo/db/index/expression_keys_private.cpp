@@ -235,8 +235,7 @@ using std::vector;
 // static
 void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                                       const TwoDIndexingParams& params,
-                                      BSONObjSet* keys,
-                                      std::vector<BSONObj>* locs) {
+                                      BSONObjSet* keys) {
     BSONElementMultiSet bSet;
 
     // Get all the nested location fields, but don't return individual elements from
@@ -289,10 +288,6 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
             }
 
             BSONObjBuilder b(64);
-
-            // Remember the actual location object if needed
-            if (locs)
-                locs->push_back(locObj);
 
             // Stop if we don't need to get anything but location objects
             if (!keys) {

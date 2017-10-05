@@ -51,9 +51,6 @@ private:
         return _params;
     }
 
-    // This really gets the 'locs' from the provided obj.
-    void getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const;
-
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
      *

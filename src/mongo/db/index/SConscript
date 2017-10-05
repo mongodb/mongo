@@ -38,18 +38,6 @@ env.Library(
 )
 
 env.Library(
-        target='external_key_generator',
-        source=[
-            'external_key_generator.cpp',
-        ],
-        LIBDEPS=[
-            'key_generator',
-            'expression_params',
-            '$BUILD_DIR/mongo/base',
-        ],
-)
-
-env.Library(
         target='expression_params',
         source=[
             'expression_params.cpp',

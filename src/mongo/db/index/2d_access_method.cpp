@@ -51,12 +51,7 @@ TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInte
 void TwoDAccessMethod::doGetKeys(const BSONObj& obj,
                                  BSONObjSet* keys,
                                  MultikeyPaths* multikeyPaths) const {
-    ExpressionKeysPrivate::get2DKeys(obj, _params, keys, NULL);
-}
-
-/** Finds all locations in a geo-indexed object */
-void TwoDAccessMethod::getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const {
-    ExpressionKeysPrivate::get2DKeys(obj, _params, NULL, &locs);
+    ExpressionKeysPrivate::get2DKeys(obj, _params, keys);
 }
 
 }  // namespace mongo

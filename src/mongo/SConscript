@@ -414,7 +414,6 @@ if not has_option('noshell') and usemozjs:
                 LIBDEPS=[
                     'db/logical_session_id_helpers',
                     'db/catalog/index_key_validate',
-                    'db/index/external_key_generator',
                     'db/query/command_request_response',
                     'db/query/query_request',
                     'db/server_options_core',

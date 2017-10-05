@@ -58,10 +58,7 @@ public:
     // 2d
     //
 
-    static void get2DKeys(const BSONObj& obj,
-                          const TwoDIndexingParams& params,
-                          BSONObjSet* keys,
-                          std::vector<BSONObj>* locs);
+    static void get2DKeys(const BSONObj& obj, const TwoDIndexingParams& params, BSONObjSet* keys);
 
     //
     // FTS
