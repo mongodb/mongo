@@ -298,7 +298,10 @@
 
     // Test that a 3.4 secondary can successfully perform initial sync from a 3.6 primary with
     // featureCompatibilityVersion=3.4.
-    rst = new ReplSetTest({nodes: [{binVersion: latest}]});
+    // Start with 2 3.6 nodes so that when the 3.4 node added later crashes the primary doesn't
+    // step down.
+    rst = new ReplSetTest(
+        {nodes: [{binVersion: latest}, {binVersion: latest, rsConfig: {priority: 0}}]});
     rst.startSet();
     rst.initiate();
 
@@ -311,8 +314,8 @@
     // Rig the election so that the first node running latest version remains the primary after the
     // 3.4 secondary is added to the replica set.
     replSetConfig = rst.getReplSetConfig();
-    replSetConfig.version = 3;
-    replSetConfig.members[1].priority = 0;
+    replSetConfig.version = 4;
+    replSetConfig.members[2].priority = 0;
 
     // The default value for 'catchUpTimeoutMillis' on 3.6 is -1. A 3.4 secondary will refuse to
     // join a replica set with catchUpTimeoutMillis=-1.
@@ -321,12 +324,11 @@
 
     // Verify that the 3.4 secondary successfully performed its initial sync.
     assert.writeOK(
-        primaryAdminDB.getSiblingDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 2}}));
+        primaryAdminDB.getSiblingDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
 
     // Test that a 3.4 secondary crashes when syncing from a 3.6 primary and the
-    // featureCompatibilityVersion is set to 3.6. The primary may step down before the command
-    // returns.
-    assert.adminCommandWorkedAllowingNetworkError(primary, {setFeatureCompatibilityVersion: "3.6"});
+    // featureCompatibilityVersion is set to 3.6.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
     assert.soon(function() {
         try {
             secondaryAdminDB.runCommand({ping: 1});

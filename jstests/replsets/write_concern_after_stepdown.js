@@ -50,13 +50,14 @@
     var doMajorityWrite = function() {
         // Run ismaster command with 'hangUpOnStepDown' set to false to mark this connection as
         // one that shouldn't be closed when the node steps down.  This makes it easier to detect
-        // the PrimarySteppedDown error.
+        // the error returned by the write concern failure.
         assert.commandWorked(db.adminCommand({ismaster: 1, hangUpOnStepDown: false}));
 
         var res = db.getSiblingDB('wMajorityCheck').stepdownAndBackUp.insert({a: 2}, {
             writeConcern: {w: 'majority', wtimeout: 600000}
         });
-        assert.writeErrorWithCode(res, ErrorCodes.PrimarySteppedDown);
+        assert.writeErrorWithCode(
+            res, [ErrorCodes.PrimarySteppedDown, ErrorCodes.InterruptedDueToReplStateChange]);
     };
 
     var joinMajorityWriter = startParallelShell(doMajorityWrite, nodes[0].port);

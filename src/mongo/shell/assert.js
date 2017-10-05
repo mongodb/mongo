@@ -571,6 +571,8 @@ assert.writeError = function(res, msg) {
     return assert.writeErrorWithCode(res, null, msg);
 };
 
+// If expectedCode is an array then this asserts that the found code is one of the codes in
+// the expectedCode array.
 assert.writeErrorWithCode = function(res, expectedCode, msg) {
 
     var errMsg = null;
@@ -607,7 +609,12 @@ assert.writeErrorWithCode = function(res, expectedCode, msg) {
     }
 
     if (!errMsg && expectedCode) {
-        if (foundCode != expectedCode) {
+        if (Array.isArray(expectedCode)) {
+            if (!expectedCode.includes(foundCode)) {
+                errMsg = "found code " + foundCode + " does not match any of the expected codes " +
+                    tojson(expectedCode);
+            }
+        } else if (foundCode != expectedCode) {
             errMsg = "found code " + foundCode + " does not match expected code " + expectedCode;
         }
     }

@@ -387,7 +387,12 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     }
 
     auto opCtx = cc().makeOperationContext();
-    Lock::GlobalWrite globalExclusiveLock(opCtx.get());
+    Lock::GlobalLock globalExclusiveLock{
+        opCtx.get(), MODE_X, UINT_MAX, Lock::GlobalLock::EnqueueOnly()};
+    _externalState->killAllUserOperations(opCtx.get());
+    globalExclusiveLock.waitForLock(UINT_MAX);
+    invariant(globalExclusiveLock.isLocked());
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     _topCoord->finishUnconditionalStepDown();
