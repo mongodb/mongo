@@ -96,8 +96,7 @@
 
     assert.eq(100,
               master.getDB("foo").getCollection("bar").count(),
-              "count before running " +
-                  "mongooplog was not 100 as expected");
+              "count before running mongooplog was not 100 as expected");
 
     exitCode = MongoRunner.runMongoTool("mongooplog", {
         from: "127.0.0.1:" + replTest.ports[0],
