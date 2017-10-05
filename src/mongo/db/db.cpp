@@ -707,6 +707,16 @@ ExitCode _initAndListen(int listenPort) {
                   << "2.6 and then run the authSchemaUpgrade command.";
             exitCleanly(EXIT_NEED_UPGRADE);
         }
+
+        if (foundSchemaVersion <= AuthorizationManager::schemaVersion26Final) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: This server is using MONGODB-CR, a deprecated authentication "
+                  << "mechanism." << startupWarningsLog;
+            log() << "**          Support will be dropped in a future release."
+                  << startupWarningsLog;
+            log() << "**          See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1"
+                  << startupWarningsLog;
+        }
     } else if (globalAuthzManager->isAuthEnabled()) {
         error() << "Auth must be disabled when starting without auth schema validation";
         exitCleanly(EXIT_BADOPTIONS);
