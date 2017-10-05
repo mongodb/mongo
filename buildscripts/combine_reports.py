@@ -81,7 +81,7 @@ def main():
         except IOError as e:
             # errno.ENOENT is the error code for "No such file or directory".
             if e.errno == errno.ENOENT:
-                report_file_count -= 1
+                report_files_count -= 1
                 continue
             raise
 
