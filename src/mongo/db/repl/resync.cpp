@@ -90,23 +90,28 @@ public:
                            "Replica sets do not support the resync command"));
             }
 
-            const MemberState memberState = replCoord->getMemberState();
-            if (memberState.startup()) {
-                return appendCommandStatus(
-                    result, Status(ErrorCodes::NotYetInitialized, "no replication yet active"));
-            }
-            if (memberState.primary()) {
-                return appendCommandStatus(
-                    result, Status(ErrorCodes::NotSecondary, "primaries cannot resync"));
-            }
-            auto status = replCoord->setFollowerMode(MemberState::RS_STARTUP2);
-            if (!status.isOK()) {
-                return appendCommandStatus(
-                    result,
-                    Status(status.code(),
-                           str::stream()
-                               << "Failed to transition to STARTUP2 state to perform resync: "
-                               << status.reason()));
+            {
+                // Need global write lock to transition out of SECONDARY
+                Lock::GlobalWrite globalWriteLock(opCtx);
+
+                const MemberState memberState = replCoord->getMemberState();
+                if (memberState.startup()) {
+                    return appendCommandStatus(
+                        result, Status(ErrorCodes::NotYetInitialized, "no replication yet active"));
+                }
+                if (memberState.primary()) {
+                    return appendCommandStatus(
+                        result, Status(ErrorCodes::NotSecondary, "primaries cannot resync"));
+                }
+                auto status = replCoord->setFollowerMode(MemberState::RS_STARTUP2);
+                if (!status.isOK()) {
+                    return appendCommandStatus(
+                        result,
+                        Status(status.code(),
+                               str::stream()
+                                   << "Failed to transition to STARTUP2 state to perform resync: "
+                                   << status.reason()));
+                }
             }
             uassertStatusOKWithLocation(replCoord->resyncData(opCtx, waitForResync), "resync", 0);
             return true;

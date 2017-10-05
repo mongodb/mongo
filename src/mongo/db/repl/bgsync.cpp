@@ -364,6 +364,10 @@ void BackgroundSync::_produce() {
         // Mark yourself as too stale.
         _tooStale = true;
 
+        // Need to take global X lock to transition out of SECONDARY.
+        auto opCtx = cc().makeOperationContext();
+        Lock::GlobalWrite globalWriteLock(opCtx.get());
+
         error() << "too stale to catch up -- entering maintenance mode";
         log() << "Our newest OpTime : " << lastOpTimeFetched;
         log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
