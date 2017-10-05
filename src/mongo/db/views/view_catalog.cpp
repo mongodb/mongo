@@ -168,25 +168,9 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
 
     // Performs the insert into the graph.
     auto doInsert = [this, &opCtx](const ViewDefinition& viewDef, bool needsValidation) -> Status {
-        // Make a LiteParsedPipeline to determine the namespaces referenced by this pipeline.
-        AggregationRequest request(viewDef.viewOn(), viewDef.pipeline());
-        const LiteParsedPipeline liteParsedPipeline(request);
-        const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
-
-        // Verify that this is a legitimate pipeline specification by making sure it parses
-        // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a
-        // collection and a pipeline, but in this case we don't need this map to be accurate since
-        // we will not be evaluating the pipeline.
-        StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-        for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
-            resolvedNamespaces[nss.coll()] = {nss, {}};
-        }
-        boost::intrusive_ptr<ExpressionContext> expCtx =
-            new ExpressionContext(opCtx,
-                                  request,
-                                  CollatorInterface::cloneCollator(viewDef.defaultCollator()),
-                                  std::move(resolvedNamespaces));
-        auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
+        // Validate that the pipeline is eligible to serve as a view definition. If it is, this
+        // will also return the set of involved namespaces.
+        auto pipelineStatus = _validatePipeline_inlock(opCtx, viewDef);
         if (!pipelineStatus.isOK()) {
             uassert(40255,
                     str::stream() << "Invalid pipeline for view " << viewDef.name().ns() << "; "
@@ -195,6 +179,7 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
             return pipelineStatus.getStatus();
         }
 
+        auto involvedNamespaces = pipelineStatus.getValue();
         std::vector<NamespaceString> refs(involvedNamespaces.begin(), involvedNamespaces.end());
         refs.push_back(viewDef.viewOn());
 
@@ -235,6 +220,41 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
     _viewGraph.remove(viewDef.name());
 
     return doInsert(viewDef, true);
+}
+
+StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_inlock(
+    OperationContext* opCtx, const ViewDefinition& viewDef) const {
+    // Make a LiteParsedPipeline to determine the namespaces referenced by this pipeline.
+    AggregationRequest request(viewDef.viewOn(), viewDef.pipeline());
+    const LiteParsedPipeline liteParsedPipeline(request);
+    const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+
+    // Verify that this is a legitimate pipeline specification by making sure it parses
+    // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a
+    // collection and a pipeline, but in this case we don't need this map to be accurate since
+    // we will not be evaluating the pipeline.
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
+        resolvedNamespaces[nss.coll()] = {nss, {}};
+    }
+    boost::intrusive_ptr<ExpressionContext> expCtx =
+        new ExpressionContext(opCtx,
+                              request,
+                              CollatorInterface::cloneCollator(viewDef.defaultCollator()),
+                              std::move(resolvedNamespaces));
+    auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
+    if (!pipelineStatus.isOK()) {
+        return pipelineStatus.getStatus();
+    }
+
+    // Validate that the view pipeline does not contain any ineligible stages.
+    auto sources = pipelineStatus.getValue()->getSources();
+    if (!sources.empty() && sources.front()->constraints().isChangeStreamStage()) {
+        return {ErrorCodes::OptionNotSupportedOnView,
+                "$changeStream cannot be used in a view definition"};
+    }
+
+    return std::move(involvedNamespaces);
 }
 
 Status ViewCatalog::_validateCollation_inlock(OperationContext* opCtx,

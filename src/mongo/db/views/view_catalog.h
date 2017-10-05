@@ -148,6 +148,13 @@ private:
     Status _upsertIntoGraph(OperationContext* opCtx, const ViewDefinition& viewDef);
 
     /**
+     * Returns Status::OK with the set of involved namespaces if the given pipeline is eligible to
+     * act as a view definition. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
+     */
+    StatusWith<stdx::unordered_set<NamespaceString>> _validatePipeline_inlock(
+        OperationContext* opCtx, const ViewDefinition& viewDef) const;
+
+    /**
      * Returns Status::OK if each view namespace in 'refs' has the same default collation as 'view'.
      * Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
      */
