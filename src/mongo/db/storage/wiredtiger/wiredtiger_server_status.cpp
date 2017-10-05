@@ -62,7 +62,7 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
     // The session does not open a transaction here as one is not needed and opening one would
     // mean that execution could become blocked when a new transaction cannot be allocated
     // immediately.
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn(opCtx);
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
     invariant(session);
 
     WT_SESSION* s = session->getSession();

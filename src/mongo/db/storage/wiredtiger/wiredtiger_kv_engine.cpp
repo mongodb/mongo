@@ -565,12 +565,12 @@ Status WiredTigerKVEngine::okToRename(OperationContext* opCtx,
 }
 
 int64_t WiredTigerKVEngine::getIdentSize(OperationContext* opCtx, StringData ident) {
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx);
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     return WiredTigerUtil::getIdentSize(session->getSession(), _uri(ident));
 }
 
 Status WiredTigerKVEngine::repairIdent(OperationContext* opCtx, StringData ident) {
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx);
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     string uri = _uri(ident);
     session->closeAllCursors(uri);
     _sessionCache->closeAllCursors(uri);
@@ -784,7 +784,7 @@ Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, StringData ident) 
     string uri = _uri(ident);
 
     WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get(opCtx);
-    ru->getSessionNoTxn(opCtx)->closeAllCursors(uri);
+    ru->getSessionNoTxn()->closeAllCursors(uri);
     _sessionCache->closeAllCursors(uri);
 
     WiredTigerSession session(_conn);
@@ -901,8 +901,7 @@ bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
 }
 
 bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, StringData ident) const {
-    return _hasUri(WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->getSession(),
-                   _uri(ident));
+    return _hasUri(WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession(), _uri(ident));
 }
 
 bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) const {

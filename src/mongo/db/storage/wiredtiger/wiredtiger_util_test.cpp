@@ -115,7 +115,7 @@ protected:
 
     void createSession(const char* config) {
         WT_SESSION* wtSession =
-            WiredTigerRecoveryUnit::get(_opCtx.get())->getSession(_opCtx.get())->getSession();
+            WiredTigerRecoveryUnit::get(_opCtx.get())->getSession()->getSession();
         ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, getURI(), config)));
     }
 
@@ -254,7 +254,7 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
 TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
-    WiredTigerSession* session = recoveryUnit.getSession(NULL);
+    WiredTigerSession* session = recoveryUnit.getSession();
     StatusWith<uint64_t> result =
         WiredTigerUtil::getStatisticsValue(session->getSession(),
                                            "statistics:table:no_such_table",
@@ -267,7 +267,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
 TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
-    WiredTigerSession* session = recoveryUnit.getSession(NULL);
+    WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
     StatusWith<uint64_t> result = WiredTigerUtil::getStatisticsValue(session->getSession(),
@@ -281,7 +281,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
 TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
-    WiredTigerSession* session = recoveryUnit.getSession(NULL);
+    WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
     // Use connection statistics key which does not apply to a table.
@@ -296,7 +296,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
 TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
-    WiredTigerSession* session = recoveryUnit.getSession(NULL);
+    WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
     // Use connection statistics key which does not apply to a table.
@@ -312,7 +312,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
 TEST(WiredTigerUtilTest, GetStatisticsValueAsUInt8) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
-    WiredTigerSession* session = recoveryUnit.getSession(NULL);
+    WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
 

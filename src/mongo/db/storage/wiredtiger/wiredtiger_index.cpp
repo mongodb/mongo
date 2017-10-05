@@ -378,7 +378,7 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
         output->append("type", type);
     }
 
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx);
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     WT_SESSION* s = session->getSession();
     Status status =
         WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri(), "statistics=(fast)", output);
@@ -435,7 +435,7 @@ Status WiredTigerIndex::touch(OperationContext* opCtx) const {
 
 long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
-    WiredTigerSession* session = ru->getSession(opCtx);
+    WiredTigerSession* session = ru->getSession();
 
     if (ru->getSessionCache()->isEphemeral()) {
         // For ephemeral case, use cursor statistics
@@ -507,7 +507,7 @@ Status WiredTigerIndex::initAsEmpty(OperationContext* opCtx) {
 Status WiredTigerIndex::compact(OperationContext* opCtx) {
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     if (!cache->isEphemeral()) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->getSession();
+        WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
         opCtx->recoveryUnit()->abandonSnapshot();
         int ret = s->compact(s, uri().c_str(), "timeout=0");
         invariantWTOK(ret);
@@ -537,7 +537,7 @@ protected:
     WT_CURSOR* openBulkCursor(WiredTigerIndex* idx) {
         // Open cursors can cause bulk open_cursor to fail with EBUSY.
         // TODO any other cases that could cause EBUSY?
-        WiredTigerSession* outerSession = WiredTigerRecoveryUnit::get(_opCtx)->getSession(_opCtx);
+        WiredTigerSession* outerSession = WiredTigerRecoveryUnit::get(_opCtx)->getSession();
         outerSession->closeAllCursors(idx->uri());
 
         // Not using cursor cache since we need to set "bulk".
@@ -811,7 +811,7 @@ public:
         }
 
         // Ensure an active session exists, so any restored cursors will bind to it
-        invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession(_opCtx) == _cursor->getSession());
+        invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
 
         if (!_eof) {
             // Unique indices *don't* include the record id in their KeyStrings. If we seek to the

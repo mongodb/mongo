@@ -99,7 +99,7 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            WT_SESSION* s = ru->getSession(&opCtx)->getSession();
+            WT_SESSION* s = ru->getSession()->getSession();
             invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
             uow.commit();
         }
@@ -145,7 +145,7 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            WT_SESSION* s = ru->getSession(&opCtx)->getSession();
+            WT_SESSION* s = ru->getSession()->getSession();
             invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
             uow.commit();
         }

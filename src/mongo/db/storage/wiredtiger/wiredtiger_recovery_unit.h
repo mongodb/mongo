@@ -81,7 +81,7 @@ public:
 
     // ---- WT STUFF
 
-    WiredTigerSession* getSession(OperationContext* opCtx);
+    WiredTigerSession* getSession();
     void setIsOplogReader();
 
     /**
@@ -89,7 +89,7 @@ public:
      * running session.
      */
 
-    WiredTigerSession* getSessionNoTxn(OperationContext* opCtx);
+    WiredTigerSession* getSessionNoTxn();
 
     WiredTigerSessionCache* getSessionCache() {
         return _sessionCache;

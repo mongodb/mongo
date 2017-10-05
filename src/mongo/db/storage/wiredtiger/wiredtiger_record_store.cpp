@@ -515,7 +515,7 @@ public:
 
     bool restore() final {
         // We can't use the CursorCache since this cursor needs a special config string.
-        WT_SESSION* session = WiredTigerRecoveryUnit::get(_opCtx)->getSession(_opCtx)->getSession();
+        WT_SESSION* session = WiredTigerRecoveryUnit::get(_opCtx)->getSession()->getSession();
 
         if (!_cursor) {
             invariantWTOK(session->open_cursor(
@@ -774,7 +774,7 @@ int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
     if (_isEphemeral) {
         return dataSize(opCtx);
     }
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx);
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     StatusWith<int64_t> result =
         WiredTigerUtil::getStatisticsValueAs<int64_t>(session->getSession(),
                                                       "statistics:" + getURI(),
@@ -918,7 +918,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
     OperationContext::RecoveryUnitState const realRUstate =
         opCtx->setRecoveryUnit(new WiredTigerRecoveryUnit(sc), OperationContext::kNotInUnitOfWork);
 
-    WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->getSession();
+    WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
 
     int64_t dataSize = _dataSize.load();
     int64_t numRecords = _numRecords.load();
@@ -1071,7 +1071,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
                << " records totaling to " << stone->bytes << " bytes";
 
         WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get(opCtx);
-        WT_SESSION* session = ru->getSession(opCtx)->getSession();
+        WT_SESSION* session = ru->getSession()->getSession();
 
         try {
             WriteUnitOfWork wuow(opCtx);
@@ -1355,7 +1355,7 @@ Status WiredTigerRecordStore::truncate(OperationContext* opCtx) {
     }
     invariantWTOK(ret);
 
-    WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->getSession();
+    WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
     invariantWTOK(WT_OP_CHECK(session->truncate(session, NULL, start, NULL, NULL)));
     _changeNumRecords(opCtx, -numRecords(opCtx));
     _increaseDataSize(opCtx, -dataSize(opCtx));
@@ -1373,7 +1373,7 @@ Status WiredTigerRecordStore::compact(OperationContext* opCtx,
                                       CompactStats* stats) {
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     if (!cache->isEphemeral()) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->getSession();
+        WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
         opCtx->recoveryUnit()->abandonSnapshot();
         int ret = s->compact(s, getURI().c_str(), "timeout=0");
         invariantWTOK(ret);
@@ -1457,7 +1457,7 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
         result->appendIntOrLL("sleepCount", _cappedSleep.load());
         result->appendIntOrLL("sleepMS", _cappedSleepMS.load());
     }
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx);
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     WT_SESSION* s = session->getSession();
     BSONObjBuilder bob(result->subobjStart(_engineName));
     {
@@ -1650,7 +1650,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
     WT_CURSOR* start = startwrap.get();
     setKey(start, firstRemovedId);
 
-    WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->getSession();
+    WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
     invariantWTOK(session->truncate(session, nullptr, start, nullptr, nullptr));
 
     _changeNumRecords(opCtx, -recordsRemoved);
@@ -1788,7 +1788,7 @@ bool WiredTigerRecordStoreCursorBase::restore() {
         _cursor.emplace(_rs.getURI(), _rs.tableId(), true, _opCtx);
 
     // This will ensure an active session exists, so any restored cursors will bind to it
-    invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession(_opCtx) == _cursor->getSession());
+    invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
     _skipNextAdvance = false;
 
     // If we've hit EOF, then this iterator is done and need not be restored.

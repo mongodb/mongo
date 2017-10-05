@@ -68,7 +68,7 @@ void WiredTigerRecoveryUnit::prepareForCreateSnapshot(OperationContext* opCtx) {
     invariant(!_readFromMajorityCommittedSnapshot);
 
     // Starts the WT transaction that will be the basis for creating a named snapshot.
-    getSession(opCtx);
+    getSession();
     _areWriteUnitOfWorksBanned = true;
 }
 
@@ -152,14 +152,14 @@ void WiredTigerRecoveryUnit::assertInActiveTxn() const {
     fassert(28575, _active);
 }
 
-WiredTigerSession* WiredTigerRecoveryUnit::getSession(OperationContext* opCtx) {
+WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
     if (!_active) {
         _txnOpen();
     }
     return _session.get();
 }
 
-WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn(OperationContext* opCtx) {
+WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
     _ensureSession();
     return _session.get();
 }
@@ -259,7 +259,7 @@ Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
     invariant(_inUnitOfWork);
 
     // Starts the WT transaction associated with this session.
-    getSession(nullptr);
+    getSession();
 
     const std::string conf = "commit_timestamp=" + timestamp.toString();
     auto rc = session->timestamp_transaction(session, conf.c_str());
@@ -285,7 +285,7 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
                                    OperationContext* opCtx) {
     _tableID = tableId;
     _ru = WiredTigerRecoveryUnit::get(opCtx);
-    _session = _ru->getSession(opCtx);
+    _session = _ru->getSession();
     _cursor = _session->getCursor(uri, tableId, forRecordStore);
     if (!_cursor) {
         error() << "no cursor for uri: " << uri;

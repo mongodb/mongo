@@ -425,7 +425,7 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
     ErrorAccumulator eventHandler(errors);
 
     // Try to close as much as possible to avoid EBUSY errors.
-    WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->closeAllCursors(uri);
+    WiredTigerRecoveryUnit::get(opCtx)->getSession()->closeAllCursors(uri);
     WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     sessionCache->closeAllCursors(uri);
 
@@ -463,7 +463,7 @@ bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
 
 Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::string& uri, bool on) {
     WiredTigerRecoveryUnit* recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
-    return setTableLogging(recoveryUnit->getSession(opCtx)->getSession(), uri, on);
+    return setTableLogging(recoveryUnit->getSession()->getSession(), uri, on);
 }
 
 Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {

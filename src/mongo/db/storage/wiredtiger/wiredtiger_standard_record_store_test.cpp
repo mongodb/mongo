@@ -103,7 +103,7 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            WT_SESSION* s = ru->getSession(&opCtx)->getSession();
+            WT_SESSION* s = ru->getSession()->getSession();
             invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
             uow.commit();
         }
@@ -148,7 +148,7 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            WT_SESSION* s = ru->getSession(&opCtx)->getSession();
+            WT_SESSION* s = ru->getSession()->getSession();
             invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
             uow.commit();
         }
@@ -274,7 +274,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
         {
             WriteUnitOfWork uow(opCtx.get());
-            WT_SESSION* s = ru->getSession(opCtx.get())->getSession();
+            WT_SESSION* s = ru->getSession()->getSession();
             invariantWTOK(s->create(s, indexUri.c_str(), ""));
             uow.commit();
         }
