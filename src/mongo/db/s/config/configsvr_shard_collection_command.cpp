@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
@@ -732,6 +733,10 @@ public:
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrShardCollection can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+        // Do not allow sharding collections while a featureCompatibilityVersion upgrade or
+        // downgrade is in progress (see SERVER-31231 for details).
+        Lock::ExclusiveLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
         auto request = ConfigsvrShardCollectionRequest::parse(

@@ -57,6 +57,8 @@ constexpr StringData FeatureCompatibilityVersion::kParameterName;
 constexpr StringData FeatureCompatibilityVersion::kVersionField;
 constexpr StringData FeatureCompatibilityVersion::kTargetVersionField;
 
+Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionLock");
+
 StatusWith<FeatureCompatibilityVersionInfo> FeatureCompatibilityVersion::parse(
     const BSONObj& featureCompatibilityVersionInfo) {
     FeatureCompatibilityVersionInfo versionInfo;

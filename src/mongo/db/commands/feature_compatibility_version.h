@@ -68,6 +68,12 @@ public:
     static constexpr StringData kTargetVersionField = "targetVersion"_sd;
 
     /**
+     * Should be taken in exclusive mode by any operations that should not run while
+     * setFeatureCompatibilityVersion is running.
+     */
+    static Lock::ResourceMutex fcvLock;
+
+    /**
      * Parses the featureCompatibilityVersion document from admin.system.version, and returns the
      * version.
      */

@@ -68,8 +68,7 @@ MONGO_FP_DECLARE(featureCompatibilityUpgrade);
 class SetFeatureCompatibilityVersionCommand : public BasicCommand {
 public:
     SetFeatureCompatibilityVersionCommand()
-        : BasicCommand(FeatureCompatibilityVersion::kCommandName),
-          _kFeatureCompatibilityVersionLock("featureCompatibilityVersionLock") {}
+        : BasicCommand(FeatureCompatibilityVersion::kCommandName) {}
 
     virtual bool slaveOk() const {
         return false;
@@ -110,7 +109,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
-        Lock::ExclusiveLock lk(opCtx->lockState(), _kFeatureCompatibilityVersionLock);
+        Lock::ExclusiveLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
         const auto requestedVersion = uassertStatusOK(
             FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
@@ -180,8 +179,6 @@ public:
         return true;
     }
 
-private:
-    Lock::ResourceMutex _kFeatureCompatibilityVersionLock;
 
 } setFeatureCompatibilityVersionCommand;
 
