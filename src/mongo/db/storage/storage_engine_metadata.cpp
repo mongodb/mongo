@@ -262,7 +262,7 @@ Status StorageEngineMetadata::write() const {
                           str::stream() << "Failed to fsync new `storage.bson` file.");
         }
         boost::filesystem::rename(metadataTempPath, metadataPath);
-        flushMyDirectory(metadataPath.parent_path());
+        flushMyDirectory(metadataPath);
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::FileRenameFailed,
                       str::stream() << "Unexpected error while renaming temporary metadata file "
