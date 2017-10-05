@@ -367,9 +367,6 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         !(checkIfReplMissingFromCommandLine(opCtx) || replSettings.usingReplSets() ||
           replSettings.isSlave());
 
-    // To print warning later if any database collections have UUIDs in FCV 3.4.
-    bool collsHaveUuids = false;
-
     for (const auto& dbName : dbNames) {
         LOG(1) << "    Recovering database: " << dbName;
 
@@ -434,29 +431,6 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                               << "command to resume upgrade to 3.6 or downgrade to 3.4."
                               << startupWarningsLog;
                     }
-                }
-            }
-        }
-
-        // If featureCompatibilityVersion is 3.4 and any collections have UUIDs, log warning.
-        if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k34) {
-
-            // Iterate through collections and check for UUIDs
-            for (auto collectionIt = db->begin(); !collsHaveUuids && collectionIt != db->end();
-                 ++collectionIt) {
-
-                Collection* coll = *collectionIt;
-                if (coll->uuid()) {
-                    collsHaveUuids = true;
-
-                    // This warning will only be printed once, for the first collection found with
-                    // a UUID.
-                    log() << "** WARNING: Using featureCompatibilityVersion 3.4, but the "
-                          << "collection '" << coll->ns() << "' has a UUID. " << startupWarningsLog;
-                    log() << "**          To fix this, use the setFeatureCompatibilityVersion "
-                          << "command to resume upgrade to 3.6 or downgrade to 3.4."
-                          << startupWarningsLog;
                 }
             }
         }

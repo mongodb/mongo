@@ -56,7 +56,7 @@
         });
     };
 
-    jsTest.log("Testing Incomeplete Downgrade");
+    jsTest.log("Testing Incomplete Downgrade");
 
     let dbpath = MongoRunner.dataPath + "incomplete_downgrade";
     resetDbpath(dbpath);
@@ -102,7 +102,7 @@
     checkFCV(adminDB, "3.4", "3.4");
 
     // Verify startup warnings
-    let msg1 = "WARNING: Using featureCompatibilityVersion 3.4, but the collection";
+    let msg1 = "WARNING: A featureCompatibilityVersion upgrade or downgrade did not complete";
     let msg2 = "use the setFeatureCompatibilityVersion command to resume";
     assert.soon(function() {
         return rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2);
