@@ -1320,9 +1320,8 @@ var ReplSetTest = function(opts) {
         }
     };
 
-    this.checkReplicatedDataHashes = function(msgPrefix = 'checkReplicatedDataHashes',
-                                              excludedDBs = []) {
-
+    this.checkReplicatedDataHashes = function(
+        msgPrefix = 'checkReplicatedDataHashes', excludedDBs = [], ignoreUUIDs = false) {
         // Return items that are in either Array `a` or `b` but not both. Note that this will
         // not work with arrays containing NaN. Array.indexOf(NaN) will always return -1.
         function arraySymmetricDifference(a, b) {
@@ -1397,7 +1396,7 @@ var ReplSetTest = function(opts) {
             }
         }
 
-        function checkDBHashesForReplSet(rst, dbBlacklist = [], msgPrefix) {
+        function checkDBHashesForReplSet(rst, dbBlacklist = [], msgPrefix, ignoreUUIDs) {
             // We don't expect the local database to match because some of its
             // collections are not replicated.
             dbBlacklist.push('local');
@@ -1482,6 +1481,12 @@ var ReplSetTest = function(opts) {
                         primaryCollInfo.forEach(primaryInfo => {
                             if (secondaryInfo.name === primaryInfo.name &&
                                 secondaryInfo.type === primaryInfo.type) {
+                                if (ignoreUUIDs) {
+                                    print(msgPrefix + ", skipping UUID check for " +
+                                          primaryInfo.name);
+                                    primaryInfo.info.uuid = null;
+                                    secondaryInfo.info.uuid = null;
+                                }
                                 if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
                                     print(msgPrefix +
                                           ', the primary and secondary have different ' +
@@ -1548,7 +1553,7 @@ var ReplSetTest = function(opts) {
             assert(success, 'dbhash mismatch between primary and secondary');
         }
 
-        this.checkReplicaSet(checkDBHashesForReplSet, this, excludedDBs, msgPrefix);
+        this.checkReplicaSet(checkDBHashesForReplSet, this, excludedDBs, msgPrefix, ignoreUUIDs);
     };
 
     this.checkOplogs = function(msgPrefix) {

@@ -86,7 +86,7 @@
     var testFixture = isMasterSlave ? new MasterSlaveDBHashTest(db.getMongo().host)
                                     : new ReplSetTest(db.getMongo().host);
     var excludedDBs = jsTest.options().excludedDBsFromDBHash || [];
-    testFixture.checkReplicatedDataHashes(undefined, excludedDBs);
+    testFixture.checkReplicatedDataHashes(undefined, excludedDBs, true /* skip UUID check */);
 
     var totalTime = Date.now() - startTime;
     print('Finished consistency checks of cluster in ' + totalTime + ' ms.');

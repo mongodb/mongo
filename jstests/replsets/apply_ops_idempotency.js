@@ -2,11 +2,7 @@
     'use strict';
     const debug = 0;
 
-    let rst = new ReplSetTest({
-        name: "applyOpsIdempotency",
-        nodes: 1,
-        nodeOptions: {setParameter: "enableCollectionUUIDs=1"}
-    });
+    let rst = new ReplSetTest({name: "applyOpsIdempotency", nodes: 1});
     rst.startSet();
     rst.initiate();
 

@@ -38,8 +38,6 @@
 namespace mongo {
 
 bool enableCollectionUUIDs = true;
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableCollectionUUIDsParameter(
-    ServerParameterSet::getGlobal(), "enableCollectionUUIDs", &enableCollectionUUIDs);
 
 // static
 bool CollectionOptions::validMaxCappedDocs(long long* max) {
