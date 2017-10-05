@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
@@ -209,6 +210,22 @@ Status _applyOps(OperationContext* opCtx,
                         NamespaceString indexNss;
                         std::tie(indexSpec, indexNss) =
                             repl::prepForApplyOpsIndexInsert(fieldO, opObj, nss);
+                        if (!indexSpec["collation"]) {
+                            // If the index spec does not include a collation, explicitly specify
+                            // the simple collation, so the index does not inherit the collection
+                            // default collation.
+                            auto indexVersion = indexSpec["v"];
+                            // The index version is populated by prepForApplyOpsIndexInsert().
+                            invariant(indexVersion);
+                            if (indexVersion.isNumber() &&
+                                (indexVersion.numberInt() >=
+                                 static_cast<int>(IndexDescriptor::IndexVersion::kV2))) {
+                                BSONObjBuilder bob;
+                                bob.append("collation", CollationSpec::kSimpleSpec);
+                                bob.appendElements(indexSpec);
+                                indexSpec = bob.obj();
+                            }
+                        }
                         BSONObjBuilder command;
                         command.append("createIndexes", indexNss.coll());
                         {
