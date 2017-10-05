@@ -287,6 +287,7 @@ void	 bdb_update(const void *, size_t, const void *, size_t);
 
 WT_THREAD_RET alter(void *);
 WT_THREAD_RET backup(void *);
+WT_THREAD_RET checkpoint(void *);
 WT_THREAD_RET compact(void *);
 void	 config_clear(void);
 void	 config_error(void);

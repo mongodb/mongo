@@ -169,7 +169,6 @@ main(int argc, char *argv[])
 	 */
 	testutil_check(pthread_rwlock_init(&g.append_lock, NULL));
 	testutil_check(pthread_rwlock_init(&g.backup_lock, NULL));
-	testutil_check(pthread_rwlock_init(&g.checkpoint_lock, NULL));
 	testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
 
 	printf("%s: process %" PRIdMAX "\n", progname, (intmax_t)getpid());
@@ -267,7 +266,6 @@ main(int argc, char *argv[])
 
 	testutil_check(pthread_rwlock_destroy(&g.append_lock));
 	testutil_check(pthread_rwlock_destroy(&g.backup_lock));
-	testutil_check(pthread_rwlock_destroy(&g.checkpoint_lock));
 	testutil_check(pthread_rwlock_destroy(&g.death_lock));
 
 	config_clear();

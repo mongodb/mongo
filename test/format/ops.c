@@ -76,7 +76,8 @@ wts_ops(int lastrun)
 	TINFO **tinfo_list, *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	wt_thread_t alter_tid, backup_tid, compact_tid, lrt_tid, timestamp_tid;
+	wt_thread_t alter_tid, backup_tid, checkpoint_tid, compact_tid, lrt_tid;
+	wt_thread_t timestamp_tid;
 	int64_t fourths, quit_fourths, thread_ops;
 	uint32_t i;
 	bool running;
@@ -86,6 +87,7 @@ wts_ops(int lastrun)
 	session = NULL;			/* -Wconditional-uninitialized */
 	memset(&alter_tid, 0, sizeof(alter_tid));
 	memset(&backup_tid, 0, sizeof(backup_tid));
+	memset(&checkpoint_tid, 0, sizeof(checkpoint_tid));
 	memset(&compact_tid, 0, sizeof(compact_tid));
 	memset(&lrt_tid, 0, sizeof(lrt_tid));
 	memset(&timestamp_tid, 0, sizeof(timestamp_tid));
@@ -173,6 +175,9 @@ wts_ops(int lastrun)
 	if (g.c_backups)
 		testutil_check(
 		    __wt_thread_create(NULL, &backup_tid, backup, NULL));
+	if (g.c_checkpoints)
+		testutil_check(__wt_thread_create(
+		    NULL, &checkpoint_tid, checkpoint, NULL));
 	if (g.c_compact)
 		testutil_check(
 		    __wt_thread_create(NULL, &compact_tid, compact, NULL));
@@ -247,6 +252,8 @@ wts_ops(int lastrun)
 		testutil_check(__wt_thread_join(NULL, alter_tid));
 	if (g.c_backups)
 		testutil_check(__wt_thread_join(NULL, backup_tid));
+	if (g.c_checkpoints)
+		testutil_check(__wt_thread_join(NULL, checkpoint_tid));
 	if (g.c_compact)
 		testutil_check(__wt_thread_join(NULL, compact_tid));
 	if (!SINGLETHREADED && g.c_long_running_txn)
@@ -514,12 +521,11 @@ ops(void *arg)
 	WT_DECL_RET;
 	WT_ITEM *key, _key, *value, _value;
 	WT_SESSION *session;
-	uint64_t ckpt_op, keyno, reset_op, session_op;
+	uint64_t keyno, reset_op, session_op;
 	uint32_t rnd;
 	u_int i, iso_config;
 	int dir;
-	char *ckpt_config, ckpt_name[64];
-	bool ckpt_available, intxn, positioned, readonly;
+	bool intxn, positioned, readonly;
 
 	tinfo = arg;
 
@@ -542,57 +548,60 @@ ops(void *arg)
 	session = NULL;
 	session_op = 0;
 
-	/* Set the first operation where we'll perform checkpoint operations. */
-	ckpt_op = g.c_checkpoints ? mmrand(&tinfo->rnd, 100, 10000) : 0;
-	ckpt_available = false;
-
 	/* Set the first operation where we'll reset the session. */
 	reset_op = mmrand(&tinfo->rnd, 100, 10000);
 
 	for (intxn = false; !tinfo->quit; ++tinfo->ops) {
-		/*
-		 * We can't checkpoint or swap sessions/cursors while in a
-		 * transaction, resolve any running transaction.
-		 */
-		if (intxn &&
-		    (tinfo->ops == ckpt_op || tinfo->ops == session_op)) {
-			commit_transaction(tinfo, session);
-			intxn = false;
-		}
-
-		/* Open up a new session and cursors. */
-		if (tinfo->ops == session_op ||
+		/* Periodically open up a new session and cursors. */
+		if (tinfo->ops > session_op ||
 		    session == NULL || cursor == NULL) {
+			/*
+			 * We can't swap sessions/cursors if in a transaction,
+			 * resolve any running transaction.
+			 */
+			if (intxn) {
+				commit_transaction(tinfo, session);
+				intxn = false;
+			}
+
 			if (session != NULL)
 				testutil_check(session->close(session, NULL));
-
 			testutil_check(
 			    conn->open_session(conn, NULL, NULL, &session));
+
+			/* Pick the next session/cursor close/open. */
+			session_op += mmrand(&tinfo->rnd, 100, 5000);
 
 			/*
 			 * 10% of the time, perform some read-only operations
 			 * from a checkpoint.
 			 *
-			 * Skip that if we are single-threaded and doing checks
-			 * against a Berkeley DB database, because that won't
-			 * work because the Berkeley DB database records won't
-			 * match the checkpoint.  Also skip if we are using
-			 * LSM, because it doesn't support reads from
-			 * checkpoints.
+			 * Skip if single-threaded and doing checks against a
+			 * Berkeley DB database, that won't work because the
+			 * Berkeley DB database won't match the checkpoint.
+			 *
+			 * Skip if we are using data-sources or LSM, they don't
+			 * support reading from checkpoints.
 			 */
-			if (!SINGLETHREADED && !DATASOURCE("lsm") &&
-			    ckpt_available && mmrand(&tinfo->rnd, 1, 10) == 1) {
+			if (!SINGLETHREADED && !DATASOURCE("helium") &&
+			    !DATASOURCE("kvsbdb") && !DATASOURCE("lsm") &&
+			    mmrand(&tinfo->rnd, 1, 10) == 1) {
 				/*
 				 * open_cursor can return EBUSY if concurrent
 				 * with a metadata operation, retry.
 				 */
 				while ((ret = session->open_cursor(session,
-				    g.uri, NULL, ckpt_name, &cursor)) == EBUSY)
+				    g.uri, NULL,
+				    "checkpoint=WiredTigerCheckpoint",
+				    &cursor)) == EBUSY)
 					__wt_yield();
+				/*
+				 * If the checkpoint hasn't been created yet,
+				 * ignore the error.
+				 */
+				if (ret == ENOENT)
+					continue;
 				testutil_check(ret);
-
-				/* Pick the next session/cursor close/open. */
-				session_op += 250;
 
 				/* Checkpoints are read-only. */
 				readonly = true;
@@ -608,73 +617,9 @@ ops(void *arg)
 					__wt_yield();
 				testutil_check(ret);
 
-				/* Pick the next session/cursor close/open. */
-				session_op += mmrand(&tinfo->rnd, 100, 5000);
-
 				/* Updates supported. */
 				readonly = false;
 			}
-		}
-
-		/* Checkpoint the database. */
-		if (tinfo->ops == ckpt_op && g.c_checkpoints) {
-			/*
-			 * Checkpoints are single-threaded inside WiredTiger,
-			 * skip our checkpoint if another thread is already
-			 * doing one.
-			 */
-			ret = pthread_rwlock_trywrlock(&g.checkpoint_lock);
-			if (ret == EBUSY)
-				goto skip_checkpoint;
-			testutil_check(ret);
-
-			/*
-			 * LSM and data-sources don't support named checkpoints
-			 * and we can't drop a named checkpoint while there's a
-			 * backup in progress, otherwise name the checkpoint 5%
-			 * of the time.
-			 */
-			if (mmrand(&tinfo->rnd, 1, 20) != 1 ||
-			    DATASOURCE("helium") ||
-			    DATASOURCE("kvsbdb") || DATASOURCE("lsm") ||
-			    pthread_rwlock_trywrlock(&g.backup_lock) == EBUSY)
-				ckpt_config = NULL;
-			else {
-				testutil_check(__wt_snprintf(
-				    ckpt_name, sizeof(ckpt_name),
-				    "name=thread-%d", tinfo->id));
-				ckpt_config = ckpt_name;
-			}
-
-			ret = session->checkpoint(session, ckpt_config);
-			/*
-			 * We may be trying to create a named checkpoint while
-			 * we hold a cursor open to the previous checkpoint.
-			 * Tolerate EBUSY.
-			 */
-			if (ret != 0 && ret != EBUSY)
-				testutil_die(ret, "%s",
-				    ckpt_config == NULL ? "" : ckpt_config);
-			ret = 0;
-
-			if (ckpt_config != NULL)
-				testutil_check(
-				    pthread_rwlock_unlock(&g.backup_lock));
-			testutil_check(
-			    pthread_rwlock_unlock(&g.checkpoint_lock));
-
-			/* Rephrase the checkpoint name for cursor open. */
-			if (ckpt_config == NULL)
-				strcpy(ckpt_name,
-				    "checkpoint=WiredTigerCheckpoint");
-			else
-				testutil_check(__wt_snprintf(
-				    ckpt_name, sizeof(ckpt_name),
-				    "checkpoint=thread-%d", tinfo->id));
-			ckpt_available = true;
-
-skip_checkpoint:	/* Pick the next checkpoint operation. */
-			ckpt_op += mmrand(&tinfo->rnd, 5000, 20000);
 		}
 
 		/*

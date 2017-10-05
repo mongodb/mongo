@@ -501,6 +501,75 @@ fclose_and_clear(FILE **fpp)
 }
 
 /*
+ * checkpoint --
+ *	Periodically take a checkpoint
+ */
+WT_THREAD_RET
+checkpoint(void *arg)
+{
+	WT_CONNECTION *conn;
+	WT_DECL_RET;
+	WT_SESSION *session;
+	u_int secs;
+	const char *ckpt_config;
+	char config_buf[64];
+	bool backup_locked;
+
+	(void)arg;
+	conn = g.wts_conn;
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+	for (secs = mmrand(NULL, 1, 10); !g.workers_finished;) {
+		if (secs > 0) {
+			__wt_sleep(1, 0);
+			--secs;
+			continue;
+		}
+
+		/* LSM and data-sources don't support named checkpoints. */
+		ckpt_config = NULL;
+		backup_locked = false;
+		if (!DATASOURCE("helium") && !DATASOURCE("kvsbdb") &&
+		    !DATASOURCE("lsm"))
+			switch (mmrand(NULL, 1, 20)) {
+			case 1:
+				/*
+				 * 5% create a named snapshot. Rotate between a
+				 * few names to test multiple named snapshots in
+				 * the system.
+				 */
+				testutil_check(__wt_snprintf(
+				    config_buf, sizeof(config_buf),
+				    "name=mine.%" PRIu32, mmrand(NULL, 1, 4)));
+				ckpt_config = config_buf;
+				break;
+			case 2:
+				/*
+				 * 5% drop all named snapshots.
+				 * We can't drop checkpoints during a backup.
+				 */
+				ret = pthread_rwlock_trywrlock(&g.backup_lock);
+				if (ret == 0) {
+					backup_locked = true;
+					ckpt_config = "drop=(all)";
+				} else if (ret != EBUSY)
+					testutil_check(ret);
+				break;
+			}
+
+		testutil_check(session->checkpoint(session, ckpt_config));
+
+		if (backup_locked)
+			testutil_check(pthread_rwlock_unlock(&g.backup_lock));
+
+		secs = mmrand(NULL, 5, 40);
+	}
+
+	testutil_check(session->close(session, NULL));
+	return (WT_THREAD_RET_VALUE);
+}
+
+/*
  * timestamp --
  *	Periodically update the oldest timestamp.
  */
