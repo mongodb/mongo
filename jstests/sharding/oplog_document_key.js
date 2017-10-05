@@ -45,10 +45,10 @@
     // unsharded, only _id appears in o2:
 
     var a = oplog.findOne({ns: 'test.un', op: 'u', 'o2._id': 10});
-    assert.docEq(a.o2, {_id: 10});
+    assert.eq(a.o2, {_id: 10});
 
     var b = oplog.findOne({ns: 'test.un', op: 'u', 'o2._id': 30});
-    assert.docEq(b.o2, {_id: 30});
+    assert.eq(b.o2, {_id: 30});
 
     ////////////////////////////////////////////////////////////////////////
     jsTest.log("Test update command on 'byId'");
@@ -59,10 +59,10 @@
     // sharded by {_id: 1}: only _id appears in o2:
 
     a = oplog.findOne({ns: 'test.byId', op: 'u', 'o2._id': 11});
-    assert.docEq(a.o2, {_id: 11});
+    assert.eq(a.o2, {_id: 11});
 
     b = oplog.findOne({ns: 'test.byId', op: 'u', 'o2._id': 31});
-    assert.docEq(b.o2, {_id: 31});
+    assert.eq(b.o2, {_id: 31});
 
     ////////////////////////////////////////////////////////////////////////
     jsTest.log("Test update command on 'byX'");
@@ -73,10 +73,10 @@
     // sharded by {x: 1}: x appears in o2, followed by _id:
 
     a = oplog.findOne({ns: 'test.byX', op: 'u', 'o2._id': 12});
-    assert.docEq(a.o2, {x: 52, _id: 12});
+    assert.eq(a.o2, {x: 52, _id: 12});
 
     b = oplog.findOne({ns: 'test.byX', op: 'u', 'o2._id': 32});
-    assert.docEq(b.o2, {x: 72, _id: 32});
+    assert.eq(b.o2, {x: 72, _id: 32});
 
     ////////////////////////////////////////////////////////////////////////
     jsTest.log("Test update command on 'byXId'");
@@ -87,10 +87,10 @@
     // sharded by {x: 1, _id: 1}: x appears in o2, followed by _id:
 
     a = oplog.findOne({ns: 'test.byXId', op: 'u', 'o2._id': 13});
-    assert.docEq(a.o2, {x: 53, _id: 13});
+    assert.eq(a.o2, {x: 53, _id: 13});
 
     b = oplog.findOne({ns: 'test.byXId', op: 'u', 'o2._id': 33});
-    assert.docEq(b.o2, {x: 73, _id: 33});
+    assert.eq(b.o2, {x: 73, _id: 33});
 
     ////////////////////////////////////////////////////////////////////////
     jsTest.log("Test update command on 'byIdX'");
@@ -101,10 +101,10 @@
     // sharded by {_id: 1, x: 1}: _id appears in o2, followed by x:
 
     a = oplog.findOne({ns: 'test.byIdX', op: 'u', 'o2._id': 14});
-    assert.docEq(a.o2, {_id: 14, x: 54});
+    assert.eq(a.o2, {_id: 14, x: 54});
 
     b = oplog.findOne({ns: 'test.byIdX', op: 'u', 'o2._id': 34});
-    assert.docEq(b.o2, {_id: 34, x: 74});
+    assert.eq(b.o2, {_id: 34, x: 74});
 
     ////////////////////////////////////////////////////////////////////////
     jsTest.log("Test remove command: 'un'");
@@ -113,9 +113,9 @@
     assert.writeOK(db.un.remove({_id: 30}));
 
     a = oplog.findOne({ns: 'test.un', op: 'd', 'o._id': 10});
-    assert.docEq(a.o, {_id: 10});
+    assert.eq(a.o, {_id: 10});
     b = oplog.findOne({ns: 'test.un', op: 'd', 'o._id': 30});
-    assert.docEq(b.o, {_id: 30});
+    assert.eq(b.o, {_id: 30});
 
     ////////////////////////////////////////////////////////////////////////
     jsTest.log("Test remove command: 'byX'");
@@ -124,9 +124,9 @@
     assert.writeOK(db.byX.remove({_id: 32}));
 
     a = oplog.findOne({ns: 'test.byX', op: 'd', 'o._id': 12});
-    assert.docEq(a.o, {x: 52, _id: 12});
+    assert.eq(a.o, {x: 52, _id: 12});
     b = oplog.findOne({ns: 'test.byX', op: 'd', 'o._id': 32});
-    assert.docEq(b.o, {x: 72, _id: 32});
+    assert.eq(b.o, {x: 72, _id: 32});
 
     ////////////////////////////////////////////////////////////////////////
     jsTest.log("Test remove command: 'byXId'");
@@ -135,9 +135,9 @@
     assert.writeOK(db.byXId.remove({_id: 33}));
 
     a = oplog.findOne({ns: 'test.byXId', op: 'd', 'o._id': 13});
-    assert.docEq(a.o, {x: 53, _id: 13});
+    assert.eq(a.o, {x: 53, _id: 13});
     b = oplog.findOne({ns: 'test.byXId', op: 'd', 'o._id': 33});
-    assert.docEq(b.o, {x: 73, _id: 33});
+    assert.eq(b.o, {x: 73, _id: 33});
 
     ////////////////////////////////////////////////////////////////////////
     jsTest.log("Test remove command: 'byIdX'");
@@ -146,9 +146,9 @@
     assert.writeOK(db.byIdX.remove({_id: 34}));
 
     a = oplog.findOne({ns: 'test.byIdX', op: 'd', 'o._id': 14});
-    assert.docEq(a.o, {_id: 14, x: 54});
+    assert.eq(a.o, {_id: 14, x: 54});
     b = oplog.findOne({ns: 'test.byIdX', op: 'd', 'o._id': 34});
-    assert.docEq(b.o, {_id: 34, x: 74});
+    assert.eq(b.o, {_id: 34, x: 74});
 
     st.stop();
 })();
