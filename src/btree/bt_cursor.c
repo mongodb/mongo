@@ -334,7 +334,7 @@ __cursor_col_search(
 	WT_DECL_RET;
 
 	WT_WITH_PAGE_INDEX(session,
-	    ret = __wt_col_search(session, cbt->iface.recno, leaf, cbt));
+	    ret = __wt_col_search(session, cbt->iface.recno, leaf, cbt, false));
 	return (ret);
 }
 
@@ -348,8 +348,8 @@ __cursor_row_search(
 {
 	WT_DECL_RET;
 
-	WT_WITH_PAGE_INDEX(session,
-	    ret = __wt_row_search(session, &cbt->iface.key, leaf, cbt, insert));
+	WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(
+	    session, &cbt->iface.key, leaf, cbt, insert, false));
 	return (ret);
 }
 

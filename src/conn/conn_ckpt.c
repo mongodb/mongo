@@ -161,8 +161,11 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	 *
 	 * Checkpoint does enough I/O it may be called upon to perform slow
 	 * operations for the block manager.
+	 *
+	 * The checkpoint thread reads the lookaside table for outdated records,
+	 * it gets its own cursor for that purpose.
 	 */
-	session_flags = WT_SESSION_CAN_WAIT;
+	session_flags = WT_SESSION_CAN_WAIT | WT_SESSION_LOOKASIDE_CURSOR;
 	WT_RET(__wt_open_internal_session(conn,
 	    "checkpoint-server", true, session_flags, &conn->ckpt_session));
 	session = conn->ckpt_session;

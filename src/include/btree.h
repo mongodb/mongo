@@ -134,6 +134,7 @@ struct __wt_btree {
 	u_int	rec_multiblock_max;	/* Maximum blocks written for a page */
 
 	uint64_t last_recno;		/* Column-store last record number */
+	uint64_t las_pageid;		/* Lookaside table page ID counter */
 
 	WT_REF	root;			/* Root page reference */
 	bool	modified;		/* If the tree ever modified */

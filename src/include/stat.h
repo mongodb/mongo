@@ -341,6 +341,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_internal;
 	int64_t cache_eviction_split_internal;
 	int64_t cache_eviction_split_leaf;
+	int64_t cache_lookaside_entries;
 	int64_t cache_lookaside_insert;
 	int64_t cache_lookaside_remove;
 	int64_t cache_bytes_max;

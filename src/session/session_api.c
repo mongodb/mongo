@@ -1992,11 +1992,14 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	F_SET(session, session_flags | WT_SESSION_INTERNAL);
 
 	/*
+	 * Optionally acquire a lookaside table cursor (or clear caller's flag).
 	 * Acquiring the lookaside table cursor requires various locks; we've
 	 * seen problems in the past where deadlocks happened because sessions
 	 * deadlocked getting the cursor late in the process.  Be defensive,
 	 * get it now.
 	 */
+	if (!F_ISSET(conn, WT_CONN_LAS_OPEN))
+		F_CLR(session, WT_SESSION_LOOKASIDE_CURSOR);
 	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR) &&
 	    (ret = __wt_las_cursor_open(session, &session->las_cursor)) != 0) {
 		wt_session = &session->iface;

@@ -77,9 +77,6 @@ struct __wt_session_impl {
 	enum { WT_COMPACT_NONE=0,
 	    WT_COMPACT_RUNNING, WT_COMPACT_SUCCESS } compact_state;
 
-	/*
-	 * Lookaside table cursor, sweep and eviction worker threads only.
-	 */
 	WT_CURSOR	*las_cursor;	/* Lookaside table cursor */
 
 	WT_CURSOR *meta_cursor;		/* Metadata file */

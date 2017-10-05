@@ -205,7 +205,8 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
  */
 int
 __wt_row_search(WT_SESSION_IMPL *session,
-    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt, bool insert)
+    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt,
+    bool insert, bool restore)
 {
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
@@ -250,14 +251,13 @@ __wt_row_search(WT_SESSION_IMPL *session,
 
 	/*
 	 * We may be searching only a single leaf page, not the full tree. In
-	 * the normal case where the page links to a parent, check the page's
+	 * the normal case where we are searching a tree, check the page's
 	 * parent keys before doing the full search, it's faster when the
-	 * cursor is being re-positioned. (One case where the page doesn't
-	 * have a parent is if it is being re-instantiated in memory as part
-	 * of a split).
+	 * cursor is being re-positioned.  Skip this if the page is being
+	 * re-instantiated in memory.
 	 */
 	if (leaf != NULL) {
-		if (leaf->home != NULL) {
+		if (!restore) {
 			WT_RET(__check_leaf_key_range(
 			    session, srch_key, leaf, cbt));
 			if (cbt->compare != 0) {

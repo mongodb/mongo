@@ -61,6 +61,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         ('col_var', dict(empty=0, cacheSize='cache_size=20MB', extra_config=',key_format=r')),
         ('lsm', dict(empty=0, cacheSize='cache_size=31MB', extra_config=',type=lsm')),
         ('row', dict(empty=0, cacheSize='cache_size=20MB', extra_config='',)),
+        ('row-smallcache', dict(empty=0, cacheSize='cache_size=2MB', extra_config='',)),
     ]
 
     scenarios = make_scenarios(conncfg, types)

@@ -209,9 +209,9 @@ cursor_ops(WT_SESSION *session)
 	value.size = strlen("another value");
 	cursor->set_value(cursor, &value);
 	/*! [Set the cursor's raw value] */
-	}
 
 	error_check(cursor->insert(cursor));
+	}
 
 	/*! [Return the next record] */
 	error_check(cursor->next(cursor));

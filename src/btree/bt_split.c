@@ -1385,9 +1385,11 @@ __split_multi_inmem(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SAVE_UPD *supd;
-	WT_UPDATE *upd;
+	WT_UPDATE *prev_upd, *upd;
 	uint64_t recno;
 	uint32_t i, slot;
+
+	WT_ASSERT(session, multi->las_pageid == 0);
 
 	/*
 	 * In 04/2016, we removed column-store record numbers from the WT_PAGE
@@ -1434,7 +1436,7 @@ __split_multi_inmem(
 	__wt_btcur_open(&cbt);
 
 	/* Re-create each modification we couldn't write. */
-	for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd)
+	for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd) {
 		switch (orig->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
@@ -1443,7 +1445,8 @@ __split_multi_inmem(
 			recno = WT_INSERT_RECNO(supd->ins);
 
 			/* Search the page. */
-			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
+			WT_ERR(__wt_col_search(
+			    session, recno, ref, &cbt, true));
 
 			/* Apply the modification. */
 			WT_ERR(__wt_col_modify(session, &cbt,
@@ -1465,7 +1468,8 @@ __split_multi_inmem(
 			}
 
 			/* Search the page. */
-			WT_ERR(__wt_row_search(session, key, ref, &cbt, true));
+			WT_ERR(__wt_row_search(
+			    session, key, ref, &cbt, true, true));
 
 			/* Apply the modification. */
 			WT_ERR(__wt_row_modify(session,
@@ -1473,6 +1477,27 @@ __split_multi_inmem(
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
+
+		/*
+		 * The update used to create the on-page disk image must be
+		 * truncated.  This is not just a performance issue: if the
+		 * update is a modification, it cannot safely be reapplied to
+		 * the full value stored on disk.
+		 */
+		if (supd->onpage_upd != NULL) {
+			for (prev_upd = upd; prev_upd != NULL &&
+			    prev_upd->next != supd->onpage_upd;
+			    prev_upd = prev_upd->next)
+				;
+			if (prev_upd != NULL) {
+				WT_ASSERT(session,
+				    prev_upd->next == supd->onpage_upd);
+				__wt_update_obsolete_free(
+				    session, page, prev_upd->next);
+				prev_upd->next = NULL;
+			}
+		}
+	}
 
 	/*
 	 * When modifying the page we set the first dirty transaction to the
@@ -1620,7 +1645,16 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		addr->type = multi->addr.type;
 		WT_RET(__wt_memdup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
-		ref->state = WT_REF_DISK;
+		if (multi->las_pageid != 0) {
+			WT_RET(__wt_calloc_one(session, &ref->page_las));
+			ref->page_las->las_pageid = multi->las_pageid;
+#ifdef HAVE_TIMESTAMPS
+			__wt_timestamp_set(&ref->page_las->min_timestamp,
+			    &multi->las_min_timestamp);
+#endif
+			ref->state = WT_REF_LOOKASIDE;
+		} else
+			ref->state = WT_REF_DISK;
 	}
 
 	/*

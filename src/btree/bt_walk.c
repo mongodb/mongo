@@ -472,6 +472,11 @@ restart:	/*
 				if (LF_ISSET(WT_READ_NO_WAIT) &&
 				    ref->state != WT_REF_MEM)
 					break;
+
+				/* Skip lookaside pages if not requested. */
+				if (ref->state == WT_REF_LOOKASIDE &&
+				    !LF_ISSET(WT_READ_LOOKASIDE))
+					break;
 			} else if (LF_ISSET(WT_READ_TRUNCATE)) {
 				/*
 				 * Avoid pulling a deleted page back in to try
