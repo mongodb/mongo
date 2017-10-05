@@ -1999,6 +1999,18 @@ def doConfigure(myenv):
         # it isn't required
         AddToCXXFLAGSIfSupported(myenv, "-Wno-instantiation-after-specialization")
 
+        # This warning was added in clang-5 and flags many of our lambdas. Since it isn't actively
+        # harmful to capture unused variables we are suppressing for now with a plan to fix later.
+        # Additionally, this has some false-positives where removing the capture makes the code
+        # incorrect and fail to compile on other compilers.
+        # See https://bugs.llvm.org/show_bug.cgi?id=34865.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-unused-lambda-capture")
+
+        # This warning was added in clang-5 and incorrectly flags our implementation of
+        # exceptionToStatus(). See https://bugs.llvm.org/show_bug.cgi?id=34804
+        AddToCCFLAGSIfSupported(myenv, "-Wno-exceptions")
+
+
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
         # it shouldn't.
