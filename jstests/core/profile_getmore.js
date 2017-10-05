@@ -24,12 +24,13 @@
     var cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).batchSize(2);
     cursor.next();  // Perform initial query and consume first of 2 docs returned.
 
-    var cursorId = getLatestProfilerEntry(testDB).cursorid;  // Save cursorid from find.
+    var cursorId =
+        getLatestProfilerEntry(testDB, {op: "query"}).cursorid;  // Save cursorid from find.
 
     cursor.next();  // Consume second of 2 docs from initial query.
     cursor.next();  // getMore performed, leaving open cursor.
 
-    var profileObj = getLatestProfilerEntry(testDB);
+    var profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "getmore", tojson(profileObj));
@@ -67,7 +68,7 @@
     cursor.next();  // Consume second of 2 docs from initial query.
     cursor.next();  // getMore performed, leaving open cursor.
 
-    profileObj = getLatestProfilerEntry(testDB);
+    profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
     assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
 
@@ -83,7 +84,7 @@
     cursor.next();     // Perform initial query and consume first of 3 docs returned.
     cursor.itcount();  // Exhaust the cursor.
 
-    profileObj = getLatestProfilerEntry(testDB);
+    profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
     assert(profileObj.hasOwnProperty("cursorid"),
            tojson(profileObj));  // cursorid should always be present on getMore.
@@ -101,12 +102,12 @@
     assert.commandWorked(coll.createIndex({a: 1}));
 
     var cursor = coll.aggregate([{$match: {a: {$gte: 0}}}], {cursor: {batchSize: 0}});
-    var cursorId = getLatestProfilerEntry(testDB).cursorid;
+    var cursorId = getLatestProfilerEntry(testDB, {"command.aggregate": coll.getName()}).cursorid;
     assert.neq(0, cursorId);
 
     cursor.next();  // Consume the result set.
 
-    profileObj = getLatestProfilerEntry(testDB);
+    profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "getmore", tojson(profileObj));
