@@ -38,7 +38,8 @@ var $config = (function() {
 
             // Fail the test on any write error, except for a duplicate key error, which can
             // (rarely) happen when we accidentally choose the same random key more than once.
-            assert(!res.hasWriteError() || res.getWriteError().code == ErrorCodes.DuplicateKey);
+            assert(!res.hasWriteError() || res.getWriteError().code == ErrorCodes.DuplicateKey,
+                   "Failed insert: " + tojson(res));
             assert.writeOK(db[collName].update({_id: insertID}, {$set: {b: 1, a: 1}}));
         }
 
