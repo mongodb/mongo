@@ -79,26 +79,6 @@ var RandomOps = {
         return created;
     },
 
-    /*
-     * Return a random non-system.indexes collection from the 'user created' collections.
-     */
-    getRandomExistingCollection: function(conn) {
-        var dbs = this.getCreatedDatabases(conn);
-        if (dbs.length === 0) {
-            return null;
-        }
-        var dbName = this.randomChoice(dbs);
-        var db = conn.getDB(dbName);
-        if (db.getCollectionNames().length <= 1) {
-            return null;
-        }
-        var coll = this.randomChoice(db.getCollectionNames());
-        while (coll == "system.indexes") {
-            coll = this.randomChoice(db.getCollectionNames());
-        }
-        return db[coll];
-    },
-
     getRandomDoc: function(collection) {
         try {
             var randIndex = Random.randInt(0, collection.find().count());
@@ -109,21 +89,33 @@ var RandomOps = {
     },
 
     /*
-     * Returns a random user defined collection, selecting from only those for which filterFn
-     * returns true, or null if there are none.
+     * Returns a random user defined collection.
+     *
+     * The second parameter is a function that should return false if it wants to filter out
+     * a collection from the list.
+     *
+     * If no collections exist, this returns null.
      */
-    getRandomCollectionWFilter: function(conn, filterFn) {
+    getRandomExistingCollection: function(conn, filterFn) {
         var matched = [];
         var dbs = this.getCreatedDatabases(conn);
         for (var i in dbs) {
             var dbName = dbs[i];
-            var colls = conn.getDB(dbName).getCollectionNames();
-            for (var j in colls) {
-                var coll = colls[j];
-                if (filterFn(dbName, coll)) {
-                    matched.push(coll);
-                }
-            }
+            var colls = conn.getDB(dbName)
+                            .getCollectionNames()
+                            .filter(function(collName) {
+                                if (collName == "system.indexes") {
+                                    return false;
+                                } else if (filterFn && !filterFn(dbName, collName)) {
+                                    return false;
+                                } else {
+                                    return true;
+                                }
+                            })
+                            .map(function(collName) {
+                                return conn.getDB(dbName).getCollection(collName);
+                            });
+            Array.prototype.push.apply(matched, colls);
         }
         if (matched.length === 0) {
             return null;
@@ -339,7 +331,7 @@ var RandomOps = {
         var isCapped = function(dbName, coll) {
             return conn.getDB(dbName)[coll].isCapped();
         };
-        var coll = this.getRandomCollectionWFilter(conn, isCapped);
+        var coll = this.getRandomExistingCollection(conn, isCapped);
         if (coll === null) {
             return null;
         }
@@ -404,9 +396,9 @@ var RandomOps = {
      */
     convertToCapped: function(conn) {
         var isNotCapped = function(dbName, coll) {
-            return conn.getDB(dbName)[coll].isCapped();
+            return !conn.getDB(dbName)[coll].isCapped();
         };
-        var coll = this.getRandomCollectionWFilter(conn, isNotCapped);
+        var coll = this.getRandomExistingCollection(conn, isNotCapped);
         if (coll === null) {
             return null;
         }
