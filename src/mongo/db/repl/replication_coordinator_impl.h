@@ -1151,9 +1151,8 @@ private:
     // (PS) Pointer is read-only in concurrent operation, item pointed to is self-synchronizing;
     //      Access in any context.
     // (M)  Reads and writes guarded by _mutex
-    // (GM) Readable under a global intent lock.  Must either hold global lock in exclusive
-    //      mode (MODE_X) or both hold global lock in shared mode (MODE_S) and hold _mutex
-    //      to write.
+    // (GM) Readable under any global intent lock.  Must hold both the global lock in exclusive
+    //      mode (MODE_X) and hold _mutex to write.
     // (I)  Independently synchronized, see member variable comment.
 
     // Protects member data of this ReplicationCoordinator.
