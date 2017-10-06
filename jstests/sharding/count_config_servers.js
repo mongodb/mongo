@@ -2,6 +2,11 @@
  * Test count commands against the config servers, including when some of them are down.
  * This test fails when run with authentication due to SERVER-6327
  */
+
+// Checking UUID consistency requires querying the config primary, but this test shuts down 2 out of
+// the 3 config servers. Therefore, we cannot do the check on this test.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 
