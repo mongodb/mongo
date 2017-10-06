@@ -132,24 +132,31 @@ class _TestList(object):
     """
     A list of tests on which filtering operations can be applied.
 
-    The tests will often be file paths but they do not need to be.
-    The are following tests are assumed to be file paths:
-    - an element of the 'roots' argument to __init__() that is a glob pattern,
-    - an element of the 'include_files' argument to include_files(),
-    - an element of the 'exclude_files' argument to exclude_files().
+    Args:
+        test_file_explorer: a TestFileExplorer instance.
+        roots: a list of tests to initialize the _TestList with.
+        tests_are_files: indicates if the tests are file paths. If so the _TestList will perform
+            glob expansion of paths and check if they are existing files. If not, calling
+            'include_files()' or 'exclude_files()' will raise an TypeError.
     """
-    def __init__(self, test_file_explorer, roots):
+    def __init__(self, test_file_explorer, roots, tests_are_files=True):
         """Initializes the _TestList with a TestFileExplorer component and a list of root tests."""
         self._test_file_explorer = test_file_explorer
-        self._roots = self._expand(roots)
+        self._tests_are_files = tests_are_files
+        self._roots = self._expand_files(roots) if tests_are_files else roots
         self._filtered = set(self._roots)
 
-    def _expand(self, tests):
+    def _expand_files(self, tests):
         expanded_tests = []
         for test in tests:
             if self._test_file_explorer.is_glob_pattern(test):
-                expanded_tests.extend(self._test_file_explorer.iglob(test))
+                expanded = list(self._test_file_explorer.iglob(test))
+                if not expanded:
+                    raise ValueError("Pattern does not match any files: {}".format(test))
+                expanded_tests.extend(expanded)
             else:
+                if not self._test_file_explorer.isfile(test):
+                    raise ValueError("Unrecognized test file: {}".format(test))
                 expanded_tests.append(test)
         return expanded_tests
 
@@ -161,6 +168,8 @@ class _TestList(object):
              force: if True include the matching files that were previously excluded, otherwise
                 only include files that match and were not previously excluded from this _TestList.
         """
+        if not self._tests_are_files:
+            raise TypeError("_TestList does not contain files.")
         expanded_include_files = set()
         for path in include_files:
             if self._test_file_explorer.is_glob_pattern(path):
@@ -180,6 +189,8 @@ class _TestList(object):
             ValueError: if exclude_files contains a non-globbed path that does not correspond to
                 an existing file.
         """
+        if not self._tests_are_files:
+            raise TypeError("_TestList does not contain files.")
         for path in exclude_files:
             if self._test_file_explorer.is_glob_pattern(path):
                 paths = self._test_file_explorer.iglob(path)
@@ -383,7 +394,7 @@ class _SelectorConfig(object):
 
 class _Selector(object):
     """Selection algorithm to select tests matching a selector configuration."""
-    def __init__(self, test_file_explorer):
+    def __init__(self, test_file_explorer, tests_are_files=True):
         """
         Initializes the _Selector.
 
@@ -391,6 +402,7 @@ class _Selector(object):
             test_file_explorer: a TestFileExplorer instance.
         """
         self._test_file_explorer = test_file_explorer
+        self._tests_are_files = tests_are_files
 
     def select(self, selector_config):
         """Select the test files that match the given configuration.
@@ -406,15 +418,15 @@ class _Selector(object):
             roots = self._test_file_explorer.read_root_file(selector_config.root)
 
         # 2. Create a _TestList.
-        test_list = _TestList(self._test_file_explorer, roots)
+        test_list = _TestList(self._test_file_explorer, roots, self._tests_are_files)
         # 3. Apply the exclude_files.
-        if selector_config.exclude_files:
+        if self._tests_are_files and selector_config.exclude_files:
             test_list.exclude_files(selector_config.exclude_files)
         # 4. Apply the tag filters.
         if selector_config.tags_expression:
             test_list.match_tag_expression(selector_config.tags_expression, self.get_tags)
         # 5. Apply the include files last with force=True to take precedence over the tags.
-        if selector_config.include_files:
+        if self._tests_are_files and selector_config.include_files:
             test_list.include_files(selector_config.include_files, force=True)
         return test_list.get_tests()
 
@@ -472,7 +484,8 @@ class _CppTestSelector(_Selector):
         if selector_config.roots:
             # Tests have been specified on the command line. We use them without additional
             # filtering.
-            return selector_config.roots
+            test_list = _TestList(self._test_file_explorer, selector_config.roots)
+            return test_list.get_tests()
         return _Selector.select(self, selector_config)
 
 
@@ -495,7 +508,7 @@ class _DbTestSelectorConfig(_SelectorConfig):
 class _DbTestSelector(_Selector):
     """_Selector subclass for db_test tests."""
     def __init__(self, test_file_explorer):
-        _Selector.__init__(self, test_file_explorer)
+        _Selector.__init__(self, test_file_explorer, tests_are_files=False)
 
     def select(self, selector_config):
         if config.INCLUDE_WITH_ANY_TAGS:
@@ -509,14 +522,14 @@ class _DbTestSelector(_Selector):
             return selector_config.roots
 
         if not self._test_file_explorer.isfile(selector_config.binary):
-            raise IOError(errno.ENOENT, "File not found", selector_config.binaryy)
+            raise IOError(errno.ENOENT, "File not found", selector_config.binary)
 
         dbtests = self._test_file_explorer.list_dbtests(selector_config.binary)
 
         if not selector_config.include_suites:
             return dbtests
 
-        test_files = _TestList(self._test_file_explorer, dbtests)
+        test_files = _TestList(self._test_file_explorer, dbtests, tests_are_files=False)
         test_files.include_any_pattern(selector_config.include_suites)
 
         return test_files.get_tests()

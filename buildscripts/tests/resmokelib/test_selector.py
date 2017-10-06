@@ -115,12 +115,16 @@ class MockTestFileExplorer(object):
         self.files = ["dir/subdir1/test11.js",
                       "dir/subdir1/test12.js",
                       "dir/subdir2/test21.js",
-                      "dir/subdir3/a/test3a1.js"]
+                      "dir/subdir3/a/test3a1.js",
+                      "build/testA",
+                      "build/testB",
+                      "build/testC",
+                      "dbtest"]
         self.tags = {"dir/subdir1/test11.js": ["tag1", "tag2"],
                      "dir/subdir1/test12.js": ["tag3"],
                      "dir/subdir2/test21.js": ["tag2", "tag4"],
                      "dir/subdir3/a/test3a1.js": ["tag4", "tag5"]}
-        self.binary = "bin/executable"
+        self.binary = "dbtest"
         self.jstest_tag_file = {"dir/subdir1/test11.js": "tagA",
                                 "dir/subdir3/a/test3a1.js": "tagB"}
 
@@ -138,13 +142,13 @@ class MockTestFileExplorer(object):
         return self.tags.get(file_path, [])
 
     def read_root_file(self, root_file_path):
-        return ["dir/root/testA.cpp", "dir/root/testB.cpp"]
+        return ["build/testA", "build/testB"]
 
     def fnmatchcase(self, name, pattern):
         return fnmatch.fnmatchcase(name, pattern)
 
     def isfile(self, path):
-        return path == self.binary
+        return path in self.files
 
     def list_dbtests(self, binary):
         return ["dbtestA", "dbtestB", "dbtestC"]
@@ -163,7 +167,7 @@ class TestTestList(unittest.TestCase):
 
     def test_roots(self):
         roots = ["a", "b"]
-        test_list = selector._TestList(self.test_file_explorer, roots)
+        test_list = selector._TestList(self.test_file_explorer, roots, tests_are_files=False)
         self.assertEqual(roots, test_list.get_tests())
 
     def test_roots_with_glob(self):
@@ -171,6 +175,16 @@ class TestTestList(unittest.TestCase):
         expected_roots = ["dir/subdir1/test11.js", "dir/subdir1/test12.js"]
         test_list = selector._TestList(self.test_file_explorer, glob_roots)
         self.assertEqual(expected_roots, test_list.get_tests())
+
+    def test_roots_with_unmatching_glob(self):
+        glob_roots = ["unknown/subdir1/*.js"]
+        with self.assertRaisesRegexp(ValueError, "Pattern does not match any files: unknown/subdir1/\*.js"):
+            selector._TestList(self.test_file_explorer, glob_roots)
+
+    def test_roots_unknown_file(self):
+        roots = ["dir/subdir1/unknown"]
+        with self.assertRaisesRegexp(ValueError, "Unrecognized test file: dir/subdir1/unknown"):
+            selector._TestList(self.test_file_explorer, roots, tests_are_files=True)
 
     def test_include_files(self):
         roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*"]
@@ -258,6 +272,14 @@ class TestTestList(unittest.TestCase):
         test_list.include_files(["dir/subdir1/test11.js"], force=True)
         self.assertEqual(["dir/subdir1/test11.js"], test_list.get_tests())
 
+    def test_tests_are_not_files(self):
+        roots = ["a", "b"]
+        test_list = selector._TestList(self.test_file_explorer, roots, tests_are_files=False)
+        with self.assertRaises(TypeError):
+            test_list.include_files([])
+        with self.assertRaises(TypeError):
+            test_list.exclude_files([])
+
 
 class TestSelectorConfig(unittest.TestCase):
     def test_root_roots(self):
@@ -327,17 +349,25 @@ class TestFilterTests(unittest.TestCase):
     def test_cpp_all(self):
         config = {"root": "integrationtest.txt"}
         selected = selector.filter_tests("cpp_integration_test", config, self.test_file_explorer)
-        self.assertEqual(["dir/root/testA.cpp", "dir/root/testB.cpp"], selected)
+        self.assertEqual(["build/testA", "build/testB"], selected)
 
     def test_cpp_roots_override(self):
         # When roots are specified for cpp tests they override all filtering since
         # 'roots' are populated with the command line arguments.
         config = {"include_files": "unknown_file",
-                  "roots": ["cpptestOverride"]}
+                  "roots": ["build/testC"]}
         selected = selector.filter_tests("cpp_unit_test", config, self.test_file_explorer)
-        self.assertEqual(["cpptestOverride"], selected)
+        self.assertEqual(["build/testC"], selected)
         selected = selector.filter_tests("cpp_integration_test", config, self.test_file_explorer)
-        self.assertEqual(["cpptestOverride"], selected)
+        self.assertEqual(["build/testC"], selected)
+
+    def test_cpp_expand_roots(self):
+        config = {"root": "integrationtest.txt", "roots": ["build/test*"]}
+        selected = selector.filter_tests("cpp_integration_test", config, self.test_file_explorer)
+        self.assertEqual(["build/testA", "build/testB", "build/testC"], selected)
+
+        selected = selector.filter_tests("cpp_unit_test", config, self.test_file_explorer)
+        self.assertEqual(["build/testA", "build/testB", "build/testC"], selected)
 
     def test_cpp_with_any_tags(self):
         buildscripts.resmokelib.config.INCLUDE_WITH_ANY_TAGS = ["tag1"]
@@ -387,6 +417,11 @@ class TestFilterTests(unittest.TestCase):
         selected = selector.filter_tests("js_test", config, self.test_file_explorer)
         self.assertEqual(["dir/subdir1/test11.js",
                           "dir/subdir2/test21.js"], selected)
+
+    def test_jstest_unknown_file(self):
+        config = {"roots": ["dir/subdir1/*.js", "dir/subdir1/unknown"]}
+        with self.assertRaisesRegexp(ValueError, "Unrecognized test file: dir/subdir1/unknown"):
+            selector.filter_tests("js_test", config, self.test_file_explorer)
 
     def test_json_schema_exclude_files(self):
         config = {"roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"],

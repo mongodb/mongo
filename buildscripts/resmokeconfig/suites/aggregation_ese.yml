@@ -10,7 +10,6 @@ selector:
   - jstests/aggregation/bugs/*.js
   - jstests/aggregation/expressions/*.js
   - jstests/aggregation/sources/*/*.js
-  - src/mongo/db/modules/*/jstests/aggregation/*.js
   exclude_files:
   # Skip any tests that run with auth explicitly.
   - jstests/aggregation/*[aA]uth*.js
