@@ -373,6 +373,7 @@ class TestUpdateTags(unittest.TestCase):
         summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(collections.OrderedDict(), self.assert_has_only_js_tests(lifecycle))
 
+        tests = ["jstests/core/all.js"]
         report = test_failures.Report([
             self.ENTRY._replace(num_pass=0, num_fail=1),
             self.ENTRY._replace(num_pass=0, num_fail=1, task="jsCore"),
@@ -382,7 +383,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, expected_tags)
 
@@ -468,6 +469,7 @@ class TestUpdateTags(unittest.TestCase):
         summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
+        tests = ["jstests/core/all.js"]
         report = test_failures.Report([
             self.ENTRY._replace(num_pass=1, num_fail=0),
             self.ENTRY._replace(num_pass=1, num_fail=0, task="jsCore"),
@@ -477,9 +479,91 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, collections.OrderedDict())
+
+    def test_non_running_in_reliable_period_is_reliable(self):
+        """
+        Tests that tests that have a failure rate above the unacceptable rate during the unreliable
+        period but haven't run during the reliable period are marked as reliable.
+        """
+        # Unreliable period is 2 days: 2017-06-03 to 2017-06-04.
+        # Reliable period is 1 day: 2016-06-04.
+        reliable_period_date = datetime.date(2017, 6, 4)
+        config = self.CONFIG._replace(
+            test_fail_rates=self.CONFIG.test_fail_rates._replace(unacceptable=0.1),
+            task_fail_rates=self.CONFIG.task_fail_rates._replace(unacceptable=0.1),
+            variant_fail_rates=self.CONFIG.variant_fail_rates._replace(unacceptable=0.1),
+            distro_fail_rates=self.CONFIG.distro_fail_rates._replace(unacceptable=0.1),
+            unreliable_time_period=datetime.timedelta(days=2))
+
+        tests = ["jstests/core/all.js"]
+        initial_tags = collections.OrderedDict([
+            ("jstests/core/all.js", [
+                "unreliable",
+                "unreliable|jsCore_WT",
+                "unreliable|jsCore_WT|linux-64",
+                "unreliable|jsCore_WT|linux-64|rhel62",
+            ]),
+        ])
+
+        lifecycle = ci_tags.TagsConfig.from_dict(
+            dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
+        self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
+
+        # The test did not run on the reliable period on linux-64.
+        report = test_failures.Report([
+            # Failing.
+            self.ENTRY._replace(num_pass=0,
+                                num_fail=2),
+            # Passing on a different variant.
+            self.ENTRY._replace(start_date=reliable_period_date,
+                                end_date=reliable_period_date,
+                                num_pass=3,
+                                num_fail=0,
+                                variant="linux-alt",
+                                distro="debian7"),
+        ])
+
+        update_test_lifecycle.validate_config(config)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
+        updated_tags = self.assert_has_only_js_tests(lifecycle)
+        # The tags for variant and distro have been removed.
+        self.assertEqual(updated_tags, collections.OrderedDict([
+            ("jstests/core/all.js", ["unreliable", "unreliable|jsCore_WT"])]))
+
+    def test_non_running_at_all_is_reliable(self):
+        """
+        Tests that tests that are tagged as unreliable but no longer running (either during the
+        reliable or the unreliable period) have their tags removed.
+        """
+        config = self.CONFIG
+
+        tests = ["jstests/core/all.js", "jstests/core/all2.js"]
+        initial_tags = collections.OrderedDict([
+            ("jstests/core/all2.js", [
+                "unreliable",
+                "unreliable|jsCore_WT",
+                "unreliable|jsCore_WT|linux-64",
+                "unreliable|jsCore_WT|linux-64|rhel62",
+            ]),
+        ])
+
+        lifecycle = ci_tags.TagsConfig.from_dict(
+            dict(selector=dict(js_test=copy.deepcopy(initial_tags))))
+        summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
+        self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
+
+        # all2.js did not run at all
+        report = test_failures.Report([self.ENTRY])
+
+        update_test_lifecycle.validate_config(config)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
+        updated_tags = self.assert_has_only_js_tests(lifecycle)
+        # The tags for variant and distro have been removed.
+        self.assertEqual(updated_tags, collections.OrderedDict([]))
 
     def test_transition_test_from_unreliable_to_reliable(self):
         """
@@ -571,6 +655,7 @@ class TestUpdateTags(unittest.TestCase):
         summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
+        tests = ["jstests/core/all.js"]
         report = test_failures.Report([
             self.ENTRY._replace(num_pass=1, num_fail=0),
             self.ENTRY._replace(num_pass=1, num_fail=0, task="jsCore"),
@@ -580,7 +665,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, initial_tags)
 
@@ -609,6 +694,7 @@ class TestUpdateTags(unittest.TestCase):
         summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
+        tests = ["jstests/core/all.js"]
         report = test_failures.Report([
             self.ENTRY._replace(num_pass=0, num_fail=1),
             self.ENTRY._replace(num_pass=0, num_fail=1, task="jsCore"),
@@ -618,7 +704,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, initial_tags)
 
@@ -660,6 +746,7 @@ class TestUpdateTags(unittest.TestCase):
         summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
+        tests = ["jstests/core/all.js"]
         report = test_failures.Report([
             self.ENTRY._replace(start_date=(self.ENTRY.start_date - datetime.timedelta(days=1)),
                                 end_date=(self.ENTRY.end_date - datetime.timedelta(days=1)),
@@ -677,7 +764,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, collections.OrderedDict([
             ("jstests/core/all.js", [
@@ -707,6 +794,7 @@ class TestUpdateTags(unittest.TestCase):
         summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
+        tests = ["jstests/core/all.js"]
         report = test_failures.Report([
             self.ENTRY._replace(num_pass=0, num_fail=1),
             self.ENTRY._replace(num_pass=0, num_fail=1, task="jsCore"),
@@ -716,7 +804,7 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, initial_tags)
 
@@ -745,6 +833,7 @@ class TestUpdateTags(unittest.TestCase):
         summary_lifecycle = update_test_lifecycle.TagsConfigWithChangelog(lifecycle)
         self.assertEqual(initial_tags, self.assert_has_only_js_tests(lifecycle))
 
+        tests = ["jstests/core/all.js"]
         report = test_failures.Report([
             self.ENTRY._replace(start_date=(self.ENTRY.start_date - datetime.timedelta(days=1)),
                                 end_date=(self.ENTRY.end_date - datetime.timedelta(days=1)),
@@ -762,9 +851,51 @@ class TestUpdateTags(unittest.TestCase):
         ])
 
         update_test_lifecycle.validate_config(config)
-        update_test_lifecycle.update_tags(summary_lifecycle, config, report)
+        update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         self.assertEqual(updated_tags, collections.OrderedDict())
+
+
+class TestCombinationHelpers(unittest.TestCase):
+    def test_from_entry(self):
+        entry = test_failures._ReportEntry(
+            "testA", "taskA", "variantA", "distroA",
+            datetime.date.today(),
+            datetime.date.today(), 0, 0)
+        combination = update_test_lifecycle._test_combination_from_entry(
+            entry, test_failures.Report.TEST)
+        self.assertEqual(combination, ("testA",))
+
+        combination = update_test_lifecycle._test_combination_from_entry(
+            entry, test_failures.Report.TEST_TASK)
+        self.assertEqual(combination, ("testA", "taskA"))
+
+        combination = update_test_lifecycle._test_combination_from_entry(
+            entry, test_failures.Report.TEST_TASK_VARIANT)
+        self.assertEqual(combination, ("testA", "taskA", "variantA"))
+
+        combination = update_test_lifecycle._test_combination_from_entry(
+            entry, test_failures.Report.TEST_TASK_VARIANT_DISTRO)
+        self.assertEqual(combination, ("testA", "taskA", "variantA", "distroA"))
+
+    def test_make_from_tag(self):
+        test = "testA"
+
+        combination = update_test_lifecycle._test_combination_from_tag(
+            test, "unreliable")
+        self.assertEqual(combination, ("testA",))
+
+        combination = update_test_lifecycle._test_combination_from_tag(
+            test, "unreliable|taskA")
+        self.assertEqual(combination, ("testA", "taskA"))
+
+        combination = update_test_lifecycle._test_combination_from_tag(
+            test, "unreliable|taskA|variantA")
+        self.assertEqual(combination, ("testA", "taskA", "variantA"))
+
+        combination = update_test_lifecycle._test_combination_from_tag(
+            test, "unreliable|taskA|variantA|distroA")
+        self.assertEqual(combination, ("testA", "taskA", "variantA", "distroA"))
 
 
 class TestCleanUpTags(unittest.TestCase):
@@ -847,11 +978,11 @@ class TestJiraIssueCreator(unittest.TestCase):
         desc = update_test_lifecycle.JiraIssueCreator._make_updated_tags_description(data)
         expected = ("- *js_test*\n"
                     "-- {{testfile1}}\n"
-                    "--- {{tag1}} (0.10 %)\n"
-                    "--- {{tag2}} (0.20 %)\n"
+                    "--- {{tag1}} (0.10)\n"
+                    "--- {{tag2}} (0.20)\n"
                     "-- {{testfile2}}\n"
-                    "--- {{tag1}} (0.10 %)\n"
-                    "--- {{tag3}} (0.30 %)")
+                    "--- {{tag1}} (0.10)\n"
+                    "--- {{tag3}} (0.30)")
         self.assertEqual(expected, desc)
 
     def test_description_empty(self):

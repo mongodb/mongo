@@ -12,6 +12,7 @@ import collections
 import datetime
 import logging
 import multiprocessing.dummy
+import operator
 import optparse
 import os.path
 import posixpath
@@ -328,10 +329,35 @@ def validate_config(config):
                     name, time_period))
 
 
-def update_tags(lifecycle_tags, config, report):
+def _test_combination_from_entry(entry, components):
+    """Creates a test combination tuple from a tf._ReportEntry and target components.
+
+    Returns:
+        A tuple containing the entry fields specified in components.
     """
-    Updates the tags in 'lifecycle_tags' based on the historical test failures mentioned in
-    'report' according to the model described by 'config'.
+    combination = []
+    for component in components:
+        combination.append(operator.attrgetter(component)(entry))
+    return tuple(combination)
+
+
+def _test_combination_from_tag(test, tag):
+    """Creates a test combination tuple from a test name and a tag.
+
+    Returns:
+        A tuple containing the test name and the components found in the tag.
+    """
+    combination = [test]
+    for element in _split_tag(tag):
+        if element:
+            combination.append(element)
+    return tuple(combination)
+
+
+def update_tags(lifecycle_tags, config, report, tests):
+    """
+    Updates the tags in 'lifecycle_tags' based on the historical test failures of tests 'tests'
+    mentioned in 'report' according to the model described by 'config'.
     """
 
     # We initialize 'grouped_entries' to make PyLint not complain about 'grouped_entries' being used
@@ -350,11 +376,30 @@ def update_tags(lifecycle_tags, config, report):
         # those components, etc.
         grouped_entries = report.summarize_by(components, time_period=tf.Report.DAILY)
 
+        # Create the reliable report.
+        # Filter out any test executions from prior to 'config.reliable_time_period'.
+        reliable_start_date = (report.end_date - config.reliable_time_period
+                               + datetime.timedelta(days=1))
+        reliable_entries = [entry for entry in grouped_entries
+                            if entry.start_date >= reliable_start_date]
+        reliable_report = tf.Report(reliable_entries)
+        reliable_combinations = {_test_combination_from_entry(entry, components)
+                                 for entry in reliable_entries}
+
+        # Create the unreliable report.
         # Filter out any test executions from prior to 'config.unreliable_time_period'.
+        # Also filter out any test that is not present in the reliable_report in order
+        # to avoid tagging as unreliable tests that are no longer running.
         unreliable_start_date = (report.end_date - config.unreliable_time_period
                                  + datetime.timedelta(days=1))
-        unreliable_report = tf.Report(entry for entry in grouped_entries
-                                      if entry.start_date >= unreliable_start_date)
+        unreliable_entries = [
+            entry for entry in grouped_entries
+            if (entry.start_date >= unreliable_start_date and
+                _test_combination_from_entry(entry, components) in reliable_combinations)
+        ]
+        unreliable_report = tf.Report(unreliable_entries)
+
+        # Update the tags using the unreliable report.
         update_lifecycle(lifecycle_tags,
                          unreliable_report.summarize_by(components),
                          unreliable_test,
@@ -362,17 +407,29 @@ def update_tags(lifecycle_tags, config, report):
                          rates.unacceptable,
                          config.unreliable_min_runs)
 
-        # Filter out any test executions from prior to 'config.reliable_time_period'.
-        reliable_start_date = (report.end_date - config.reliable_time_period
-                               + datetime.timedelta(days=1))
-        reliable_report = tf.Report(entry for entry in grouped_entries
-                                    if entry.start_date >= reliable_start_date)
+        # Update the tags using the reliable report.
         update_lifecycle(lifecycle_tags,
                          reliable_report.summarize_by(components),
                          reliable_test,
                          False,
                          rates.acceptable,
                          config.reliable_min_runs)
+
+        def should_be_removed(test, tag):
+            combination = _test_combination_from_tag(test, tag)
+            if len(combination) != len(components):
+                # The tag is not for these components.
+                return False
+            return combination not in reliable_combinations
+
+        # Remove the tags that correspond to tests that have not run during the reliable period.
+        for test in tests:
+            tags = lifecycle_tags.lifecycle.get_tags("js_test", test)
+            for tag in tags[:]:
+                if should_be_removed(test, tag):
+                    LOGGER.info("Removing tag '%s' of test '%s' because the combination did not run"
+                                " during the reliable period", tag, test)
+                    lifecycle_tags.remove_tag("js_test", test, tag, failure_rate=0)
 
 
 def _split_tag(tag):
@@ -566,7 +623,7 @@ class JiraIssueCreator(object):
                 tags_lines.append("-- {0}".format(mono(test)))
                 for tag in sorted(tags.keys()):
                     coefficient = tags[tag]
-                    tags_lines.append("--- {0} ({1:.2})".format(mono(tag), coefficient))
+                    tags_lines.append("--- {0} ({1:.2f})".format(mono(tag), coefficient))
         if tags_lines:
             return "\n".join(tags_lines)
         else:
@@ -1111,7 +1168,7 @@ def main():
             continue
         history_data = test_history_source.get_history_data(tests, tasks)
         report = tf.Report(history_data)
-        update_tags(lifecycle_tags_file.changelog_lifecycle, config, report)
+        update_tags(lifecycle_tags_file.changelog_lifecycle, config, report, tests)
 
     # Remove tags that are no longer relevant
     clean_up_tags(lifecycle_tags_file.changelog_lifecycle, evg_conf)
