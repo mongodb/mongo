@@ -154,7 +154,6 @@ variables:
   - suse12
   - ubuntu1204
   - ubuntu1404
-  - ubuntu1404-rocksdb
   - ubuntu1604
   - ubuntu1604-arm64
   - ubuntu1604-asan
@@ -357,19 +356,6 @@ functions:
         ${decompress} mongo-debugsymbols.tgz
         mv mongodb*/mongo.{debug,dSYM,pdb} mongodb*/mongod.{debug,dSYM,pdb} mongodb*/mongos.{debug,dSYM,pdb} . 2>/dev/null || true
         rm -r mongodb*/*.{debug,dSYM,pdb} mongo-debugsymbols.tgz 2>/dev/null || true
-
-  "build rocksdb" :
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ "${build_rocksdb|}" = "true" ]; then
-        rm -rf rocksdb
-        git clone https://github.com/facebook/rocksdb.git
-        cd rocksdb
-        make USE_RTTI=1 CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
-        fi
 
   "build new tools" :
     command: shell.exec
@@ -1238,14 +1224,12 @@ tasks:
         directory: src
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           enterprise: ${enterprise_rev}
-          rocksdb: ${rocksdb_rev}
     - command: git.apply_patch
       params:
         directory: src
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
-    - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - command: shell.exec
       params:
         working_dir: src
@@ -1420,7 +1404,6 @@ tasks:
         directory: src
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           enterprise: ${enterprise_rev}
-          rocksdb: ${rocksdb_rev}
     - command: git.apply_patch
       params:
         directory: src
@@ -3509,11 +3492,6 @@ tasks:
 modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: v3.4
-
-- name: rocksdb
-  repo: git@github.com:mongodb-partners/mongo-rocks.git
   prefix: src/mongo/db/modules
   branch: v3.4
 
@@ -8178,75 +8156,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
-  - name: unittests
-
-- name: ubuntu1404-rocksdb
-  display_name: Ubuntu 14.04 (RocksDB)
-  modules:
-  - rocksdb
-  run_on:
-  - ubuntu1404-test
-  batchtime: 1440 # 1 day
-  expansions:
-    build_rocksdb: true
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy VARIANT_DIR=release --runtime-hardening=off
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --storageEngine=rocksdb
-    use_scons_cache: true
-    build_mongoreplay: true
-  tasks:
-  - name: compile
-    distros:
-    - ubuntu1404-build
-  - name: aggregation
-  - name: aggregation_WT
-  - name: aggregation_auth
-  - name: auth
-  - name: dbtest
-  # - name: disk
-  # - name: durability
-  # - name: dur_jscore_passthrough
-  - name: failpoints
-  - name: failpoints_auth
-  - name: gle_auth
-  - name: gle_auth_write_cmd
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: jsCore
-  - name: jsCore_auth
-  - name: jsCore_compatibility
-  - name: jstestfuzz
-  - name: jstestfuzz_concurrent_WT
-  - name: jstestfuzz_concurrent_replication_WT
-  - name: jstestfuzz_concurrent_sharded_WT
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_sharded
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: bulk_gle_passthrough
-  - name: parallel
-  - name: parallel_compatibility
-  - name: concurrency
-  - name: concurrency_replication
-  - name: concurrency_sharded
-    # We use machines with more RAM to avoid OOM issues when validating collections.
-    distros:
-    - ubuntu1404-build
-  - name: concurrency_simultaneous
-  - name: replica_sets
-  - name: replica_sets_auth
-  - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: slow1
-  - name: serial_run
-  - name: sharding_jscore_passthrough
   - name: unittests
 
 ###########################################
