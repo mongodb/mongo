@@ -50,8 +50,6 @@ namespace {
 const auto getReplicationProcess =
     ServiceContext::declareDecoration<std::unique_ptr<ReplicationProcess>>();
 
-const int kUninitializedRollbackId = -1;
-
 const auto kRollbackNamespacePrefix = "local.system.rollback."_sd;
 
 const auto kRollbackProgressIdDoc = BSON("_id"

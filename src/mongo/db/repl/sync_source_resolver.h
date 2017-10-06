@@ -154,7 +154,8 @@ private:
      * Creates fetcher to check the remote oplog for '_requiredOpTime'.
      */
     std::unique_ptr<Fetcher> _makeRequiredOpTimeFetcher(HostAndPort candidate,
-                                                        OpTime earliestOpTimeSeen);
+                                                        OpTime earliestOpTimeSeen,
+                                                        int rbid);
 
     /**
      * Schedules fetcher to read oplog on sync source.
@@ -179,7 +180,7 @@ private:
     /**
      * Schedules a replSetGetRBID command against the candidate to fetch its current rollback id.
      */
-    void _scheduleRBIDRequest(HostAndPort candidate, OpTime earliestOpTimeSeen);
+    Status _scheduleRBIDRequest(HostAndPort candidate, OpTime earliestOpTimeSeen);
     void _rbidRequestCallback(HostAndPort candidate,
                               OpTime earliestOpTimeSeen,
                               const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply);
@@ -194,7 +195,8 @@ private:
      */
     void _requiredOpTimeFetcherCallback(const StatusWith<Fetcher::QueryResponse>& queryResult,
                                         HostAndPort candidate,
-                                        OpTime earliestOpTimeSeen);
+                                        OpTime earliestOpTimeSeen,
+                                        int rbid);
 
     /**
      * Obtains new sync source candidate and schedules remote command to fetcher first oplog entry.
@@ -207,7 +209,8 @@ private:
      * Invokes completion callback and transitions state to State::kComplete.
      * Returns result.getStatus().
      */
-    Status _finishCallback(StatusWith<HostAndPort> result);
+    Status _finishCallback(HostAndPort hostAndPort, int rbid);
+    Status _finishCallback(Status status);
     Status _finishCallback(const SyncSourceResolverResponse& response);
 
     // Executor used to send remote commands to sync source candidates.
@@ -228,9 +231,6 @@ private:
     // This is invoked exactly once after startup. The caller gets the results of the sync source
     // resolver via this callback in a SyncSourceResolverResponse struct when the resolver finishes.
     const OnCompletionFn _onCompletion;
-
-    // The rbid we will return to our caller.
-    int _rbid;
 
     // Protects members of this sync source resolver defined below.
     mutable stdx::mutex _mutex;

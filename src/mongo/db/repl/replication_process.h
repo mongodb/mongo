@@ -74,6 +74,7 @@ public:
      * apply in order to complete rollback successfully.
      */
     static const NamespaceString kRollbackProgressNamespace;
+    static const int kUninitializedRollbackId = -1;
 
     // Operation Context binding.
     static ReplicationProcess* get(ServiceContext* service);
