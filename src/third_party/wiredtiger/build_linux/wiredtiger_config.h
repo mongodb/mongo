@@ -82,6 +82,9 @@
 /* Define to 1 if you have the `posix_memalign' function. */
 #define HAVE_POSIX_MEMALIGN 1
 
+/* Define to 1 if pthread condition variables support monotonic clocks. */
+#define HAVE_PTHREAD_COND_MONOTONIC 1
+
 /* Define to 1 if you have the <pthread_np.h> header file. */
 /* #undef HAVE_PTHREAD_NP_H */
 
