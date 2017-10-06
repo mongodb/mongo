@@ -259,11 +259,7 @@ private:
      * Builds a parsed pipeline for introspection (e.g. constraints, dependencies). Any sub-$lookup
      * pipelines will be built recursively.
      */
-    void initializeIntrospectionPipeline() {
-        copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
-        _parsedIntrospectionPipeline =
-            uassertStatusOK(Pipeline::parse(_resolvedPipeline, _fromExpCtx));
-    }
+    void initializeIntrospectionPipeline();
 
     /**
      * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a

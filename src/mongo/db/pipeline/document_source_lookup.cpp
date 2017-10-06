@@ -596,6 +596,19 @@ void DocumentSourceLookUp::resolveLetVariables(const Document& localDoc, Variabl
     }
 }
 
+void DocumentSourceLookUp::initializeIntrospectionPipeline() {
+    copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
+    _parsedIntrospectionPipeline = uassertStatusOK(Pipeline::parse(_resolvedPipeline, _fromExpCtx));
+
+    auto& sources = _parsedIntrospectionPipeline->getSources();
+
+    // Ensure that the pipeline does not contain a $changeStream stage. This check will be
+    // performed recursively on all sub-pipelines.
+    uassert(ErrorCodes::IllegalOperation,
+            "$changeStream is not allowed within a $lookup foreign pipeline",
+            sources.empty() || !sources.front()->constraints().isChangeStreamStage());
+}
+
 void DocumentSourceLookUp::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     Document doc;

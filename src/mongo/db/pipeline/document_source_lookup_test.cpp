@@ -44,6 +44,9 @@
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 namespace {
@@ -56,6 +59,41 @@ using DocumentSourceLookUpTest = AggregationContextFixture;
 
 const long long kDefaultMaxCacheSize = internalDocumentSourceLookupCacheSizeBytes.load();
 const auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
+
+// Allow tests to temporarily switch to a different FCV.
+class EnsureFCV {
+public:
+    using Version = ServerGlobalParams::FeatureCompatibility::Version;
+    EnsureFCV(Version version)
+        : _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
+        serverGlobalParams.featureCompatibility.setVersion(version);
+    }
+    ~EnsureFCV() {
+        serverGlobalParams.featureCompatibility.setVersion(_origVersion);
+    }
+
+private:
+    const Version _origVersion;
+};
+
+// For tests which need to run in a replica set context.
+class ReplDocumentSourceLookUpTest : public DocumentSourceLookUpTest {
+public:
+    void setUp() override {
+        auto service = getExpCtx()->opCtx->getServiceContext();
+        repl::ReplSettings settings;
+
+        settings.setReplSetString("lookupTestSet/node1:12345");
+        settings.setMajorityReadConcernEnabled(true);
+
+        repl::StorageInterface::set(service, stdx::make_unique<repl::StorageInterfaceMock>());
+        auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(service, settings);
+
+        // Ensure that we are primary.
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        repl::ReplicationCoordinator::set(service, std::move(replCoord));
+    }
+};
 
 // A 'let' variable defined in a $lookup stage is expected to be available to all sub-pipelines. For
 // sub-pipelines below the immediate one, they are passed to via ExpressionContext. This test
@@ -200,6 +238,43 @@ TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedN
     ASSERT_EQ(2ul, namespaceSet.size());
 }
 
+TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
+    // Temporarily set FCV to 3.6 for $changeStream.
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    // Verify that attempting to create a $lookup pipeline containing a $changeStream stage fails.
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            fromjson("{$lookup: {from: 'coll', as: 'as', pipeline: [{$changeStream: {}}]}}")
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::IllegalOperation);
+}
+
+TEST_F(ReplDocumentSourceLookUpTest, RejectsSubPipelineWithChangeStreamStage) {
+    // Temporarily set FCV to 3.6 for $changeStream.
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    // Verify that attempting to create a sub-$lookup pipeline containing a $changeStream stage
+    // fails at parse time, even if the outer pipeline does not have a $changeStream stage.
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            fromjson("{$lookup: {from: 'coll', as: 'as', pipeline: [{$match: {_id: 1}}, {$lookup: "
+                     "{from: 'coll', as: 'subas', pipeline: [{$changeStream: {}}]}}]}}")
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::IllegalOperation);
+}
 
 TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpecified) {
     auto expCtx = getExpCtx();
