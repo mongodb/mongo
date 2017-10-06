@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-enum class LogicalSessionCacheServer { kSharded, kReplicaSet, kStandalone };
+enum class LogicalSessionCacheServer { kSharded, kConfigServer, kReplicaSet, kStandalone };
 
 class ServiceContext;
 

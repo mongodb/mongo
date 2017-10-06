@@ -2,6 +2,10 @@
  * Tests count and distinct using slaveOk. Also tests a scenario querying a set where only one
  * secondary is up.
  */
+
+// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
 
@@ -61,7 +65,6 @@
 
         print("Should not reach here!");
         assert(false);
-
     } catch (e) {
         print("Non-slaveOk'd connection failed.");
     }

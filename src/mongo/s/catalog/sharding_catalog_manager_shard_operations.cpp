@@ -52,6 +52,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/sessions_collection.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -468,6 +469,30 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     return shard;
 }
 
+Status ShardingCatalogManager::_dropSessionsCollection(
+    OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
+
+    BSONObjBuilder builder;
+    builder.append("drop", SessionsCollection::kSessionsCollection.toString());
+    {
+        BSONObjBuilder wcBuilder(builder.subobjStart("writeConcern"));
+        wcBuilder.append("w", "majority");
+    }
+
+    auto swCommandResponse = _runCommandForAddShard(
+        opCtx, targeter.get(), SessionsCollection::kSessionsDb.toString(), builder.done());
+    if (!swCommandResponse.isOK()) {
+        return swCommandResponse.getStatus();
+    }
+
+    auto cmdStatus = std::move(swCommandResponse.getValue().commandStatus);
+    if (!cmdStatus.isOK() && cmdStatus.code() != ErrorCodes::NamespaceNotFound) {
+        return cmdStatus;
+    }
+
+    return Status::OK();
+}
+
 StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFromShard(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
@@ -590,6 +615,18 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         } else if (dbt != ErrorCodes::NamespaceNotFound) {
             return dbt.getStatus();
         }
+    }
+
+    // Check that the shard candidate does not have a local config.system.sessions collection
+    auto res = _dropSessionsCollection(opCtx, targeter);
+
+    if (!res.isOK()) {
+        return Status(
+            res.code(),
+            str::stream()
+                << "can't add shard with a local copy of config.system.sessions due to "
+                << res.reason()
+                << ", please drop this collection from the shard manually and try again.");
     }
 
     // If a name for a shard wasn't provided, generate one

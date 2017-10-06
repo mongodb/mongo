@@ -36,6 +36,7 @@
 
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/service_liason_mongod.h"
+#include "mongo/db/sessions_collection_config_server.h"
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/db/sessions_collection_standalone.h"
@@ -51,6 +52,8 @@ std::shared_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheSe
     switch (state) {
         case LogicalSessionCacheServer::kSharded:
             return std::make_shared<SessionsCollectionSharded>();
+        case LogicalSessionCacheServer::kConfigServer:
+            return std::make_shared<SessionsCollectionConfigServer>();
         case LogicalSessionCacheServer::kReplicaSet:
             return std::make_shared<SessionsCollectionRS>();
         case LogicalSessionCacheServer::kStandalone:

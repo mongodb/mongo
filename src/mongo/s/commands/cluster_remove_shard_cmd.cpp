@@ -31,59 +31,48 @@
 #include "mongo/platform/basic.h"
 
 #include <string>
-#include <vector>
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::string;
-using std::vector;
-
 namespace {
 
 class RemoveShardCmd : public BasicCommand {
 public:
     RemoveShardCmd() : BasicCommand("removeShard", "removeshard") {}
 
-    virtual bool slaveOk() const {
-        return false;
-    }
-
-    virtual bool adminOnly() const {
-        return true;
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    virtual void help(std::stringstream& help) const {
+    void help(std::stringstream& help) const override {
         help << "remove a shard from the system.";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+    bool slaveOk() const override {
+        return false;
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) override {
         ActionSet actions;
         actions.addAction(ActionType::removeShard);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "Field '" << cmdObj.firstElement().fieldName()
                               << "' must be of type string",

@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -130,6 +131,28 @@ auto dispatch(const NamespaceString& ns,
 }
 
 }  // namespace
+
+Status SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
+    return dispatch(kSessionsNamespaceString,
+                    MODE_IX,
+                    opCtx,
+                    [&] {
+                        // Creating the TTL index will auto-generate the collection.
+                        DBDirectClient client(opCtx);
+                        BSONObj info;
+                        auto cmd = generateCreateIndexesCmd();
+                        if (!client.runCommand(kSessionsDb.toString(), cmd, info)) {
+                            return getStatusFromCommandResult(info);
+                        }
+
+                        return Status::OK();
+                    },
+                    [&](DBClientBase*) {
+                        // If we are not the primary, we aren't going to do writes
+                        // anyway, so just return ok.
+                        return Status::OK();
+                    });
+}
 
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
                                              const LogicalSessionRecordSet& sessions) {

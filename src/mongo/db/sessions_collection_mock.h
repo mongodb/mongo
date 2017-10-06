@@ -104,6 +104,10 @@ public:
     explicit MockSessionsCollection(std::shared_ptr<MockSessionsCollectionImpl> impl)
         : _impl(std::move(impl)) {}
 
+    Status setupSessionsCollection(OperationContext* opCtx) override {
+        return Status::OK();
+    }
+
     Status refreshSessions(OperationContext* opCtx,
                            const LogicalSessionRecordSet& sessions) override {
         return _impl->refreshSessions(sessions);

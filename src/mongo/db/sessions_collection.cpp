@@ -35,6 +35,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/refresh_sessions_gen.h"
@@ -204,6 +205,7 @@ Status SessionsCollection::doRefresh(const NamespaceString& ns,
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("update", ns.coll());
         batch->append("ordered", false);
+        batch->append("allowImplicitCollectionCreation", false);
     };
 
     auto add = [](BSONArrayBuilder* entries, const LogicalSessionRecord& record) {
@@ -309,4 +311,19 @@ StatusWith<LogicalSessionIdSet> SessionsCollection::doFetch(const NamespaceStrin
     return removed;
 }
 
+BSONObj SessionsCollection::generateCreateIndexesCmd() {
+    NewIndexSpec index;
+    index.setKey(BSON("lastUse" << 1));
+    index.setName("lsidTTLIndex");
+    index.setExpireAfterSeconds(localLogicalSessionTimeoutMinutes * 60);
+
+    std::vector<NewIndexSpec> indexes;
+    indexes.push_back(std::move(index));
+
+    CreateIndexesCmd createIndexes;
+    createIndexes.setCreateIndexes(kSessionsCollection.toString());
+    createIndexes.setIndexes(std::move(indexes));
+
+    return createIndexes.toBSON();
+}
 }  // namespace mongo

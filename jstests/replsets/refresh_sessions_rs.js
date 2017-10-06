@@ -48,8 +48,8 @@
     res = db2.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
 
-    // Connect to the primary. The sessions collection here should now contain one record.
-    assert.eq(db1.system.sessions.count(), 1, "did not flush refresh to the primary");
+    // Connect to the primary. The sessions collection here should not yet contain records.
+    assert.eq(db1.system.sessions.count(), 0, "flushed refresh to the primary prematurely");
 
     // Trigger a refresh on the primary. The sessions collection should now contain two records.
     res = db1.runCommand(refresh);
@@ -58,11 +58,11 @@
         db1.system.sessions.count(), 2, "should have two local session records after refresh");
 
     // Trigger another refresh on all members.
-    res = db1.runCommand(refresh);
-    assert.commandWorked(res, "failed to refresh");
     res = db2.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
     res = db3.runCommand(refresh);
+    assert.commandWorked(res, "failed to refresh");
+    res = db1.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
 
     // The sessions collection on the primary should now contain all records.

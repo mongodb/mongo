@@ -54,6 +54,7 @@ selector:
   - jstests/sharding/secondary_shard_version_protocol_with_fcv.js
   - jstests/sharding/secondary_shard_versioning.js
   - jstests/sharding/session_info_in_oplog.js
+  - jstests/sharding/sessions_collection_auto_healing.js
   - jstests/sharding/shard_config_db_collections.js
   - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
   - jstests/sharding/uuid_propagated_to_recipient_shard_on_recvChunkStart.js

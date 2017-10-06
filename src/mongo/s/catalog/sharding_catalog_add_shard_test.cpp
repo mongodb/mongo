@@ -120,6 +120,19 @@ protected:
         });
     }
 
+    void expectCollectionDrop(const HostAndPort& target, const NamespaceString& nss) {
+        onCommandForAddShard([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, target);
+            ASSERT_EQ(request.dbname, nss.db());
+            ASSERT_BSONOBJ_EQ(request.cmdObj,
+                              BSON("drop" << nss.coll() << "writeConcern" << BSON("w"
+                                                                                  << "majority")));
+            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
+
+            return BSON("ok" << 1);
+        });
+    }
+
     void expectSetFeatureCompatibilityVersion(const HostAndPort& target,
                                               StatusWith<BSONObj> response) {
         onCommandForAddShard([&, target, response](const RemoteCommandRequest& request) {
@@ -401,6 +414,8 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
+    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
@@ -483,6 +498,8 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
                                   << 1000),
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+
+    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
 
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
@@ -909,6 +926,8 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
+    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
@@ -973,6 +992,8 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
+
+    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
 
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
@@ -1054,6 +1075,8 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
                                   << 1000),
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+
+    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
 
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);

@@ -34,6 +34,7 @@
 #include "mongo/client/query.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
 
@@ -43,6 +44,17 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
     return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
 }
 }  // namespace
+
+Status SessionsCollectionStandalone::setupSessionsCollection(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    auto cmd = generateCreateIndexesCmd();
+    BSONObj info;
+    if (!client.runCommand(kSessionsDb.toString(), cmd, info)) {
+        return getStatusFromCommandResult(info);
+    }
+
+    return Status::OK();
+}
 
 Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
                                                      const LogicalSessionRecordSet& sessions) {

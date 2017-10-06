@@ -45,6 +45,7 @@
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -55,6 +56,7 @@ const Milliseconds kForceRefresh =
     duration_cast<Milliseconds>(LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh);
 
 using SessionList = std::list<LogicalSessionId>;
+using unittest::EnsureFCV;
 
 /**
  * Test fixture that sets up a session cache attached to a mock service liason
@@ -64,7 +66,8 @@ class LogicalSessionCacheTest : public unittest::Test {
 public:
     LogicalSessionCacheTest()
         : _service(std::make_shared<MockServiceLiasonImpl>()),
-          _sessions(std::make_shared<MockSessionsCollectionImpl>()) {}
+          _sessions(std::make_shared<MockSessionsCollectionImpl>()),
+          _fcv(EnsureFCV::Version::k36) {}
 
     void setUp() override {
         auto localManagerState = stdx::make_unique<AuthzManagerExternalStateMock>();
@@ -137,6 +140,8 @@ private:
     std::unique_ptr<LogicalSessionCache> _cache;
 
     Client* _client;
+
+    EnsureFCV _fcv;
 };
 
 // Test that the getFromCache method does not make calls to the sessions collection

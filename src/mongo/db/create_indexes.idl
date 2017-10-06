@@ -1,0 +1,88 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# This IDL file describes the BSON format for a LogicalSessionId, and
+# handles the serialization to and deserialization from its BSON representation
+# for that class.
+
+global:
+  cpp_namespace: "mongo"
+
+imports:
+  - "mongo/idl/basic_types.idl"
+
+structs:
+
+  NewIndexSpec:
+    description: "A type representing a spec for a new index"
+    strict: true
+    fields:
+      key: object
+      name: string
+      background:
+        type: bool
+        optional: true
+      unique:
+        type: bool
+        optional: true
+      partialFilterExpression:
+        type: object
+        optional: true
+      sparse:
+        type: bool
+        optional: true
+      expireAfterSeconds:
+        type: int
+        optional: true
+      storageEngine:
+        type: object
+        optional: true
+      weights:
+        type: object
+        optional: true
+      default_language:
+        type: string
+        optional: true
+      language_override:
+        type: string
+        optional: true
+      textIndexVersion:
+        type: int
+        optional: true
+      2dsphereIndexVersion:
+        type: int
+        optional: true
+      bits:
+        type: int
+        optional: true
+      min:
+        type: double
+        optional: true
+      max:
+        type: double
+        optional: true
+      bucketSize:
+        type: double
+        optional: true
+      collation:
+        type: object
+        optional: true
+
+  CreateIndexesCmd:
+    description: "A struct representing a createIndexes command"
+    strict: false
+    fields:
+      createIndexes: string
+      indexes: array<NewIndexSpec>

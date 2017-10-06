@@ -3,6 +3,10 @@
  * primary and secondary will get updated whenever the config server membership changes.
  * @tags: [requires_persistence]
  */
+
+// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 
@@ -98,5 +102,4 @@
     });
 
     st.stop();
-
 })();

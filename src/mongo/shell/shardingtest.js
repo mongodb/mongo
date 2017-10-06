@@ -1506,6 +1506,20 @@ var ShardingTest = function(params) {
             return true;
         }, "waiting for all mongos servers to return cluster times", 60 * 1000, 500);
     }
+
+    // Ensure that the sessions collection exists so jstests can run things with
+    // logical sessions and test them. We do this by forcing an immediate cache refresh
+    // on the config server, which auto-shards the collection for the cluster.
+    var lastStableBinVersion = MongoRunner.getBinVersionFor('last-stable');
+    if ((!otherParams.configOptions) ||
+        (otherParams.configOptions && !otherParams.configOptions.binVersion) ||
+        (otherParams.configOptions && otherParams.configOptions.binVersion &&
+         MongoRunner.areBinVersionsTheSame(
+             lastStableBinVersion,
+             MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion)))) {
+        this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+    }
+
 };
 
 // Stub for a hook to check that collection UUIDs are consistent across shards and the config

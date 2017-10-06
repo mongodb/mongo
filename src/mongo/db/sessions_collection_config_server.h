@@ -30,54 +30,36 @@
 
 #include <memory>
 
-#include "mongo/client/connection_string.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/sessions_collection.h"
+#include "mongo/db/sessions_collection_sharded.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class DBDirectClient;
 class OperationContext;
-class RemoteCommandTargeter;
 
 /**
- * Accesses the sessions collection for replica set members.
+ * Accesses the sessions collection for config servers.
  */
-class SessionsCollectionRS : public SessionsCollection {
+class SessionsCollectionConfigServer : public SessionsCollectionSharded {
 public:
     /**
-     * Constructs a new SessionsCollectionRS.
-     */
-    SessionsCollectionRS() = default;
-
-    /**
-     * Ensures that the sessions collection exists and has the proper indexes.
-     */
+    * Ensures that the sessions collection has been set up for this cluster,
+    * sharded, and with the proper indexes.
+    *
+    * This method may safely be called multiple times.
+    *
+    * If there are no shards in this cluster, this method will do nothing.
+    */
     Status setupSessionsCollection(OperationContext* opCtx) override;
 
-    /**
-     * Updates the last-use times on the given sessions to be greater than
-     * or equal to the current time.
-     */
-    Status refreshSessions(OperationContext* opCtx,
-                           const LogicalSessionRecordSet& sessions) override;
+private:
+    Status _shardCollectionIfNeeded(OperationContext* opCtx);
+    Status _generateIndexesIfNeeded(OperationContext* opCtx);
 
-    /**
-     * Removes the authoritative records for the specified sessions.
-     */
-    Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
-
-    StatusWith<LogicalSessionIdSet> findRemovedSessions(
-        OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
-
-    Status removeTransactionRecords(OperationContext* opCtx,
-                                    const LogicalSessionIdSet& sessions) override;
-
-    static Status removeTransactionRecordsHelper(OperationContext* opCtx,
-                                                 const LogicalSessionIdSet& sessions);
+    stdx::mutex _mutex;
+    bool _collectionSetUp;
 };
 
 }  // namespace mongo

@@ -35,6 +35,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -115,8 +116,6 @@ Status LogicalSessionCacheImpl::refreshSessions(OperationContext* opCtx,
 
 Status LogicalSessionCacheImpl::refreshSessions(OperationContext* opCtx,
                                                 const RefreshSessionsCmdFromClusterMember& cmd) {
-    LogicalSessionRecordSet toRefresh{};
-
     // Update the timestamps of all these records in our cache.
     auto records = cmd.getRefreshSessionsInternal();
     for (const auto& record : records) {
@@ -124,11 +123,9 @@ Status LogicalSessionCacheImpl::refreshSessions(OperationContext* opCtx,
             // This is a new record, insert it.
             _addToCache(record);
         }
-        toRefresh.insert(record);
     }
 
-    // Write to the sessions collection now.
-    return _sessionsColl->refreshSessions(opCtx, toRefresh);
+    return Status::OK();
 }
 
 void LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSessionId& lsid) {
@@ -201,6 +198,30 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
 }
 
 void LogicalSessionCacheImpl::_refresh(Client* client) {
+    // Do not run this job if we are not in FCV 3.6
+    if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+        LOG(1) << "Skipping session refresh job while feature compatibility version is not 3.6";
+        return;
+    }
+
+    // get or make an opCtx
+    boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
+    auto* const opCtx = [&client, &uniqueCtx] {
+        if (client->getOperationContext()) {
+            return client->getOperationContext();
+        }
+
+        uniqueCtx.emplace(client->makeOperationContext());
+        return uniqueCtx->get();
+    }();
+
+    auto res = _sessionsColl->setupSessionsCollection(opCtx);
+    if (!res.isOK()) {
+        log() << "Sessions collection is not set up; "
+              << "waiting until next sessions refresh interval: " << res.reason();
+        return;
+    }
+
     LogicalSessionIdSet staleSessions;
     LogicalSessionIdSet explicitlyEndingSessions;
     LogicalSessionIdMap<LogicalSessionRecord> activeSessions;
@@ -228,18 +249,6 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     }
     auto activeSessionsBackSwapper = backSwapper(_activeSessions, activeSessions);
     auto explicitlyEndingBackSwaper = backSwapper(_endingSessions, explicitlyEndingSessions);
-
-    // get or make an opCtx
-
-    boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
-    auto* const opCtx = [&client, &uniqueCtx] {
-        if (client->getOperationContext()) {
-            return client->getOperationContext();
-        }
-
-        uniqueCtx.emplace(client->makeOperationContext());
-        return uniqueCtx->get();
-    }();
 
     // remove all explicitlyEndingSessions from activeSessions
     for (const auto& lsid : explicitlyEndingSessions) {

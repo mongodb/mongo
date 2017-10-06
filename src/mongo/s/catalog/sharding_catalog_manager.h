@@ -381,6 +381,12 @@ private:
                                                const ConnectionString& connectionString);
 
     /**
+     * Drops the sessions collection on the specified host.
+     */
+    Status _dropSessionsCollection(OperationContext* opCtx,
+                                   std::shared_ptr<RemoteCommandTargeter> targeter);
+
+    /**
      * Runs the listDatabases command on the specified host and returns the names of all databases
      * it returns excluding those named local, config and admin, since they serve administrative
      * purposes.

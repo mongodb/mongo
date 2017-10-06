@@ -6,6 +6,9 @@
  * @tags: [requires_persistence]
  */
 
+// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 // Run through the same test twice, once with a hard -9 kill, once with a regular shutdown
 (function() {
     'use strict';

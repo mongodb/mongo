@@ -170,6 +170,12 @@ void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
     all->assign(seen.begin(), seen.end());
 }
 
+int ShardRegistry::getNumShards() const {
+    std::set<ShardId> seen;
+    _data.getAllShardIds(seen);
+    return seen.size();
+}
+
 void ShardRegistry::toBSON(BSONObjBuilder* result) const {
     _data.toBSON(result);
 }

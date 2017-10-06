@@ -574,7 +574,6 @@ env.Library(
     LIBDEPS=[
         'db_raii',
         'catalog/index_key_validate',
-        'logical_session_cache',
     ],
 )
 
@@ -977,6 +976,7 @@ env.Library(
     target='sessions_collection',
     source=[
         'sessions_collection.cpp',
+        env.Idlc('create_indexes.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1041,6 +1041,22 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/s/query/cluster_query',
         'sessions_collection_rs',
+    ],
+)
+
+env.Library(
+    target='sessions_collection_config_server',
+    source=[
+        'sessions_collection_config_server.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/sharding_request_types',
+        'dbdirectclient',
+        'sessions_collection',
+        'sessions_collection_sharded',
     ],
 )
 
@@ -1122,6 +1138,7 @@ envWithAsio.Library(
         'logical_session_cache',
         'logical_session_cache_impl',
         'service_liason_mongod',
+        'sessions_collection_config_server',
         'sessions_collection_rs',
         'sessions_collection_sharded',
         'sessions_collection_standalone',

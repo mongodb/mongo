@@ -56,6 +56,11 @@ public:
     static const NamespaceString kSessionsNamespaceString;
 
     /**
+     * Ensures that the sessions collection exists and has the proper indexes.
+     */
+    virtual Status setupSessionsCollection(OperationContext* opCtx) = 0;
+
+    /**
      * Updates the last-use times on the given sessions to be greater than
      * or equal to the given time. Returns an error if a networking issue occurred.
      */
@@ -82,6 +87,11 @@ public:
      */
     virtual StatusWith<LogicalSessionIdSet> findRemovedSessions(
         OperationContext* opCtx, const LogicalSessionIdSet& sessions) = 0;
+
+    /**
+     * Generates a createIndexes command for the sessions collection TTL index.
+     */
+    static BSONObj generateCreateIndexesCmd();
 
 protected:
     /**

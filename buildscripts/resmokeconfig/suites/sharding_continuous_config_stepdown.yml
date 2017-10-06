@@ -141,6 +141,8 @@ selector:
   # Stepping down the config can cause moveChunks stopped on shards via killOp to be restarted.
   - jstests/sharding/migration_ignore_interrupts_3.js
   - jstests/sharding/migration_ignore_interrupts_4.js
+  # listCollections is not retryable
+  - jstests/sharding/sessions_collection_auto_healing.js
 
 executor:
   config:

@@ -261,6 +261,12 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     // some special rules
 
     if (coll.find(".system.") != string::npos) {
+        // If this is metadata for the sessions collection, shard servers need to be able to
+        // write to it.
+        if (coll.find(".system.sessions") != string::npos) {
+            return Status::OK();
+        }
+
         // this matches old (2.4 and older) behavior, but I'm not sure its a good idea
         return Status(ErrorCodes::BadValue,
                       str::stream() << "cannot write to '" << db << "." << coll << "'");

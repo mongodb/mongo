@@ -134,6 +134,11 @@ class ShardedClusterFixture(interface.Fixture):
             self.logger.info("Enabling sharding for '%s' database...", db_name)
             client.admin.command({"enablesharding": db_name})
 
+        # Ensure that the sessions collection gets auto-sharded by the config server
+        if self.configsvr is not None:
+            primary = self.configsvr.get_primary().mongo_client()
+            primary.admin.command({ "refreshLogicalSessionCacheNow" : 1 })
+
     def _do_teardown(self):
         """
         Shuts down the sharded cluster.

@@ -65,17 +65,4 @@
     db = conn.getDB("admin");
     assert.eq(2, db.system.roles.getIndexes().length);
 
-    // TEST: Inserting to the sessions collection creates indexes
-    config = conn.getDB("config");
-    assert.eq(0, config.system.sessions.getIndexes().length);
-    config.system.sessions.insert({lastUse: new Date()});
-    assert.eq(2, config.system.sessions.getIndexes().length);
-
-    // TEST: Destroying config.system.sessions index and restarting will recreate it
-    assert.commandWorked(config.system.sessions.dropIndexes());
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({restart: conn, cleanData: false});
-    config = conn.getDB("config");
-    assert.eq(2, config.system.sessions.getIndexes().length);
-
 })();

@@ -233,6 +233,8 @@ public:
     std::shared_ptr<Shard> lookupRSName(const std::string& name) const;
 
     void getAllShardIds(std::vector<ShardId>* all) const;
+    int getNumShards() const;
+
     void toBSON(BSONObjBuilder* result) const;
     bool isUp() const;
 
