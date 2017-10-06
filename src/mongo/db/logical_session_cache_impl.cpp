@@ -257,9 +257,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         if (explicitlyEndingSessions.count(it) > 0) {
             continue;
         }
-        LogicalSessionRecord lsr;
-        lsr.setId(it);
-        activeSessionRecords.insert(lsr);
+        activeSessionRecords.insert(makeLogicalSessionRecord(it, now()));
     }
     for (const auto& it : activeSessions) {
         activeSessionRecords.insert(it.second);
