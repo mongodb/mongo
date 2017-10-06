@@ -305,6 +305,7 @@ void KeysCollectionManagerSharding::PeriodicRunner::_doPeriodicRefresh(
 void KeysCollectionManagerSharding::PeriodicRunner::setFunc(RefreshFunc newRefreshStrategy) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _doRefresh = std::make_shared<RefreshFunc>(std::move(newRefreshStrategy));
+    _refreshNeededCV.notify_all();
 }
 
 void KeysCollectionManagerSharding::PeriodicRunner::switchFunc(OperationContext* opCtx,

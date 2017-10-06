@@ -74,7 +74,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
         auto shardingState = ShardingState::get(opCtx);
         // standalone replica set, so there is no need to advance the OpLog on the primary.
         if (!shardingState->enabled()) {
-            log() << "XXX: attempting to make a write for clusterTIme: " << clusterTime
+            log() << "Attempting to make a write for clusterTIme: " << clusterTime
                   << " but is in standalone RS";
             return Status::OK();
         }
