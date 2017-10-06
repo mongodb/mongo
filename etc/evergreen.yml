@@ -87,7 +87,6 @@ variables:
   - ubuntu1204
   - ubuntu1404
   - ubuntu1604
-  - ubuntu1404-rocksdb
   - debian71
   - debian81
   - osx-107-ssl
@@ -189,19 +188,6 @@ functions:
       local_file: src/mongo-debugsymbols.tgz
       build_variants:
         *debug_symbol_variants
-
-  "build rocksdb" :
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ "${build_rocksdb|}" = "true" ]; then
-        rm -rf rocksdb
-        git clone https://github.com/facebook/rocksdb.git
-        cd rocksdb
-        make USE_RTTI=1 static_lib
-        fi
 
   "build new tools" :
     command: shell.exec
@@ -573,14 +559,12 @@ tasks:
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           enterprise: ${enterprise_rev}
           mongo-tools: ${mongo-tools_rev}
-          rocksdb: ${rocksdb_rev}
     - command: git.apply_patch
       params:
         directory: src
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
-    - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - command: shell.exec
       params:
         working_dir: src
@@ -747,7 +731,6 @@ tasks:
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           enterprise: ${enterprise_rev}
           mongo-tools: ${mongo-tools_rev}
-          rocksdb: ${rocksdb_rev}
     - command: git.apply_patch
       params:
         directory: src
@@ -2424,11 +2407,6 @@ modules:
 - name: mongo-tools
   repo: git@github.com:mongodb/mongo-tools.git
   prefix: .
-  branch: v3.2
-
-- name: rocksdb
-  repo: git@github.com:mongodb-partners/mongo-rocks.git
-  prefix: src/mongo/db/modules
   branch: v3.2
 
 #######################################
@@ -5898,67 +5876,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
-  - name: unittests
-
-- name: ubuntu1404-rocksdb
-  display_name: Ubuntu 14.04 (RocksDB)
-  modules:
-  - rocksdb
-  - mongo-tools
-  run_on:
-  - ubuntu1404-test
-  batchtime: 1440 # 1 day
-  expansions:
-    build_rocksdb: true
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ VARIANT_DIR=release
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --storageEngine=rocksdb
-  tasks:
-  - name: compile
-    distros:
-    - ubuntu1404-build
-  - name: aggregation
-  - name: aggregation_WT
-  - name: aggregation_auth
-  - name: auth
-  - name: dbtest
-  # - name: disk
-  # - name: durability
-  # - name: dur_jscore_passthrough
-  - name: failpoints
-  - name: failpoints_auth
-  - name: gle_auth
-  - name: gle_auth_write_cmd
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: jsCore
-  - name: jsCore_auth
-  - name: jsCore_compatibility
-  - name: jsCore_small_oplog
-  - name: jsCore_small_oplog_rs
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: bulk_gle_passthrough
-  - name: parallel
-  - name: parallel_compatibility
-  - name: concurrency
-  - name: concurrency_replication
-  - name: concurrency_sharded
-  - name: concurrency_sharded_sccc
-  - name: replicasets
-  - name: replicasets_auth
-  - name: replication
-  - name: replication_WT
-  - name: replication_auth
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_csrs_upgrade
-  - name: sharding_csrs_upgrade_auth_WT
-  - name: slow1
-  - name: slow2
-  - name: sharding_jscore_passthrough
   - name: unittests
 
 ###########################################
