@@ -37,12 +37,6 @@ from wtscenario import make_scenarios
 def timestamp_str(t):
     return '%x' % t
 
-def timestamp_ret_str(t):
-    s = timestamp_str(t)
-    if len(s) % 2 == 1:
-        s = '0' + s
-    return s
-
 class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_log     = 'table:ts04_ts_logged'
     table_ts_nolog   = 'table:ts04_ts_nologged'

@@ -176,7 +176,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
                 k + 1, None)
 
         # Bump the oldest timestamp, we're not going back...
-        self.assertEqual(self.conn.query_timestamp(), timestamp_str(self.nkeys))
+        self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(self.nkeys))
         self.oldts = timestamp_str(self.nkeys)
         self.conn.set_timestamp('oldest_timestamp=' + self.oldts)
         self.conn.set_timestamp('stable_timestamp=' + self.oldts)

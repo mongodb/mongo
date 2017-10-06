@@ -39,12 +39,6 @@ from wtscenario import make_scenarios
 def timestamp_str(t):
     return '%x' % t
 
-def timestamp_ret_str(t):
-    s = timestamp_str(t)
-    if len(s) % 2 == 1:
-        s = '0' + s
-    return s
-
 class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_log     = 'ts03_ts_logged'
     table_ts_nolog   = 'ts03_ts_nologged'
@@ -226,7 +220,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
                 self.table_nots_nolog, dict((k, self.value) for k in orig_keys))
 
         # Bump the oldest_timestamp, we're not going back...
-        self.assertEqual(self.conn.query_timestamp(), timestamp_ret_str(100))
+        self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(100))
         old_ts = timestamp_str(100)
         self.conn.set_timestamp('oldest_timestamp=' + old_ts)
         self.conn.set_timestamp('stable_timestamp=' + old_ts)
