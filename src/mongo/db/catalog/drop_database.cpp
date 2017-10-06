@@ -224,6 +224,20 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
     return writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
         Lock::GlobalWrite lk(opCtx);
+
+        bool userInitiatedWritesAndNotPrimary =
+            opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
+
+        if (userInitiatedWritesAndNotPrimary) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Could not drop database " << dbName
+                                        << " because we transitioned from PRIMARY to "
+                                        << replCoord->getMemberState().toString()
+                                        << " while waiting for "
+                                        << numCollectionsToDrop
+                                        << " pending collection drop(s).");
+        }
+
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         if (auto db = autoDB.getDb()) {
             return _finishDropDatabase(opCtx, dbName, db);

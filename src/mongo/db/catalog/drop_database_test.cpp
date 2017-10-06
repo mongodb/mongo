@@ -426,4 +426,28 @@ TEST_F(DropDatabaseTest,
     ASSERT_FALSE(AutoGetDb(_opCtx.get(), _nss.db(), MODE_X).getDb());
 }
 
+TEST_F(DropDatabaseTest,
+       DropDatabaseReturnsNotMasterIfNotPrimaryAfterCollectionsDropsAreReplicated) {
+    // Transition from PRIMARY to SECONDARY while awaiting replication of collection drops.
+    _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime&) {
+        ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+        ASSERT_TRUE(_opCtx->writesAreReplicated());
+        ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.db()));
+        return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
+    });
+
+    _createCollection(_opCtx.get(), _nss);
+
+    ASSERT_TRUE(AutoGetDb(_opCtx.get(), _nss.db(), MODE_X).getDb());
+
+    auto status = dropDatabase(_opCtx.get(), _nss.db().toString());
+    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    ASSERT_EQUALS(status.reason(),
+                  str::stream() << "Could not drop database " << _nss.db()
+                                << " because we transitioned from PRIMARY to SECONDARY"
+                                << " while waiting for 1 pending collection drop(s).");
+
+    ASSERT_TRUE(AutoGetDb(_opCtx.get(), _nss.db(), MODE_X).getDb());
+}
+
 }  // namespace
