@@ -150,10 +150,7 @@ class _TestList(object):
         expanded_tests = []
         for test in tests:
             if self._test_file_explorer.is_glob_pattern(test):
-                expanded = list(self._test_file_explorer.iglob(test))
-                if not expanded:
-                    raise ValueError("Pattern does not match any files: {}".format(test))
-                expanded_tests.extend(expanded)
+                expanded_tests.extend(self._test_file_explorer.iglob(test))
             else:
                 if not self._test_file_explorer.isfile(test):
                     raise ValueError("Unrecognized test file: {}".format(test))
