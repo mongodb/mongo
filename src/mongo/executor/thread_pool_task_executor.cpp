@@ -339,7 +339,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
     }
     lk.unlock();
     _net->setAlarm(when,
-                   [this, when, cbHandle] {
+                   [this, cbHandle] {
                        auto cbState =
                            checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
                        if (cbState->canceled.load()) {

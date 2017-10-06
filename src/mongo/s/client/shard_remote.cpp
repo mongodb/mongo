@@ -248,45 +248,44 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     // If for some reason the callback never gets invoked, we will return this status in response.
     Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
 
-    auto fetcherCallback =
-        [this, &status, &response](const Fetcher::QueryResponseStatus& dataStatus,
-                                   Fetcher::NextAction* nextAction,
-                                   BSONObjBuilder* getMoreBob) {
+    auto fetcherCallback = [&status, &response](const Fetcher::QueryResponseStatus& dataStatus,
+                                                Fetcher::NextAction* nextAction,
+                                                BSONObjBuilder* getMoreBob) {
 
-            // Throw out any accumulated results on error
-            if (!dataStatus.isOK()) {
-                status = dataStatus.getStatus();
+        // Throw out any accumulated results on error
+        if (!dataStatus.isOK()) {
+            status = dataStatus.getStatus();
+            response.docs.clear();
+            return;
+        }
+
+        const auto& data = dataStatus.getValue();
+
+        if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
+            auto replParseStatus =
+                rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
+            if (!replParseStatus.isOK()) {
+                status = replParseStatus.getStatus();
                 response.docs.clear();
                 return;
             }
 
-            const auto& data = dataStatus.getValue();
+            const auto& replSetMetadata = replParseStatus.getValue();
+            response.opTime = replSetMetadata.getLastOpCommitted();
+        }
 
-            if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
-                auto replParseStatus =
-                    rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
-                if (!replParseStatus.isOK()) {
-                    status = replParseStatus.getStatus();
-                    response.docs.clear();
-                    return;
-                }
+        for (const BSONObj& doc : data.documents) {
+            response.docs.push_back(doc.getOwned());
+        }
 
-                const auto& replSetMetadata = replParseStatus.getValue();
-                response.opTime = replSetMetadata.getLastOpCommitted();
-            }
+        status = Status::OK();
 
-            for (const BSONObj& doc : data.documents) {
-                response.docs.push_back(doc.getOwned());
-            }
-
-            status = Status::OK();
-
-            if (!getMoreBob) {
-                return;
-            }
-            getMoreBob->append("getMore", data.cursorId);
-            getMoreBob->append("collection", data.nss.coll());
-        };
+        if (!getMoreBob) {
+            return;
+        }
+        getMoreBob->append("getMore", data.cursorId);
+        getMoreBob->append("collection", data.nss.coll());
+    };
 
     BSONObj readConcernObj;
     {

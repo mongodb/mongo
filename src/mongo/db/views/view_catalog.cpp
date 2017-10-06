@@ -393,7 +393,7 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
     ViewDefinition savedDefinition = *viewPtr;
-    opCtx->recoveryUnit()->onRollback([this, opCtx, viewName, savedDefinition]() {
+    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
         this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
     });
 
@@ -422,7 +422,7 @@ Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& vie
     _durable->remove(opCtx, viewName);
     _viewGraph.remove(savedDefinition.name());
     _viewMap.erase(viewName.ns());
-    opCtx->recoveryUnit()->onRollback([this, opCtx, viewName, savedDefinition]() {
+    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
         this->_viewGraphNeedsRefresh = true;
         this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
     });

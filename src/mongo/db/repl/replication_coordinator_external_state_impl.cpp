@@ -378,12 +378,11 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                                                          const BSONObj& config) {
     try {
         createOplog(opCtx);
-        const auto& kRsOplogNamespace = NamespaceString::kRsOplogNamespace;
 
         writeConflictRetry(opCtx,
                            "initiate oplog entry",
-                           kRsOplogNamespace.toString(),
-                           [this, &opCtx, &config, &kRsOplogNamespace] {
+                           NamespaceString::kRsOplogNamespace.toString(),
+                           [this, &opCtx, &config] {
                                Lock::GlobalWrite globalWrite(opCtx);
 
                                WriteUnitOfWork wuow(opCtx);
@@ -397,7 +396,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // retries and they will succeed.  Unfortunately, initial sync will
                                // fail if it finds its sync source has an empty oplog.  Thus, we
                                // need to wait here until the seed document is visible in our oplog.
-                               AutoGetCollection oplog(opCtx, kRsOplogNamespace, MODE_IS);
+                               AutoGetCollection oplog(
+                                   opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
                                waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
 

@@ -51,16 +51,18 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
 #ifndef _WIN32
     using shim_char = char;
     using shim_addrinfo = struct addrinfo;
+    shim_addrinfo* info = nullptr;
     const auto& shim_getaddrinfo = getaddrinfo;
-    const auto& shim_freeaddrinfo = freeaddrinfo;
+    const auto& shim_freeaddrinfo = [&info] { freeaddrinfo(info); };
     const auto& shim_getnameinfo = getnameinfo;
     const auto& shim_toNativeString = [](const char* str) { return std::string(str); };
     const auto& shim_fromNativeString = [](const std::string& str) { return str; };
 #else
     using shim_char = wchar_t;
     using shim_addrinfo = struct addrinfoW;
+    shim_addrinfo* info = nullptr;
     const auto& shim_getaddrinfo = GetAddrInfoW;
-    const auto& shim_freeaddrinfo = FreeAddrInfoW;
+    const auto& shim_freeaddrinfo = [&info] { FreeAddrInfoW(info); };
     const auto& shim_getnameinfo = GetNameInfoW;
     const auto& shim_toNativeString = toWideString;
     const auto& shim_fromNativeString = toUtf8String;
@@ -85,14 +87,13 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
     }
 
     int err;
-    shim_addrinfo* info;
     auto nativeHostName = shim_toNativeString(hostName.c_str());
     if ((err = shim_getaddrinfo(nativeHostName.c_str(), nullptr, &hints, &info)) != 0) {
         LOG(3) << "Failed to obtain address information for hostname " << hostName << ": "
                << getAddrInfoStrError(err);
         return results;
     }
-    const auto guard = MakeGuard([&shim_freeaddrinfo, &info] { shim_freeaddrinfo(info); });
+    const auto guard = MakeGuard(shim_freeaddrinfo);
 
     if (mode == HostnameCanonicalizationMode::kForward) {
         results.emplace_back(shim_fromNativeString(info->ai_canonname));

@@ -210,7 +210,7 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
             _localThreadState->executing.markRunning();
             _threadsInUse.addAndFetch(1);
         }
-        const auto guard = MakeGuard([this, start, taskName] {
+        const auto guard = MakeGuard([this, taskName] {
             if (--_localThreadState->recursionDepth == 0) {
                 _localThreadState->executingCurRun += _localThreadState->executing.markStopped();
                 _threadsInUse.subtractAndFetch(1);
