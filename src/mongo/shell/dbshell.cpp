@@ -332,11 +332,11 @@ string getURIFromArgs(const std::string& arg, const std::string& host, const std
         // --host provided, treat it as the connect string and get db from positional arg.
         return parseDbHost(arg, host);
     } else if (arg.size()) {
-        // --host missing, but we have a potential db/host positional arg.
+        // --host missing, but we have a potential host/db positional arg.
         const auto slashPos = arg.find('/');
         if (slashPos != std::string::npos) {
-            // db/host pair.
-            return parseDbHost(arg.substr(0, slashPos), arg.substr(slashPos + 1));
+            // host/db pair.
+            return parseDbHost(arg.substr(slashPos + 1), arg.substr(0, slashPos));
         }
 
         // Compatability formats.
