@@ -18,7 +18,10 @@
     var name = 'catchup_takeover_two_nodes_ahead';
     var replSet = new ReplSetTest({name: name, nodes: 5});
     var nodes = replSet.startSet();
-    replSet.initiate();
+    var config = replSet.getReplSetConfig();
+    // Prevent nodes from syncing from other secondaries.
+    config.settings = {chainingAllowed: false};
+    replSet.initiate(config);
     replSet.awaitReplication();
 
     // Write something so that nodes 0 and 1 are ahead.
