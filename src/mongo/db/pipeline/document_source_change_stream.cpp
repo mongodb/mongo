@@ -281,7 +281,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
 
     uassert(40471,
-            "Only default collation is allowed when using a $changeStream stage.",
+            "Only simple collation is currently allowed when using a $changeStream stage. Please "
+            "specify a collation of {locale: 'simple'} to open a $changeStream on this collection.",
             !expCtx->getCollator());
 
     boost::optional<Timestamp> startFrom;

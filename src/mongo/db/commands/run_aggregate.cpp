@@ -308,6 +308,23 @@ Status waitForMajorityReadConcern(OperationContext* opCtx) {
     }
     return Status::OK();
 }
+
+/**
+ * Resolves the collator to either the user-specified collation or, if none was specified, to the
+ * collection-default collation.
+ */
+std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
+                                                   const AggregationRequest& request,
+                                                   const Collection* collection) {
+    if (!request.getCollation().isEmpty()) {
+        return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                   ->makeFromBSON(request.getCollation()));
+    }
+
+    return (collection && collection->getDefaultCollator()
+                ? collection->getDefaultCollator()->clone()
+                : nullptr);
+}
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
@@ -326,11 +343,9 @@ Status runAggregate(OperationContext* opCtx,
                                  "readConcern levels"};
     }
 
-    // Parse the user-specified collation, if any.
-    std::unique_ptr<CollatorInterface> userSpecifiedCollator = request.getCollation().isEmpty()
-        ? nullptr
-        : uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                              ->makeFromBSON(request.getCollation()));
+    // The collation to use for this aggregation. boost::optional to distinguish between the case
+    // where the collation has not yet been resolved, and where it has been resolved to nullptr.
+    boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse;
 
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -343,6 +358,14 @@ Status runAggregate(OperationContext* opCtx,
 
             // Require $changeNotification to run with readConcern:majority.
             uassertStatusOK(waitForMajorityReadConcern(opCtx));
+
+            // Resolve the collator to either the user-specified collation or the default collation
+            // of the collection on which $changeStream was invoked, so that we do not end up
+            // resolving the collation on the oplog.
+            invariant(!collatorToUse);
+            AutoGetCollection origNssCtx(opCtx, origNss, MODE_IS);
+            Collection* origColl = origNssCtx.getCollection();
+            collatorToUse.emplace(resolveCollator(opCtx, request, origColl));
         }
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
@@ -366,6 +389,12 @@ Status runAggregate(OperationContext* opCtx,
 
         Collection* collection = ctx ? ctx->getCollection() : nullptr;
 
+        // The collator may already have been set if this is a $changeStream pipeline. If not,
+        // resolve the collator to either the user-specified collation or the collection default.
+        if (!collatorToUse) {
+            collatorToUse.emplace(resolveCollator(opCtx, request, collection));
+        }
+
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
         // recursively calling runAggregate(), which will re-acquire locks on the underlying
@@ -375,11 +404,11 @@ Status runAggregate(OperationContext* opCtx,
             invariant(nss != NamespaceString::kRsOplogNamespace);
             invariant(!nss.isCollectionlessAggregateNS());
             // Check that the default collation of 'view' is compatible with the operation's
-            // collation. The check is skipped if the 'request' has the empty collation, which
-            // means that no collation was specified.
+            // collation. The check is skipped if the request did not specify a collation.
             if (!request.getCollation().isEmpty()) {
+                invariant(collatorToUse);  // Should already be resolved at this point.
                 if (!CollatorInterface::collatorsMatch(ctx->getView()->defaultCollator(),
-                                                       userSpecifiedCollator.get())) {
+                                                       collatorToUse->get())) {
                     return {ErrorCodes::OptionNotSupportedOnView,
                             "Cannot override a view's default collation"};
                 }
@@ -418,22 +447,11 @@ Status runAggregate(OperationContext* opCtx,
             return status;
         }
 
-        // Determine the appropriate collation to make the ExpressionContext.
-
-        // If the pipeline does not have a user-specified collation, set it from the collection
-        // default. Be careful to consult the original request BSON to check if a collation was
-        // specified, since a specification of {locale: "simple"} will result in a null
-        // collator.
-        auto collatorToUse = std::move(userSpecifiedCollator);
-        if (request.getCollation().isEmpty() && collection && collection->getDefaultCollator()) {
-            invariant(!collatorToUse);
-            collatorToUse = collection->getDefaultCollator()->clone();
-        }
-
+        invariant(collatorToUse);
         expCtx.reset(
             new ExpressionContext(opCtx,
                                   request,
-                                  std::move(collatorToUse),
+                                  std::move(*collatorToUse),
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request))));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
