@@ -526,7 +526,13 @@ checkpoint(void *arg)
 			continue;
 		}
 
-		/* LSM and data-sources don't support named checkpoints. */
+		/*
+		 * LSM and data-sources don't support named checkpoints. Also,
+		 * don't attempt named checkpoints during a hot backup. It's
+		 * OK to create named checkpoints during a hot backup, but we
+		 * can't delete them, so repeating an already existing named
+		 * checkpoint will fail when we can't drop the previous one.
+		 */
 		ckpt_config = NULL;
 		backup_locked = false;
 		if (!DATASOURCE("helium") && !DATASOURCE("kvsbdb") &&
@@ -538,15 +544,20 @@ checkpoint(void *arg)
 				 * few names to test multiple named snapshots in
 				 * the system.
 				 */
-				testutil_check(__wt_snprintf(
-				    config_buf, sizeof(config_buf),
-				    "name=mine.%" PRIu32, mmrand(NULL, 1, 4)));
-				ckpt_config = config_buf;
+				ret = pthread_rwlock_trywrlock(&g.backup_lock);
+				if (ret == 0) {
+					backup_locked = true;
+					testutil_check(__wt_snprintf(
+					    config_buf, sizeof(config_buf),
+					    "name=mine.%" PRIu32,
+					    mmrand(NULL, 1, 4)));
+					ckpt_config = config_buf;
+				} else if (ret != EBUSY)
+					testutil_check(ret);
 				break;
 			case 2:
 				/*
 				 * 5% drop all named snapshots.
-				 * We can't drop checkpoints during a backup.
 				 */
 				ret = pthread_rwlock_trywrlock(&g.backup_lock);
 				if (ret == 0) {
