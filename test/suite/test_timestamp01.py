@@ -77,12 +77,6 @@ class test_timestamp01(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
-                'commit_timestamp=' + 'aD78f'),
-                '/Failed to parse commit timestamp/')
-
-        self.session.begin_transaction()
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(
                 'commit_timestamp=' + 'a`78f'),
                 '/Failed to parse commit timestamp/')
 
@@ -92,10 +86,13 @@ class test_timestamp01(wttest.WiredTigerTestCase, suite_subprocess):
                 'commit_timestamp=' + 'a{78f'),
                 '/Failed to parse commit timestamp/')
 
-        # One is okay, as is 2**64 - 1
+        # One is okay, as is upper case hex and 2**64 - 1
         self.session.begin_transaction()
         self.session.commit_transaction(
             'commit_timestamp=' + timestamp_str(1))
+        self.session.begin_transaction()
+        self.session.commit_transaction(
+            'commit_timestamp=0A78F')
         self.session.begin_transaction()
         self.session.commit_transaction(
             'commit_timestamp=' + timestamp_str(1 << 64 - 1))
