@@ -553,7 +553,9 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // MMAPv1 requires that index namespaces are subject to the same length constraints as indexes
     // in collections that are not in a drop-pending state. Therefore, we check if the drop-pending
     // namespace is too long for any index names in the collection.
-    if (opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+    // These indexes are dropped regardless of the storage engine on the current node because we may
+    // still have nodes running MMAPv1 in the replica set.
+    {
 
         // Compile a list of any indexes that would become too long following the drop-pending
         // rename. In the case that this collection drop gets rolled back, this will incur a

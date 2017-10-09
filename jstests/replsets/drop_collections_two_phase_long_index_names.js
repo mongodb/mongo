@@ -47,15 +47,13 @@
 
     let droppedCollName = twoPhaseDropTest.prepareDropCollection(collName);
 
-    // Check that, on MMAPv1, indexes that would violate the namespace length constraints after
-    // rename were dropped.
-    let storageEngine = jsTest.options().storageEngine;
-    if (storageEngine === 'mmapv1') {
-        let primaryDB = replTest.getPrimary().getDB(dbName);
-        let indexes = listIndexes(primaryDB, droppedCollName);
-        assert(indexes.find(idx => idx.name === shortIndexName));
-        assert.eq(undefined, indexes.find(idx => idx.name === longIndexName));
-    }
+    // Check that indexes that would violate the namespace length constraints after rename were
+    // dropped.
+    const primary = replTest.getPrimary();
+    let primaryDB = primary.getDB(dbName);
+    let indexes = listIndexes(primaryDB, droppedCollName);
+    assert(indexes.find(idx => idx.name === shortIndexName));
+    assert.eq(undefined, indexes.find(idx => idx.name === longIndexName));
 
     twoPhaseDropTest.commitDropCollection(collName);
 
