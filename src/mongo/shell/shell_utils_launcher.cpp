@@ -78,7 +78,6 @@ extern char** environ;
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::cout;
 using std::endl;
 using std::make_pair;
@@ -86,6 +85,7 @@ using std::map;
 using std::pair;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 #ifdef _WIN32
@@ -1033,6 +1033,7 @@ int KillMongoProgramInstances() {
         int port = registry.portForPid(pid);
         int code = killDb(port != -1 ? port : 0, pid, SIGTERM);
         if (code != EXIT_SUCCESS) {
+            log() << "Process with pid " << pid << " exited with error code " << code;
             returnCode = code;
         }
     }
@@ -1058,5 +1059,5 @@ void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("pathExists", PathExists);
     scope.injectNative("copyDbpath", CopyDbpath);
 }
-}
-}
+}  // namespace shell_utils
+}  // namespace mongo

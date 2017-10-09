@@ -99,7 +99,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion36, ("EndStar
         ServerGlobalParams::FeatureCompatibility::Version::k36);
     return Status::OK();
 }
-}
+}  // namespace
 
 namespace mongo {
 
@@ -861,6 +861,8 @@ int _main(int argc, char* argv[], char** envp) {
             return -3;
         }
         if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
+            cout << "one more more child processes exited with an error during "
+                 << shellGlobalParams.files[i] << endl;
             return -3;
         }
     }
