@@ -3,6 +3,7 @@ Testing hook that periodically makes the primary of a replica set step down.
 """
 from __future__ import absolute_import
 
+import sys
 import time
 import threading
 
@@ -64,21 +65,25 @@ class ContinuousStepdown(interface.CustomBehavior):
         self._stepdown_thread.stop()
 
     def before_test(self, test, test_report):
-        self._check_thread()
+        self._check_thread(test, test_report)
         self.logger.info("Resuming the stepdown thread.")
         self._stepdown_thread.resume()
 
     def after_test(self, test, test_report):
-        self._check_thread()
+        self._check_thread(test, test_report)
         self.logger.info("Pausing the stepdown thread.")
         self._stepdown_thread.pause()
         self.logger.info("Paused the stepdown thread.")
 
-    def _check_thread(self):
+    def _check_thread(self, test, test_report):
         if not self._stepdown_thread.is_alive():
             msg = "The stepdown thread is not running."
             self.logger.error(msg)
-            raise errors.StopExecution(msg)
+            try:
+                raise errors.StopExecution(msg)
+            except errors.StopExecution:
+                test_report.addError(test, sys.exc_info())
+                raise
 
     def _add_fixture(self, fixture):
         if isinstance(fixture, replicaset.ReplicaSetFixture):
