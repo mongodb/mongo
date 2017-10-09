@@ -443,10 +443,10 @@ Status _collModInternal(OperationContext* opCtx,
     return Status::OK();
 }
 
-void _updateDBSchemaVersion(OperationContext* opCtx,
-                            const std::string& dbname,
-                            std::map<std::string, UUID>& collToUUID,
-                            bool needUUIDAdded) {
+void _updateDatabaseUUIDSchemaVersion(OperationContext* opCtx,
+                                      const std::string& dbname,
+                                      std::map<std::string, UUID>& collToUUID,
+                                      bool needUUIDAdded) {
     // Iterate through all collections of database dbname and make necessary UUID changes.
     std::vector<NamespaceString> collNamespaceStrings;
     {
@@ -498,16 +498,17 @@ void _updateDBSchemaVersion(OperationContext* opCtx,
     }
 }
 
-void _updateDBSchemaVersionNonReplicated(OperationContext* opCtx,
-                                         const std::string& dbname,
-                                         bool needUUIDAdded) {
+Status _updateDatabaseUUIDSchemaVersionNonReplicated(OperationContext* opCtx,
+                                                     const std::string& dbname,
+                                                     bool needUUIDAdded) {
     // Iterate through all collections if we're in the "local" database.
     std::vector<NamespaceString> collNamespaceStrings;
     if (dbname == "local") {
         AutoGetDb autoDb(opCtx, dbname, MODE_X);
         Database* const db = autoDb.getDb();
         if (!db) {
-            return;
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "database " << dbname << " does not exist");
         }
         for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
             Collection* coll = *collectionIt;
@@ -540,27 +541,14 @@ void _updateDBSchemaVersionNonReplicated(OperationContext* opCtx,
         }
         if ((needUUIDAdded && !coll->uuid()) || (!needUUIDAdded && coll->uuid())) {
             BSONObjBuilder resultWeDontCareAbout;
-            uassertStatusOK(_collModInternal(
-                opCtx, coll->ns(), collModObj, &resultWeDontCareAbout, /*upgradeUUID*/ true, uuid));
+            auto collModStatus = _collModInternal(
+                opCtx, coll->ns(), collModObj, &resultWeDontCareAbout, /*upgradeUUID*/ true, uuid);
+            if (!collModStatus.isOK()) {
+                return collModStatus;
+            }
         }
     }
-}
-
-void updateUUIDSchemaVersionNonReplicated(OperationContext* opCtx, bool upgrade) {
-    if (!enableCollectionUUIDs) {
-        return;
-    }
-    // Update UUIDs on all collections of all non-replicated databases.
-    std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
-    {
-        Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
-        storageEngine->listDatabases(&dbNames);
-    }
-    for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
-        auto dbName = *it;
-        _updateDBSchemaVersionNonReplicated(opCtx, dbName, upgrade);
-    }
+    return Status::OK();
 }
 }  // namespace
 
@@ -579,7 +567,10 @@ Status collModForUUIDUpgrade(OperationContext* opCtx,
     BSONObjBuilder resultWeDontCareAbout;
     // Update all non-replicated collection UUIDs.
     if (nss.ns() == "admin.system.version") {
-        updateUUIDSchemaVersionNonReplicated(opCtx, !!uuid);
+        auto schemaStatus = updateUUIDSchemaVersionNonReplicated(opCtx, !!uuid);
+        if (!schemaStatus.isOK()) {
+            return schemaStatus;
+        }
     }
     return _collModInternal(opCtx, nss, cmdObj, &resultWeDontCareAbout, /*upgradeUUID*/ true, uuid);
 }
@@ -632,11 +623,32 @@ void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade) {
 
     for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
         auto dbName = *it;
-        _updateDBSchemaVersion(opCtx, dbName, dbToCollToUUID[dbName], upgrade);
+        _updateDatabaseUUIDSchemaVersion(opCtx, dbName, dbToCollToUUID[dbName], upgrade);
     }
     const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
                                            WriteConcernOptions::SyncMode::UNSET,
                                            /*timeout*/ INT_MAX);
     repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(opCtx, writeConcern);
+}
+
+Status updateUUIDSchemaVersionNonReplicated(OperationContext* opCtx, bool upgrade) {
+    if (!enableCollectionUUIDs) {
+        return Status::OK();
+    }
+    // Update UUIDs on all collections of all non-replicated databases.
+    std::vector<std::string> dbNames;
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    {
+        Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
+        storageEngine->listDatabases(&dbNames);
+    }
+    for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
+        auto dbName = *it;
+        auto schemaStatus = _updateDatabaseUUIDSchemaVersionNonReplicated(opCtx, dbName, upgrade);
+        if (!schemaStatus.isOK()) {
+            return schemaStatus;
+        }
+    }
+    return Status::OK();
 }
 }  // namespace mongo

@@ -137,6 +137,11 @@ public:
     StatusWith<StorageInterface::CollectionCount> getCollectionCount(
         OperationContext* opCtx, const NamespaceString& nss) override;
 
+    StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
+                                                         const NamespaceString& nss) override;
+
+    Status upgradeUUIDSchemaVersionNonReplicated(OperationContext* opCtx) override;
+
     void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
 
     void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;

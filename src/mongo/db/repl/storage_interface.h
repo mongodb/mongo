@@ -290,6 +290,18 @@ public:
                                                            const NamespaceString& nss) = 0;
 
     /**
+     * Returns the UUID of the collection specified by nss, if such a UUID exists.
+     */
+    virtual StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
+                                                                 const NamespaceString& nss) = 0;
+
+    /**
+     * Adds UUIDs for non-replicated collections. To be called only at the end of initial
+     * sync and only if the admin.system.version collection has a UUID.
+     */
+    virtual Status upgradeUUIDSchemaVersionNonReplicated(OperationContext* opCtx) = 0;
+
+    /**
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
      * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
      */

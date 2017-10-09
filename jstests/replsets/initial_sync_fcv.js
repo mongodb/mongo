@@ -73,11 +73,11 @@
     runInitialSync({setFeatureCompatibilityVersion: '3.4'},
                    'Attempt to assign UUID to replicated collection');
 
-    // Although 'dropDatabase' does not mention the 'admin.system.version' collection, it still
-    // logs a 'drop' operation on the 'admin.system.version' collection (due to two-phase drop)
-    // that gets caught in initial sync.
-    runInitialSync({dropDatabase: 1},
-                   'Applying command to feature compatibility version collection');
+    // Modifications to the featureCompatibilityVersion document during initial sync should be
+    // caught and cause initial sync to fail.
+    runInitialSync(
+        {delete: 'system.version', deletes: [{q: {_id: "featureCompatibilityVersion"}, limit: 1}]},
+        'Applying operation on feature compatibility version document');
 
     rst.stopSet();
 })();

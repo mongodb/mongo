@@ -8,7 +8,7 @@
     const latest = "latest";
     const downgrade = "3.4";
 
-    let checkCollectionUUIDs = function(adminDB, isDowngrade, excludeLocal) {
+    let checkCollectionUUIDs = function(adminDB, isDowngrade) {
         let databaseList = adminDB.runCommand({"listDatabases": 1}).databases;
 
         databaseList.forEach(function(database) {
@@ -19,19 +19,12 @@
                 if (collectionInfos[i].name == "system.indexes") {
                     continue;
                 }
-                if (excludeLocal) {
-                    // Exclude checking all collections in local until SERVER-30131 is fixed.
-                    if (currentDatabase != "local") {
-                        assert(collectionInfos[i].info.uuid);
-                    }
+                if (isDowngrade) {
+                    assert(!collectionInfos[i].info.uuid,
+                           "Unexpected uuid for collection: " + tojson(collectionInfos[i]));
                 } else {
-                    if (isDowngrade) {
-                        assert(!collectionInfos[i].info.uuid,
-                               "Unexpected uuid for collection: " + tojson(collectionInfos[i]));
-                    } else {
-                        assert(collectionInfos[i].info.uuid,
-                               "Expect uuid for collection: " + tojson(collectionInfos[i]));
-                    }
+                    assert(collectionInfos[i].info.uuid,
+                           "Expect uuid for collection: " + tojson(collectionInfos[i]));
                 }
             }
         });
@@ -92,13 +85,13 @@
         insertDataForConn(conn, ["admin", "local", "test"]);
 
         // Ensure all collections have UUIDs in 3.6 mode.
-        checkCollectionUUIDs(adminDB, false, true);
+        checkCollectionUUIDs(adminDB, false);
 
         // Set featureCompatibilityVersion to 3.4.
         setFCV(adminDB, "3.4");
 
         // Ensure no collections in a featureCompatibilityVersion 3.4 database have UUIDs.
-        checkCollectionUUIDs(adminDB, true, false);
+        checkCollectionUUIDs(adminDB, true);
 
         // Stop Mongod 3.6
         MongoRunner.stopMongod(conn);
@@ -112,7 +105,7 @@
         checkFCV(downgradeAdminDB, "3.4", true);
 
         // Ensure there are no UUIDs
-        checkCollectionUUIDs(downgradeAdminDB, true, false);
+        checkCollectionUUIDs(downgradeAdminDB, true);
 
         // Stop 3.4
         MongoRunner.stopMongod(downgradeConn);
@@ -125,7 +118,7 @@
         // Ensure all collections have UUIDs after switching back to featureCompatibilityVersion
         // 3.6.
         setFCV(adminDB, "3.6");
-        checkCollectionUUIDs(adminDB, false, true);
+        checkCollectionUUIDs(adminDB, false);
 
         // Stop Mongod 3.6 for the last time
         MongoRunner.stopMongod(conn);
@@ -157,10 +150,10 @@
         }
 
         // Ensure all collections have UUIDs in 3.6 mode on both primary and secondaries.
-        checkCollectionUUIDs(primaryAdminDB, false, true);
+        checkCollectionUUIDs(primaryAdminDB, false);
         for (let j = 0; j < secondaries.length; j++) {
             let secondaryAdminDB = secondaries[j].getDB("admin");
-            checkCollectionUUIDs(secondaryAdminDB, false, true);
+            checkCollectionUUIDs(secondaryAdminDB, false);
         }
 
         // Change featureCompatibilityVersion to 3.4.
@@ -172,10 +165,10 @@
         }
 
         // Ensure no collections have UUIDs in 3.4 mode on both primary and secondaries.
-        checkCollectionUUIDs(primaryAdminDB, true, false);
+        checkCollectionUUIDs(primaryAdminDB, true);
         for (let j = 0; j < secondaries.length; j++) {
             let secondaryAdminDB = secondaries[j].getDB("admin");
-            checkCollectionUUIDs(secondaryAdminDB, true, false);
+            checkCollectionUUIDs(secondaryAdminDB, true);
         }
 
         // Stop 3.6 RS
@@ -191,14 +184,14 @@
         let downgradeSecondaries = downgradeRst.getSecondaries();
 
         // Initially featureCompatibilityVersion document is 3.4 on primary and secondaries.
-        checkCollectionUUIDs(downgradePrimaryAdminDB, true, false);
+        checkCollectionUUIDs(downgradePrimaryAdminDB, true);
         checkFCV(downgradePrimaryAdminDB, "3.4", true);
         for (let j = 0; j < downgradeSecondaries.length; j++) {
             let secondaryAdminDB = downgradeSecondaries[j].getDB("admin");
             checkFCV(secondaryAdminDB, "3.4", true);
 
             // Ensure no collections have UUIDs
-            checkCollectionUUIDs(secondaryAdminDB, true, false);
+            checkCollectionUUIDs(secondaryAdminDB, true);
         }
 
         downgradeRst.stopSet();
@@ -219,10 +212,10 @@
             checkFCV(secondaryAdminDB, "3.6");
         }
 
-        checkCollectionUUIDs(primaryAdminDB, false, true);
+        checkCollectionUUIDs(primaryAdminDB, false);
         for (let j = 0; j < secondaries.length; j++) {
             let secondaryAdminDB = secondaries[j].getDB("admin");
-            checkCollectionUUIDs(secondaryAdminDB, false, true);
+            checkCollectionUUIDs(secondaryAdminDB, false);
         }
 
         rst.stopSet();
