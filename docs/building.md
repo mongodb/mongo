@@ -45,7 +45,7 @@ If you want to build everything (mongod, mongo, tests, etc):
 
 If you only want to build the database:
 
-    $ python2 buildscripts/scons.py scons
+    $ python2 buildscripts/scons.py mongod
 
 To install
 
