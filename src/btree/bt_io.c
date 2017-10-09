@@ -25,6 +25,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_ITEM *ip;
 	const WT_PAGE_HEADER *dsk;
 	size_t result_len;
+	uint64_t bytes_read;
 	const char *fail_msg;
 
 	btree = S2BT(session);
@@ -38,11 +39,13 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	 */
 	if (btree->compressor == NULL && btree->kencryptor == NULL) {
 		WT_RET(bm->read(bm, session, buf, addr, addr_size));
+		bytes_read = buf->size;
 		dsk = buf->data;
 		ip = NULL;
 	} else {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(bm->read(bm, session, tmp, addr, addr_size));
+		bytes_read = tmp->size;
 		dsk = tmp->data;
 		ip = tmp;
 	}
@@ -143,8 +146,9 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_STAT_DATA_INCR(session, cache_read);
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
 		WT_STAT_DATA_INCR(session, compress_read);
-	WT_STAT_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
-	WT_STAT_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
+	WT_STAT_CONN_INCRV(session, cache_bytes_read, bytes_read);
+	WT_STAT_DATA_INCRV(session, cache_bytes_read, bytes_read);
+	(void)__wt_atomic_add64(&S2C(session)->cache->bytes_read, bytes_read);
 
 	if (0) {
 corrupt:	if (ret == 0)
@@ -181,6 +185,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_PAGE_HEADER *dsk;
 	size_t dst_len, len, result_len, size, src_len;
+	uint64_t bytes_written;
 	uint8_t *dst, *src;
 	int compression_failed;		/* Extension API, so not a bool. */
 	bool data_checksum, encrypted, timer;
@@ -371,6 +376,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	    bm->checkpoint(bm, session, ip, btree->ckpt, data_checksum) :
 	    bm->write(
 	    bm, session, ip, addr, addr_sizep, data_checksum, checkpoint_io));
+	bytes_written = ip->size;
 
 	/* Update some statistics now that the write is done */
 	if (timer) {
@@ -382,9 +388,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 
 	WT_STAT_CONN_INCR(session, cache_write);
 	WT_STAT_DATA_INCR(session, cache_write);
-	S2C(session)->cache->bytes_written += dsk->mem_size;
-	WT_STAT_CONN_INCRV(session, cache_bytes_write, dsk->mem_size);
-	WT_STAT_DATA_INCRV(session, cache_bytes_write, dsk->mem_size);
+	WT_STAT_CONN_INCRV(session, cache_bytes_write, bytes_written);
+	WT_STAT_DATA_INCRV(session, cache_bytes_write, bytes_written);
+	(void)__wt_atomic_add64(
+	    &S2C(session)->cache->bytes_written, bytes_written);
 
 err:	__wt_scr_free(session, &ctmp);
 	__wt_scr_free(session, &etmp);
