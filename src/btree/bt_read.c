@@ -367,14 +367,15 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 		WT_STAT_CONN_INCRV(session, cache_read_app_time,
 		    WT_TIMEDIFF_US(stop, start));
 	}
-	WT_ERR(__wt_page_inmem(session, ref, tmp.data, tmp.memsize,
-	    WT_DATA_IN_ITEM(&tmp) ?
-	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 
 	/*
-	 * Clear the local reference to an allocated copy of the disk image on
-	 * return; the page steals it, errors in this code should not free it.
+	 * Build the in-memory version of the page. Clear our local reference to
+	 * the allocated copy of the disk image on return, the in-memory object
+	 * steals it.
 	 */
+	WT_ERR(__wt_page_inmem(session, ref, tmp.data,
+	    WT_DATA_IN_ITEM(&tmp) ?
+	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 	tmp.mem = NULL;
 
 skip_read:

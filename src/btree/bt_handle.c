@@ -572,7 +572,7 @@ __wt_btree_tree_open(
 	 * the allocated copy of the disk image on return, the in-memory object
 	 * steals it.
 	 */
-	WT_ERR(__wt_page_inmem(session, NULL, dsk.data, dsk.memsize,
+	WT_ERR(__wt_page_inmem(session, NULL, dsk.data,
 	    WT_DATA_IN_ITEM(&dsk) ?
 	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 	dsk.mem = NULL;
