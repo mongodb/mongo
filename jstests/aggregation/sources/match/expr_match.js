@@ -36,4 +36,14 @@
     // $match with constant expression and no field path.
     assert.eq(4, coll.aggregate([{$match: {$expr: {$gte: [10, 5]}}}]).itcount());
     assert.eq(0, coll.aggregate([{$match: {$expr: {$gte: [5, 10]}}}]).itcount());
+
+    // $match with $expr works inside a $or.
+    assert.eq(4,
+              coll.aggregate([{$match: {$or: [{$expr: {$eq: ["$foo", "$bar"]}}, {b: {$gt: 3}}]}}])
+                  .itcount());
+
+    // $match with $expr works inside a $and.
+    assert.eq(2,
+              coll.aggregate([{$match: {$and: [{$expr: {$eq: ["$foo", "$bar"]}}, {x: {$lt: 2}}]}}])
+                  .itcount());
 })();

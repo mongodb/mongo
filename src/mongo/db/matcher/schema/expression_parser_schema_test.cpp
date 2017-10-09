@@ -238,7 +238,7 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchSubExprRejectsTopLevelOperators
         "}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 }
 
 //
@@ -853,7 +853,7 @@ TEST(MatchExpressionParserSchemaTest, RootDocEqMustBeTopLevel) {
     auto query = fromjson("{a: {$_internalSchemaRootDocEq: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto rootDocEq = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::FailedToParse);
 
     query = fromjson("{$or: [{a: 1}, {$_internalSchemaRootDocEq: 1}]}");
     rootDocEq = MatchExpressionParser::parse(query, expCtx);
@@ -861,7 +861,7 @@ TEST(MatchExpressionParserSchemaTest, RootDocEqMustBeTopLevel) {
 
     query = fromjson("{a: {$elemMatch: {$_internalSchemaRootDocEq: 1}}}");
     rootDocEq = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(MatchExpressionParserSchemaTest, RootDocEqParsesSuccessfully) {

@@ -171,15 +171,25 @@ Status ParsedUpdate::parseArrayFilters() {
     for (auto rawArrayFilter : _request->getArrayFilters()) {
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(_opCtx, _collator.get()));
-        auto arrayFilterStatus =
-            ExpressionWithPlaceholder::parse(rawArrayFilter, std::move(expCtx));
-        if (!arrayFilterStatus.isOK()) {
-            return Status(arrayFilterStatus.getStatus().code(),
+        auto parsedArrayFilter =
+            MatchExpressionParser::parse(rawArrayFilter,
+                                         std::move(expCtx),
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kBanAllSpecialFeatures);
+        if (!parsedArrayFilter.isOK()) {
+            return Status(parsedArrayFilter.getStatus().code(),
                           str::stream() << "Error parsing array filter: "
-                                        << arrayFilterStatus.getStatus().reason());
+                                        << parsedArrayFilter.getStatus().reason());
         }
-        auto arrayFilter = std::move(arrayFilterStatus.getValue());
-        auto fieldName = arrayFilter->getPlaceholder();
+        auto parsedArrayFilterWithPlaceholder =
+            ExpressionWithPlaceholder::make(std::move(parsedArrayFilter.getValue()));
+        if (!parsedArrayFilterWithPlaceholder.isOK()) {
+            return Status(parsedArrayFilterWithPlaceholder.getStatus().code(),
+                          str::stream() << "Error parsing array filter: "
+                                        << parsedArrayFilterWithPlaceholder.getStatus().reason());
+        }
+        auto finalArrayFilter = std::move(parsedArrayFilterWithPlaceholder.getValue());
+        auto fieldName = finalArrayFilter->getPlaceholder();
         if (!fieldName) {
             return Status(
                 ErrorCodes::FailedToParse,
@@ -192,7 +202,7 @@ Status ParsedUpdate::parseArrayFilters() {
                               << *fieldName);
         }
 
-        _arrayFilters[*fieldName] = std::move(arrayFilter);
+        _arrayFilters[*fieldName] = std::move(finalArrayFilter);
     }
 
     return Status::OK();

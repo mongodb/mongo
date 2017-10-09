@@ -62,6 +62,26 @@
                 "Cannot use an expression without a top-level field name in arrayFilters"),
             "update failed for a reason other than missing a top-level field name in arrayFilter");
 
+        // Array filter with $text inside fails to parse.
+        res = coll.update(
+            {_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$text: {$search: "foo"}}]});
+        assert.writeErrorWithCode(res, ErrorCodes.BadValue);
+
+        // Array filter with $where inside fails to parse.
+        res =
+            coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$where: "this.a == 2"}]});
+        assert.writeErrorWithCode(res, ErrorCodes.BadValue);
+
+        // Array filter with $geoNear inside fails to parse.
+        res = coll.update(
+            {_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{loc: {$geoNear: [50, 50]}}]});
+        assert.writeErrorWithCode(res, ErrorCodes.BadValue);
+
+        // Array filter with $expr inside fails to parse.
+        res = coll.update(
+            {_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{$expr: {$eq: ["$foo", "$bar"]}}]});
+        assert.writeErrorWithCode(res, ErrorCodes.QueryFeatureNotAllowed);
+
         // Good value for arrayFilters succeeds.
         assert.writeOK(coll.update(
             {_id: 0}, {$set: {"a.$[i]": 5, "a.$[j]": 6}}, {arrayFilters: [{i: 0}, {j: 0}]}));

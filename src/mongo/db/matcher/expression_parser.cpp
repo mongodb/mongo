@@ -89,15 +89,24 @@ bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
     return false;
 }
 
-const boost::container::flat_set<StringData> topLevelOperators{"$_internalSchemaAllowedProperties",
-                                                               "$_internalSchemaMaxProperties",
-                                                               "$_internalSchemaMinProperties",
-                                                               "$_internalSchemaXor",
-                                                               "$and",
-                                                               "$nor",
-                                                               "$or",
-                                                               "$where"};
-
+const boost::container::flat_set<StringData> kPathlessOperators{"$_internalSchemaAllowedProperties",
+                                                                "$_internalSchemaCond",
+                                                                "$_internalSchemaMaxProperties",
+                                                                "$_internalSchemaMinProperties",
+                                                                "$_internalSchemaRootDocEq",
+                                                                "$_internalSchemaXor",
+                                                                "$alwaysFalse",
+                                                                "$alwaysTrue",
+                                                                "$and",
+                                                                "$atomic",
+                                                                "$comment",
+                                                                "$expr",
+                                                                "$isolated"
+                                                                "$jsonSchema",
+                                                                "$nor",
+                                                                "$or",
+                                                                "$text",
+                                                                "$where"};
 }  // namespace
 
 namespace mongo {
@@ -145,23 +154,25 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
     const BSONElement& e,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AllowedFeatureSet allowedFeatures,
-    bool topLevel) {
+    DocumentParseLevel currentLevel) {
     if (mongoutils::str::equals("$eq", e.fieldName()))
         return _parseComparison(name, new EqualityMatchExpression(), e, expCtx, allowedFeatures);
 
     if (mongoutils::str::equals("$not", e.fieldName())) {
-        return _parseNot(name, e, expCtx, allowedFeatures, topLevel);
+        return _parseNot(name, e, expCtx, allowedFeatures, currentLevel);
     }
 
     auto parseExpMatchType = MatchExpressionParser::parsePathAcceptingKeyword(e);
     if (!parseExpMatchType) {
-        // $where cannot be a sub-expression because it works on top-level documents only.
-        if (mongoutils::str::equals("$where", e.fieldName())) {
-            return {Status(ErrorCodes::BadValue, "$where cannot be applied to a field")};
+        if (kPathlessOperators.find(e.fieldNameStringData()) != kPathlessOperators.end()) {
+            return {Status(ErrorCodes::FailedToParse,
+                           mongoutils::str::stream() << e.fieldNameStringData()
+                                                     << " cannot be applied to a field path.")};
         }
 
-        return {Status(ErrorCodes::BadValue,
-                       mongoutils::str::stream() << "unknown operator: " << e.fieldName())};
+        return {
+            Status(ErrorCodes::BadValue,
+                   mongoutils::str::stream() << "unknown operator: " << e.fieldNameStringData())};
     }
 
     switch (*parseExpMatchType) {
@@ -299,10 +310,10 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
         }
 
         case PathAcceptingKeyword::ELEM_MATCH:
-            return _parseElemMatch(name, e, expCtx, allowedFeatures, topLevel);
+            return _parseElemMatch(name, e, expCtx, allowedFeatures);
 
         case PathAcceptingKeyword::ALL:
-            return _parseAll(name, e, expCtx, allowedFeatures, topLevel);
+            return _parseAll(name, e, expCtx, allowedFeatures);
 
         case PathAcceptingKeyword::WITHIN:
         case PathAcceptingKeyword::GEO_INTERSECTS:
@@ -349,7 +360,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
                               str::stream() << "$_internalSchemaObjectMatch must be an object");
             }
 
-            auto parsedSubObjExpr = _parse(e.Obj(), expCtx, allowedFeatures, topLevel);
+            auto parsedSubObjExpr =
+                _parse(e.Obj(), expCtx, allowedFeatures, DocumentParseLevel::kUserSubDocument);
             if (!parsedSubObjExpr.isOK()) {
                 return parsedSubObjExpr;
             }
@@ -387,7 +399,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX: {
-            return _parseInternalSchemaMatchArrayIndex(name, e, expCtx);
+            return _parseInternalSchemaMatchArrayIndex(
+                name, e, expCtx, allowedFeatures, currentLevel);
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX: {
@@ -435,8 +448,17 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(
                                   << "must be an object");
             }
 
+            auto filter = _parse(second.embeddedObject(),
+                                 expCtx,
+                                 kBanAllSpecialFeatures,
+                                 DocumentParseLevel::kUserSubDocument);
+
+            if (!filter.isOK()) {
+                return filter.getStatus();
+            }
+
             auto exprWithPlaceholder =
-                ExpressionWithPlaceholder::parse(second.embeddedObject(), expCtx);
+                ExpressionWithPlaceholder::make(std::move(filter.getValue()));
             if (!exprWithPlaceholder.isOK()) {
                 return exprWithPlaceholder.getStatus();
             }
@@ -472,10 +494,12 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
     const BSONObj& obj,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AllowedFeatureSet allowedFeatures,
-    bool topLevel) {
+    DocumentParseLevel currentLevel) {
     std::unique_ptr<AndMatchExpression> root = stdx::make_unique<AndMatchExpression>();
 
-    const bool childIsTopLevel = false;
+    const DocumentParseLevel nextLevel = (currentLevel == DocumentParseLevel::kPredicateTopLevel)
+        ? DocumentParseLevel::kUserDocumentTopLevel
+        : currentLevel;
     BSONObjIterator i(obj);
     while (i.more()) {
         BSONElement e = i.next();
@@ -486,8 +510,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 if (e.type() != Array)
                     return {Status(ErrorCodes::BadValue, "$or must be an array")};
                 std::unique_ptr<OrMatchExpression> temp = stdx::make_unique<OrMatchExpression>();
-                Status s =
-                    _parseTreeList(e.Obj(), temp.get(), expCtx, allowedFeatures, childIsTopLevel);
+                Status s = _parseTreeList(e.Obj(), temp.get(), expCtx, allowedFeatures, nextLevel);
                 if (!s.isOK())
                     return s;
                 root->add(temp.release());
@@ -495,8 +518,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 if (e.type() != Array)
                     return {Status(ErrorCodes::BadValue, "$and must be an array")};
                 std::unique_ptr<AndMatchExpression> temp = stdx::make_unique<AndMatchExpression>();
-                Status s =
-                    _parseTreeList(e.Obj(), temp.get(), expCtx, allowedFeatures, childIsTopLevel);
+                Status s = _parseTreeList(e.Obj(), temp.get(), expCtx, allowedFeatures, nextLevel);
                 if (!s.isOK())
                     return s;
                 root->add(temp.release());
@@ -504,16 +526,16 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 if (e.type() != Array)
                     return {Status(ErrorCodes::BadValue, "$nor must be an array")};
                 std::unique_ptr<NorMatchExpression> temp = stdx::make_unique<NorMatchExpression>();
-                Status s =
-                    _parseTreeList(e.Obj(), temp.get(), expCtx, allowedFeatures, childIsTopLevel);
+                Status s = _parseTreeList(e.Obj(), temp.get(), expCtx, allowedFeatures, nextLevel);
                 if (!s.isOK())
                     return s;
                 root->add(temp.release());
             } else if (mongoutils::str::equals("atomic", rest) ||
                        mongoutils::str::equals("isolated", rest)) {
-                if (!topLevel)
-                    return {Status(ErrorCodes::BadValue,
+                if (currentLevel != DocumentParseLevel::kPredicateTopLevel) {
+                    return {Status(ErrorCodes::FailedToParse,
                                    "$atomic/$isolated has to be at the top level")};
+                }
                 // Don't do anything with the expression; CanonicalQuery::init() will look through
                 // the BSONObj again for a $atomic/$isolated.
             } else if (mongoutils::str::equals("where", rest)) {
@@ -521,13 +543,19 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                     return {Status(ErrorCodes::BadValue, "$where is not allowed in this context")};
                 }
 
+                if (currentLevel == DocumentParseLevel::kUserSubDocument) {
+                    return {Status(ErrorCodes::FailedToParse,
+                                   "$where can only be applied to the top-level document")};
+                }
+
                 StatusWithMatchExpression s = _extensionsCallback->parseWhere(e);
                 if (!s.isOK())
                     return s;
                 root->add(s.getValue().release());
             } else if (mongoutils::str::equals("expr", rest)) {
-                if (!topLevel) {
-                    return {Status(ErrorCodes::BadValue, "$expr has to be at the top level")};
+                if (currentLevel == DocumentParseLevel::kUserSubDocument) {
+                    return {Status(ErrorCodes::FailedToParse,
+                                   "$expr can only be applied to the top-level document")};
                 }
 
                 auto status = _parseExpr(e, allowedFeatures, expCtx);
@@ -558,7 +586,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
 
                 root->add(eq.release());
             } else if (mongoutils::str::equals("_internalSchemaAllowedProperties", rest)) {
-                auto allowedProperties = _parseInternalSchemaAllowedProperties(e, expCtx);
+                auto allowedProperties =
+                    _parseInternalSchemaAllowedProperties(e, expCtx, allowedFeatures, nextLevel);
                 if (!allowedProperties.isOK()) {
                     return allowedProperties.getStatus();
                 }
@@ -566,7 +595,11 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
             } else if (mongoutils::str::equals("_internalSchemaCond", rest)) {
                 auto condExpr =
                     _parseInternalSchemaFixedArityArgument<InternalSchemaCondMatchExpression>(
-                        InternalSchemaCondMatchExpression::kName, e, expCtx, allowedFeatures);
+                        InternalSchemaCondMatchExpression::kName,
+                        e,
+                        expCtx,
+                        allowedFeatures,
+                        nextLevel);
                 if (!condExpr.isOK()) {
                     return condExpr.getStatus();
                 }
@@ -577,8 +610,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                     return {
                         Status(ErrorCodes::TypeMismatch, "$_internalSchemaXor must be an array")};
                 auto xorExpr = stdx::make_unique<InternalSchemaXorMatchExpression>();
-                Status s = _parseTreeList(
-                    e.Obj(), xorExpr.get(), expCtx, allowedFeatures, childIsTopLevel);
+                Status s =
+                    _parseTreeList(e.Obj(), xorExpr.get(), expCtx, allowedFeatures, nextLevel);
                 if (!s.isOK())
                     return s;
                 root->add(xorExpr.release());
@@ -639,7 +672,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
                 auto alwaysTrueExpr = stdx::make_unique<AlwaysTrueMatchExpression>();
                 root->add(alwaysTrueExpr.release());
             } else if (mongoutils::str::equals("_internalSchemaRootDocEq", rest)) {
-                if (!topLevel) {
+                if (currentLevel != DocumentParseLevel::kPredicateTopLevel) {
                     return {Status(ErrorCodes::FailedToParse,
                                    str::stream() << InternalSchemaRootDocEqMatchExpression::kName
                                                  << " must be at the top level")};
@@ -664,8 +697,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(
         }
 
         if (_isExpressionDocument(e, false)) {
-            Status s = _parseSub(
-                e.fieldName(), e.Obj(), root.get(), expCtx, allowedFeatures, childIsTopLevel);
+            Status s =
+                _parseSub(e.fieldName(), e.Obj(), root.get(), expCtx, allowedFeatures, nextLevel);
             if (!s.isOK())
                 return s;
             continue;
@@ -701,7 +734,7 @@ Status MatchExpressionParser::_parseSub(const char* name,
                                         AndMatchExpression* root,
                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         AllowedFeatureSet allowedFeatures,
-                                        bool topLevel) {
+                                        DocumentParseLevel currentLevel) {
     // The one exception to {field : {fully contained argument} } is, of course, geo.  Example:
     // sub == { field : {$near[Sphere]: [0,0], $maxDistance: 1000, $minDistance: 10 } }
     // We peek inside of 'sub' to see if it's possibly a $near.  If so, we can't iterate over
@@ -733,9 +766,8 @@ Status MatchExpressionParser::_parseSub(const char* name,
     while (j.more()) {
         BSONElement deep = j.next();
 
-        const bool childIsTopLevel = false;
         StatusWithMatchExpression s =
-            _parseSubField(sub, root, name, deep, expCtx, allowedFeatures, childIsTopLevel);
+            _parseSubField(sub, root, name, deep, expCtx, allowedFeatures, currentLevel);
         if (!s.isOK())
             return s.getStatus();
 
@@ -945,21 +977,15 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
     const char* name,
     const BSONElement& e,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    AllowedFeatureSet allowedFeatures,
-    bool topLevel) {
+    AllowedFeatureSet allowedFeatures) {
     if (e.type() != Object)
         return {Status(ErrorCodes::BadValue, "$elemMatch needs an Object")};
 
     BSONObj obj = e.Obj();
 
-    // $elemMatch value case applies when the children all
-    // work on the field 'name'.
-    // This is the case when:
-    //     1) the argument is an expression document; and
-    //     2) expression is not a AND/NOR/OR logical operator. Children of
-    //        these logical operators are initialized with field names.
-    //     3) expression is not a WHERE operator. WHERE works on objects instead
-    //        of specific field.
+    // We distinguish here between $elemMatch value and $elemMatch object. The $elemMatch can only
+    // be $elemMatch value if the argument is an expression document whose operator is
+    // path-accepting.
     bool isElemMatchValue = false;
     if (_isExpressionDocument(e, true)) {
         BSONObj o = e.Obj();
@@ -967,14 +993,15 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
         invariant(!elt.eoo());
 
         isElemMatchValue =
-            topLevelOperators.find(elt.fieldNameStringData()) == topLevelOperators.end();
+            kPathlessOperators.find(elt.fieldNameStringData()) == kPathlessOperators.end();
     }
 
     if (isElemMatchValue) {
         // value case
 
         AndMatchExpression theAnd;
-        Status s = _parseSub("", obj, &theAnd, expCtx, allowedFeatures, topLevel);
+        Status s = _parseSub(
+            "", obj, &theAnd, expCtx, allowedFeatures, DocumentParseLevel::kUserSubDocument);
         if (!s.isOK())
             return s;
 
@@ -998,16 +1025,11 @@ StatusWithMatchExpression MatchExpressionParser::_parseElemMatch(
 
     // object case
 
-    StatusWithMatchExpression subRaw = _parse(obj, expCtx, allowedFeatures, topLevel);
+    StatusWithMatchExpression subRaw =
+        _parse(obj, expCtx, allowedFeatures, DocumentParseLevel::kUserSubDocument);
     if (!subRaw.isOK())
         return subRaw;
     std::unique_ptr<MatchExpression> sub = std::move(subRaw.getValue());
-
-    // $where is not supported under $elemMatch because $where
-    // applies to top-level document, not array elements in a field.
-    if (hasNode(sub.get(), MatchExpression::WHERE)) {
-        return {Status(ErrorCodes::BadValue, "$elemMatch cannot contain $where expression")};
-    }
 
     std::unique_ptr<ElemMatchObjectMatchExpression> temp =
         stdx::make_unique<ElemMatchObjectMatchExpression>();
@@ -1022,8 +1044,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(
     const char* name,
     const BSONElement& e,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    AllowedFeatureSet allowedFeatures,
-    bool topLevel) {
+    AllowedFeatureSet allowedFeatures) {
     if (e.type() != Array)
         return {Status(ErrorCodes::BadValue, "$all needs an array")};
 
@@ -1051,12 +1072,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(
                 return {Status(ErrorCodes::BadValue, "$all/$elemMatch has to be consistent")};
             }
 
-            const bool childIsTopLevel = false;
-            StatusWithMatchExpression inner = _parseElemMatch(name,
-                                                              hopefullyElemMatchObj.firstElement(),
-                                                              expCtx,
-                                                              allowedFeatures,
-                                                              childIsTopLevel);
+            StatusWithMatchExpression inner = _parseElemMatch(
+                name, hopefullyElemMatchObj.firstElement(), expCtx, allowedFeatures);
             if (!inner.isOK())
                 return inner;
             myAnd->add(inner.getValue().release());
@@ -1267,6 +1284,128 @@ StatusWith<long long> MatchExpressionParser::parseIntegerElementToLong(BSONEleme
     return number;
 }
 
+StatusWith<std::unique_ptr<ExpressionWithPlaceholder>>
+MatchExpressionParser::_parseExprWithPlaceholder(
+    const BSONObj& containingObject,
+    StringData exprWithPlaceholderFieldName,
+    StringData expressionName,
+    StringData expectedPlaceholder,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
+    DocumentParseLevel currentLevel) {
+    auto exprWithPlaceholderElem = containingObject[exprWithPlaceholderFieldName];
+    if (!exprWithPlaceholderElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << expressionName << " requires '" << exprWithPlaceholderFieldName
+                              << "'"};
+    } else if (exprWithPlaceholderElem.type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << expressionName << " found '" << exprWithPlaceholderFieldName
+                              << "', which is an incompatible type: "
+                              << exprWithPlaceholderElem.type()};
+    }
+
+    auto filter = _parse(
+        exprWithPlaceholderElem.embeddedObject(), expCtx, kBanAllSpecialFeatures, currentLevel);
+
+    if (!filter.isOK()) {
+        return filter.getStatus();
+    }
+
+    auto result = ExpressionWithPlaceholder::make(std::move(filter.getValue()));
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    auto placeholder = result.getValue()->getPlaceholder();
+    if (placeholder && (*placeholder != expectedPlaceholder)) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << expressionName << " expected a name placeholder of "
+                              << expectedPlaceholder
+                              << ", but '"
+                              << exprWithPlaceholderElem.fieldName()
+                              << "' has a mismatching placeholder '"
+                              << *placeholder
+                              << "'"};
+    }
+    return result;
+}
+
+StatusWith<std::vector<InternalSchemaAllowedPropertiesMatchExpression::PatternSchema>>
+MatchExpressionParser::_parsePatternProperties(
+    BSONElement patternPropertiesElem,
+    StringData expectedPlaceholder,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
+    DocumentParseLevel currentLevel) {
+    if (!patternPropertiesElem) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires 'patternProperties'"};
+    } else if (patternPropertiesElem.type() != BSONType::Array) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires 'patternProperties' to be an array, not "
+                              << patternPropertiesElem.type()};
+    }
+
+    std::vector<InternalSchemaAllowedPropertiesMatchExpression::PatternSchema> patternProperties;
+    for (auto&& constraintElem : patternPropertiesElem.embeddedObject()) {
+        if (constraintElem.type() != BSONType::Object) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                                  << " requires 'patternProperties' to be an array of objects"};
+        }
+
+        auto constraint = constraintElem.embeddedObject();
+        if (constraint.nFields() != 2) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                                  << " requires 'patternProperties' to be an array of objects "
+                                     "containing exactly two fields, 'regex' and 'expression'"};
+        }
+
+        auto expressionWithPlaceholder =
+            _parseExprWithPlaceholder(constraint,
+                                      "expression"_sd,
+                                      InternalSchemaAllowedPropertiesMatchExpression::kName,
+                                      expectedPlaceholder,
+                                      expCtx,
+                                      allowedFeatures,
+                                      currentLevel);
+        if (!expressionWithPlaceholder.isOK()) {
+            return expressionWithPlaceholder.getStatus();
+        }
+
+        auto regexElem = constraint["regex"];
+        if (!regexElem) {
+            return {
+                ErrorCodes::FailedToParse,
+                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                              << " requires each object in 'patternProperties' to have a 'regex'"};
+        }
+        if (regexElem.type() != BSONType::RegEx) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
+                                  << " requires 'patternProperties' to be an array of objects, "
+                                     "where 'regex' is a regular expression"};
+        }
+        if (*regexElem.regexFlags() != '\0') {
+            return {
+                ErrorCodes::BadValue,
+                str::stream()
+                    << InternalSchemaAllowedPropertiesMatchExpression::kName
+                    << " does not accept regex flags for pattern schemas in 'patternProperties'"};
+        }
+
+        patternProperties.emplace_back(
+            InternalSchemaAllowedPropertiesMatchExpression::Pattern(regexElem.regex()),
+            std::move(expressionWithPlaceholder.getValue()));
+    }
+
+    return std::move(patternProperties);
+}
+
 StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFmod(const char* name,
                                                                           const BSONElement& elem) {
     StringData path(name);
@@ -1307,7 +1446,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFixedArityA
     StringData name,
     const BSONElement& input,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    AllowedFeatureSet allowedFeatures) {
+    AllowedFeatureSet allowedFeatures,
+    DocumentParseLevel currentLevel) {
     constexpr auto arity = T::arity();
     if (input.type() != BSONType::Array) {
         return {ErrorCodes::FailedToParse,
@@ -1335,8 +1475,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaFixedArityA
                                   << elem.type()};
         }
 
-        const bool isTopLevel = false;
-        auto subexpr = _parse(elem.embeddedObject(), expCtx, allowedFeatures, isTopLevel);
+        auto subexpr = _parse(elem.embeddedObject(), expCtx, allowedFeatures, currentLevel);
         if (!subexpr.isOK()) {
             return subexpr.getStatus();
         }
@@ -1404,120 +1543,6 @@ StatusWith<StringData> parseNamePlaceholder(const BSONObj& containingObject,
     return {namePlaceholderElem.valueStringData()};
 }
 
-/**
- * Looks at the field named 'exprWithPlaceholderFieldName' within 'containingObject' and parses an
- * ExpressionWithPlaceholder from that element. Fails if an error occurs during parsing, or if the
- * ExpressionWithPlaceholder has a different name placeholder than 'expectedPlaceholder'.
- * 'expressionName' is the name of the expression that requires the ExpressionWithPlaceholder and is
- * used to generate helpful error messages.
- */
-StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parseExprWithPlaceholder(
-    const BSONObj& containingObject,
-    StringData exprWithPlaceholderFieldName,
-    StringData expressionName,
-    StringData expectedPlaceholder,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto exprWithPlaceholderElem = containingObject[exprWithPlaceholderFieldName];
-    if (!exprWithPlaceholderElem) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << expressionName << " requires '" << exprWithPlaceholderFieldName
-                              << "'"};
-    } else if (exprWithPlaceholderElem.type() != BSONType::Object) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << expressionName << " found '" << exprWithPlaceholderFieldName
-                              << "', which is an incompatible type: "
-                              << exprWithPlaceholderElem.type()};
-    }
-
-    auto result =
-        ExpressionWithPlaceholder::parse(exprWithPlaceholderElem.embeddedObject(), expCtx);
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    auto placeholder = result.getValue()->getPlaceholder();
-    if (placeholder && (*placeholder != expectedPlaceholder)) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << expressionName << " expected a name placeholder of "
-                              << expectedPlaceholder
-                              << ", but '"
-                              << exprWithPlaceholderElem.fieldName()
-                              << "' has a mismatching placeholder '"
-                              << *placeholder
-                              << "'"};
-    }
-    return result;
-}
-
-StatusWith<std::vector<InternalSchemaAllowedPropertiesMatchExpression::PatternSchema>>
-parsePatternProperties(BSONElement patternPropertiesElem,
-                       StringData expectedPlaceholder,
-                       const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (!patternPropertiesElem) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
-                              << " requires 'patternProperties'"};
-    } else if (patternPropertiesElem.type() != BSONType::Array) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
-                              << " requires 'patternProperties' to be an array, not "
-                              << patternPropertiesElem.type()};
-    }
-
-    std::vector<InternalSchemaAllowedPropertiesMatchExpression::PatternSchema> patternProperties;
-    for (auto&& constraintElem : patternPropertiesElem.embeddedObject()) {
-        if (constraintElem.type() != BSONType::Object) {
-            return {ErrorCodes::TypeMismatch,
-                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
-                                  << " requires 'patternProperties' to be an array of objects"};
-        }
-
-        auto constraint = constraintElem.embeddedObject();
-        if (constraint.nFields() != 2) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
-                                  << " requires 'patternProperties' to be an array of objects "
-                                     "containing exactly two fields, 'regex' and 'expression'"};
-        }
-
-        auto expressionWithPlaceholder =
-            parseExprWithPlaceholder(constraint,
-                                     "expression"_sd,
-                                     InternalSchemaAllowedPropertiesMatchExpression::kName,
-                                     expectedPlaceholder,
-                                     expCtx);
-        if (!expressionWithPlaceholder.isOK()) {
-            return expressionWithPlaceholder.getStatus();
-        }
-
-        auto regexElem = constraint["regex"];
-        if (!regexElem) {
-            return {
-                ErrorCodes::FailedToParse,
-                str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
-                              << " requires each object in 'patternProperties' to have a 'regex'"};
-        }
-        if (regexElem.type() != BSONType::RegEx) {
-            return {ErrorCodes::TypeMismatch,
-                    str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
-                                  << " requires 'patternProperties' to be an array of objects, "
-                                     "where 'regex' is a regular expression"};
-        } else if (*regexElem.regexFlags() != '\0') {
-            return {
-                ErrorCodes::BadValue,
-                str::stream()
-                    << InternalSchemaAllowedPropertiesMatchExpression::kName
-                    << " does not accept regex flags for pattern schemas in 'patternProperties'"};
-        }
-
-        patternProperties.emplace_back(
-            InternalSchemaAllowedPropertiesMatchExpression::Pattern(regexElem.regex()),
-            std::move(expressionWithPlaceholder.getValue()));
-    }
-
-    return std::move(patternProperties);
-}
-
 StatusWith<boost::container::flat_set<StringData>> parseProperties(BSONElement propertiesElem) {
     if (!propertiesElem) {
         return {ErrorCodes::FailedToParse,
@@ -1549,7 +1574,9 @@ StatusWith<boost::container::flat_set<StringData>> parseProperties(BSONElement p
 StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaMatchArrayIndex(
     const char* path,
     const BSONElement& elem,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
+    DocumentParseLevel currentLevel) {
     if (elem.type() != BSONType::Object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
@@ -1576,11 +1603,13 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaMatchArrayI
     }
 
     auto expressionWithPlaceholder =
-        parseExprWithPlaceholder(subobj,
-                                 "expression"_sd,
-                                 InternalSchemaMatchArrayIndexMatchExpression::kName,
-                                 namePlaceholder.getValue(),
-                                 expCtx);
+        _parseExprWithPlaceholder(subobj,
+                                  "expression"_sd,
+                                  InternalSchemaMatchArrayIndexMatchExpression::kName,
+                                  namePlaceholder.getValue(),
+                                  expCtx,
+                                  allowedFeatures,
+                                  currentLevel);
     if (!expressionWithPlaceholder.isOK()) {
         return expressionWithPlaceholder.getStatus();
     }
@@ -1595,7 +1624,10 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaMatchArrayI
 }
 
 StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaAllowedProperties(
-    const BSONElement& elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const BSONElement& elem,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AllowedFeatureSet allowedFeatures,
+    DocumentParseLevel currentLevel) {
     if (elem.type() != BSONType::Object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
@@ -1616,17 +1648,23 @@ StatusWithMatchExpression MatchExpressionParser::_parseInternalSchemaAllowedProp
         return namePlaceholder.getStatus();
     }
 
-    auto patternProperties =
-        parsePatternProperties(subobj["patternProperties"], namePlaceholder.getValue(), expCtx);
+    auto patternProperties = _parsePatternProperties(subobj["patternProperties"],
+                                                     namePlaceholder.getValue(),
+                                                     expCtx,
+                                                     allowedFeatures,
+                                                     currentLevel);
     if (!patternProperties.isOK()) {
         return patternProperties.getStatus();
     }
 
-    auto otherwise = parseExprWithPlaceholder(subobj,
-                                              "otherwise"_sd,
-                                              InternalSchemaAllowedPropertiesMatchExpression::kName,
-                                              namePlaceholder.getValue(),
-                                              expCtx);
+    auto otherwise =
+        _parseExprWithPlaceholder(subobj,
+                                  "otherwise"_sd,
+                                  InternalSchemaAllowedPropertiesMatchExpression::kName,
+                                  namePlaceholder.getValue(),
+                                  expCtx,
+                                  allowedFeatures,
+                                  currentLevel);
     if (!otherwise.isOK()) {
         return otherwise.getStatus();
     }

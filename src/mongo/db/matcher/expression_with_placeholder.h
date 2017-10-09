@@ -31,7 +31,9 @@
 #include <boost/optional.hpp>
 #include <regex>
 
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 
@@ -45,13 +47,11 @@ public:
     static const std::regex placeholderRegex;
 
     /**
-     * Parses 'rawFilter' to an ExpressionWithPlaceholder. This succeeds if 'rawFilter' is a
-     * filter over a single top-level field, which begins with a lowercase letter and contains
-     * no special characters. Otherwise, a non-OK status is returned. Callers must maintain
-     * ownership of 'rawFilter'.
+     * Constructs an ExpressionWithPlaceholder from an existing match expression. Returns a non-OK
+     * status if the paths inside the match expression do not name a consistent placeholder string.
      */
-    static StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parse(
-        BSONObj rawFilter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> make(
+        std::unique_ptr<MatchExpression> filter);
 
     /**
      * Construct a new ExpressionWithPlaceholder. 'filter' must point to a valid MatchExpression.

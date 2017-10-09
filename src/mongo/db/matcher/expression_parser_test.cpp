@@ -385,9 +385,49 @@ TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWithAdditionalTopLevelPred
     ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
 }
 
-TEST(MatchExpressionParserTest, ExprFailsToParseWithinTopLevelOr) {
+TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWithinTopLevelOr) {
     auto query = fromjson("{$or: [{x: 1}, {$expr: {$eq: ['$a', 5]}}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
+            .getStatus());
+}
+
+TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWithinTopLevelAnd) {
+    auto query = fromjson("{$and: [{x: 1}, {$expr: {$eq: ['$a', 5]}}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
+            .getStatus());
+}
+
+TEST(MatchExpressionParserTest, ExprFailsToParseWithinElemMatch) {
+    auto query = fromjson("{a: {$elemMatch: {$expr: {$eq: ['$foo', '$bar']}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
+            .getStatus());
+}
+
+TEST(MatchExpressionParserTest, ExprNestedFailsToParseWithinElemMatch) {
+    auto query =
+        fromjson("{a: {$elemMatch: {b: 1, $or: [{$expr: {$eq: ['$foo', '$bar']}}, {c: 1}]}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
+            .getStatus());
+}
+
+TEST(MatchExpressionParserTest, ExprFailsToParseWithinInternalSchemaObjectMatch) {
+    auto query = fromjson("{a: {$_internalSchemaObjectMatch: {$expr: {$eq: ['$foo', '$bar']}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
+            .getStatus());
 }
 }
