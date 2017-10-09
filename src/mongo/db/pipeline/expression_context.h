@@ -113,9 +113,10 @@ public:
     };
 
     /**
-     * Convenience call that returns true if the tailableMode indicate a tailable query.
+     * Convenience call that returns true if the tailableMode indicates a tailable and awaitData
+     * query.
      */
-    bool isTailable() const {
+    bool isTailableAwaitData() const {
         return tailableMode == TailableMode::kTailableAndAwaitData;
     }
 

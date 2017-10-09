@@ -92,7 +92,6 @@
 
     // Test that using change streams with any stages not allowed to run on mongos results in an
     // error.
-    assertErrorCode(mongosColl, [{$changeStream: {fullDocument: "updateLookup"}}], 40470);
     assertErrorCode(
         mongosColl, [{$changeStream: {}}, {$out: "shouldntWork"}], ErrorCodes.IllegalOperation);
 

@@ -351,14 +351,12 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
         // There should only be one close cursor stage. If we're on the shards and producing input
         // to be merged, do not add a close cursor stage, since the mongos will already have one.
         stages.push_back(DocumentSourceCloseCursor::create(expCtx));
-    }
-    if (shouldLookupPostImage) {
-        uassert(
-            40470,
-            str::stream() << "looking up the full document after an update is not yet supported on "
-                             "sharded collections",
-            !expCtx->inMongos);
-        stages.push_back(DocumentSourceLookupChangePostImage::create(expCtx));
+
+        // There should be only one post-image lookup stage.  If we're on the shards and producing
+        // input to be merged, the lookup is done on the mongos.
+        if (shouldLookupPostImage) {
+            stages.push_back(DocumentSourceLookupChangePostImage::create(expCtx));
+        }
     }
     return stages;
 }

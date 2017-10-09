@@ -32,6 +32,7 @@ env.Library(
 env.Library(
     target="router_exec_stage",
     source=[
+        "document_source_router_adapter.cpp",
         "router_stage_limit.cpp",
         "router_stage_merge.cpp",
         "router_stage_mock.cpp",

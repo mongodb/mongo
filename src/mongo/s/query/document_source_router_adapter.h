@@ -32,35 +32,46 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/query/document_source_router_adapter.h"
 
 namespace mongo {
-
 /**
- * Inserts a pipeline into the router execution tree, drawing results from the input stage, feeding
- * them through the pipeline, and outputting the results of the pipeline.
+ * A class that acts as an adapter between the RouterExecStage and DocumentSource interfaces,
+ * translating results from an input RouterExecStage into DocumentSource::GetNextResults.
  */
-class RouterStagePipeline final : public RouterExecStage {
+class DocumentSourceRouterAdapter final : public DocumentSource {
 public:
-    RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
-                        std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline);
+    static boost::intrusive_ptr<DocumentSourceRouterAdapter> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::unique_ptr<RouterExecStage> childStage);
 
-    StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext execContext) final;
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        return {StreamType::kStreaming,
+                PositionRequirement::kFirst,
+                HostTypeRequirement::kMongoS,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed};
+    }
 
-    void kill(OperationContext* opCtx) final;
+    GetNextResult getNext() final;
+    void doDispose() final;
+    void reattachToOperationContext(OperationContext* opCtx) final;
+    void detachFromOperationContext() final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    bool remotesExhausted();
 
-    bool remotesExhausted() final;
+    void setExecContext(RouterExecStage::ExecContext execContext) {
+        _execContext = execContext;
+    }
 
-protected:
-    Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
-    void doReattachToOperationContext() final;
-
-    void doDetachFromOperationContext() final;
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) const {
+        return _child->setAwaitDataTimeout(awaitDataTimeout);
+    }
 
 private:
-    boost::intrusive_ptr<DocumentSourceRouterAdapter> _routerAdapter;
-    std::unique_ptr<Pipeline, Pipeline::Deleter> _mergePipeline;
-    bool _mongosOnlyPipeline;
+    DocumentSourceRouterAdapter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                std::unique_ptr<RouterExecStage> childStage);
+
+    std::unique_ptr<RouterExecStage> _child;
+    RouterExecStage::ExecContext _execContext;
 };
 }  // namespace mongo
