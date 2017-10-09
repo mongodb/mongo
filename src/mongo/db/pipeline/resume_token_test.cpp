@@ -295,8 +295,8 @@ TEST(ResumeToken, CorruptTokens) {
                                     {"_typeBits", BSONBinData(goodData.data, 0, newUUID)}}),
         AssertionException);
 
-    const char zeroes[] = {0, 0, 0, 0, 0};
-    const char nonsense[] = {-91, 85, 77, 86, -1};
+    const unsigned char zeroes[] = {0, 0, 0, 0, 0};
+    const unsigned char nonsense[] = {165, 85, 77, 86, 255};
     // Data of correct type, but empty.  This won't fail until we try to decode the data.
     auto emptyToken =
         ResumeToken::parse(Document{{"_data"_sd, BSONBinData(zeroes, 0, BinDataGeneral)}});
