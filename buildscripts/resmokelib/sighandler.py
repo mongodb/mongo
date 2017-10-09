@@ -64,8 +64,6 @@ def register(logger, suites, start_time):
         _dump_stacks(logger, header_msg)
         reportfile.write(suites)
 
-        for suite in suites:
-            suite.interrupt()
         testing.suite.Suite.log_summaries(logger, suites, time.time() - start_time)
 
 
