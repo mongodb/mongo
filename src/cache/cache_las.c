@@ -284,9 +284,12 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 
 		/*
 		 * Confirm the search using the unique prefix; if not a match,
-		 * we're done searching for records for this page.
+		 * we're done searching for records for this page.  Note that
+		 * page ID zero is special: it is a wild card indicating that
+		 * all pages in the tree should be removed.
 		 */
-		 if (las_id != btree_id || las_pageid != pageid)
+		 if (las_id != btree_id ||
+		    (pageid != 0 && las_pageid != pageid))
 			break;
 
 		WT_ERR(cursor->remove(cursor));

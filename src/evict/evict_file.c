@@ -16,11 +16,15 @@ int
 __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
 	WT_BTREE *btree;
+	WT_CURSOR *las_cursor;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
+	uint32_t session_flags, walk_flags;
 
-	btree = S2BT(session);
+	dhandle = session->dhandle;
+	btree = dhandle->handle;
 
 	/*
 	 * We need exclusive access to the file, we're about to discard the root
@@ -28,7 +32,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	 */
 	WT_ASSERT(session,
 	    btree->evict_disabled > 0 ||
-	    !F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
+	    !F_ISSET(dhandle, WT_DHANDLE_OPEN));
 
 	/*
 	 * We do discard objects without pages in memory. If that's the case,
@@ -36,6 +40,32 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	 */
 	if (btree->root.page == NULL)
 		return (0);
+
+	walk_flags = WT_READ_CACHE | WT_READ_NO_EVICT;
+
+	/*
+	 * If discarding a dead tree, remove any lookaside entries.  This deals
+	 * with the case where a tree is dropped with "force=true".  It happens
+	 * that we also force-drop the lookaside table itself: it can never
+	 * participate in lookaside eviction, and we can't open a cursor on it
+	 * as we are discarding it.
+	 *
+	 * We use the special page ID zero so that all lookaside entries for
+	 * the tree are removed.
+	 */
+	if (F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
+	    F_ISSET(S2C(session), WT_CONN_LAS_OPEN) &&
+	    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
+		WT_ASSERT(session, !WT_IS_METADATA(dhandle));
+
+		__wt_las_cursor(session, &las_cursor, &session_flags);
+		WT_TRET(__wt_las_remove_block(
+		    session, las_cursor, btree->id, 0));
+		WT_TRET(__wt_las_cursor_close(
+		    session, &las_cursor, session_flags));
+		WT_RET(ret);
+	} else
+		FLD_SET(walk_flags, WT_READ_LOOKASIDE);
 
 	/* Make sure the oldest transaction ID is up-to-date. */
 	WT_RET(__wt_txn_update_oldest(
@@ -81,8 +111,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 * the reconciliation, the next walk call could miss a page in
 		 * the tree.
 		 */
-		WT_ERR(__wt_tree_walk(session, &next_ref,
-		    WT_READ_CACHE | WT_READ_LOOKASIDE | WT_READ_NO_EVICT));
+		WT_ERR(__wt_tree_walk(session, &next_ref, walk_flags));
 
 		switch (syncop) {
 		case WT_SYNC_CLOSE:
@@ -96,7 +125,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			 * Discard the page regardless of whether it is dirty.
 			 */
 			WT_ASSERT(session,
-			    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+			    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
 			    __wt_page_can_evict(session, ref, NULL));
 			__wt_ref_out(session, ref);
 			break;

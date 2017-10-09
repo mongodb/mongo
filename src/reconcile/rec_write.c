@@ -3584,6 +3584,9 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	las_pageid = multi->las_pageid =
 	    __wt_atomic_add64(&S2BT(session)->las_pageid, 1);
 
+	/* The zero page ID is reserved, check we don't see it. */
+	WT_ASSERT(session, las_pageid != 0);
+
 	/*
 	 * Make sure there are no left over entries (e.g., from a handle
 	 * reopen).
