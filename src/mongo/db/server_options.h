@@ -171,6 +171,11 @@ struct ServerGlobalParams {
             return _version.load();
         }
 
+        void reset() {
+            _version.store(Version::k34);
+            _targetVersion.store(Version::kUnset);
+        }
+
         void setVersion(Version version) {
             return _version.store(version);
         }

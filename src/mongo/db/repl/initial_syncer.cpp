@@ -424,6 +424,11 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     _lastApplied = {};
     _lastFetched = {};
 
+    LOG(2) << "Resetting feature compatibility version to 3.4. If the sync source is in feature "
+              "compatibility version 3.6, we will find out when we clone the admin.system.version "
+              "collection.";
+    serverGlobalParams.featureCompatibility.reset();
+
     // Clear the oplog buffer.
     _oplogBuffer->clear(makeOpCtx().get());
 

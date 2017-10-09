@@ -144,9 +144,13 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
       _documentsToInsert(),
       _dbWorkTaskRunner(_dbWorkThreadPool),
       _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackFn& work) {
-          auto task = [work](OperationContext* opCtx,
-                             const Status& status) -> TaskRunner::NextAction {
-              work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, opCtx));
+          auto task = [ this, work ](OperationContext * opCtx,
+                                     const Status& status) noexcept->TaskRunner::NextAction {
+              try {
+                  work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, opCtx));
+              } catch (...) {
+                  _finishCallback(exceptionToStatus());
+              }
               return TaskRunner::NextAction::kDisposeOperationContext;
           };
           _dbWorkTaskRunner.schedule(task);

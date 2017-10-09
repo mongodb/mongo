@@ -51,6 +51,9 @@
 namespace mongo {
 namespace repl {
 
+// Failpoint which causes the initial sync function to hang before running listCollections.
+MONGO_FP_DECLARE(initialSyncHangBeforeListCollections);
+
 namespace {
 
 using LockGuard = stdx::lock_guard<stdx::mutex>;
@@ -164,8 +167,13 @@ bool DatabaseCloner::_isActive_inlock() const {
     return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
-Status DatabaseCloner::startup() noexcept {
+bool DatabaseCloner::_isShuttingDown() const {
     LockGuard lk(_mutex);
+    return State::kShuttingDown == _state;
+}
+
+Status DatabaseCloner::startup() noexcept {
+    UniqueLock lk(_mutex);
 
     switch (_state) {
         case State::kPreStart:
@@ -177,6 +185,20 @@ Status DatabaseCloner::startup() noexcept {
             return Status(ErrorCodes::ShutdownInProgress, "database cloner shutting down");
         case State::kComplete:
             return Status(ErrorCodes::ShutdownInProgress, "database cloner completed");
+    }
+
+    MONGO_FAIL_POINT_BLOCK(initialSyncHangBeforeListCollections, customArgs) {
+        const auto& data = customArgs.getData();
+        const auto databaseElem = data["database"];
+        if (!databaseElem || databaseElem.checkAndGetStringData() == _dbname) {
+            lk.unlock();
+            log() << "initial sync - initialSyncHangBeforeListCollections fail point "
+                     "enabled. Blocking until fail point is disabled.";
+            while (MONGO_FAIL_POINT(initialSyncHangBeforeListCollections) && !_isShuttingDown()) {
+                mongo::sleepsecs(1);
+            }
+            lk.lock();
+        }
     }
 
     _stats.start = _executor->now();

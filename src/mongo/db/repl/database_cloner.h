@@ -178,6 +178,11 @@ private:
     bool _isActive_inlock() const;
 
     /**
+     * Returns whether the DatabaseCloner is in shutdown.
+     */
+    bool _isShuttingDown() const;
+
+    /**
      * Read collection names and options from listCollections result.
      */
     void _listCollectionsCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,

@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -64,6 +65,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/md5.hpp"
@@ -593,6 +595,36 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
     // Collection should be created after SyncTail::syncApply() processes operation.
     _opCtx = cc().makeOperationContext();
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
+}
+
+DEATH_TEST_F(SyncTailTest,
+             MultiSyncApplyFailsWhenCollectionCreationTriesToMakeUUID,
+             "Attempt to assign UUID to replicated collection") {
+    NamespaceString nss("foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
+
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
+
+    auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
+    _opCtx.reset();
+    MultiApplier::OperationPtrs ops = {&op};
+    multiSyncApply(&ops, nullptr);
+}
+
+TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
+    NamespaceString nss("foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
+
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
+
+    auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
+
+    _opCtx.reset();
+    MultiApplier::OperationPtrs ops = {&op};
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, multiInitialSyncApply(&ops, nullptr, nullptr));
+
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
@@ -1414,6 +1446,51 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
 
     auto ops = {collModOp, dropIndexOp};
     testOpsAreIdempotent(ops);
+}
+
+TEST_F(IdempotencyTest, ResyncOnDropFCVCollection) {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    auto cmd = BSON("drop" << fcvNS.coll());
+    auto op = makeCommandOplogEntry(
+        nextOpTime(), NamespaceString(FeatureCompatibilityVersion::kCollection), cmd);
+    ASSERT_EQUALS(runOp(op), ErrorCodes::OplogOperationUnsupported);
+}
+
+TEST_F(IdempotencyTest, ResyncOnInsertFCVDocument) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeInsertDocumentOplogEntry(
+        nextOpTime(), fcvNS, BSON("_id" << FeatureCompatibilityVersion::kParameterName));
+    ASSERT_EQUALS(runOp(op), ErrorCodes::OplogOperationUnsupported);
+}
+
+TEST_F(IdempotencyTest, InsertToFCVCollectionBesidesFCVDocumentSucceeds) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeInsertDocumentOplogEntry(nextOpTime(),
+                                           fcvNS,
+                                           BSON("_id"
+                                                << "other"));
+    ASSERT_OK(runOp(op));
+}
+
+TEST_F(IdempotencyTest, DropDatabaseSucceeds) {
+    auto ns = NamespaceString("foo.bar");
+    ::mongo::repl::createCollection(_opCtx.get(), ns, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeCommandOplogEntry(nextOpTime(), ns, BSON("dropDatabase" << 1));
+    ASSERT_OK(runOp(op));
 }
 
 }  // namespace

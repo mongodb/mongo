@@ -57,6 +57,7 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -989,6 +990,19 @@ Status applyOperation_inlock(OperationContext* opCtx,
         collection = db->getCollection(opCtx, requestNss);
     }
 
+    // During upgrade from 3.4 to 3.6, the feature compatibility version cannot change during
+    // initial sync because we cannot do some operations with UUIDs and others without.
+    if (!inSteadyStateReplication && requestNss == FeatureCompatibilityVersion::kCollection) {
+        std::string oID;
+        auto status = bsonExtractStringField(o, "_id", &oID);
+        if (status.isOK() && oID == FeatureCompatibilityVersion::kParameterName) {
+            return Status(ErrorCodes::OplogOperationUnsupported,
+                          str::stream() << "Applying operation on feature compatibility version "
+                                           "document not supported in initial sync: "
+                                        << redact(op));
+        }
+    }
+
     BSONObj o2;
     if (fieldO2.isABSONObj())
         o2 = fieldO2.Obj();
@@ -1386,6 +1400,23 @@ Status applyCommand_inlock(OperationContext* opCtx,
         warning() << "allowUnsafeRenamesDuringInitialSync set to true. Applying renameCollection "
                      "operation during initial sync even though it may lead to data corruption: "
                   << redact(op);
+    }
+
+    // During upgrade from 3.4 to 3.6, the feature compatibility version cannot change during
+    // initial sync because we cannot do some operations with UUIDs and others without.
+    // We do not attempt to parse the whitelisted ops because they do not have a collection
+    // namespace. If we drop the 'admin' database we will also log a 'drop' oplog entry for each
+    // collection dropped. 'applyOps' will try to apply each individual operation, and those
+    // will be caught then if they are a problem.
+    auto whitelistedOps = std::vector<std::string>{"dropDatabase", "applyOps", "dbCheck"};
+    if (!inSteadyStateReplication &&
+        (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
+         whitelistedOps.end()) &&
+        parseNs(nss.ns(), o) == FeatureCompatibilityVersion::kCollection) {
+        return Status(ErrorCodes::OplogOperationUnsupported,
+                      str::stream() << "Applying command to feature compatibility version "
+                                       "collection not supported in initial sync: "
+                                    << redact(op));
     }
 
     // Applying commands in repl is done under Global W-lock, so it is safe to not

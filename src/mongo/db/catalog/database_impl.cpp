@@ -771,8 +771,10 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
              coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) ||
              nss.isSystemDotProfile());  // system.profile is special as it's not replicated
         if (!okayCreation) {
-            severe() << "Attempt to assign UUID to replicated collection: " << nss.ns();
-            fassertFailed(40643);
+            std::string msg = str::stream() << "Attempt to assign UUID to replicated collection: "
+                                            << nss.ns();
+            severe() << msg;
+            uasserted(ErrorCodes::InvalidOptions, msg);
         }
         optionsWithUUID.uuid.emplace(CollectionUUID::gen());
     }
