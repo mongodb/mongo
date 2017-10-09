@@ -1011,28 +1011,6 @@ void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
         return;
     }
 
-    // Set UUIDs for all non-replicated collections on secondaries. See comment in
-    // ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage() for the explanation of
-    // why we do this and why it is not necessary for sharded clusters.
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
-        serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-        const NamespaceString nss("admin", "system.version");
-        auto opCtx = makeOpCtx();
-        auto statusWithUUID = _storage->getCollectionUUID(opCtx.get(), nss);
-        if (!statusWithUUID.isOK()) {
-            onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock,
-                                                                      statusWithUUID.getStatus());
-            return;
-        }
-        if (statusWithUUID.getValue()) {
-            auto schemaStatus = _storage->upgradeUUIDSchemaVersionNonReplicated(opCtx.get());
-            if (!schemaStatus.isOK()) {
-                onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, schemaStatus);
-                return;
-            }
-        }
-    }
-
     // Success!
     onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, _lastApplied);
 }

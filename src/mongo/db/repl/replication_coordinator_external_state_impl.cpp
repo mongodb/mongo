@@ -38,7 +38,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
@@ -391,21 +390,6 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
 
-        // Set UUIDs for all non-replicated collections. This is necessary for independent replica
-        // sets started with no data files because collections in local are created prior to the
-        // featureCompatibilityVersion being set to 3.6, so the collections are not created with
-        // UUIDs. This is not an issue for sharded clusters because the config server sends a
-        // setFeatureCompatibilityVersion command with the featureCompatibilityVersion equal to the
-        // cluster's featureCompatibilityVersion during addShard, which will add UUIDs to all
-        // collections that do not already have them. Here, we add UUIDs to the non-replicated
-        // collections on the primary. We add them on the secondaries during InitialSync.
-        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
-            serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            auto schemaStatus = updateUUIDSchemaVersionNonReplicated(opCtx, true);
-            if (!schemaStatus.isOK()) {
-                return schemaStatus;
-            }
-        }
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
     } catch (const DBException& ex) {
         return ex.toStatus();

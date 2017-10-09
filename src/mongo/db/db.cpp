@@ -633,15 +633,6 @@ ExitCode _initAndListen(int listenPort) {
 
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
-    if (!storageGlobalParams.readOnly) {
-        if (!replSettings.usingReplSets() && !replSettings.isSlave() &&
-            storageGlobalParams.engine != "devnull") {
-            Lock::GlobalWrite lk(startupOpCtx.get());
-            FeatureCompatibilityVersion::setIfCleanStartup(
-                startupOpCtx.get(), repl::StorageInterface::get(serviceContext));
-        }
-    }
-
     repairDatabasesAndCheckVersion(startupOpCtx.get());
 
     if (storageGlobalParams.upgrade) {
@@ -778,6 +769,13 @@ ExitCode _initAndListen(int listenPort) {
             log() << startupWarningsLog;
         } else {
             startTTLBackgroundJob();
+        }
+
+        if (!replSettings.usingReplSets() && !replSettings.isSlave() &&
+            storageGlobalParams.engine != "devnull") {
+            Lock::GlobalWrite lk(startupOpCtx.get());
+            FeatureCompatibilityVersion::setIfCleanStartup(
+                startupOpCtx.get(), repl::StorageInterface::get(serviceContext));
         }
 
         if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave()) ||

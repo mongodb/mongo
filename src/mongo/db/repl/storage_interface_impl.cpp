@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
@@ -921,23 +920,6 @@ StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectio
     auto collection = collectionResult.getValue();
 
     return collection->numRecords(opCtx);
-}
-
-StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead autoColl(opCtx, nss);
-
-    auto collectionResult = getCollection(
-        autoColl, nss, str::stream() << "Unable to get UUID of " << nss.ns() << " collection.");
-    if (!collectionResult.isOK()) {
-        return collectionResult.getStatus();
-    }
-    auto collection = collectionResult.getValue();
-    return collection->uuid();
-}
-
-Status StorageInterfaceImpl::upgradeUUIDSchemaVersionNonReplicated(OperationContext* opCtx) {
-    return updateUUIDSchemaVersionNonReplicated(opCtx, true);
 }
 
 void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx,
