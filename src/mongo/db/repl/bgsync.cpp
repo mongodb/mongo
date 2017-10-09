@@ -87,16 +87,15 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(rollbackMethod, std::string, kRollbackViaR
 // Checks that only the valid strings above can be used as a rollbackMethod
 // parameter. Throws an error if an invalid string is passed to the server parameter.
 MONGO_INITIALIZER(rollbackMethod)(InitializerContext*) {
-    std::set<StringData> supportedRollbackMethods = {
-        kRollbackViaRefetchNoUUID, kRollbackViaRefetch, kRollbackToCheckpoint};
+    std::set<StringData> supportedRollbackMethods = {kRollbackViaRefetchNoUUID,
+                                                     kRollbackViaRefetch};
 
     // Unsupported rollback method.
     if (supportedRollbackMethods.count(rollbackMethod) == 0) {
         std::string errMsg = str::stream()
             << "Unsupported rollback method: '" + rollbackMethod + "'. "
             << "Supported rollback methods: "
-            << "'" << kRollbackViaRefetchNoUUID << "' | '" << kRollbackViaRefetch << "' | '"
-            << kRollbackToCheckpoint << "'";
+            << "'" << kRollbackViaRefetchNoUUID << "' | '" << kRollbackViaRefetch << "'";
         return Status(ErrorCodes::BadValue, errMsg);
     }
     return Status::OK();
@@ -735,6 +734,8 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
             return;
         }
     }
+
+    fassertFailedNoTrace(40651);
 
     _rollback = stdx::make_unique<RollbackImpl>(
         localOplog, &remoteOplog, storageInterface, _replicationProcess, _replCoord);
