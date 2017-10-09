@@ -76,7 +76,6 @@ public:
     const Decimal128 decimalValue;
 };
 
-#pragma pack(1)
 class ValueStorage {
 public:
     // Note: it is important the memory is zeroed out (by calling zero()) at the start of every
@@ -311,6 +310,7 @@ public:
 
     // This data is public because this should only be used by Value which would be a friend
     union {
+#pragma pack(1)
         struct {
             // byte 1
             signed char type;
@@ -354,11 +354,16 @@ public:
                 };
             };
         };
+#pragma pack()
 
         // covers the whole ValueStorage
         long long i64[2];
+
+        // Forces the ValueStorage type to have at least pointer alignment. Can't use alignas on the
+        // type since that causes issues on MSVC.
+        void* forcePointerAlignment;
     };
 };
 MONGO_STATIC_ASSERT(sizeof(ValueStorage) == 16);
-#pragma pack()
+MONGO_STATIC_ASSERT(alignof(ValueStorage) >= alignof(void*));
 }
