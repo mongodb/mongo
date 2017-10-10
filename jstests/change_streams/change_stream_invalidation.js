@@ -31,7 +31,7 @@
     assert.writeOK(collGetMore.update({_id: 1}, {$set: {a: 1}}));
     assert.writeOK(collGetMore.remove({_id: 1}));
     // Drop the collection.
-    assert.commandWorked(db.runCommand({drop: collGetMore.getName(), writeConcern: {j: true}}));
+    assert.commandWorked(db.runCommand({drop: collGetMore.getName()}));
     // We should get 4 oplog entries of type insert, update, delete, and invalidate. The cursor
     // should be closed.
     let change = cst.getOneChange(aggcursor);

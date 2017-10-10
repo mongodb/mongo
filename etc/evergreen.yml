@@ -2721,7 +2721,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=change_streams --storageEngine=wiredTiger
+      resmoke_args: --suites=change_streams_mongos_passthrough --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
