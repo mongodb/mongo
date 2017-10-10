@@ -9,6 +9,6 @@ testDB.adminCommand({shardCollection: "test.collection", key: {a: "hashed"}});
 
 // check the number of initial chunks.
 assert.eq(2,
-          st.getDB('config').chunks.count(),
+          st.getDB('config').chunks.count({"ns": "test.collection"}),
           'Using hashed shard key but failing to do correct presplitting');
 st.stop();

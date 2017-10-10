@@ -178,9 +178,9 @@
     s.startBalancer(60000);
 
     assert.soon(function() {
-        var d1Chunks = s.getDB("config").chunks.count({shard: "d1"});
-        var d2Chunks = s.getDB("config").chunks.count({shard: "d2"});
-        var totalChunks = s.getDB("config").chunks.count({ns: "test.foo"});
+        var d1Chunks = s.getDB("config").chunks.count({ns: 'test.foo', shard: "d1"});
+        var d2Chunks = s.getDB("config").chunks.count({ns: 'test.foo', shard: "d2"});
+        var totalChunks = s.getDB("config").chunks.count({ns: 'test.foo'});
 
         print("chunks: " + d1Chunks + " " + d2Chunks + " " + totalChunks);
 

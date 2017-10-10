@@ -1,6 +1,7 @@
 (function() {
+    'use strict';
 
-    var s = new ShardingTest({name: "auto2", shards: 2, mongos: 2, other: {enableAutoSplit: true}});
+    var s = new ShardingTest({shards: 2, mongos: 2, other: {enableAutoSplit: true}});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', 'shard0001');
@@ -38,6 +39,8 @@
     print("datasize: " +
           tojson(s.getPrimaryShard("test").getDB("admin").runCommand({datasize: "test.foo"})));
     s.printChunks();
+
+    var counta, countb;
 
     function doCountsGlobal() {
         counta = s._connections[0].getDB("test").foo.count();
@@ -90,7 +93,7 @@
 
     print("checkpoint C");
 
-    assert(Array.unique(s.config.chunks.find().toArray().map(function(z) {
+    assert(Array.unique(s.config.chunks.find({ns: 'test.foo'}).toArray().map(function(z) {
                     return z.shard;
                 })).length == 2,
            "should be using both servers");
@@ -103,9 +106,9 @@
 
     print("checkpoint D");
 
-    // test not-sharded cursors
+    // Test non-sharded cursors
     db = s.getDB("test2");
-    t = db.foobar;
+    var t = db.foobar;
     for (i = 0; i < 100; i++)
         t.save({_id: i});
     for (i = 0; i < 100; i++) {
@@ -126,7 +129,7 @@
 
     for (i = 0; i < 20; i++) {
         var conn = new Mongo(db.getMongo().host);
-        temp2 = conn.getDB("test2").foobar;
+        var temp2 = conn.getDB("test2").foobar;
         assert.eq(conn._fullNameSpace, t._fullNameSpace, "check close 1");
         assert(temp2.findOne(), "check close 2");
         conn.close();
@@ -143,5 +146,4 @@
     print("checkpoint G");
 
     s.stop();
-
 })();

@@ -31,8 +31,14 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.commandWorked(st.moveChunk('TestDB.TestColl', {Key: 20}, st.shard1.shardName));
     assert.commandWorked(st.moveChunk('TestDB.TestColl', {Key: 30}, st.shard1.shardName));
 
-    assert.eq(2, st.s0.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
-    assert.eq(2, st.s0.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
+    assert.eq(2,
+              st.s0.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard0.shardName})
+                  .itcount());
+    assert.eq(2,
+              st.s0.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard1.shardName})
+                  .itcount());
 
     // Pause migrations at shards 2 and 3
     pauseMigrateAtStep(st.shard2, migrateStepNames.deletedPriorDataInRange);
@@ -53,10 +59,22 @@ load('./jstests/libs/chunk_manipulation_util.js');
     joinMoveChunk1();
     joinMoveChunk2();
 
-    assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
-    assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
-    assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard2.shardName}).itcount());
-    assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard3.shardName}).itcount());
+    assert.eq(1,
+              st.s0.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard0.shardName})
+                  .itcount());
+    assert.eq(1,
+              st.s0.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard1.shardName})
+                  .itcount());
+    assert.eq(1,
+              st.s0.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard2.shardName})
+                  .itcount());
+    assert.eq(1,
+              st.s0.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard3.shardName})
+                  .itcount());
 
     st.stop();
 })();

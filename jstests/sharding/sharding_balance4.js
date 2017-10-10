@@ -66,7 +66,7 @@
     }
     check("initial at end");
 
-    assert.lt(20, s.config.chunks.count(), "setup2");
+    assert.lt(20, s.config.chunks.count({"ns": "test.foo"}), "setup2");
 
     function check(msg, dontAssert) {
         for (var x in counts) {

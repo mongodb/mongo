@@ -35,6 +35,9 @@
         admin.runCommand({setFeatureCompatibilityVersion: '3.4', maxTimeMS: 1000 * 60 * 60 * 24}),
         "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
 
-    st.stop();
+    assert.commandWorked(
+        admin.runCommand({setFeatureCompatibilityVersion: '3.6', maxTimeMS: 1000 * 60 * 60 * 24}),
+        "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
 
+    st.stop();
 })();

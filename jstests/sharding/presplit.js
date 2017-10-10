@@ -24,14 +24,14 @@
     // Make sure that there's only one chunk holding all the data.
     s.printChunks();
     primary = s.getPrimaryShard("test").getDB("test");
-    assert.eq(0, s.config.chunks.count(), "single chunk assertion");
+    assert.eq(0, s.config.chunks.count({"ns": "test.foo"}), "single chunk assertion");
     assert.eq(num, primary.foo.count());
 
     s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
     // Make sure the collection's original chunk got split
     s.printChunks();
-    assert.lt(20, s.config.chunks.count(), "many chunks assertion");
+    assert.lt(20, s.config.chunks.count({"ns": "test.foo"}), "many chunks assertion");
     assert.eq(num, primary.foo.count());
 
     s.printChangeLog();

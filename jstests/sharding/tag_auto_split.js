@@ -8,7 +8,7 @@
     s.ensurePrimaryShard('test', 'shard0001');
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
 
-    assert.eq(1, s.config.chunks.find().itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo"}).itcount());
 
     s.addShardTag("shard0000", "a");
     s.addShardTag("shard0000", "b");
@@ -19,17 +19,17 @@
     s.startBalancer();
 
     assert.soon(function() {
-        return s.config.chunks.find().itcount() == 4;
+        return s.config.chunks.find({"ns": "test.foo"}).itcount() == 4;
     }, 'Split did not occur', 3 * 60 * 1000);
 
     s.awaitBalancerRound();
     s.printShardingStatus(true);
-    assert.eq(4, s.config.chunks.find().itcount(), 'Split points changed');
+    assert.eq(4, s.config.chunks.find({"ns": "test.foo"}).itcount(), 'Split points changed');
 
-    assert.eq(1, s.config.chunks.find({min: {_id: MinKey}}).itcount());
-    assert.eq(1, s.config.chunks.find({min: {_id: 5}}).itcount());
-    assert.eq(1, s.config.chunks.find({min: {_id: 10}}).itcount());
-    assert.eq(1, s.config.chunks.find({min: {_id: 15}}).itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo", min: {_id: MinKey}}).itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo", min: {_id: 5}}).itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo", min: {_id: 10}}).itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo", min: {_id: 15}}).itcount());
 
     s.stop();
 })();

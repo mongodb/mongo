@@ -128,15 +128,19 @@
 
     st.printShardingStatus(true);
 
-    assert.eq(2, st.s0.getDB('config').chunks.find({}).itcount());
-    assert.eq(1,
-              st.s0.getDB('config')
-                  .chunks.find({'min._id': MinKey, 'max._id': 90, shard: st.shard0.shardName})
-                  .itcount());
-    assert.eq(1,
-              st.s0.getDB('config')
-                  .chunks.find({'min._id': 90, 'max._id': MaxKey, shard: st.shard1.shardName})
-                  .itcount());
+    assert.eq(2, st.s0.getDB('config').chunks.find({'ns': 'foo.bar'}).itcount());
+    assert.eq(
+        1,
+        st.s0.getDB('config')
+            .chunks
+            .find({'ns': 'foo.bar', 'min._id': MinKey, 'max._id': 90, shard: st.shard0.shardName})
+            .itcount());
+    assert.eq(
+        1,
+        st.s0.getDB('config')
+            .chunks
+            .find({'ns': 'foo.bar', 'min._id': 90, 'max._id': MaxKey, shard: st.shard1.shardName})
+            .itcount());
 
     st.stop();
 })();

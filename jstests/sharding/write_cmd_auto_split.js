@@ -15,7 +15,7 @@
 
     jsTest.log('Test single batch insert should auto-split');
 
-    assert.eq(1, configDB.chunks.find().itcount());
+    assert.eq(1, configDB.chunks.find({"ns": "test.insert"}).itcount());
 
     // Note: Estimated 'chunk size' tracked by mongos is initialized with a random value so
     // we are going to be conservative.
@@ -30,7 +30,7 @@
 
     // Inserted batch is a multiple of the chunkSize, expect the chunks to split into
     // more than 2.
-    assert.gt(configDB.chunks.find().itcount(), 2);
+    assert.gt(configDB.chunks.find({"ns": "test.insert"}).itcount(), 2);
     testDB.dropDatabase();
 
     jsTest.log('Test single batch update should auto-split');
@@ -38,7 +38,7 @@
     assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
     assert.commandWorked(configDB.adminCommand({shardCollection: 'test.update', key: {x: 1}}));
 
-    assert.eq(1, configDB.chunks.find().itcount());
+    assert.eq(1, configDB.chunks.find({"ns": "test.update"}).itcount());
 
     for (var x = 0; x < 1100; x++) {
         assert.writeOK(testDB.runCommand({
@@ -49,7 +49,7 @@
         }));
     }
 
-    assert.gt(configDB.chunks.find().itcount(), 1);
+    assert.gt(configDB.chunks.find({"ns": "test.update"}).itcount(), 1);
     testDB.dropDatabase();
 
     jsTest.log('Test single delete should not auto-split');
@@ -57,7 +57,7 @@
     assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
     assert.commandWorked(configDB.adminCommand({shardCollection: 'test.delete', key: {x: 1}}));
 
-    assert.eq(1, configDB.chunks.find().itcount());
+    assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
 
     for (var x = 0; x < 1100; x++) {
         assert.writeOK(testDB.runCommand({
@@ -68,7 +68,7 @@
         }));
     }
 
-    assert.eq(1, configDB.chunks.find().itcount());
+    assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
     testDB.dropDatabase();
 
     jsTest.log('Test batched insert should auto-split');
@@ -76,7 +76,7 @@
     assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
     assert.commandWorked(configDB.adminCommand({shardCollection: 'test.insert', key: {x: 1}}));
 
-    assert.eq(1, configDB.chunks.find().itcount());
+    assert.eq(1, configDB.chunks.find({"ns": "test.insert"}).itcount());
 
     // Note: Estimated 'chunk size' tracked by mongos is initialized with a random value so
     // we are going to be conservative.
@@ -91,7 +91,7 @@
             {insert: 'insert', documents: docs, ordered: false, writeConcern: {w: 1}}));
     }
 
-    assert.gt(configDB.chunks.find().itcount(), 1);
+    assert.gt(configDB.chunks.find({"ns": "test.insert"}).itcount(), 1);
     testDB.dropDatabase();
 
     jsTest.log('Test batched update should auto-split');
@@ -99,7 +99,7 @@
     assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
     assert.commandWorked(configDB.adminCommand({shardCollection: 'test.update', key: {x: 1}}));
 
-    assert.eq(1, configDB.chunks.find().itcount());
+    assert.eq(1, configDB.chunks.find({"ns": "test.update"}).itcount());
 
     for (var x = 0; x < 1100; x += 400) {
         var docs = [];
@@ -113,7 +113,7 @@
             {update: 'update', updates: docs, ordered: false, writeConcern: {w: 1}}));
     }
 
-    assert.gt(configDB.chunks.find().itcount(), 1);
+    assert.gt(configDB.chunks.find({"ns": "test.update"}).itcount(), 1);
     testDB.dropDatabase();
 
     jsTest.log('Test batched delete should not auto-split');
@@ -121,7 +121,7 @@
     assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
     assert.commandWorked(configDB.adminCommand({shardCollection: 'test.delete', key: {x: 1}}));
 
-    assert.eq(1, configDB.chunks.find().itcount());
+    assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
 
     for (var x = 0; x < 1100; x += 400) {
         var docs = [];
@@ -139,7 +139,7 @@
         }));
     }
 
-    assert.eq(1, configDB.chunks.find().itcount());
+    assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
 
     st.stop();
 })();

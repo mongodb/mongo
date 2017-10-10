@@ -31,7 +31,7 @@
     assert.writeOK(bulk.execute());
 
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
-    assert.gt(s.config.chunks.count(), 10);
+    assert.gt(s.config.chunks.count({"ns": "test.foo"}), 10);
 
     var getShardSize = function(conn) {
         var listDatabases = conn.getDB('admin').runCommand({listDatabases: 1});

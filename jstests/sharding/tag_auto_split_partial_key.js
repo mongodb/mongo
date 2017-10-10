@@ -8,7 +8,7 @@
     s.ensurePrimaryShard('test', 'shard0001');
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1, a: 1}}));
 
-    assert.eq(1, s.config.chunks.find().itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo"}).itcount());
 
     s.addShardTag("shard0000", "a");
     s.addShardTag("shard0000", "b");
@@ -19,14 +19,14 @@
     s.startBalancer();
 
     assert.soon(function() {
-        return s.config.chunks.find().itcount() == 4;
+        return s.config.chunks.find({"ns": "test.foo"}).itcount() == 4;
     }, 'Split did not occur', 3 * 60 * 1000);
 
     s.awaitBalancerRound();
     s.printShardingStatus(true);
-    assert.eq(4, s.config.chunks.find().itcount(), 'Split points changed');
+    assert.eq(4, s.config.chunks.find({"ns": "test.foo"}).itcount(), 'Split points changed');
 
-    s.config.chunks.find().forEach(function(chunk) {
+    s.config.chunks.find({"ns": "test.foo"}).forEach(function(chunk) {
         var numFields = 0;
         for (var x in chunk.min) {
             numFields++;
@@ -36,10 +36,10 @@
     });
 
     // Check chunk mins correspond exactly to tag range boundaries, extended to match shard key
-    assert.eq(1, s.config.chunks.find({min: {_id: MinKey, a: MinKey}}).itcount());
-    assert.eq(1, s.config.chunks.find({min: {_id: 5, a: MinKey}}).itcount());
-    assert.eq(1, s.config.chunks.find({min: {_id: 10, a: MinKey}}).itcount());
-    assert.eq(1, s.config.chunks.find({min: {_id: 15, a: MinKey}}).itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo", min: {_id: MinKey, a: MinKey}}).itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo", min: {_id: 5, a: MinKey}}).itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo", min: {_id: 10, a: MinKey}}).itcount());
+    assert.eq(1, s.config.chunks.find({"ns": "test.foo", min: {_id: 15, a: MinKey}}).itcount());
 
     s.stop();
 })();

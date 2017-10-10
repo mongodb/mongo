@@ -9,7 +9,7 @@
     primary = s.getPrimaryShard("test").getDB("test");
     seconday = s.getOther(primary).getDB("test");
 
-    assert.eq(1, s.config.chunks.count(), "sanity check A");
+    assert.eq(1, s.config.chunks.count({"ns": "test.foo"}), "sanity check A");
 
     var db = s.getDB("test");
 

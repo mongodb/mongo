@@ -21,7 +21,9 @@
         bulk.insert({_id: i});
     }
     assert.writeOK(bulk.execute());
-    assert.eq(1, s.config.chunks.count(), "test requires collection to have one chunk initially");
+    assert.eq(1,
+              s.config.chunks.count({"ns": "test.foo"}),
+              "test requires collection to have one chunk initially");
 
     // we'll split the collection in two and move the second chunk while three cursors are open
     // cursor1 still has more data in the first chunk, the one that didn't move
@@ -36,7 +38,7 @@
 
     s.adminCommand({split: "test.foo", middle: {_id: 5}});
     s.adminCommand({movechunk: "test.foo", find: {_id: 5}, to: secondary.getMongo().name});
-    assert.eq(2, s.config.chunks.count());
+    assert.eq(2, s.config.chunks.count({"ns": "test.foo"}));
 
     // the cursors should not have been affected
     assert.eq(numObjs, cursor1.itcount(), "c1");

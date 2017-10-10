@@ -12,7 +12,7 @@
         assert.eq(st.config.tags.count(), num, message);
     }
 
-    assert.eq(1, st.config.chunks.count());
+    assert.eq(1, st.config.chunks.count({"ns": "test.tag_range"}));
 
     st.addShardTag('shard0000', 'a');
     st.addShardTag('shard0000', 'b');

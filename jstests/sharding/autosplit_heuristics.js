@@ -73,7 +73,7 @@
 
         // Check that all chunks (except the two extreme chunks)
         // have been split at least once + 1 extra chunk as reload buffer
-        assert.gte(config.chunks.count(), numChunks * 2 + 3);
+        assert.gte(config.chunks.count({"ns": "foo.hashBar"}), numChunks * 2 + 3);
 
         jsTest.log("DONE!");
 

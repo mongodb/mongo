@@ -31,7 +31,7 @@
 
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
 
-    assert.eq(1, s.config.chunks.count(), "step 1 - need one large chunk");
+    assert.eq(1, s.config.chunks.count({"ns": "test.foo"}), "step 1 - need one large chunk");
 
     var primary = s.getPrimaryShard("test").getDB("test");
     var secondary = s.getOther(primary).getDB("test");
@@ -51,15 +51,14 @@
 
     // Move the chunk
     print("checkpoint 1b");
-    var before = s.config.chunks.find().toArray();
+    var before = s.config.chunks.find({ns: 'test.foo'}).toArray();
     assert.commandWorked(
         s.s0.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name}));
 
-    var after = s.config.chunks.find().toArray();
+    var after = s.config.chunks.find({ns: 'test.foo'}).toArray();
     assert.neq(before[0].shard, after[0].shard, "move chunk did not work");
 
     s.config.changelog.find().forEach(printjson);
 
     s.stop();
-
 })();

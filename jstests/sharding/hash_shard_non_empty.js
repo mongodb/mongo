@@ -16,7 +16,7 @@ db.getCollection(coll).ensureIndex({a: "hashed"});
 var res = db.adminCommand({shardcollection: dbname + "." + coll, key: {a: "hashed"}});
 assert.eq(res.ok, 1, "shardcollection didn't work");
 s.printShardingStatus();
-var numChunks = s.config.chunks.count();
+var numChunks = s.config.chunks.count({"ns": "test.foo"});
 assert.eq(numChunks, 1, "sharding non-empty collection should not pre-split");
 
 s.stop();

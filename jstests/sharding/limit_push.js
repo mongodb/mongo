@@ -27,7 +27,7 @@
     });
 
     // Check that the chunck have split correctly
-    assert.eq(2, s.config.chunks.count(), "wrong number of chunks");
+    assert.eq(2, s.config.chunks.count({"ns": "test.limit_push"}), "wrong number of chunks");
 
     // The query is asking for the maximum value below a given value
     // db.limit_push.find( { x : { $lt : 60} } ).sort( { x:-1} ).limit(1)

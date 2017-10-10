@@ -211,7 +211,7 @@
             checkCommandSucceeded(adminDB, {isdbgrid: 1});
             checkCommandSucceeded(adminDB, {ismaster: 1});
             checkCommandSucceeded(adminDB, {split: 'test.foo', find: {i: 1, j: 1}});
-            var chunk = configDB.chunks.findOne({shard: st.rs0.name});
+            var chunk = configDB.chunks.findOne({ns: 'test.foo', shard: st.rs0.name});
             checkCommandSucceeded(
                 adminDB,
                 {moveChunk: 'test.foo', find: chunk.min, to: st.rs1.name, _waitForDelete: true});

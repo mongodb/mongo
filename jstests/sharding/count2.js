@@ -10,7 +10,7 @@
     var db1 = s1.getDB("test").foo;
     var db2 = s2.getDB("test").foo;
 
-    assert.eq(1, s1.config.chunks.count(), "sanity check A");
+    assert.eq(1, s1.config.chunks.count({"ns": "test.foo"}), "sanity check A");
 
     db1.save({name: "aaa"});
     db1.save({name: "bbb"});

@@ -35,7 +35,7 @@
     primary = s.getPrimaryShard("test").getDB("test");
     secondary = s.getOther(primary).getDB("test");
 
-    assert.eq(1, s.config.chunks.count(), "sanity check A");
+    assert.eq(1, s.config.chunks.count({"ns": "test.foo"}), "sanity check A");
 
     db.foo.save({_id: 1, name: "eliot"});
     db.foo.save({_id: 2, name: "sara"});

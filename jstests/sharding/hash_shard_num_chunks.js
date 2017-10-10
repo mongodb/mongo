@@ -16,7 +16,7 @@
 
     s.printShardingStatus();
 
-    var numChunks = s.config.chunks.count();
+    var numChunks = s.config.chunks.count({"ns": "test.foo"});
     assert.eq(numChunks, 500, "should be exactly 500 chunks");
 
     s.config.shards.find().forEach(

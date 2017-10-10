@@ -1,8 +1,8 @@
 (function() {
+    'use strict';
 
     var s = new ShardingTest({name: "shard_existing", shards: 2, mongos: 1, other: {chunkSize: 1}});
-
-    db = s.getDB("test");
+    var db = s.getDB("test");
 
     var stringSize = 10000;
     var numDocs = 2000;
@@ -14,7 +14,7 @@
     print("NumDocs: " + numDocs + " DocSize: " + docSize + " TotalSize: " + totalSize);
 
     var bulk = db.data.initializeUnorderedBulkOp();
-    for (i = 0; i < numDocs; i++) {
+    for (var i = 0; i < numDocs; i++) {
         bulk.insert({_id: i, s: bigString});
     }
     assert.writeOK(bulk.execute());
@@ -25,14 +25,13 @@
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', 'shard0001');
-    res = s.adminCommand({shardcollection: "test.data", key: {_id: 1}});
+    var res = s.adminCommand({shardcollection: "test.data", key: {_id: 1}});
     printjson(res);
 
     // number of chunks should be approx equal to the total data size / half the chunk size
-    var numChunks = s.config.chunks.find().itcount();
+    var numChunks = s.config.chunks.find({ns: 'test.data'}).itcount();
     var guess = Math.ceil(dataSize / (512 * 1024 + avgObjSize));
     assert(Math.abs(numChunks - guess) < 2, "not right number of chunks");
 
     s.stop();
-
 })();

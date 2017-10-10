@@ -45,8 +45,14 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Ensure a new primary is found promptly
     st.configRS.getPrimary(30000);
 
-    assert.eq(1, mongos.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
-    assert.eq(0, mongos.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
+    assert.eq(1,
+              mongos.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard0.shardName})
+                  .itcount());
+    assert.eq(0,
+              mongos.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard1.shardName})
+                  .itcount());
 
     // At this point, the balancer is in recovery mode. Ensure that stepdown can be done again and
     // the recovery mode interrupted.
@@ -63,8 +69,14 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Ensure that migration succeeded
     joinMoveChunk();
 
-    assert.eq(0, mongos.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
-    assert.eq(1, mongos.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
+    assert.eq(0,
+              mongos.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard0.shardName})
+                  .itcount());
+    assert.eq(1,
+              mongos.getDB('config')
+                  .chunks.find({ns: 'TestDB.TestColl', shard: st.shard1.shardName})
+                  .itcount());
 
     st.stop();
 })();
