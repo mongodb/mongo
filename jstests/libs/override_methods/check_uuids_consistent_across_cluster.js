@@ -22,6 +22,11 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
     }
 
     try {
+        // Reset slaveOk to false on the connection to the mongos, in case it was set to true by the
+        // test. (We only read from the primary config server, rather than awaiting replication on
+        // the config replica set).
+        this.s.setSlaveOk(false);
+
         // Read from config.collections, config.shards, and config.chunks to construct a picture
         // of which shards own data for which collections, and what the UUIDs for those collections
         // are.
