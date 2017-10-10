@@ -127,9 +127,13 @@ Status TransportLayerLegacy::start() {
         return {ErrorCodes::InternalError, "TransportLayer is already running"};
     }
 
-    _listenerThread = stdx::thread([this]() { _listener->initAndListen(); });
-
-    return Status::OK();
+    try {
+        _listenerThread = stdx::thread([this]() { _listener->initAndListen(); });
+        _listener->waitUntilListening();
+        return Status::OK();
+    } catch (...) {
+        return {ErrorCodes::InternalError, "Failed to start listener thread."};
+    }
 }
 
 TransportLayerLegacy::~TransportLayerLegacy() = default;

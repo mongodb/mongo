@@ -161,12 +161,19 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
     // of the interfaces on this machine.
     // No need for ip match if the ports do not match
     if (hostAndPort.port() == serverGlobalParams.port) {
-        std::vector<std::string> myAddrs = serverGlobalParams.bind_ip.empty()
-            ? getBoundAddrs(IPv6Enabled())
-            : std::vector<std::string>();
+        std::vector<std::string> myAddrs;
 
         if (!serverGlobalParams.bind_ip.empty()) {
             boost::split(myAddrs, serverGlobalParams.bind_ip, boost::is_any_of(", "));
+        }
+
+        // If any of the bound addresses is the default route (0.0.0.0 on IPv4) it means we are
+        // listening on all network interfaces and need to check against any of them.
+        if (myAddrs.empty() ||
+            std::any_of(myAddrs.cbegin(), myAddrs.cend(), [](std::string const& addrStr) {
+                return HostAndPort(addrStr, serverGlobalParams.port).isDefaultRoute();
+            })) {
+            myAddrs = getBoundAddrs(IPv6Enabled());
         }
 
         const std::vector<std::string> hostAddrs =
