@@ -61,10 +61,38 @@ class test_timestamp01(wttest.WiredTigerTestCase, suite_subprocess):
                 'commit_timestamp=' + timestamp_str(1 << 5000)),
                 '/too long/')
 
-        # One is okay, as is 2**64 - 1
+        # Anything other than lower case hexadecimal characters is not permitted
+        self.session.begin_transaction()
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.commit_transaction(
+                'commit_timestamp=' + timestamp_str(-1)),
+                '/Failed to parse commit timestamp/')
+
+        self.session.begin_transaction()
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.commit_transaction(
+                'commit_timestamp=' + 'a/78f'),
+                '/Failed to parse commit timestamp/')
+
+        self.session.begin_transaction()
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.commit_transaction(
+                'commit_timestamp=' + 'a`78f'),
+                '/Failed to parse commit timestamp/')
+
+        self.session.begin_transaction()
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.commit_transaction(
+                'commit_timestamp=' + 'a{78f'),
+                '/Failed to parse commit timestamp/')
+
+        # One is okay, as is upper case hex and 2**64 - 1
         self.session.begin_transaction()
         self.session.commit_transaction(
             'commit_timestamp=' + timestamp_str(1))
+        self.session.begin_transaction()
+        self.session.commit_transaction(
+            'commit_timestamp=0A78F')
         self.session.begin_transaction()
         self.session.commit_transaction(
             'commit_timestamp=' + timestamp_str(1 << 64 - 1))

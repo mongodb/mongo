@@ -116,6 +116,12 @@ __wt_hex2byte(const u_char *from, u_char *to)
 	case '7': byte = 7 << 4; break;
 	case '8': byte = 8 << 4; break;
 	case '9': byte = 9 << 4; break;
+	case 'A': byte = 10 << 4; break;
+	case 'B': byte = 11 << 4; break;
+	case 'C': byte = 12 << 4; break;
+	case 'D': byte = 13 << 4; break;
+	case 'E': byte = 14 << 4; break;
+	case 'F': byte = 15 << 4; break;
 	case 'a': byte = 10 << 4; break;
 	case 'b': byte = 11 << 4; break;
 	case 'c': byte = 12 << 4; break;
@@ -137,6 +143,12 @@ __wt_hex2byte(const u_char *from, u_char *to)
 	case '7': byte |= 7; break;
 	case '8': byte |= 8; break;
 	case '9': byte |= 9; break;
+	case 'A': byte |= 10; break;
+	case 'B': byte |= 11; break;
+	case 'C': byte |= 12; break;
+	case 'D': byte |= 13; break;
+	case 'E': byte |= 14; break;
+	case 'F': byte |= 15; break;
 	case 'a': byte |= 10; break;
 	case 'b': byte |= 11; break;
 	case 'c': byte |= 12; break;

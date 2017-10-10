@@ -26,15 +26,52 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
+def timestamp_str(t):
+    return '%x' % t
+
 # test_las.py
-#       Smoke tests to ensure lookaside tables are working.
+# Smoke tests to ensure lookaside tables are working.
 class test_las(wttest.WiredTigerTestCase):
     # Force a small cache.
     def conn_config(self):
         return 'cache_size=1GB'
+
+    def large_updates(self, session, uri, value, ds, nrows, timestamp=False):
+        # Insert a large number of records, we'll hang if the lookaside table
+        # isn't doing its thing.
+        cursor = session.open_cursor(uri)
+        for i in range(1, 1000000):
+            if timestamp == True:
+                session.begin_transaction()
+            cursor.set_key(ds.key(nrows + i))
+            cursor.set_value(value)
+            self.assertEquals(cursor.update(), 0)
+            if timestamp == True:
+                session.commit_transaction('commit_timestamp=' + timestamp_str(i + 1))
+        cursor.close()
+
+    def durable_check(self, check_value, uri, ds, nrows):
+        # Checkpoint and backup so as to simulate recovery
+        self.session.checkpoint()
+        newdir = "BACKUP"
+        copy_wiredtiger_home('.', newdir, True)
+
+        conn = self.setUpConnectionOpen(newdir)
+        session = self.setUpSessionOpen(conn)
+        cursor = session.open_cursor(uri, None)
+        # Skip the initial rows, which were not updated
+        for i in range(0, nrows+1):
+            self.assertEquals(cursor.next(), 0)
+        #print "Check value : " + str(check_value)
+        #print "value : " + str(cursor.get_value())
+        self.assertTrue(check_value == cursor.get_value())
+        cursor.close()
+        session.close()
+        conn.close()
 
     @wttest.longtest('lookaside table smoke test')
     def test_las(self):
@@ -43,18 +80,49 @@ class test_las(wttest.WiredTigerTestCase):
         nrows = 100
         ds = SimpleDataSet(self, uri, nrows, key_format="S")
         ds.populate()
+        bigvalue = "aaaaa" * 100
 
-        # Take a snapshot.
-        self.session.snapshot("name=xxx")
-
-        # Insert a large number of records, we'll hang if the lookaside table
-        # isn't doing its thing.
-        c = self.session.open_cursor(uri)
-        bigvalue = "abcde" * 100
+        # Initially load huge data
+        cursor = self.session.open_cursor(uri)
         for i in range(1, 1000000):
-            c.set_key(ds.key(nrows + i))
-            c.set_value(bigvalue)
-            self.assertEquals(c.insert(), 0)
+            cursor.set_key(ds.key(nrows + i))
+            cursor.set_value(bigvalue)
+            self.assertEquals(cursor.insert(), 0)
+        cursor.close()
+        self.session.checkpoint()
+
+        # Scenario: 1
+        # Check to see LAS working with old snapshot
+        bigvalue1 = "bbbbb" * 100
+        self.session.snapshot("name=xxx")
+        # Update the values in different session after snapshot
+        self.large_updates(self.session, uri, bigvalue1, ds, nrows)
+        # Check to see the value after recovery
+        self.durable_check(bigvalue1, uri, ds, nrows)
+        self.session.snapshot("drop=(all)")
+
+        # Scenario: 2
+        # Check to see LAS working with old reader
+        bigvalue2 = "ccccc" * 100
+        session2 = self.conn.open_session()
+        session2.begin_transaction('isolation=snapshot')
+        self.large_updates(self.session, uri, bigvalue2, ds, nrows)
+        # Check to see the value after recovery
+        self.durable_check(bigvalue2, uri, ds, nrows)
+        session2.rollback_transaction()
+        session2.close()
+
+        # Scenario: 3
+        # Check to see LAS working with old timestamp
+        bigvalue3 = "ddddd" * 100
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+        self.large_updates(self.session, uri, bigvalue3, ds, nrows, timestamp=True)
+        # Check to see data can be see only till the stable_timestamp
+        self.durable_check(bigvalue2, uri, ds, nrows)
+
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(i + 1))
+        # Check to see latest data can be seen
+        self.durable_check(bigvalue3, uri, ds, nrows)
 
 if __name__ == '__main__':
     wttest.run()

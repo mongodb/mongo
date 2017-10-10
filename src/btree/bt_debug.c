@@ -1124,6 +1124,9 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
 	case WT_REF_LOCKED:
 		state = "locked";
 		break;
+	case WT_REF_LOOKASIDE:
+		state = "lookaside";
+		break;
 	case WT_REF_MEM:
 		state = "memory";
 		break;

@@ -296,7 +296,9 @@ struct __wt_table {
 		F_CLR(session, WT_SESSION_LOCKED_CHECKPOINT);		\
 		__wt_spin_unlock(session, &__conn->checkpoint_lock);	\
 	}								\
+	__wt_yield();							\
 	op;								\
+	__wt_yield();							\
 	if (__checkpoint_locked) {					\
 		__wt_spin_lock(session, &__conn->checkpoint_lock);	\
 		F_SET(session, WT_SESSION_LOCKED_CHECKPOINT);		\

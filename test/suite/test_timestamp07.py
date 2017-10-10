@@ -56,8 +56,8 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
 
     nkeys = [
         ('100keys', dict(nkeys=100)),
-#        ('500keys', dict(nkeys=500)),
-#        ('1000keys', dict(nkeys=1000)),
+        ('500keys', dict(nkeys=500)),
+        ('1000keys', dict(nkeys=1000)),
     ]
 
     scenarios = make_scenarios(types, conncfg, nkeys)
@@ -68,19 +68,20 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     value3 = u'\u0001\u0002cdef\u0007\u0004'
 
     # Check that a cursor (optionally started in a new transaction), sees the
-    # expected values.
-    def check(self, session, txn_config, expected):
+    # expected value for a key
+    def check(self, session, txn_config, k, expected):
         if txn_config:
             session.begin_transaction(txn_config)
         c = session.open_cursor(self.uri + self.tablename, None)
-        actual = dict((k, v) for k, v in c if v != 0)
-        self.assertTrue(actual == expected)
-        # Search for the expected items as well as iterating
-        for k, v in expected.iteritems():
-            self.assertEqual(c[k], v, "for key " + str(k))
+        if not expected:
+            c.set_key(k)
+            self.assertEqual(c.search(), wiredtiger.WT_NOTFOUND)
+        else:
+            self.assertEqual(c[k], expected)
         c.close()
         if txn_config:
             session.commit_transaction()
+
     #
     # Take a backup of the database and verify that the value we want to
     # check exists in the tables the expected number of times.
@@ -168,12 +169,14 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Now check that we see the expected state when reading at each
         # timestamp.
-        for i, t in enumerate(orig_keys):
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t),
-                dict((k, self.value) for k in orig_keys[:i+1]))
+        for k in orig_keys:
+            self.check(self.session, 'read_timestamp=' + timestamp_str(k),
+                k, self.value)
+            self.check(self.session, 'read_timestamp=' + timestamp_str(k),
+                k + 1, None)
 
         # Bump the oldest timestamp, we're not going back...
-        self.assertEqual(self.conn.query_timestamp(), timestamp_str(self.nkeys))
+        self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(self.nkeys))
         self.oldts = timestamp_str(self.nkeys)
         self.conn.set_timestamp('oldest_timestamp=' + self.oldts)
         self.conn.set_timestamp('stable_timestamp=' + self.oldts)
@@ -201,12 +204,8 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Take a checkpoint using the given configuration.  Then verify
         # whether value2 appears in a copy of that data or not.
-        valcnt2 = valcnt3 = self.nkeys
-        valcnt = 0
-        # If logging is disabled then value2 should not appear in logged table.
-        if self.using_log == False:
-            valcnt3 = 0
-        self.ckpt_backup(self.value2, valcnt, valcnt2, valcnt3)
+        self.ckpt_backup(self.value2, 0, self.nkeys, self.nkeys if self.using_log else 0)
+
         # Update the stable timestamp to the latest, but not the oldest
         # timestamp and make sure we can see the data.  Once the stable
         # timestamp is moved we should see all keys with value2.
@@ -245,9 +244,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # of that data or not.  Both tables that are logged should see
         # all the data regardless of timestamps.  The table that is not
         # logged should not see any of it.
-        valcnt = 0
-        valcnt2 = valcnt3 = self.nkeys
-        self.backup_check(self.value3, valcnt, valcnt2, valcnt3)
+        self.backup_check(self.value3, 0, self.nkeys, self.nkeys)
 
 if __name__ == '__main__':
     wttest.run()

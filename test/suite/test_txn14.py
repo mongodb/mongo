@@ -93,10 +93,11 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
         self.session.log_flush(cfgarg)
         if self.sync == 'background':
-            # If doing a background flush, wait a few seconds.  I have
-            # seen an individual log file's fsync take more than a second
-            # on some systems.  So give it time to flush perhaps a few files.
-            self.session.transaction_sync('timeout_ms=4000')
+            # If doing a background flush, wait 10 seconds. I have seen an
+            # individual log file's fsync take more than a second on some
+            # systems, and we've seen timeouts at lower levels on systems
+            # with slow I/O. So give it time to flush perhaps a few files.
+            self.session.transaction_sync('timeout_ms=10000')
         self.simulate_crash_restart(".", "RESTART")
         c = self.session.open_cursor(self.t1, None, None)
         i = 0

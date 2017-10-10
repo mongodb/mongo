@@ -10,6 +10,26 @@ static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 #ifdef HAVE_TIMESTAMPS
+/*
+ * __wt_txn_timestamp_flags --
+ *	Set txn related timestamp flags.
+ */
+static inline void
+__wt_txn_timestamp_flags(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+
+	if (session->dhandle == NULL)
+		return;
+	btree = S2BT(session);
+	if (btree == NULL)
+		return;
+	if (FLD_ISSET(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS))
+		F_SET(&session->txn, WT_TXN_TS_COMMIT_ALWAYS);
+	if (FLD_ISSET(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER))
+		F_SET(&session->txn, WT_TXN_TS_COMMIT_NEVER);
+}
+
 #if WT_TIMESTAMP_SIZE == 8
 #define	WT_WITH_TIMESTAMP_READLOCK(session, l, e)       e
 
@@ -631,6 +651,37 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 		WT_RET_MSG(session, WT_ERROR, "out of transaction IDs");
 	F_SET(txn, WT_TXN_HAS_ID);
 
+	return (0);
+}
+
+/*
+ * __wt_txn_search_check --
+ *	Check if the current transaction can search.
+ */
+static inline int
+__wt_txn_search_check(WT_SESSION_IMPL *session)
+{
+#ifdef  HAVE_TIMESTAMPS
+	WT_BTREE *btree;
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	btree = S2BT(session);
+	/*
+	 * If the user says a table should always use a read timestamp,
+	 * verify this transaction has one.  Same if it should never have
+	 * a read timestamp.
+	 */
+	if (FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS) &&
+	    !F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
+		WT_RET_MSG(session, EINVAL, "read_timestamp required and "
+		    "none set on this transaction");
+	if (FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_NEVER) &&
+	    F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
+		WT_RET_MSG(session, EINVAL, "no read_timestamp required and "
+		    "timestamp set on this transaction");
+#endif
+	WT_UNUSED(session);
 	return (0);
 }
 

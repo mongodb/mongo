@@ -113,11 +113,15 @@ static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
+	WT_DECL_RET;
 	pthread_mutexattr_t attr;
 
 	WT_RET(pthread_mutexattr_init(&attr));
-	WT_RET(pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP));
-	WT_RET(pthread_mutex_init(&t->lock, &attr));
+	ret = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP);
+	if (ret == 0)
+		ret = pthread_mutex_init(&t->lock, &attr);
+	WT_TRET(pthread_mutexattr_destroy(&attr));
+	WT_RET(ret);
 #else
 	WT_RET(pthread_mutex_init(&t->lock, NULL));
 #endif

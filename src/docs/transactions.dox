@@ -165,8 +165,8 @@ transaction timestamp functionality.
 
 Applications can assign explicit commit timestamps to transactions, then read
 "as of" a timestamp.  Timestamps are communicated to WiredTiger using a
-lower case hexadecimal encoding, so the encoded value can be twice as long as
-the raw timestamp value.
+hexadecimal encoding, so the encoded value can be twice as long as the raw
+timestamp value.
 
 Setting a read timestamp in WT_SESSION::begin_transaction forces a transaction
 to run at snapshot isolation and ignore any commits with a newer timestamp.

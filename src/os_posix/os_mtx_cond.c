@@ -26,8 +26,11 @@ __wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, WT_CONDVAR **condp)
 	pthread_condattr_t condattr;
 
 	WT_ERR(pthread_condattr_init(&condattr));
-	WT_ERR(pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC));
-	WT_ERR(pthread_cond_init(&cond->cond, &condattr));
+	ret = pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC);
+	if (ret == 0)
+		ret = pthread_cond_init(&cond->cond, &condattr);
+	WT_TRET(pthread_condattr_destroy(&condattr));
+	WT_ERR(ret);
 	}
 #else
 	WT_ERR(pthread_cond_init(&cond->cond, NULL));

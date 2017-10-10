@@ -62,6 +62,81 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __sync_dup_walk --
+ *	Duplicate a tree walk point.
+ */
+static inline int
+__sync_dup_walk(
+    WT_SESSION_IMPL *session, WT_REF *walk, uint32_t flags, WT_REF **dupp)
+{
+	WT_REF *old;
+	bool busy;
+
+	if ((old = *dupp) != NULL) {
+		*dupp = NULL;
+		WT_RET(__wt_page_release(session, old, flags));
+	}
+
+	/* It is okay to duplicate a walk before it starts. */
+	if (walk == NULL || __wt_ref_is_root(walk)) {
+		*dupp = walk;
+		return (0);
+	}
+
+	/* Get a duplicate hazard pointer. */
+	for (;;) {
+#ifdef HAVE_DIAGNOSTIC
+		WT_RET(
+		    __wt_hazard_set(session, walk, &busy, __func__, __LINE__));
+#else
+		WT_RET(__wt_hazard_set(session, walk, &busy));
+#endif
+		/*
+		 * We already have a hazard pointer, we should generally be able
+		 * to get another one. We can get spurious busy errors (e.g., if
+		 * eviction is attempting to lock the page. Keep trying: we have
+		 * one hazard pointer so we should be able to get another one.
+		 */
+		if (!busy)
+			break;
+		__wt_yield();
+	}
+
+	*dupp = walk;
+	return (0);
+}
+
+/*
+ * __sync_evict_page --
+ *	Attempt to evict a page during a checkpoint walk.
+ */
+static int
+__sync_evict_page(WT_SESSION_IMPL *session, WT_REF **walkp, uint32_t flags)
+{
+	WT_DECL_RET;
+	WT_REF *next, *to_evict;
+
+	to_evict = *walkp;
+	next = NULL;
+
+	/*
+	 * Get the ref after the page we're trying to evicting.  If the
+	 * eviction is successful, the walk will continue from here.
+	 */
+	WT_RET(__sync_dup_walk(session, to_evict, flags, &next));
+	WT_ERR(__wt_tree_walk(session, &next, flags));
+
+	WT_ERR(__wt_page_release_evict(session, to_evict));
+
+	/* Success: continue the walk at the next page. */
+	*walkp = next;
+	return (0);
+
+err:	WT_TRET(__wt_page_release(session, next, flags));
+	return (ret);
+}
+
+/*
  * __sync_file --
  *	Flush pages for a specific file.
  */
@@ -73,22 +148,23 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_REF *walk;
+	WT_REF *prev, *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
 	uint64_t oldest_id, saved_pinned_id;
 	uint32_t flags;
-	bool timer;
+	bool evict_failed, skip_walk, timer;
 
 	conn = S2C(session);
 	btree = S2BT(session);
-	walk = NULL;
+	prev = walk = NULL;
 	txn = &session->txn;
-	saved_pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
-	flags = WT_READ_CACHE | WT_READ_NO_GEN;
+	evict_failed = skip_walk = false;
 
+	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
+	saved_pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
 	timer = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT);
 	if (timer)
 		__wt_epoch(session, &start);
@@ -119,8 +195,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 */
 		oldest_id = __wt_txn_oldest_id(session);
 
-		flags |= WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
-		for (walk = NULL;;) {
+		LF_SET(WT_READ_NO_WAIT | WT_READ_SKIP_INTL);
+		for (;;) {
 			WT_ERR(__wt_tree_walk(session, &walk, flags));
 			if (walk == NULL)
 				break;
@@ -139,7 +215,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
 				WT_ERR(__wt_reconcile(session,
-				    walk, NULL, WT_CHECKPOINTING, NULL));
+				    walk, NULL, WT_REC_CHECKPOINT, NULL));
 			}
 		}
 		break;
@@ -184,9 +260,19 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		btree->checkpointing = WT_CKPT_RUNNING;
 
 		/* Write all dirty in-cache pages. */
-		flags |= WT_READ_NO_EVICT;
-		for (walk = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk, flags));
+		LF_SET(WT_READ_NO_EVICT);
+
+		/* Read pages with lookaside entries and evict them asap. */
+		LF_SET(WT_READ_LOOKASIDE | WT_READ_WONT_NEED);
+
+		for (;;) {
+			if (!skip_walk) {
+				WT_ERR(__sync_dup_walk(
+				    session, walk, flags, &prev));
+				WT_ERR(__wt_tree_walk(session, &walk, flags));
+			}
+			skip_walk = false;
+
 			if (walk == NULL)
 				break;
 
@@ -221,8 +307,39 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
 			}
+
+			/*
+			 * If the page needs forced eviction, try to do that
+			 * now.
+			 *
+			 * For eviction to have a chance, we first need to move
+			 * the walk point to the next page checkpoint will
+			 * visit.  We want to avoid this code being too special
+			 * purpose, so try to reuse the ordinary eviction path.
+			 *
+			 * If eviction succeeded, it steps to the next ref, so
+			 * we have to skip the next walk.  If eviction fails,
+			 * remember so we don't retry it.
+			 */
+			if (!WT_PAGE_IS_INTERNAL(page) &&
+			    page->read_gen == WT_READGEN_OLDEST &&
+			    !evict_failed) {
+				if ((ret = __sync_evict_page(
+				    session, &walk, flags)) == 0) {
+					evict_failed = false;
+					skip_walk = true;
+				} else {
+					walk = prev;
+					prev = NULL;
+					evict_failed = true;
+				}
+				WT_ERR_BUSY_OK(ret);
+				continue;
+			}
+
+			evict_failed = false;
 			WT_ERR(__wt_reconcile(
-			    session, walk, NULL, WT_CHECKPOINTING, NULL));
+			    session, walk, NULL, WT_REC_CHECKPOINT, NULL));
 		}
 		break;
 	case WT_SYNC_CLOSE:
@@ -244,8 +361,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	}
 
 err:	/* On error, clear any left-over tree walk. */
-	if (walk != NULL)
-		WT_TRET(__wt_page_release(session, walk, flags));
+	WT_TRET(__wt_page_release(session, walk, flags));
+	WT_TRET(__wt_page_release(session, prev, flags));
 
 	/*
 	 * If we got a snapshot in order to write pages, and there was no

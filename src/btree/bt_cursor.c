@@ -334,7 +334,7 @@ __cursor_col_search(
 	WT_DECL_RET;
 
 	WT_WITH_PAGE_INDEX(session,
-	    ret = __wt_col_search(session, cbt->iface.recno, leaf, cbt));
+	    ret = __wt_col_search(session, cbt->iface.recno, leaf, cbt, false));
 	return (ret);
 }
 
@@ -348,8 +348,8 @@ __cursor_row_search(
 {
 	WT_DECL_RET;
 
-	WT_WITH_PAGE_INDEX(session,
-	    ret = __wt_row_search(session, &cbt->iface.key, leaf, cbt, insert));
+	WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(
+	    session, &cbt->iface.key, leaf, cbt, insert, false));
 	return (ret);
 }
 
@@ -445,6 +445,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_STAT_CONN_INCR(session, cursor_search);
 	WT_STAT_DATA_INCR(session, cursor_search);
 
+	WT_RET(__wt_txn_search_check(session));
 	__cursor_state_save(cursor, &state);
 
 	/*
@@ -534,6 +535,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	WT_STAT_CONN_INCR(session, cursor_search_near);
 	WT_STAT_DATA_INCR(session, cursor_search_near);
 
+	WT_RET(__wt_txn_search_check(session));
 	__cursor_state_save(cursor, &state);
 
 	/*

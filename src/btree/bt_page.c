@@ -127,8 +127,8 @@ err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
-    const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep)
+__wt_page_inmem(WT_SESSION_IMPL *session,
+    WT_REF *ref, const void *image, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -196,8 +196,13 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * Track the memory allocated to build this page so we can update the
 	 * cache statistics in a single call. If the disk image is in allocated
 	 * memory, start with that.
+	 *
+	 * Accounting is based on the page-header's in-memory disk size instead
+	 * of the buffer memory used to instantiate the page image even though
+	 * the values might not match exactly, because that's the only value we
+	 * have when discarding the page image and accounting needs to match.
 	 */
-	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? memsize : 0;
+	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? dsk->mem_size : 0;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -218,9 +223,10 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	/* Update the page's in-memory size and the cache statistics. */
+	/* Update the page's cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
-	__wt_cache_page_image_incr(session, dsk->mem_size);
+	if (LF_ISSET(WT_PAGE_DISK_ALLOC))
+		__wt_cache_page_image_incr(session, dsk->mem_size);
 
 	/* Link the new internal page to the parent. */
 	if (ref != NULL) {

@@ -37,12 +37,6 @@ from wtscenario import make_scenarios
 def timestamp_str(t):
     return '%x' % t
 
-def timestamp_ret_str(t):
-    s = timestamp_str(t)
-    if len(s) % 2 == 1:
-        s = '0' + s
-    return s
-
 class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_log     = 'table:ts04_ts_logged'
     table_ts_nolog   = 'table:ts04_ts_nologged'
@@ -61,6 +55,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         ('col_var', dict(empty=0, cacheSize='cache_size=20MB', extra_config=',key_format=r')),
         ('lsm', dict(empty=0, cacheSize='cache_size=31MB', extra_config=',type=lsm')),
         ('row', dict(empty=0, cacheSize='cache_size=20MB', extra_config='',)),
+        ('row-smallcache', dict(empty=0, cacheSize='cache_size=2MB', extra_config='',)),
     ]
 
     scenarios = make_scenarios(conncfg, types)

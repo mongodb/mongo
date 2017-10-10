@@ -147,7 +147,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 int
 __wt_ovfl_remove(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_CELL_UNPACK *unpack, bool checkpoint)
+    WT_PAGE *page, WT_CELL_UNPACK *unpack, bool evicting)
 {
 	/*
 	 * This function solves two problems in reconciliation.
@@ -188,7 +188,7 @@ __wt_ovfl_remove(WT_SESSION_IMPL *session,
 	 * We only have to do this for checkpoints: in any eviction mode, there
 	 * can't be threads sitting in our update lists.
 	 */
-	if (checkpoint)
+	if (!evicting)
 		WT_RET(__ovfl_cache(session, page, unpack));
 
 	/*
