@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -65,7 +66,9 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/fill_locker_info.h"
@@ -74,7 +77,10 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
@@ -88,6 +94,7 @@ using std::string;
 using std::unique_ptr;
 
 namespace {
+
 class MongodProcessInterface final
     : public DocumentSourceNeedsMongoProcessInterface::MongoProcessInterface {
 public:
@@ -340,6 +347,38 @@ public:
         }
 
         return std::string();
+    }
+
+    std::vector<FieldPath> collectDocumentKeyFields(UUID uuid) const final {
+        if (!ShardingState::get(_ctx->opCtx)->enabled()) {
+            return {"_id"};  // Nothing is sharded.
+        }
+
+        auto scm = [this]() -> ScopedCollectionMetadata {
+            AutoGetCollection autoColl(_ctx->opCtx, _ctx->ns, MODE_IS);
+            return CollectionShardingState::get(_ctx->opCtx, _ctx->ns)->getMetadata();
+        }();
+
+        if (!scm) {
+            return {"_id"};  // Collection is not sharded.
+        }
+
+        uassert(ErrorCodes::StaleConfig,
+                str::stream() << "Collection " << _ctx->ns.ns()
+                              << " UUID differs from UUID on change stream operations",
+                scm->uuidMatches(uuid));
+
+        // Unpack the shard key.
+        std::vector<FieldPath> result;
+        bool gotId = false;
+        for (auto& field : scm->getKeyPatternFields()) {
+            result.emplace_back(field->dottedField());
+            gotId |= (result.back().fullPath() == "_id");
+        }
+        if (!gotId) {  // If not part of the shard key, "_id" comes last.
+            result.emplace_back("_id");
+        }
+        return result;
     }
 
 private:

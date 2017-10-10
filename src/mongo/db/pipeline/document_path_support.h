@@ -64,5 +64,10 @@ StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const Fie
  */
 BSONObj documentToBsonWithPaths(const Document&, const std::set<std::string>& paths);
 
+/**
+ * Extracts 'paths' from the input document to a flat document.
+ */
+Document extractDocumentKeyFromDoc(const Document& doc, const std::vector<FieldPath>& paths);
+
 }  // namespace document_path_support
 }  // namespace mongo

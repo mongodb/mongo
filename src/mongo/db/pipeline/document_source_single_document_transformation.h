@@ -38,7 +38,8 @@ namespace mongo {
  * a ParsedSingleDocumentTransformation. It is not a registered DocumentSource, and it cannot be
  * created from BSON.
  */
-class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
+class DocumentSourceSingleDocumentTransformation final
+    : public DocumentSourceNeedsMongoProcessInterface {
 public:
     /**
      * This class defines the minimal interface that every parser wishing to take advantage of
@@ -86,6 +87,16 @@ public:
         virtual bool isSubsetOfProjection(const BSONObj& proj) const {
             return false;
         }
+
+    protected:
+        MongoProcessInterface* _mongoProcess{nullptr};
+
+    private:
+        void injectMongoProcess(MongoProcessInterface* p) {
+            _mongoProcess = p;
+        }
+
+        friend class DocumentSourceSingleDocumentTransformation;
     };
 
     DocumentSourceSingleDocumentTransformation(
@@ -100,6 +111,12 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
+
+    void doInjectMongoProcessInterface(
+        std::shared_ptr<MongoProcessInterface> mongoProcessInterface) override {
+
+        _parsedTransform->injectMongoProcess(mongoProcessInterface.get());
+    }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(

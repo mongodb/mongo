@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_sources_gen.h"
+#include "mongo/db/pipeline/field_path.h"
 
 namespace mongo {
 
@@ -88,6 +89,11 @@ public:
     private:
         boost::intrusive_ptr<ExpressionContext> _expCtx;
         BSONObj _changeStreamSpec;
+
+        // Fields of the document key, in order, including the shard key if the collection is
+        // sharded, and anyway "_id". Empty until the first oplog entry with a uuid is encountered.
+        // Needed for transforming 'insert' oplog entries.
+        std::vector<FieldPath> _documentKeyFields;
     };
 
     // The sort pattern used to merge results from multiple change streams on a mongos.

@@ -65,8 +65,7 @@
         assert.soon(() => changeStream.hasNext());
         let next = changeStream.next();
         assert.eq(next.operationType, "insert");
-        // TODO SERVER-30599 this documentKey should contain the shard key.
-        assert.eq(next.documentKey, {_id: id});
+        assert.eq(next.documentKey, {shardKey: id, _id: id});
 
         assert.soon(() => changeStream.hasNext());
         next = changeStream.next();

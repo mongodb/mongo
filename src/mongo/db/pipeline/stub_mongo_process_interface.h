@@ -113,5 +113,9 @@ public:
     std::string getShardName(OperationContext* opCtx) const override {
         MONGO_UNREACHABLE;
     }
+
+    std::vector<FieldPath> collectDocumentKeyFields(UUID) const override {
+        MONGO_UNREACHABLE;
+    }
 };
 }  // namespace mongo

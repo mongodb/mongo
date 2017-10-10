@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/pipeline/close_change_stream_exception.h"
+#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
@@ -383,6 +384,9 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
     if (!uuid.missing()) {
         checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
+        if (_mongoProcess && _documentKeyFields.empty()) {
+            _documentKeyFields = _mongoProcess->collectDocumentKeyFields(uuid.getUuid());
+        }
     }
     NamespaceString nss(ns.getString());
     Value id = input.getNestedField("o._id");
@@ -398,7 +402,8 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         case repl::OpTypeEnum::kInsert: {
             operationType = kInsertOpType;
             fullDocument = input[repl::OplogEntry::kObjectFieldName];
-            documentKey = Value(Document{{kIdField, id}});
+            documentKey = Value(document_path_support::extractDocumentKeyFromDoc(
+                fullDocument.getDocument(), _documentKeyFields));
             break;
         }
         case repl::OpTypeEnum::kDelete: {

@@ -157,6 +157,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::vector<FieldPath> collectDocumentKeyFields(UUID) const override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipelineWithOneRemote(
         const std::vector<BSONObj>& rawPipeline,

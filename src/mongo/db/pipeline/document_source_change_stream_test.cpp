@@ -36,12 +36,14 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -81,6 +83,18 @@ private:
     EnsureFCV _ensureFCV;
 };
 
+// This is needed only for the "insert" tests.
+struct MockMongoProcessInterface final : public StubMongoProcessInterface {
+
+    MockMongoProcessInterface(std::vector<FieldPath> fields) : _fields(std::move(fields)) {}
+
+    std::vector<FieldPath> collectDocumentKeyFields(UUID) const final {
+        return _fields;
+    }
+
+    std::vector<FieldPath> _fields;
+};
+
 class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
 public:
     ChangeStreamStageTest() : ChangeStreamStageTestNoSetup() {
@@ -89,9 +103,15 @@ public:
                                               getExpCtx()->opCtx->getServiceContext()));
     }
 
-    void checkTransformation(const OplogEntry& entry, const boost::optional<Document> expectedDoc) {
+    void checkTransformation(const OplogEntry& entry,
+                             const boost::optional<Document> expectedDoc,
+                             std::vector<FieldPath> docKeyFields = {}) {
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry);
         auto transform = stages[2].get();
+
+        auto mongoProcess = std::make_shared<MockMongoProcessInterface>(docKeyFields);
+        using NeedyDS = DocumentSourceNeedsMongoProcessInterface;
+        dynamic_cast<NeedyDS&>(*transform).injectMongoProcessInterface(std::move(mongoProcess));
 
         auto next = transform->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -217,20 +237,45 @@ TEST_F(ChangeStreamStageTest, StagesGeneratedCorrectly) {
     // TODO: Check explain result.
 }
 
-TEST_F(ChangeStreamStageTest, TransformInsert) {
-    OplogEntry insert(optime, 1, OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 1));
+TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
+    OplogEntry insert(optime, 1, OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 2));
     insert.setUuid(testUuid());
-    // Insert
+    Document expectedInsert{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("x" << 2 << "_id" << 1))},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
+    };
+    checkTransformation(insert, expectedInsert, {{"x"}, {"_id"}});
+    insert.setFromMigrate(false);  // also check actual "fromMigrate: false" not filtered
+    checkTransformation(insert, expectedInsert, {{"x"}, {"_id"}});
+}
+
+TEST_F(ChangeStreamStageTest, TransformInsertDocKeyIdAndX) {
+    OplogEntry insert(optime, 1, OpTypeEnum::kInsert, nss, BSON("x" << 2 << "_id" << 1));
+    insert.setUuid(testUuid());
+    Document expectedInsert{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("_id" << 1 << "x" << 2))},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kFullDocumentField, D{{"x", 2}, {"_id", 1}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},  // _id first
+    };
+    checkTransformation(insert, expectedInsert, {{"_id"}, {"x"}});
+}
+
+TEST_F(ChangeStreamStageTest, TransformInsertDocKeyJustId) {
+    OplogEntry insert(optime, 1, OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 2));
+    insert.setUuid(testUuid());
     Document expectedInsert{
         {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("_id" << 1))},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 1}}},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
-    checkTransformation(insert, expectedInsert);
-    insert.setFromMigrate(false);  // also check actual "fromMigrate: false" not filtered
-    checkTransformation(insert, expectedInsert);
+    checkTransformation(insert, expectedInsert, {{"_id"}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertFromMigrate) {

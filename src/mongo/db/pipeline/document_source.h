@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
@@ -831,6 +832,12 @@ public:
          * Returns the name of the local shard if sharding is enabled, or an empty string.
          */
         virtual std::string getShardName(OperationContext* opCtx) const = 0;
+
+        /**
+         * Returns the fields of the document key (in order) for the current collection, including
+         * the shard key and _id.  If _id is not in the shard key, it is added last.
+         */
+        virtual std::vector<FieldPath> collectDocumentKeyFields(UUID) const = 0;
 
         // Add new methods as needed.
     };
