@@ -1,33 +1,23 @@
-//
-// Tests what happens when a shard goes down with pooled connections.
-//
-// This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
-// A restarted standalone will lose all data when using an ephemeral storage engine.
-// @tags: [requires_persistence]
-//
+/**
+ * Tests what happens when a shard goes down with pooled connections.
+ *
+ * This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
+ * A restarted standalone will lose all data when using an ephemeral storage engine.
+ * @tags: [requires_persistence]
+ */
 
 // Run through the same test twice, once with a hard -9 kill, once with a regular shutdown
+(function() {
+    'use strict';
 
-for (var test = 0; test < 2; test++) {
-    var killWith = (test == 0 ? 15 : 9);
+    for (var test = 0; test < 2; test++) {
+        var killWith = (test == 0 ? 15 : 9);
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+        var st = new ShardingTest({shards: 2});
 
-    // Stop balancer to eliminate weird conn stuff
-    st.stopBalancer();
-
-    var mongos = st.s0;
-    var coll = mongos.getCollection("foo.bar");
-    var db = coll.getDB();
-
-    // Test is not valid for Win32
-    var is32Bits = (db.serverBuildInfo().bits == 32);
-    if (is32Bits && _isWindows()) {
-        // Win32 doesn't provide the polling interface we need to implement the check tested here
-        jsTest.log("Test is not valid on Win32 platform.");
-
-    } else {
-        // Non-Win32 platform
+        var mongos = st.s0;
+        var coll = mongos.getCollection("foo.bar");
+        var db = coll.getDB();
 
         assert.writeOK(coll.insert({hello: "world"}));
 
@@ -47,7 +37,8 @@ for (var test = 0; test < 2; test++) {
             conns[i].close();
         }
 
-        // Don't make test fragile by linking to format of shardConnPoolStats, but this is useful if
+        // Don't make test fragile by linking to format of shardConnPoolStats, but this is
+        // useful if
         // something goes wrong.
         var connPoolStats = mongos.getDB("admin").runCommand({shardConnPoolStats: 1});
         printjson(connPoolStats);
@@ -85,12 +76,9 @@ for (var test = 0; test < 2; test++) {
 
         assert.eq(0, numErrors);
 
-    }  // End Win32 check
+        st.stop();
 
-    st.stop();
+        jsTest.log("DONE test " + test);
+    }
 
-    jsTest.log("DONE test " + test);
-
-}  // End test loop
-
-jsTest.log("DONE!");
+})();

@@ -3,6 +3,7 @@
  */
 (function() {
     'use strict';
+
     load("jstests/replsets/rslib.js");
 
     var st = new ShardingTest({
@@ -95,20 +96,16 @@
     };
 
     var checkCommandSucceeded = function(db, cmdObj) {
-        print("Running command that should succeed: ");
-        printjson(cmdObj);
-        var resultObj = db.runCommand(cmdObj);
+        print("Running command that should succeed: " + tojson(cmdObj));
+        var resultObj = assert.commandWorked(db.runCommand(cmdObj));
         printjson(resultObj);
-        assert(resultObj.ok);
         return resultObj;
     };
 
     var checkCommandFailed = function(db, cmdObj) {
-        print("Running command that should fail: ");
-        printjson(cmdObj);
-        var resultObj = db.runCommand(cmdObj);
+        print("Running command that should fail: " + tojson(cmdObj));
+        var resultObj = assert.commandFailed(db.runCommand(cmdObj));
         printjson(resultObj);
-        assert(!resultObj.ok);
         return resultObj;
     };
 

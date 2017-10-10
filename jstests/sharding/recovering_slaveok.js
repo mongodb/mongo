@@ -20,8 +20,8 @@
     var dbaseSOk = mongosSOK.getDB("" + dbase);
     var collSOk = mongosSOK.getCollection("" + coll);
 
-    var rsA = shardTest._rs[0].test;
-    var rsB = shardTest._rs[1].test;
+    var rsA = shardTest.rs0;
+    var rsB = shardTest.rs1;
 
     assert.writeOK(rsA.getPrimary().getDB("test_a").dummy.insert({x: 1}));
     assert.writeOK(rsB.getPrimary().getDB("test_b").dummy.insert({x: 1}));

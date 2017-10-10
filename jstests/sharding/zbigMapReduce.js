@@ -214,13 +214,13 @@ function runTest(s) {
 
     // Verify that data is also on secondary
     jsTestLog("Test G");
-    var primary = s._rs[0].test.liveNodes.master;
-    var secondaries = s._rs[0].test.liveNodes.slaves;
+    var primary = s.rs0.liveNodes.master;
+    var secondaries = s.rs0.liveNodes.slaves;
 
     // Stop the balancer to prevent new writes from happening and make sure
     // that replication can keep up even on slow machines.
     s.stopBalancer();
-    s._rs[0].test.awaitReplication();
+    s.rs0.awaitReplication();
     assert.eq(51200, primary.getDB("test")[outcol].find().itcount(), "Wrong count");
     for (var i = 0; i < secondaries.length; ++i) {
         assert.eq(51200, secondaries[i].getDB("test")[outcol].find().itcount(), "Wrong count");
