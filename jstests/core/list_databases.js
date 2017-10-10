@@ -72,6 +72,9 @@
     assert.commandFailed(
         db.adminCommand({listDatabases: 1, filter: {$expr: {$eq: ["$name", "$$unbound"]}}}));
 
+    // $expr with a filter that throws at runtime.
+    assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {$expr: {$abs: "$name"}}}));
+
     // No extensions are allowed in filters.
     assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {$text: {$search: "str"}}}));
     assert.commandFailed(db.adminCommand({

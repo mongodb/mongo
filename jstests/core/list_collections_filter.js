@@ -92,6 +92,11 @@
         mydb.getCollectionInfos({$expr: {$eq: ["$name", "$$unbound"]}});
     });
 
+    // Filter with $expr with a runtime error.
+    assert.throws(function() {
+        mydb.getCollectionInfos({$expr: {$abs: "$name"}});
+    });
+
     // No extensions are allowed in filters.
     assert.throws(function() {
         mydb.getCollectionInfos({$text: {$search: "str"}});

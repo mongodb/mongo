@@ -13,10 +13,13 @@
     //
 
     coll.drop();
-    assert.writeOK(coll.insert({a: 5}));
-    assert.eq(1, coll.aggregate([{$match: {$expr: {$eq: ["$a", 5]}}}]).itcount());
+    assert.writeOK(coll.insert({a: 0}));
+    assert.eq(1, coll.aggregate([{$match: {$expr: {$eq: ["$a", 0]}}}]).itcount());
     assert.throws(function() {
         coll.aggregate([{$match: {$expr: {$eq: ["$a", "$$unbound"]}}}]);
+    });
+    assert.throws(function() {
+        coll.aggregate([{$match: {$expr: {$divide: [1, "$a"]}}}]);
     });
 
     //
@@ -24,10 +27,13 @@
     //
 
     coll.drop();
-    assert.writeOK(coll.insert({a: 5}));
-    assert.eq(1, coll.find({$expr: {$eq: ["$a", 5]}}).count());
+    assert.writeOK(coll.insert({a: 0}));
+    assert.eq(1, coll.find({$expr: {$eq: ["$a", 0]}}).count());
     assert.throws(function() {
         coll.find({$expr: {$eq: ["$a", "$$unbound"]}}).count();
+    });
+    assert.throws(function() {
+        coll.find({$expr: {$divide: [1, "$a"]}}).count();
     });
 
     //
@@ -35,10 +41,13 @@
     //
 
     coll.drop();
-    assert.writeOK(coll.insert({a: 5}));
-    assert.eq(1, coll.distinct("a", {$expr: {$eq: ["$a", 5]}}).length);
+    assert.writeOK(coll.insert({a: 0}));
+    assert.eq(1, coll.distinct("a", {$expr: {$eq: ["$a", 0]}}).length);
     assert.throws(function() {
         coll.distinct("a", {$expr: {$eq: ["$a", "$$unbound"]}});
+    });
+    assert.throws(function() {
+        coll.distinct("a", {$expr: {$divide: [1, "$a"]}});
     });
 
     //
@@ -47,20 +56,30 @@
 
     // $expr is allowed in query.
     coll.drop();
-    assert.writeOK(coll.insert({a: 5}));
-    assert.eq(1, coll.find({$expr: {$eq: ["$a", 5]}}).itcount());
+    assert.writeOK(coll.insert({a: 0}));
+    assert.eq(1, coll.find({$expr: {$eq: ["$a", 0]}}).itcount());
 
     // $expr with unbound variable throws.
     assert.throws(function() {
         coll.find({$expr: {$eq: ["$a", "$$unbound"]}}).itcount();
     });
 
+    // $expr with division by zero throws.
+    assert.throws(function() {
+        coll.find({$expr: {$divide: [1, "$a"]}}).itcount();
+    });
+
     // $expr is allowed in find with explain.
-    assert.commandWorked(coll.find({$expr: {$eq: ["$a", 5]}}).explain());
+    assert.commandWorked(coll.find({$expr: {$eq: ["$a", 0]}}).explain());
 
     // $expr with unbound variable in find with explain throws.
     assert.throws(function() {
         coll.find({$expr: {$eq: ["$a", "$$unbound"]}}).explain();
+    });
+
+    // $expr with division by zero in find with explain with executionStats throws.
+    assert.throws(function() {
+        coll.find({$expr: {$divide: [1, "$a"]}}).explain("executionStats");
     });
 
     // $expr is not allowed in $elemMatch projection.
@@ -76,10 +95,10 @@
 
     // $expr is allowed in the query when upsert=false.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 0, a: 5}));
-    assert.eq({_id: 0, a: 5, b: 6},
+    assert.writeOK(coll.insert({_id: 0, a: 0}));
+    assert.eq({_id: 0, a: 0, b: 6},
               coll.findAndModify(
-                  {query: {_id: 0, $expr: {$eq: ["$a", 5]}}, update: {$set: {b: 6}}, new: true}));
+                  {query: {_id: 0, $expr: {$eq: ["$a", 0]}}, update: {$set: {b: 6}}, new: true}));
 
     // $expr with unbound variable throws.
     assert.throws(function() {
@@ -87,12 +106,17 @@
             {query: {_id: 0, $expr: {$eq: ["$a", "$$unbound"]}}, update: {$set: {b: 6}}});
     });
 
+    // $expr with division by zero throws.
+    assert.throws(function() {
+        coll.findAndModify({query: {_id: 0, $expr: {$divide: [1, "$a"]}}, update: {$set: {b: 6}}});
+    });
+
     // $expr is not allowed in the query when upsert=true.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 0, a: 5}));
+    assert.writeOK(coll.insert({_id: 0, a: 0}));
     assert.throws(function() {
         coll.findAndModify(
-            {query: {_id: 0, $expr: {$eq: ["$a", 5]}}, update: {$set: {b: 6}}, upsert: true});
+            {query: {_id: 0, $expr: {$eq: ["$a", 0]}}, update: {$set: {b: 6}}, upsert: true});
     });
 
     // $expr is not allowed in $pull filter.
@@ -120,7 +144,7 @@
     //
 
     coll.drop();
-    assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 5}));
+    assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}));
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
     assert.eq(1,
               assert
@@ -128,7 +152,7 @@
                       geoNear: coll.getName(),
                       near: {type: "Point", coordinates: [0, 0]},
                       spherical: true,
-                      query: {$expr: {$eq: ["$a", 5]}}
+                      query: {$expr: {$eq: ["$a", 0]}}
                   }))
                   .results.length);
     assert.commandFailed(db.runCommand({
@@ -136,6 +160,12 @@
         near: {type: "Point", coordinates: [0, 0]},
         spherical: true,
         query: {$expr: {$eq: ["$a", "$$unbound"]}}
+    }));
+    assert.commandFailed(db.runCommand({
+        geoNear: coll.getName(),
+        near: {type: "Point", coordinates: [0, 0]},
+        spherical: true,
+        query: {$expr: {$divide: [1, "$a"]}}
     }));
 
     //
@@ -145,9 +175,9 @@
     // The group command is not permitted in sharded collections.
     if (!isMongos) {
         coll.drop();
-        assert.writeOK(coll.insert({a: 5}));
-        assert.eq([{a: 5, count: 1}], coll.group({
-            cond: {$expr: {$eq: ["$a", 5]}},
+        assert.writeOK(coll.insert({a: 0}));
+        assert.eq([{a: 0, count: 1}], coll.group({
+            cond: {$expr: {$eq: ["$a", 0]}},
             key: {a: 1},
             initial: {count: 0},
             reduce: function(curr, result) {
@@ -164,6 +194,16 @@
                 }
             });
         });
+        assert.throws(function() {
+            coll.group({
+                cond: {$expr: {$divide: [1, "$a"]}},
+                key: {a: 1},
+                initial: {count: 0},
+                reduce: function(curr, result) {
+                    result.count += 1;
+                }
+            });
+        });
     }
 
     //
@@ -171,7 +211,7 @@
     //
 
     coll.drop();
-    assert.writeOK(coll.insert({a: 5}));
+    assert.writeOK(coll.insert({a: 0}));
     let mapReduceOut = coll.mapReduce(
         function() {
             emit(this.a, 1);
@@ -179,7 +219,7 @@
         function(key, values) {
             return Array.sum(values);
         },
-        {out: {inline: 1}, query: {$expr: {$eq: ["$a", 5]}}});
+        {out: {inline: 1}, query: {$expr: {$eq: ["$a", 0]}}});
     assert.commandWorked(mapReduceOut);
     assert.eq(mapReduceOut.results.length, 1, tojson(mapReduceOut));
     assert.throws(function() {
@@ -192,17 +232,29 @@
             },
             {out: {inline: 1}, query: {$expr: {$eq: ["$a", "$$unbound"]}}});
     });
+    assert.throws(function() {
+        coll.mapReduce(
+            function() {
+                emit(this.a, 1);
+            },
+            function(key, values) {
+                return Array.sum(values);
+            },
+            {out: {inline: 1}, query: {$expr: {$divide: [1, "$a"]}}});
+    });
 
     //
     // $expr in remove.
     //
 
     coll.drop();
-    assert.writeOK(coll.insert({_id: 0, a: 5}));
-    let writeRes = coll.remove({_id: 0, $expr: {$eq: ["$a", 5]}});
+    assert.writeOK(coll.insert({_id: 0, a: 0}));
+    let writeRes = coll.remove({_id: 0, $expr: {$eq: ["$a", 0]}});
     assert.writeOK(writeRes);
     assert.eq(1, writeRes.nRemoved);
     assert.writeError(coll.remove({_id: 0, $expr: {$eq: ["$a", "$$unbound"]}}));
+    assert.writeOK(coll.insert({_id: 0, a: 0}));
+    assert.writeError(coll.remove({_id: 0, $expr: {$divide: [1, "$a"]}}));
 
     // Any writes preceding the write that fails to parse are executed.
     coll.drop();
@@ -222,12 +274,15 @@
 
     // $expr is allowed in the query when upsert=false.
     coll.drop();
-    assert.writeOK(coll.insert({_id: 0, a: 5}));
-    assert.writeOK(coll.update({_id: 0, $expr: {$eq: ["$a", 5]}}, {$set: {b: 6}}));
-    assert.eq({_id: 0, a: 5, b: 6}, coll.findOne({_id: 0}));
+    assert.writeOK(coll.insert({_id: 0, a: 0}));
+    assert.writeOK(coll.update({_id: 0, $expr: {$eq: ["$a", 0]}}, {$set: {b: 6}}));
+    assert.eq({_id: 0, a: 0, b: 6}, coll.findOne({_id: 0}));
 
     // $expr with unbound variable fails.
     assert.writeError(coll.update({_id: 0, $expr: {$eq: ["$a", "$$unbound"]}}, {$set: {b: 6}}));
+
+    // $expr with division by zero fails.
+    assert.writeError(coll.update({_id: 0, $expr: {$divide: [1, "$a"]}}, {$set: {b: 6}}));
 
     // $expr is not allowed in the query when upsert=true.
     coll.drop();
