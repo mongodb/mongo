@@ -32,6 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/algorithm/string.hpp>
+
 #include "mongo/db/repl/repl_set_command.h"
 
 #include "mongo/base/init.h"
@@ -248,23 +250,39 @@ private:
 
 namespace {
 HostAndPort someHostAndPortForMe() {
-    const char* ips = serverGlobalParams.bind_ip.c_str();
-    while (*ips) {
-        std::string ip;
-        const char* comma = strchr(ips, ',');
-        if (comma) {
-            ip = std::string(ips, comma - ips);
-            ips = comma + 1;
-        } else {
-            ip = std::string(ips);
-            ips = "";
-        }
-        HostAndPort h = HostAndPort(ip, serverGlobalParams.port);
-        if (!h.isLocalHost() && !h.isDefaultRoute()) {
-            return h;
+    const auto& bind_ip = serverGlobalParams.bind_ip;
+    const auto& bind_port = serverGlobalParams.port;
+    const auto& af = IPv6Enabled() ? AF_UNSPEC : AF_INET;
+    bool localhost_only = true;
+
+    std::vector<std::string> addrs;
+    boost::split(addrs, bind_ip, boost::is_any_of(","), boost::token_compress_on);
+    for (const auto& addr : addrs) {
+        // Get all addresses associated with each named bind host.
+        // If we find any that are valid external identifiers,
+        // then go ahead and use the first one.
+        const auto& socks = SockAddr::createAll(addr, bind_port, af);
+        for (const auto& sock : socks) {
+            if (!sock.isLocalHost()) {
+                if (!sock.isDefaultRoute()) {
+                    // Return the hostname as passed rather than the resolved address.
+                    return HostAndPort(addr, bind_port);
+                }
+                localhost_only = false;
+            }
         }
     }
 
+    if (localhost_only) {
+        // We're only binding localhost-type interfaces.
+        // Use one of those by name if available,
+        // otherwise fall back on "localhost".
+        return HostAndPort(addrs.size() ? addrs[0] : "localhost", bind_port);
+    }
+
+    // Based on the above logic, this is only reached for --bind_ip '0.0.0.0'.
+    // We are listening externally, but we don't have a definite hostname.
+    // Ask the OS.
     std::string h = getHostName();
     verify(!h.empty());
     verify(h != "localhost");

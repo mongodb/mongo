@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <iterator>
+
 #include "mongo/util/net/sockaddr.h"
 
 #if !defined(_WIN32)
@@ -211,6 +213,22 @@ bool SockAddr::isLocalHost() const {
     }
     fassert(16502, false);
     return false;
+}
+
+bool SockAddr::isDefaultRoute() const {
+    using std::begin;
+    using std::end;
+    switch (getType()) {
+        case AF_INET:
+            return as<sockaddr_in>().sin_addr.s_addr == 0;
+        case AF_INET6: {
+            const auto& addr6 = as<sockaddr_in6>().sin6_addr;
+            return std::all_of(
+                begin(addr6.s6_addr), end(addr6.s6_addr), [](const auto c) { return c == 0; });
+        }
+        default:
+            return false;
+    }
 }
 
 std::string SockAddr::toString(bool includePort) const {

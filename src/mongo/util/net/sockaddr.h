@@ -132,6 +132,7 @@ struct SockAddr {
     std::string getAddr() const;
 
     bool isLocalHost() const;
+    bool isDefaultRoute() const;
 
     bool operator==(const SockAddr& r) const;
 
