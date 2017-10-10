@@ -249,6 +249,14 @@ bool typeMatch(const BSONObj& obj) {
     return first.canonicalType() == second.canonicalType();
 }
 
+bool IndexBoundsBuilder::canUseCoveredMatching(const MatchExpression* expr,
+                                               const IndexEntry& index) {
+    IndexBoundsBuilder::BoundsTightness tightness;
+    OrderedIntervalList oil;
+    translate(expr, BSONElement{}, index, &oil, &tightness);
+    return tightness >= IndexBoundsBuilder::INEXACT_COVERED;
+}
+
 // static
 void IndexBoundsBuilder::translate(const MatchExpression* expr,
                                    const BSONElement& elt,

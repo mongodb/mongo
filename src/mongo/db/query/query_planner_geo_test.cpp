@@ -1531,4 +1531,66 @@ TEST_F(QueryPlanner2dsphereVersionTest, NegationWithoutGeoPredCannotUseGeoIndex)
     testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
 }
 
+TEST_F(QueryPlannerTest, 2dInexactFetchPredicateOverTrailingFieldHandledCorrectly) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    addIndex(BSON("a"
+                  << "2d"
+                  << "b"
+                  << 1));
+
+    runQuery(fromjson("{a: {$geoWithin: {$center: [[0, 0], 1]}}, b: {$exists: true}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$geoWithin: {$center: [[0, 0], 1]}}, b: {$exists: true}}, node: "
+        "{ixscan: {filter: null, pattern: {a: '2d', b: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dInexactFetchPredicateOverTrailingFieldHandledCorrectlyMultikey) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    const bool multikey = true;
+    addIndex(BSON("a"
+                  << "2d"
+                  << "b"
+                  << 1),
+             multikey);
+
+    runQuery(fromjson("{a: {$geoWithin: {$center: [[0, 0], 1]}}, b: {$exists: true}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$geoWithin: {$center: [[0, 0], 1]}}, b: {$exists: true}}, node: "
+        "{ixscan: {filter: null, pattern: {a: '2d', b: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dNearInexactFetchPredicateOverTrailingFieldHandledCorrectly) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    addIndex(BSON("a"
+                  << "2d"
+                  << "b"
+                  << 1));
+
+    runQuery(fromjson("{a: {$near: [0, 0]}, b: {$exists: true}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: {$exists: true}}, node: {geoNear2d: {a: '2d', b: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dNearInexactFetchPredicateOverTrailingFieldMultikey) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    const bool multikey = true;
+    addIndex(BSON("a"
+                  << "2d"
+                  << "b"
+                  << 1),
+             multikey);
+
+    runQuery(fromjson("{a: {$near: [0, 0]}, b: {$exists: true}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: {$exists: true}}, node: {geoNear2d: {a: '2d', b: 1}}}}");
+}
+
 }  // namespace
