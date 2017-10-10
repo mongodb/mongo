@@ -70,6 +70,17 @@ public:
     static void allValuesForField(const BSONElement& elt, OrderedIntervalList* out);
 
     /**
+     * Returns true if 'expr' can correctly be assigned as an INEXACT_COVERED predicate to an index
+     * scan over 'index'.
+     *
+     * The result of this function is not meaningful when the predicate applies to special fields
+     * such as "hashed", "2d", or "2dsphere". That is, the caller is responsible for ensuring that
+     * 'expr' is a candidate for covered matching over a regular ascending/descending field of the
+     * index.
+     */
+    static bool canUseCoveredMatching(const MatchExpression* expr, const IndexEntry& index);
+
+    /**
      * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr' is
      * concerned with is indexed according to the keypattern element 'elt' from index 'index'.
      *

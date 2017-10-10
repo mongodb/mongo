@@ -487,4 +487,62 @@ TEST_F(QueryPlannerTest, PredicatesOverLeadingFieldsWithSharedPathPrefixHandledC
         "{text: {search: 'foo', prefix: {'a.x': 1, 'a.y': 2, 'b.x': 3, 'b.y': 4}}}");
 }
 
+TEST_F(QueryPlannerTest, EqualityToArrayOverLeadingFieldHandledCorrectly) {
+    addIndex(BSON("a" << 1 << "_fts"
+                      << "text"
+                      << "_ftsx"
+                      << 1));
+
+    runQuery(fromjson("{a: [1, 2, 3], $text: {$search: 'foo'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{text: {search: 'foo', prefix: {a: [1, 2, 3]}}}");
+}
+
+TEST_F(QueryPlannerTest, EqualityToArrayOverLeadingFieldHandledCorrectlyWithMultikeyTrue) {
+    const bool multikey = true;
+    addIndex(BSON("a" << 1 << "_fts"
+                      << "text"
+                      << "_ftsx"
+                      << 1),
+             multikey);
+
+    runQuery(fromjson("{a: [1, 2, 3], $text: {$search: 'foo'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{text: {search: 'foo', prefix: {a: [1, 2, 3]}}}");
+}
+
+TEST_F(QueryPlannerTest, InexactFetchPredicateOverTrailingFieldHandledCorrectly) {
+    addIndex(BSON("a" << 1 << "_fts"
+                      << "text"
+                      << "_ftsx"
+                      << 1
+                      << "b"
+                      << 1));
+
+    runQuery(fromjson("{a: 3, $text: {$search: 'foo'}, b: {$exists: true}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: {$exists: true}}, node: {text: {search: 'foo', prefix: {a: 3}}}}}");
+}
+
+TEST_F(QueryPlannerTest, InexactFetchPredicateOverTrailingFieldHandledCorrectlyMultikeyTrue) {
+    const bool multikey = true;
+    addIndex(BSON("a" << 1 << "_fts"
+                      << "text"
+                      << "_ftsx"
+                      << 1
+                      << "b"
+                      << 1),
+             multikey);
+
+    runQuery(fromjson("{a: 3, $text: {$search: 'foo'}, b: {$exists: true}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: {$exists: true}}, node: {text: {search: 'foo', prefix: {a: 3}}}}}");
+}
+
 }  // namespace

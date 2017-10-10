@@ -250,6 +250,13 @@ struct TextNode : public QuerySolutionNode {
     IndexEntry index;
     std::unique_ptr<fts::FTSQuery> ftsQuery;
 
+    // The number of fields in the prefix of the text index. For example, if the key pattern is
+    //
+    //   { a: 1, b: 1, _fts: "text", _ftsx: 1, c: 1 }
+    //
+    // then the number of prefix fields is 2, because of "a" and "b".
+    size_t numPrefixFields = 0u;
+
     // "Prefix" fields of a text index can handle equality predicates.  We group them with the
     // text node while creating the text leaf node and convert them into a BSONObj index prefix
     // when we finish the text leaf node.

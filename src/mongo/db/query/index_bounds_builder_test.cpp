@@ -2209,4 +2209,54 @@ TEST(IndexBoundsBuilderTest, RedundantTypeNumberHasCorrectBounds) {
     ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
 }
 
+TEST(IndexBoundsBuilderTest, CanUseCoveredMatchingForEqualityPredicate) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$eq: 3}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    ASSERT_TRUE(IndexBoundsBuilder::canUseCoveredMatching(expr.get(), testIndex));
+}
+
+TEST(IndexBoundsBuilderTest, CannotUseCoveredMatchingForEqualityToArrayPredicate) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$eq: [1, 2, 3]}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    ASSERT_FALSE(IndexBoundsBuilder::canUseCoveredMatching(expr.get(), testIndex));
+}
+
+TEST(IndexBoundsBuilderTest, CannotUseCoveredMatchingForEqualityToNullPredicate) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: null}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    ASSERT_FALSE(IndexBoundsBuilder::canUseCoveredMatching(expr.get(), testIndex));
+}
+
+TEST(IndexBoundsBuilderTest, CannotUseCoveredMatchingForTypeArrayPredicate) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$type: 'array'}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    ASSERT_FALSE(IndexBoundsBuilder::canUseCoveredMatching(expr.get(), testIndex));
+}
+
+TEST(IndexBoundsBuilderTest, CannotUseCoveredMatchingForExistsTruePredicate) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$exists: true}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    ASSERT_FALSE(IndexBoundsBuilder::canUseCoveredMatching(expr.get(), testIndex));
+}
+
+TEST(IndexBoundsBuilderTest, CannotUseCoveredMatchingForExistsFalsePredicate) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$exists: false}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    ASSERT_FALSE(IndexBoundsBuilder::canUseCoveredMatching(expr.get(), testIndex));
+}
+
+TEST(IndexBoundsBuilderTest, CanUseCoveredMatchingForExistsTrueWithSparseIndex) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    testIndex.sparse = true;
+    BSONObj obj = fromjson("{a: {$exists: true}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    ASSERT_TRUE(IndexBoundsBuilder::canUseCoveredMatching(expr.get(), testIndex));
+}
+
 }  // namespace

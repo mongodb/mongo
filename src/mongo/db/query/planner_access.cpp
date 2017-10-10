@@ -227,6 +227,17 @@ QuerySolutionNode* QueryPlannerAccess::makeLeafNode(
         TextMatchExpressionBase* textExpr = static_cast<TextMatchExpressionBase*>(expr);
         TextNode* ret = new TextNode(index);
         ret->ftsQuery = textExpr->getFTSQuery().clone();
+
+        // Count the number of prefix fields before the "text" field.
+        for (auto&& keyPatternElt : ret->index.keyPattern) {
+            // We know that the only key pattern with a type of String is the _fts field
+            // which is immediately after all prefix fields.
+            if (BSONType::String == keyPatternElt.type()) {
+                break;
+            }
+            ++(ret->numPrefixFields);
+        }
+
         return ret;
     } else {
         // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()
@@ -338,10 +349,24 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
 
     const StageType type = node->getType();
 
-    // Text data is covered, but not exactly.  Text covering is unlike any other covering
-    // so we deal with it in addFilterToSolutionNode.
     if (STAGE_TEXT == type) {
-        scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
+        auto textNode = static_cast<TextNode*>(node);
+
+        if (pos < textNode->numPrefixFields) {
+            // This predicate is assigned to one of the prefix fields of the text index. Such
+            // predicates must always be equalities and must always be attached to the TEXT node. In
+            // order to ensure this happens, we assign INEXACT_COVERED tightness.
+            scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
+        } else {
+            // The predicate is assigned to one of the trailing fields of the text index. We
+            // currently don't generate bounds for predicates assigned to trailing fields of a text
+            // index, but rather attempt to attach a covered filter. However, certain predicates can
+            // never be correctly covered (e.g. $exists), so we assign the tightness accordingly.
+            scanState->tightness = IndexBoundsBuilder::canUseCoveredMatching(expr, index)
+                ? IndexBoundsBuilder::INEXACT_COVERED
+                : IndexBoundsBuilder::INEXACT_FETCH;
+        }
+
         return;
     }
 
@@ -350,20 +375,23 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     if (STAGE_GEO_NEAR_2D == type) {
         invariant(INDEX_2D == index.type);
 
-        // 2D indexes are weird - the "2d" field stores a normally-indexed BinData field, but
-        // additional array fields are *not* exploded into multi-keys - they are stored directly
-        // as arrays in the index.  Also, no matter what the index expression, the "2d" field is
-        // always first.
-        // This means that we can only generically accumulate bounds for 2D indexes over the
-        // first "2d" field (pos == 0) - MatchExpressions over other fields in the 2D index may
-        // be covered (can be evaluated using only the 2D index key).  The additional fields
-        // must not affect the index scan bounds, since they are not stored in an
-        // IndexScan-compatible format.
+        // 2D indexes have a special format - the "2d" field stores a normally-indexed BinData
+        // field, but additional array fields are *not* exploded into multi-keys - they are stored
+        // directly as arrays in the index.  Also, no matter what the index expression, the "2d"
+        // field is always first.
+        //
+        // This means that we can only generically accumulate bounds for 2D indexes over the first
+        // "2d" field (pos == 0) - MatchExpressions over other fields in the 2D index may be covered
+        // (can be evaluated using only the 2D index key).  The additional fields must not affect
+        // the index scan bounds, since they are not stored in an IndexScan-compatible format.
 
         if (pos > 0) {
-            // Marking this field as covered allows the planner to accumulate a MatchExpression
-            // over the returned 2D index keys instead of adding to the index bounds.
-            scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
+            // The predicate is over a trailing field of the "2d" index. If possible, we assign it
+            // as a covered filter (the INEXACT_COVERED case). Otherwise, the filter must be
+            // evaluated after fetching the full documents.
+            scanState->tightness = IndexBoundsBuilder::canUseCoveredMatching(expr, index)
+                ? IndexBoundsBuilder::INEXACT_COVERED
+                : IndexBoundsBuilder::INEXACT_FETCH;
             return;
         }
 
@@ -377,10 +405,15 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
         verify(type == STAGE_IXSCAN);
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);
 
-        // See STAGE_GEO_NEAR_2D above - 2D indexes can only accumulate scan bounds over the
-        // first "2d" field (pos == 0)
+        // See STAGE_GEO_NEAR_2D above - 2D indexes can only accumulate scan bounds over the first
+        // "2d" field (pos == 0).
         if (INDEX_2D == index.type && pos > 0) {
-            scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
+            // The predicate is over a trailing field of the "2d" index. If possible, we assign it
+            // as a covered filter (the INEXACT_COVERED case). Otherwise, the filter must be
+            // evaluated after fetching the full documents.
+            scanState->tightness = IndexBoundsBuilder::canUseCoveredMatching(expr, index)
+                ? IndexBoundsBuilder::INEXACT_COVERED
+                : IndexBoundsBuilder::INEXACT_FETCH;
             return;
         }
 
@@ -419,25 +452,9 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
 void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntry& index) {
     TextNode* tn = static_cast<TextNode*>(node);
 
-    // Figure out what positions are prefix positions.  We build an index key prefix from
-    // the predicates over the text index prefix keys.
-    // For example, say keyPattern = { a: 1, _fts: "text", _ftsx: 1, b: 1 }
-    // prefixEnd should be 1.
-    size_t prefixEnd = 0;
-    BSONObjIterator it(tn->index.keyPattern);
-    // Count how many prefix terms we have.
-    while (it.more()) {
-        // We know that the only key pattern with a type of String is the _fts field
-        // which is immediately after all prefix fields.
-        if (String == it.next().type()) {
-            break;
-        }
-        ++prefixEnd;
-    }
-
     // If there's no prefix, the filter is already on the node and the index prefix is null.
     // We can just return.
-    if (!prefixEnd) {
+    if (!tn->numPrefixFields) {
         return;
     }
 
@@ -451,7 +468,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
 
     if (MatchExpression::AND != textFilterMe->matchType()) {
         // Only one prefix term.
-        invariant(1 == prefixEnd);
+        invariant(1u == tn->numPrefixFields);
         // Sanity check: must be an EQ.
         invariant(MatchExpression::EQ == textFilterMe->matchType());
 
@@ -463,10 +480,10 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
 
         // Indexed by the keyPattern position index assignment.  We want to add
         // prefixes in order but we must order them first.
-        vector<MatchExpression*> prefixExprs(prefixEnd, NULL);
+        vector<MatchExpression*> prefixExprs(tn->numPrefixFields, nullptr);
 
         AndMatchExpression* amExpr = static_cast<AndMatchExpression*>(textFilterMe);
-        invariant(amExpr->numChildren() >= prefixEnd);
+        invariant(amExpr->numChildren() >= tn->numPrefixFields);
 
         // Look through the AND children.  The prefix children we want to
         // stash in prefixExprs.
@@ -477,7 +494,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
             invariant(NULL != ixtag);
             // Skip this child if it's not part of a prefix, or if we've already assigned a
             // predicate to this prefix position.
-            if (ixtag->pos >= prefixEnd || prefixExprs[ixtag->pos] != NULL) {
+            if (ixtag->pos >= tn->numPrefixFields || prefixExprs[ixtag->pos] != NULL) {
                 ++curChild;
                 continue;
             }
