@@ -204,6 +204,18 @@
     assert.eq(1, writeRes.nRemoved);
     assert.writeError(coll.remove({_id: 0, $expr: {$eq: ["$a", "$$unbound"]}}));
 
+    // Any writes preceding the write that fails to parse are executed.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 0}));
+    assert.writeOK(coll.insert({_id: 1}));
+    writeRes = db.runCommand({
+        delete: coll.getName(),
+        deletes: [{q: {_id: 0}, limit: 1}, {q: {$expr: "$$unbound"}, limit: 1}]
+    });
+    assert.commandWorked(writeRes);
+    assert.eq(writeRes.writeErrors[0].code, 17276, tojson(writeRes));
+    assert.eq(writeRes.n, 1, tojson(writeRes));
+
     //
     // $expr in update.
     //
@@ -236,4 +248,16 @@
                                       {$set: {"a.$[i].b": 6}},
                                       {arrayFilters: [{"i.b": 5, $expr: {$eq: ["$i.b", 5]}}]}));
     }
+
+    // Any writes preceding the write that fails to parse are executed.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 0}));
+    assert.writeOK(coll.insert({_id: 1}));
+    writeRes = db.runCommand({
+        update: coll.getName(),
+        updates: [{q: {_id: 0}, u: {$set: {b: 6}}}, {q: {$expr: "$$unbound"}, u: {$set: {b: 6}}}]
+    });
+    assert.commandWorked(writeRes);
+    assert.eq(writeRes.writeErrors[0].code, 17276, tojson(writeRes));
+    assert.eq(writeRes.n, 1, tojson(writeRes));
 })();

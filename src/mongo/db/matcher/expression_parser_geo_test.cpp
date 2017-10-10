@@ -78,12 +78,11 @@ TEST(MatchExpressionParserGeoNear, ParseNearExtraField) {
         "$geometry:{type:\"Point\", coordinates:[0,0]}}, foo: 1}}");
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(MatchExpressionParser::parse(query,
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                expCtx,
                                                ExtensionsCallbackNoop(),
                                                MatchExpressionParser::kAllowAllSpecialFeatures)
-                      .status_with_transitional_ignore(),
-                  AssertionException);
+                      .getStatus());
 }
 
 // For $near, $nearSphere, and $geoNear syntax of:
@@ -132,32 +131,29 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidNear) {
     {
         BSONObj query = fromjson("{loc: {$near: [0,0], $maxDistance: {}}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
     {
         BSONObj query = fromjson("{loc: {$near: [0,0], $minDistance: {}}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
     {
         BSONObj query = fromjson("{loc: {$near: [0,0], $eq: 40}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
     {
         BSONObj query = fromjson("{loc: {$eq: 40, $near: [0,0]}}");
@@ -173,12 +169,11 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidNear) {
         BSONObj query = fromjson(
             "{loc: {$near: [0,0], $geoWithin: {$geometry: {type: \"Polygon\", coordinates: []}}}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
     {
         BSONObj query = fromjson("{loc: {$near: {$foo: 1}}}");
@@ -242,32 +237,29 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidGeoNear) {
     {
         BSONObj query = fromjson("{loc: {$geoNear: [0,0], $eq: 1}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
     {
         BSONObj query = fromjson("{loc: {$geoNear: [0,0], $maxDistance: {}}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
     {
         BSONObj query = fromjson("{loc: {$geoNear: [0,0], $minDistance: {}}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
 }
 
@@ -311,32 +303,29 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidNearSphere) {
     {
         BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $maxDistance: {}}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
     {
         BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $minDistance: {}}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
     {
         BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $eq: 1}}");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        ASSERT_THROWS(MatchExpressionParser::parse(query,
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
                                                    expCtx,
                                                    ExtensionsCallbackNoop(),
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
-                          .status_with_transitional_ignore(),
-                      AssertionException);
+                          .getStatus());
     }
 }
 

@@ -129,8 +129,12 @@ public:
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
         AllowedFeatureSet allowedFeatures = kDefaultSpecialFeatures) {
         invariant(expCtx.get());
-        return MatchExpressionParser(&extensionsCallback)
-            ._parse(obj, expCtx, allowedFeatures, DocumentParseLevel::kPredicateTopLevel);
+        try {
+            return MatchExpressionParser(&extensionsCallback)
+                ._parse(obj, expCtx, allowedFeatures, DocumentParseLevel::kPredicateTopLevel);
+        } catch (const DBException& ex) {
+            return {ex.toStatus()};
+        }
     }
 
     /**
