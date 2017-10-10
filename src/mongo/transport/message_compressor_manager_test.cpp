@@ -134,10 +134,10 @@ void checkFidelity(const Message& msg, std::unique_ptr<MessageCompressorBase> co
 void checkOverflow(std::unique_ptr<MessageCompressorBase> compressor) {
     // This is our test data that we're going to try to compress/decompress into a buffer that's
     // way too small.
-    const auto data = std::string{
+    const std::string data =
         "We embrace reality. We apply high-quality thinking and rigor."
         "We have courage in our convictions but work hard to ensure biases "
-        "or personal beliefs do not get in the way of finding the best solution."};
+        "or personal beliefs do not get in the way of finding the best solution.";
     ConstDataRange input(data.data(), data.size());
 
     // This is our tiny buffer that should cause an error.
@@ -147,8 +147,9 @@ void checkOverflow(std::unique_ptr<MessageCompressorBase> compressor) {
     // This is a normal sized buffer that we can store a compressed version of our test data safely
     std::vector<char> normalBuffer;
     normalBuffer.resize(compressor->getMaxCompressedSize(data.size()));
-    DataRange normalRange(normalBuffer.data(), normalBuffer.size());
-    ASSERT_OK(compressor->compressData(input, normalRange));
+    auto sws = compressor->compressData(input, DataRange(normalBuffer.data(), normalBuffer.size()));
+    ASSERT_OK(sws);
+    DataRange normalRange = DataRange(normalBuffer.data(), sws.getValue());
 
     // Check that compressing the test data into a small buffer fails
     ASSERT_NOT_OK(compressor->compressData(input, smallOutput));
