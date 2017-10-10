@@ -105,6 +105,19 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="establish_cursors_test",
+    source=[
+        "establish_cursors_test.cpp",
+    ],
+    LIBDEPS=[
+        'async_results_merger',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture',
+    ],
+)
 env.Library(
     target="store_possible_cursor",
     source=[
