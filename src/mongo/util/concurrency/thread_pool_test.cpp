@@ -240,6 +240,8 @@ DEATH_TEST(ThreadPoolTest,
 }
 
 TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks) {
+    unittest::Barrier barrier(2U);
+
     bool onCreateThreadCalled = false;
     std::string taskThreadName;
     ThreadPool::Options options;
@@ -251,9 +253,9 @@ TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks)
         taskThreadName = threadName;
     };
 
-    auto& pool = makePool(options);
+    ThreadPool pool(options);
     pool.startup();
-    unittest::Barrier barrier(2U);
+
     ASSERT_OK(pool.schedule([&barrier] { barrier.countDownAndWait(); }));
     barrier.countDownAndWait();
 
