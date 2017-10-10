@@ -20,14 +20,15 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_DECL_TIMESTAMP(rollback_timestamp)
-	WT_ITEM las_addr, las_key, las_timestamp;
+	WT_ITEM las_key, las_timestamp, las_value;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t las_counter, las_txnid, remove_cnt;
+	uint64_t las_counter, las_pageid, las_total, las_txnid;
 	uint32_t las_id, session_flags;
+	uint8_t upd_type;
 
 	conn = S2C(session);
 	cursor = NULL;
-	remove_cnt = 0;
+	las_total = 0;
 	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
 	WT_CLEAR(las_timestamp);
 
@@ -40,7 +41,7 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	txn_global = &conn->txn_global;
 	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
 	    __wt_timestamp_set(
-		&rollback_timestamp, &txn_global->stable_timestamp));
+	    &rollback_timestamp, &txn_global->stable_timestamp));
 
 	__wt_las_cursor(session, &cursor, &session_flags);
 
@@ -49,8 +50,8 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 
 	/* Walk the file. */
 	for (; (ret = cursor->next(cursor)) == 0; ) {
-		WT_ERR(cursor->get_key(cursor, &las_id, &las_addr, &las_counter,
-		    &las_txnid, &las_timestamp, &las_key));
+		WT_ERR(cursor->get_key(cursor,
+		    &las_id, &las_pageid, &las_counter, &las_key));
 
 		/* Check the file ID so we can skip durable tables */
 		if (las_id >= conn->stable_rollback_maxfile)
@@ -60,27 +61,23 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 		if (__bit_test(conn->stable_rollback_bitstring, las_id))
 			continue;
 
+		WT_ERR(cursor->get_value(cursor,
+		    &las_txnid, &las_timestamp, &upd_type, &las_value));
+
 		/*
 		 * Entries with no timestamp will have a timestamp of zero,
 		 * which will fail the following check and cause them to never
 		 * be removed.
 		 */
 		if (__wt_timestamp_cmp(
-		    &rollback_timestamp, las_timestamp.data) < 0) {
+		    &rollback_timestamp, las_timestamp.data) < 0)
 			WT_ERR(cursor->remove(cursor));
-			++remove_cnt;
-		}
+		else
+			++las_total;
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
-	/*
-	 * If there were races to remove records, we can over-count. Underflow
-	 * isn't fatal, but check anyway so we don't skew low over time.
-	 */
-	if (remove_cnt > conn->las_record_cnt)
-		conn->las_record_cnt = 0;
-	else if (remove_cnt > 0)
-		(void)__wt_atomic_sub64(&conn->las_record_cnt, remove_cnt);
+	WT_STAT_CONN_SET(session, cache_lookaside_entries, las_total);
 
 	F_CLR(session, WT_SESSION_NO_CACHE);
 
@@ -303,6 +300,20 @@ __txn_rollback_to_stable_btree_walk(
 }
 
 /*
+ * __txn_rollback_eviction_drain --
+ *	Wait for eviction to drain from a tree.
+ */
+static int
+__txn_rollback_eviction_drain(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_UNUSED(cfg);
+
+	WT_RET(__wt_evict_file_exclusive_on(session));
+	__wt_evict_file_exclusive_off(session);
+	return (0);
+}
+
+/*
  * __txn_rollback_to_stable_btree --
  *	Called for each open handle - choose to either skip or wipe the commits
  */
@@ -422,7 +433,19 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	WT_RET(__txn_rollback_to_stable_check(session));
+
+	/*
+	 * Mark that a rollback operation is in progress and wait for eviction
+	 * to drain.  This is necessary because lookaside eviction uses
+	 * transactions and causes the check for a quiescent system to fail.
+	 */
+	F_SET(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
+	WT_ERR(__wt_conn_btree_apply(session,
+	    NULL, __txn_rollback_eviction_drain, NULL, cfg));
+
+	WT_ERR(__txn_rollback_to_stable_check(session));
+
+	F_CLR(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
 
 	/*
 	 * Allocate a non-durable btree bitstring.  We increment the global
@@ -430,7 +453,7 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 	 * hence we need to add one here.
 	 */
 	conn->stable_rollback_maxfile = conn->next_file_id + 1;
-	WT_RET(__bit_alloc(session,
+	WT_ERR(__bit_alloc(session,
 	    conn->stable_rollback_maxfile, &conn->stable_rollback_bitstring));
 	WT_ERR(__wt_conn_btree_apply(session,
 	    NULL, __txn_rollback_to_stable_btree, NULL, cfg));
@@ -442,7 +465,9 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 	 * lookaside records should be removed.
 	 */
 	WT_ERR(__txn_rollback_to_stable_lookaside_fixup(session));
-err:	__wt_free(session, conn->stable_rollback_bitstring);
+
+err:	F_CLR(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
+	__wt_free(session, conn->stable_rollback_bitstring);
 	return (ret);
 #endif
 }

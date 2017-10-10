@@ -588,8 +588,12 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * and copy the full keys, then free the page. We do this on
 		 * every leaf page, and if you need to speed up the salvage,
 		 * it's probably a great place to start.
+		 *
+		 * Page flags are 0 because we aren't releasing the memory used
+		 * to read the page into memory and we don't want page discard
+		 * to free it.
 		 */
-		WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, 0, &page));
+		WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, &page));
 		WT_ERR(__wt_row_leaf_key_copy(session,
 		    page, &page->pg_row[0], &trk->row_start));
 		WT_ERR(__wt_row_leaf_key_copy(session,
@@ -1285,7 +1289,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
-	WT_ERR(__wt_reconcile(session, ref, cookie, WT_VISIBILITY_ERR, NULL));
+	WT_ERR(__wt_reconcile(
+	    session, ref, cookie, WT_REC_VISIBILITY_ERR, NULL));
 
 	/* Reset the page. */
 	page->pg_var = save_col_var;
@@ -1735,10 +1740,13 @@ __slvg_row_trk_update_start(
 	 * Read and instantiate the WT_TRACK page (we don't have to verify the
 	 * page, nor do we have to be quiet on error, we've already read this
 	 * page successfully).
+	 *
+	 * Page flags are 0 because we aren't releasing the memory used to read
+	 * the page into memory and we don't want page discard to free it.
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->trk_size, &dsk));
 	WT_ERR(__wt_bt_read(session, dsk, trk->trk_addr, trk->trk_addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, dsk->mem, 0, 0, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, dsk->data, 0, &page));
 
 	/*
 	 * Walk the page, looking for a key sorting greater than the specified
@@ -1998,7 +2006,8 @@ __slvg_row_build_leaf(
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
-	WT_ERR(__wt_reconcile(session, ref, cookie, WT_VISIBILITY_ERR, NULL));
+	WT_ERR(__wt_reconcile(
+	    session, ref, cookie, WT_REC_VISIBILITY_ERR, NULL));
 
 	/* Reset the page. */
 	page->entries += skip_stop;

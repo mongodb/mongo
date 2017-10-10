@@ -1303,19 +1303,20 @@ __wt_page_can_evict(
 	 */
 	if (__wt_leaf_page_can_split(session, page)) {
 		if (evict_flagsp != NULL)
-			FLD_SET(*evict_flagsp, WT_EVICT_INMEM_SPLIT);
+			FLD_SET(*evict_flagsp, WT_REC_INMEM_SPLIT);
 		return (true);
 	}
 
 	modified = __wt_page_is_modified(page);
 
 	/*
-	 * If the file is being checkpointed, we can't evict dirty pages:
-	 * if we write a page and free the previous version of the page, that
+	 * If the file is being checkpointed, other threads can't evict dirty
+	 * pages: if a page is written and the previous version freed, that
 	 * previous version might be referenced by an internal page already
-	 * been written in the checkpoint, leaving the checkpoint inconsistent.
+	 * written in the checkpoint, leaving the checkpoint inconsistent.
 	 */
-	if (modified && btree->checkpointing != WT_CKPT_OFF) {
+	if (modified && btree->checkpointing != WT_CKPT_OFF &&
+	    !WT_SESSION_IS_CHECKPOINT(session)) {
 		WT_STAT_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_DATA_INCR(session, cache_eviction_checkpoint);
 		return (false);

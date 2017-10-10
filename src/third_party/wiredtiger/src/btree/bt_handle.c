@@ -398,6 +398,29 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	else
 		btree->checksum = CKSUM_UNCOMPRESSED;
 
+	/* Debugging information */
+	WT_RET(__wt_config_gets(session,
+	    cfg, "assert.commit_timestamp", &cval));
+	if (WT_STRING_MATCH("always", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS);
+		FLD_CLR(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER);
+	} else if (WT_STRING_MATCH("never", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER);
+		FLD_CLR(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS);
+	} else
+		FLD_CLR(btree->assert_flags,
+		    WT_ASSERT_COMMIT_TS_ALWAYS | WT_ASSERT_COMMIT_TS_NEVER);
+	WT_RET(__wt_config_gets(session, cfg, "assert.read_timestamp", &cval));
+	if (WT_STRING_MATCH("always", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS);
+		FLD_CLR(btree->assert_flags, WT_ASSERT_READ_TS_NEVER);
+	} else if (WT_STRING_MATCH("never", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_READ_TS_NEVER);
+		FLD_CLR(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS);
+	} else
+		FLD_CLR(btree->assert_flags,
+		    WT_ASSERT_READ_TS_ALWAYS | WT_ASSERT_READ_TS_NEVER);
+
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session));
 
@@ -549,7 +572,7 @@ __wt_btree_tree_open(
 	 * the allocated copy of the disk image on return, the in-memory object
 	 * steals it.
 	 */
-	WT_ERR(__wt_page_inmem(session, NULL, dsk.data, dsk.memsize,
+	WT_ERR(__wt_page_inmem(session, NULL, dsk.data,
 	    WT_DATA_IN_ITEM(&dsk) ?
 	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 	dsk.mem = NULL;

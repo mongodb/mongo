@@ -102,8 +102,6 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 static void
 __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 {
-	int i;
-
 	/*
 	 * Stop any new work units being added. The barrier is necessary
 	 * because we rely on the state change being visible before checking
@@ -118,8 +116,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 	 * we know a user is holding a reference to the tree, so exclusive
 	 * access is not available.
 	 */
-	for (i = 0;
-	    lsm_tree->queue_ref > 0 || (final && lsm_tree->refcnt > 1); ++i) {
+	while (lsm_tree->queue_ref > 0 || (final && lsm_tree->refcnt > 1)) {
 		/*
 		 * Remove any work units from the manager queues. Do this step
 		 * repeatedly in case a work unit was in the process of being
@@ -133,10 +130,8 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 		 * other schema level operations will return EBUSY, even though
 		 * we're dropping the schema lock here.
 		 */
-		if (i % WT_THOUSAND == 0)
-			WT_WITHOUT_LOCKS(session,
-			    __wt_lsm_manager_clear_tree(session, lsm_tree));
-		__wt_yield();
+		WT_WITHOUT_LOCKS(session,
+		    __wt_lsm_manager_clear_tree(session, lsm_tree));
 	}
 }
 

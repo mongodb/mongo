@@ -36,6 +36,8 @@ extern "C" {
 }
 #endif
 
+#define	RANDOMIZER_SIZE  5    /* ":000:" prefix */
+
 namespace workgen {
 
 // A 'tint' or ('table integer') is a unique small value integer
@@ -126,7 +128,7 @@ struct ThreadRunner {
     int run();
 
     void op_create_all(Operation *, size_t &keysize, size_t &valuesize);
-    uint64_t op_get_key_recno(Operation *, tint_t tint);
+    uint64_t op_get_key_recno(Operation *, uint64_t range, tint_t tint);
     void op_get_static_counts(Operation *, Stats &, int);
     int op_run(Operation *);
 
@@ -153,11 +155,18 @@ struct Monitor {
     int run();
 };
 
+struct TableRuntime {
+    uint64_t _max_recno;                           // highest recno allocated
+    bool _disjoint;                                // does key space have holes?
+
+    TableRuntime() : _max_recno(0), _disjoint(0) {}
+};
+
 struct ContextInternal {
     std::map<std::string, tint_t> _tint;           // maps uri -> tint_t
     std::map<tint_t, std::string> _table_names;    // reverse mapping
-    uint64_t *_recno;                              // # entries per tint_t
-    uint32_t _recno_alloced;                       // length of allocated _recno
+    TableRuntime *_table_runtime;                  // # entries per tint_t
+    uint32_t _runtime_alloced;                     // length of _table_runtime
     tint_t _tint_last;                             // last tint allocated
     // unique id per context, to work with multiple contexts, starts at 1.
     uint32_t _context_count;

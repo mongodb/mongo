@@ -23,8 +23,9 @@ struct __wt_thread {
 	 */
 #define	WT_THREAD_ACTIVE	0x01	/* thread is active or paused */
 #define	WT_THREAD_CAN_WAIT	0x02	/* WT_SESSION_CAN_WAIT */
-#define	WT_THREAD_PANIC_FAIL	0x04	/* panic if the thread fails */
-#define	WT_THREAD_RUN		0x08	/* thread is running */
+#define	WT_THREAD_LOOKASIDE	0x04	/* open lookaside cursor */
+#define	WT_THREAD_PANIC_FAIL	0x08	/* panic if the thread fails */
+#define	WT_THREAD_RUN		0x10	/* thread is running */
 	uint32_t flags;
 
 	/*

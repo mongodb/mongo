@@ -30,6 +30,7 @@
 
 #include <signal.h>
 
+extern bool use_txn;				/* Operations with user txn */
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
 
 extern u_int nops;				/* Operations per thread */

@@ -1084,6 +1084,9 @@ err:	/*
 			WT_TRET(wt_session->close(wt_session, config));
 		}
 
+	/* Shut down transactions (wait for in-flight operations to complete. */
+	WT_TRET(__wt_txn_global_shutdown(session));
+
 	/*
 	 * Perform a system-wide checkpoint so that all tables are consistent
 	 * with each other.  All transactions are resolved but ignore

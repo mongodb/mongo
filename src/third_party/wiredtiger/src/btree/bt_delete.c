@@ -85,12 +85,6 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	/*
 	 * Atomically switch the page's state to lock it.  If the page is not
 	 * on-disk, other threads may be using it, no fast delete.
-	 *
-	 * Possible optimization: if the page is already deleted and the delete
-	 * is visible to us (the delete has been committed), we could skip the
-	 * page instead of instantiating it and figuring out there are no rows
-	 * in the page.  While that's a huge amount of work to no purpose, it's
-	 * unclear optimizing for overlapping range deletes is worth the effort.
 	 */
 	if (ref->state != WT_REF_DISK ||
 	    !__wt_atomic_casv32(&ref->state, WT_REF_DISK, WT_REF_LOCKED))
@@ -164,6 +158,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 	for (sleep_count = yield_count = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
+		case WT_REF_LOOKASIDE:
 		case WT_REF_READING:
 			WT_ASSERT(session, 0);		/* Impossible, assert */
 			break;

@@ -89,17 +89,24 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	WT_RET(__wt_session_create(session, WT_LAS_URI, WT_LAS_FORMAT));
 
 	/*
+	 * Flag that the lookaside table has been created (before creating the
+	 * connection's lookaside table session, it checks before creating a
+	 * lookaside table cursor.
+	 */
+	F_SET(conn, WT_CONN_LAS_OPEN);
+
+	/*
 	 * Open a shared internal session used to access the lookaside table.
 	 * This session should never be tapped for eviction.
 	 */
 	session_flags = WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION;
-	WT_RET(__wt_open_internal_session(
+	WT_ERR(__wt_open_internal_session(
 	    conn, "lookaside table", true, session_flags, &conn->las_session));
 
-	/* Flag that the lookaside table has been created. */
-	F_SET(conn, WT_CONN_LAS_OPEN);
-
 	return (0);
+
+err:	F_CLR(conn, WT_CONN_LAS_OPEN);
+	return (ret);
 }
 
 /*
@@ -124,38 +131,6 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	conn->las_session = NULL;
 
 	return (ret);
-}
-
-/*
- * __wt_las_set_written --
- *	Flag that the lookaside table has been written.
- */
-void
-__wt_las_set_written(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-	if (!conn->las_written) {
-		conn->las_written = true;
-
-		/*
-		 * Future page reads must deal with lookaside table records.
-		 * No write could be cached until a future read might matter,
-		 * the barrier is more documentation than requirement.
-		 */
-		WT_FULL_BARRIER();
-	}
-}
-
-/*
- * __wt_las_is_written --
- *	Return if the lookaside table has been written.
- */
-bool
-__wt_las_is_written(WT_SESSION_IMPL *session)
-{
-	return (S2C(session)->las_written);
 }
 
 /*
@@ -280,129 +255,48 @@ __wt_las_cursor_close(
 }
 
 /*
- * __wt_las_sweep --
- *	Sweep the lookaside table.
+ * __wt_las_remove_block --
+ *	Remove all records matching a key prefix from the lookaside store.
  */
 int
-__wt_las_sweep(WT_SESSION_IMPL *session)
+__wt_las_remove_block(WT_SESSION_IMPL *session,
+    WT_CURSOR *cursor, uint32_t btree_id, uint64_t pageid)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	WT_DECL_TIMESTAMP(timestamp)
-	WT_ITEM *key;
-	WT_ITEM las_addr, las_key, las_timestamp;
-	uint64_t cnt, las_counter, las_txnid, remove_cnt;
-	uint32_t las_id, session_flags;
-	int notused;
+	WT_ITEM las_key;
+	uint64_t las_counter, las_pageid, remove_cnt;
+	uint32_t las_id;
+	int exact;
 
-	conn = S2C(session);
-	cursor = NULL;
-	key = &conn->las_sweep_key;
 	remove_cnt = 0;
-	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
-
-	__wt_las_cursor(session, &cursor, &session_flags);
 
 	/*
-	 * If we're not starting a new sweep, position the cursor using the key
-	 * from the last call (we don't care if we're before or after the key,
-	 * just roughly in the same spot is fine).
+	 * Search for the block's unique prefix and step through all matching
+	 * records, removing them.
 	 */
-	if (key->size != 0) {
-		__wt_cursor_set_raw_key(cursor, key);
-		ret = cursor->search_near(cursor, &notused);
+	las_key.size = 0;
+	cursor->set_key(cursor, btree_id, pageid, (uint64_t)0, &las_key);
+	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
+		ret = cursor->next(cursor);
+	for (; ret == 0; ret = cursor->next(cursor)) {
+		WT_ERR(cursor->get_key(cursor,
+		    &las_id, &las_pageid, &las_counter, &las_key));
 
 		/*
-		 * Don't search for the same key twice; if we don't set a new
-		 * key below, it's because we've reached the end of the table
-		 * and we want the next pass to start at the beginning of the
-		 * table. Searching for the same key could leave us stuck at
-		 * the end of the table, repeatedly checking the same rows.
+		 * Confirm the search using the unique prefix; if not a match,
+		 * we're done searching for records for this page.  Note that
+		 * page ID zero is special: it is a wild card indicating that
+		 * all pages in the tree should be removed.
 		 */
-		key->size = 0;
-		if (ret != 0)
-			goto srch_notfound;
+		 if (las_id != btree_id ||
+		    (pageid != 0 && las_pageid != pageid))
+			break;
+
+		WT_ERR(cursor->remove(cursor));
+		++remove_cnt;
 	}
-
-	/*
-	 * The sweep server wakes up every 10 seconds (by default), it's a slow
-	 * moving thread. Try to review the entire lookaside table once every 5
-	 * minutes, or every 30 calls.
-	 *
-	 * The reason is because the lookaside table exists because we're seeing
-	 * cache/eviction pressure (it allows us to trade performance and disk
-	 * space for cache space), and it's likely lookaside blocks are being
-	 * evicted, and reading them back in doesn't help things. A trickier,
-	 * but possibly better, alternative might be to review all lookaside
-	 * blocks in the cache in order to get rid of them, and slowly review
-	 * lookaside blocks that have already been evicted.
-	 */
-	cnt = WT_MAX(100, conn->las_record_cnt / 30);
-
-	/* Discard pages we read as soon as we're done with them. */
-	F_SET(session, WT_SESSION_NO_CACHE);
-
-	/* Walk the file. */
-	for (; cnt > 0 && (ret = cursor->next(cursor)) == 0; --cnt) {
-		/*
-		 * If the loop terminates after completing a work unit, we will
-		 * continue the table sweep next time. Get a local copy of the
-		 * sweep key, we're going to reset the cursor; do so before
-		 * calling cursor.remove, cursor.remove can discard our hazard
-		 * pointer and the page could be evicted from underneath us.
-		 */
-		if (cnt == 1) {
-			WT_ERR(__wt_cursor_get_raw_key(cursor, key));
-			if (!WT_DATA_IN_ITEM(key))
-				WT_ERR(__wt_buf_set(
-				    session, key, key->data, key->size));
-		}
-
-		/*
-		 * Cursor opened overwrite=true: won't return WT_NOTFOUND should
-		 * another thread remove the record before we do, and the cursor
-		 * remains positioned in that case.
-		 */
-		WT_ERR(cursor->get_key(cursor, &las_id, &las_addr, &las_counter,
-		    &las_txnid, &las_timestamp, &las_key));
-
-		/*
-		 * If the on-page record transaction ID associated with the
-		 * record is globally visible, the record can be discarded.
-		 *
-		 * Copy the timestamp from the cursor to avoid unaligned reads.
-		 */
-#ifdef HAVE_TIMESTAMPS
-		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
-		memcpy(&timestamp, las_timestamp.data, las_timestamp.size);
-#endif
-		if (__wt_txn_visible_all(
-		    session, las_txnid, WT_TIMESTAMP_NULL(&timestamp))) {
-			WT_ERR(cursor->remove(cursor));
-			++remove_cnt;
-		}
-	}
-
-srch_notfound:
 	WT_ERR_NOTFOUND_OK(ret);
 
-	if (0) {
-err:		__wt_buf_free(session, key);
-	}
-
-	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
-
-	/*
-	 * If there were races to remove records, we can over-count. Underflow
-	 * isn't fatal, but check anyway so we don't skew low over time.
-	 */
-	if (remove_cnt > conn->las_record_cnt)
-		conn->las_record_cnt = 0;
-	else if (remove_cnt > 0)
-		(void)__wt_atomic_sub64(&conn->las_record_cnt, remove_cnt);
-
-	F_CLR(session, WT_SESSION_NO_CACHE);
-
+err:	WT_STAT_CONN_DECRV(session, cache_lookaside_entries, remove_cnt);
 	return (ret);
 }

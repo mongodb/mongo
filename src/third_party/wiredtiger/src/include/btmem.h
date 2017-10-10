@@ -165,13 +165,13 @@ struct __wt_ovfl_reuse {
  * Lookaside table support: when a page is being reconciled for eviction and has
  * updates that might be required by earlier readers in the system, the updates
  * are written into a lookaside table, and restored as necessary if the page is
- * read. The key is a unique marker for the page (a file ID plus an address),
- * a counter (used to ensure the update records remain in the original order),
- * the on-page item's transaction ID and timestamp (so we can discard any
- * update records from the lookaside table once the on-page item's transaction
- * is globally visible), and the page key (byte-string for row-store, record
- * number for column-store).  The value is the WT_UPDATE structure's
- * transaction ID, update size and value.
+ * read.
+ *
+ * The key is a unique marker for the page (a file ID plus a page ID), a
+ * counter (used to ensure the update records remain in the original order),
+ * and the record's key (byte-string for row-store, record number for
+ * column-store).  The value is the WT_UPDATE structure's transaction ID,
+ * timestamp, update type and value.
  *
  * As the key for the lookaside table is different for row- and column-store, we
  * store both key types in a WT_ITEM, building/parsing them in the code, because
@@ -182,7 +182,7 @@ struct __wt_ovfl_reuse {
  * the row-store key is relatively large.
  */
 #define	WT_LAS_FORMAT							\
-    "key_format=" WT_UNCHECKED_STRING(IuQQuu)				\
+    "key_format=" WT_UNCHECKED_STRING(IQQu)				\
     ",value_format=" WT_UNCHECKED_STRING(QuBu)
 
 /*
@@ -239,11 +239,19 @@ struct __wt_page_modify {
 		 * re-instantiate the page in memory.
 		 */
 		void	*disk_image;
+
+		/* The page has lookaside entries. */
+		uint64_t las_pageid;
+		WT_DECL_TIMESTAMP(las_min_timestamp)
 	} r;
 #undef	mod_replace
 #define	mod_replace	u1.r.replace
 #undef	mod_disk_image
 #define	mod_disk_image	u1.r.disk_image
+#undef	mod_replace_las_pageid
+#define	mod_replace_las_pageid	u1.r.las_pageid
+#undef	mod_replace_las_min_timestamp
+#define	mod_replace_las_min_timestamp	u1.r.las_min_timestamp
 
 	struct {			/* Multiple replacement blocks */
 	struct __wt_multi {
@@ -274,8 +282,7 @@ struct __wt_page_modify {
 		struct __wt_save_upd {
 			WT_INSERT *ins;		/* Insert list reference */
 			WT_ROW	  *ripcip;	/* Original on-page reference */
-			uint64_t   onpage_txn;
-			WT_DECL_TIMESTAMP(onpage_timestamp)
+			WT_UPDATE *onpage_upd;
 		} *supd;
 		uint32_t supd_entries;
 
@@ -289,6 +296,9 @@ struct __wt_page_modify {
 		WT_ADDR	 addr;
 		uint32_t size;
 		uint32_t checksum;
+
+		uint64_t las_pageid;
+		WT_DECL_TIMESTAMP(las_min_timestamp)
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
 	} m;
@@ -659,6 +669,10 @@ struct __wt_page {
  *	thread that set the page to WT_REF_LOCKED has exclusive access, no
  *	other thread may use the WT_REF until the state is changed.
  *
+ * WT_REF_LOOKASIDE:
+ *	The page is on disk (as per WT_REF_DISK) and has entries in the
+ *	lookaside table that must be applied before the page can be read.
+ *
  * WT_REF_MEM:
  *	Set by a reading thread once the page has been read from disk; the page
  *	is in the cache and the page reference is OK.
@@ -696,10 +710,20 @@ struct __wt_page {
  *	Related information for fast-delete, on-disk pages.
  */
 struct __wt_page_deleted {
-	volatile uint64_t txnid;			/* Transaction ID */
+	volatile uint64_t txnid;		/* Transaction ID */
 	WT_DECL_TIMESTAMP(timestamp)
 
-	WT_UPDATE **update_list;	/* List of updates for abort */
+	WT_UPDATE **update_list;		/* List of updates for abort */
+};
+
+/*
+ * WT_PAGE_LOOKASIDE --
+ *	Related information for on-disk pages with lookaside entries.
+ */
+struct __wt_page_lookaside {
+	uint64_t las_pageid;			/* Page ID in lookaside */
+	WT_DECL_TIMESTAMP(min_timestamp)	/* Oldest timestamp in
+						   lookaside for the page */
 };
 
 /*
@@ -718,12 +742,13 @@ struct __wt_ref {
 	WT_PAGE * volatile home;	/* Reference page */
 	volatile uint32_t pindex_hint;	/* Reference page index hint */
 
-#define	WT_REF_DISK	0		/* Page is on disk */
-#define	WT_REF_DELETED	1		/* Page is on disk, but deleted */
-#define	WT_REF_LOCKED	2		/* Page locked for exclusive access */
-#define	WT_REF_MEM	3		/* Page is in cache and valid */
-#define	WT_REF_READING	4		/* Page being read */
-#define	WT_REF_SPLIT	5		/* Parent page split (WT_REF dead) */
+#define	WT_REF_DISK	 0		/* Page is on disk */
+#define	WT_REF_DELETED	 1		/* Page is on disk, but deleted */
+#define	WT_REF_LOCKED	 2		/* Page locked for exclusive access */
+#define	WT_REF_LOOKASIDE 3		/* Page is on disk with lookaside */
+#define	WT_REF_MEM	 4		/* Page is in cache and valid */
+#define	WT_REF_READING	 5		/* Page being read */
+#define	WT_REF_SPLIT	 6		/* Parent page split (WT_REF dead) */
 	volatile uint32_t state;	/* Page state */
 
 	/*
@@ -745,7 +770,10 @@ struct __wt_ref {
 #undef	ref_ikey
 #define	ref_ikey	key.ikey
 
-	WT_PAGE_DELETED	*page_del;	/* Deleted on-disk page information */
+	union {
+		WT_PAGE_DELETED	*page_del;	/* Deleted page information */
+		WT_PAGE_LOOKASIDE *page_las;	/* Lookaside information */
+	};
 };
 /*
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure

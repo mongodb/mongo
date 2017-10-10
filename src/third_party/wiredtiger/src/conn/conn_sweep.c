@@ -278,12 +278,10 @@ __sweep_server(void *arg)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	time_t now;
-	uint64_t last_las_sweep_id, oldest_id;
 	u_int dead_handles;
 
 	session = arg;
 	conn = S2C(session);
-	last_las_sweep_id = WT_TXN_NONE;
 
 	/*
 	 * Sweep for dead and excess handles.
@@ -300,26 +298,6 @@ __sweep_server(void *arg)
 		__wt_seconds(session, &now);
 
 		WT_STAT_CONN_INCR(session, dh_sweeps);
-
-		/*
-		 * Sweep the lookaside table. If the lookaside table hasn't yet
-		 * been written, there's no work to do.
-		 *
-		 * Don't sweep the lookaside table if the cache is stuck full.
-		 * The sweep uses the cache and can exacerbate the problem.
-		 * If we try to sweep when the cache is full or we aren't
-		 * making progress in eviction, sweeping can wind up constantly
-		 * bringing in and evicting pages from the lookaside table,
-		 * which will stop the cache from moving into the stuck state.
-		 */
-		if (__wt_las_is_written(session) &&
-		    !__wt_cache_stuck(session)) {
-			oldest_id = __wt_txn_oldest_id(session);
-			if (WT_TXNID_LT(last_las_sweep_id, oldest_id)) {
-				WT_ERR(__wt_las_sweep(session));
-				last_las_sweep_id = oldest_id;
-			}
-		}
 
 		/*
 		 * Mark handles with a time of death, and report whether any
@@ -403,14 +381,9 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	 * Handle sweep does enough I/O it may be called upon to perform slow
 	 * operations for the block manager.
 	 *
-	 * The sweep thread sweeps the lookaside table for outdated records,
-	 * it gets its own cursor for that purpose.
-	 *
 	 * Don't tap the sweep thread for eviction.
 	 */
 	session_flags = WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION;
-	if (F_ISSET(conn, WT_CONN_LAS_OPEN))
-		session_flags |= WT_SESSION_LOOKASIDE_CURSOR;
 	WT_RET(__wt_open_internal_session(
 	    conn, "sweep-server", true, session_flags, &conn->sweep_session));
 	session = conn->sweep_session;
@@ -452,9 +425,6 @@ __wt_sweep_destroy(WT_SESSION_IMPL *session)
 
 		conn->sweep_session = NULL;
 	}
-
-	/* Discard any saved lookaside key. */
-	__wt_buf_free(session, &conn->las_sweep_key);
 
 	return (ret);
 }

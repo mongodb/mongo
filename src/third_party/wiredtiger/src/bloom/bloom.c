@@ -274,6 +274,7 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 	WT_ASSERT(bloom->session, bloom->bitstring == NULL);
 
 	/* Create a cursor on the first time through. */
+	c = NULL;
 	WT_ERR(__bloom_open_cursor(bloom, NULL));
 	c = bloom->c;
 
@@ -301,6 +302,8 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 err:	/* Don't return WT_NOTFOUND from a failed search. */
 	if (ret == WT_NOTFOUND)
 		ret = WT_ERROR;
+	if (c != NULL)
+		(void)c->reset(c);
 	__wt_err(bloom->session, ret, "Failed lookup in bloom filter");
 	return (ret);
 }

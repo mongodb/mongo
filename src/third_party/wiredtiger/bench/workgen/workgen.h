@@ -171,6 +171,8 @@ struct Context {
 struct TableOptions {
     int key_size;
     int value_size;
+    bool random_value;
+    int range;
 
     TableOptions();
     TableOptions(const TableOptions &other);
@@ -179,6 +181,8 @@ struct TableOptions {
     void describe(std::ostream &os) const {
 	os << "key_size " << key_size;
 	os << ", value_size " << value_size;
+	os << ", random_value " << random_value;
+	os << ", range " << range;
     }
 
     std::string help() const { return _options.help(); }
@@ -210,16 +214,46 @@ struct Table {
 #endif
 };
 
+struct ParetoOptions {
+    int param;
+    double range_low;
+    double range_high;
+    ParetoOptions(int param = 0);
+    ParetoOptions(const ParetoOptions &other);
+    ~ParetoOptions();
+
+    void describe(std::ostream &os) const {
+	os << "parameter " << param;
+	if (range_low != 0.0 || range_high != 1.0) {
+	    os << "range [" << range_low << "-" << range_high << "]";
+	}
+    }
+
+    std::string help() const { return _options.help(); }
+    std::string help_description(const char *option_name) const {
+	return _options.help_description(option_name); }
+    std::string help_type(const char *option_name) const {
+	return _options.help_type(option_name); }
+
+    static ParetoOptions DEFAULT;
+private:
+    OptionsList _options;
+};
+
 struct Key {
     typedef enum {
 	KEYGEN_AUTO, KEYGEN_APPEND, KEYGEN_PARETO, KEYGEN_UNIFORM } KeyType;
     KeyType _keytype;
     int _size;
+    ParetoOptions _pareto;
 
     /* XXX specify more about key distribution */
-    Key() : _keytype(KEYGEN_AUTO), _size(0) {}
-    Key(KeyType keytype, int size) : _keytype(keytype), _size(size) {}
-    Key(const Key &other) : _keytype(other._keytype), _size(other._size) {}
+    Key() : _keytype(KEYGEN_AUTO), _size(0), _pareto(ParetoOptions::DEFAULT) {}
+    Key(KeyType keytype, int size=0,
+      const ParetoOptions &pareto=ParetoOptions::DEFAULT) :
+	_keytype(keytype), _size(size), _pareto(pareto) {}
+    Key(const Key &other) : _keytype(other._keytype), _size(other._size),
+	_pareto(other._pareto) {}
     ~Key() {}
 
     void describe(std::ostream &os) const {
@@ -273,8 +307,9 @@ struct Operation {
     Operation& operator=(const Operation &other);
     void create_all();
     void get_static_counts(Stats &stats, int multiplier);
-    void kv_compute_max(bool);
-    void kv_gen(bool, uint64_t, char *) const;
+    void kv_compute_max(bool iskey, bool has_random);
+    void kv_gen(bool iskey, uint32_t randomizer, uint64_t n,
+      char *result) const;
     void kv_size_buffer(bool iskey, size_t &size) const;
     void size_check() const;
 #endif
@@ -365,6 +400,7 @@ struct WorkloadOptions {
     int sample_interval;
     int sample_rate;
     std::string sample_file;
+    int warmup;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);
