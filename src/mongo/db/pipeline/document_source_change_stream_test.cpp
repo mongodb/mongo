@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -64,24 +65,11 @@ using V = Value;
 
 using DSChangeStream = DocumentSourceChangeStream;
 
+using unittest::EnsureFCV;
+
 static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
 static const NamespaceString nss("unittests.change_stream");
-
-class EnsureFCV {
-public:
-    using Version = ServerGlobalParams::FeatureCompatibility::Version;
-    EnsureFCV(Version version)
-        : _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
-        serverGlobalParams.featureCompatibility.setVersion(version);
-    }
-    ~EnsureFCV() {
-        serverGlobalParams.featureCompatibility.setVersion(_origVersion);
-    }
-
-private:
-    const Version _origVersion;
-};
 
 class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
 public:

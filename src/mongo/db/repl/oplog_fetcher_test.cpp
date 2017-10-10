@@ -37,6 +37,7 @@
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -264,22 +265,6 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldBeAConstantUnderProtocolVersion0)
     auto timeout = makeOplogFetcher(_createConfig(false))->getAwaitDataTimeout_forTest();
     ASSERT_EQUALS(OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout, timeout);
 }
-
-class EnsureFCV {
-public:
-    using Version = ServerGlobalParams::FeatureCompatibility::Version;
-    EnsureFCV(Version version)
-        : _version(version), _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
-        serverGlobalParams.featureCompatibility.setVersion(_version);
-    }
-    ~EnsureFCV() {
-        serverGlobalParams.featureCompatibility.setVersion(_origVersion);
-    }
-
-private:
-    const Version _version;
-    const Version _origVersion;
-};
 
 TEST_F(OplogFetcherTest, FindQueryHasNoReadconcernIfTermNotLastFetched) {
     auto uninitializedTerm = OpTime::kUninitializedTerm;

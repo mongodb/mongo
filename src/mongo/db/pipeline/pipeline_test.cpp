@@ -54,8 +54,10 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/ensure_fcv.h"
 
-namespace PipelineTests {
+namespace mongo {
+namespace {
 
 using boost::intrusive_ptr;
 using std::string;
@@ -63,32 +65,13 @@ using std::vector;
 
 const NamespaceString kTestNss = NamespaceString("a.collection");
 
-namespace {
 void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {
     repl::ReplicationCoordinator::set(
         opCtx->getServiceContext(),
         stdx::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext()));
 }
 
-class EnsureFCV {
-public:
-    using Version = ServerGlobalParams::FeatureCompatibility::Version;
-    EnsureFCV(Version version)
-        : _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
-        serverGlobalParams.featureCompatibility.setVersion(version);
-    }
-    ~EnsureFCV() {
-        serverGlobalParams.featureCompatibility.setVersion(_origVersion);
-    }
-
-private:
-    const Version _origVersion;
-};
-}  // namespace
-
 namespace Optimizations {
-using namespace mongo;
-
 namespace Local {
 
 BSONObj pipelineFromJsonArray(const std::string& jsonArray) {
@@ -1395,9 +1378,11 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
     // Make sure the $match stage stays at the end.
     ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline->getSources().back().get()));
 }
+
 }  // namespace Local
 
 namespace Sharded {
+
 class Base {
 public:
     // These all return json arrays of pipeline operators
@@ -1703,6 +1688,7 @@ class ShouldNotCoalesceUnwindNotOnAs : public Base {
 }  // namespace coalesceLookUpAndUnwind
 
 namespace needsPrimaryShardMerger {
+
 class needsPrimaryShardMergerBase : public Base {
 public:
     void run() override {
@@ -1910,8 +1896,6 @@ TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplit
 }  // namespace mustRunOnMongoS
 }  // namespace Sharded
 }  // namespace Optimizations
-
-namespace {
 
 TEST(PipelineInitialSource, GeoNearInitialQuery) {
     OperationContextNoop _opCtx;
@@ -2229,7 +2213,6 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfAvailableButDefinite
 }
 
 }  // namespace Dependencies
-}  // namespace
 
 class All : public Suite {
 public:
@@ -2262,4 +2245,5 @@ public:
 
 SuiteInstance<All> myall;
 
-}  // namespace PipelineTests
+}  // namespace
+}  // namespace mongo
