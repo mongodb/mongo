@@ -166,12 +166,11 @@ void makeDeleteRequest(const FindAndModifyRequest& args, bool explain, DeleteReq
     requestOut->setExplain(explain);
 }
 
-void appendCommandResponse(PlanExecutor* exec,
+void appendCommandResponse(const PlanExecutor* exec,
                            bool isRemove,
                            const boost::optional<BSONObj>& value,
-                           BSONObjBuilder& result) {
-    BSONObjBuilder lastErrorObjBuilder(result.subobjStart("lastErrorObject"));
-
+                           BSONObjBuilder* result) {
+    BSONObjBuilder lastErrorObjBuilder(result->subobjStart("lastErrorObject"));
     if (isRemove) {
         lastErrorObjBuilder.appendNumber("n", getDeleteStats(exec)->docsDeleted);
     } else {
@@ -184,12 +183,12 @@ void appendCommandResponse(PlanExecutor* exec,
             lastErrorObjBuilder.appendAs(updateStats->objInserted["_id"], kUpsertedFieldName);
         }
     }
-    lastErrorObjBuilder.done();
+    lastErrorObjBuilder.doneFast();
 
     if (value) {
-        result.append("value", *value);
+        result->append("value", *value);
     } else {
-        result.appendNull("value");
+        result->appendNull("value");
     }
 }
 
@@ -459,8 +458,8 @@ public:
                 }
                 recordStatsForTopCommand(opCtx);
 
-                boost::optional<BSONObj> value = advanceStatus.getValue();
-                appendCommandResponse(exec.get(), args.isRemove(), value, result);
+                appendCommandResponse(
+                    exec.get(), args.isRemove(), advanceStatus.getValue(), &result);
             } else {
                 UpdateRequest request(nsString);
                 UpdateLifecycleImpl updateLifecycle(nsString);
@@ -573,9 +572,10 @@ public:
                 }
                 recordStatsForTopCommand(opCtx);
 
-                boost::optional<BSONObj> value = advanceStatus.getValue();
-                appendCommandResponse(exec.get(), args.isRemove(), value, result);
+                appendCommandResponse(
+                    exec.get(), args.isRemove(), advanceStatus.getValue(), &result);
             }
+
             return true;
         });
     }

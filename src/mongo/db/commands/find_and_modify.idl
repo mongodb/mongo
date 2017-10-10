@@ -18,37 +18,33 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+    - "mongo/idl/basic_types.idl"
 
 structs:
 
-  FindAndModifyLastError:
-    description: "contains some metrics for the write result."
-    strict: true
-    fields:
-      updatedExisting:
-        description: "true if the command modified an existing document."
-        type: bool
-        optional: true
-      # TODO: SERVER-30532
-      #upserted:
-      #  description: "the _id value of the upserted document"
-      #  type: any_basic_type
-      #  optional: true
-      n:
-        description: "the number of documents that were inserted/deleted/match the update predicate"
-        type: safeInt64
+    FindAndModifyLastError:
+        description: "Contains execution details for the findAndModify command"
+        strict: true
+        fields:
+            updatedExisting:
+                description: "Specifies whether the command modified an existing document"
+                type: bool
+                optional: true
+            n:
+                description: "Specifies the number of documents that were inserted/deleted or
+                              matched the update predicate"
+                type: safeInt64
 
-  FindAndModifyResult:
-    description: "Parser for serializing result for findAndModify"
-    strict: false
-    fields:
-      lastErrorObject:
-        type: FindAndModifyLastError
-      value:
-        description: "the document before or after the write depending on the 'new' field of
-                      the request was set to true or false."
-        type: object
+    FindAndModifyResult:
+        description: "Contains the result from a findAndModify command"
+        strict: false
+        fields:
+            lastErrorObject:
+                type: FindAndModifyLastError
+            value:
+                description: "Contains document before or after the write depending on the 'new'
+                              field of the request was set to true or false"
+                type: object

@@ -166,7 +166,8 @@ Status waitForWriteConcern(OperationContext* opCtx,
                            WriteConcernResult* result) {
     LOG(2) << "Waiting for write concern. OpTime: " << replOpTime
            << ", write concern: " << writeConcern.toBSON();
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     if (!opCtx->getClient()->isInDirectClient()) {
         // Respecting this failpoint for internal clients prevents stepup from working properly.
@@ -233,9 +234,9 @@ Status waitForWriteConcern(OperationContext* opCtx,
     }
 
     // Add stats
-    result->writtenTo = repl::getGlobalReplicationCoordinator()->getHostsWrittenTo(
-        replOpTime,
-        writeConcernWithPopulatedSyncMode.syncMode == WriteConcernOptions::SyncMode::JOURNAL);
+    result->writtenTo = replCoord->getHostsWrittenTo(replOpTime,
+                                                     writeConcernWithPopulatedSyncMode.syncMode ==
+                                                         WriteConcernOptions::SyncMode::JOURNAL);
     gleWtimeStats.recordMillis(durationCount<Milliseconds>(replStatus.duration));
     result->wTime = durationCount<Milliseconds>(replStatus.duration);
 

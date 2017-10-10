@@ -48,7 +48,7 @@ namespace mongo {
 
 void RSLocalClient::_updateLastOpTimeFromClient(OperationContext* opCtx,
                                                 const repl::OpTime& previousOpTimeOnClient) {
-    repl::OpTime lastOpTimeFromClient =
+    const auto lastOpTimeFromClient =
         repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
     if (lastOpTimeFromClient.isNull() || lastOpTimeFromClient == previousOpTimeOnClient) {
@@ -72,7 +72,7 @@ repl::OpTime RSLocalClient::_getLastOpTime() {
 StatusWith<Shard::CommandResponse> RSLocalClient::runCommandOnce(OperationContext* opCtx,
                                                                  const std::string& dbName,
                                                                  const BSONObj& cmdObj) {
-    repl::OpTime currentOpTimeFromClient =
+    const auto currentOpTimeFromClient =
         repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     ON_BLOCK_EXIT([this, &opCtx, &currentOpTimeFromClient] {
         _updateLastOpTimeFromClient(opCtx, currentOpTimeFromClient);

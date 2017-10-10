@@ -57,21 +57,21 @@ class ConfigSvrRemoveShardCommand : public BasicCommand {
 public:
     ConfigSvrRemoveShardCommand() : BasicCommand("_configsvrRemoveShard") {}
 
-    virtual bool slaveOk() const {
+    void help(std::stringstream& help) const override {
+        help << "Internal command, which is exported by the sharding config server. Do not call "
+                "directly. Removes a shard from the cluster.";
+    }
+
+    bool slaveOk() const override {
         return false;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
-    }
-
-    virtual void help(std::stringstream& help) const override {
-        help << "Internal command, which is exported by the sharding config server. Do not call "
-                "directly. Removes a shard from the cluster.";
     }
 
     Status checkAuthForCommand(Client* client,
@@ -87,8 +87,7 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-
+             BSONObjBuilder& result) override {
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrRemoveShard can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
@@ -99,51 +98,45 @@ public:
                 cmdObj.firstElement().type() == BSONType::String);
         const std::string target = cmdObj.firstElement().str();
 
-        const auto shardStatus = grid.shardRegistry()->getShard(opCtx, ShardId(target));
+        const auto shardStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardId(target));
         if (!shardStatus.isOK()) {
             std::string msg(str::stream() << "Could not drop shard '" << target
                                           << "' because it does not exist");
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
-        const auto shard = shardStatus.getValue();
+        const auto& shard = shardStatus.getValue();
 
         const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
 
-        StatusWith<ShardDrainingStatus> removeShardResult =
-            shardingCatalogManager->removeShard(opCtx, shard->getId());
-        if (!removeShardResult.isOK()) {
-            return appendCommandStatus(result, removeShardResult.getStatus());
-        }
+        const auto shardDrainingStatus =
+            uassertStatusOK(shardingCatalogManager->removeShard(opCtx, shard->getId()));
 
         std::vector<std::string> databases;
-        Status status =
-            shardingCatalogManager->getDatabasesForShard(opCtx, shard->getId(), &databases);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
+        uassertStatusOK(
+            shardingCatalogManager->getDatabasesForShard(opCtx, shard->getId(), &databases));
 
         // Get BSONObj containing:
         // 1) note about moving or dropping databases in a shard
         // 2) list of databases (excluding 'local' database) that need to be moved
-        BSONObj dbInfo;
-        {
+        const auto dbInfo = [&] {
             BSONObjBuilder dbInfoBuilder;
             dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
+
             BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
-            for (std::vector<std::string>::const_iterator it = databases.begin();
-                 it != databases.end();
-                 it++) {
-                if (*it != "local") {
-                    dbs.append(*it);
+            for (const auto& db : databases) {
+                if (db != NamespaceString::kLocalDb) {
+                    dbs.append(db);
                 }
             }
             dbs.doneFast();
-            dbInfo = dbInfoBuilder.obj();
-        }
 
-        // TODO: Standardize/Seperate how we append to the result object
-        switch (removeShardResult.getValue()) {
+            return dbInfoBuilder.obj();
+        }();
+
+        // TODO: Standardize/separate how we append to the result object
+        switch (shardDrainingStatus) {
             case ShardDrainingStatus::STARTED:
                 result.append("msg", "draining started successfully");
                 result.append("state", "started");
@@ -166,13 +159,9 @@ public:
 
                 result.append("msg", "draining ongoing");
                 result.append("state", "ongoing");
-                {
-                    BSONObjBuilder inner;
-                    inner.append("chunks", static_cast<long long>(chunks.size()));
-                    inner.append("dbs", static_cast<long long>(databases.size()));
-                    BSONObj b = inner.obj();
-                    result.append("remaining", b);
-                }
+                result.append("remaining",
+                              BSON("chunks" << static_cast<long long>(chunks.size()) << "dbs"
+                                            << static_cast<long long>(databases.size())));
                 result.appendElements(dbInfo);
                 break;
             }
@@ -180,6 +169,7 @@ public:
                 result.append("msg", "removeshard completed successfully");
                 result.append("state", "completed");
                 result.append("shard", shard->getId().toString());
+                break;
         }
 
         return true;
