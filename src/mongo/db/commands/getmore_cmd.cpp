@@ -296,7 +296,9 @@ public:
                 opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
             }
         }
-        opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
+        if (!cursor->isAwaitData()) {
+            opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
+        }
 
         PlanExecutor* exec = cursor->getExecutor();
         exec->reattachToOperationContext(opCtx);
