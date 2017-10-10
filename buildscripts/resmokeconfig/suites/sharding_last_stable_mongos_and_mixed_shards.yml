@@ -66,6 +66,7 @@ selector:
   - jstests/sharding/uuid_propagated_to_shards_on_setFCV_3_6.js
   - jstests/sharding/write_transactions_during_migration.js
   - jstests/sharding/json_schema.js
+  - jstests/sharding/current_op_no_shards.js
   # New feature in v3.6 mongo shell.
   - jstests/sharding/causal_consistency_shell_support.js
   - jstests/sharding/keys_rotation_interval_sec.js
