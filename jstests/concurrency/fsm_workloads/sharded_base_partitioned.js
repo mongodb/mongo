@@ -110,11 +110,13 @@ var $config = (function() {
             this.partition = this.makePartition(this.tid, this.partitionSize);
             Object.freeze(this.partition);
 
+            var ns = db[collName].getFullName();
+
             // Verify that there is exactly 1 chunk in our partition.
             var config = ChunkHelper.getPrimary(connCache.config);
             var numChunks = ChunkHelper.getNumChunks(
-                config, this.partition.chunkLower, this.partition.chunkUpper);
-            var chunks = ChunkHelper.getChunks(config, MinKey, MaxKey);
+                config, ns, this.partition.chunkLower, this.partition.chunkUpper);
+            var chunks = ChunkHelper.getChunks(config, ns, MinKey, MaxKey);
             var msg = tojson({tid: this.tid, data: this.data, chunks: chunks});
             assertWhenOwnColl.eq(numChunks, 1, msg);
         }

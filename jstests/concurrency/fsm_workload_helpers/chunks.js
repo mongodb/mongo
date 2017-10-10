@@ -145,21 +145,24 @@ var ChunkHelper = (function() {
     // Intended for use on config or mongos connections only.
     // Get number of chunks containing values in [lower, upper). The upper bound on a chunk is
     // exclusive, but to capture the chunk we must provide it with less than or equal to 'upper'.
-    function getNumChunks(conn, lower, upper) {
+    function getNumChunks(conn, ns, lower, upper) {
         assert(isMongos(conn.getDB('admin')) || isMongodConfigsvr(conn.getDB('admin')),
                tojson(conn) + ' is not to a mongos or a mongod config server');
-        var query = {'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
-
+        assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
+               ns + ' is not a valid namespace');
+        var query = {'ns': ns, 'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
         return conn.getDB('config').chunks.find(query).itcount();
     }
 
     // Intended for use on config or mongos connections only.
     // For getting chunks containing values in [lower, upper). The upper bound on a chunk is
     // exclusive, but to capture the chunk we must provide it with less than or equal to 'upper'.
-    function getChunks(conn, lower, upper) {
+    function getChunks(conn, ns, lower, upper) {
         assert(isMongos(conn.getDB('admin')) || isMongodConfigsvr(conn.getDB('admin')),
                tojson(conn) + ' is not to a mongos or a mongod config server');
-        var query = {'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
+        assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
+               ns + ' is not a valid namespace');
+        var query = {'ns': ns, 'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
         return conn.getDB('config').chunks.find(query).sort({'min._id': 1}).toArray();
     }
 

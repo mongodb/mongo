@@ -57,8 +57,8 @@ var $config = extendWorkload($config, function($config, $super) {
 
         // Save the number of chunks before the moveChunk operation. This will be used
         // to verify that the number of chunks after the moveChunk operation remains the same.
-        var numChunksBefore =
-            ChunkHelper.getNumChunks(config, this.partition.chunkLower, this.partition.chunkUpper);
+        var numChunksBefore = ChunkHelper.getNumChunks(
+            config, ns, this.partition.chunkLower, this.partition.chunkUpper);
 
         // Randomly choose whether to wait for all documents on the fromShard
         // to be deleted before the moveChunk operation returns.
@@ -126,7 +126,7 @@ var $config = extendWorkload($config, function($config, $super) {
                 // Regardless of whether the operation succeeded or failed,
                 // verify that the number of chunks in our partition stayed the same.
                 var numChunksAfter = ChunkHelper.getNumChunks(
-                    conn, this.partition.chunkLower, this.partition.chunkUpper);
+                    conn, ns, this.partition.chunkLower, this.partition.chunkUpper);
                 msg = 'Number of chunks in partition seen by config changed with moveChunk.\n' +
                     msgBase;
                 assertWhenOwnColl.eq(numChunksBefore, numChunksAfter, msg);
