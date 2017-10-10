@@ -190,7 +190,12 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         throw RSFatalException(str::stream() << "Rollback too large, oplog size: "
                                              << ourObj.objsize());
 
+    // Parse the oplog entry.
     auto oplogEntry = OplogEntry(ourObj);
+
+    LOG(2) << "Updating rollback FixUpInfo for local oplog entry: " << oplogEntry.toBSON();
+
+    // Extract the op's collection namespace and UUID.
     NamespaceString nss = oplogEntry.getNamespace();
     auto uuid = oplogEntry.getUuid();
 
