@@ -88,7 +88,7 @@ void OperationContext::setDeadlineAndMaxTime(Date_t when, Microseconds maxTime) 
     _maxTime = maxTime;
 }
 
-void OperationContext::setDeadlineByDate(Date_t when) {
+Microseconds OperationContext::computeMaxTimeFromDeadline(Date_t when) {
     Microseconds maxTime;
     if (when == Date_t::max()) {
         maxTime = Microseconds::max();
@@ -98,7 +98,22 @@ void OperationContext::setDeadlineByDate(Date_t when) {
             maxTime = Microseconds::zero();
         }
     }
-    setDeadlineAndMaxTime(when, maxTime);
+    return maxTime;
+}
+
+OperationContext::DeadlineStash::DeadlineStash(OperationContext* opCtx)
+    : _opCtx(opCtx), _originalDeadline(_opCtx->getDeadline()) {
+    _opCtx->_deadline = Date_t::max();
+    _opCtx->_maxTime = _opCtx->computeMaxTimeFromDeadline(Date_t::max());
+}
+
+OperationContext::DeadlineStash::~DeadlineStash() {
+    _opCtx->_deadline = _originalDeadline;
+    _opCtx->_maxTime = _opCtx->computeMaxTimeFromDeadline(_originalDeadline);
+}
+
+void OperationContext::setDeadlineByDate(Date_t when) {
+    setDeadlineAndMaxTime(when, computeMaxTimeFromDeadline(when));
 }
 
 void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime) {

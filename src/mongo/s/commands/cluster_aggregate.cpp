@@ -726,6 +726,10 @@ MongosProcessInterface::makePipelineWithOneRemote(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
+    // Temporarily remove any deadline from this operation, we don't want to timeout while doing
+    // this lookup.
+    OperationContext::DeadlineStash deadlineStash(expCtx->opCtx);
+
     // Generate the command object for the targeted shards.
     AggregationRequest aggRequest(expCtx->ns, rawPipeline);
     LiteParsedPipeline liteParsedPipeline(aggRequest);
