@@ -34,7 +34,9 @@ var testMoveChunkWithSession = function(
     }
 
     st.rs1.awaitNodesAgreeOnPrimary();
-    awaitRSClientHosts(st.s, {host: st.rs1.getPrimary().host}, {ok: true, ismaster: true});
+    st.configRS.nodes.concat([st.s]).forEach(function awaitNode(conn) {
+        awaitRSClientHosts(conn, {host: st.rs1.getPrimary().host}, {ok: true, ismaster: true});
+    });
 
     checkRetryResultFunc(result, assert.commandWorked(testDB.runCommand(cmdObj)));
     checkDocumentsFunc(coll);
