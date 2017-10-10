@@ -45,11 +45,9 @@ class OperationContext;
  **/
 struct FeatureCompatibilityVersionInfo {
     ServerGlobalParams::FeatureCompatibility::Version version;
-    ServerGlobalParams::FeatureCompatibility::Version targetVersion;
 
     FeatureCompatibilityVersionInfo()
-        : version(ServerGlobalParams::FeatureCompatibility::Version::kUnset),
-          targetVersion(ServerGlobalParams::FeatureCompatibility::Version::kUnset) {}
+        : version(ServerGlobalParams::FeatureCompatibility::Version::kUnset) {}
 };
 
 /**
@@ -86,6 +84,10 @@ public:
                 return FeatureCompatibilityVersionCommandParser::kVersion36;
             case ServerGlobalParams::FeatureCompatibility::Version::k34:
                 return FeatureCompatibilityVersionCommandParser::kVersion34;
+            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
+                return FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo36;
+            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
+                return FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo34;
             case ServerGlobalParams::FeatureCompatibility::Version::kUnset:
                 return FeatureCompatibilityVersionCommandParser::kVersionUnset;
             default:

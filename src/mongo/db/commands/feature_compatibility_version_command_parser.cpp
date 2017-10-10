@@ -43,6 +43,8 @@ constexpr StringData kVersion32 = "3.2"_sd;
 
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion34;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion36;
+constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo36;
+constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo34;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionUnset;
 
 StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(

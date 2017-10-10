@@ -62,6 +62,8 @@ Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVe
 StatusWith<FeatureCompatibilityVersionInfo> FeatureCompatibilityVersion::parse(
     const BSONObj& featureCompatibilityVersionInfo) {
     FeatureCompatibilityVersionInfo versionInfo;
+    std::string version;
+    std::string targetVersion;
 
     for (auto&& elem : featureCompatibilityVersionInfo) {
         auto fieldName = elem.fieldNameStringData();
@@ -85,12 +87,8 @@ StatusWith<FeatureCompatibilityVersionInfo> FeatureCompatibilityVersion::parse(
                                             << ".");
             }
 
-            ServerGlobalParams::FeatureCompatibility::Version version;
-            if (elem.String() == FeatureCompatibilityVersionCommandParser::kVersion36) {
-                version = ServerGlobalParams::FeatureCompatibility::Version::k36;
-            } else if (elem.String() == FeatureCompatibilityVersionCommandParser::kVersion34) {
-                version = ServerGlobalParams::FeatureCompatibility::Version::k34;
-            } else {
+            if (elem.String() != FeatureCompatibilityVersionCommandParser::kVersion36 &&
+                elem.String() != FeatureCompatibilityVersionCommandParser::kVersion34) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Invalid value for " << fieldName << ", found "
                                             << elem.String()
@@ -110,9 +108,9 @@ StatusWith<FeatureCompatibilityVersionInfo> FeatureCompatibilityVersion::parse(
             }
 
             if (fieldName == FeatureCompatibilityVersion::kVersionField) {
-                versionInfo.version = version;
+                version = elem.String();
             } else if (fieldName == FeatureCompatibilityVersion::kTargetVersionField) {
-                versionInfo.targetVersion = version;
+                targetVersion = elem.String();
             }
         } else {
             return Status(ErrorCodes::BadValue,
@@ -128,7 +126,33 @@ StatusWith<FeatureCompatibilityVersionInfo> FeatureCompatibilityVersion::parse(
         }
     }
 
-    if (versionInfo.version == ServerGlobalParams::FeatureCompatibility::Version::kUnset) {
+    if (version == FeatureCompatibilityVersionCommandParser::kVersion34) {
+        if (targetVersion == FeatureCompatibilityVersionCommandParser::kVersion36) {
+            versionInfo.version = ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36;
+        } else if (targetVersion == FeatureCompatibilityVersionCommandParser::kVersion34) {
+            versionInfo.version =
+                ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34;
+        } else {
+            versionInfo.version = ServerGlobalParams::FeatureCompatibility::Version::k34;
+        }
+
+    } else if (version == FeatureCompatibilityVersionCommandParser::kVersion36) {
+        if (targetVersion == FeatureCompatibilityVersionCommandParser::kVersion36 ||
+            targetVersion == FeatureCompatibilityVersionCommandParser::kVersion34) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Invalid state for "
+                                        << FeatureCompatibilityVersion::kParameterName
+                                        << " document in "
+                                        << FeatureCompatibilityVersion::kCollection
+                                        << ": "
+                                        << featureCompatibilityVersionInfo
+                                        << ". See "
+                                        << feature_compatibility_version::kDochubLink
+                                        << ".");
+        } else {
+            versionInfo.version = ServerGlobalParams::FeatureCompatibility::Version::k36;
+        }
+    } else {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Missing required field '"
                                     << FeatureCompatibilityVersion::kVersionField
@@ -202,8 +226,8 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 
             // We update the value of the version server parameter so that the admin.system.version
             // collection gets a UUID.
-            serverGlobalParams.featureCompatibility.setTargetVersion(
-                ServerGlobalParams::FeatureCompatibility::Version::k36);
+            serverGlobalParams.featureCompatibility.setVersion(
+                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
 
             uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
         }
@@ -231,11 +255,6 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
     }
     auto versionInfo = uassertStatusOK(FeatureCompatibilityVersion::parse(doc));
 
-    // Indicate if an upgrade or downgrade is in progress.
-    if (versionInfo.targetVersion != ServerGlobalParams::FeatureCompatibility::Version::kUnset) {
-        log() << "targeting featureCompatibilityVersion " << toString(versionInfo.targetVersion);
-    }
-
     // To avoid extra log messages when the targetVersion is set/unset, only log when the version
     // changes.
     auto oldVersion = serverGlobalParams.featureCompatibility.getVersion();
@@ -248,11 +267,11 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
     // version that is below the minimum.
     opCtx->recoveryUnit()->onCommit([opCtx, versionInfo]() {
         serverGlobalParams.featureCompatibility.setVersion(versionInfo.version);
-        serverGlobalParams.featureCompatibility.setTargetVersion(versionInfo.targetVersion);
 
         // Close all connections from internal clients with binary versions lower than 3.6.
         if (versionInfo.version == ServerGlobalParams::FeatureCompatibility::Version::k36 ||
-            versionInfo.targetVersion == ServerGlobalParams::FeatureCompatibility::Version::k36) {
+            versionInfo.version ==
+                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36) {
             opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
                 transport::Session::kLatestVersionInternalClientKeepOpen |
                 transport::Session::kExternalClientKeepOpen);
@@ -271,8 +290,6 @@ void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONOb
     opCtx->recoveryUnit()->onCommit([]() {
         serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k34);
-        serverGlobalParams.featureCompatibility.setTargetVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kUnset);
     });
 }
 
@@ -282,8 +299,6 @@ void FeatureCompatibilityVersion::onDropCollection(OperationContext* opCtx) {
     opCtx->recoveryUnit()->onCommit([]() {
         serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k34);
-        serverGlobalParams.featureCompatibility.setTargetVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kUnset);
     });
 }
 
@@ -344,9 +359,16 @@ public:
                           ) {}
 
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
-        b.append(name,
-                 FeatureCompatibilityVersion::toString(
-                     serverGlobalParams.featureCompatibility.getVersion()));
+        std::string version;
+        if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+            b.append(name,
+                     FeatureCompatibilityVersion::toString(
+                         ServerGlobalParams::FeatureCompatibility::Version::k36));
+        } else {
+            b.append(name,
+                     FeatureCompatibilityVersion::toString(
+                         ServerGlobalParams::FeatureCompatibility::Version::k34));
+        }
     }
 
     virtual Status set(const BSONElement& newValueElement) {

@@ -2612,6 +2612,12 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
     }
 
     log() << "transition to " << newState << " from " << _memberState << rsLog;
+    // Initializes the featureCompatibilityVersion to the default value, because arbiters do not
+    // receive the replicated version.
+    if (newState.arbiter()) {
+        serverGlobalParams.featureCompatibility.reset();
+    }
+
     _memberState = newState;
 
     _cancelAndRescheduleElectionTimeout_inlock();

@@ -102,10 +102,11 @@
     checkFCV(adminDB, "3.4", "3.4");
 
     // Verify startup warnings
-    let msg1 = "WARNING: A featureCompatibilityVersion upgrade or downgrade did not complete";
+    let msgUpgrade = "WARNING: A featureCompatibilityVersion upgrade did not complete";
+    let msgDowngrade = "WARNING: A featureCompatibilityVersion downgrade did not complete";
     let msg2 = "use the setFeatureCompatibilityVersion command to resume";
     assert.soon(function() {
-        return rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2);
+        return rawMongoProgramOutput().match(msgDowngrade) && rawMongoProgramOutput().match(msg2);
     }, "Mongod should have printed startup warning about collections having UUIDs in FCV 3.4");
 
     // Check that collections still have UUIDs.
@@ -145,7 +146,7 @@
 
     // Verify startup warnings
     assert.soon(function() {
-        return rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2);
+        return rawMongoProgramOutput().match(msgUpgrade) && rawMongoProgramOutput().match(msg2);
     }, "Mongod should have printed startup warning about collections having UUIDs in FCV 3.4");
 
     // Check that collections have UUIDs.
