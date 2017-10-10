@@ -73,8 +73,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
-	WT_ERR(__wt_tree_walk(session, &next_ref,
-	    WT_READ_CACHE | WT_READ_LOOKASIDE | WT_READ_NO_EVICT));
+	WT_ERR(__wt_tree_walk(session, &next_ref, walk_flags));
 	while ((ref = next_ref) != NULL) {
 		page = ref->page;
 
@@ -140,7 +139,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 err:		/* On error, clear any left-over tree walk. */
 		if (next_ref != NULL)
 			WT_TRET(__wt_page_release(
-			    session, next_ref, WT_READ_NO_EVICT));
+			    session, next_ref, walk_flags));
 	}
 
 	return (ret);
