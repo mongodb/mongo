@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -54,6 +55,10 @@ namespace mongo {
 using std::string;
 
 namespace {
+
+const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                Seconds(60));
 
 /**
  * Internal sharding command run on config servers to change a database's primary shard.
@@ -170,9 +175,26 @@ public:
             return toShardStatus.getValue();
         }();
 
-        uassert(ErrorCodes::IllegalOperation,
-                "it is already the primary",
-                fromShard->getId() != toShard->getId());
+        if (fromShard->getId() == toShard->getId()) {
+            // Since we did a local read of the database entry above, make sure we wait for majority
+            // commit before returning success. (A previous movePrimary attempt may have failed with
+            // a write concern error).
+            // If the Client for this movePrimary attempt is the *same* as the one that made the
+            // earlier movePrimary attempt, the opTime on the ReplClientInfo for this Client will
+            // already be at least as recent as the earlier movePrimary's write. However, if this
+            // is a *different* Client, the opTime may not be as recent, so to be safe we wait for
+            // the system's last opTime to be majority-committed.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            WriteConcernResult unusedWCResult;
+            uassertStatusOK(
+                waitForWriteConcern(opCtx,
+                                    repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                                    kMajorityWriteConcern,
+                                    &unusedWCResult));
+
+            result << "primary" << toShard->toString();
+            return true;
+        }
 
         log() << "Moving " << dbname << " primary from: " << fromShard->toString()
               << " to: " << toShard->toString();

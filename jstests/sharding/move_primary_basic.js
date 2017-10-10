@@ -41,18 +41,18 @@
     assert.commandFailed(mongos.adminCommand({movePrimary: 'a.b', to: shard0}));
     assert.commandFailed(mongos.adminCommand({movePrimary: '', to: shard0}));
 
-    // Fail if shard does not exist or empty.
+    // Fail if 'to' shard does not exist or empty.
     assert.commandFailed(mongos.adminCommand({movePrimary: kDbName, to: 'Unknown'}));
     assert.commandFailed(mongos.adminCommand({movePrimary: kDbName, to: ''}));
     assert.commandFailed(mongos.adminCommand({movePrimary: kDbName}));
 
-    // Fail if moveShard to already primary and verify metadata changes.
+    // Succeed if 'to' shard exists and verify metadata changes.
     assert.eq(shard0, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
-
     assert.commandWorked(mongos.adminCommand({movePrimary: kDbName, to: shard1}));
     assert.eq(shard1, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
 
-    assert.commandFailed(mongos.adminCommand({movePrimary: kDbName, to: shard1}));
+    // Succeed if 'to' shard is already the primary shard for the db.
+    assert.commandWorked(mongos.adminCommand({movePrimary: kDbName, to: shard1}));
     assert.eq(shard1, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
 
     st.stop();

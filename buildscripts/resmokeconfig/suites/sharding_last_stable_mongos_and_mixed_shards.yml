@@ -23,6 +23,7 @@ selector:
   - jstests/sharding/view_rewrite.js
   - jstests/sharding/explain_agg_read_pref.js
   - jstests/sharding/max_time_ms_sharded_new_commands.js
+  - jstests/sharding/move_primary_basic.js
   - jstests/sharding/write_cmd_auto_split.js
   - jstests/sharding/index_and_collection_option_propagation.js
   # New feature in v3.6 mongos
