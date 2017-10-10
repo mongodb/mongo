@@ -200,4 +200,4 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
         return true;
     }
     assert(false, "expected this to be unreachable");
-}
+};
