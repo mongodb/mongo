@@ -448,6 +448,17 @@ bool GeometryContainer::contains(const S2Polyline& otherLine) const {
         return _polygon->bigPolygon->Contains(otherLine);
     }
 
+    if (NULL != _cap && (_cap->crs == SPHERE)) {
+        // If the radian distance of a line to the centroid of the complement spherical cap is less
+        // than the arc radian of the complement cap, then the line is not within the spherical cap.
+        S2Cap complementSphere = _cap->cap.Complement();
+        if (S2Distance::minDistanceRad(complementSphere.axis(), otherLine) <
+            complementSphere.angle().radians()) {
+            return false;
+        }
+        return true;
+    }
+
     if (NULL != _multiPolygon) {
         const vector<S2Polygon*>& polys = _multiPolygon->polygons.vector();
         for (size_t i = 0; i < polys.size(); ++i) {
@@ -491,6 +502,18 @@ bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
 
     if (NULL != _polygon && NULL != _polygon->bigPolygon) {
         return _polygon->bigPolygon->Contains(otherPolygon);
+    }
+
+    if (NULL != _cap && (_cap->crs == SPHERE)) {
+        // If the radian distance of a polygon to the centroid of the complement spherical cap is
+        // less than the arc radian of the complement cap, then the polygon is not within the
+        // spherical cap.
+        S2Cap complementSphere = _cap->cap.Complement();
+        if (S2Distance::minDistanceRad(complementSphere.axis(), otherPolygon) <
+            complementSphere.angle().radians()) {
+            return false;
+        }
+        return true;
     }
 
     if (NULL != _multiPolygon) {
