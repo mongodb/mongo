@@ -201,7 +201,7 @@ struct Cloner::Fun {
 
                 // Check if everything is still all right.
                 if (opCtx->writesAreReplicated()) {
-                    uassert(28592,
+                    uassert(ErrorCodes::PrimarySteppedDown,
                             str::stream() << "Cannot write to ns: " << to_collection.ns()
                                           << " after yielding",
                             repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(

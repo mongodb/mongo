@@ -273,7 +273,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 void DeleteStage::doRestoreState() {
     invariant(_collection);
     const NamespaceString& ns(_collection->ns());
-    uassert(28537,
+    uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
             !getOpCtx()->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(getOpCtx(), ns));
