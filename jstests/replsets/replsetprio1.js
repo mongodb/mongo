@@ -16,7 +16,8 @@
     });
 
     // 2 should be master (give this a while to happen, as other nodes might first be elected)
-    replTest.waitForState(nodes[2], ReplSetTest.State.PRIMARY);
+    replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, nodes, 2);
+
     // wait for 1 to not appear to be master (we are about to make it master and need a clean slate
     // here)
     replTest.waitForState(nodes[1], ReplSetTest.State.SECONDARY);
@@ -42,7 +43,7 @@
 
     // bring 2 back up, 2 should wait until caught up and then become master
     replTest.restart(2);
-    replTest.waitForState(nodes[2], ReplSetTest.State.PRIMARY);
+    replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, nodes, 2);
 
     // make sure nothing was rolled back
     master = replTest.getPrimary();
