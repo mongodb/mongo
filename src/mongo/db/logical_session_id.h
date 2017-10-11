@@ -40,7 +40,12 @@ namespace mongo {
 using TxnNumber = std::int64_t;
 using StmtId = std::int32_t;
 
+// Default value for unassigned statementId.
 const StmtId kUninitializedStmtId = -1;
+
+// Used as a substitute statementId for oplog entries that were truncated and lost.
+const StmtId kIncompleteHistoryStmtId = -2;
+
 const TxnNumber kUninitializedTxnNumber = -1;
 
 class BSONObjBuilder;

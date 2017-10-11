@@ -338,5 +338,80 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
     ASSERT(session.checkStatementExecuted(opCtx(), txnNum, 0));
 }
 
+TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 2;
+
+    OperationSessionInfo osi;
+    osi.setSessionId(sessionId);
+    osi.setTxnNumber(txnNum);
+
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+    session.beginTxn(opCtx(), txnNum);
+
+    auto firstOpTime = ([&]() {
+        AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx());
+
+        auto opTime = repl::logOp(opCtx(),
+                                  "i",
+                                  kNss,
+                                  kUUID,
+                                  BSON("x" << 1),
+                                  &Session::kDeadEndSentinel,
+                                  false,
+                                  osi,
+                                  1,
+                                  {});
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {1}, opTime);
+        wuow.commit();
+
+        return opTime;
+    })();
+
+    {
+        repl::OplogLink link;
+        link.prevOpTime = firstOpTime;
+
+        AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx());
+
+        auto opTime = repl::logOp(opCtx(),
+                                  "n",
+                                  kNss,
+                                  kUUID,
+                                  {},
+                                  &Session::kDeadEndSentinel,
+                                  false,
+                                  osi,
+                                  kIncompleteHistoryStmtId,
+                                  link);
+
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {kIncompleteHistoryStmtId}, opTime);
+        wuow.commit();
+    }
+
+    {
+        auto oplog = session.checkStatementExecuted(opCtx(), txnNum, 1);
+        ASSERT_TRUE(oplog);
+        ASSERT_EQ(firstOpTime, oplog->getOpTime());
+    }
+
+    ASSERT_THROWS(session.checkStatementExecuted(opCtx(), txnNum, 2), AssertionException);
+
+    // Should have the same behavior after loading state from storage.
+    session.invalidate();
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    {
+        auto oplog = session.checkStatementExecuted(opCtx(), txnNum, 1);
+        ASSERT_TRUE(oplog);
+        ASSERT_EQ(firstOpTime, oplog->getOpTime());
+    }
+
+    ASSERT_THROWS(session.checkStatementExecuted(opCtx(), txnNum, 2), AssertionException);
+}
+
 }  // namespace
 }  // namespace mongo

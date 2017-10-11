@@ -55,6 +55,8 @@ class Session {
     MONGO_DISALLOW_COPYING(Session);
 
 public:
+    static const BSONObj kDeadEndSentinel;
+
     explicit Session(LogicalSessionId sessionId);
 
     const LogicalSessionId& getSessionId() const {
@@ -168,6 +170,10 @@ private:
     // Counter, incremented with each call to invalidate in order to discern invalidations, which
     // happen during refresh
     int _numInvalidations{0};
+
+    // Set to true if incomplete history is detected. For example, when the oplog to a write was
+    // truncated because it was too old.
+    bool _hasIncompleteHistory{false};
 
     // Caches what is known to be the last written transaction record for the session
     boost::optional<SessionTxnRecord> _lastWrittenSessionRecord;

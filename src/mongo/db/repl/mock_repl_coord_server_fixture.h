@@ -37,6 +37,7 @@ class OperationContext;
 
 namespace repl {
 class OplogEntry;
+class StorageInterfaceMock;
 }
 
 /**
@@ -58,6 +59,7 @@ public:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
+    repl::StorageInterfaceMock* _storageInterface;
 };
 
 }  // namespace mongo

@@ -164,12 +164,14 @@ public:
                 MONGO_UNREACHABLE;
         }
 
-        if (!_prePostImageOpTime.isNull()) {
-            _cloner->_sessionCatalogSource.notifyNewWriteOpTime(_prePostImageOpTime);
-        }
+        if (auto sessionSource = _cloner->_sessionCatalogSource.get()) {
+            if (!_prePostImageOpTime.isNull()) {
+                sessionSource->notifyNewWriteOpTime(_prePostImageOpTime);
+            }
 
-        if (!_opTime.isNull()) {
-            _cloner->_sessionCatalogSource.notifyNewWriteOpTime(_opTime);
+            if (!_opTime.isNull()) {
+                sessionSource->notifyNewWriteOpTime(_opTime);
+            }
         }
     }
 
@@ -192,8 +194,7 @@ MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(MoveChunkRequ
       _sessionId(MigrationSessionId::generate(_args.getFromShardId().toString(),
                                               _args.getToShardId().toString())),
       _donorConnStr(std::move(donorConnStr)),
-      _recipientHost(std::move(recipientHost)),
-      _sessionCatalogSource(_args.getNss()) {}
+      _recipientHost(std::move(recipientHost)) {}
 
 MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
     invariant(_state == kDone);
@@ -204,16 +205,20 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());
 
-    _sessionCatalogSource.init(opCtx);
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+        _sessionCatalogSource = stdx::make_unique<SessionCatalogMigrationSource>(_args.getNss());
+        _sessionCatalogSource->init(opCtx);
+
+        // Prime up the session migration source if there are oplog entries to migrate.
+        _sessionCatalogSource->fetchNextOplog(opCtx);
+    }
 
     // Load the ids of the currently available documents
     auto storeCurrentLocsStatus = _storeCurrentLocs(opCtx);
     if (!storeCurrentLocsStatus.isOK()) {
         return storeCurrentLocsStatus;
     }
-
-    // Prime up the session migration source if there are oplog entries to migrate.
-    _sessionCatalogSource.fetchNextOplog(opCtx);
 
     // Tell the recipient shard to start cloning
     BSONObjBuilder cmdBuilder;
@@ -338,7 +343,7 @@ Status MigrationChunkClonerSourceLegacy::commitClone(OperationContext* opCtx) {
     if (responseStatus.isOK()) {
         _cleanup(opCtx);
 
-        if (_sessionCatalogSource.hasMoreOplog()) {
+        if (_sessionCatalogSource && _sessionCatalogSource->hasMoreOplog()) {
             return {ErrorCodes::SessionTransferIncomplete,
                     "destination shard finished committing but there are still some session "
                     "metadata that needs to be transferred"};
@@ -735,12 +740,16 @@ repl::OpTime MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
     repl::OpTime opTimeToWait;
     auto seenOpTimeTerm = repl::OpTime::kUninitializedTerm;
 
-    while (_sessionCatalogSource.hasMoreOplog()) {
-        auto result = _sessionCatalogSource.getLastFetchedOplog();
+    if (!_sessionCatalogSource) {
+        return {};
+    }
+
+    while (_sessionCatalogSource->hasMoreOplog()) {
+        auto result = _sessionCatalogSource->getLastFetchedOplog();
 
         if (!result.oplog) {
             // Last fetched turned out empty, try to see if there are more
-            _sessionCatalogSource.fetchNextOplog(opCtx);
+            _sessionCatalogSource->fetchNextOplog(opCtx);
             continue;
         }
 
@@ -764,7 +773,7 @@ repl::OpTime MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
         }
 
         arrBuilder->append(oplogDoc);
-        _sessionCatalogSource.fetchNextOplog(opCtx);
+        _sessionCatalogSource->fetchNextOplog(opCtx);
 
         if (result.shouldWaitForMajority) {
             if (opTimeToWait < newOpTime) {

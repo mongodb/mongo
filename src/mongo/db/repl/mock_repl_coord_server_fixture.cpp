@@ -28,18 +28,22 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
-
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery_mock.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -48,13 +52,27 @@ void MockReplCoordServerFixture::setUp() {
 
     _opCtx = cc().makeOperationContext();
 
+    auto service = getServiceContext();
+
+    _storageInterface = new repl::StorageInterfaceMock();
+    repl::StorageInterface::set(service,
+                                std::unique_ptr<repl::StorageInterface>(_storageInterface));
+    ASSERT_TRUE(_storageInterface == repl::StorageInterface::get(service));
+
+    repl::ReplicationProcess::set(service,
+                                  stdx::make_unique<repl::ReplicationProcess>(
+                                      _storageInterface,
+                                      stdx::make_unique<repl::ReplicationConsistencyMarkersMock>(),
+                                      stdx::make_unique<repl::ReplicationRecoveryMock>()));
+
+    ASSERT_OK(repl::ReplicationProcess::get(service)->initializeRollbackID(opCtx()));
+
     // Insert code path assumes existence of repl coordinator!
     repl::ReplSettings replSettings;
     replSettings.setReplSetString(
         ConnectionString::forReplicaSet("sessionTxnStateTest", {HostAndPort("a:1")}).toString());
     replSettings.setMaster(true);
 
-    auto service = getServiceContext();
     repl::ReplicationCoordinator::set(
         service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings));
 

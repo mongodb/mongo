@@ -201,7 +201,7 @@ private:
     // during the cloning stage
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _deleteNotifyExec;
 
-    SessionCatalogMigrationSource _sessionCatalogSource;
+    std::unique_ptr<SessionCatalogMigrationSource> _sessionCatalogSource;
 
     // Protects the entries below
     stdx::mutex _mutex;

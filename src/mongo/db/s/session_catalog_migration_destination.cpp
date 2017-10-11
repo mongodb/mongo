@@ -245,8 +245,16 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, result.sessionId);
     scopedSession->beginTxn(opCtx, result.txnNum);
 
-    if (scopedSession->checkStatementExecuted(opCtx, result.txnNum, stmtId)) {
-        return lastResult;
+    if (stmtId != kIncompleteHistoryStmtId) {
+        try {
+            if (scopedSession->checkStatementExecuted(opCtx, result.txnNum, stmtId)) {
+                return lastResult;
+            }
+        } catch (const DBException& excep) {
+            if (excep.code() != ErrorCodes::IncompleteTransactionHistory) {
+                throw;
+            }
+        }
     }
 
     BSONObj object(result.isPrePostImage
@@ -291,8 +299,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                                    !oplogOpTime.isNull());
 
                            // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post
-                           // image, because
-                           // the next oplog will contain the real operation.
+                           // image, because the next oplog will contain the real operation.
                            if (!result.isPrePostImage) {
                                scopedSession->onWriteOpCompletedOnPrimary(
                                    opCtx, result.txnNum, {stmtId}, oplogOpTime);
