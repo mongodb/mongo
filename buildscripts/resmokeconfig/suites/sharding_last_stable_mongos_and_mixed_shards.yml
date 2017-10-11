@@ -49,6 +49,7 @@ selector:
   - jstests/sharding/move_chunk_update_with_write_retryability.js
   - jstests/sharding/operation_time_api.js
   - jstests/sharding/refresh_sessions.js
+  - jstests/sharding/resume_change_stream.js
   - jstests/sharding/retryable_writes.js
   - jstests/sharding/safe_secondary_reads_drop_recreate.js
   - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
