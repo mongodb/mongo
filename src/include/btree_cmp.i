@@ -7,7 +7,7 @@
  */
 
 #ifdef HAVE_X86INTRIN_H
-#if !defined(_MSC_VER)
+#if !defined(_MSC_VER) && !defined(_lint)
 #include <x86intrin.h>
 #endif
 						/* 16B alignment */
