@@ -95,6 +95,7 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
         return logicalTimeMetadata.getStatus();
     }
 
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
     auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
     const auto& signedTime = logicalTimeMetadata.getValue().getSignedTime();
 
@@ -103,7 +104,7 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
         return Status::OK();
     }
 
-    if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+    if (authSession->getAuthorizationManager().isAuthEnabled()) {
         auto advanceClockStatus = logicalTimeValidator->validate(opCtx, signedTime);
 
         if (!advanceClockStatus.isOK()) {
