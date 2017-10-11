@@ -28,18 +28,15 @@
 *    it in the license file.
 */
 
-#include "mongo/db/commands/find_and_modify.h"
+#include "mongo/platform/basic.h"
 
-#include <string>
-#include <vector>
+#include "mongo/db/commands/find_and_modify_common.h"
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
 
 namespace mongo {
 namespace find_and_modify {
