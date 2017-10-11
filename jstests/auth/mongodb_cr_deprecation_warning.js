@@ -1,4 +1,8 @@
-// Tests startup warning for deprecated authSchemaVersion
+/* Tests startup warning for deprecated authSchemaVersion
+ *
+ * This test requires auth schema version to persist across a restart.
+ * @tags: [requires_persistence]
+ */
 (function() {
     "use strict";
 
