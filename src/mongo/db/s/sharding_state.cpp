@@ -626,46 +626,71 @@ ChunkVersion ShardingState::_refreshMetadata(OperationContext* txn, const Namesp
                           << " before shard name has been set",
             shardId.isValid());
 
-    auto newCollectionMetadata = [&]() -> std::unique_ptr<CollectionMetadata> {
-        auto const catalogCache = Grid::get(txn)->catalogCache();
-        catalogCache->invalidateShardedCollection(nss);
+    auto const catalogCache = Grid::get(txn)->catalogCache();
+    catalogCache->invalidateShardedCollection(nss);
 
-        const auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(txn, nss));
-        const auto cm = routingInfo.cm();
-        if (!cm) {
-            return nullptr;
+    auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(txn, nss));
+    const auto cm = routingInfo.cm();
+
+    if (!cm) {
+        // No chunk manager, so unsharded.
+
+        // Exclusive collection lock needed since we're now changing the metadata
+        ScopedTransaction transaction(txn, MODE_IX);
+        AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
+
+        auto css = CollectionShardingState::get(txn, nss);
+        css->refreshMetadata(txn, nullptr);
+
+        return ChunkVersion::UNSHARDED();
+    }
+
+    {
+        AutoGetCollection autoColl(txn, nss, MODE_IS);
+        auto css = CollectionShardingState::get(txn, nss);
+
+        // We already have newer version
+        if (css->getMetadata() && css->getMetadata()->getCollVersion() >= cm->getVersion()) {
+            LOG(1) << "Skipping refresh of metadata for " << nss << " "
+                   << css->getMetadata()->getCollVersion() << " with an older " << cm->getVersion();
+            return css->getMetadata()->getShardVersion();
         }
-
-        RangeMap shardChunksMap =
-            SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-
-        for (const auto& chunkMapEntry : cm->chunkMap()) {
-            const auto& chunk = chunkMapEntry.second;
-
-            if (chunk->getShardId() != shardId)
-                continue;
-
-            shardChunksMap.emplace_hint(shardChunksMap.end(),
-                                        chunk->getMin(),
-                                        CachedChunkInfo(chunk->getMax(), chunk->getLastmod()));
-        }
-
-        return stdx::make_unique<CollectionMetadata>(cm->getShardKeyPattern().toBSON(),
-                                                     cm->getVersion(),
-                                                     cm->getVersion(shardId),
-                                                     std::move(shardChunksMap));
-    }();
+    }
 
     // Exclusive collection lock needed since we're now changing the metadata
     ScopedTransaction transaction(txn, MODE_IX);
     AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
 
     auto css = CollectionShardingState::get(txn, nss);
-    css->refreshMetadata(txn, std::move(newCollectionMetadata));
 
-    if (!css->getMetadata()) {
-        return ChunkVersion::UNSHARDED();
+    // We already have newer version
+    if (css->getMetadata() && css->getMetadata()->getCollVersion() >= cm->getVersion()) {
+        LOG(1) << "Skipping refresh of metadata for " << nss << " "
+               << css->getMetadata()->getCollVersion() << " with an older " << cm->getVersion();
+        return css->getMetadata()->getShardVersion();
     }
+
+    RangeMap shardChunksMap =
+        SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
+
+    for (const auto& chunkMapEntry : cm->chunkMap()) {
+        const auto& chunk = chunkMapEntry.second;
+
+        if (chunk->getShardId() != shardId)
+            continue;
+
+        shardChunksMap.emplace_hint(shardChunksMap.end(),
+                                    chunk->getMin(),
+                                    CachedChunkInfo(chunk->getMax(), chunk->getLastmod()));
+    }
+
+    std::unique_ptr<CollectionMetadata> newCollectionMetadata =
+        stdx::make_unique<CollectionMetadata>(cm->getShardKeyPattern().toBSON(),
+                                              cm->getVersion(),
+                                              cm->getVersion(shardId),
+                                              std::move(shardChunksMap));
+
+    css->refreshMetadata(txn, std::move(newCollectionMetadata));
 
     return css->getMetadata()->getShardVersion();
 }
