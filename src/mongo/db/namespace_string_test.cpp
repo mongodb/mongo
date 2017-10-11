@@ -234,4 +234,17 @@ TEST(NamespaceStringTest, NamespaceStringParse4) {
     ASSERT_EQUALS((string) "abc", ns.db());
     ASSERT_EQUALS((string) "", ns.coll());
 }
+
+
+TEST(NamespaceStringTest, EmptyNSStringReturnsEmptyColl) {
+    NamespaceString nss{};
+    ASSERT_TRUE(nss.toString().empty());
+    ASSERT_EQ(nss.coll(), StringData{});
+}
+
+TEST(NamespaceStringTest, EmptyNSStringReturnsEmptyDb) {
+    NamespaceString nss{};
+    ASSERT_TRUE(nss.toString().empty());
+    ASSERT_EQ(nss.db(), StringData{});
+}
 }
