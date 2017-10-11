@@ -107,7 +107,7 @@ selector:
   - jstests/sharding/stale_mongos_updates_and_removes.js
   - jstests/sharding/zero_shard_version.js
   # Already stop or blackholes the primary of the CSRS config shard
-  - jstests/sharding/all_config_hosts_down.js
+  - jstests/sharding/all_shard_and_config_hosts_brought_down_one_by_one.js
   - jstests/sharding/all_config_servers_blackholed_from_mongos.js
   - jstests/sharding/batch_write_command_sharded.js
   - jstests/sharding/config_rs_no_primary.js
