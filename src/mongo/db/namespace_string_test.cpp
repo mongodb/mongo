@@ -392,4 +392,16 @@ TEST(NamespaceStringTest, makeListIndexesNSIsCorrect) {
     ASSERT(ns.isListIndexesCursorNS());
     ASSERT_EQUALS(NamespaceString("DB.COLL"), ns.getTargetNSForListIndexes());
 }
+
+TEST(NamespaceStringTest, EmptyNSStringReturnsEmptyColl) {
+    NamespaceString nss{};
+    ASSERT_TRUE(nss.isEmpty());
+    ASSERT_EQ(nss.coll(), StringData{});
+}
+
+TEST(NamespaceStringTest, EmptyNSStringReturnsEmptyDb) {
+    NamespaceString nss{};
+    ASSERT_TRUE(nss.isEmpty());
+    ASSERT_EQ(nss.db(), StringData{});
+}
 }

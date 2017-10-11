@@ -118,7 +118,7 @@ inline bool NamespaceString::validCollectionName(StringData coll) {
     return true;
 }
 
-inline NamespaceString::NamespaceString() : _ns(), _dotIndex(0) {}
+inline NamespaceString::NamespaceString() : _ns(), _dotIndex(std::string::npos) {}
 inline NamespaceString::NamespaceString(StringData nsIn) {
     _ns = nsIn.toString();  // copy to our buffer
     _dotIndex = _ns.find('.');
