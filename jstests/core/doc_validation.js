@@ -7,98 +7,174 @@
     "use strict";
 
     function assertFailsValidation(res) {
-        var DocumentValidationFailure = 121;
-        assert.writeError(res);
-        assert.eq(res.getWriteError().code, DocumentValidationFailure);
+        if (res instanceof WriteResult) {
+            assert.writeErrorWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
+        } else {
+            assert.commandFailedWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
+        }
     }
 
-    var array = [];
-    for (var i = 0; i < 2048; i++) {
+    const array = [];
+    for (let i = 0; i < 2048; i++) {
         array.push({arbitrary: i});
     }
 
-    var collName = "doc_validation";
-    var coll = db[collName];
-    coll.drop();
+    const collName = "doc_validation";
+    const coll = db[collName];
 
-    // Create collection with document validator.
-    assert.commandWorked(db.createCollection(collName, {validator: {a: {$exists: true}}}));
+    /**
+     * Runs a series of document validation tests using the validator 'validator', which should
+     * enforce the existence of a field "a".
+     */
+    function runInsertUpdateValidationTest(validator) {
+        coll.drop();
 
-    // Insert and upsert documents that will pass validation.
-    assert.writeOK(coll.insert({_id: 'valid1', a: 1}));
-    assert.writeOK(coll.update({_id: 'valid2'}, {_id: 'valid2', a: 2}, {upsert: true}));
+        // Create a collection with document validator 'validator'.
+        assert.commandWorked(db.createCollection(collName, {validator: validator}));
 
-    // Insert and upsert documents that will not pass validation.
-    assertFailsValidation(coll.insert({_id: 'invalid3', b: 1}));
-    assertFailsValidation(coll.update({_id: 'invalid4'}, {_id: 'invalid4', b: 2}, {upsert: true}));
+        // Insert and upsert documents that will pass validation.
+        assert.writeOK(coll.insert({_id: "valid1", a: 1}));
+        assert.writeOK(coll.update({_id: "valid2"}, {_id: "valid2", a: 2}, {upsert: true}));
+        assert.writeOK(coll.runCommand(
+            "findAndModify", {query: {_id: "valid3"}, update: {$set: {a: 3}}, upsert: true}));
 
-    // Remove document that passed validation.
-    assert.writeOK(coll.remove({_id: 'valid1'}));
+        // Insert and upsert documents that will not pass validation.
+        assertFailsValidation(coll.insert({_id: "invalid3", b: 1}));
+        assertFailsValidation(
+            coll.update({_id: "invalid4"}, {_id: "invalid4", b: 2}, {upsert: true}));
+        assertFailsValidation(coll.runCommand(
+            "findAndModify", {query: {_id: "invalid4"}, update: {$set: {b: 3}}, upsert: true}));
 
-    // Drop will assert on failure.
-    coll.drop();
+        // Assert that we can remove the document that passed validation.
+        assert.writeOK(coll.remove({_id: "valid1"}));
 
-    // Check that we can only update documents that pass validation.
+        // Check that we can only update documents that pass validation. We insert a valid and an
+        // invalid document, then set the validator.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: "valid1", a: 1}));
+        assert.writeOK(coll.insert({_id: "invalid2", b: 1}));
+        assert.commandWorked(coll.runCommand("collMod", {validator: validator}));
 
-    // Set up valid and invalid docs then set validator.
-    assert.writeOK(coll.insert({_id: 'valid1', a: 1}));
-    assert.writeOK(coll.insert({_id: 'invalid2', b: 1}));
-    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {a: {$exists: true}}}));
+        // Assert that updates on a conforming document succeed when they affect fields not involved
+        // in validator.
+        // Add a new field.
+        assert.writeOK(coll.update({_id: "valid1"}, {$set: {z: 1}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {y: 2}}}));
+        // In-place update.
+        assert.writeOK(coll.update({_id: "valid1"}, {$inc: {z: 1}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$inc: {y: 1}}}));
+        // Out-of-place update.
+        assert.writeOK(coll.update({_id: "valid1"}, {$set: {z: array}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {y: array}}}));
+        // No-op update.
+        assert.writeOK(coll.update({_id: "valid1"}, {a: 1}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {a: 1}}}));
 
-    // Updates affecting fields not included in validator document
-    // on a conforming document.
+        // Verify those same updates will fail on non-conforming document.
+        assertFailsValidation(coll.update({_id: "invalid2"}, {$set: {z: 1}}));
+        assertFailsValidation(coll.update({_id: "invalid2"}, {$inc: {z: 1}}));
+        assertFailsValidation(coll.update({_id: "invalid2"}, {$set: {z: array}}));
+        assertFailsValidation(
+            coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {y: 2}}}));
+        assertFailsValidation(
+            coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$inc: {y: 1}}}));
+        assertFailsValidation(coll.runCommand(
+            "findAndModify", {query: {_id: "invalid2"}, update: {$set: {y: array}}}));
 
-    // Add new field.
-    assert.writeOK(coll.update({_id: 'valid1'}, {$set: {z: 1}}));
-    // In place update.
-    assert.writeOK(coll.update({_id: 'valid1'}, {$inc: {z: 1}}));
-    // Out of place update.
-    assert.writeOK(coll.update({_id: 'valid1'}, {$set: {z: array}}));
-    // No-op update.
-    assert.writeOK(coll.update({_id: 'valid1'}, {a: 1}));
+        // A no-op update of an invalid doc will succeed.
+        assert.writeOK(coll.update({_id: "invalid2"}, {$set: {b: 1}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {b: 1}}}));
 
-    // Verify those updates will fail on non-conforming document.
-    assertFailsValidation(coll.update({_id: 'invalid2'}, {$set: {z: 1}}));
-    assertFailsValidation(coll.update({_id: 'invalid2'}, {$inc: {z: 1}}));
-    assertFailsValidation(coll.update({_id: 'invalid2'}, {$set: {z: array}}));
+        // Verify that we can't make a conforming document fail validation, but can update a
+        // non-conforming document to pass validation.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: "valid1", a: 1}));
+        assert.writeOK(coll.insert({_id: "invalid2", b: 1}));
+        assert.writeOK(coll.insert({_id: "invalid3", b: 1}));
+        assert.commandWorked(coll.runCommand("collMod", {validator: validator}));
 
-    // A no-op update of an invalid doc will succeed.
-    assert.writeOK(coll.update({_id: 'invalid2'}, {$set: {b: 1}}));
+        assertFailsValidation(coll.update({_id: "valid1"}, {$unset: {a: 1}}));
+        assert.writeOK(coll.update({_id: "invalid2"}, {$set: {a: 1}}));
+        assertFailsValidation(
+            coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "invalid3"}, update: {$set: {a: 1}}}));
 
-    // Verify that the validator respects the collection's default collation. We do this by setting
-    // a case-insensitive (strength 2) US English collation, and ensuring that the validation is
-    // case-insensitive.
-    coll.drop();
-    assert.commandWorked(db.createCollection(
-        collName, {validator: {a: "xyz"}, collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({a: "XYZ"}));
-    assert.writeOK(coll.insert({a: "XyZ", b: "foo"}));
-    assert.writeOK(coll.update({b: "foo"}, {a: "xyZ", b: "foo"}));
-    assert.writeOK(coll.update({b: "foo"}, {$set: {a: "Xyz"}}));
-    assertFailsValidation(coll.insert({a: "not xyz"}));
-    assertFailsValidation(coll.update({b: "foo"}, {$set: {a: "xyzz"}}));
+        // Modify the collection to remove the document validator.
+        assert.commandWorked(coll.runCommand("collMod", {validator: {}}));
 
-    // Verify can't make a conforming doc fail validation,
-    // but can update non-conforming doc to pass validation.
-    coll.drop();
-    assert.writeOK(coll.insert({_id: 'valid1', a: 1}));
-    assert.writeOK(coll.insert({_id: 'invalid2', b: 1}));
-    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {a: {$exists: true}}}));
+        // Verify that no validation is applied to updates.
+        assert.writeOK(coll.update({_id: "valid1"}, {$set: {z: 1}}));
+        assert.writeOK(coll.update({_id: "invalid2"}, {$set: {z: 1}}));
+        assert.writeOK(coll.update({_id: "valid1"}, {$unset: {a: 1}}));
+        assert.writeOK(coll.update({_id: "invalid2"}, {$set: {a: 1}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {z: 2}}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {z: 2}}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}));
+        assert.writeOK(
+            coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {a: 1}}}));
+    }
 
-    assertFailsValidation(coll.update({_id: 'valid1'}, {$unset: {a: 1}}));
-    assert.writeOK(coll.update({_id: 'invalid2'}, {$set: {a: 1}}));
+    // Run the test with a normal validator.
+    runInsertUpdateValidationTest({a: {$exists: true}});
 
-    // Modify collection to remove validator statement
-    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {}}));
+    // Run the test again with an equivalent JSON Schema.
+    runInsertUpdateValidationTest({$jsonSchema: {required: ["a"]}});
 
-    // Verify no validation applied to updates.
-    assert.writeOK(coll.update({_id: 'valid1'}, {$set: {z: 1}}));
-    assert.writeOK(coll.update({_id: 'invalid2'}, {$set: {z: 1}}));
-    assert.writeOK(coll.update({_id: 'valid1'}, {$unset: {a: 1}}));
-    assert.writeOK(coll.update({_id: 'invalid2'}, {$set: {a: 1}}));
-    coll.drop();
+    /**
+     * Run a series of document validation tests involving collation using the validator
+     * 'validator', which should enforce that the field "a" has the value "xyz".
+     */
+    function runCollationValidationTest(validator) {
+        coll.drop();
+        assert.commandWorked(db.createCollection(
+            collName, {validator: validator, collation: {locale: "en_US", strength: 2}}));
+
+        // An insert that matches the validator should succeed.
+        assert.writeOK(coll.insert({_id: 0, a: "xyz", b: "foo"}));
+
+        const isJSONSchema = validator.hasOwnProperty("$jsonSchema");
+
+        // A normal validator should respect the collation and the inserts should succeed. A JSON
+        // Schema validator ignores the collation and the inserts should fail.
+        const assertCorrectResult =
+            isJSONSchema ? res => assertFailsValidation(res) : res => assert.writeOK(res);
+        assertCorrectResult(coll.insert({a: "XYZ"}));
+        assertCorrectResult(coll.insert({a: "XyZ", b: "foo"}));
+        assertCorrectResult(coll.update({_id: 0}, {a: "xyZ", b: "foo"}));
+        assertCorrectResult(coll.update({_id: 0}, {$set: {a: "Xyz"}}));
+        assertCorrectResult(
+            coll.runCommand("findAndModify", {query: {_id: 0}, update: {a: "xyZ", b: "foo"}}));
+        assertCorrectResult(
+            coll.runCommand("findAndModify", {query: {_id: 0}, update: {$set: {a: "Xyz"}}}));
+
+        // Test an insert and an update that should always fail.
+        assertFailsValidation(coll.insert({a: "not xyz"}));
+        assertFailsValidation(coll.update({_id: 0}, {$set: {a: "xyzz"}}));
+        assertFailsValidation(
+            coll.runCommand("findAndModify", {query: {_id: 0}, update: {$set: {a: "xyzz"}}}));
+
+        // A normal validator expands leaf arrays, such that if "a" is an array containing "xyz", it
+        // matches {a: "xyz"}. A JSON Schema validator does not expand leaf arrays and treats arrays
+        // as a single array value.
+        assertCorrectResult(coll.insert({a: ["xyz"]}));
+        assertCorrectResult(coll.insert({a: ["XYZ"]}));
+        assertCorrectResult(coll.insert({a: ["XyZ"], b: "foo"}));
+    }
+
+    runCollationValidationTest({a: "xyz"});
+    runCollationValidationTest({$jsonSchema: {properties: {a: {enum: ["xyz"]}}}});
 
     // The validator is allowed to contain $expr.
+    coll.drop();
     assert.commandWorked(db.createCollection(collName, {validator: {$expr: {$eq: ["$a", 5]}}}));
     assert.writeOK(coll.insert({a: 5}));
     assertFailsValidation(coll.insert({a: 4}));
