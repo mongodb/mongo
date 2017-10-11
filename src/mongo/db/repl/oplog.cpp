@@ -800,8 +800,16 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          BSONObj& cmd,
          const OpTime& opTime) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
+          auto nss = parseUUIDorNs(opCtx, ns, ui, cmd);
+          if (nss.isDropPendingNamespace()) {
+              log()
+                  << "applyCommand: " << nss << " (UUID: " << ui.toString(false)
+                  << "): collection is already in a drop-pending state: ignoring collection drop: "
+                  << redact(cmd);
+              return Status::OK();
+          }
           return dropCollection(opCtx,
-                                parseUUIDorNs(opCtx, ns, ui, cmd),
+                                nss,
                                 resultWeDontCareAbout,
                                 opTime,
                                 DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
