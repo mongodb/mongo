@@ -1,6 +1,7 @@
 package mongoreplay
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -126,38 +127,17 @@ func TestMultiChannelGetMoreLiveDB(t *testing.T) {
 	pcapTestHelper(t, pcapFname, true, verifier)
 }
 
-func pcapTestHelper(t *testing.T, pcapFname string, preprocess bool, verifier verifyFunc) {
+func TestRecordEOF(t *testing.T) {
+	pcapFile := "testPcap/workload_with_EOF.pcap"
 
-	pcapFile := "mongoreplay/testPcap/" + pcapFname
 	if _, err := os.Stat(pcapFile); err != nil {
 		t.Skipf("pcap file %v not present, skipping test", pcapFile)
 	}
 
-	if err := teardownDB(); err != nil {
-		t.Error(err)
-	}
-
-	playbackFname := "pcap_test_run.tape"
-	streamSettings := OpStreamSettings{
-		PcapFile:      pcapFile,
-		PacketBufSize: 9000,
-	}
-	t.Log("Opening op stream")
-	ctx, err := getOpstream(streamSettings)
+	playbackFname := "pcaptest_run.playback"
+	err := playbackFileFromPcap(pcapFile, playbackFname)
 	if err != nil {
-		t.Errorf("error opening opstream: %v\n", err)
-	}
-
-	playbackWriter, err := NewPlaybackWriter(playbackFname, false)
-	defer os.Remove(playbackFname)
-	if err != nil {
-		t.Errorf("error opening playback file to write: %v\n", err)
-	}
-
-	t.Log("Recording playbackfile from pcap file")
-	err = Record(ctx, playbackWriter, false)
-	if err != nil {
-		t.Errorf("error makign tape file: %v\n", err)
+		t.Errorf("error creating playback file from pcap: %v\n", err)
 	}
 
 	playbackReader, err := NewPlaybackFileReader(playbackFname, false)
@@ -165,13 +145,81 @@ func pcapTestHelper(t *testing.T, pcapFname string, preprocess bool, verifier ve
 		t.Errorf("error opening playback file to write: %v\n", err)
 	}
 
+	count := 1
+	for {
+		recordedOp, err := playbackReader.NextRecordedOp()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Error(err)
+		}
+		if count == 27 || count == 54 {
+			if !recordedOp.EOF {
+				t.Errorf("expecting EOF op to be placed in recording file")
+			}
+		}
+		count++
+	}
+
+}
+
+func playbackFileFromPcap(pcapFname, playbackFname string) error {
+
+	streamSettings := OpStreamSettings{
+		PcapFile:      pcapFname,
+		PacketBufSize: 9000,
+	}
+	ctx, err := getOpstream(streamSettings)
+	if err != nil {
+		return fmt.Errorf("couldn't open opstream: %v", err)
+	}
+
+	playbackWriter, err := NewPlaybackFileWriter(playbackFname, false, false)
+	if err != nil {
+		return err
+	}
+
+	err = Record(ctx, playbackWriter, false)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func pcapTestHelper(t *testing.T, pcapFname string, preprocess bool, verifier verifyFunc) {
+	pcapFile := "mongoreplay/testPcap/" + pcapFname
+	if _, err := os.Stat(pcapFile); err != nil {
+		t.Skipf("pcap file %v not present, skipping test", pcapFile)
+	}
+	playbackFname := "pcap_test_run.playback"
+	err := playbackFileFromPcap(pcapFname, playbackFname)
+	defer os.Remove(playbackFname)
+	if err != nil {
+		t.Errorf("error writing playbackfile %v\n", err)
+	}
+
+	playbackReader, err := NewPlaybackFileReader(playbackFname, false)
+	if err != nil {
+		t.Errorf("error opening playback file to write: %v\n", err)
+	}
+
+	if err := teardownDB(); err != nil {
+		t.Error(err)
+	}
+
 	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
-	context := NewExecutionContext(statCollector)
+	replaySession, err := mgo.Dial(currentTestURL)
+	if err != nil {
+		t.Errorf("Error connecting to test server: %v", err)
+	}
+	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
 	var preprocessMap preprocessCursorManager
 	if preprocess {
-		opChan, errChan := NewOpChanFromFile(playbackReader, 1)
+		opChan, errChan := playbackReader.OpChan(1)
 		preprocessMap, err := newPreprocessCursorManager(opChan)
 
 		if err != nil {
@@ -190,10 +238,10 @@ func pcapTestHelper(t *testing.T, pcapFname string, preprocess bool, verifier ve
 		context.CursorIDMap = preprocessMap
 	}
 
-	opChan, errChan := NewOpChanFromFile(playbackReader, 1)
+	opChan, errChan := playbackReader.OpChan(1)
 
 	t.Log("Reading ops from playback file")
-	err = Play(context, opChan, testSpeed, currentTestURL, 1, 30)
+	err = Play(context, opChan, testSpeed, 1, 30)
 	if err != nil {
 		t.Errorf("error playing back recorded file: %v\n", err)
 	}

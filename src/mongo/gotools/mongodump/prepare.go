@@ -12,23 +12,12 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type NilPos struct{}
 
 func (NilPos) Pos() int64 {
 	return -1
-}
-
-type collectionInfo struct {
-	Name    string  `bson:"name"`
-	Type    string  `bson:"type"`
-	Options *bson.D `bson:"options"`
-}
-
-func (ci *collectionInfo) IsView() bool {
-	return ci.Type == "view"
 }
 
 // writeFlusher wraps an io.Writer and adds a Flush function.
@@ -179,55 +168,6 @@ func checkStringForPathSeparator(s string, c *rune) bool {
 	return false
 }
 
-// NewIntent creates a bare intent without populating the options.
-func (dump *MongoDump) NewIntent(dbName, colName string) (*intents.Intent, error) {
-	intent := &intents.Intent{
-		DB: dbName,
-		C:  colName,
-	}
-	if dump.OutputOptions.Out == "-" {
-		intent.BSONFile = &stdoutFile{Writer: dump.OutputWriter}
-	} else {
-		if dump.OutputOptions.Archive != "" {
-			intent.BSONFile = &archive.MuxIn{Intent: intent, Mux: dump.archive.Mux}
-		} else {
-			var c rune
-			if checkStringForPathSeparator(colName, &c) || checkStringForPathSeparator(dbName, &c) {
-				return nil, fmt.Errorf(`"%v.%v" contains a path separator '%c' `+
-					`and can't be dumped to the filesystem`, dbName, colName, c)
-			}
-			path := nameGz(dump.OutputOptions.Gzip, dump.outputPath(dbName, colName)+".bson")
-			intent.BSONFile = &realBSONFile{path: path, intent: intent}
-		}
-		if !intent.IsSystemIndexes() {
-			if dump.OutputOptions.Archive != "" {
-				intent.MetadataFile = &archive.MetadataFile{
-					Intent: intent,
-					Buffer: &bytes.Buffer{},
-				}
-			} else {
-				path := nameGz(dump.OutputOptions.Gzip, dump.outputPath(dbName, colName+".metadata.json"))
-				intent.MetadataFile = &realMetadataFile{path: path, intent: intent}
-			}
-		}
-	}
-
-	// get a document count for scheduling purposes
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return nil, err
-	}
-	defer session.Close()
-
-	count, err := session.DB(dbName).C(colName).Count()
-	if err != nil {
-		return nil, fmt.Errorf("error counting %v: %v", intent.Namespace(), err)
-	}
-	intent.Size = int64(count)
-
-	return intent, nil
-}
-
 // CreateOplogIntents creates an intents.Intent for the oplog and adds it to the manager
 func (dump *MongoDump) CreateOplogIntents() error {
 	err := dump.determineOplogCollectionName()
@@ -290,57 +230,94 @@ func (dump *MongoDump) CreateCollectionIntent(dbName, colName string) error {
 		return nil
 	}
 
-	intent, err := dump.NewIntent(dbName, colName)
-	if err != nil {
-		return err
-	}
-
 	session, err := dump.SessionProvider.GetSession()
 	if err != nil {
 		return err
 	}
 	defer session.Close()
 
-	intent.Options, err = db.GetCollectionOptions(session.DB(dbName).C(colName))
+	collOptions, err := db.GetCollectionInfo(session.DB(dbName).C(colName))
 	if err != nil {
 		return fmt.Errorf("error getting collection options: %v", err)
 	}
 
-	dump.manager.Put(intent)
-
-	log.Logvf(log.DebugLow, "enqueued collection '%v'", intent.Namespace())
-	return nil
-}
-
-func (dump *MongoDump) createIntentFromOptions(dbName string, ci *collectionInfo) error {
-	if dump.shouldSkipCollection(ci.Name) {
-		log.Logvf(log.DebugLow, "skipping dump of %v.%v, it is excluded", dbName, ci.Name)
-		return nil
-	}
-
-	if dump.OutputOptions.ViewsAsCollections && !ci.IsView() {
-		log.Logvf(log.DebugLow, "skipping dump of %v.%v because it is not a view", dbName, ci.Name)
-		return nil
-	}
-
-	intent, err := dump.NewIntent(dbName, ci.Name)
+	intent, err := dump.NewIntentFromOptions(dbName, collOptions)
 	if err != nil {
 		return err
 	}
-	if dump.OutputOptions.ViewsAsCollections {
-		log.Logvf(log.DebugLow, "not dumping metadata for %v.%v because it is a view", dbName, ci.Name)
-		intent.MetadataFile = nil
-	} else if ci.IsView() {
-		log.Logvf(log.DebugLow, "not dumping data for %v.%v because it is a view", dbName, ci.Name)
-		// only write a bson file if using archive
-		if dump.OutputOptions.Archive == "" {
-			intent.BSONFile = nil
+
+	dump.manager.Put(intent)
+	return nil
+}
+
+func (dump *MongoDump) NewIntentFromOptions(dbName string, ci *db.CollectionInfo) (*intents.Intent, error) {
+	intent := &intents.Intent{
+		DB:      dbName,
+		C:       ci.Name,
+		Options: ci.Options,
+	}
+
+	// Setup output location
+	if dump.OutputOptions.Out == "-" { // regular standard output
+		intent.BSONFile = &stdoutFile{Writer: dump.OutputWriter}
+	} else {
+		// Set the BSONFile path.
+		if dump.OutputOptions.Archive != "" {
+			// if archive mode, then the output should be written using an output
+			// muxer.
+			intent.BSONFile = &archive.MuxIn{Intent: intent, Mux: dump.archive.Mux}
+		} else if dump.OutputOptions.ViewsAsCollections || !ci.IsView() {
+			// otherwise, if it's either not a view or we're treating views as collections
+			// then create a standard filesystem path for this collection.
+			var c rune
+			if checkStringForPathSeparator(ci.Name, &c) || checkStringForPathSeparator(dbName, &c) {
+				return nil, fmt.Errorf(`"%v.%v" contains a path separator '%c' `+
+					`and can't be dumped to the filesystem`, dbName, ci.Name, c)
+			}
+			path := nameGz(dump.OutputOptions.Gzip, dump.outputPath(dbName, ci.Name)+".bson")
+			intent.BSONFile = &realBSONFile{path: path, intent: intent}
+		} else {
+			// otherwise, it's a view and the options specify not dumping a view
+			// so don't dump it.
+			log.Logvf(log.DebugLow, "not dumping data for %v.%v because it is a view", dbName, ci.Name)
+		}
+		//Set the MetadataFile path.
+		if dump.OutputOptions.ViewsAsCollections && ci.IsView() {
+			log.Logvf(log.DebugLow, "not dumping metadata for %v.%v because it is a view", dbName, ci.Name)
+		} else {
+			if !intent.IsSystemIndexes() {
+				if dump.OutputOptions.Archive != "" {
+					intent.MetadataFile = &archive.MetadataFile{
+						Intent: intent,
+						Buffer: &bytes.Buffer{},
+					}
+				} else {
+					path := nameGz(dump.OutputOptions.Gzip, dump.outputPath(dbName, ci.Name+".metadata.json"))
+					intent.MetadataFile = &realMetadataFile{path: path, intent: intent}
+				}
+			}
 		}
 	}
-	intent.Options = ci.Options
-	dump.manager.Put(intent)
-	log.Logvf(log.DebugLow, "enqueued collection '%v'", intent.Namespace())
-	return nil
+
+	// get a document count for scheduling purposes.
+	// skips this if it is a view, as it may be incredibly slow if the
+	// view is based on a slow query.
+
+	if ci.IsView() {
+		return intent, nil
+	}
+
+	session, err := dump.SessionProvider.GetSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()
+	count, err := session.DB(dbName).C(ci.Name).Count()
+	if err != nil {
+		return nil, fmt.Errorf("error counting %v: %v", intent.Namespace(), err)
+	}
+	intent.Size = int64(count)
+	return intent, nil
 }
 
 // CreateIntentsForDatabase iterates through collections in a db
@@ -359,7 +336,7 @@ func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 		return fmt.Errorf("error getting collections for database `%v`: %v", dbName, err)
 	}
 
-	collInfo := &collectionInfo{}
+	collInfo := &db.CollectionInfo{}
 	for colsIter.Next(collInfo) {
 		// ignore <db>.system.* except for admin
 		if dbName != "admin" && strings.HasPrefix(collInfo.Name, "system.") {
@@ -371,19 +348,26 @@ func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 			continue
 		}
 		if fullName {
-			namespacePrefix := dbName + "."
-			// if the collection info came from querying system.indexes (2.6 or earlier) then the
-			// "name" we get includes the db name as well, so we must remove it
-			if strings.HasPrefix(collInfo.Name, namespacePrefix) {
-				collInfo.Name = collInfo.Name[len(namespacePrefix):]
-			} else {
-				return fmt.Errorf("namespace '%v' format is invalid - expected to start with '%v'", collInfo.Name, namespacePrefix)
+			collName, err := db.StripDBFromNamespace(collInfo.Name, dbName)
+			if err != nil {
+				return err
 			}
+			collInfo.Name = collName
 		}
-		err := dump.createIntentFromOptions(dbName, collInfo)
+		if dump.shouldSkipCollection(collInfo.Name) {
+			log.Logvf(log.DebugLow, "skipping dump of %v.%v, it is excluded", dbName, collInfo.Name)
+			continue
+		}
+
+		if dump.OutputOptions.ViewsAsCollections && !collInfo.IsView() {
+			log.Logvf(log.DebugLow, "skipping dump of %v.%v because it is not a view", dbName, collInfo.Name)
+			continue
+		}
+		intent, err := dump.NewIntentFromOptions(dbName, collInfo)
 		if err != nil {
 			return err
 		}
+		dump.manager.Put(intent)
 	}
 	return colsIter.Err()
 }

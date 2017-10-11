@@ -237,11 +237,9 @@ func (op *CommandOp) FromReader(r io.Reader) error {
 
 // Execute performs the CommandOp on a given session, yielding the reply when
 // successful (and an error otherwise).
-func (op *CommandOp) Execute(session *mgo.Session) (Replyable, error) {
-	session.SetSocketTimeout(0)
-
+func (op *CommandOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
 	before := time.Now()
-	metadata, commandReply, replyData, resultReply, err := mgo.ExecOpWithReply(session, &op.CommandOp)
+	metadata, commandReply, replyData, resultReply, err := mgo.ExecOpWithReply(socket, &op.CommandOp)
 	after := time.Now()
 	if err != nil {
 		return nil, err

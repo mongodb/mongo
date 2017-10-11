@@ -24,14 +24,14 @@ const (
 func main() {
 	// initialize command-line opts
 	opts := options.New("mongoexport", mongoexport.Usage,
-		options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
+		options.EnabledOptions{Auth: true, Connection: true, Namespace: true, URI: true})
 
 	outputOpts := &mongoexport.OutputFormatOptions{}
 	opts.AddOptions(outputOpts)
 	inputOpts := &mongoexport.InputOptions{}
 	opts.AddOptions(inputOpts)
 
-	args, err := opts.Parse()
+	args, err := opts.ParseArgs(os.Args[1:])
 	if err != nil {
 		log.Logvf(log.Always, "error parsing command line options: %v", err)
 		log.Logvf(log.Always, "try 'mongoexport --help' for more information")
@@ -56,10 +56,8 @@ func main() {
 		return
 	}
 
-	// connect directly, unless a replica set name is explicitly specified
-	_, setName := util.ParseConnectionString(opts.Host)
-	opts.Direct = (setName == "")
-	opts.ReplicaSetName = setName
+	// verify uri options and log them
+	opts.URI.LogUnsupportedOptions()
 
 	provider, err := db.NewSessionProvider(*opts)
 	if err != nil {

@@ -285,6 +285,7 @@ func (manager *Manager) putNormalIntentWithNamespace(ns string, intent *Intent) 
 // Put inserts an intent into the manager with the same source namespace as
 // its destinations.
 func (manager *Manager) Put(intent *Intent) {
+	log.Logvf(log.DebugLow, "enqueued collection '%v'", intent.Namespace())
 	manager.PutWithNamespace(intent.Namespace(), intent)
 }
 

@@ -120,7 +120,9 @@ func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 func (self *SessionProvider) Close() {
 	self.masterSessionLock.Lock()
 	defer self.masterSessionLock.Unlock()
-	self.masterSession.Close()
+	if self.masterSession != nil {
+		self.masterSession.Close()
+	}
 }
 
 // refresh is a helper for modifying the session based on the

@@ -5,32 +5,47 @@ import (
 	"io"
 	"testing"
 	"time"
-
-	"github.com/10gen/llmgo/bson"
 )
 
 func TestRepeatGeneration(t *testing.T) {
 	recOp := &RecordedOp{
 		Seen: &PreciseTime{time.Now()},
 	}
-	bsonBytes, err := bson.Marshal(recOp)
+
+	var buf bytes.Buffer
+	wc := NopWriteCloser(&buf)
+	file, err := playbackFileWriterFromWriteCloser(wc, "", PlaybackFileMetadata{})
 	if err != nil {
-		t.Errorf("couldn't marshal %v", err)
+		t.Fatalf("error creating playback file %v", err)
 	}
-	playbackReader := &PlaybackFileReader{bytes.NewReader(bsonBytes)}
+
+	err = bsonToWriter(file, recOp)
+	if err != nil {
+		t.Fatalf("error writing to bson file %v", err)
+	}
+
+	rs := bytes.NewReader(buf.Bytes())
+	playbackReader, err := playbackFileReaderFromReadSeeker(rs, "")
+	if err != nil {
+		t.Fatalf("unable to read from playback file %v", err)
+	}
 
 	repeat := 2
-	opChan, errChan := NewOpChanFromFile(playbackReader, repeat)
+	opChan, errChan := playbackReader.OpChan(repeat)
 	op1, ok := <-opChan
 	if !ok {
-		t.Errorf("read of 0-generation op failed")
+		err, ok := <-errChan
+		if ok {
+			t.Logf("error: %v", err)
+		}
+		t.Fatalf("read of 0-generation op failed")
 	}
 	if op1.Generation != 0 {
 		t.Errorf("generation of 0 generation op is %v", op1.Generation)
 	}
 	op2, ok := <-opChan
 	if !ok {
-		t.Errorf("read of 1-generation op failed")
+		t.Fatalf("read of 1-generation op failed")
 	}
 	if op2.Generation != 1 {
 		t.Errorf("generation of 1 generation op is %v", op2.Generation)
@@ -53,28 +68,38 @@ func TestPlayOpEOF(t *testing.T) {
 		EOF:  true,
 	}}
 	var buf bytes.Buffer
-	for _, op := range ops {
-		bsonBytes, err := bson.Marshal(op)
-		if err != nil {
-			t.Errorf("couldn't marshal op %v", err)
-		}
-		buf.Write(bsonBytes)
+	wc := NopWriteCloser(&buf)
+	file, err := playbackFileWriterFromWriteCloser(wc, "", PlaybackFileMetadata{})
+	if err != nil {
+		t.Fatalf("error creating playback file %v", err)
 	}
-	playbackReader := &PlaybackFileReader{bytes.NewReader(buf.Bytes())}
+
+	for _, op := range ops {
+		err := bsonToWriter(file, op)
+		if err != nil {
+			t.Fatalf("unable to write to playback file %v", err)
+		}
+	}
+
+	rs := bytes.NewReader(buf.Bytes())
+	playbackReader, err := playbackFileReaderFromReadSeeker(rs, "")
+	if err != nil {
+		t.Fatalf("unable to read from playback file %v", err)
+	}
 
 	repeat := 2
-	opChan, errChan := NewOpChanFromFile(playbackReader, repeat)
+	opChan, errChan := playbackReader.OpChan(repeat)
 
 	op1, ok := <-opChan
 	if !ok {
-		t.Errorf("read of op1 failed")
+		t.Fatalf("read of op1 failed")
 	}
 	if op1.EOF {
 		t.Errorf("op1 should not be an EOF op")
 	}
 	op2, ok := <-opChan
 	if !ok {
-		t.Errorf("read op2 failed")
+		t.Fatalf("read op2 failed")
 	}
 	if op2.EOF {
 		t.Errorf("op2 should not be an EOF op")
@@ -91,7 +116,7 @@ func TestPlayOpEOF(t *testing.T) {
 	if ok {
 		t.Errorf("Successfully read past end of op chan")
 	}
-	err := <-errChan
+	err = <-errChan
 	if err != io.EOF {
 		t.Errorf("should have eof at end, but got %v", err)
 	}

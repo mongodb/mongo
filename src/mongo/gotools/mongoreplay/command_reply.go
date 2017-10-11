@@ -174,7 +174,7 @@ func (op *CommandReplyOp) FromReader(r io.Reader) error {
 
 // Execute logs a warning and returns nil because OP_COMMANDREPLY cannot yet be
 // handled fully by mongoreplay.
-func (op *CommandReplyOp) Execute(session *mgo.Session) (Replyable, error) {
+func (op *CommandReplyOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
 	userInfoLogger.Logv(Always, "Skipping unimplemented op: OP_COMMANDREPLY")
 	return nil, nil
 }

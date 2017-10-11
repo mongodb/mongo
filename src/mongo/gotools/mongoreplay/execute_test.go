@@ -7,7 +7,7 @@ import (
 )
 
 func TestCompleteReply(t *testing.T) {
-	context := NewExecutionContext(&StatCollector{})
+	context := NewExecutionContext(&StatCollector{}, nil, &ExecutionOptions{})
 
 	// AddFromWire takes a recorded request and a live reply to the re-execution
 	// of that reply

@@ -1,6 +1,9 @@
 package mongodump
 
 import (
+	"github.com/mongodb/mongo-tools/common/connstring"
+	"github.com/mongodb/mongo-tools/common/options"
+
 	"fmt"
 	"io/ioutil"
 )
@@ -24,6 +27,14 @@ type InputOptions struct {
 // Name returns a human-readable group name for input options.
 func (*InputOptions) Name() string {
 	return "query"
+}
+
+func (inputOpts *InputOptions) SetOptionsFromURI(cs connstring.ConnString) error {
+	if inputOpts.ReadPreference != "" {
+		return fmt.Errorf(options.IncompatibleArgsErrorFormat, "--readPreference")
+	}
+	inputOpts.ReadPreference = cs.ReadPreference
+	return nil
 }
 
 func (inputOptions *InputOptions) HasQuery() bool {

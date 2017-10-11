@@ -429,6 +429,35 @@ func (b *PreciseTime) SetBSON(raw bson.Raw) error {
 	return nil
 }
 
+// bsonFromReader reads a bson document from the reader into out.
+func bsonFromReader(reader io.Reader, out interface{}) error {
+	buf, err := ReadDocument(reader)
+	if err != nil {
+		if err != io.EOF {
+			err = fmt.Errorf("ReadDocument Error: %v", err)
+		}
+		return err
+	}
+	err = bson.Unmarshal(buf, out)
+	if err != nil {
+		return fmt.Errorf("Unmarshal RecordedOp Error: %v\n", err)
+	}
+	return nil
+}
+
+// bsonToWriter writes a bson document to the writer given.
+func bsonToWriter(writer io.Writer, in interface{}) error {
+	bsonBytes, err := bson.Marshal(in)
+	if err != nil {
+		return err
+	}
+	_, err = writer.Write(bsonBytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // bufferWaiter is a channel-like structure which only recieves a buffer
 // from its channel once on the first Get() call, then yields the same
 // buffer upon subsequent Get() calls.

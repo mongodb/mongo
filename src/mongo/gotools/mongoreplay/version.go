@@ -10,12 +10,16 @@ import (
 // is specified.
 func (o *VersionOptions) PrintVersion() bool {
 	if o.Version {
-		fmt.Printf("%v version: %v\n", "mongoreplay", options.VersionStr)
-		fmt.Printf("git version: %v\n", options.Gitspec)
-		fmt.Printf("Go version: %v\n", runtime.Version())
-		fmt.Printf("   os: %v\n", runtime.GOOS)
-		fmt.Printf("   arch: %v\n", runtime.GOARCH)
-		fmt.Printf("   compiler: %v\n", runtime.Compiler)
+		printVersionInfo()
 	}
 	return o.Version
+}
+
+func printVersionInfo() {
+	fmt.Printf("%v version: %v\n", "mongoreplay", options.VersionStr)
+	fmt.Printf("git version: %v\n", options.Gitspec)
+	fmt.Printf("Go version: %v\n", runtime.Version())
+	fmt.Printf("   os: %v\n", runtime.GOOS)
+	fmt.Printf("   arch: %v\n", runtime.GOARCH)
+	fmt.Printf("   compiler: %v\n", runtime.Compiler)
 }

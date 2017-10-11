@@ -32,8 +32,8 @@ type StatOptions struct {
 // recording functions
 type StatCollector struct {
 	sync.Once
-	done       chan struct{}
-	statStream chan *OpStat
+	done           chan struct{}
+	statStream     chan *OpStat
 	statStreamSize int
 	StatGenerator
 	StatRecorder
@@ -138,10 +138,15 @@ func FindValueByKey(keyName string, document *bson.D) (interface{}, bool) {
 	return nil, false
 }
 
-func shouldCollectOp(op Op) bool {
+func shouldCollectOp(op Op, driverOpsFiltered bool) bool {
 	_, isReplyOp := op.(*ReplyOp)
 	_, isCommandReplyOp := op.(*CommandReplyOp)
-	return !isReplyOp && !isCommandReplyOp && !IsDriverOp(op)
+
+	var isDriverOp bool
+	if !driverOpsFiltered {
+		isDriverOp = IsDriverOp(op)
+	}
+	return !isReplyOp && !isCommandReplyOp && !isDriverOp
 }
 
 // Collect formats the operation statistics as specified by the contained StatGenerator and writes it to

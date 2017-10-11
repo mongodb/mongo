@@ -65,9 +65,8 @@ func (op *KillCursorsOp) FromReader(r io.Reader) error {
 
 // Execute performs the KillCursorsOp on a given session, yielding the reply
 // when successful (and an error otherwise).
-func (op *KillCursorsOp) Execute(session *mgo.Session) (Replyable, error) {
-	session.SetSocketTimeout(0)
-	if err := mgo.ExecOpWithoutReply(session, &op.KillCursorsOp); err != nil {
+func (op *KillCursorsOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+	if err := mgo.ExecOpWithoutReply(socket, &op.KillCursorsOp); err != nil {
 		return nil, err
 	}
 

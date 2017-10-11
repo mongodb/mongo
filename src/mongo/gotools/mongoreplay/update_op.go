@@ -113,10 +113,10 @@ func (op *UpdateOp) FromReader(r io.Reader) error {
 	return nil
 }
 
-// Execute performs the UpdateOp on a given session, yielding the reply when
+// Execute performs the UpdateOp on a given socket, yielding the reply when
 // successful (and an error otherwise).
-func (op *UpdateOp) Execute(session *mgo.Session) (Replyable, error) {
-	if err := mgo.ExecOpWithoutReply(session, &op.UpdateOp); err != nil {
+func (op *UpdateOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+	if err := mgo.ExecOpWithoutReply(socket, &op.UpdateOp); err != nil {
 		return nil, err
 	}
 	return nil, nil

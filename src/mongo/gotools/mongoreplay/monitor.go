@@ -98,7 +98,7 @@ func (monitor *MonitorCommand) Execute(args []string) error {
 		if err != nil {
 			return err
 		}
-		opChan, errChan = NewOpChanFromFile(playbackFileReader, 1)
+		opChan, errChan = playbackFileReader.OpChan(1)
 
 	} else {
 		ctx, err := getOpstream(monitor.OpStreamSettings)

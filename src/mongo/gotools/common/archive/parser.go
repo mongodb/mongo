@@ -104,8 +104,9 @@ func (parse *Parser) ReadAllBlocks(consumer ParserConsumer) (err error) {
 	for err == nil {
 		err = parse.ReadBlock(consumer)
 	}
+	endError := consumer.End()
 	if err == io.EOF {
-		return nil
+		return endError
 	}
 	return err
 }
@@ -119,13 +120,6 @@ func (parse *Parser) ReadAllBlocks(consumer ParserConsumer) (err error) {
 // parsing failure.
 func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
 	isTerminator, err := parse.readBSONOrTerminator()
-	if err == io.EOF {
-		handlerErr := consumer.End()
-		if handlerErr != nil {
-			return newParserWrappedError("ParserConsumer.End", handlerErr)
-		}
-		return err
-	}
 	if err != nil {
 		return err
 	}

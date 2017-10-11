@@ -35,6 +35,7 @@ func TestMongorestore(t *testing.T) {
 			Host: testServer,
 			Port: testPort,
 		},
+		URI:  &options.URI{},
 		Auth: &auth,
 		SSL:  &ssl,
 	}

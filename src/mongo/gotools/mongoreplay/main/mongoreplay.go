@@ -4,7 +4,9 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/mongodb/mongo-tools/mongoreplay"
 
+	"fmt"
 	"os"
+	"runtime"
 )
 
 const (
@@ -27,6 +29,11 @@ func main() {
 		os.Exit(ExitOk)
 	}
 
+	if runtime.NumCPU() == 1 {
+		fmt.Fprint(os.Stderr, "mongoreplay must be run with multiple threads")
+		os.Exit(ExitError)
+	}
+
 	opts := mongoreplay.Options{}
 
 	var parser = flags.NewParser(&opts, flags.Default)
@@ -45,6 +52,12 @@ func main() {
 
 	_, err = parser.AddCommand("monitor", "Inspect live or pre-recorded mongodb traffic", "",
 		&mongoreplay.MonitorCommand{GlobalOpts: &opts})
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = parser.AddCommand("filter", "Filter playback file", "",
+		&mongoreplay.FilterCommand{GlobalOpts: &opts})
 	if err != nil {
 		panic(err)
 	}

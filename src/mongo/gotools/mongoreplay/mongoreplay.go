@@ -17,6 +17,9 @@ func (opts *Options) SetLogging() {
 	}
 	userInfoLogger.setVerbosity(v)
 	toolDebugLogger.setVerbosity(d)
+	if d > 0 || v > 0 {
+		printVersionInfo()
+	}
 }
 
 type VersionOptions struct {

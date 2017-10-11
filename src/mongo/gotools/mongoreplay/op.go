@@ -46,9 +46,9 @@ type Op interface {
 	// structure.
 	FromReader(io.Reader) error
 
-	// Execute performs the op on a given session, yielding the reply when
+	// Execute performs the op on a given socket, yielding the reply when
 	// successful (and an error otherwise).
-	Execute(*mgo.Session) (Replyable, error)
+	Execute(*mgo.MongoSocket) (Replyable, error)
 
 	// Meta returns metadata about the operation, useful for analysis of traffic.
 	Meta() OpMetadata

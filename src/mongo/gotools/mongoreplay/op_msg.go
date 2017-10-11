@@ -25,7 +25,7 @@ func (op *OpMsg) FromReader(r io.Reader) error {
 }
 
 // Execute does nothing for an OpMsg
-func (op *OpMsg) Execute(session *mgo.Session) (*ReplyOp, error) {
+func (op *OpMsg) Execute(socket *mgo.MongoSocket) (*ReplyOp, error) {
 	return nil, nil
 }
 

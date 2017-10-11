@@ -56,5 +56,10 @@ void Goopenssl_thread_locking_callback(int mode, int n, const char *file,
 		LeaveCriticalSection(&goopenssl_locks[n]);
 	}
 }
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+unsigned long Goopenssl_thread_id_callback() {
+	return (unsigned long) GetCurrentThreadId();
+}
+#endif
 */
 import "C"

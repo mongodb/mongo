@@ -86,7 +86,10 @@ func TestBasicMux(t *testing.T) {
 			err = <-mux.Completed
 			So(err, ShouldBeNil)
 
-			demux := &Demultiplexer{In: buf}
+			demux := &Demultiplexer{
+				In:              buf,
+				NamespaceStatus: make(map[string]int),
+			}
 			demuxOuts := map[string]*RegularCollectionReceiver{}
 
 			errChan := make(chan error)
@@ -121,7 +124,10 @@ func TestParallelMux(t *testing.T) {
 		mux := NewMultiplexer(writePipe, new(testNotifier))
 		muxIns := map[string]*MuxIn{}
 
-		demux := &Demultiplexer{In: readPipe}
+		demux := &Demultiplexer{
+			In:              readPipe,
+			NamespaceStatus: make(map[string]int),
+		}
 		demuxOuts := map[string]*RegularCollectionReceiver{}
 
 		inChecksum := map[string]hash.Hash{}

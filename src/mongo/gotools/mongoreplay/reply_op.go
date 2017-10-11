@@ -96,9 +96,9 @@ func (op *ReplyOp) FromReader(r io.Reader) error {
 	return nil
 }
 
-// Execute performs the ReplyOp on a given session, yielding the reply when
+// Execute performs the ReplyOp on a given socket, yielding the reply when
 // successful (and an error otherwise).
-func (op *ReplyOp) Execute(session *mgo.Session) (Replyable, error) {
+func (op *ReplyOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
 	return nil, nil
 }
 
