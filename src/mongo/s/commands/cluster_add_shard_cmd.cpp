@@ -41,6 +41,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_request_type.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -86,30 +87,22 @@ public:
                      BSONObjBuilder& result) {
         auto parsedRequest = uassertStatusOK(AddShardRequest::parseFromMongosCommand(cmdObj));
 
+        // Force a reload of this node's shard list cache at the end of this command.
+        ON_BLOCK_EXIT([opCtx] {
+            if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
+                Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+            }
+        });
+
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(
+        auto cmdResponse = uassertStatusOK(
             configShard->runCommandWithFixedRetryAttempts(opCtx,
                                                           kPrimaryOnlyReadPreference,
                                                           "admin",
                                                           parsedRequest.toCommandForConfig(),
                                                           Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(cmdResponseStatus.commandStatus);
 
-        string shardAdded;
-        uassertStatusOK(
-            bsonExtractStringField(cmdResponseStatus.response, kShardAdded, &shardAdded));
-        result << "shardAdded" << shardAdded;
-
-        // Ensure the added shard is visible to this process.
-        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        if (!shardRegistry->getShard(opCtx, shardAdded).isOK()) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::OperationFailed,
-                                        "Could not find shard metadata for shard after adding it. "
-                                        "This most likely indicates that the shard was removed "
-                                        "immediately after it was added."});
-        }
-
+        Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
 

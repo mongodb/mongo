@@ -112,19 +112,14 @@ public:
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-        auto cmdResponseStatus = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
             Command::appendPassthroughFields(cmdObj, configMovePrimaryRequest.toBSON()),
             Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(cmdResponseStatus.commandStatus);
 
-        if (!cmdResponseStatus.writeConcernStatus.isOK()) {
-            appendWriteConcernErrorToCmdResponse(
-                configShard->getId(), cmdResponseStatus.response["writeConcernError"], result);
-        }
-
+        Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
 
