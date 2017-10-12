@@ -61,13 +61,6 @@ Status ShardingCatalogManager::createDatabase(OperationContext* opCtx, const std
                   str::stream() << "cannot manually create database '" << dbName << "'");
     }
 
-    // Lock the database globally to prevent conflicts with simultaneous database creation.
-    auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
-        opCtx, dbName, "createDatabase", DistLockManager::kDefaultLockTimeout);
-    if (!scopedDistLock.isOK()) {
-        return scopedDistLock.getStatus();
-    }
-
     // check for case sensitivity violations
     Status status = _checkDbDoesNotExist(opCtx, dbName, nullptr);
     if (!status.isOK()) {
@@ -113,14 +106,6 @@ Status ShardingCatalogManager::enableSharding(OperationContext* opCtx, const std
     // Sharding is enabled automatically on the config db.
     if (dbName == NamespaceString::kConfigDb) {
         return Status::OK();
-    }
-
-    // Lock the database globally to prevent conflicts with simultaneous database
-    // creation/modification.
-    auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
-        opCtx, dbName, "enableSharding", DistLockManager::kDefaultLockTimeout);
-    if (!scopedDistLock.isOK()) {
-        return scopedDistLock.getStatus();
     }
 
     // Check for case sensitivity violations

@@ -41,10 +41,13 @@
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FP_DECLARE(setDropCollDistLockWait);
 
 class DropCmd : public BasicCommand {
 public:
@@ -77,6 +80,21 @@ public:
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
+        auto const catalogClient = Grid::get(opCtx)->catalogClient();
+
+        // Remove the backwards compatible lock after 3.6 ships.
+        Seconds waitFor(DistLockManager::kDefaultLockTimeout);
+        MONGO_FAIL_POINT_BLOCK(setDropCollDistLockWait, customWait) {
+            const BSONObj& data = customWait.getData();
+            waitFor = Seconds(data["waitForSecs"].numberInt());
+        }
+        auto backwardsCompatibleDbDistLock =
+            uassertStatusOK(catalogClient->getDistLockManager()->lock(
+                opCtx, nss.db() + "-movePrimary", "dropCollection", waitFor));
+        auto dbDistLock = uassertStatusOK(
+            catalogClient->getDistLockManager()->lock(opCtx, nss.db(), "dropCollection", waitFor));
+        auto collDistLock = uassertStatusOK(
+            catalogClient->getDistLockManager()->lock(opCtx, nss.ns(), "dropCollection", waitFor));
 
         auto routingInfoStatus = catalogCache->getCollectionRoutingInfo(opCtx, nss);
         if (routingInfoStatus == ErrorCodes::NamespaceNotFound) {
@@ -88,7 +106,7 @@ public:
         if (!routingInfo.cm()) {
             _dropUnshardedCollectionFromShard(opCtx, routingInfo.primaryId(), nss, &result);
         } else {
-            uassertStatusOK(Grid::get(opCtx)->catalogClient()->dropCollection(opCtx, nss));
+            uassertStatusOK(catalogClient->dropCollection(opCtx, nss));
             catalogCache->invalidateShardedCollection(nss);
         }
 
@@ -104,11 +122,7 @@ private:
                                                   const ShardId& shardId,
                                                   const NamespaceString& nss,
                                                   BSONObjBuilder* result) {
-        const auto catalogClient = Grid::get(opCtx)->catalogClient();
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-        auto scopedDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
-            opCtx, nss.ns(), "drop", DistLockManager::kDefaultLockTimeout));
 
         const auto dropCommandBSON = [shardRegistry, opCtx, &shardId, &nss] {
             BSONObjBuilder builder;

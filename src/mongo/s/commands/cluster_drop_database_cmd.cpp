@@ -83,9 +83,13 @@ public:
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
-        // Lock the database globally to prevent conflicts with simultaneous database
-        // creation/modification.
-        auto scopedDatabaseDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
+        // Remove the backwards compatible lock after 3.6 ships.
+        auto backwardsCompatibleDbDistLock = uassertStatusOK(
+            catalogClient->getDistLockManager()->lock(opCtx,
+                                                      dbname + "-movePrimary",
+                                                      "dropDatabase",
+                                                      DistLockManager::kDefaultLockTimeout));
+        auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
             opCtx, dbname, "dropDatabase", DistLockManager::kDefaultLockTimeout));
 
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
@@ -114,6 +118,8 @@ public:
 
         // Drop the database's collections from metadata
         for (const auto& nss : getAllShardedCollectionsForDb(opCtx, dbname)) {
+            auto collDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
+                opCtx, nss.ns(), "dropCollection", DistLockManager::kDefaultLockTimeout));
             uassertStatusOK(catalogClient->dropCollection(opCtx, nss));
         }
 

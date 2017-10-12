@@ -153,24 +153,6 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CreateDatabaseTest, createDatabaseDistLockHeld) {
-    const std::string dbname = "db2";
-
-    ASSERT_OK(distLockCatalog()
-                  ->grabLock(operationContext(),
-                             dbname,
-                             OID::gen(),
-                             "dummyWho",
-                             "dummyProcessId",
-                             Date_t::now(),
-                             "dummyReason")
-                  .getStatus());
-
-    Status status =
-        ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname);
-    ASSERT_EQUALS(ErrorCodes::LockBusy, status);
-}
-
 TEST_F(CreateDatabaseTest, createDatabaseDBExists) {
     const std::string dbname = "db3";
 

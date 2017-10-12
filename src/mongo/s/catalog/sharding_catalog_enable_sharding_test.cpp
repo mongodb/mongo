@@ -104,23 +104,6 @@ TEST_F(EnableShardingTest, noDBExists) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(EnableShardingTest, lockBusy) {
-    std::string db = "db2";
-    ASSERT_OK(distLockCatalog()
-                  ->grabLock(operationContext(),
-                             db,
-                             OID::gen(),
-                             "dummyWho",
-                             "dummyProcessId",
-                             Date_t::now(),
-                             "dummyReason")
-                  .getStatus());
-
-    auto status =
-        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), db);
-    ASSERT_EQ(ErrorCodes::LockBusy, status.code());
-}
-
 TEST_F(EnableShardingTest, dbExistsWithDifferentCase) {
     ShardType shard;
     shard.setName("shard0");

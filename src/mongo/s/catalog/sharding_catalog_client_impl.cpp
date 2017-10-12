@@ -82,7 +82,6 @@
 namespace mongo {
 
 MONGO_FP_DECLARE(failApplyChunkOps);
-MONGO_FP_DECLARE(setDropCollDistLockWait);
 
 using repl::OpTime;
 using std::set;
@@ -439,20 +438,6 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
     vector<ShardType> allShards = std::move(shardsStatus.getValue().value);
 
     LOG(1) << "dropCollection " << ns << " started";
-
-    // Lock the collection globally so that split/migrate cannot run
-    Seconds waitFor(DistLockManager::kDefaultLockTimeout);
-    MONGO_FAIL_POINT_BLOCK(setDropCollDistLockWait, customWait) {
-        const BSONObj& data = customWait.getData();
-        waitFor = Seconds(data["waitForSecs"].numberInt());
-    }
-
-    auto scopedDistLock = getDistLockManager()->lock(opCtx, ns.ns(), "drop", waitFor);
-    if (!scopedDistLock.isOK()) {
-        return scopedDistLock.getStatus();
-    }
-
-    LOG(1) << "dropCollection " << ns << " locked";
 
     const auto dropCommandBSON = [opCtx, &ns] {
         BSONObjBuilder builder;

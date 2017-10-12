@@ -271,25 +271,6 @@ TEST_F(DropColl2ShardTest, ConfigTargeterError) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(DropColl2ShardTest, DistLockBusy) {
-    distLock()->expectLock([](StringData, StringData, Milliseconds) {},
-                           {ErrorCodes::LockBusy, "test lock taken"});
-
-    auto future = launchAsync([this] {
-        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
-        ASSERT_EQ(ErrorCodes::LockBusy, status.code());
-        ASSERT_FALSE(status.reason().empty());
-    });
-
-    expectChangeLogCreate(configHost(), BSON("ok" << 1));
-    expectChangeLogInsert(
-        configHost(), network()->now(), "dropCollection.start", dropNS().ns(), BSONObj());
-
-    expectGetShards({shard1(), shard2()});
-
-    future.timed_get(kFutureTimeout);
-}
-
 TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
     auto shard1Targeter = RemoteCommandTargeterMock::get(
         uassertStatusOK(shardRegistry()->getShard(operationContext(), shard1().getName()))

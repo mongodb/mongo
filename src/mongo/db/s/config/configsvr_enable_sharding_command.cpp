@@ -121,6 +121,16 @@ public:
         // Make sure to force update of any stale metadata
         ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
 
+        // Remove the backwards compatible lock after 3.6 ships.
+        auto const catalogClient = Grid::get(opCtx)->catalogClient();
+        auto backwardsCompatibleDbDistLock = uassertStatusOK(
+            catalogClient->getDistLockManager()->lock(opCtx,
+                                                      dbname + "-movePrimary",
+                                                      "enableSharding",
+                                                      DistLockManager::kDefaultLockTimeout));
+        auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
+            opCtx, dbname, "enableSharding", DistLockManager::kDefaultLockTimeout));
+
         uassertStatusOK(ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname));
         audit::logEnableSharding(Client::getCurrent(), dbname);
 
