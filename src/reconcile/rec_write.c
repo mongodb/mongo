@@ -629,7 +629,7 @@ __rec_write_check_complete(
 	 * Check if lookaside eviction is possible.  If any of the updates we
 	 * saw were uncommitted, the lookaside table cannot be used.
 	 */
-	if (r->update_used || r->update_uncommitted)
+	if (r->update_uncommitted || r->update_used)
 		return (0);
 
 	*lookaside_retryp = true;
@@ -956,7 +956,7 @@ __rec_init(WT_SESSION_IMPL *session,
 #endif
 
 	/* Track if updates were used and/or uncommitted. */
-	r->update_used = r->update_uncommitted = false;
+	r->update_uncommitted = r->update_used = false;
 
 	/* Track if the page can be marked clean. */
 	r->leave_dirty = false;
@@ -1392,8 +1392,10 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 #ifdef HAVE_TIMESTAMPS
 	/* Track the oldest saved timestamp for lookaside. */
-	if (F_ISSET(r, WT_REC_LOOKASIDE))
-		for (upd = first_upd; upd->next != NULL; upd = upd->next)
+	if (first_ts_upd == NULL)
+		__wt_timestamp_set_zero(&r->min_saved_timestamp);
+	else if (F_ISSET(r, WT_REC_LOOKASIDE))
+		for (upd = first_upd; upd != NULL; upd = upd->next)
 			if (upd->txnid != WT_TXN_ABORTED &&
 			    upd->txnid != WT_TXN_NONE &&
 			    __wt_timestamp_cmp(
@@ -5984,11 +5986,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			mod->mod_disk_image = r->multi->disk_image;
 			r->multi->disk_image = NULL;
 			mod->mod_replace_las_pageid = r->multi->las_pageid;
+			r->multi->las_pageid = 0;
 #ifdef HAVE_TIMESTAMPS
 			__wt_timestamp_set(&mod->mod_replace_las_min_timestamp,
 			     &r->min_saved_timestamp);
 #endif
-			r->multi->las_pageid = 0;
 		} else
 			WT_RET(__wt_bt_write(session, r->wrapup_checkpoint,
 			    NULL, NULL, true, F_ISSET(r, WT_REC_CHECKPOINT),
