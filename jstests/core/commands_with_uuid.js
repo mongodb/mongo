@@ -42,6 +42,16 @@
     assert.eq(doc.fooField, 'FOO');
     assert(!cursor.hasNext(), 'expected to have exhausted cursor for results ' + tojson(res));
 
+    // Although we check for both string type and BinData type for the collection identifier
+    // argument to a find command to accomodate for searching both by name and by UUID, if an
+    // invalid type is passed, the parsing error message should say the expected type is string and
+    // not BinData to avoid confusing the user.
+    cmd = {find: 1.0};
+    res = db.runCommand(cmd);
+    assert.commandFailed(res, 'expected ' + tojson(cmd) + ' to fail.');
+    assert(res.errmsg.includes('field must be of BSON type string'),
+           'expected the error message of ' + tojson(res) + ' to include string type');
+
     // Ensure passing a missing UUID to commands taking UUIDs uasserts that the UUID is not found.
     const missingUUID = UUID();
     for (cmd of[{count: missingUUID},
