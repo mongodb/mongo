@@ -179,6 +179,128 @@ TEST_F(ViewCatalogFixture, CreateViewOnDifferentDatabase) {
         viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
+// TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
+TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesSucceedsUnder36FCV) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+
+    const NamespaceString viewOn("db.coll");
+
+    ASSERT_OK(viewCatalog.createView(opCtx.get(),
+                                     NamespaceString("db.view1"),
+                                     viewOn,
+                                     BSON_ARRAY(BSON("$match" << BSON("$expr" << 1))),
+                                     emptyCollation));
+
+    ASSERT_OK(viewCatalog.createView(
+        opCtx.get(),
+        NamespaceString("db.view2"),
+        viewOn,
+        BSON_ARRAY(BSON("$match" << BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("x"))))),
+        emptyCollation));
+
+    ASSERT_OK(viewCatalog.createView(
+        opCtx.get(),
+        NamespaceString("db.view3"),
+        viewOn,
+        BSON_ARRAY(
+            BSON("$facet" << BSON("output" << BSON_ARRAY(BSON("$match" << BSON("$expr" << 1)))))),
+        emptyCollation));
+
+    ASSERT_OK(viewCatalog.createView(
+        opCtx.get(),
+        NamespaceString("db.view4"),
+        viewOn,
+        BSON_ARRAY(BSON(
+            "$facet" << BSON(
+                "output" << BSON_ARRAY(BSON(
+                    "$match" << BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("x")))))))),
+        emptyCollation));
+
+    ASSERT_OK(viewCatalog.createView(opCtx.get(),
+                                     NamespaceString("db.view5"),
+                                     viewOn,
+                                     BSON_ARRAY(BSON("$lookup" << BSON("from"
+                                                                       << "fcoll"
+                                                                       << "as"
+                                                                       << "as"
+                                                                       << "pipeline"
+                                                                       << BSONArray()))),
+                                     emptyCollation));
+}
+
+// TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
+TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesFailsUnder34FCV) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::k34);
+
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+
+    ASSERT_THROWS_CODE(viewCatalog
+                           .createView(opCtx.get(),
+                                       viewName,
+                                       viewOn,
+                                       BSON_ARRAY(BSON("$match" << BSON("$expr" << 1))),
+                                       emptyCollation)
+                           .ignore(),
+                       AssertionException,
+                       ErrorCodes::QueryFeatureNotAllowed);
+
+    ASSERT_THROWS_CODE(
+        viewCatalog
+            .createView(opCtx.get(),
+                        viewName,
+                        viewOn,
+                        BSON_ARRAY(BSON("$match" << BSON("$jsonSchema"
+                                                         << BSON("required" << BSON_ARRAY("x"))))),
+                        emptyCollation)
+            .ignore(),
+        AssertionException,
+        ErrorCodes::QueryFeatureNotAllowed);
+
+    ASSERT_THROWS_CODE(
+        viewCatalog
+            .createView(opCtx.get(),
+                        viewName,
+                        viewOn,
+                        BSON_ARRAY(BSON("$facet" << BSON("output" << BSON_ARRAY(BSON(
+                                                             "$match" << BSON("$expr" << 1)))))),
+                        emptyCollation)
+            .ignore(),
+        AssertionException,
+        ErrorCodes::QueryFeatureNotAllowed);
+
+    ASSERT_THROWS_CODE(
+        viewCatalog
+            .createView(
+                opCtx.get(),
+                viewName,
+                viewOn,
+                BSON_ARRAY(BSON(
+                    "$facet" << BSON("output" << BSON_ARRAY(BSON(
+                                         "$match" << BSON("$jsonSchema" << BSON(
+                                                              "required" << BSON_ARRAY("x")))))))),
+                emptyCollation)
+            .ignore(),
+        AssertionException,
+        ErrorCodes::QueryFeatureNotAllowed);
+
+    ASSERT_THROWS_CODE(viewCatalog
+                           .createView(opCtx.get(),
+                                       viewName,
+                                       viewOn,
+                                       BSON_ARRAY(BSON("$lookup" << BSON("from"
+                                                                         << "fcoll"
+                                                                         << "as"
+                                                                         << "as"
+                                                                         << "pipeline"
+                                                                         << BSONArray()))),
+                                       emptyCollation)
+                           .ignore(),
+                       AssertionException,
+                       ErrorCodes::QueryFeatureNotAllowed);
+}
+
+
 TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
@@ -204,7 +326,7 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStage) {
         viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation)
             .ignore(),
         AssertionException,
-        40255);
+        ErrorCodes::OptionNotSupportedOnView);
 }
 
 TEST_F(ViewCatalogFixture, CreateViewOnInvalidCollectionName) {
@@ -383,7 +505,7 @@ TEST_F(ReplViewCatalogFixture, ModifyViewWithPipelineFailsOnIneligibleStage) {
     ASSERT_THROWS_CODE(
         viewCatalog.modifyView(opCtx.get(), viewName, viewOn, invalidPipeline).ignore(),
         AssertionException,
-        40255);
+        ErrorCodes::OptionNotSupportedOnView);
 }
 
 TEST_F(ViewCatalogFixture, LookupMissingView) {

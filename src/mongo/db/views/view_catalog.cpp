@@ -38,10 +38,14 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_facet.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -64,6 +68,62 @@ StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* o
     }
     return CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationSpec);
 }
+
+// TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
+Status validInViewUnder34FeatureCompatibility(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const Pipeline& pipeline) {
+    const auto& sourceList = pipeline.getSources();
+    // Confirm that the view pipeline does not contain elements that require 3.6 feature
+    // compatibility.
+    for (auto&& source : sourceList) {
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(source.get())) {
+            auto query = matchStage->getQuery();
+            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+                Pipeline::kAllowedMatcherFeatures &
+                ~MatchExpressionParser::AllowedFeatures::kJSONSchema &
+                ~MatchExpressionParser::AllowedFeatures::kExpr;
+
+            auto statusWithMatcher = MatchExpressionParser::parse(
+                query, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
+
+            if (!statusWithMatcher.isOK()) {
+                if (statusWithMatcher.getStatus().code() == ErrorCodes::QueryFeatureNotAllowed) {
+                    return {statusWithMatcher.getStatus().code(),
+                            str::stream()
+                                << "featureCompatibility version '3.6' is required to create "
+                                   "a view containing new features. See "
+                                << feature_compatibility_version::kDochubLink
+                                << "; "
+                                << statusWithMatcher.getStatus().reason()};
+                }
+
+                uasserted(ErrorCodes::InternalError,
+                          str::stream()
+                              << "Unexpected error on validation for 3.4 feature compatibility: "
+                              << statusWithMatcher.getStatus().toString());
+            }
+        } else if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(source.get())) {
+            if (lookupStage->wasConstructedWithPipelineSyntax()) {
+                return {ErrorCodes::QueryFeatureNotAllowed,
+                        str::stream() << "featureCompatibility version '3.6' is required to create "
+                                         "a view containing "
+                                         "a $lookup stage with 'pipeline' syntax. See "
+                                      << feature_compatibility_version::kDochubLink};
+            }
+        } else if (auto facetStage = dynamic_cast<DocumentSourceFacet*>(source.get())) {
+            for (auto&& facetSubPipe : facetStage->getFacetPipelines()) {
+                auto status =
+                    validInViewUnder34FeatureCompatibility(expCtx, *facetSubPipe.pipeline);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 Status ViewCatalog::reloadIfNeeded(OperationContext* opCtx) {
@@ -172,7 +232,7 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
         // will also return the set of involved namespaces.
         auto pipelineStatus = _validatePipeline_inlock(opCtx, viewDef);
         if (!pipelineStatus.isOK()) {
-            uassert(40255,
+            uassert(pipelineStatus.getStatus().code(),
                     str::stream() << "Invalid pipeline for view " << viewDef.name().ns() << "; "
                                   << pipelineStatus.getStatus().reason(),
                     !needsValidation);
@@ -224,7 +284,6 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
 
 StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_inlock(
     OperationContext* opCtx, const ViewDefinition& viewDef) const {
-    // Make a LiteParsedPipeline to determine the namespaces referenced by this pipeline.
     AggregationRequest request(viewDef.viewOn(), viewDef.pipeline());
     const LiteParsedPipeline liteParsedPipeline(request);
     const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
@@ -234,7 +293,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
     // collection and a pipeline, but in this case we don't need this map to be accurate since
     // we will not be evaluating the pipeline.
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
+    for (auto&& nss : involvedNamespaces) {
         resolvedNamespaces[nss.coll()] = {nss, {}};
     }
     boost::intrusive_ptr<ExpressionContext> expCtx =
@@ -252,6 +311,14 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
     if (!sources.empty() && sources.front()->constraints().isChangeStreamStage()) {
         return {ErrorCodes::OptionNotSupportedOnView,
                 "$changeStream cannot be used in a view definition"};
+    }
+
+    if (serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() &&
+        !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+        auto status = validInViewUnder34FeatureCompatibility(expCtx, *pipelineStatus.getValue());
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     return std::move(involvedNamespaces);

@@ -22,9 +22,11 @@
 
     // Verify that we cannot create a view using a pipeline which begins with $changeStream.
     assert.commandFailedWithCode(
-        db.runCommand({create: csViewName, viewOn: collName, pipeline: csPipe}), 40255);
+        db.runCommand({create: csViewName, viewOn: collName, pipeline: csPipe}),
+        ErrorCodes.OptionNotSupportedOnView);
 
     // We also cannot update an existing view to use a $changeStream pipeline.
     assert.commandFailedWithCode(
-        db.runCommand({collMod: normalViewName, viewOn: collName, pipeline: csPipe}), 40255);
+        db.runCommand({collMod: normalViewName, viewOn: collName, pipeline: csPipe}),
+        ErrorCodes.OptionNotSupportedOnView);
 })();

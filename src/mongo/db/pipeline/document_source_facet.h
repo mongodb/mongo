@@ -130,6 +130,10 @@ public:
         return {this};
     }
 
+    const std::vector<FacetPipeline>& getFacetPipelines() const {
+        return _facets;
+    }
+
     // The following are overridden just to forward calls to sub-pipelines.
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final;
     void doInjectMongoProcessInterface(std::shared_ptr<MongoProcessInterface>) final;
