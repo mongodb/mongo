@@ -26,35 +26,52 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/ops/find_and_modify_result.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/lasterror.h"
 
 namespace mongo {
+namespace find_and_modify {
+namespace {
 
-struct UpdateResult {
-    UpdateResult(bool existing_,
-                 bool modifiers_,
-                 unsigned long long numDocsModified_,
-                 unsigned long long numMatched_,
-                 const BSONObj& upsertedObject_);
+void appendValue(const boost::optional<BSONObj>& value, BSONObjBuilder* builder) {
+    if (value) {
+        builder->append("value", *value);
+    } else {
+        builder->appendNull("value");
+    }
+}
 
-    std::string toString() const;
+}  // namespace
 
-    // if existing objects were modified
-    const bool existing;
+void serializeRemove(size_t n, const boost::optional<BSONObj>& value, BSONObjBuilder* builder) {
+    BSONObjBuilder lastErrorObjBuilder(builder->subobjStart("lastErrorObject"));
+    builder->appendNumber("n", n);
+    lastErrorObjBuilder.doneFast();
 
-    // was this a $ mod
-    const bool modifiers;
+    appendValue(value, builder);
+}
 
-    // how many docs updated
-    const long long numDocsModified;
+void serializeUpsert(size_t n,
+                     const boost::optional<BSONObj>& value,
+                     bool updatedExisting,
+                     const BSONObj& objInserted,
+                     BSONObjBuilder* builder) {
+    BSONObjBuilder lastErrorObjBuilder(builder->subobjStart("lastErrorObject"));
+    lastErrorObjBuilder.appendNumber("n", n);
+    lastErrorObjBuilder.appendBool("updatedExisting", updatedExisting);
+    if (!objInserted.isEmpty()) {
+        lastErrorObjBuilder.appendAs(objInserted["_id"], kUpsertedFieldName);
+    }
+    lastErrorObjBuilder.doneFast();
 
-    // how many docs seen by update
-    const long long numMatched;
+    appendValue(value, builder);
+}
 
-    // if something was upserted, the new _id of the object
-    BSONObj upserted;
-};
-
+}  // namespace find_and_modify
 }  // namespace mongo

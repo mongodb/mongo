@@ -1,20 +1,12 @@
 load("jstests/sharding/move_chunk_with_session_helper.js");
 
 (function() {
-
     "use strict";
 
     var checkFindAndModifyResult = function(expected, toCheck) {
         assert.eq(expected.ok, toCheck.ok);
         assert.eq(expected.value, toCheck.value);
-
-        // TODO: SERVER-30532: after adding upserted, just compare the entire lastErrorObject
-        var expectedLE = expected.lastErrorObject;
-        var toCheckLE = toCheck.lastErrorObject;
-
-        assert.neq(null, toCheckLE);
-        assert.eq(expected.updatedExisting, toCheck.updatedExisting);
-        assert.eq(expected.n, toCheck.n);
+        assert.eq(expected.lastErrorObject, toCheck.lastErrorObject);
     };
 
     var lsid = UUID();

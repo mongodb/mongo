@@ -28,33 +28,23 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
-struct UpdateResult {
-    UpdateResult(bool existing_,
-                 bool modifiers_,
-                 unsigned long long numDocsModified_,
-                 unsigned long long numMatched_,
-                 const BSONObj& upsertedObject_);
+class BSONObjBuilder;
 
-    std::string toString() const;
+namespace find_and_modify {
 
-    // if existing objects were modified
-    const bool existing;
+void serializeRemove(size_t n, const boost::optional<BSONObj>& value, BSONObjBuilder* builder);
 
-    // was this a $ mod
-    const bool modifiers;
+void serializeUpsert(size_t n,
+                     const boost::optional<BSONObj>& value,
+                     bool updatedExisting,
+                     const BSONObj& objInserted,
+                     BSONObjBuilder* builder);
 
-    // how many docs updated
-    const long long numDocsModified;
-
-    // how many docs seen by update
-    const long long numMatched;
-
-    // if something was upserted, the new _id of the object
-    BSONObj upserted;
-};
-
+}  // namespace find_and_modify
 }  // namespace mongo

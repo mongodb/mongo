@@ -8,14 +8,7 @@
     function checkFindAndModifyResult(expected, toCheck) {
         assert.eq(expected.ok, toCheck.ok);
         assert.eq(expected.value, toCheck.value);
-
-        // TODO: SERVER-30532: after adding upserted, just compare the entire lastErrorObject
-        var expectedLE = expected.lastErrorObject;
-        var toCheckLE = toCheck.lastErrorObject;
-
-        assert.neq(null, toCheckLE);
-        assert.eq(expected.updatedExisting, toCheck.updatedExisting);
-        assert.eq(expected.n, toCheck.n);
+        assert.docEq(expected.lastErrorObject, toCheck.lastErrorObject);
     }
 
     function runTests(mainConn, priConn) {

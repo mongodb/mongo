@@ -1606,6 +1606,7 @@ env.Library(
     target='write_ops',
     source=[
         'ops/delete.cpp',
+        'ops/find_and_modify_result.cpp',
         'ops/insert.cpp',
         'ops/parsed_delete.cpp',
         'ops/parsed_update.cpp',
@@ -1617,7 +1618,6 @@ env.Library(
         'session_catalog.cpp',
         'session_txn_record.cpp',
         'transaction_history_iterator.cpp',
-        env.Idlc('commands/find_and_modify.idl')[0],
         env.Idlc('ops/single_write_result.idl')[0],
         env.Idlc('session_txn_record.idl')[0],
     ],

@@ -13,7 +13,6 @@ load('./jstests/libs/chunk_manipulation_util.js');
  * 4. Retry writes and confirm that writes are not duplicated.
  */
 (function() {
-
     "use strict";
 
     var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
@@ -67,14 +66,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     assert.eq(findAndModifyResult.ok, findAndModifyRetryResult.ok);
     assert.eq(findAndModifyResult.value, findAndModifyRetryResult.value);
-
-    // TODO: SERVER-30532: after adding upserted, just compare the entire lastErrorObject
-    var expectedLE = findAndModifyResult.lastErrorObject;
-    var toCheckLE = findAndModifyRetryResult.lastErrorObject;
-
-    assert.neq(null, toCheckLE);
-    assert.eq(findAndModifyResult.updatedExisting, findAndModifyRetryResult.updatedExisting);
-    assert.eq(findAndModifyResult.n, findAndModifyRetryResult.n);
+    assert.eq(findAndModifyResult.lastErrorObject, findAndModifyRetryResult.lastErrorObject);
 
     assert.eq(1, testDB.user.findOne({x: 30}).y);
 

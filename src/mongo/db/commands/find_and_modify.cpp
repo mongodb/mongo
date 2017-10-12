@@ -48,6 +48,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/find_and_modify_result.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -168,25 +169,18 @@ void appendCommandResponse(const PlanExecutor* exec,
                            bool isRemove,
                            const boost::optional<BSONObj>& value,
                            BSONObjBuilder* result) {
-    BSONObjBuilder lastErrorObjBuilder(result->subobjStart("lastErrorObject"));
     if (isRemove) {
-        lastErrorObjBuilder.appendNumber("n", getDeleteStats(exec)->docsDeleted);
+        find_and_modify::serializeRemove(getDeleteStats(exec)->docsDeleted, value, result);
     } else {
-        const UpdateStats* updateStats = getUpdateStats(exec);
-        lastErrorObjBuilder.appendBool("updatedExisting", updateStats->nMatched > 0);
-        lastErrorObjBuilder.appendNumber("n", updateStats->inserted ? 1 : updateStats->nMatched);
-        // Note we have to use the objInserted from the stats here, rather than 'value'
-        // because the _id field could have been excluded by a projection.
-        if (!updateStats->objInserted.isEmpty()) {
-            lastErrorObjBuilder.appendAs(updateStats->objInserted["_id"], kUpsertedFieldName);
-        }
-    }
-    lastErrorObjBuilder.doneFast();
+        const auto updateStats = getUpdateStats(exec);
 
-    if (value) {
-        result->append("value", *value);
-    } else {
-        result->appendNull("value");
+        // Note we have to use the objInserted from the stats here, rather than 'value' because the
+        // _id field could have been excluded by a projection.
+        find_and_modify::serializeUpsert(updateStats->inserted ? 1 : updateStats->nMatched,
+                                         value,
+                                         updateStats->nMatched > 0,
+                                         updateStats->objInserted,
+                                         result);
     }
 }
 
@@ -360,8 +354,7 @@ public:
             auto session = OperationContextSession::get(opCtx);
             if (auto entry =
                     session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
-                auto findAndModifyResult = parseOplogEntryForFindAndModify(opCtx, args, *entry);
-                findAndModifyResult.serialize(&result);
+                parseOplogEntryForFindAndModify(opCtx, args, *entry, &result);
                 return true;
             }
         }

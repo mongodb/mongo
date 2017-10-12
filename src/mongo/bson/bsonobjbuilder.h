@@ -500,11 +500,6 @@ public:
         return appendSymbol(fieldName, symbol.symbol);
     }
 
-    /** Implements builder interface but no-op in ObjBuilder */
-    void appendNull() {
-        msgasserted(16234, "Invalid call to appendNull in BSONObj Builder.");
-    }
-
     /** Append a Null element to the object */
     BSONObjBuilder& appendNull(StringData fieldName) {
         _b.appendNum((char)jstNULL);

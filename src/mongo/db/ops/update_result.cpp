@@ -1,7 +1,5 @@
-//@file update_result.cpp
-
 /**
- *    Copyright (C) 2008-2014 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,6 +26,7 @@
  *    it in the license file.
  */
 
+
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
 
 #include "mongo/platform/basic.h"
@@ -36,6 +35,7 @@
 
 #include "mongo/db/lasterror.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -53,6 +53,12 @@ UpdateResult::UpdateResult(bool existing_,
         upserted = id.wrap(kUpsertedFieldName);
     }
     LOG(4) << "UpdateResult -- " << redact(toString());
+}
+
+std::string UpdateResult::toString() const {
+    return str::stream() << " upserted: " << upserted << " modifiers: " << modifiers
+                         << " existing: " << existing << " numDocsModified: " << numDocsModified
+                         << " numMatched: " << numMatched;
 }
 
 }  // namespace mongo

@@ -29,16 +29,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -46,21 +42,22 @@
 namespace mongo {
 namespace {
 
-using WriteOpsRetryability = ServiceContextMongoDTest;
+using unittest::assertGet;
 
 const BSONObj kNestedOplog(BSON("$sessionMigrateInfo" << 1));
 
+using WriteOpsRetryability = ServiceContextMongoDTest;
+
 TEST_F(WriteOpsRetryability, ParseOplogEntryForInsert) {
-    auto entry =
+    const auto entry = assertGet(
         repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
                                           << "i"
                                           << "ns"
                                           << "a.b"
                                           << "o"
-                                          << BSON("_id" << 1 << "x" << 5)));
-    ASSERT(entry.isOK());
+                                          << BSON("_id" << 1 << "x" << 5))));
 
-    auto res = mongo::parseOplogEntryForInsert(entry.getValue());
+    auto res = parseOplogEntryForInsert(entry);
 
     ASSERT_EQ(res.getN(), 1);
     ASSERT_EQ(res.getNModified(), 0);
@@ -80,7 +77,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedInsert) {
                                  kNestedOplog,
                                  innerOplog.toBSON());
 
-    auto res = mongo::parseOplogEntryForInsert(insertOplog);
+    auto res = parseOplogEntryForInsert(insertOplog);
 
     ASSERT_EQ(res.getN(), 1);
     ASSERT_EQ(res.getNModified(), 0);
@@ -88,7 +85,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedInsert) {
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
-    auto entry =
+    const auto entry = assertGet(
         repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
                                           << "u"
                                           << "ns"
@@ -96,10 +93,9 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
                                           << "o"
                                           << BSON("_id" << 1 << "x" << 5)
                                           << "o2"
-                                          << BSON("_id" << 1)));
-    ASSERT(entry.isOK());
+                                          << BSON("_id" << 1))));
 
-    auto res = mongo::parseOplogEntryForUpdate(entry.getValue());
+    auto res = parseOplogEntryForUpdate(entry);
 
     ASSERT_EQ(res.getN(), 1);
     ASSERT_EQ(res.getNModified(), 1);
@@ -120,7 +116,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpdate) {
                                  kNestedOplog,
                                  innerOplog.toBSON());
 
-    auto res = mongo::parseOplogEntryForUpdate(updateOplog);
+    auto res = parseOplogEntryForUpdate(updateOplog);
 
     ASSERT_EQ(res.getN(), 1);
     ASSERT_EQ(res.getNModified(), 1);
@@ -128,16 +124,15 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpdate) {
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpsert) {
-    auto entry =
+    const auto entry = assertGet(
         repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
                                           << "i"
                                           << "ns"
                                           << "a.b"
                                           << "o"
-                                          << BSON("_id" << 1 << "x" << 5)));
-    ASSERT(entry.isOK());
+                                          << BSON("_id" << 1 << "x" << 5))));
 
-    auto res = mongo::parseOplogEntryForUpdate(entry.getValue());
+    auto res = parseOplogEntryForUpdate(entry);
 
     ASSERT_EQ(res.getN(), 1);
     ASSERT_EQ(res.getNModified(), 0);
@@ -157,7 +152,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpsert) {
                                  kNestedOplog,
                                  innerOplog.toBSON());
 
-    auto res = mongo::parseOplogEntryForUpdate(insertOplog);
+    auto res = parseOplogEntryForUpdate(insertOplog);
 
     ASSERT_EQ(res.getN(), 1);
     ASSERT_EQ(res.getNModified(), 0);
@@ -165,16 +160,15 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpsert) {
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForDelete) {
-    auto entry =
+    const auto entry = assertGet(
         repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
                                           << "d"
                                           << "ns"
                                           << "a.b"
                                           << "o"
-                                          << BSON("_id" << 1 << "x" << 5)));
-    ASSERT(entry.isOK());
+                                          << BSON("_id" << 1 << "x" << 5))));
 
-    auto res = mongo::parseOplogEntryForDelete(entry.getValue());
+    auto res = parseOplogEntryForDelete(entry);
 
     ASSERT_EQ(res.getN(), 1);
     ASSERT_EQ(res.getNModified(), 0);
@@ -194,7 +188,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedDelete) {
                                  kNestedOplog,
                                  innerOplog.toBSON());
 
-    auto res = mongo::parseOplogEntryForDelete(deleteOplog);
+    auto res = parseOplogEntryForDelete(deleteOplog);
 
     ASSERT_EQ(res.getN(), 1);
     ASSERT_EQ(res.getNModified(), 0);
@@ -231,31 +225,57 @@ TEST_F(WriteOpsRetryability, ShouldFailIfParsingInsertOplogForDelete) {
     ASSERT_THROWS(parseOplogEntryForDelete(insertOplog), AssertionException);
 }
 
-using FindAndModifyRetryability = MockReplCoordServerFixture;
+class FindAndModifyRetryability : public MockReplCoordServerFixture {
+public:
+    FindAndModifyRetryability() = default;
 
-NamespaceString kNs("test.user");
+protected:
+    /**
+     * Helper function to return a fully-constructed BSONObj instead of having to use
+     * BSONObjBuilder.
+     */
+    static BSONObj constructFindAndModifyRetryResult(OperationContext* opCtx,
+                                                     const FindAndModifyRequest& request,
+                                                     const repl::OplogEntry& oplogEntry) {
+        BSONObjBuilder builder;
+        parseOplogEntryForFindAndModify(opCtx, request, oplogEntry, &builder);
+        return builder.obj();
+    }
+};
+
+const NamespaceString kNs("test.user");
 
 TEST_F(FindAndModifyRetryability, BasicUpsert) {
     auto request = FindAndModifyRequest::makeUpdate(kNs, BSONObj(), BSONObj());
     request.setUpsert(true);
 
-    repl::OplogEntry insertOplog(repl::OpTime(), 0, repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1));
+    repl::OplogEntry insertOplog(repl::OpTime(),
+                                 0,
+                                 repl::OpTypeEnum::kInsert,
+                                 kNs,
+                                 BSON("_id"
+                                      << "ID value"
+                                      << "x"
+                                      << 1));
 
-    auto result = parseOplogEntryForFindAndModify(nullptr, request, insertOplog);
-
-    auto lastError = result.getLastErrorObject();
-    ASSERT_EQ(1, lastError.getN());
-    ASSERT_TRUE(lastError.getUpdatedExisting());
-    ASSERT_FALSE(lastError.getUpdatedExisting().value());
-
-    ASSERT_BSONOBJ_EQ(BSON("x" << 1), result.getValue());
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, insertOplog);
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"
+                           << BSON("n" << 1 << "updatedExisting" << false << "upserted"
+                                       << "ID value")
+                           << "value"
+                           << BSON("_id"
+                                   << "ID value"
+                                   << "x"
+                                   << 1)),
+                      result);
 }
 
 TEST_F(FindAndModifyRetryability, NestedUpsert) {
     auto request = FindAndModifyRequest::makeUpdate(kNs, BSONObj(), BSONObj());
     request.setUpsert(true);
 
-    repl::OplogEntry innerOplog(repl::OpTime(), 0, repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1));
+    repl::OplogEntry innerOplog(
+        repl::OpTime(), 0, repl::OpTypeEnum::kInsert, kNs, BSON("_id" << 1));
     repl::OplogEntry insertOplog(repl::OpTime(Timestamp(60, 10), 1),
                                  0,
                                  repl::OpTypeEnum::kNoop,
@@ -263,23 +283,22 @@ TEST_F(FindAndModifyRetryability, NestedUpsert) {
                                  kNestedOplog,
                                  innerOplog.toBSON());
 
-    auto result = parseOplogEntryForFindAndModify(nullptr, request, insertOplog);
-
-    auto lastError = result.getLastErrorObject();
-    ASSERT_EQ(1, lastError.getN());
-    ASSERT_TRUE(lastError.getUpdatedExisting());
-    ASSERT_FALSE(lastError.getUpdatedExisting().value());
-
-    ASSERT_BSONOBJ_EQ(BSON("x" << 1), result.getValue());
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, insertOplog);
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"
+                           << BSON("n" << 1 << "updatedExisting" << false << "upserted" << 1)
+                           << "value"
+                           << BSON("_id" << 1)),
+                      result);
 }
 
 TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithUpdateWithoutUpsertErrors) {
     auto request = FindAndModifyRequest::makeUpdate(kNs, BSONObj(), BSONObj());
     request.setUpsert(false);
 
-    repl::OplogEntry insertOplog(repl::OpTime(), 0, repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1));
+    repl::OplogEntry insertOplog(
+        repl::OpTime(), 0, repl::OpTypeEnum::kInsert, kNs, BSON("_id" << 1));
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, insertOplog),
+    ASSERT_THROWS(constructFindAndModifyRetryResult(opCtx(), request, insertOplog),
                   AssertionException);
 }
 
@@ -289,7 +308,7 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPostImageButOplogHasPre) {
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     repl::OplogEntry noteOplog(
-        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
+        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("_id" << 1 << "z" << 1));
 
     insertOplogEntry(noteOplog);
 
@@ -297,11 +316,11 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPostImageButOplogHasPre) {
                                  0,
                                  repl::OpTypeEnum::kUpdate,
                                  kNs,
-                                 BSON("x" << 1 << "y" << 1),
-                                 BSON("x" << 1));
+                                 BSON("_id" << 1 << "y" << 1),
+                                 BSON("_id" << 1));
     updateOplog.setPreImageOpTime(imageOpTime);
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+    ASSERT_THROWS(constructFindAndModifyRetryResult(opCtx(), request, updateOplog),
                   AssertionException);
 }
 
@@ -311,14 +330,14 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsUpdateButOplogIsDelete) {
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     repl::OplogEntry noteOplog(
-        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
+        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("_id" << 1 << "z" << 1));
 
     insertOplogEntry(noteOplog);
 
     repl::OplogEntry oplog(repl::OpTime(), 0, repl::OpTypeEnum::kDelete, kNs, BSON("_id" << 1));
     oplog.setPreImageOpTime(imageOpTime);
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, oplog), AssertionException);
+    ASSERT_THROWS(constructFindAndModifyRetryResult(opCtx(), request, oplog), AssertionException);
 }
 
 TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
@@ -327,7 +346,7 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     repl::OplogEntry noteOplog(
-        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
+        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("_id" << 1 << "z" << 1));
 
     insertOplogEntry(noteOplog);
 
@@ -335,11 +354,11 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
                                  0,
                                  repl::OpTypeEnum::kUpdate,
                                  kNs,
-                                 BSON("x" << 1 << "y" << 1),
-                                 BSON("x" << 1));
+                                 BSON("_id" << 1 << "y" << 1),
+                                 BSON("_id" << 1));
     updateOplog.setPostImageOpTime(imageOpTime);
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+    ASSERT_THROWS(constructFindAndModifyRetryResult(opCtx(), request, updateOplog),
                   AssertionException);
 }
 
@@ -349,7 +368,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPreImage) {
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     repl::OplogEntry noteOplog(
-        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
+        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("_id" << 1 << "z" << 1));
 
     insertOplogEntry(noteOplog);
 
@@ -357,18 +376,15 @@ TEST_F(FindAndModifyRetryability, UpdateWithPreImage) {
                                  0,
                                  repl::OpTypeEnum::kUpdate,
                                  kNs,
-                                 BSON("x" << 1 << "y" << 1),
-                                 BSON("x" << 1));
+                                 BSON("_id" << 1 << "y" << 1),
+                                 BSON("_id" << 1));
     updateOplog.setPreImageOpTime(imageOpTime);
 
-    auto result = parseOplogEntryForFindAndModify(opCtx(), request, updateOplog);
-
-    auto lastError = result.getLastErrorObject();
-    ASSERT_EQ(1, lastError.getN());
-    ASSERT_TRUE(lastError.getUpdatedExisting());
-    ASSERT_TRUE(lastError.getUpdatedExisting().value());
-
-    ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "z" << 1), result.getValue());
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, updateOplog);
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
+                                             << "value"
+                                             << BSON("_id" << 1 << "z" << 1)),
+                      result);
 }
 
 TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
@@ -377,7 +393,7 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     repl::OplogEntry noteOplog(
-        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("x" << 1 << "z" << 1));
+        imageOpTime, 0, repl::OpTypeEnum::kNoop, kNs, BSON("_id" << 1 << "z" << 1));
 
     insertOplogEntry(noteOplog);
 
@@ -385,8 +401,8 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
                                 0,
                                 repl::OpTypeEnum::kUpdate,
                                 kNs,
-                                BSON("x" << 1 << "y" << 1),
-                                BSON("x" << 1));
+                                BSON("_id" << 1 << "y" << 1),
+                                BSON("_id" << 1));
 
     repl::OplogEntry updateOplog(repl::OpTime(Timestamp(60, 10), 1),
                                  0,
@@ -396,14 +412,11 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
                                  innerOplog.toBSON());
     updateOplog.setPreImageOpTime(imageOpTime);
 
-    auto result = parseOplogEntryForFindAndModify(opCtx(), request, updateOplog);
-
-    auto lastError = result.getLastErrorObject();
-    ASSERT_EQ(1, lastError.getN());
-    ASSERT_TRUE(lastError.getUpdatedExisting());
-    ASSERT_TRUE(lastError.getUpdatedExisting().value());
-
-    ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "z" << 1), result.getValue());
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, updateOplog);
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
+                                             << "value"
+                                             << BSON("_id" << 1 << "z" << 1)),
+                      result);
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
@@ -420,18 +433,15 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
                                  0,
                                  repl::OpTypeEnum::kUpdate,
                                  kNs,
-                                 BSON("x" << 1 << "y" << 1),
-                                 BSON("x" << 1));
+                                 BSON("_id" << 1 << "y" << 1),
+                                 BSON("_id" << 1));
     updateOplog.setPostImageOpTime(imageOpTime);
 
-    auto result = parseOplogEntryForFindAndModify(opCtx(), request, updateOplog);
-
-    auto lastError = result.getLastErrorObject();
-    ASSERT_EQ(1, lastError.getN());
-    ASSERT_TRUE(lastError.getUpdatedExisting());
-    ASSERT_TRUE(lastError.getUpdatedExisting().value());
-
-    ASSERT_BSONOBJ_EQ(BSON("a" << 1 << "b" << 1), result.getValue());
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, updateOplog);
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
+                                             << "value"
+                                             << BSON("a" << 1 << "b" << 1)),
+                      result);
 }
 
 TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
@@ -448,8 +458,8 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
                                 0,
                                 repl::OpTypeEnum::kUpdate,
                                 kNs,
-                                BSON("x" << 1 << "y" << 1),
-                                BSON("x" << 1));
+                                BSON("_id" << 1 << "y" << 1),
+                                BSON("_id" << 1));
 
     repl::OplogEntry updateOplog(repl::OpTime(Timestamp(60, 10), 1),
                                  0,
@@ -459,14 +469,11 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
                                  innerOplog.toBSON());
     updateOplog.setPostImageOpTime(imageOpTime);
 
-    auto result = parseOplogEntryForFindAndModify(opCtx(), request, updateOplog);
-
-    auto lastError = result.getLastErrorObject();
-    ASSERT_EQ(1, lastError.getN());
-    ASSERT_TRUE(lastError.getUpdatedExisting());
-    ASSERT_TRUE(lastError.getUpdatedExisting().value());
-
-    ASSERT_BSONOBJ_EQ(BSON("a" << 1 << "b" << 1), result.getValue());
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, updateOplog);
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
+                                             << "value"
+                                             << BSON("a" << 1 << "b" << 1)),
+                      result);
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImageButOplogDoesNotExistShouldError) {
@@ -478,11 +485,11 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImageButOplogDoesNotExistShouldE
                                  0,
                                  repl::OpTypeEnum::kUpdate,
                                  kNs,
-                                 BSON("x" << 1 << "y" << 1),
-                                 BSON("x" << 1));
+                                 BSON("_id" << 1 << "y" << 1),
+                                 BSON("_id" << 1));
     updateOplog.setPostImageOpTime(imageOpTime);
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+    ASSERT_THROWS(constructFindAndModifyRetryResult(opCtx(), request, updateOplog),
                   AssertionException);
 }
 
@@ -499,13 +506,10 @@ TEST_F(FindAndModifyRetryability, BasicRemove) {
         repl::OpTime(), 0, repl::OpTypeEnum::kDelete, kNs, BSON("_id" << 20));
     removeOplog.setPreImageOpTime(imageOpTime);
 
-    auto result = parseOplogEntryForFindAndModify(opCtx(), request, removeOplog);
-
-    auto lastError = result.getLastErrorObject();
-    ASSERT_EQ(1, lastError.getN());
-    ASSERT_FALSE(lastError.getUpdatedExisting());
-
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 20 << "a" << 1), result.getValue());
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, removeOplog);
+    ASSERT_BSONOBJ_EQ(
+        BSON("lastErrorObject" << BSON("n" << 1) << "value" << BSON("_id" << 20 << "a" << 1)),
+        result);
 }
 
 TEST_F(FindAndModifyRetryability, NestedRemove) {
@@ -528,21 +532,19 @@ TEST_F(FindAndModifyRetryability, NestedRemove) {
                                  innerOplog.toBSON());
     removeOplog.setPreImageOpTime(imageOpTime);
 
-    auto result = parseOplogEntryForFindAndModify(opCtx(), request, removeOplog);
-
-    auto lastError = result.getLastErrorObject();
-    ASSERT_EQ(1, lastError.getN());
-    ASSERT_FALSE(lastError.getUpdatedExisting());
-
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 20 << "a" << 1), result.getValue());
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, removeOplog);
+    ASSERT_BSONOBJ_EQ(
+        BSON("lastErrorObject" << BSON("n" << 1) << "value" << BSON("_id" << 20 << "a" << 1)),
+        result);
 }
 
 TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithRemoveErrors) {
     auto request = FindAndModifyRequest::makeRemove(kNs, BSONObj());
 
-    repl::OplogEntry insertOplog(repl::OpTime(), 0, repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1));
+    repl::OplogEntry insertOplog(
+        repl::OpTime(), 0, repl::OpTypeEnum::kInsert, kNs, BSON("_id" << 1));
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, insertOplog),
+    ASSERT_THROWS(constructFindAndModifyRetryResult(opCtx(), request, insertOplog),
                   AssertionException);
 }
 

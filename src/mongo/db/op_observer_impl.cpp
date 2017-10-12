@@ -128,7 +128,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     BSONObj storeObj;
     if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
         invariant(args.preImageDoc);
-        storeObj = args.preImageDoc.value();
+        storeObj = *args.preImageDoc;
     } else if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PostImage) {
         storeObj = args.updatedDoc;
     }

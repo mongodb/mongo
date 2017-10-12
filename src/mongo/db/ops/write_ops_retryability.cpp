@@ -28,18 +28,16 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/ops/write_ops_retryability.h"
+
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/single_write_result_gen.h"
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/find_and_modify_result.h"
 #include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/logger/redaction.h"
 
 namespace mongo {
-
 namespace {
 
 /**
@@ -141,47 +139,26 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
  * previous execution of the command. In the case of nested oplog entry where the correct links
  * are in the top level oplog, oplogWithCorrectLinks can be used to specify the outer oplog.
  */
-FindAndModifyResult parseOplogEntryForFindAndModify(OperationContext* opCtx,
-                                                    const FindAndModifyRequest& request,
-                                                    const repl::OplogEntry& oplogEntry,
-                                                    const repl::OplogEntry& oplogWithCorrectLinks) {
-    const auto opType = oplogEntry.getOpType();
-
+void parseOplogEntryForFindAndModify(OperationContext* opCtx,
+                                     const FindAndModifyRequest& request,
+                                     const repl::OplogEntry& oplogEntry,
+                                     const repl::OplogEntry& oplogWithCorrectLinks,
+                                     BSONObjBuilder* builder) {
     validateFindAndModifyRetryability(request, oplogEntry, oplogWithCorrectLinks);
 
-    FindAndModifyResult result;
-
-    if (opType == repl::OpTypeEnum::kDelete) {
-        FindAndModifyLastError lastError;
-        lastError.setN(1);
-        result.setLastErrorObject(std::move(lastError));
-        result.setValue(extractPreOrPostImage(opCtx, oplogWithCorrectLinks));
-
-        return result;
+    switch (oplogEntry.getOpType()) {
+        case repl::OpTypeEnum::kInsert:
+            return find_and_modify::serializeUpsert(
+                1, oplogEntry.getObject(), false, oplogEntry.getObject(), builder);
+        case repl::OpTypeEnum::kUpdate:
+            return find_and_modify::serializeUpsert(
+                1, extractPreOrPostImage(opCtx, oplogWithCorrectLinks), true, {}, builder);
+        case repl::OpTypeEnum::kDelete:
+            return find_and_modify::serializeRemove(
+                1, extractPreOrPostImage(opCtx, oplogWithCorrectLinks), builder);
+        default:
+            MONGO_UNREACHABLE;
     }
-
-    // Upsert case
-    if (opType == repl::OpTypeEnum::kInsert) {
-        FindAndModifyLastError lastError;
-        lastError.setN(1);
-        lastError.setUpdatedExisting(false);
-        // TODO: SERVER-30532 set upserted
-
-        result.setLastErrorObject(std::move(lastError));
-        result.setValue(oplogEntry.getObject().getOwned());
-
-        return result;
-    }
-
-    // Update case
-    FindAndModifyLastError lastError;
-    lastError.setN(1);
-    lastError.setUpdatedExisting(true);
-
-    result.setLastErrorObject(std::move(lastError));
-    result.setValue(extractPreOrPostImage(opCtx, oplogWithCorrectLinks));
-
-    return result;
 }
 
 repl::OplogEntry getInnerNestedOplogEntry(const repl::OplogEntry& entry) {
@@ -267,16 +244,17 @@ SingleWriteResult parseOplogEntryForDelete(const repl::OplogEntry& entry) {
     return res;
 }
 
-FindAndModifyResult parseOplogEntryForFindAndModify(OperationContext* opCtx,
-                                                    const FindAndModifyRequest& request,
-                                                    const repl::OplogEntry& oplogEntry) {
+void parseOplogEntryForFindAndModify(OperationContext* opCtx,
+                                     const FindAndModifyRequest& request,
+                                     const repl::OplogEntry& oplogEntry,
+                                     BSONObjBuilder* builder) {
     // Migrated op case.
     if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
-        return parseOplogEntryForFindAndModify(
-            opCtx, request, getInnerNestedOplogEntry(oplogEntry), oplogEntry);
+        parseOplogEntryForFindAndModify(
+            opCtx, request, getInnerNestedOplogEntry(oplogEntry), oplogEntry, builder);
+    } else {
+        parseOplogEntryForFindAndModify(opCtx, request, oplogEntry, oplogEntry, builder);
     }
-
-    return parseOplogEntryForFindAndModify(opCtx, request, oplogEntry, oplogEntry);
 }
 
 }  // namespace mongo
