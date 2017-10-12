@@ -1385,7 +1385,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * tree, then perform a general check if eviction will be possible.
 	 */
 	page = ref->page;
-	if (page->read_gen != WT_READGEN_OLDEST ||
+	if (!WT_READGEN_EVICT_SOON(page->read_gen) ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    btree->evict_disabled > 0 ||

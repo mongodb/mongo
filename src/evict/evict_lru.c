@@ -71,7 +71,7 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
 	page = ref->page;
 
 	/* Any page set to the oldest generation should be discarded. */
-	if (page->read_gen == WT_READGEN_OLDEST)
+	if (WT_READGEN_EVICT_SOON(page->read_gen))
 		return (WT_READGEN_OLDEST);
 
 	/* Any page from a dead tree is a great choice. */
@@ -1271,10 +1271,10 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		 * system.  The queue is sorted, find the first "normal"
 		 * generation.
 		 */
-		read_gen_oldest = WT_READGEN_OLDEST;
+		read_gen_oldest = WT_READGEN_START_VALUE;
 		for (candidates = 0; candidates < entries; ++candidates) {
 			read_gen_oldest = queue->evict_queue[candidates].score;
-			if (read_gen_oldest != WT_READGEN_OLDEST)
+			if (!WT_READGEN_EVICT_SOON(read_gen_oldest))
 				break;
 		}
 
@@ -1286,7 +1286,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		 * 50% of the entries were at the oldest read generation, take
 		 * all of them.
 		 */
-		if (read_gen_oldest == WT_READGEN_OLDEST)
+		if (WT_READGEN_EVICT_SOON(read_gen_oldest))
 			queue->evict_candidates = entries;
 		else if (candidates > entries / 2)
 			queue->evict_candidates = candidates;
@@ -2001,7 +2001,7 @@ fast:		/* If the page can't be evicted, give up. */
 	 */
 	if (ref != NULL) {
 		if (__wt_ref_is_root(ref) || evict == start || give_up ||
-		    ref->page->read_gen == WT_READGEN_OLDEST ||
+		    WT_READGEN_EVICT_SOON(ref->page->read_gen) ||
 		    ref->page->memory_footprint >= btree->splitmempage) {
 			if (restarts == 0)
 				WT_STAT_CONN_INCR(
@@ -2009,7 +2009,7 @@ fast:		/* If the page can't be evicted, give up. */
 			WT_RET(__wt_page_release(cache->walk_session,
 			    ref, WT_READ_NO_EVICT));
 			ref = NULL;
-		} else if (ref->page->read_gen == WT_READGEN_OLDEST)
+		} else if (WT_READGEN_EVICT_SOON(ref->page->read_gen))
 			WT_RET_NOTFOUND_OK(__wt_tree_walk_count(
 			    session, &ref, &refs_walked, walk_flags));
 		btree->evict_ref = ref;

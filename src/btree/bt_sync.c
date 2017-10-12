@@ -309,8 +309,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			}
 
 			/*
-			 * If the page needs forced eviction, try to do that
-			 * now.
+			 * If the page was pulled into cache by our read, try
+			 * to evict it now.
 			 *
 			 * For eviction to have a chance, we first need to move
 			 * the walk point to the next page checkpoint will
@@ -322,7 +322,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			 * remember so we don't retry it.
 			 */
 			if (!WT_PAGE_IS_INTERNAL(page) &&
-			    page->read_gen == WT_READGEN_OLDEST &&
+			    page->read_gen == WT_READGEN_WONT_NEED &&
 			    !evict_failed) {
 				if ((ret = __sync_evict_page(
 				    session, &walk, flags)) == 0) {
