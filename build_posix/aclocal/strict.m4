@@ -95,6 +95,10 @@ AC_DEFUN([AM_CLANG_WARNINGS], [
 	# w="$w -Wno-error=cast-qual"
 	w="$w -Wno-cast-qual"
 
+	# Turn off clang thread-safety-analysis, it doesn't like some of the
+	# code patterns in WiredTiger.
+	w="$w -Wno-thread-safety-analysis"
+
 	# On Centos 7.3.1611, system header files aren't compatible with
 	# -Wdisabled-macro-expansion.
 	w="$w -Wno-disabled-macro-expansion"

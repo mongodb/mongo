@@ -1205,7 +1205,6 @@ static int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_INSERT *ins, void *ripcip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
-	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_UPDATE *first_ts_upd, *first_txn_upd, *first_upd, *upd;
 	wt_timestamp_t *timestampp;
@@ -1214,7 +1213,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 	*updp = NULL;
 
-	btree = S2BT(session);
 	page = r->page;
 	first_ts_upd = first_txn_upd = NULL;
 	max_txn = WT_TXN_NONE;
@@ -1262,15 +1260,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * uncommitted updates).  Lookaside eviction can save any
 		 * committed update.  Regular eviction checks that the maximum
 		 * transaction ID and timestamp seen are stable.
-		 *
-		 * Use the first committed entry we find in the lookaside
-		 * table.
 		 */
-		if (F_ISSET(btree, WT_BTREE_LOOKASIDE) && !uncommitted) {
-			*updp = upd;
-			break;
-		}
-
 		if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    !__wt_txn_upd_visible_all(session, upd) :
 		    !__wt_txn_upd_visible(session, upd)) {
@@ -1326,9 +1316,10 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 	/*
 	 * The checkpoint transaction is special.  Make sure we never write
-	 * (metadata) updates from a checkpoint in a concurrent session.
+	 * metadata updates from a checkpoint in a concurrent session.
 	 */
-	WT_ASSERT(session, *updp == NULL || (*updp)->txnid == WT_TXN_NONE ||
+	WT_ASSERT(session, !WT_IS_METADATA(session->dhandle) ||
+	    *updp == NULL || (*updp)->txnid == WT_TXN_NONE ||
 	    (*updp)->txnid != S2C(session)->txn_global.checkpoint_state.id ||
 	    WT_SESSION_IS_CHECKPOINT(session));
 
@@ -1352,13 +1343,10 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_UNUSED(first_ts_upd);
 	timestampp = NULL;
 #endif
-	if (F_ISSET(btree, WT_BTREE_LOOKASIDE))
-		all_visible = !uncommitted;
-	else
-		all_visible = *updp == first_txn_upd &&
-		    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
-		    __wt_txn_visible_all(session, max_txn, timestampp) :
-		    __wt_txn_visible(session, max_txn, timestampp));
+	all_visible = *updp == first_txn_upd &&
+	    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
+	    __wt_txn_visible_all(session, max_txn, timestampp) :
+	    __wt_txn_visible(session, max_txn, timestampp));
 
 	if (all_visible)
 		goto check_original_value;
@@ -1391,8 +1379,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * path is the WT_REC_UPDATE_RESTORE flag, the lookaside table path is
 	 * the WT_REC_LOOKASIDE flag.
 	 */
-	if (!F_ISSET(r, WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE) &&
-	    !F_ISSET(btree, WT_BTREE_LOOKASIDE))
+	if (!F_ISSET(r, WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE))
 		return (EBUSY);
 	if (uncommitted && !F_ISSET(r, WT_REC_UPDATE_RESTORE))
 		return (EBUSY);
@@ -1405,14 +1392,14 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 #ifdef HAVE_TIMESTAMPS
 	/* Track the oldest saved timestamp for lookaside. */
-	if (F_ISSET(r, WT_REC_LOOKASIDE)) {
+	if (F_ISSET(r, WT_REC_LOOKASIDE))
 		for (upd = first_upd; upd->next != NULL; upd = upd->next)
-			;
-		if (__wt_timestamp_cmp(
-		    &r->min_saved_timestamp, &upd->timestamp) > 0)
-			__wt_timestamp_set(
-			    &r->min_saved_timestamp, &upd->timestamp);
-	}
+			if (upd->txnid != WT_TXN_ABORTED &&
+			    upd->txnid != WT_TXN_NONE &&
+			    __wt_timestamp_cmp(
+			    &upd->timestamp, &r->min_saved_timestamp) < 0)
+				__wt_timestamp_set(
+				    &r->min_saved_timestamp, &upd->timestamp);
 #endif
 
 check_original_value:
@@ -1658,6 +1645,17 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
 			if (F_ISSET(r, WT_REC_EVICT))
 				return (EBUSY);
+
+			/*
+			 * A page evicted with lookaside entries may not have
+			 * an address, if no updates were visible to
+			 * reconciliation.  Any child pages in that state
+			 * should be ignored.
+			 */
+			if (ref->addr == NULL) {
+				*statep = WT_CHILD_IGNORE;
+				WT_CHILD_RELEASE(session, *hazardp, ref);
+			}
 
 			goto done;
 
@@ -1994,6 +1992,29 @@ __rec_leaf_page_max(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * Salvage is the backup plan: don't let this fail.
 	 */
 	return (page_size * 2);
+}
+
+#define	WT_REC_MAX_SAVED_UPDATES	100
+
+/*
+ * __rec_need_split --
+ *	Check whether adding some bytes to the page requires a split.
+ *
+ *	This takes into account the disk image growing across a boundary, and
+ *	also triggers a split for row store leaf pages when a threshold number
+ *	of saved updates is reached.  This allows pages to split for update /
+ *	restore and lookaside eviction when there is no visible data that
+ *	causes the disk image to grow.
+ */
+static bool
+__rec_need_split(WT_RECONCILE *r, size_t len)
+{
+	if (r->page->type == WT_PAGE_ROW_LEAF &&
+	    r->supd_next >= WT_REC_MAX_SAVED_UPDATES)
+		return (true);
+
+	return (r->raw_compression ?
+	    len > r->space_avail : WT_CHECK_CROSSING_BND(r, len));
 }
 
 /*
@@ -2456,7 +2477,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 	btree = S2BT(session);
 
 	/* Fixed length col store can call with next_len 0 */
-	WT_ASSERT(session, next_len == 0 || r->space_avail < next_len);
+	WT_ASSERT(session, next_len == 0 || __rec_need_split(r, next_len));
 
 	/*
 	 * We should never split during salvage, and we're about to drop core
@@ -2474,7 +2495,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 	 * Additionally, grow the buffer to contain the current item if we
 	 * haven't already consumed a reasonable portion of a split chunk.
 	 */
-	if (inuse < r->split_size / 2)
+	if (inuse < r->split_size / 2 && !__rec_need_split(r, 0))
 		goto done;
 
 	/* All page boundaries reset the dictionary. */
@@ -2557,7 +2578,7 @@ __rec_split_crossing_bnd(
 	WT_BTREE *btree;
 	size_t min_offset;
 
-	WT_ASSERT(session, WT_CHECK_CROSSING_BND(r, next_len));
+	WT_ASSERT(session, __rec_need_split(r, next_len));
 
 	/*
 	 * If crossing the minimum split size boundary, store the boundary
@@ -2566,7 +2587,7 @@ __rec_split_crossing_bnd(
 	 * large enough, just split at this point.
 	 */
 	if (WT_CROSSING_MIN_BND(r, next_len) &&
-	    !WT_CROSSING_SPLIT_BND(r, next_len)) {
+	    !WT_CROSSING_SPLIT_BND(r, next_len) && !__rec_need_split(r, 0)) {
 		btree = S2BT(session);
 		WT_ASSERT(session, r->cur_ptr->min_offset == 0);
 
@@ -2640,7 +2661,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	/*
 	 * We can get here if the first key/value pair won't fit.
 	 */
-	if (r->entries == 0)
+	if (r->entries == 0 && !__rec_need_split(r, 0))
 		goto split_grow;
 
 	/*
@@ -4110,13 +4131,13 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/* Boundary: split or write the page. */
-		if (r->raw_compression) {
-			if (val->len > r->space_avail)
+		if (__rec_need_split(r, val->len)) {
+			if (r->raw_compression)
 				WT_ERR(__rec_split_raw(session, r, val->len));
-		} else
-			if (WT_CHECK_CROSSING_BND(r, val->len))
+			else
 				WT_ERR(__rec_split_crossing_bnd(
 				    session, r, val->len));
+		}
 
 		/* Copy the value onto the page. */
 		__rec_copy_incr(session, r, val);
@@ -4158,13 +4179,13 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		    addr->addr, addr->size, __rec_vtype(addr), r->recno);
 
 		/* Boundary: split or write the page. */
-		if (r->raw_compression) {
-			if (val->len > r->space_avail)
+		if (__rec_need_split(r, val->len)) {
+			if (r->raw_compression)
 				WT_RET(__rec_split_raw(session, r, val->len));
-		} else
-			if (WT_CHECK_CROSSING_BND(r, val->len))
+			else
 				WT_RET(__rec_split_crossing_bnd(
 				    session, r, val->len));
+		}
 
 		/* Copy the value onto the page. */
 		__rec_copy_incr(session, r, val);
@@ -4431,12 +4452,12 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    session, r, value->data, value->size, rle));
 
 	/* Boundary: split or write the page. */
-	if (r->raw_compression) {
-		if (val->len > r->space_avail)
+	if (__rec_need_split(r, val->len)) {
+		if (r->raw_compression)
 			WT_RET(__rec_split_raw(session, r, val->len));
-	} else
-		if (WT_CHECK_CROSSING_BND(r, val->len))
+		else
 			WT_RET(__rec_split_crossing_bnd(session, r, val->len));
+	}
 
 	/* Copy the value onto the page. */
 	if (!deleted && !overflow_type && btree->dictionary)
@@ -5132,12 +5153,11 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		r->cell_zero = false;
 
 		/* Boundary: split or write the page. */
-		if (r->raw_compression) {
-			if (key->len + val->len > r->space_avail)
+		if (__rec_need_split(r, key->len + val->len)) {
+			if (r->raw_compression)
 				WT_ERR(__rec_split_raw(
 				    session, r, key->len + val->len));
-		} else
-			if (WT_CHECK_CROSSING_BND(r, key->len + val->len)) {
+			else {
 				/*
 				 * In one path above, we copied address blocks
 				 * from the page rather than building the actual
@@ -5153,6 +5173,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				WT_ERR(__rec_split_crossing_bnd(
 				    session, r, key->len + val->len));
 			}
+		}
 
 		/* Copy the key and value onto the page. */
 		__rec_copy_incr(session, r, key);
@@ -5202,14 +5223,14 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		    addr->addr, addr->size, __rec_vtype(addr), WT_RECNO_OOB);
 
 		/* Boundary: split or write the page. */
-		if (r->raw_compression) {
-			if (key->len + val->len > r->space_avail)
+		if (__rec_need_split(r, key->len + val->len)) {
+			if (r->raw_compression)
 				WT_RET(__rec_split_raw(
 				    session, r, key->len + val->len));
-		} else
-			if (WT_CHECK_CROSSING_BND(r, key->len + val->len))
+			else
 				WT_RET(__rec_split_crossing_bnd(
 				    session, r, key->len + val->len));
+		}
 
 		/* Copy the key and value onto the page. */
 		__rec_copy_incr(session, r, key);
@@ -5549,12 +5570,11 @@ build:
 		}
 
 		/* Boundary: split or write the page. */
-		if (r->raw_compression) {
-			if (key->len + val->len > r->space_avail)
+		if (__rec_need_split(r, key->len + val->len)) {
+			if (r->raw_compression)
 				WT_ERR(__rec_split_raw(
 				    session, r, key->len + val->len));
-		} else
-			if (WT_CHECK_CROSSING_BND(r, key->len + val->len)) {
+			else {
 				/*
 				 * If we copied address blocks from the page
 				 * rather than building the actual key, we have
@@ -5585,6 +5605,7 @@ build:
 				WT_ERR(__rec_split_crossing_bnd(
 				    session, r, key->len + val->len));
 			}
+		}
 
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
@@ -5693,12 +5714,11 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &ovfl_key));
 
 		/* Boundary: split or write the page. */
-		if (r->raw_compression) {
-			if (key->len + val->len > r->space_avail)
+		if (__rec_need_split(r, key->len + val->len)) {
+			if (r->raw_compression)
 				WT_RET(__rec_split_raw(
 				    session, r, key->len + val->len));
-		} else
-			if (WT_CHECK_CROSSING_BND(r, key->len + val->len)) {
+			else {
 				/*
 				 * Turn off prefix compression until a full key
 				 * written to the new page, and (unless already
@@ -5717,6 +5737,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 				WT_RET(__rec_split_crossing_bnd(
 				    session, r, key->len + val->len));
 			}
+		}
 
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);

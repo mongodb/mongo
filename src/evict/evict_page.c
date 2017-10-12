@@ -344,6 +344,9 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		/*
 		 * Update the parent to reference the replacement page.
 		 *
+		 * A page evicted with lookaside entries may not have an
+		 * address, if no updates were visible to reconciliation.
+		 *
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
@@ -574,10 +577,17 @@ __evict_review(
 			}
 
 			/*
-			 * Check if reconciliation suggests trying the
-			 * lookaside table.
+			 * If the cache is nearly stuck, check if
+			 * reconciliation suggests trying the lookaside table
+			 * unless lookaside eviction is disabled globally.
+			 *
+			 * We don't wait until the cache is completely stuck:
+			 * for workloads where lookaside eviction is necessary
+			 * to make progress, we don't want a single successful
+			 * page eviction to make the cache "unstuck" so we have
+			 * to wait again before evicting the next page.
 			 */
-			if (__wt_cache_aggressive(session) &&
+			if (__wt_cache_nearly_stuck(session) &&
 			    !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE))
 				lookaside_retryp = &lookaside_retry;
 		}
@@ -626,7 +636,6 @@ __evict_review(
 	WT_ASSERT(session,
 	    __wt_page_is_modified(page) ||
 	    LF_ISSET(WT_REC_LOOKASIDE) ||
-	    F_ISSET(S2BT(session), WT_BTREE_LOOKASIDE) ||
 	    __wt_txn_visible_all(session, page->modify->rec_max_txn,
 	    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp)));
 
