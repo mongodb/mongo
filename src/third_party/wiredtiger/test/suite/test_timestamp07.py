@@ -82,6 +82,34 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         if txn_config:
             session.commit_transaction()
 
+    # Check reads of all tables at a timestamp
+    def check_reads(self, session, txn_config, check_value, valcnt, valcnt2, valcnt3):
+        if txn_config:
+            session.begin_transaction(txn_config)
+        c = session.open_cursor(self.uri + self.tablename, None)
+        c2 = session.open_cursor(self.uri + self.tablename2, None)
+        c3 = session.open_cursor(self.uri + self.tablename3, None)
+        count = 0
+        for k, v in c:
+            if check_value in str(v):
+                count += 1
+        c.close()
+        count2 = 0
+        for k, v in c2:
+            if check_value in str(v):
+                count2 += 1
+        c2.close()
+        count3 = 0
+        for k, v in c3:
+            if check_value in str(v):
+                count3 += 1
+        c3.close()
+        if txn_config:
+            session.commit_transaction()
+        self.assertEqual(count, valcnt)
+        self.assertEqual(count2, valcnt2)
+        self.assertEqual(count3, valcnt3)
+
     #
     # Take a backup of the database and verify that the value we want to
     # check exists in the tables the expected number of times.
@@ -135,6 +163,15 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.checkpoint(ckptcfg)
         self.backup_check(check_value, valcnt, valcnt2, valcnt3)
 
+    def check_stable(self, check_value, valcnt, valcnt2, valcnt3):
+        self.ckpt_backup(check_value, valcnt, valcnt2, valcnt3)
+
+        # When reading as-of a timestamp, tables 1 and 3 should match (both
+        # use timestamps and we're not running recovery, so logging behavior
+        # should be irrelevant).
+        self.check_reads(self.session, 'read_timestamp=' + self.stablets,
+            check_value, valcnt, valcnt2, valcnt)
+
     def test_timestamp07(self):
         if not wiredtiger.timestamp_build():
             self.skipTest('requires a timestamp build')
@@ -177,9 +214,9 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Bump the oldest timestamp, we're not going back...
         self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(self.nkeys))
-        self.oldts = timestamp_str(self.nkeys)
+        self.oldts = self.stablets = timestamp_str(self.nkeys)
         self.conn.set_timestamp('oldest_timestamp=' + self.oldts)
-        self.conn.set_timestamp('stable_timestamp=' + self.oldts)
+        self.conn.set_timestamp('stable_timestamp=' + self.stablets)
         # print "Oldest " + self.oldts
 
         # Update them and retry.
@@ -204,14 +241,14 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Take a checkpoint using the given configuration.  Then verify
         # whether value2 appears in a copy of that data or not.
-        self.ckpt_backup(self.value2, 0, self.nkeys, self.nkeys if self.using_log else 0)
+        self.check_stable(self.value2, 0, self.nkeys, self.nkeys if self.using_log else 0)
 
         # Update the stable timestamp to the latest, but not the oldest
         # timestamp and make sure we can see the data.  Once the stable
         # timestamp is moved we should see all keys with value2.
-        self.conn.set_timestamp('stable_timestamp=' + \
-            timestamp_str(self.nkeys*2))
-        self.ckpt_backup(self.value2, self.nkeys, self.nkeys, self.nkeys)
+        self.stablets = timestamp_str(self.nkeys*2)
+        self.conn.set_timestamp('stable_timestamp=' + self.stablets)
+        self.check_stable(self.value2, self.nkeys, self.nkeys, self.nkeys)
 
         # If we're not using the log we're done.
         if not self.using_log:
@@ -244,7 +281,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # of that data or not.  Both tables that are logged should see
         # all the data regardless of timestamps.  The table that is not
         # logged should not see any of it.
-        self.backup_check(self.value3, 0, self.nkeys, self.nkeys)
+        self.check_stable(self.value3, 0, self.nkeys, self.nkeys)
 
 if __name__ == '__main__':
     wttest.run()

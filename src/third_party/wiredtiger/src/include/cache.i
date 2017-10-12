@@ -79,6 +79,22 @@ __wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_cache_nearly_stuck --
+ *      Indicate if the cache is nearly stuck.
+ */
+static inline bool
+__wt_cache_nearly_stuck(WT_SESSION_IMPL *session)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	return (cache->evict_aggressive_score >=
+	    (WT_EVICT_SCORE_MAX - WT_EVICT_SCORE_BUMP) &&
+	    F_ISSET(cache,
+		WT_CACHE_EVICT_CLEAN_HARD | WT_CACHE_EVICT_DIRTY_HARD));
+}
+
+/*
  * __wt_cache_stuck --
  *      Indicate if the cache is stuck (i.e., not making progress).
  */
