@@ -477,9 +477,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 		case WT_REF_DISK:
 		case WT_REF_LOOKASIDE:
 			if (LF_ISSET(WT_READ_CACHE)) {
-				if (ref->state != WT_REF_LOOKASIDE)
-					return (WT_NOTFOUND);
-				if (!LF_ISSET(WT_READ_LOOKASIDE))
+				if (ref->state != WT_REF_LOOKASIDE ||
+				    !LF_ISSET(WT_READ_LOOKASIDE))
 					return (WT_NOTFOUND);
 #ifdef HAVE_TIMESTAMPS
 				/*
