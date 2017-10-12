@@ -55,22 +55,6 @@ using namespace std;
 
 namespace mongo {
 
-namespace {
-
-/**
- * This type is used for all exceptions that don't have a more specific type. It is defined locally
- * in this file to prevent anyone from catching it specifically separately from AssertionException.
- */
-class NonspecificAssertionException final : public AssertionException {
-public:
-    using AssertionException::AssertionException;
-
-private:
-    void defineOnlyInFinalSubclassToPreventSlicing() final {}
-};
-
-}  // namespace
-
 AssertionCount assertionCount;
 
 AssertionCount::AssertionCount() : regular(0), warning(0), msg(0), user(0), rollovers(0) {}
@@ -136,7 +120,7 @@ NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned lin
     severe() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
     std::abort();
 #endif
-    throw NonspecificAssertionException(ErrorCodes::UnknownError, temp.str());
+    error_details::throwExceptionForStatus(Status(ErrorCodes::UnknownError, temp.str()));
 }
 
 NOINLINE_DECL void invariantFailed(const char* expr, const char* file, unsigned line) noexcept {
@@ -202,7 +186,7 @@ NOINLINE_DECL void uassertedWithLocation(int msgid,
     assertionCount.condrollover(++assertionCount.user);
     LOG(1) << "User Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
            << endl;
-    throw NonspecificAssertionException(msgid, msg);
+    error_details::throwExceptionForStatus(Status(ErrorCodes::Error(msgid), msg));
 }
 
 NOINLINE_DECL void msgassertedWithLocation(int msgid,
@@ -212,7 +196,7 @@ NOINLINE_DECL void msgassertedWithLocation(int msgid,
     assertionCount.condrollover(++assertionCount.msg);
     error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
             << endl;
-    throw NonspecificAssertionException(msgid, msg);
+    error_details::throwExceptionForStatus(Status(ErrorCodes::Error(msgid), msg));
 }
 
 std::string causedBy(StringData e) {

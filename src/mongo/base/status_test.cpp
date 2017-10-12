@@ -36,15 +36,19 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+namespace mongo {
 namespace {
-
-using mongo::ErrorCodes;
-using mongo::Status;
 
 TEST(Basic, Accessors) {
     Status status(ErrorCodes::MaxError, "error");
     ASSERT_EQUALS(status.code(), ErrorCodes::MaxError);
     ASSERT_EQUALS(status.reason(), "error");
+}
+
+TEST(Basic, IsA) {
+    ASSERT(!Status(ErrorCodes::BadValue, "").isA<ErrorCategory::Interruption>());
+    ASSERT(Status(ErrorCodes::Interrupted, "").isA<ErrorCategory::Interruption>());
+    ASSERT(!Status(ErrorCodes::Interrupted, "").isA<ErrorCategory::ShutdownError>());
 }
 
 TEST(Basic, OKIsAValidStatus) {
@@ -249,4 +253,5 @@ TEST(Transformers, ExceptionToStatus) {
     ASSERT_TRUE(fromBoostExcept.reason().find("boost::exception") != std::string::npos);
 }
 
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo

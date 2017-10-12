@@ -74,4 +74,28 @@ bool ErrorCodes::is${cat.name}(Error err) {
 }
 //#end for
 
+void error_details::throwExceptionForStatus(const Status& status) {
+    /**
+     * This type is used for all exceptions that don't have a more specific type. It is defined
+     * locally in this function to prevent anyone from catching it specifically separately from
+     * AssertionException.
+     */
+    class NonspecificAssertionException final : public AssertionException {
+    public:
+        using AssertionException::AssertionException;
+
+    private:
+        void defineOnlyInFinalSubclassToPreventSlicing() final {}
+    };
+
+    switch (status.code()) {
+        //#for $ec in $codes
+        case ErrorCodes::$ec.name:
+            throw ExceptionFor<ErrorCodes::$ec.name>(status);
+        //#end for
+        default:
+            throw NonspecificAssertionException(status);
+    }
+}
+
 }  // namespace mongo

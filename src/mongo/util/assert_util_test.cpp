@@ -30,12 +30,121 @@
 
 #include "mongo/platform/basic.h"
 
+#include <type_traits>
+
+#include "mongo/base/static_assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+namespace mongo {
 namespace {
-using namespace mongo;
+
+#define ASSERT_CATCHES(code, Type)                                         \
+    ([] {                                                                  \
+        try {                                                              \
+            uasserted(code, "");                                           \
+        } catch (const Type&) {                                            \
+            /* Success - ignore*/                                          \
+        } catch (const std::exception& ex) {                               \
+            FAIL("Expected to be able to catch " #code " as a " #Type)     \
+                << " actual exception type: " << demangleName(typeid(ex)); \
+        }                                                                  \
+    }())
+
+#define ASSERT_NOT_CATCHES(code, Type)            \
+    ([] {                                         \
+        try {                                     \
+            uasserted(code, "");                  \
+        } catch (const Type&) {                   \
+            FAIL("Caught " #code " as a " #Type); \
+        } catch (const DBException&) {            \
+            /* Success - ignore*/                 \
+        }                                         \
+    }())
+
+// BadValue - no categories
+MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::BadValue>,
+                                 error_details::CategoryList<>>());
+MONGO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::BadValue>>());
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+                                     ExceptionFor<ErrorCodes::BadValue>>());
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
+                                     ExceptionFor<ErrorCodes::BadValue>>());
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
+                                     ExceptionFor<ErrorCodes::BadValue>>());
+
+TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
+    ASSERT_CATCHES(ErrorCodes::BadValue, DBException);
+    ASSERT_CATCHES(ErrorCodes::BadValue, AssertionException);
+    ASSERT_CATCHES(ErrorCodes::BadValue, ExceptionFor<ErrorCodes::BadValue>);
+    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionFor<ErrorCodes::DuplicateKey>);
+    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::NotMasterError>);
+    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::Interruption>);
+}
+
+// NotMaster - just NotMasterError
+MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::NotMaster>,
+                                 error_details::CategoryList<ErrorCategory::NotMasterError>>());
+MONGO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::NotMaster>>());
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+                                     ExceptionFor<ErrorCodes::NotMaster>>());
+MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
+                                    ExceptionFor<ErrorCodes::NotMaster>>());
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
+                                     ExceptionFor<ErrorCodes::NotMaster>>());
+
+TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
+    ASSERT_CATCHES(ErrorCodes::NotMaster, DBException);
+    ASSERT_CATCHES(ErrorCodes::NotMaster, AssertionException);
+    ASSERT_CATCHES(ErrorCodes::NotMaster, ExceptionFor<ErrorCodes::NotMaster>);
+    ASSERT_NOT_CATCHES(ErrorCodes::NotMaster, ExceptionFor<ErrorCodes::DuplicateKey>);
+    ASSERT_NOT_CATCHES(ErrorCodes::NotMaster, ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_CATCHES(ErrorCodes::NotMaster, ExceptionForCat<ErrorCategory::NotMasterError>);
+    ASSERT_NOT_CATCHES(ErrorCodes::NotMaster, ExceptionForCat<ErrorCategory::Interruption>);
+}
+
+// InterruptedDueToReplStateChange - NotMasterError and Interruption
+MONGO_STATIC_ASSERT(
+    std::is_same<
+        error_details::ErrorCategoriesFor<ErrorCodes::InterruptedDueToReplStateChange>,
+        error_details::CategoryList<ErrorCategory::Interruption, ErrorCategory::NotMasterError>>());
+MONGO_STATIC_ASSERT(std::is_base_of<AssertionException,
+                                    ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+                                     ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
+MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
+                                    ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
+MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
+                                    ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
+
+TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange, DBException);
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange, AssertionException);
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
+                   ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>);
+    ASSERT_NOT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
+                       ExceptionFor<ErrorCodes::DuplicateKey>);
+    ASSERT_NOT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
+                       ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
+                   ExceptionForCat<ErrorCategory::NotMasterError>);
+    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
+                   ExceptionForCat<ErrorCategory::Interruption>);
+}
+
+MONGO_STATIC_ASSERT(!error_details::isNamedCode<19999>);
+// ExceptionFor<ErrorCodes::Error(19999)> invalidType;  // Must not compile.
+
+TEST(AssertUtils, UassertNumericCode) {
+    ASSERT_CATCHES(19999, DBException);
+    ASSERT_CATCHES(19999, AssertionException);
+    ASSERT_NOT_CATCHES(19999, ExceptionFor<ErrorCodes::DuplicateKey>);
+    ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::NotMasterError>);
+    ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::Interruption>);
+}
 
 // uassert and its friends
 DEATH_TEST(UassertionTerminationTest, uassert, "Terminating with uassert") {
@@ -111,3 +220,4 @@ DEATH_TEST(MassertionTerminationTest, msgasserted, "Terminating with msgasserted
 }
 
 }  // namespace
+}  // namespace mongo

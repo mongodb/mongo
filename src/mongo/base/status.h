@@ -131,6 +131,14 @@ public:
     std::string toString() const;
 
     /**
+     * Returns true if this Status's code is a member of the given category.
+     */
+    template <ErrorCategory category>
+    bool isA() const {
+        return ErrorCodes::isA<category>(code());
+    }
+
+    /**
      * Call this method to indicate that it is your intention to ignore a returned status. Ignoring
      * is only possible if the value being ignored is an xvalue -- it is not appropriate to create a
      * status variable and then ignore it.

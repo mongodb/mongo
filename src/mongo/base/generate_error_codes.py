@@ -56,13 +56,16 @@ def render_template(template_path, **kw):
             useCache=False)
     return str(template(**kw))
 
-ErrorCode = namedtuple('ErrorCode', ['name', 'code'])
-def makeErrorCode(name, code):
-    return ErrorCode(name, code)
+class ErrorCode:
+    def __init__(self, name, code):
+        self.name = name
+        self.code = code
+        self.categories = []
 
-ErrorClass = namedtuple('ErrorClass', ['name', 'codes'])
-def makeErrorClass(name, codes):
-    return ErrorClass(name, codes)
+class ErrorClass:
+    def __init__(self, name, codes):
+        self.name = name
+        self.codes = codes
 
 def main(argv):
     # Parse and validate argv.
@@ -107,9 +110,10 @@ def parse_error_definitions_from_file(errors_filename):
     error_codes = []
     error_classes = []
     eval(errors_code,
-            dict(error_code=lambda *args, **kw: error_codes.append(makeErrorCode(*args, **kw)),
-                 error_class=lambda *args: error_classes.append(makeErrorClass(*args))))
+            dict(error_code=lambda *args, **kw: error_codes.append(ErrorCode(*args, **kw)),
+                 error_class=lambda *args: error_classes.append(ErrorClass(*args))))
     error_codes.sort(key=lambda x: x.code)
+
     return error_codes, error_classes
 
 def check_for_conflicts(error_codes, error_classes):
@@ -157,13 +161,16 @@ def has_duplicate_error_classes(error_classes):
     return failed
 
 def has_missing_error_codes(error_codes, error_classes):
-    code_names = set(ec[0] for ec in error_codes)
+    code_names = dict((ec.name, ec) for ec in error_codes)
     failed = False
-    for class_name, class_code_names in error_classes:
-        for name in class_code_names:
-            if name not in code_names:
-                sys.stdout.write('Undeclared error code %s in class %s\n' % (name, class_name))
+    for category in error_classes:
+        for name in category.codes:
+            try:
+                code_names[name].categories.append(category.name)
+            except KeyError:
+                sys.stdout.write('Undeclared error code %s in class %s\n' % (name, category.name))
                 failed = True
+
     return failed
 
 if __name__ == '__main__':

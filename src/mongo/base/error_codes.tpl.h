@@ -33,8 +33,17 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
+
+class Status;
+
+enum class ErrorCategory {
+    //#for $cat in $categories
+    ${cat.name},
+    //#end for
+};
 
 /**
  * This is a generated class containing a table of error codes and their corresponding error
@@ -72,11 +81,69 @@ public:
         return static_cast<Error>(code);
     }
 
+    /**
+     * Generic predicate to test if a given error code is in a category.
+     *
+     * This version is intended to simplify forwarding by Status and DBException. Non-generic
+     * callers should just use the specific isCategoryName() methods instead.
+     */
+    template <ErrorCategory category>
+    static bool isA(Error code);
+
     //#for $cat in $categories
-    static bool is${cat.name}(Error err);
+    static bool is${cat.name}(Error code);
     //#end for
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);
+
+//#for $cat in $categories
+template <>
+inline bool ErrorCodes::isA<ErrorCategory::$cat.name>(Error code) {
+    return is${cat.name}(code);
+}
+//#end for
+
+/**
+ * This namespace contains implementation details for our error handling code and should not be used
+ * directly in general code.
+ */
+namespace error_details {
+
+template <int32_t code>
+constexpr bool isNamedCode = false;
+//#for $ec in $codes
+template <>
+constexpr bool isNamedCode<ErrorCodes::$ec.name> = true;
+//#end for
+
+MONGO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
+
+template <ErrorCategory... categories>
+struct CategoryList;
+
+template <ErrorCodes::Error code>
+struct ErrorCategoriesForImpl {
+    using type = CategoryList<>;
+};
+
+//#for $ec in $codes:
+//#if $ec.categories
+template <>
+struct ErrorCategoriesForImpl<ErrorCodes::$ec.name> {
+    using type = CategoryList<
+        //#for $i, $cat in enumerate($ec.categories)
+        //#set $comma = '' if i == len($ec.categories) - 1 else ', '
+        ErrorCategory::$cat$comma
+        //#end for
+        >;
+};
+//#end if
+//#end for
+
+template <ErrorCodes::Error code>
+using ErrorCategoriesFor = typename ErrorCategoriesForImpl<code>::type;
+
+}  // namespace error_details
 
 }  // namespace mongo
