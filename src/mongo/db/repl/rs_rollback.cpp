@@ -182,7 +182,8 @@ Status FixUpInfo::recordDropTargetInfo(const BSONElement& dropTarget,
 }
 
 Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo,
-                                                             const BSONObj& ourObj) {
+                                                             const BSONObj& ourObj,
+                                                             bool isNestedApplyOpsCommand) {
 
     // Checks that the oplog entry is smaller than 512 MB. We do not roll back if the
     // oplog entry is larger than 512 MB.
@@ -190,10 +191,31 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         throw RSFatalException(str::stream() << "Rollback too large, oplog size: "
                                              << ourObj.objsize());
 
-    // Parse the oplog entry.
-    auto oplogEntry = OplogEntry(ourObj);
+    // If required fields are not present in the BSONObj for an applyOps entry, create these fields
+    // and populate them with dummy values before parsing ourObj as an oplog entry.
+    BSONObjBuilder bob;
+    if (isNestedApplyOpsCommand) {
+        if (!ourObj.hasField("ts")) {
+            bob.appendTimestamp("ts");
+        }
+        if (!ourObj.hasField("h")) {
+            long long dummyHash = 0;
+            bob.append("h", dummyHash);
+        }
+    }
+    bob.appendElements(ourObj);
+    BSONObj fixedObj = bob.obj();
 
-    LOG(2) << "Updating rollback FixUpInfo for local oplog entry: " << oplogEntry.toBSON();
+    // Parse the oplog entry.
+    auto oplogEntry = OplogEntry(fixedObj);
+
+    if (isNestedApplyOpsCommand) {
+        LOG(2) << "Updating rollback FixUpInfo for nested applyOps entry: "
+               << redact(oplogEntry.toBSON());
+    } else {
+        LOG(2) << "Updating rollback FixUpInfo for local oplog entry: "
+               << redact(oplogEntry.toBSON());
+    }
 
     // Extract the op's collection namespace and UUID.
     NamespaceString nss = oplogEntry.getNamespace();
@@ -201,10 +223,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
 
     if (oplogEntry.getOpType() == OpTypeEnum::kNoop)
         return Status::OK();
-
-    // If we are inserting/updating/deleting a document in the oplog entry, we will update
-    // the doc._id field when we actually insert the docID into the docsToRefetch set.
-    DocID doc = DocID(oplogEntry.raw, BSONElement(), *uuid);
 
     if (oplogEntry.getNamespace().isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no ns: "
@@ -312,7 +330,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 if (!status.isOK()) {
                     severe()
                         << "Missing index name in dropIndexes operation on rollback, document: "
-                        << redact(doc.ownedObj);
+                        << redact(oplogEntry.toBSON());
                     throw RSFatalException(
                         "Missing index name in dropIndexes operation on rollback.");
                 }
@@ -340,7 +358,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 if (!status.isOK()) {
                     severe()
                         << "Missing index name in createIndexes operation on rollback, document: "
-                        << redact(doc.ownedObj);
+                        << redact(oplogEntry.toBSON());
                     throw RSFatalException(
                         "Missing index name in createIndexes operation on rollback.");
                 }
@@ -487,7 +505,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                 //                        }]
                 //         }
                 // }
-
                 if (first.type() != Array) {
                     std::string message = str::stream()
                         << "Expected applyOps argument to be an array; found " << redact(first);
@@ -507,7 +524,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                     // needed for rollback that is contained within the applyOps, creating a nested
                     // call.
                     auto subStatus =
-                        updateFixUpInfoFromLocalOplogEntry(fixUpInfo, subopElement.Obj());
+                        updateFixUpInfoFromLocalOplogEntry(fixUpInfo, subopElement.Obj(), true);
                     if (!subStatus.isOK()) {
                         return subStatus;
                     }
@@ -522,6 +539,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
             }
         }
     }
+
+    // If we are inserting/updating/deleting a document in the oplog entry, we will update
+    // the doc._id field when we actually insert the docID into the docsToRefetch set.
+    DocID doc = DocID(oplogEntry.raw, BSONElement(), *uuid);
 
     doc._id = oplogEntry.getIdElement();
     if (doc._id.eoo()) {
@@ -860,7 +881,7 @@ Status _syncRollback(OperationContext* opCtx,
     try {
 
         auto processOperationForFixUp = [&how](const BSONObj& operation) {
-            return updateFixUpInfoFromLocalOplogEntry(how, operation);
+            return updateFixUpInfoFromLocalOplogEntry(how, operation, false);
         };
 
         // Calls syncRollBackLocalOperations to run updateFixUpInfoFromLocalOplogEntry

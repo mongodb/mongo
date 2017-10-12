@@ -1378,11 +1378,12 @@ TEST_F(RSRollbackTest, RollbackDropDatabaseCommand) {
                            _replicationProcess.get()));
 }
 
-BSONObj makeApplyOpsOplogEntry(Timestamp ts, UUID uuid, std::initializer_list<BSONObj> ops) {
+BSONObj makeApplyOpsOplogEntry(Timestamp ts, std::initializer_list<BSONObj> ops) {
+    // applyOps oplog entries are special and do not include a UUID field.
     BSONObjBuilder entry;
     entry << "ts" << ts << "h" << 1LL << "op"
           << "c"
-          << "ui" << uuid << "ns"
+          << "ns"
           << "admin";
     {
         BSONObjBuilder cmd(entry.subobjStart("o"));
@@ -1435,7 +1436,6 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     const auto applyOpsOperation =
         std::make_pair(makeApplyOpsOplogEntry(Timestamp(Seconds(2), 0),
-                                              uuid,
                                               {BSON("op"
                                                     << "u"
                                                     << "ui"
@@ -1492,6 +1492,42 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
                                                     << 1LL
                                                     << "h"
                                                     << 2LL
+                                                    << "ns"
+                                                    << "test.t"
+                                                    << "o"
+                                                    << BSON("_id" << 4)),
+                                               // applyOps internal oplog entries are not required
+                                               // to have a timestamp and/or hash.
+                                               BSON("op"
+                                                    << "i"
+                                                    << "ui"
+                                                    << uuid
+                                                    << "ts"
+                                                    << Timestamp(4, 1)
+                                                    << "t"
+                                                    << 1LL
+                                                    << "ns"
+                                                    << "test.t"
+                                                    << "o"
+                                                    << BSON("_id" << 4)),
+                                               BSON("op"
+                                                    << "i"
+                                                    << "ui"
+                                                    << uuid
+                                                    << "t"
+                                                    << 1LL
+                                                    << "h"
+                                                    << 2LL
+                                                    << "ns"
+                                                    << "test.t"
+                                                    << "o"
+                                                    << BSON("_id" << 4)),
+                                               BSON("op"
+                                                    << "i"
+                                                    << "ui"
+                                                    << uuid
+                                                    << "t"
+                                                    << 1LL
                                                     << "ns"
                                                     << "test.t"
                                                     << "o"
@@ -1861,7 +1897,7 @@ TEST(RSRollbackTest, LocalEntryWithoutNsIsFatal) {
                                       << "o"
                                       << BSON("_id" << 1 << "a" << 1));
     FixUpInfo fui;
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry, false));
     const auto invalidOplogEntry = BSON("op"
                                         << "i"
                                         << "ui"
@@ -1876,8 +1912,9 @@ TEST(RSRollbackTest, LocalEntryWithoutNsIsFatal) {
                                         << ""
                                         << "o"
                                         << BSON("_id" << 1 << "a" << 1));
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry).transitional_ignore(),
-                  RSFatalException);
+    ASSERT_THROWS(
+        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
+        RSFatalException);
 }
 
 TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
@@ -1896,7 +1933,7 @@ TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
                                       << "o"
                                       << BSON("_id" << 1 << "a" << 1));
     FixUpInfo fui;
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry, false));
     const auto invalidOplogEntry = BSON("op"
                                         << "i"
                                         << "ui"
@@ -1911,8 +1948,9 @@ TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
                                         << "test.t"
                                         << "o"
                                         << BSONObj());
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry).transitional_ignore(),
-                  RSFatalException);
+    ASSERT_THROWS(
+        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
+        RSFatalException);
 }
 
 TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
@@ -1933,7 +1971,7 @@ TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
                                       << "o2"
                                       << BSON("_id" << 1));
     FixUpInfo fui;
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry, false));
     const auto invalidOplogEntry = BSON("op"
                                         << "u"
                                         << "ui"
@@ -1950,8 +1988,9 @@ TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
                                         << BSON("_id" << 1 << "a" << 1)
                                         << "o2"
                                         << BSONObj());
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry).transitional_ignore(),
-                  RSFatalException);
+    ASSERT_THROWS(
+        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
+        RSFatalException);
 }
 
 DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutSessionIdIsFatal, "invariant") {
@@ -1964,14 +2003,14 @@ DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutSessionIdIsFatal, "in
                                      << "o"
                                      << BSON("_id" << 1 << "a" << 1));
     FixUpInfo fui;
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry, false));
 
     const auto txnNumber = BSON("txnNumber" << 1LL);
     const auto noSessionIdOrStmtId = validOplogEntry.addField(txnNumber.firstElement());
 
     const auto stmtId = BSON("stmtId" << 1);
     const auto noSessionId = noSessionIdOrStmtId.addField(stmtId.firstElement());
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noSessionId).transitional_ignore(),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noSessionId, false).transitional_ignore(),
                   RSFatalException);
 }
 
@@ -1985,7 +2024,7 @@ DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutStmtIdIsFatal, "invar
                                      << "o"
                                      << BSON("_id" << 1 << "a" << 1));
     FixUpInfo fui;
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry, false));
 
     const auto txnNumber = BSON("txnNumber" << 1LL);
     const auto noSessionIdOrStmtId = validOplogEntry.addField(txnNumber.firstElement());
@@ -1993,7 +2032,7 @@ DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutStmtIdIsFatal, "invar
     const auto lsid = makeLogicalSessionIdForTest();
     const auto sessionId = BSON("lsid" << lsid.toBSON());
     const auto noStmtId = noSessionIdOrStmtId.addField(sessionId.firstElement());
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noStmtId).transitional_ignore(),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noStmtId, false).transitional_ignore(),
                   RSFatalException);
 }
 
@@ -2018,7 +2057,7 @@ TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutTxnTableUUIDIsFatal) {
                   << lsid.toBSON());
 
     FixUpInfo fui;
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber).ignore(),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber, false).ignore(),
                   RSFatalException);
 }
 
@@ -2036,7 +2075,7 @@ TEST_F(RSRollbackTest, LocalEntryWithTxnNumberAddsTransactionTableDocToBeRefetch
                   << "o"
                   << BSON("_id" << 2 << "a" << 2));
 
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithoutTxnNumber));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithoutTxnNumber, false));
     ASSERT_EQ(fui.docsToRefetch.size(), 1U);
 
     // If txnNumber is present, and the transaction table exists and has a UUID, the session
@@ -2062,7 +2101,7 @@ TEST_F(RSRollbackTest, LocalEntryWithTxnNumberAddsTransactionTableDocToBeRefetch
     UUID transactionTableUUID = UUID::gen();
     fui.transactionTableUUID = transactionTableUUID;
 
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber, false));
     ASSERT_EQ(fui.docsToRefetch.size(), 3U);
 
     auto expectedObj = BSON("_id" << lsid.toBSON());
@@ -2104,7 +2143,7 @@ TEST_F(RSRollbackTest, RollbackFailsIfTransactionDocumentRefetchReturnsDifferent
     fui.rbid = 1;
 
     // The FixUpInfo will have an extra doc to refetch: the corresponding transaction table entry.
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber));
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber, false));
     ASSERT_EQ(fui.docsToRefetch.size(), 2U);
 
     {
