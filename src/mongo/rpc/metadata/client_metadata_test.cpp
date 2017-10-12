@@ -37,8 +37,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -50,6 +52,9 @@ constexpr auto kType = "type"_sd;
 constexpr auto kVersion = "version"_sd;
 constexpr auto kOperatingSystem = "os"_sd;
 constexpr auto kArchitecture = "architecture"_sd;
+constexpr auto kMongos = "mongos"_sd;
+constexpr auto kClient = "client"_sd;
+constexpr auto kHost = "host"_sd;
 
 constexpr auto kUnknown = "unkown"_sd;
 
@@ -249,6 +254,10 @@ TEST(ClientMetadatTest, TestNegativeWrongTypes) {
 
 // Negative: document larger than 512 bytes
 TEST(ClientMetadatTest, TestNegativeLargeDocument) {
+    bool savedMongos = isMongos();
+    auto unsetMongoS = MakeGuard(&setMongos, savedMongos);
+
+    setMongos(true);
     {
         std::string str(350, 'x');
         ASSERT_DOC_OK(kApplication << BSON(kName << "1") << kDriver
@@ -291,6 +300,33 @@ TEST(ClientMetadatTest, TestNegativeLargeAppName) {
         BSONObjBuilder builder;
         ASSERT_NOT_OK(ClientMetadata::serialize("n1", "1", str, &builder));
     }
+}
+
+// Serialize and attach mongos information
+TEST(ClientMetadatTest, TestMongoSAppend) {
+    BSONObjBuilder builder;
+    ASSERT_OK(ClientMetadata::serializePrivate("a", "b", "c", "d", "e", "f", "g", &builder));
+
+    auto obj = builder.obj();
+    auto swParseStatus = ClientMetadata::parse(obj[kMetadataDoc]);
+    ASSERT_OK(swParseStatus.getStatus());
+    ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
+
+    swParseStatus.getValue().get().setMongoSMetadata("h", "i", "j");
+    auto doc = swParseStatus.getValue().get().getDocument();
+
+    constexpr auto kMongos = "mongos"_sd;
+    constexpr auto kClient = "client"_sd;
+    constexpr auto kHost = "host"_sd;
+
+    BSONObj outDoc =
+        BSON(kApplication << BSON(kName << "g") << kDriver << BSON(kName << "a" << kVersion << "b")
+                          << kOperatingSystem
+                          << BSON(kType << "c" << kName << "d" << kArchitecture << "e" << kVersion
+                                        << "f")
+                          << kMongos
+                          << BSON(kHost << "h" << kClient << "i" << kVersion << "j"));
+    ASSERT_BSONOBJ_EQ(doc, outDoc);
 }
 
 }  // namespace mongo

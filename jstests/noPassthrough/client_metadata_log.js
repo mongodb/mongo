@@ -40,6 +40,23 @@
 
         checkLog(st.s0);
 
+        // Validate db.currentOp() contains mongos information
+        let curOp = st.s0.adminCommand({currentOp: 1});
+        print(tojson(curOp));
+
+        var inprogSample = null;
+        for (let inprog of curOp.inprog) {
+            if (inprog.hasOwnProperty("clientMetadata") &&
+                inprog.clientMetadata.hasOwnProperty("mongos")) {
+                inprogSample = inprog;
+                break;
+            }
+        }
+
+        assert.neq(inprogSample.clientMetadata.mongos.host, "unknown");
+        assert.neq(inprogSample.clientMetadata.mongos.client, "unknown");
+        assert.neq(inprogSample.clientMetadata.mongos.version, "unknown");
+
         st.stop();
     };
 

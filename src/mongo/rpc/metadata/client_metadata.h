@@ -66,6 +66,11 @@ constexpr auto kMetadataDocumentName = "client"_sd;
  *            "architecture" : "string", // Optional, Informational Only
  *            "version" : "string"       // Optional, Informational Only
  *        }
+ *        "mongos" : {                   // Optional, Informational Only
+ *            "host" : "string",         // Optional, Informational Only
+ *            "client" : "string",       // Optional, Informational Only
+ *            "version" : "string"       // Optional, Informational Only
+ *        }
  *    }
  * }
  *
@@ -147,6 +152,21 @@ public:
                             StringData driverVersion,
                             StringData appName,
                             BSONObjBuilder* builder);
+
+    /**
+     * Modify the existing client metadata document to include a mongos section.
+     *
+     * hostAndPort is "host:port" of the running MongoS.
+     * monogsClient is "host:port" of the connected driver.
+     * version is the version string of MongoS.
+     *
+     * "mongos" : {
+     *     "host" : "string",
+     *     "client" : "string",
+     *     "version" : "string"
+     * }
+     */
+    void setMongoSMetadata(StringData hostAndPort, StringData mongosClient, StringData version);
 
     /**
      * Get the Application Name for the client metadata document.

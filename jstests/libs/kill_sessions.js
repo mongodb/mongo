@@ -122,15 +122,19 @@ var _kill_sessions_api_module = (function() {
         // We verify that our hanging op is up by looking for it in current op on the required
         // hosts.  We identify particular ops by secs sleeping.
         this.visit(function(client) {
+            let admin = client.getDB("admin");
+            admin.getMongo().setSlaveOk();
+
             assert.soon(function() {
-                var inprog = client.getDB("admin").currentOp().inprog;
-                for (var i = 0; i < inprog.length; ++i) {
-                    if (inprog[i].command && inprog[i].command.sleep &&
-                        inprog[i].command.secs == id && inprog[i].lsid) {
-                        lsid = inprog[i].lsid;
+                let inProgressOps = admin.aggregate([{$currentOp: {'allUsers': true}}]);
+                while (inProgressOps.hasNext()) {
+                    let op = inProgressOps.next();
+                    if (op.command && op.command.sleep && op.command.secs == id && op.lsid) {
+                        lsid = op.lsid;
                         return true;
                     }
                 }
+
                 return false;
             }, "never started sleep", 30000, 1);
         });

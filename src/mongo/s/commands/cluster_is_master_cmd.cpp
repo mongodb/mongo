@@ -40,6 +40,8 @@
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/map_util.h"
+#include "mongo/util/net/sock.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 namespace {
@@ -94,6 +96,11 @@ public:
             invariant(swParseClientMetadata.getValue());
 
             swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
+
+            swParseClientMetadata.getValue().get().setMongoSMetadata(
+                getHostNameCachedAndPort(),
+                opCtx->getClient()->clientAddress(true),
+                VersionInfoInterface::instance().version());
 
             clientMetadataIsMasterState.setClientMetadata(
                 opCtx->getClient(), std::move(swParseClientMetadata.getValue()));

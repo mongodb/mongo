@@ -122,9 +122,13 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
                numberToName(moveChunkStepNames, stepNumber) + '".');
 
     assert.soon(function() {
-        var in_progress = admin.currentOp().inprog;
-        for (var i = 0; i < in_progress.length; ++i) {
-            var op = in_progress[i];
+        var inProgressStr = '';
+        let in_progress = admin.aggregate([{$currentOp: {'allUsers': true}}]);
+
+        while (in_progress.hasNext()) {
+            let op = in_progress.next();
+            inProgressStr += tojson(op);
+
             if (op.query && op.query.moveChunk ||  // compatibility with v3.4, remove after v3.6
                 op.command && op.command.moveChunk) {
                 // Note: moveChunk in join mode will not have the "step" message. So keep on

@@ -10,6 +10,7 @@
 
     var s = new ShardingTest({shards: 2, mongos: 1});
     var dbForTest = s.getDB("test");
+    var admin = s.getDB("admin");
     dbForTest.foo.drop();
 
     var numDocs = 10000;
@@ -69,18 +70,21 @@
 
     // Get all current $where operations
     function getInProgWhereOps() {
-        var inprog = dbForTest.currentOp().inprog;
+        let inProgressOps = admin.aggregate([{$currentOp: {'allUsers': true}}]);
+        let inProgressStr = '';
 
         // Find all the where queries
         var myProcs = [];
-        inprog.forEach(function(op) {
+        while (inProgressOps.hasNext()) {
+            let op = inProgressOps.next();
+            inProgressStr += tojson(op);
             if (op.command && op.command.filter && op.command.filter.$where) {
                 myProcs.push(op);
             }
-        });
+        }
 
         if (myProcs.length == 0) {
-            print('No $where operations found: ' + tojson(inprog));
+            print('No $where operations found: ' + inProgressStr);
         } else {
             print('Found ' + myProcs.length + ' $where operations: ' + tojson(myProcs));
         }

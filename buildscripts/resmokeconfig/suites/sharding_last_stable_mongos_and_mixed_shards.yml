@@ -71,9 +71,15 @@ selector:
   - jstests/sharding/keys_rotation_interval_sec.js
   # Changes to currentOp format in 3.6.
   - jstests/sharding/features3.js
+  - jstests/sharding/migration_ignore_interrupts_1.js
+  - jstests/sharding/migration_ignore_interrupts_2.js
   - jstests/sharding/migration_ignore_interrupts_3.js
   - jstests/sharding/migration_ignore_interrupts_4.js
+  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
+  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
   - jstests/sharding/mongos_query_comment.js
+  - jstests/sharding/migration_move_chunk_after_receive.js
+  - jstests/sharding/migration_server_status.js
   - jstests/sharding/sharded_profile.js
   # Changes to cluster listDatabases format in 3.6.
   - jstests/sharding/listDatabases.js
