@@ -1205,7 +1205,6 @@ static int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_INSERT *ins, void *ripcip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
-	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_UPDATE *first_ts_upd, *first_txn_upd, *first_upd, *upd;
 	wt_timestamp_t *timestampp;
@@ -1214,7 +1213,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 	*updp = NULL;
 
-	btree = S2BT(session);
 	page = r->page;
 	first_ts_upd = first_txn_upd = NULL;
 	max_txn = WT_TXN_NONE;
@@ -1262,15 +1260,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * uncommitted updates).  Lookaside eviction can save any
 		 * committed update.  Regular eviction checks that the maximum
 		 * transaction ID and timestamp seen are stable.
-		 *
-		 * Use the first committed entry we find in the lookaside
-		 * table.
 		 */
-		if (F_ISSET(btree, WT_BTREE_LOOKASIDE) && !uncommitted) {
-			*updp = upd;
-			break;
-		}
-
 		if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    !__wt_txn_upd_visible_all(session, upd) :
 		    !__wt_txn_upd_visible(session, upd)) {
@@ -1352,13 +1342,10 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_UNUSED(first_ts_upd);
 	timestampp = NULL;
 #endif
-	if (F_ISSET(btree, WT_BTREE_LOOKASIDE))
-		all_visible = !uncommitted;
-	else
-		all_visible = *updp == first_txn_upd &&
-		    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
-		    __wt_txn_visible_all(session, max_txn, timestampp) :
-		    __wt_txn_visible(session, max_txn, timestampp));
+	all_visible = *updp == first_txn_upd &&
+	    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
+	    __wt_txn_visible_all(session, max_txn, timestampp) :
+	    __wt_txn_visible(session, max_txn, timestampp));
 
 	if (all_visible)
 		goto check_original_value;
@@ -1391,8 +1378,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * path is the WT_REC_UPDATE_RESTORE flag, the lookaside table path is
 	 * the WT_REC_LOOKASIDE flag.
 	 */
-	if (!F_ISSET(r, WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE) &&
-	    !F_ISSET(btree, WT_BTREE_LOOKASIDE))
+	if (!F_ISSET(r, WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE))
 		return (EBUSY);
 	if (uncommitted && !F_ISSET(r, WT_REC_UPDATE_RESTORE))
 		return (EBUSY);

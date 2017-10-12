@@ -156,6 +156,10 @@ __wt_las_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	 */
 	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
 
+	/* Track the lookaside file ID. */
+	if (S2C(session)->las_fileid == 0)
+		S2C(session)->las_fileid = btree->id;
+
 	/*
 	 * Set special flags for the lookaside table: the lookaside flag (used,
 	 * for example, to avoid writing records during reconciliation), also

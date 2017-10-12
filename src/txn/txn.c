@@ -701,6 +701,16 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 				break;
 			}
 
+			/*
+			 * Writes to the lookaside file can be evicted as soon
+			 * as they commit.
+			 */
+			if (conn->las_fileid != 0 &&
+			    op->fileid == conn->las_fileid) {
+				op->u.upd->txnid = WT_TXN_NONE;
+				break;
+			}
+
 #ifdef HAVE_TIMESTAMPS
 			if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
 			    op->type != WT_TXN_OP_BASIC_TS) {

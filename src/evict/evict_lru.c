@@ -1872,9 +1872,16 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 			continue;
 		}
 
-		/* Pages that are empty or from dead trees are fast-tracked. */
+		/*
+		 * Pages that are empty or from dead trees are fast-tracked.
+		 *
+		 * Also evict lookaside table pages without further filtering:
+		 * the cache is under pressure by definition and we want to
+		 * free space.
+		 */
 		if (__wt_page_is_empty(page) ||
-		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+		    F_ISSET(btree, WT_BTREE_LOOKASIDE))
 			goto fast;
 
 		/*
@@ -1937,8 +1944,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		 * can be evicted as soon as they are committed.
 		 */
 		mod = page->modify;
-		if (modified && !F_ISSET(btree, WT_BTREE_LOOKASIDE) &&
-		    txn_global->current != txn_global->oldest_id &&
+		if (modified && txn_global->current != txn_global->oldest_id &&
 		    (mod->last_eviction_id == __wt_txn_oldest_id(session) ||
 		    !__wt_txn_visible_all(session, mod->update_txn, NULL)))
 			continue;
