@@ -81,7 +81,8 @@ Status parseSingleType(BSONElement elt,
     invariant(elt.isNumber());
     int typeInt = elt.numberInt();
     if (elt.type() != BSONType::NumberInt && typeInt != elt.number()) {
-        typeInt = -1;
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid numerical type code: " << elt.number());
     }
 
     if (!isValidBSONType(typeInt)) {

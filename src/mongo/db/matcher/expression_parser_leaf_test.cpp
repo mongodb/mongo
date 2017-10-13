@@ -991,14 +991,12 @@ TEST(MatchExpressionParserLeafTest, Type2) {
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
 }
 
-TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
+TEST(MatchExpressionParserLeafTest, TypeDoubleOperatorFailsToParse) {
     BSONObj query = BSON("x" << BSON("$type" << 1.5));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5.3)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(ErrorCodes::BadValue, result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeDecimalOperator) {
