@@ -21,16 +21,43 @@
     assert.writeOK(foreign.insert({_id: 1, foreignKey: 1}));
     assert.writeOK(foreign.insert({_id: 2, foreignKey: 2}));
 
-    const lookupStage = {
-        $lookup:
-            {from: foreign.getName(), localField: "_id", foreignField: "foreignKey", as: "joined"}
-    };
-    const lookupResults = local.aggregate([lookupStage]).toArray();
-    const facetedLookupResults = local.aggregate([{$facet: {nested: [lookupStage]}}]).toArray();
-    assert.eq(facetedLookupResults, [{nested: lookupResults}]);
+    function runTest(lookupStage) {
+        const lookupResults = local.aggregate([lookupStage]).toArray();
+        const facetedLookupResults = local.aggregate([{$facet: {nested: [lookupStage]}}]).toArray();
+        assert.eq(facetedLookupResults, [{nested: lookupResults}]);
 
-    const lookupResultsUnwound = local.aggregate([lookupStage, {$unwind: "$joined"}]).toArray();
-    const facetedLookupResultsUnwound =
-        local.aggregate([{$facet: {nested: [lookupStage, {$unwind: "$joined"}]}}]).toArray();
-    assert.eq(facetedLookupResultsUnwound, [{nested: lookupResultsUnwound}]);
+        const lookupResultsUnwound = local.aggregate([lookupStage, {$unwind: "$joined"}]).toArray();
+        const facetedLookupResultsUnwound =
+            local.aggregate([{$facet: {nested: [lookupStage, {$unwind: "$joined"}]}}]).toArray();
+        assert.eq(facetedLookupResultsUnwound, [{nested: lookupResultsUnwound}]);
+    }
+
+    runTest({
+        $lookup: {
+            from: foreign.getName(),
+            localField: "_id",
+            foreignField: "foreignKey",
+            as: "joined"
+        }
+    });
+
+    runTest({
+        $lookup: {
+            from: foreign.getName(),
+            let : {id1: "$_id"},
+            pipeline: [
+                {$match: {$expr: {$eq: ["$$id1", "$foreignKey"]}}},
+                {
+                  $lookup: {
+                      from: foreign.getName(),
+                      let : {id2: "$_id"},
+                      pipeline: [{$match: {$expr: {$eq: ["$$id2", "$foreignKey"]}}}],
+                      as: "joined2"
+                  }
+                },
+                {$unwind: "$joined2"}
+            ],
+            as: "joined"
+        }
+    });
 }());

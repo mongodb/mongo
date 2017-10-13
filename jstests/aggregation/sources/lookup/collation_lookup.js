@@ -46,6 +46,44 @@
         arrayEq(expected, res[0].matched),
         "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched) + " up to ordering");
 
+    res = withDefaultCollationColl
+              .aggregate([{
+                  $lookup: {
+                      from: withoutDefaultCollationColl.getName(),
+                      let : {str1: "$str"},
+                      pipeline: [
+                          {$match: {$expr: {$eq: ["$str", "$$str1"]}}},
+                          {
+                            $lookup: {
+                                from: withoutDefaultCollationColl.getName(),
+                                let : {str2: "$str"},
+                                pipeline: [{$match: {$expr: {$eq: ["$str", "$$str1"]}}}],
+                                as: "matched2"
+                            }
+                          }
+                      ],
+                      as: "matched1",
+                  },
+              }])
+              .toArray();
+    assert.eq(1, res.length, tojson(res));
+
+    expected = [
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
+        },
+        {
+          "_id": "uppercase",
+          "str": "ABC",
+          "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
+        }
+    ];
+    assert(arrayEq(expected, res[0].matched1),
+           "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched1) +
+               " up to ordering. " + tojson(res));
+
     // Test that the $lookup stage respects the inherited collation when it optimizes with an
     // $unwind stage.
     res = withDefaultCollationColl
@@ -66,6 +104,61 @@
     expected = [
         {_id: "lowercase", str: "abc", matched: {_id: "lowercase", str: "abc"}},
         {_id: "lowercase", str: "abc", matched: {_id: "uppercase", str: "ABC"}}
+    ];
+    assert(arrayEq(expected, res),
+           "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
+
+    res = withDefaultCollationColl
+              .aggregate([
+                  {
+                    $lookup: {
+                        from: withoutDefaultCollationColl.getName(),
+                        let : {str1: "$str"},
+                        pipeline: [
+                            {$match: {$expr: {$eq: ["$str", "$$str1"]}}},
+                            {
+                              $lookup: {
+                                  from: withoutDefaultCollationColl.getName(),
+                                  let : {str2: "$str"},
+                                  pipeline: [{$match: {$expr: {$eq: ["$str", "$$str1"]}}}],
+                                  as: "matched2"
+                              }
+                            },
+                            {$unwind: "$matched2"},
+                        ],
+                        as: "matched1",
+                    },
+                  },
+                  {$unwind: "$matched1"},
+              ])
+              .toArray();
+    assert.eq(4, res.length, tojson(res));
+
+    expected = [
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched1":
+              {"_id": "lowercase", "str": "abc", "matched2": {"_id": "lowercase", "str": "abc"}}
+        },
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched1":
+              {"_id": "lowercase", "str": "abc", "matched2": {"_id": "uppercase", "str": "ABC"}}
+        },
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched1":
+              {"_id": "uppercase", "str": "ABC", "matched2": {"_id": "lowercase", "str": "abc"}}
+        },
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched1":
+              {"_id": "uppercase", "str": "ABC", "matched2": {"_id": "uppercase", "str": "ABC"}}
+        }
     ];
     assert(arrayEq(expected, res),
            "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
@@ -92,6 +185,49 @@
     assert(
         arrayEq(expected, res[0].matched),
         "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched) + " up to ordering");
+
+    res = withoutDefaultCollationColl
+              .aggregate(
+                  [
+                    {$match: {_id: "lowercase"}},
+                    {
+                      $lookup: {
+                          from: withoutDefaultCollationColl.getName(),
+                          let : {str1: "$str"},
+                          pipeline: [
+                              {$match: {$expr: {$eq: ["$str", "$$str1"]}}},
+                              {
+                                $lookup: {
+                                    from: withoutDefaultCollationColl.getName(),
+                                    let : {str2: "$str"},
+                                    pipeline: [{$match: {$expr: {$eq: ["$str", "$$str1"]}}}],
+                                    as: "matched2"
+                                }
+                              }
+                          ],
+                          as: "matched1",
+                      },
+                    }
+                  ],
+                  caseInsensitive)
+              .toArray();
+    assert.eq(1, res.length, tojson(res));
+
+    expected = [
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
+        },
+        {
+          "_id": "uppercase",
+          "str": "ABC",
+          "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
+        }
+    ];
+    assert(arrayEq(expected, res[0].matched1),
+           "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched1) +
+               " up to ordering");
 
     // Test that the $lookup stage respects an explicit collation on the aggregation operation when
     // it optimizes with an $unwind stage.
@@ -120,6 +256,64 @@
     assert(arrayEq(expected, res),
            "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
 
+    res = withoutDefaultCollationColl
+              .aggregate(
+                  [
+                    {$match: {_id: "lowercase"}},
+                    {
+                      $lookup: {
+                          from: withoutDefaultCollationColl.getName(),
+                          let : {str1: "$str"},
+                          pipeline: [
+                              {$match: {$expr: {$eq: ["$str", "$$str1"]}}},
+                              {
+                                $lookup: {
+                                    from: withoutDefaultCollationColl.getName(),
+                                    let : {str2: "$str"},
+                                    pipeline: [{$match: {$expr: {$eq: ["$str", "$$str1"]}}}],
+                                    as: "matched2"
+                                }
+                              },
+                              {$unwind: "$matched2"},
+                          ],
+                          as: "matched1",
+                      },
+                    },
+                    {$unwind: "$matched1"},
+                  ],
+                  caseInsensitive)
+              .toArray();
+    assert.eq(4, res.length, tojson(res));
+
+    expected = [
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched1":
+              {"_id": "lowercase", "str": "abc", "matched2": {"_id": "lowercase", "str": "abc"}}
+        },
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched1":
+              {"_id": "lowercase", "str": "abc", "matched2": {"_id": "uppercase", "str": "ABC"}}
+        },
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched1":
+              {"_id": "uppercase", "str": "ABC", "matched2": {"_id": "lowercase", "str": "abc"}}
+        },
+        {
+          "_id": "lowercase",
+          "str": "abc",
+          "matched1":
+              {"_id": "uppercase", "str": "ABC", "matched2": {"_id": "uppercase", "str": "ABC"}}
+        }
+    ];
+    assert(arrayEq(expected, res),
+           "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
+
     // Test that the $lookup stage uses the "simple" collation if a collation isn't set on the
     // collection or the aggregation operation.
     res = withoutDefaultCollationColl
@@ -136,4 +330,39 @@
               ])
               .toArray();
     assert.eq([{_id: "lowercase", str: "abc", matched: [{_id: "lowercase", str: "abc"}]}], res);
+
+    res = withoutDefaultCollationColl
+              .aggregate([
+                  {$match: {_id: "lowercase"}},
+                  {
+                    $lookup: {
+                        from: withoutDefaultCollationColl.getName(),
+                        let : {str1: "$str"},
+                        pipeline: [
+                            {$match: {$expr: {$eq: ["$str", "$$str1"]}}},
+                            {
+                              $lookup: {
+                                  from: withoutDefaultCollationColl.getName(),
+                                  let : {str2: "$str"},
+                                  pipeline: [{$match: {$expr: {$eq: ["$str", "$$str1"]}}}],
+                                  as: "matched2"
+                              }
+                            },
+                            {$unwind: "$matched2"},
+                        ],
+                        as: "matched1",
+                    },
+                  },
+              ])
+              .toArray();
+    assert.eq([{
+                 "_id": "lowercase",
+                 "str": "abc",
+                 "matched1": [{
+                     "_id": "lowercase",
+                     "str": "abc",
+                     "matched2": {"_id": "lowercase", "str": "abc"}
+                 }]
+              }],
+              res);
 })();

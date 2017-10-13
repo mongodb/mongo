@@ -94,5 +94,34 @@
         },
     ]);
 
+    // Test that an aggregation cursor with nested $lookup stages is killed when the timeout is
+    // reached.
+    assertCursorTimesOut('source', [
+        {
+          $lookup: {
+              from: 'dest',
+              let : {local1: "$local"},
+              pipeline: [
+                  {$match: {$expr: {$eq: ["$foreign", "$$local1"]}}},
+                  {
+                    $lookup: {
+                        from: 'source',
+                        let : {foreign1: "$foreign"},
+                        pipeline: [{$match: {$expr: {$eq: ["$local", "$$foreign1"]}}}],
+                        as: 'matches2'
+                    }
+                  },
+                  {
+                    $unwind: "$matches2",
+                  },
+              ],
+              as: 'matches1',
+          }
+        },
+        {
+          $unwind: "$matches1",
+        },
+    ]);
+
     MongoRunner.stopMongod(conn);
 })();

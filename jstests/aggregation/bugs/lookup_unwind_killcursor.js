@@ -13,43 +13,80 @@
 
     const testDB = conn.getDB('test');
 
-    // We use a batch size of 2 to ensure that the mongo shell does not exhaust the cursor on its
-    // first batch.
-    const batchSize = 2;
-    const numMatches = 5;
+    function runTest(pipeline) {
+        // We use a batch size of 2 to ensure that the mongo shell does not exhaust the cursor on
+        // its first batch.
+        const batchSize = 2;
 
-    assert.writeOK(testDB.source.insert({local: 1}));
-    for (let i = 0; i < numMatches; ++i) {
-        assert.writeOK(testDB.dest.insert({foreign: 1}));
+        testDB.source.drop();
+        assert.writeOK(testDB.source.insert({x: 1}));
+
+        testDB.dest.drop();
+        for (let i = 0; i < 5; ++i) {
+            assert.writeOK(testDB.dest.insert({x: 1}));
+        }
+
+        const res = assert.commandWorked(testDB.runCommand({
+            aggregate: 'source',
+            pipeline: pipeline,
+            cursor: {
+                batchSize: batchSize,
+            },
+        }));
+
+        const cursor = new DBCommandCursor(testDB, res, batchSize);
+        cursor.close();  // Closing the cursor will issue the "killCursors" command.
+
+        const serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+        assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus.metrics.cursor));
     }
 
-    const res = assert.commandWorked(testDB.runCommand({
-        aggregate: 'source',
-        pipeline: [
-            {
-              $lookup: {
-                  from: 'dest',
-                  localField: 'local',
-                  foreignField: 'foreign',
-                  as: 'matches',
-              }
-            },
-            {
-              $unwind: {
-                  path: '$matches',
-              },
-            },
-        ],
-        cursor: {
-            batchSize: batchSize,
+    runTest([
+        {
+          $lookup: {
+              from: 'dest',
+              localField: 'x',
+              foreignField: 'x',
+              as: 'matches',
+          }
         },
-    }));
+        {
+          $unwind: {
+              path: '$matches',
+          },
+        },
+    ]);
 
-    const cursor = new DBCommandCursor(testDB, res, batchSize);
-    cursor.close();  // Closing the cursor will issue the "killCursors" command.
-
-    const serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
-    assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus.metrics.cursor));
+    runTest([
+        {
+          $lookup: {
+              from: 'dest',
+              let : {x1: "$x"},
+              pipeline: [
+                  {$match: {$expr: {$eq: ["$$x1", "$x"]}}},
+                  {
+                    $lookup: {
+                        from: "dest",
+                        as: "matches2",
+                        let : {x2: "$x"},
+                        pipeline: [{$match: {$expr: {$eq: ["$$x2", "$x"]}}}]
+                    }
+                  },
+                  {
+                    $unwind: {
+                        path: '$matches2',
+                    },
+                  },
+              ],
+              as: 'matches1',
+          }
+        },
+        {
+          $unwind: {
+              path: '$matches1',
+          },
+        },
+    ]);
 
     MongoRunner.stopMongod(conn);
 })();

@@ -13,25 +13,43 @@
 
     const testDB = conn.getDB('test');
 
-    // We use a batch size of 2 to ensure that the mongo shell issues a getMore when unwinding the
-    // results from the 'dest' collection for the same document in the 'source' collection under a
-    // different OperationContext.
-    const batchSize = 2;
-    const numMatches = 5;
+    /**
+     * Executes an aggregrate with 'options.pipeline' and confirms that 'options.numResults' were
+     * returned.
+     */
+    function runTest(options) {
+        // The batchSize must be smaller than the number of documents returned by the $lookup. This
+        // ensures that the mongo shell will issue a getMore when unwinding the $lookup results for
+        // the same document in the 'source' collection, under a different OperationContext.
+        const batchSize = 2;
 
-    assert.writeOK(testDB.source.insert({local: 1}));
-    for (let i = 0; i < numMatches; ++i) {
-        assert.writeOK(testDB.dest.insert({foreign: 1}));
+        testDB.source.drop();
+        assert.writeOK(testDB.source.insert({x: 1}));
+
+        testDB.dest.drop();
+        for (let i = 0; i < 5; ++i) {
+            assert.writeOK(testDB.dest.insert({x: 1}));
+        }
+
+        const res = assert.commandWorked(testDB.runCommand({
+            aggregate: 'source',
+            pipeline: options.pipeline,
+            cursor: {
+                batchSize: batchSize,
+            },
+        }));
+
+        const cursor = new DBCommandCursor(testDB, res, batchSize);
+        assert.eq(options.numResults, cursor.itcount());
     }
 
-    const res = assert.commandWorked(testDB.runCommand({
-        aggregate: 'source',
+    runTest({
         pipeline: [
             {
               $lookup: {
                   from: 'dest',
-                  localField: 'local',
-                  foreignField: 'foreign',
+                  localField: 'x',
+                  foreignField: 'x',
                   as: 'matches',
               }
             },
@@ -41,13 +59,42 @@
               },
             },
         ],
-        cursor: {
-            batchSize: batchSize,
-        },
-    }));
+        numResults: 5
+    });
 
-    const cursor = new DBCommandCursor(testDB, res, batchSize);
-    assert.eq(numMatches, cursor.itcount());
+    runTest({
+        pipeline: [
+            {
+              $lookup: {
+                  from: 'dest',
+                  let : {x1: "$x"},
+                  pipeline: [
+                      {$match: {$expr: {$eq: ["$$x1", "$x"]}}},
+                      {
+                        $lookup: {
+                            from: "dest",
+                            as: "matches2",
+                            let : {x2: "$x"},
+                            pipeline: [{$match: {$expr: {$eq: ["$$x2", "$x"]}}}]
+                        }
+                      },
+                      {
+                        $unwind: {
+                            path: '$matches2',
+                        },
+                      },
+                  ],
+                  as: 'matches1',
+              }
+            },
+            {
+              $unwind: {
+                  path: '$matches1',
+              },
+            },
+        ],
+        numResults: 25
+    });
 
     MongoRunner.stopMongod(conn);
 })();
