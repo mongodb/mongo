@@ -244,15 +244,9 @@ public:
             }
         }
 
-        // Update the new primary in the config server metadata
-        {
-            auto dbt =
-                uassertStatusOK(catalogClient->getDatabase(
-                                    opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern))
-                    .value;
-            dbt.setPrimary(toShard->getId());
-            uassertStatusOK(catalogClient->updateDatabase(opCtx, dbname, dbt));
-        }
+        // Update the new primary in the config server metadata.
+        dbType.setPrimary(toShard->getId());
+        uassertStatusOK(catalogClient->updateDatabase(opCtx, dbname, dbType));
 
         // Ensure the next attempt to retrieve the database or any of its collections will do a full
         // reload
