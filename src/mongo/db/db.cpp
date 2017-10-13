@@ -820,15 +820,15 @@ ExitCode _initAndListen(int listenPort) {
     // operation context anymore
     startupOpCtx.reset();
 
-    auto start = serviceContext->getTransportLayer()->start();
+    auto start = serviceContext->getServiceExecutor()->start();
     if (!start.isOK()) {
-        error() << "Failed to start the listener: " << start.toString();
+        error() << "Failed to start the service executor: " << start;
         return EXIT_NET_ERROR;
     }
 
-    start = serviceContext->getServiceExecutor()->start();
+    start = serviceContext->getTransportLayer()->start();
     if (!start.isOK()) {
-        error() << "Failed to start the service executor: " << start;
+        error() << "Failed to start the listener: " << start.toString();
         return EXIT_NET_ERROR;
     }
 

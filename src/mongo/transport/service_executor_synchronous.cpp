@@ -89,12 +89,16 @@ Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
 }
 
 Status ServiceExecutorSynchronous::schedule(Task task, ScheduleFlags flags) {
+    if (!_stillRunning.load()) {
+        return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
+    }
+
     if (!_localWorkQueue.empty()) {
         /*
-        * In perf testing we found that yielding after running a each request produced
-        * at 5% performance boost in microbenchmarks if the number of worker threads
-        * was greater than the number of available cores.
-        */
+         * In perf testing we found that yielding after running a each request produced
+         * at 5% performance boost in microbenchmarks if the number of worker threads
+         * was greater than the number of available cores.
+         */
         if (flags & ScheduleFlags::kMayYieldBeforeSchedule) {
             if ((_localThreadIdleCounter++ & 0xf) == 0) {
                 markThreadIdle();

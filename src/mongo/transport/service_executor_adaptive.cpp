@@ -190,6 +190,10 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task, Sch
     auto pendingCounterPtr = (flags & kDeferredTask) ? &_deferredTasksQueued : &_tasksQueued;
     pendingCounterPtr->addAndFetch(1);
 
+    if (!_isRunning.load()) {
+        return {ErrorCodes::ShutdownInProgress, "Executor is not running"};
+    }
+
     auto wrappedTask = [ this, task = std::move(task), scheduleTime, pendingCounterPtr ] {
         pendingCounterPtr->subtractAndFetch(1);
         auto start = _tickSource->getTicks();

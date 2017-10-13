@@ -447,14 +447,14 @@ static ExitCode runMongosServer() {
     // Set up the logical session cache
     LogicalSessionCache::set(getGlobalServiceContext(), makeLogicalSessionCacheS());
 
-    auto start = getGlobalServiceContext()->getTransportLayer()->start();
+    auto start = getGlobalServiceContext()->getServiceExecutor()->start();
     if (!start.isOK()) {
+        error() << "Failed to start the service executor: " << start;
         return EXIT_NET_ERROR;
     }
 
-    start = getGlobalServiceContext()->getServiceExecutor()->start();
+    start = getGlobalServiceContext()->getTransportLayer()->start();
     if (!start.isOK()) {
-        error() << "Failed to start the service executor: " << start;
         return EXIT_NET_ERROR;
     }
 
