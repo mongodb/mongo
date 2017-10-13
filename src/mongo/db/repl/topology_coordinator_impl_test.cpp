@@ -2357,13 +2357,13 @@ TEST_F(TopoCoordTest, NodeReturnsBadValueWhenFreshnessIsCheckedByANodeWithOurID)
     ASSERT_TRUE(responseBuilder.obj().isEmpty());
 }
 
-TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) {
-    // This tests that arbiters issue heartbeats at electionTimeout/2 frequencies
+TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeIncreasedWhenArbiter) {
+    // This tests that arbiters issue heartbeats at higher frequencies.
     TopoCoordTest::setUp();
     updateConfig(fromjson("{_id:'mySet', version:1, protocolVersion:1, members:["
                           "{_id:1, host:'node1:12345', arbiterOnly:true}, "
                           "{_id:2, host:'node2:12345'}], "
-                          "settings:{heartbeatIntervalMillis:10, electionTimeoutMillis:5000}}"),
+                          "settings:{heartbeatIntervalMillis:3000, electionTimeoutMillis:5000}}"),
                  0);
     HostAndPort target("host2", 27017);
     Date_t requestDate = now();

@@ -1758,7 +1758,7 @@ TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) 
     updateConfig(fromjson("{_id:'mySet', version:1, protocolVersion:1, members:["
                           "{_id:1, host:'node1:12345', arbiterOnly:true}, "
                           "{_id:2, host:'node2:12345'}], "
-                          "settings:{heartbeatIntervalMillis:10, electionTimeoutMillis:5000}}"),
+                          "settings:{heartbeatIntervalMillis:3000, electionTimeoutMillis:5000}}"),
                  0);
     HostAndPort target("host2", 27017);
     Date_t requestDate = now();
@@ -5031,9 +5031,9 @@ TEST_F(HeartbeatResponseTestV1, NodeDoesNotRetryHeartbeatIfTheFirstFailureTakesT
 
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-    // Because the heartbeat timed out, we'll retry in half of the election timeout.
+    // Because the heartbeat timed out, we'll retry sooner.
     ASSERT_EQUALS(firstRequestDate + Milliseconds(5000) +
-                      ReplSetConfig::kDefaultElectionTimeoutPeriod / 2,
+                      ReplSetConfig::kDefaultHeartbeatInterval / 4,
                   action.getNextHeartbeatStartDate());
 }
 
@@ -5210,9 +5210,9 @@ TEST_F(HeartbeatResponseTestOneRetryV1,
 
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-    // Because the heartbeat timed out, we'll retry in half of the election timeout.
+    // Because the heartbeat timed out, we'll retry sooner.
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(5010) +
-                      ReplSetConfig::kDefaultElectionTimeoutPeriod / 2,
+                      ReplSetConfig::kDefaultHeartbeatInterval / 4,
                   action.getNextHeartbeatStartDate());
 }
 
@@ -5276,10 +5276,10 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, NodeDoesNotRetryHeartbeatsAfterFailing
         StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"));
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-    // Because this is the second retry, rather than retry again, we expect to wait for half
-    // of the election timeout interval of 2 seconds to elapse.
+    // Because this is the second retry, rather than retry again, we expect to wait for a quarter
+    // of the heartbeat interval to elapse.
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(4800) +
-                      ReplSetConfig::kDefaultElectionTimeoutPeriod / 2,
+                      ReplSetConfig::kDefaultHeartbeatInterval / 4,
                   action.getNextHeartbeatStartDate());
 
     // Ensure a third failed heartbeat caused the node to be marked down
@@ -5318,9 +5318,9 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
 
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-    // Because the heartbeat succeeded, we'll retry in half of the election timeout.
+    // Because the heartbeat succeeded, we'll retry sooner.
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(4500) +
-                      ReplSetConfig::kDefaultElectionTimeoutPeriod / 2,
+                      ReplSetConfig::kDefaultHeartbeatInterval / 4,
                   action.getNextHeartbeatStartDate());
 
     // request next heartbeat
