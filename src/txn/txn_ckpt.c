@@ -511,7 +511,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
  */
 static void
 __checkpoint_stats(
-    WT_SESSION_IMPL *session)
+    WT_SESSION_IMPL *session, struct timespec *start, struct timespec *stop)
 {
 	WT_CONNECTION_IMPL *conn;
 	uint64_t msec;
@@ -521,7 +521,7 @@ __checkpoint_stats(
 	/*
 	 * Get time diff in microseconds.
 	 */
-	msec = WT_TIMEDIFF_MS(conn->ckpt_stop_time, conn->ckpt_start_time);
+	msec = WT_TIMEDIFF_MS(*stop, *start);
 
 	if (msec > conn->ckpt_time_max)
 		conn->ckpt_time_max = msec;
@@ -537,29 +537,28 @@ __checkpoint_stats(
  */
 static void
 __checkpoint_verbose_track(WT_SESSION_IMPL *session,
-    const char *msg)
+    const char *msg, struct timespec *start)
 {
 #ifdef HAVE_VERBOSE
-	WT_CONNECTION_IMPL *conn;
 	struct timespec stop;
 	uint64_t msec;
 
 	if (!WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
 		return;
 
-	conn = S2C(session);
-
 	__wt_epoch(session, &stop);
 
 	/*
 	 * Get time diff in microseconds.
 	 */
-	msec = WT_TIMEDIFF_MS(stop, conn->ckpt_verb_start_time);
+	msec = WT_TIMEDIFF_MS(stop, *start);
 	__wt_verbose(session,
 	    WT_VERB_CHECKPOINT, "time: %" PRIu64 " us, gen: %" PRIu64
 	    ": Full database checkpoint %s",
 	    msec, __wt_gen(session, WT_GEN_CHECKPOINT), msg);
 
+	/* Update the timestamp so we are reporting intervals. */
+	memcpy(start, &stop, sizeof(*start));
 #else
 	WT_UNUSED(session);
 	WT_UNUSED(msg);
@@ -714,6 +713,7 @@ static int
 __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	struct timespec fsync_start, fsync_stop;
+	struct timespec start, stop, verb_timer;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -745,7 +745,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	conn->cache->evict_max_page_size = 0;
 
 	/* Initialize the verbose tracking timer */
-	__wt_epoch(session, &conn->ckpt_verb_start_time);
+	__wt_epoch(session, &verb_timer);
 
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
@@ -771,10 +771,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
 	__checkpoint_verbose_track(session,
-	    "starting transaction");
+	    "starting transaction", &verb_timer);
 
 	if (full)
-		__wt_epoch(session, &conn->ckpt_start_time);
+		__wt_epoch(session, &start);
 
 	/*
 	 * Start the checkpoint for real.
@@ -845,7 +845,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_presync));
 	__wt_evict_server_wake(session);
 
-	__checkpoint_verbose_track(session, "committing transaction");
+	__checkpoint_verbose_track(session,
+	    "committing transaction", &verb_timer);
 
 	/*
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
@@ -859,7 +860,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_STAT_CONN_SET(session,
 	    txn_checkpoint_fsync_post_duration, fsync_duration_usecs);
 
-	__checkpoint_verbose_track(session, "sync completed");
+	__checkpoint_verbose_track(session, "sync completed", &verb_timer);
 
 	/*
 	 * Commit the transaction now that we are sure that all files in the
@@ -897,7 +898,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    ret = __wt_checkpoint_sync(session, NULL));
 		WT_ERR(ret);
 
-		__checkpoint_verbose_track(session, "metadata sync completed");
+		__checkpoint_verbose_track(session,
+		    "metadata sync completed", &verb_timer);
 	} else
 		WT_WITH_DHANDLE(session,
 		    WT_SESSION_META_DHANDLE(session),
@@ -911,8 +913,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global->checkpoint_state.pinned_id = WT_TXN_NONE;
 
 	if (full) {
-		__wt_epoch(session, &conn->ckpt_stop_time);
-		__checkpoint_stats(session);
+		__wt_epoch(session, &stop);
+		__checkpoint_stats(session, &start, &stop);
 	}
 
 err:	/*
