@@ -64,11 +64,11 @@ compact(void *arg)
 			break;
 
 		/*
-		 * Compact can return EBUSY if concurrent with alter.
+		 * Compact can return EBUSY if concurrent with alter or if there
+		 * is eviction pressure, or we collide with checkpoints.
 		 */
-		while ((ret = session->compact(session, g.uri, NULL)) == EBUSY)
-			__wt_yield();
-		if (ret != 0 && ret != WT_ROLLBACK)
+		ret = session->compact(session, g.uri, NULL);
+		if (ret != 0 && ret != EBUSY && ret != WT_ROLLBACK)
 			testutil_die(ret, "session.compact");
 	}
 
