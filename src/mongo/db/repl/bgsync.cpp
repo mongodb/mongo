@@ -265,15 +265,16 @@ void BackgroundSync::_runProducer() {
     }
     // we want to start when we're no longer primary
     // start() also loads _lastOpTimeFetched, which we know is set from the "if"
-    auto opCtx = cc().makeOperationContext();
-    if (getState() == ProducerState::Starting) {
-        start(opCtx.get());
+    {
+        auto opCtx = cc().makeOperationContext();
+        if (getState() == ProducerState::Starting) {
+            start(opCtx.get());
+        }
     }
-
-    _produce(opCtx.get());
+    _produce();
 }
 
-void BackgroundSync::_produce(OperationContext* opCtx) {
+void BackgroundSync::_produce() {
     if (MONGO_FAIL_POINT(stopReplProducer)) {
         // This log output is used in js tests so please leave it.
         log() << "bgsync - stopReplProducer fail point "
@@ -314,9 +315,11 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
 
     // find a target to sync from the last optime fetched
     {
-        const OpTime minValidSaved =
-            _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx);
-
+        OpTime minValidSaved;
+        {
+            auto opCtx = cc().makeOperationContext();
+            minValidSaved = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx.get());
+        }
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
@@ -439,9 +442,12 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
     // Set the applied point if unset. This is most likely the first time we've established a sync
     // source since stepping down or otherwise clearing the applied point. We need to set this here,
     // before the OplogWriter gets a chance to append to the oplog.
-    if (_replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx).isNull()) {
-        _replicationProcess->getConsistencyMarkers()->setAppliedThrough(
-            opCtx, _replCoord->getMyLastAppliedOpTime());
+    {
+        auto opCtx = cc().makeOperationContext();
+        if (_replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx.get()).isNull()) {
+            _replicationProcess->getConsistencyMarkers()->setAppliedThrough(
+                opCtx.get(), _replCoord->getMyLastAppliedOpTime());
+        }
     }
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
@@ -513,8 +519,10 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         // if it can't return a matching oplog start from the last fetch oplog ts field.
         return;
     } else if (fetcherReturnStatus.code() == ErrorCodes::OplogStartMissing) {
-        auto storageInterface = StorageInterface::get(opCtx);
-        _runRollback(opCtx, fetcherReturnStatus, source, syncSourceResp.rbid, storageInterface);
+        auto opCtx = cc().makeOperationContext();
+        auto storageInterface = StorageInterface::get(opCtx.get());
+        _runRollback(
+            opCtx.get(), fetcherReturnStatus, source, syncSourceResp.rbid, storageInterface);
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         Seconds blacklistDuration(60);
         warning() << "Fetcher got invalid BSON while querying oplog. Blacklisting sync source "
