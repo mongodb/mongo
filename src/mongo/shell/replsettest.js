@@ -1244,14 +1244,17 @@ var ReplSetTest = function(opts) {
     };
 
     this.dumpOplog = function(conn, query = {}, limit = 10) {
-        print('Dumping the latest ' + limit + ' documents that match ' + tojson(query) +
-              ' from the oplog ' + oplogName + ' of ' + conn.host);
+        var log = 'Dumping the latest ' + limit + ' documents that match ' + tojson(query) +
+            ' from the oplog ' + oplogName + ' of ' + conn.host;
         var cursor = conn.getDB('local')
                          .getCollection(oplogName)
                          .find(query)
                          .sort({$natural: -1})
                          .limit(limit);
-        cursor.forEach(printjsononeline);
+        cursor.forEach(function(entry) {
+            log = log + '\n' + tojsononeline(entry);
+        });
+        jsTestLog(log);
     };
 
     // Call the provided checkerFunction, after the replica set has been write locked.
