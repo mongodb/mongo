@@ -1424,7 +1424,7 @@ var ShardingTest = function(params) {
             throw new Error("Failed to start mongos " + i);
         }
 
-        if (options.causallyConsistent) {
+        if (otherParams.causallyConsistent) {
             conn.setCausalConsistency(true);
         }
 
