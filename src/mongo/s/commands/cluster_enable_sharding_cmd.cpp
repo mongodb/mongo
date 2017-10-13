@@ -60,9 +60,8 @@ public:
         return true;
     }
 
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+        return true;
     }
 
     virtual void help(std::stringstream& help) const {
@@ -103,7 +102,8 @@ public:
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            Command::appendPassthroughFields(cmdObj, BSON("_configsvrEnableSharding" << db)),
+            Command::appendMajorityWriteConcern(
+                Command::appendPassthroughFields(cmdObj, BSON("_configsvrEnableSharding" << db))),
             Shard::RetryPolicy::kIdempotent));
 
         Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);

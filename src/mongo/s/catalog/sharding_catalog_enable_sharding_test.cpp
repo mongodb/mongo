@@ -80,8 +80,7 @@ TEST_F(EnableShardingTest, noDBExists) {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto opCtx = cc().makeOperationContext();
-        auto status = ShardingCatalogManager::get(opCtx.get())->enableSharding(opCtx.get(), "db1");
-        ASSERT_OK(status);
+        ShardingCatalogManager::get(opCtx.get())->enableSharding(opCtx.get(), "db1");
     });
 
     // list databases for checking shard size.
@@ -108,43 +107,30 @@ TEST_F(EnableShardingTest, dbExistsWithDifferentCase) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-
     ASSERT_OK(setupShards(vector<ShardType>{shard}));
-
     setupDatabase("Db3", shard.getName(), false);
-
-    auto status =
-        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db3");
-    ASSERT_EQ(ErrorCodes::DatabaseDifferCase, status.code());
-    ASSERT_FALSE(status.reason().empty());
+    ASSERT_THROWS_CODE(
+        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db3"),
+        AssertionException,
+        ErrorCodes::DatabaseDifferCase);
 }
 
 TEST_F(EnableShardingTest, dbExists) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-
     ASSERT_OK(setupShards(vector<ShardType>{shard}));
-
     setupDatabase("db4", shard.getName(), false);
-
-    auto status =
-        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db4");
-    ASSERT_OK(status);
+    ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db4");
 }
 
 TEST_F(EnableShardingTest, succeedsWhenTheDatabaseIsAlreadySharded) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-
     ASSERT_OK(setupShards(vector<ShardType>{shard}));
-
     setupDatabase("db5", shard.getName(), true);
-
-    auto status =
-        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db5");
-    ASSERT_OK(status);
+    ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db5");
 }
 
 TEST_F(EnableShardingTest, dbExistsInvalidFormat) {
@@ -165,16 +151,17 @@ TEST_F(EnableShardingTest, dbExistsInvalidFormat) {
                                                          << false),
                                                     ShardingCatalogClient::kMajorityWriteConcern));
 
-    auto status =
-        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db6");
-    ASSERT_EQ(ErrorCodes::TypeMismatch, status.code());
+    ASSERT_THROWS_CODE(
+        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db6"),
+        AssertionException,
+        ErrorCodes::TypeMismatch);
 }
 
 TEST_F(EnableShardingTest, noDBExistsNoShards) {
-    auto status =
-        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db7");
-    ASSERT_EQ(ErrorCodes::ShardNotFound, status.code());
-    ASSERT_FALSE(status.reason().empty());
+    ASSERT_THROWS_CODE(
+        ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db7"),
+        AssertionException,
+        ErrorCodes::ShardNotFound);
 }
 
 }  // namespace

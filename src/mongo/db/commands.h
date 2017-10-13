@@ -451,6 +451,11 @@ public:
                                            const BSONObj& request);
 
     /**
+     * Returns a copy of 'cmdObj' with a majority writeConcern appended.
+     */
+    static BSONObj appendMajorityWriteConcern(const BSONObj& cmdObj);
+
+    /**
      * Returns true if the provided argument is one that is handled by the command processing layer
      * and should generally be ignored by individual command implementations. In particular,
      * commands that fail on unrecognized arguments must not fail for any of these.

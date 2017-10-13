@@ -98,6 +98,11 @@ public:
                 cmdObj.firstElement().type() == BSONType::String);
         const std::string target = cmdObj.firstElement().str();
 
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "removeShard must be called with majority writeConcern, got "
+                              << cmdObj,
+                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
         const auto shardStatus =
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardId(target));
         if (!shardStatus.isOK()) {

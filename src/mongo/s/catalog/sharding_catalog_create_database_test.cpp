@@ -101,9 +101,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto opCtx = cc().makeOperationContext();
-        Status status =
-            ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname);
-        ASSERT_OK(status);
+        ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname);
     });
 
     // Return size information about first shard
@@ -164,9 +162,7 @@ TEST_F(CreateDatabaseTest, createDatabaseDBExists) {
 
     setupDatabase(dbname, shard.getName(), false);
 
-    Status status =
-        ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname);
-    ASSERT_OK(status);
+    ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname);
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseDBExistsDifferentCase) {
@@ -181,17 +177,18 @@ TEST_F(CreateDatabaseTest, createDatabaseDBExistsDifferentCase) {
 
     setupDatabase(dbnameDiffCase, shard.getName(), false);
 
-    Status status =
-        ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname);
-    ASSERT_EQUALS(ErrorCodes::DatabaseDifferCase, status);
+    ASSERT_THROWS_CODE(
+        ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname),
+        AssertionException,
+        ErrorCodes::DatabaseDifferCase);
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseNoShards) {
     const std::string dbname = "db5";
-
-    Status status =
-        ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname);
-    ASSERT_EQUALS(ErrorCodes::ShardNotFound, status);
+    ASSERT_THROWS_CODE(
+        ShardingCatalogManager::get(operationContext())->createDatabase(operationContext(), dbname),
+        AssertionException,
+        ErrorCodes::ShardNotFound);
 }
 
 }  // namespace

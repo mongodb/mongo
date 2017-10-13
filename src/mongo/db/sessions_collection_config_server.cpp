@@ -33,6 +33,7 @@
 #include "mongo/db/sessions_collection_config_server.h"
 
 #include "mongo/client/query.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
@@ -68,7 +69,8 @@ Status SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext
 
     DBDirectClient client(opCtx);
     BSONObj info;
-    if (!client.runCommand("admin", shardCollection.toBSON(), info)) {
+    if (!client.runCommand(
+            "admin", Command::appendMajorityWriteConcern(shardCollection.toBSON()), info)) {
         return getStatusFromCommandResult(info);
     }
 

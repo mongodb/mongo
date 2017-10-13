@@ -118,6 +118,11 @@ public:
                                         str::stream() << "can't shard " + dbname + " database"});
         }
 
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "enableSharding must be called with majority writeConcern, got "
+                              << cmdObj,
+                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
         // Make sure to force update of any stale metadata
         ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
 
@@ -131,7 +136,7 @@ public:
         auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
             opCtx, dbname, "enableSharding", DistLockManager::kDefaultLockTimeout));
 
-        uassertStatusOK(ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname));
+        ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname);
         audit::logEnableSharding(Client::getCurrent(), dbname);
 
         return true;

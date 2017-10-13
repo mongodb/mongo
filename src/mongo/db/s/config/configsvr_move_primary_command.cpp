@@ -132,6 +132,11 @@ public:
                  str::stream() << "Can't move primary for " << dbname << " database"});
         }
 
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "movePrimary must be called with majority writeConcern, got "
+                              << cmdObj,
+                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -175,22 +180,12 @@ public:
         }();
 
         if (fromShard->getId() == toShard->getId()) {
-            // Since we did a local read of the database entry above, make sure we wait for majority
-            // commit before returning success. (A previous movePrimary attempt may have failed with
-            // a write concern error).
-            // If the Client for this movePrimary attempt is the *same* as the one that made the
-            // earlier movePrimary attempt, the opTime on the ReplClientInfo for this Client will
-            // already be at least as recent as the earlier movePrimary's write. However, if this
-            // is a *different* Client, the opTime may not be as recent, so to be safe we wait for
-            // the system's last opTime to be majority-committed.
+            // We did a local read of the database entry above and found that this movePrimary
+            // request was already satisfied. However, the data may not be majority committed (a
+            // previous movePrimary attempt may have failed with a write concern error).
+            // Since the current Client doesn't know the opTime of the last write to the database
+            // entry, make it wait for the last opTime in the system when we wait for writeConcern.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-            WriteConcernResult unusedWCResult;
-            uassertStatusOK(
-                waitForWriteConcern(opCtx,
-                                    repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                                    kMajorityWriteConcern,
-                                    &unusedWCResult));
-
             result << "primary" << toShard->toString();
             return true;
         }

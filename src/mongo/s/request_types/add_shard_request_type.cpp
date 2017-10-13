@@ -128,9 +128,6 @@ BSONObj AddShardRequest::toCommandForConfig() {
     if (hasName()) {
         cmdBuilder.append(shardName.name(), *_name);
     }
-
-    cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
-
     return cmdBuilder.obj();
 }
 

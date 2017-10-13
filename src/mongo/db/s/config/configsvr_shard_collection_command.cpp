@@ -43,6 +43,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/sessions_collection.h"
@@ -255,8 +256,6 @@ boost::optional<CollectionType> checkIfAlreadyShardedWithSameOptions(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ConfigsvrShardCollectionRequest& request) {
-    // TODO (SERVER-31027): Replace this direct read with using the routing table cache once UUIDs
-    // are stored in the routing table cache.
     auto existingColls =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                             opCtx,
@@ -268,8 +267,6 @@ boost::optional<CollectionType> checkIfAlreadyShardedWithSameOptions(
                             1))
             .docs;
 
-    // If the collection is already sharded, fail if the deduced options in this request do not
-    // match the options the collection was originally sharded with.
     if (!existingColls.empty()) {
         auto existingOptions = uassertStatusOK(CollectionType::fromBSON(existingColls.front()));
 
@@ -279,13 +276,20 @@ boost::optional<CollectionType> checkIfAlreadyShardedWithSameOptions(
         requestedOptions.setDefaultCollation(*request.getCollation());
         requestedOptions.setUnique(request.getUnique());
 
+        // If the collection is already sharded, fail if the deduced options in this request do not
+        // match the options the collection was originally sharded with.
         uassert(ErrorCodes::AlreadyInitialized,
                 str::stream() << "sharding already enabled for collection " << nss.ns()
                               << " with options "
                               << existingOptions.toString(),
                 requestedOptions.hasSameOptions(existingOptions));
 
-        // If the options do match, return the existing collection's full spec.
+        // We did a local read of the collection entry above and found that this shardCollection
+        // request was already satisfied. However, the data may not be majority committed (a
+        // previous shardCollection attempt may have failed with a writeConcern error).
+        // Since the current Client doesn't know the opTime of the last write to the collection
+        // entry, make it wait for the last opTime in the system when we wait for writeConcern.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         return existingOptions;
     }
 
@@ -733,6 +737,11 @@ public:
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrShardCollection can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "shardCollection must be called with majority writeConcern, got "
+                              << cmdObj,
+                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         // Do not allow sharding collections while a featureCompatibilityVersion upgrade or
         // downgrade is in progress (see SERVER-31231 for details).

@@ -72,6 +72,14 @@ namespace {
 ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsParameter(
     ServerParameterSet::getGlobal(), "enableTestCommands", &Command::testCommandsEnabled);
 
+const char kWriteConcernField[] = "writeConcern";
+const WriteConcernOptions kMajorityWriteConcern(
+    WriteConcernOptions::kMajority,
+    // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
+    // supported by the mongod.
+    WriteConcernOptions::SyncMode::UNSET,
+    Seconds(60));
+
 }  // namespace
 
 Command::~Command() = default;
@@ -88,6 +96,16 @@ BSONObj Command::appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFie
         }
     }
     return b.obj();
+}
+
+BSONObj Command::appendMajorityWriteConcern(const BSONObj& cmdObj) {
+    if (cmdObj.hasField(kWriteConcernField)) {
+        return cmdObj;
+    }
+    BSONObjBuilder cmdObjWithWriteConcern;
+    cmdObjWithWriteConcern.appendElementsUnique(cmdObj);
+    cmdObjWithWriteConcern.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
+    return cmdObjWithWriteConcern.obj();
 }
 
 string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) {

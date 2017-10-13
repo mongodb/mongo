@@ -364,47 +364,6 @@ load('jstests/libs/write_concern_util.js');
         admin: false
     });
 
-    // Only create shards for the movePrimary test once.
-    shardCollectionWithChunks(st, db.getSiblingDB("move-primary-db-sharded").shardColl);
-    // Create a non-sharded collection in the move-primary-db.
-    db.getSiblingDB("move-primary-db-sharded").nonshardColl.insert({a: 1});
-    commands.push({
-        req: {movePrimary: "move-primary-db-sharded", to: st.shard1.shardName},
-        setupFunc: function() {
-            st.ensurePrimaryShard("move-primary-db-sharded", st.shard0.shardName);
-            assert.eq(db.getSiblingDB('config')
-                          .databases.findOne({_id: 'move-primary-db-sharded'})
-                          .primary,
-                      st.shard0.shardName);
-        },
-        confirmFunc: function() {
-            assert.eq(db.getSiblingDB('config')
-                          .databases.findOne({_id: 'move-primary-db-sharded'})
-                          .primary,
-                      st.shard1.shardName);
-        },
-        admin: true
-    });
-
-    commands.push({
-        req: {movePrimary: "move-primary-db-unsharded", to: st.shard1.shardName},
-        setupFunc: function() {
-            db.getSiblingDB("move-primary-db-unsharded").nonshardColl.insert({a: 1});
-            st.ensurePrimaryShard("move-primary-db-unsharded", st.shard0.shardName);
-            assert.eq(db.getSiblingDB('config')
-                          .databases.findOne({_id: 'move-primary-db-unsharded'})
-                          .primary,
-                      st.shard0.shardName);
-        },
-        confirmFunc: function() {
-            assert.eq(db.getSiblingDB('config')
-                          .databases.findOne({_id: 'move-primary-db-unsharded'})
-                          .primary,
-                      st.shard1.shardName);
-        },
-        admin: true
-    });
-
     function testValidWriteConcern(cmd) {
         cmd.req.writeConcern = {w: 'majority', wtimeout: 5 * 60 * 1000};
         jsTest.log("Testing " + tojson(cmd.req));

@@ -116,6 +116,11 @@ public:
             return appendCommandStatus(result, validationStatus);
         }
 
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "addShard must be called with majority writeConcern, got "
+                              << cmdObj,
+                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
         audit::logAddShard(Client::getCurrent(),
                            parsedRequest.hasName() ? parsedRequest.getName() : "",
                            parsedRequest.getConnString().toString(),

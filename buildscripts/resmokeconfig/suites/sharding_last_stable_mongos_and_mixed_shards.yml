@@ -19,6 +19,7 @@ selector:
   # 3.6 becomes 'last-stable'.
   - jstests/sharding/covered_shard_key_indexes.js
   # Enable when 3.6 becomes last-stable.
+  - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   - jstests/sharding/views.js
   - jstests/sharding/view_rewrite.js
   - jstests/sharding/explain_agg_read_pref.js

@@ -426,12 +426,13 @@ StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, Stri
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
         auto createDbStatus =
-            uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                                opCtx,
-                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                "admin",
-                                configCreateDatabaseRequest.toBSON(),
-                                Shard::RetryPolicy::kIdempotent))
+            uassertStatusOK(
+                configShard->runCommandWithFixedRetryAttempts(
+                    opCtx,
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    "admin",
+                    Command::appendMajorityWriteConcern(configCreateDatabaseRequest.toBSON()),
+                    Shard::RetryPolicy::kIdempotent))
                 .commandStatus;
 
         if (createDbStatus.isOK() || createDbStatus == ErrorCodes::NamespaceExists) {

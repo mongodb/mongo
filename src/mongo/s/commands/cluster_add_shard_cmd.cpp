@@ -64,9 +64,8 @@ public:
         return true;
     }
 
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+        return true;
     }
 
     virtual void help(std::stringstream& help) const {
@@ -95,12 +94,13 @@ public:
         });
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponse = uassertStatusOK(
-            configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                          kPrimaryOnlyReadPreference,
-                                                          "admin",
-                                                          parsedRequest.toCommandForConfig(),
-                                                          Shard::RetryPolicy::kIdempotent));
+        auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            kPrimaryOnlyReadPreference,
+            "admin",
+            Command::appendMajorityWriteConcern(
+                Command::appendPassthroughFields(cmdObj, parsedRequest.toCommandForConfig())),
+            Shard::RetryPolicy::kIdempotent));
 
         Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
