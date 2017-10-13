@@ -181,11 +181,12 @@ public:
 
         if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
-            (dbname == NamespaceString::kLocalDb)) {
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::IllegalOperation,
-                                              "Cannot drop 'local' database while replication "
-                                              "is active"));
+            ((dbname == NamespaceString::kLocalDb) || (dbname == NamespaceString::kAdminDb))) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::IllegalOperation,
+                       str::stream() << "Cannot drop '" << dbname
+                                     << "' database while replication is active"));
         }
         BSONElement e = cmdObj.firstElement();
         int p = (int)e.number();

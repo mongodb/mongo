@@ -134,14 +134,6 @@
         assertListContainsRole(role.inheritedRoles, {role: "dbAdmin", db: "db1"}, node);
     });
 
-    // Verify that dropping the admin database propagates.
-    assert.commandWorked(rstest.getPrimary().getDB("admin").dropDatabase());
-    assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
-    rstest.nodes.forEach(function(node) {
-        var roles = node.getDB("db1").getRoles();
-        assert.eq(0, roles.length, node);
-    });
-
     // Verify that applyOps commands propagate.
     // NOTE: This section of the test depends on the oplog and roles schemas.
     assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({
@@ -171,15 +163,6 @@
               }
             },
             {op: "c", ns: "admin.$cmd", o: {drop: "system.roles"}},
-        ]
-    }));
-
-    // The dropDatabase command cannot be run inside an applyOps if it still has any collections
-    // (drop-pending included). See SERVER-29874.
-    assert.commandWorked(rstest.getPrimary().getDB("admin").dropDatabase());
-
-    assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({
-        applyOps: [
             {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
             {
               op: "i",
