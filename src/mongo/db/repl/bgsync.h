@@ -148,7 +148,7 @@ private:
     void _run();
     // Production thread inner loop.
     void _runProducer();
-    void _produce(OperationContext* txn);
+    void _produce();
 
     /**
      * Checks current background sync state before pushing operations into blocking queue and

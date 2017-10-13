@@ -225,15 +225,16 @@ void BackgroundSync::_runProducer() {
     }
     // we want to start when we're no longer primary
     // start() also loads _lastOpTimeFetched, which we know is set from the "if"
-    auto txn = cc().makeOperationContext();
-    if (getState() == ProducerState::Starting) {
-        start(txn.get());
+    {
+        auto opCtx = cc().makeOperationContext();
+        if (getState() == ProducerState::Starting) {
+            start(opCtx.get());
+        }
     }
-
-    _produce(txn.get());
+    _produce();
 }
 
-void BackgroundSync::_produce(OperationContext* opCtx) {
+void BackgroundSync::_produce() {
     if (MONGO_FAIL_POINT(stopReplProducer)) {
         // This log output is used in js tests so please leave it.
         log() << "bgsync - stopReplProducer fail point "
@@ -266,15 +267,18 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         }
     }
 
-    auto storageInterface = StorageInterface::get(opCtx);
     // find a target to sync from the last optime fetched
     OpTime lastOpTimeFetched;
     HostAndPort source;
     HostAndPort oldSource = _syncSourceHost;
     SyncSourceResolverResponse syncSourceResp;
     {
-        const OpTime minValidSaved = storageInterface->getMinValid(opCtx);
-
+        OpTime minValidSaved;
+        {
+            auto opCtx = cc().makeOperationContext();
+            auto storageInterface = StorageInterface::get(opCtx.get());
+            minValidSaved = storageInterface->getMinValid(opCtx.get());
+        }
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
@@ -397,8 +401,12 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
     // Set the applied point if unset. This is most likely the first time we've established a sync
     // source since stepping down or otherwise clearing the applied point. We need to set this here,
     // before the OplogWriter gets a chance to append to the oplog.
-    if (storageInterface->getAppliedThrough(opCtx).isNull()) {
-        storageInterface->setAppliedThrough(opCtx, _replCoord->getMyLastAppliedOpTime());
+    {
+        auto opCtx = cc().makeOperationContext();
+        auto storageInterface = StorageInterface::get(opCtx.get());
+        if (storageInterface->getAppliedThrough(opCtx.get()).isNull()) {
+            storageInterface->setAppliedThrough(opCtx.get(), _replCoord->getMyLastAppliedOpTime());
+        }
     }
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
@@ -521,10 +529,18 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
             }
         }
 
-        OplogInterfaceLocal localOplog(opCtx, rsOplogName);
-        RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
-        rollback(
-            opCtx, localOplog, rollbackSource, syncSourceResp.rbid, _replCoord, storageInterface);
+        {
+            auto opCtx = cc().makeOperationContext();
+            OplogInterfaceLocal localOplog(opCtx.get(), rsOplogName);
+            RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
+            auto storageInterface = StorageInterface::get(opCtx.get());
+            rollback(opCtx.get(),
+                     localOplog,
+                     rollbackSource,
+                     syncSourceResp.rbid,
+                     _replCoord,
+                     storageInterface);
+        }
 
         // Reset the producer to clear the sync source and the last optime fetched.
         stop(true);
