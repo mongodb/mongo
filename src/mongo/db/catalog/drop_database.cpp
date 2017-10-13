@@ -229,7 +229,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
         if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
+            return Status(ErrorCodes::PrimarySteppedDown,
                           str::stream() << "Could not drop database " << dbName
                                         << " because we transitioned from PRIMARY to "
                                         << replCoord->getMemberState().toString()

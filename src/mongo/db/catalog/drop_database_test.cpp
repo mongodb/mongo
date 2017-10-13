@@ -441,7 +441,7 @@ TEST_F(DropDatabaseTest,
     ASSERT_TRUE(AutoGetDb(_opCtx.get(), _nss.db(), MODE_X).getDb());
 
     auto status = dropDatabase(_opCtx.get(), _nss.db().toString());
-    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, status);
     ASSERT_EQUALS(status.reason(),
                   str::stream() << "Could not drop database " << _nss.db()
                                 << " because we transitioned from PRIMARY to SECONDARY"
