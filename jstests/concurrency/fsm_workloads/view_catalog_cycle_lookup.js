@@ -22,13 +22,14 @@ var $config = (function() {
             return viewList[Random.randInt(viewList.length)];
         },
         getRandomViewPipeline: function() {
-            const lookupViewNs = this.getRandomView(this.viewList);
-            const index = Random.randInt(3);
+            const lookupViewNs1 = this.getRandomView(this.viewList);
+            const lookupViewNs2 = this.getRandomView(this.viewList);
+            const index = Random.randInt(4);
             switch (index) {
                 case 0:
                     return [{
                         $lookup: {
-                            from: lookupViewNs,
+                            from: lookupViewNs1,
                             localField: 'a',
                             foreignField: 'b',
                             as: 'result1'
@@ -36,15 +37,34 @@ var $config = (function() {
                     }];
                 case 1:
                     return [{
-                        $graphLookup: {
-                            from: lookupViewNs,
-                            startWith: '$a',
-                            connectFromField: 'a',
-                            connectToField: 'b',
+                        $lookup: {
+                            from: lookupViewNs1,
+                            let : {a1: '$a'},
+                            pipeline: [
+                                {$match: {$expr: {$eq: ["$$a1", "$b"]}}},
+                                {
+                                  $lookup: {
+                                      from: lookupViewNs2,
+                                      let : {b1: '$b'},
+                                      pipeline: [{$match: {$expr: {$eq: ["$$b1", "$b"]}}}],
+                                      as: "result2Inner"
+                                  }
+                                }
+                            ],
                             as: 'result2'
                         }
                     }];
                 case 2:
+                    return [{
+                        $graphLookup: {
+                            from: lookupViewNs1,
+                            startWith: '$a',
+                            connectFromField: 'a',
+                            connectToField: 'b',
+                            as: 'result3'
+                        }
+                    }];
+                case 3:
                     return [];
                 default:
                     assertAlways(false, "Invalid index: " + index);
