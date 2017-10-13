@@ -38,13 +38,13 @@ def timestamp_str(t):
 class test_las(wttest.WiredTigerTestCase):
     # Force a small cache.
     def conn_config(self):
-        return 'cache_size=1GB'
+        return 'cache_size=50MB'
 
     def large_updates(self, session, uri, value, ds, nrows, timestamp=False):
         # Insert a large number of records, we'll hang if the lookaside table
         # isn't doing its thing.
         cursor = session.open_cursor(uri)
-        for i in range(1, 1000000):
+        for i in range(1, 10000):
             if timestamp == True:
                 session.begin_transaction()
             cursor.set_key(ds.key(nrows + i))
@@ -73,7 +73,6 @@ class test_las(wttest.WiredTigerTestCase):
         session.close()
         conn.close()
 
-    @wttest.longtest('lookaside table smoke test')
     def test_las(self):
         # Create a small table.
         uri = "table:test_las"
@@ -84,7 +83,7 @@ class test_las(wttest.WiredTigerTestCase):
 
         # Initially load huge data
         cursor = self.session.open_cursor(uri)
-        for i in range(1, 1000000):
+        for i in range(1, 10000):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(bigvalue)
             self.assertEquals(cursor.insert(), 0)
