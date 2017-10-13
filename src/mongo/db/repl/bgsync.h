@@ -170,7 +170,7 @@ private:
 
     // Production thread
     void _producerThread();
-    void _produce(OperationContext* txn);
+    void _produce();
 
     /**
      * Signals to the applier that we have no new data,

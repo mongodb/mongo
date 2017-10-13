@@ -262,15 +262,15 @@ void BackgroundSync::_producerThread() {
     }
     // we want to start when we're no longer primary
     // start() also loads _lastOpTimeFetched, which we know is set from the "if"
-    OperationContextImpl txn;
     if (isStopped()) {
-        start(&txn);
+        OperationContextImpl opCtx;
+        start(&opCtx);
     }
 
-    _produce(&txn);
+    _produce();
 }
 
-void BackgroundSync::_produce(OperationContext* txn) {
+void BackgroundSync::_produce() {
     if (MONGO_FAIL_POINT(stopReplProducer)) {
         // This log output is used in js tests so please leave it.
         log() << "bgsync - stopReplProducer fail point "
@@ -316,14 +316,19 @@ void BackgroundSync::_produce(OperationContext* txn) {
     OplogReader syncSourceReader;
     OpTime minValid;
     if (_replCoord->getMemberState().recovering()) {
-        auto minValidSaved = getMinValid(txn);
+        OperationContextImpl opCtx;
+        auto minValidSaved = getMinValid(&opCtx);
         if (minValidSaved > lastOpTimeFetched) {
             minValid = minValidSaved;
         }
     }
 
     int rbid;
-    syncSourceReader.connectToSyncSource(txn, lastOpTimeFetched, minValid, _replCoord, &rbid);
+    {
+        OperationContextImpl opCtx;
+        syncSourceReader.connectToSyncSource(
+            &opCtx, lastOpTimeFetched, minValid, _replCoord, &rbid);
+    }
 
     // no server found
     if (syncSourceReader.getHost().empty()) {
@@ -373,8 +378,11 @@ void BackgroundSync::_produce(OperationContext* txn) {
     // Set the applied point if unset. This is most likely the first time we've established a sync
     // source since stepping down or otherwise clearing the applied point. We need to set this here,
     // before the OplogWriter gets a chance to append to the oplog.
-    if (getAppliedThrough(txn).isNull()) {
-        setAppliedThrough(txn, _replCoord->getMyLastAppliedOpTime());
+    {
+        OperationContextImpl opCtx;
+        if (getAppliedThrough(&opCtx).isNull()) {
+            setAppliedThrough(&opCtx, _replCoord->getMyLastAppliedOpTime());
+        }
     }
 
     Status fetcherReturnStatus = Status::OK();
@@ -492,7 +500,10 @@ void BackgroundSync::_produce(OperationContext* txn) {
             }
         }
 
-        _rollback(txn, source, rbid, getConnection);
+        {
+            OperationContextImpl opCtx;
+            _rollback(&opCtx, source, rbid, getConnection);
+        }
         stop();
     } else if (!fetcherReturnStatus.isOK()) {
         warning() << "Fetcher error querying oplog: " << fetcherReturnStatus.toString();
