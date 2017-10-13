@@ -277,8 +277,9 @@ public:
      * "firstOpTimeOfTerm" is a floor on the OpTimes this node will be allowed to consider committed
      * for this tenure as primary. This prevents entries from before our election from counting as
      * committed in our view, until our election (the "firstOpTimeOfTerm" op) has been committed.
+     * Returns PrimarySteppedDown if this node is no longer eligible to begin accepting writes.
      */
-    virtual void completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm) = 0;
+    virtual Status completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm) = 0;
 
     /**
      * Adjusts the maintenance mode count by "inc".

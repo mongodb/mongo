@@ -113,7 +113,7 @@ protected:
                          const OpTime& firstOpTimeOfTerm = OpTime()) {
         getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
         getTopoCoord()._setCurrentPrimaryForTest(_selfIndex);
-        getTopoCoord().completeTransitionToPrimary(firstOpTimeOfTerm);
+        ASSERT_OK(getTopoCoord().completeTransitionToPrimary(firstOpTimeOfTerm));
     }
 
     void setSelfMemberState(const MemberState& newState) {

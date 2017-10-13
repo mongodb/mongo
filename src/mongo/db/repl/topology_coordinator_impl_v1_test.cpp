@@ -114,7 +114,7 @@ protected:
         getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
         getTopoCoord()._setCurrentPrimaryForTest(_selfIndex);
         OpTime dummyOpTime(Timestamp(1, 1), getTopoCoord().getTerm());
-        getTopoCoord().completeTransitionToPrimary(dummyOpTime);
+        ASSERT_OK(getTopoCoord().completeTransitionToPrimary(dummyOpTime));
     }
 
     void setMyOpTime(const OpTime& opTime) {
@@ -128,6 +128,10 @@ protected:
 
     int getCurrentPrimaryIndex() {
         return getTopoCoord().getCurrentPrimaryIndex();
+    }
+
+    int getSelfIndex() {
+        return _selfIndex;
     }
 
     HostAndPort getCurrentPrimaryHost() {
@@ -4925,6 +4929,28 @@ TEST_F(HeartbeatResponseTestV1, NodeDoesNotStepDownSelfWhenRemoteNodeWasElectedL
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
     ASSERT_NO_ACTION(nextAction.getAction());
+}
+
+TEST_F(HeartbeatResponseTestV1, NodeWillNotTransitionToPrimaryAfterHearingAboutNewerTerm) {
+    auto initialTerm = getTopoCoord().getTerm();
+    OpTime firstOpTimeOfTerm(Timestamp(1, 1), initialTerm);
+
+    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+    getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY,
+                                             firstOpTimeOfTerm.getTimestamp());
+    getTopoCoord()._setCurrentPrimaryForTest(getSelfIndex());
+
+    // At first transition to primary is OK
+    ASSERT(getTopoCoord().canCompleteTransitionToPrimary(initialTerm));
+
+    // Now mark ourselves as mid-stepdown, as if we had heard about a new term.
+    getTopoCoord().prepareForUnconditionalStepDown();
+
+    ASSERT_FALSE(getTopoCoord().canCompleteTransitionToPrimary(initialTerm));
+
+    // Check that transitioning to primary fails now that the term has been updated.
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown,
+                  getTopoCoord().completeTransitionToPrimary(firstOpTimeOfTerm));
 }
 
 TEST_F(HeartbeatResponseTestV1,

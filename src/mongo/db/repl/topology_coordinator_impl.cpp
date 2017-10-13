@@ -2901,12 +2901,17 @@ bool TopologyCoordinatorImpl::canCompleteTransitionToPrimary(
     return true;
 }
 
-void TopologyCoordinatorImpl::completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm) {
-    invariant(canCompleteTransitionToPrimary(firstOpTimeOfTerm.getTerm()));
+Status TopologyCoordinatorImpl::completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm) {
+    if (!canCompleteTransitionToPrimary(firstOpTimeOfTerm.getTerm())) {
+        return Status(ErrorCodes::PrimarySteppedDown,
+                      "By the time this node was ready to complete its transition to PRIMARY it "
+                      "was no longer eligible to do so");
+    }
     if (_leaderMode == LeaderMode::kLeaderElect) {
         _setLeaderMode(LeaderMode::kMaster);
     }
     _firstOpTimeOfMyTerm = firstOpTimeOfTerm;
+    return Status::OK();
 }
 
 void TopologyCoordinatorImpl::adjustMaintenanceCountBy(int inc) {
