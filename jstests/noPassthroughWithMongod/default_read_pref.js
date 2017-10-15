@@ -27,8 +27,17 @@
             getMaxWireVersion: function() {
                 return mongo.getMaxWireVersion();
             },
+            isReplicaSetMember: function() {
+                return mongo.isReplicaSetMember();
+            },
+            isMongos: function() {
+                return mongo.isMongos();
+            },
             isCausalConsistency: function() {
                 return false;
+            },
+            getClusterTime: function() {
+                return null;
             },
         };
         db._session = new _DummyDriverSession(db._mongo);

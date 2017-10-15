@@ -537,6 +537,29 @@ var runner = (function() {
                 cleanup.push(workload);
             });
 
+            // Since the worker threads may be running with causal consistency enabled, we set the
+            // initial clusterTime and initial operationTime for the sessions they'll create so that
+            // they are guaranteed to observe the effects of the workload's $config.setup() function
+            // being called.
+            if (typeof executionOptions.sessionOptions === 'object' &&
+                executionOptions.sessionOptions !== null) {
+                // We only start a session for the worker threads and never start one for the main
+                // thread. We can therefore get the clusterTime and operationTime tracked by the
+                // underlying DummyDriverSession through any DB instance (i.e. the "test" database
+                // here was chosen arbitrarily).
+                const session = cluster.getDB('test').getSession();
+
+                // JavaScript objects backed by C++ objects (e.g. BSON values from a command
+                // response) do not serialize correctly when passed through the ScopedThread
+                // constructor. To work around this behavior, we instead pass a stringified form of
+                // the JavaScript object through the ScopedThread constructor and use eval() to
+                // rehydrate it.
+                executionOptions.sessionOptions.initialClusterTime =
+                    tojson(session.getClusterTime());
+                executionOptions.sessionOptions.initialOperationTime =
+                    tojson(session.getOperationTime());
+            }
+
             if (cluster.shouldPerformContinuousStepdowns()) {
                 cluster.startContinuousFailover();
             }

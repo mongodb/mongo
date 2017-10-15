@@ -38,6 +38,21 @@ var workerThread = (function() {
                 }
 
                 if (typeof args.sessionOptions !== 'undefined') {
+                    // JavaScript objects backed by C++ objects (e.g. BSON values from a command
+                    // response) do not serialize correctly when passed through the ScopedThread
+                    // constructor. To work around this behavior, we instead pass a stringified form
+                    // of the JavaScript object through the ScopedThread constructor and use eval()
+                    // to rehydrate it.
+                    if (typeof args.sessionOptions.initialClusterTime === 'string') {
+                        args.sessionOptions.initialClusterTime =
+                            eval('(' + args.sessionOptions.initialClusterTime + ')');
+                    }
+
+                    if (typeof args.sessionOptions.initialOperationTime === 'string') {
+                        args.sessionOptions.initialOperationTime =
+                            eval('(' + args.sessionOptions.initialOperationTime + ')');
+                    }
+
                     myDB = new Mongo(args.host)
                                .startSession(args.sessionOptions)
                                .getDatabase(args.dbName);

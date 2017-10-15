@@ -1,5 +1,10 @@
 // tests getlog as well as slow querying logging
 
+// We turn off gossiping the mongo shell's clusterTime because it causes the slow command log
+// messages to get truncated since they'll exceed 512 characters. The truncated log messages will
+// fail to match the find and update patterns defined later on in this test.
+TestData.skipGossipingClusterTime = true;
+
 glcol = db.getLogTest2;
 glcol.drop();
 

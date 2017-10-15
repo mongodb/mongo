@@ -140,6 +140,26 @@ var {
             return true;
         }
 
+        function gossipClusterTime(cmdObj, clusterTime) {
+            cmdObj = Object.assign({}, cmdObj);
+
+            const cmdName = Object.keys(cmdObj)[0];
+
+            // If the command is in a wrapped form, then we look for the actual command object
+            // inside the query/$query object.
+            let cmdObjUnwrapped = cmdObj;
+            if (cmdName === "query" || cmdName === "$query") {
+                cmdObj[cmdName] = Object.assign({}, cmdObj[cmdName]);
+                cmdObjUnwrapped = cmdObj[cmdName];
+            }
+
+            if (!cmdObjUnwrapped.hasOwnProperty("$clusterTime")) {
+                cmdObjUnwrapped.$clusterTime = clusterTime;
+            }
+
+            return cmdObj;
+        }
+
         function injectAfterClusterTime(cmdObj, operationTime) {
             cmdObj = Object.assign({}, cmdObj);
 
@@ -165,9 +185,49 @@ var {
             return cmdObj;
         }
 
+        function isNonNullObject(obj) {
+            return typeof obj === "object" && obj !== null;
+        }
+
         function prepareCommandRequest(driverSession, cmdObj) {
             if (serverSupports(kWireVersionSupportingLogicalSession)) {
                 cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+            }
+
+            if (serverSupports(kWireVersionSupportingCausalConsistency) &&
+                (client.isReplicaSetMember() || client.isMongos()) &&
+                !jsTest.options().skipGossipingClusterTime) {
+                // The `clientClusterTime` is the highest clusterTime observed by any connection
+                // within this mongo shell.
+                const clientClusterTime = client.getClusterTime();
+                // The `sessionClusterTime` is the highest clusterTime tracked by the
+                // `driverSession` session and may lag behind `clientClusterTime` if operations on
+                // other sessions or connections are advancing the clusterTime.
+                const sessionClusterTime = driverSession.getClusterTime();
+
+                // We gossip the greater of the client's clusterTime and the session's clusterTime.
+                // If this is the first command being sent on this connection and/or session, then
+                // it's possible that either clusterTime hasn't been initialized yet. Additionally,
+                // if the user specified a malformed clusterTime as part of initialClusterTime, then
+                // we want the server to be the one to reject it and therefore write our comparisons
+                // using bsonWoCompare() accordingly.
+                if (isNonNullObject(clientClusterTime) || isNonNullObject(sessionClusterTime)) {
+                    let clusterTimeToGossip;
+
+                    if (!isNonNullObject(sessionClusterTime)) {
+                        clusterTimeToGossip = clientClusterTime;
+                    } else if (!isNonNullObject(clientClusterTime)) {
+                        clusterTimeToGossip = sessionClusterTime;
+                    } else {
+                        clusterTimeToGossip =
+                            (bsonWoCompare({_: clientClusterTime.clusterTime},
+                                           {_: sessionClusterTime.clusterTime}) >= 0)
+                            ? clientClusterTime
+                            : sessionClusterTime;
+                    }
+
+                    cmdObj = gossipClusterTime(cmdObj, clusterTimeToGossip);
+                }
             }
 
             if (serverSupports(kWireVersionSupportingCausalConsistency) &&
@@ -491,6 +551,14 @@ var {
 
         this.getOptions = function() {
             return originalSession.getOptions();
+        };
+
+        this.getOperationTime = function getOperationTime() {
+            return this._operationTime;
+        };
+
+        this.getClusterTime = function getClusterTime() {
+            return originalSession.getClusterTime();
         };
 
         this.getDatabase = function(dbName) {

@@ -7,6 +7,11 @@
 
 load('jstests/multiVersion/libs/multi_rs.js');
 
+// We turn off gossiping the mongo shell's clusterTime because this test connects to replica sets
+// and sharded clusters as a user other than __system. Attempting to advance the clusterTime while
+// it has been signed with a dummy key results in an authorization error.
+TestData.skipGossipingClusterTime = true;
+
 (function() {
     'use strict';
     var keyFilePath = 'jstests/libs/key1';

@@ -258,6 +258,7 @@ jsTestOptions = function() {
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
             alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,
+            skipGossipingClusterTime: TestData.skipGossipingClusterTime || false,
         });
     }
     return _jsTestOptions;
