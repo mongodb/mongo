@@ -861,6 +861,18 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
     }
 
     {
+        // The Server Discovery and Monitoring (SDAM) specification identifies a replica set member
+        // as either (a) having a "setName" field in the isMaster response, or (b) having
+        // "isreplicaset: true" in the isMaster response.
+        //
+        // https://github.com/mongodb/specifications/blob/c386e23724318e2fa82f4f7663d77581b755b2c3/
+        // source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#type
+        const bool hasSetNameField = swIsMasterReply.data.hasField("setName");
+        const bool isReplicaSetField = swIsMasterReply.data.getBoolField("isreplicaset");
+        _isReplicaSetMember = hasSetNameField || isReplicaSetField;
+    }
+
+    {
         std::string msgField;
         auto msgFieldExtractStatus = bsonExtractStringField(swIsMasterReply.data, "msg", &msgField);
 

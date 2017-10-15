@@ -97,6 +97,8 @@ public:
     int getMinWireVersion() final;
     int getMaxWireVersion() final;
 
+    bool isReplicaSetMember() const final;
+
     bool isMongos() const final {
         return false;
     }

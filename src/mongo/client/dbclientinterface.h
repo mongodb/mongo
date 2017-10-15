@@ -791,6 +791,8 @@ public:
 
     virtual void reset() {}
 
+    virtual bool isReplicaSetMember() const = 0;
+
     virtual bool isMongos() const = 0;
 
     /**
@@ -1047,6 +1049,10 @@ public:
             _checkConnection();
     }
 
+    bool isReplicaSetMember() const override {
+        return _isReplicaSetMember;
+    }
+
     bool isMongos() const override {
         return _isMongos;
     }
@@ -1054,6 +1060,7 @@ public:
 protected:
     int _minWireVersion{0};
     int _maxWireVersion{0};
+    bool _isReplicaSetMember = false;
     bool _isMongos = false;
 
     virtual void _auth(const BSONObj& params);

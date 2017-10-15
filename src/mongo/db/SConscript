@@ -552,6 +552,9 @@ env.Library(
         'curop',
         'lasterror',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+    ],
 )
 
 env.Library(

@@ -219,6 +219,10 @@ public:
      */
     virtual void reset();
 
+    bool isReplicaSetMember() const override {
+        return true;
+    }
+
     bool isMongos() const override {
         return false;
     }

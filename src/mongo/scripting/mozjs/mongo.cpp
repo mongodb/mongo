@@ -84,6 +84,9 @@ const JSFunctionSpec MongoBase::methods[] = {
         getMinWireVersion, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
         getMaxWireVersion, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        isReplicaSetMember, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isMongos, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getClusterTime, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClusterTime, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoLocalInfo, MongoExternalInfo),
@@ -764,6 +767,18 @@ void MongoBase::Functions::getMaxWireVersion::call(JSContext* cx, JS::CallArgs a
     auto conn = getConnection(args);
 
     args.rval().setInt32(conn->getMaxWireVersion());
+}
+
+void MongoBase::Functions::isReplicaSetMember::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+
+    args.rval().setBoolean(conn->isReplicaSetMember());
+}
+
+void MongoBase::Functions::isMongos::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+
+    args.rval().setBoolean(conn->isMongos());
 }
 
 void MongoBase::Functions::getClusterTime::call(JSContext* cx, JS::CallArgs args) {
