@@ -634,15 +634,12 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
     const auto needsInitialSync =
         lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(opCtx);
     if (!needsInitialSync) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (!_inShutdown) {
-            // Start steady replication, since we already have data.
-            // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
-            auto memberState = _getMemberState_inlock();
-            invariant(memberState.startup2() || memberState.removed());
-            invariantOK(_setFollowerMode(&lk, MemberState::RS_RECOVERING));
-            _externalState->startSteadyStateReplication(opCtx, this);
-        }
+        // Start steady replication, since we already have data.
+        // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
+        auto memberState = getMemberState();
+        invariant(memberState.startup2() || memberState.removed());
+        invariantOK(setFollowerMode(MemberState::RS_RECOVERING));
+        _externalState->startSteadyStateReplication(opCtx, this);
         return;
     }
 
@@ -867,12 +864,6 @@ void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
 
 Status ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    return _setFollowerMode(&lk, newState);
-}
-
-Status ReplicationCoordinatorImpl::_setFollowerMode(stdx::unique_lock<stdx::mutex>* lock,
-                                                    const MemberState& newState) {
-    invariant(lock->owns_lock());
     if (newState == _topCoord->getMemberState()) {
         return Status::OK();
     }
@@ -897,7 +888,7 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(stdx::unique_lock<stdx::mute
 
     const PostMemberStateUpdateAction action =
         _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
-    lock->unlock();
+    lk.unlock();
     _performPostMemberStateUpdateAction(action);
 
     return Status::OK();

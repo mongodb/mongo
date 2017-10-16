@@ -68,6 +68,8 @@ public:
         ReplicationProcess* replicationProcess);
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
+    // The implementation acquires the LockManager locks on oplog, so it cannot be called while
+    // holding ReplicationCoordinatorImpl's mutex.
     virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) override;
     virtual void stopDataReplication(OperationContext* opCtx) override;
@@ -167,6 +169,9 @@ private:
 
     // True when the threads have been started
     bool _startedThreads = false;
+
+    // Set to true when we are in the process of shutting down replication.
+    bool _inShutdown = false;
 
     // The SyncSourceFeedback class is responsible for sending replSetUpdatePosition commands
     // for forwarding replication progress information upstream when there is chained

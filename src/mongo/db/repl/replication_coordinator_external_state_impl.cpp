@@ -223,6 +223,11 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     acquireOplogCollectionForLogging(opCtx);
 
     LockGuard lk(_threadMutex);
+
+    // We've shut down the external state, don't start again.
+    if (_inShutdown)
+        return;
+
     invariant(replCoord);
     invariant(!_bgSync);
     log() << "Starting replication fetcher thread";
@@ -313,6 +318,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
         return;
     }
 
+    _inShutdown = true;
     _stopDataReplication_inlock(opCtx, &lk);
 
     if (_noopWriter) {
