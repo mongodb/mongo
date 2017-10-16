@@ -175,7 +175,7 @@ wts_ops(int lastrun)
 	if (g.c_backups)
 		testutil_check(
 		    __wt_thread_create(NULL, &backup_tid, backup, NULL));
-	if (g.c_checkpoints)
+	if (g.c_checkpoint_flag == CHECKPOINT_ON)
 		testutil_check(__wt_thread_create(
 		    NULL, &checkpoint_tid, checkpoint, NULL));
 	if (g.c_compact)
@@ -252,7 +252,7 @@ wts_ops(int lastrun)
 		testutil_check(__wt_thread_join(NULL, alter_tid));
 	if (g.c_backups)
 		testutil_check(__wt_thread_join(NULL, backup_tid));
-	if (g.c_checkpoints)
+	if (g.c_checkpoint_flag == CHECKPOINT_ON)
 		testutil_check(__wt_thread_join(NULL, checkpoint_tid));
 	if (g.c_compact)
 		testutil_check(__wt_thread_join(NULL, compact_tid));

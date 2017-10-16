@@ -151,7 +151,9 @@ typedef struct {
 	uint32_t c_bloom_hash_count;
 	uint32_t c_bloom_oldest;
 	uint32_t c_cache;
-	uint32_t c_checkpoints;
+	char	*c_checkpoint;
+	uint32_t c_checkpoint_log_size;
+	uint32_t c_checkpoint_wait;
 	char	*c_checksum;
 	uint32_t c_chunk_size;
 	uint32_t c_compact;
@@ -182,6 +184,7 @@ typedef struct {
 	uint32_t c_logging;
 	uint32_t c_logging_archive;
 	char	*c_logging_compression;
+	uint32_t c_logging_file_max;
 	uint32_t c_logging_prealloc;
 	uint32_t c_long_running_txn;
 	uint32_t c_lsm_worker_threads;
@@ -215,6 +218,11 @@ typedef struct {
 #define	ROW				2
 #define	VAR				3
 	u_int type;				/* File type's flag value */
+
+#define	CHECKPOINT_OFF			1
+#define	CHECKPOINT_ON			2
+#define	CHECKPOINT_WIREDTIGER		3
+	u_int c_checkpoint_flag;		/* Checkpoint flag value */
 
 #define	CHECKSUM_OFF			1
 #define	CHECKSUM_ON			2
