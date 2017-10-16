@@ -1302,13 +1302,13 @@ BSONObj fromjson(const char* jsonString, int* len) {
     } catch (std::exception& e) {
         std::ostringstream message;
         message << "caught exception from within JSON parser: " << e.what();
-        throw AssertionException(17031, message.str());
+        uasserted(17031, message.str());
     }
 
     if (ret != Status::OK()) {
         ostringstream message;
         message << "code " << ret.code() << ": " << ret.codeString() << ": " << ret.reason();
-        throw AssertionException(16619, message.str());
+        uasserted(16619, message.str());
     }
     if (len)
         *len = jparse.offset();

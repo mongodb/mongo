@@ -100,15 +100,13 @@ public:
     std::vector<std::string> txtEntry() const {
         const auto data = this->_rawData();
         if (data.empty()) {
-            throw DBException(ErrorCodes::DNSProtocolError,
-                              "DNS TXT Record is not correctly sized");
+            uasserted(ErrorCodes::DNSProtocolError, "DNS TXT Record is not correctly sized");
         }
         const std::size_t amount = data.front();
         const auto first = begin(data) + 1;
         std::vector<std::string> rv;
         if (data.size() - 1 < amount) {
-            throw DBException(ErrorCodes::DNSProtocolError,
-                              "DNS TXT Record is not correctly sized");
+            uasserted(ErrorCodes::DNSProtocolError, "DNS TXT Record is not correctly sized");
         }
         rv.emplace_back(first, first + amount);
         return rv;
@@ -122,7 +120,7 @@ public:
 
         auto data = _rawData();
         if (data.size() != 4) {
-            throw DBException(ErrorCodes::DNSProtocolError, "DNS A Record is not correctly sized");
+            uasserted(ErrorCodes::DNSProtocolError, "DNS A Record is not correctly sized");
         }
         for (const std::uint8_t& ch : data) {
             std::ostringstream oss;
@@ -145,7 +143,7 @@ public:
             std::ostringstream oss;
             oss << "Invalid record " << this->_pos << " of SRV answer for \"" << this->_service
                 << "\": Incorrect result size";
-            throw DBException(ErrorCodes::DNSProtocolError, oss.str());
+            uasserted(ErrorCodes::DNSProtocolError, oss.str());
         }
         const std::uint16_t port = [data] {
             std::uint16_t tmp;
@@ -180,7 +178,7 @@ private:
         std::ostringstream oss;
         oss << "Invalid record " << this->_pos << " of DNS answer for \"" << this->_service
             << "\": \"" << strerror(errno) << "\"";
-        throw DBException(ErrorCodes::DNSProtocolError, oss.str());
+        uasserted(ErrorCodes::DNSProtocolError, oss.str());
     };
 
     std::vector<std::uint8_t> _rawData() const {
@@ -208,7 +206,7 @@ public:
         if (ns_initparse(this->_data.data(), this->_data.size(), &this->_ns_answer)) {
             std::ostringstream oss;
             oss << "Invalid SRV answer for \"" << this->_service << "\"";
-            throw DBException(ErrorCodes::DNSProtocolError, oss.str());
+            uasserted(ErrorCodes::DNSProtocolError, oss.str());
         }
 
         this->_nRecords = ns_msg_count(this->_ns_answer, ns_s_an);
@@ -216,7 +214,7 @@ public:
         if (!this->_nRecords) {
             std::ostringstream oss;
             oss << "No SRV records for \"" << this->_service << "\"";
-            throw DBException(ErrorCodes::DNSProtocolError, oss.str());
+            uasserted(ErrorCodes::DNSProtocolError, oss.str());
         }
     }
 
@@ -322,7 +320,7 @@ public:
         if (size < 0) {
             std::ostringstream oss;
             oss << "Failed to look up service \"" << service << "\": " << strerror(errno);
-            throw DBException(ErrorCodes::DNSHostNotFound, oss.str());
+            uasserted(ErrorCodes::DNSHostNotFound, oss.str());
         }
         result.resize(size);
 

@@ -509,12 +509,13 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
 
         if (canContinue && !fixedDoc.isOK()) {
             globalOpCounters.gotInsert();
-            canContinue = handleError(
-                opCtx,
-                AssertionException(fixedDoc.getStatus().code(), fixedDoc.getStatus().reason()),
-                wholeOp.getNamespace(),
-                wholeOp.getWriteCommandBase(),
-                &out);
+            try {
+                uassertStatusOK(fixedDoc.getStatus());
+                MONGO_UNREACHABLE;
+            } catch (const DBException& ex) {
+                canContinue = handleError(
+                    opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
+            }
         }
 
         if (!canContinue)

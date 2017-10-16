@@ -125,7 +125,7 @@ IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) {
     Extra* e = extra();
     if (!e) {
         if (missingExpected)
-            throw AssertionException(13283, "Missing Extra");
+            uasserted(13283, "Missing Extra");
         massert(14045, "missing Extra", e);
     }
     int i = idxNo - NIndexesBase;
@@ -133,7 +133,7 @@ IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) {
         e = e->next(this);
         if (!e) {
             if (missingExpected)
-                throw AssertionException(14823, "missing extra");
+                uasserted(14823, "missing extra");
             massert(14824, "missing Extra", e);
         }
         i -= NIndexesExtra;
@@ -150,7 +150,7 @@ const IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) const
     const Extra* e = extra();
     if (!e) {
         if (missingExpected)
-            throw AssertionException(17421, "Missing Extra");
+            uasserted(17421, "Missing Extra");
         massert(17422, "missing Extra", e);
     }
     int i = idxNo - NIndexesBase;
@@ -158,7 +158,7 @@ const IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) const
         e = e->next(this);
         if (!e) {
             if (missingExpected)
-                throw AssertionException(17423, "missing extra");
+                uasserted(17423, "missing extra");
             massert(17424, "missing Extra", e);
         }
         i -= NIndexesExtra;

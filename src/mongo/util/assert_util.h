@@ -65,15 +65,7 @@ std::string causedBy(const std::string& e);
 /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
 class DBException : public std::exception {
 public:
-    DBException(const Status& status) : _status(status) {
-        invariant(!status.isOK());
-        traceIfNeeded(*this);
-    }
-    DBException(int code, StringData msg)
-        : DBException(Status(code ? ErrorCodes::fromInt(code) : ErrorCodes::UnknownError, msg)) {}
-    virtual ~DBException() throw() {}
-
-    virtual const char* what() const throw() {
+    const char* what() const throw() final {
         return reason().c_str();
     }
 
@@ -100,13 +92,30 @@ public:
         return _status.code();
     }
 
-private:
-    static void traceIfNeeded(const DBException& e);
+    std::string codeString() const {
+        return _status.codeString();
+    }
 
-public:
     static AtomicBool traceExceptions;
 
 protected:
+    DBException(const Status& status) : _status(status) {
+        invariant(!status.isOK());
+        traceIfNeeded(*this);
+    }
+
+    DBException(int code, StringData msg)
+        : DBException(Status(code ? ErrorCodes::fromInt(code) : ErrorCodes::UnknownError, msg)) {}
+
+private:
+    static void traceIfNeeded(const DBException& e);
+
+    /**
+     * This method exists only to make all non-final types in this hierarchy abstract to prevent
+     * accidental slicing.
+     */
+    virtual void defineOnlyInFinalSubclassToPreventSlicing() = 0;
+
     Status _status;
 };
 
@@ -114,8 +123,6 @@ class AssertionException : public DBException {
 public:
     AssertionException(const Status& status) : DBException(status) {}
     AssertionException(int code, StringData msg) : DBException(code, msg) {}
-
-    virtual ~AssertionException() throw() {}
 };
 
 MONGO_COMPILER_NORETURN void verifyFailed(const char* expr, const char* file, unsigned line);

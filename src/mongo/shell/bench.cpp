@@ -1024,9 +1024,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
-                                throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
-                                                  (std::string) "From benchRun GLE" +
-                                                      causedBy(result["err"].String()));
+                                uasserted(result["code"].eoo() ? 0 : result["code"].Int(),
+                                          (std::string) "From benchRun GLE" +
+                                              causedBy(result["err"].String()));
                         }
                     } break;
                     case OpType::INSERT: {
@@ -1098,9 +1098,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
-                                throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
-                                                  (std::string) "From benchRun GLE" +
-                                                      causedBy(result["err"].String()));
+                                uasserted(result["code"].eoo() ? 0 : result["code"].Int(),
+                                          (std::string) "From benchRun GLE" +
+                                              causedBy(result["err"].String()));
                         }
                     } break;
                     case OpType::REMOVE: {
@@ -1153,9 +1153,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
-                                throw DBException(result["code"].eoo() ? 0 : result["code"].Int(),
-                                                  (std::string) "From benchRun GLE " +
-                                                      causedBy(result["err"].String()));
+                                uasserted(result["code"].eoo() ? 0 : result["code"].Int(),
+                                          (std::string) "From benchRun GLE " +
+                                              causedBy(result["err"].String()));
                         }
                     } break;
                     case OpType::CREATEINDEX:

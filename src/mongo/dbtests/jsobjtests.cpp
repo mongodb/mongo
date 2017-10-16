@@ -2041,7 +2041,7 @@ public:
     void good(BSONObj o) {
         if (o.storageValidEmbedded().isOK())
             return;
-        throw AssertionException(12528, (string) "should be ok for storage:" + o.toString());
+        uasserted(12528, (string) "should be ok for storage:" + o.toString());
     }
 
     void bad(string s) {
@@ -2051,7 +2051,7 @@ public:
     void bad(BSONObj o) {
         if (!o.storageValidEmbedded().isOK())
             return;
-        throw AssertionException(12529, (string) "should NOT be ok for storage:" + o.toString());
+        uasserted(12529, (string) "should NOT be ok for storage:" + o.toString());
     }
 
     void run() {

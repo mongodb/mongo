@@ -190,8 +190,8 @@ void KeysCollectionManagerSharding::PeriodicRunner::refreshNow(OperationContext*
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_inShutdown) {
-            throw DBException(ErrorCodes::ShutdownInProgress,
-                              "aborting keys cache refresh because node is shutting down");
+            uasserted(ErrorCodes::ShutdownInProgress,
+                      "aborting keys cache refresh because node is shutting down");
         }
 
         if (_refreshRequest) {
@@ -207,7 +207,7 @@ void KeysCollectionManagerSharding::PeriodicRunner::refreshNow(OperationContext*
     // waitFor also throws if timeout, so also throw when notification was not satisfied after
     // waiting.
     if (!refreshRequest->waitFor(opCtx, kDefaultRefreshWaitTime)) {
-        throw DBException(ErrorCodes::ExceededTimeLimit, "timed out waiting for refresh");
+        uasserted(ErrorCodes::ExceededTimeLimit, "timed out waiting for refresh");
     }
 }
 

@@ -43,7 +43,7 @@ namespace mongo {
  * For example if two operations get the same version of a document, and then both try to
  * modify that document, this exception will get thrown by one of them.
  */
-class WriteConflictException : public DBException {
+class WriteConflictException final : public DBException {
 public:
     WriteConflictException();
 
@@ -60,6 +60,9 @@ public:
      * Can be set via setParameter named traceWriteConflictExceptions.
      */
     static AtomicBool trace;
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
 };
 
 /**

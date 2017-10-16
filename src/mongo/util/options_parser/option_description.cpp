@@ -128,14 +128,14 @@ OptionDescription::OptionDescription(const std::string& dottedName,
     if (std::count(_deprecatedDottedNames.begin(), _deprecatedDottedNames.end(), "")) {
         StringBuilder sb;
         sb << "Attempted to register option with empty string for deprecated dotted name";
-        throw DBException(ErrorCodes::BadValue, sb.str());
+        uasserted(ErrorCodes::BadValue, sb.str());
     }
     // Should not be the same as _dottedName.
     if (std::count(_deprecatedDottedNames.begin(), _deprecatedDottedNames.end(), dottedName)) {
         StringBuilder sb;
         sb << "Attempted to register option with conflict between dottedName and deprecated "
            << "dotted name: " << _dottedName;
-        throw DBException(ErrorCodes::BadValue, sb.str());
+        uasserted(ErrorCodes::BadValue, sb.str());
     }
 }
 
@@ -151,7 +151,7 @@ OptionDescription& OptionDescription::setDefault(Value defaultValue) {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "Cannot register a default value for a composing option";
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     // Make sure the type of our default value matches our declared type
@@ -160,7 +160,7 @@ OptionDescription& OptionDescription::setDefault(Value defaultValue) {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "mismatch between declared type and type of default value: " << ret.toString();
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     _default = defaultValue;
@@ -174,7 +174,7 @@ OptionDescription& OptionDescription::setImplicit(Value implicitValue) {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "Cannot register an implicit value for a composing option";
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     // Make sure the type of our implicit value matches our declared type
@@ -183,7 +183,7 @@ OptionDescription& OptionDescription::setImplicit(Value implicitValue) {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "mismatch between declared type and type of implicit value: " << ret.toString();
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     // It doesn't make sense to set an "implicit value" for switch options since they can never
@@ -192,7 +192,7 @@ OptionDescription& OptionDescription::setImplicit(Value implicitValue) {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "the implicit value of a Switch option is true and cannot be changed";
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     _implicit = implicitValue;
@@ -204,7 +204,7 @@ OptionDescription& OptionDescription::composing() {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "only options registered as StringVector or StringMap can be composing";
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     // Disallow registering a default value for a composing option since the interaction
@@ -213,7 +213,7 @@ OptionDescription& OptionDescription::composing() {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "Cannot make an option with an default value composing";
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     // Disallow registering an implicit value for a composing option since the interaction
@@ -222,7 +222,7 @@ OptionDescription& OptionDescription::composing() {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "Cannot make an option with an implicit value composing";
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     _isComposing = true;
@@ -239,7 +239,7 @@ OptionDescription& OptionDescription::positional(int start, int end) {
         StringBuilder sb;
         sb << "Could not register option \"" << _dottedName << "\": "
            << "Invalid positional specification:  \"start\": " << start << ", \"end\": " << end;
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     if ((end - start) > 0) {
@@ -248,7 +248,7 @@ OptionDescription& OptionDescription::positional(int start, int end) {
             sb << "Could not register option \"" << _dottedName << "\": "
                << "Positional range implies that multiple values are allowed, "
                << "but option is not registered as type StringVector";
-            throw DBException(ErrorCodes::InternalError, sb.str());
+            uasserted(ErrorCodes::InternalError, sb.str());
         }
     }
 
@@ -269,7 +269,7 @@ OptionDescription& OptionDescription::validRange(long min, long max) {
         sb << "Could not register option \"" << _dottedName << "\": "
            << "only options registered as a numeric type can have a valid range, "
            << "but option has type: " << _type;
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     return addConstraint(new NumericKeyConstraint(_dottedName, min, max));
@@ -290,7 +290,7 @@ OptionDescription& OptionDescription::format(const std::string& regexFormat,
         sb << "Could not register option \"" << _dottedName << "\": "
            << "only options registered as a string type can have a required format, "
            << "but option has type: " << _type;
-        throw DBException(ErrorCodes::InternalError, sb.str());
+        uasserted(ErrorCodes::InternalError, sb.str());
     }
 
     return addConstraint(new StringFormatKeyConstraint(_dottedName, regexFormat, displayFormat));

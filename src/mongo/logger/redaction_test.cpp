@@ -53,14 +53,17 @@ TEST(RedactStatusTest, StatusOK) {
 
 TEST(RedactExceptionTest, NoRedact) {
     logger::globalLogDomain()->setShouldRedactLogs(false);
-    DBException ex(ErrorCodes::InternalError, kMsg);
-    ASSERT_EQ(redact(ex), ex.toString());
+    ASSERT_THROWS_WITH_CHECK(uasserted(ErrorCodes::InternalError, kMsg),
+                             DBException,
+                             [](const DBException& ex) { ASSERT_EQ(redact(ex), ex.toString()); });
 }
 
 TEST(RedactExceptionTest, BasicException) {
     logger::globalLogDomain()->setShouldRedactLogs(true);
-    DBException ex(ErrorCodes::InternalError, kMsg);
-    ASSERT_EQ(redact(ex), "InternalError ###");
+    ASSERT_THROWS_WITH_CHECK(
+        uasserted(ErrorCodes::InternalError, kMsg), DBException, [](const DBException& ex) {
+            ASSERT_EQ(redact(ex), "InternalError ###");
+        });
 }
 
 TEST(RedactBSONTest, NoRedact) {

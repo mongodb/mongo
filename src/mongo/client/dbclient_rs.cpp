@@ -645,9 +645,9 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult(
     BSONElement code = error["code"];
     if (code.isNumber() && code.Int() == ErrorCodes::NotMasterOrSecondary) {
         isntSecondary();
-        throw DBException(14812,
-                          str::stream() << "slave " << _lastSlaveOkHost.toString()
-                                        << " is no longer secondary");
+        uasserted(14812,
+                  str::stream() << "slave " << _lastSlaveOkHost.toString()
+                                << " is no longer secondary");
     }
 
     return result;

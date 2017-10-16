@@ -789,7 +789,7 @@ void syncFixUp(OperationContext* opCtx,
                                                     wunit.commit();
                                                 });
                                         } else {
-                                            throw e;
+                                            throw;
                                         }
                                     }
                                 }

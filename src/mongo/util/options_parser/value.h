@@ -171,7 +171,7 @@ T Value::as() const {
     if (!ret.isOK()) {
         StringBuilder message;
         message << "failed to extract typed value from Value container: " << ret.toString();
-        throw AssertionException(17114, message.str());
+        uasserted(17114, message.str());
     }
 
     return valueType;

@@ -214,7 +214,7 @@ public:
                 uasserted(ErrorCodes::BadValue,
                           str::stream() << "can't use sharded collection from db.eval");
             }
-            throw ex;
+            throw;
         }
     }
 

@@ -81,7 +81,7 @@ public:
             std::ostringstream oss;
             oss << "Incorrect record format for \"" << this->_service
                 << "\": expected TXT record, found something else";
-            throw DBException(ErrorCodes::DNSProtocolError, oss.str());
+            uasserted(ErrorCodes::DNSProtocolError, oss.str());
         }
 
         std::vector<std::string> rv;
@@ -100,7 +100,7 @@ public:
             std::ostringstream oss;
             oss << "Incorrect record format for \"" << this->_service
                 << "\": expected A record, found something else";
-            throw DBException(ErrorCodes::DNSProtocolError, oss.str());
+            uasserted(ErrorCodes::DNSProtocolError, oss.str());
         }
 
         std::string rv;
@@ -124,7 +124,7 @@ public:
             std::ostringstream oss;
             oss << "Incorrect record format for \"" << this->_service
                 << "\": expected SRV record, found something else";
-            throw DBException(ErrorCodes::DNSProtocolError, oss.str());
+            uasserted(ErrorCodes::DNSProtocolError, oss.str());
         }
 
         const auto& data = this->_record->Data.SRV;
@@ -244,8 +244,8 @@ public:
                                 nullptr);
 
         if (ec) {
-            throw DBException(ErrorCodes::DNSHostNotFound,
-                              "Failed to look up service \""s + "\":"s + errnoWithDescription(ec));
+            uasserted(ErrorCodes::DNSHostNotFound,
+                      "Failed to look up service \""s + "\":"s + errnoWithDescription(ec));
         }
         return DNSResponse{queryResults};
     }

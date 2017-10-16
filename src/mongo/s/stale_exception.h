@@ -100,6 +100,8 @@ public:
     }
 
 private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+
     std::string _ns;
     ChunkVersion _received;
     ChunkVersion _wanted;

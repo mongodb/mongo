@@ -68,7 +68,7 @@ void throwCursorError(DBClientCursor* cursor) {
 
     if (cursor->hasResultFlag(ResultFlag_ErrSet)) {
         BSONObj o = cursor->next();
-        throw AssertionException(o["code"].numberInt(), o["$err"].str());
+        uasserted(o["code"].numberInt(), o["$err"].str());
     }
 }
 
@@ -1160,7 +1160,7 @@ void ParallelSortClusteredCursor::_oldInit() {
             throw StaleConfigException(
                 _ns, errMsg.str(), ChunkVersion(0, 0, OID()), ChunkVersion(0, 0, OID()));
         } else if (throwException) {
-            throw DBException(14827, errMsg.str());
+            uasserted(14827, errMsg.str());
         } else {
             warning() << redact(errMsg.str());
         }

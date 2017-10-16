@@ -37,10 +37,13 @@ namespace mongo {
  * An exception used to signal to the aggregate and getMore commands that a change stream has been
  * invalidated, and the cursor should not be left open.
  */
-class CloseChangeStreamException : public DBException {
+class CloseChangeStreamException final : public DBException {
 public:
     CloseChangeStreamException()
         : DBException(ErrorCodes::CloseChangeStream, "CloseChangeStream") {}
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
 };
 
 }  // namespace mongo

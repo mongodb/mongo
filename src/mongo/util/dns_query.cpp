@@ -67,8 +67,8 @@ std::vector<std::string> dns::lookupARecords(const std::string& service) {
     auto response = dnsQuery.lookup(service, DNSQueryClass::kInternet, DNSQueryType::kAddress);
 
     if (response.size() == 0) {
-        throw DBException(ErrorCodes::DNSProtocolError,
-                          "Looking up " + service + " A record yielded no results.");
+        uasserted(ErrorCodes::DNSProtocolError,
+                  "Looking up " + service + " A record yielded no results.");
     }
 
     std::vector<std::string> rv;

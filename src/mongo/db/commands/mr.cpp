@@ -1663,10 +1663,10 @@ public:
         // *requires* rethrow AssertionExceptions - should probably fix.
         catch (AssertionException& e) {
             log() << "mr failed, removing collection" << redact(e);
-            throw e;
+            throw;
         } catch (std::exception& e) {
             log() << "mr failed, removing collection" << causedBy(e);
-            throw e;
+            throw;
         } catch (...) {
             log() << "mr failed for unknown reason, removing collection";
             throw;

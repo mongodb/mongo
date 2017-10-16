@@ -37,7 +37,7 @@ namespace mongo {
 /**
  * A special class of DBException thrown by Sockets.
  */
-class SocketException : public DBException {
+class SocketException final : public DBException {
 public:
     const enum Type {
         CLOSED,
@@ -61,6 +61,8 @@ public:
     std::string toString() const override;
 
 private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+
     std::string _server;
     std::string _extra;
 };

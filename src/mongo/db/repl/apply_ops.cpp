@@ -165,10 +165,9 @@ Status _applyOps(OperationContext* opCtx,
             if (!db) {
                 // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
                 // within an active WriteUnitOfWork.
-                throw DBException(
-                    ErrorCodes::AtomicityFailure,
-                    "cannot create a database in atomic applyOps mode; will retry without "
-                    "atomicity");
+                uasserted(ErrorCodes::AtomicityFailure,
+                          "cannot create a database in atomic applyOps mode; will retry without "
+                          "atomicity");
             }
 
             // When processing an update on a non-existent collection, applyOperation_inlock()
@@ -178,7 +177,7 @@ Status _applyOps(OperationContext* opCtx,
             // Additionally for inserts, we fail early on non-existent collections.
             auto collection = db->getCollection(opCtx, nss);
             if (!collection && !nss.isSystemDotIndexes() && (*opType == 'i' || *opType == 'u')) {
-                throw DBException(
+                uasserted(
                     ErrorCodes::AtomicityFailure,
                     str::stream()
                         << "cannot apply insert or update operation on a non-existent namespace "
@@ -189,9 +188,9 @@ Status _applyOps(OperationContext* opCtx,
 
             // Cannot specify timestamp values in an atomic applyOps.
             if (opObj.hasField("ts")) {
-                throw DBException(ErrorCodes::AtomicityFailure,
-                                  "cannot apply an op with a timestamp in atomic applyOps mode; "
-                                  "will retry without atomicity");
+                uasserted(ErrorCodes::AtomicityFailure,
+                          "cannot apply an op with a timestamp in atomic applyOps mode; "
+                          "will retry without atomicity");
             }
 
             OldClientContext ctx(opCtx, nss.ns());
@@ -218,13 +217,13 @@ Status _applyOps(OperationContext* opCtx,
                             if (*opType == 'd') {
                                 return Status::OK();
                             }
-                            throw DBException(ErrorCodes::NamespaceNotFound,
-                                              str::stream()
-                                                  << "cannot apply insert or update operation on a "
-                                                     "non-existent namespace "
-                                                  << nss.ns()
-                                                  << ": "
-                                                  << mongo::redact(opObj));
+                            uasserted(ErrorCodes::NamespaceNotFound,
+                                      str::stream()
+                                          << "cannot apply insert or update operation on a "
+                                             "non-existent namespace "
+                                          << nss.ns()
+                                          << ": "
+                                          << mongo::redact(opObj));
                         }
 
                         OldClientContext ctx(opCtx, nss.ns());

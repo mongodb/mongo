@@ -588,7 +588,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
                 ss << "cmdline oplogsize (" << n << ") different than existing (" << o
                    << ") see: http://dochub.mongodb.org/core/increase-oplog";
                 log() << ss.str() << endl;
-                throw AssertionException(13257, ss.str());
+                uasserted(13257, ss.str());
             }
         }
         acquireOplogCollectionForLogging(opCtx);
@@ -1394,8 +1394,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
     } else {
         invariant(*opType != 'c');  // commands are processed in applyCommand_inlock()
-        throw AssertionException(
-            14825, str::stream() << "error in applyOperation : unknown opType " << *opType);
+        uasserted(14825, str::stream() << "error in applyOperation : unknown opType " << *opType);
     }
 
     return Status::OK();

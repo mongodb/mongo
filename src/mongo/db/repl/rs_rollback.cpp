@@ -1331,7 +1331,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                                     wunit.commit();
                                                 });
                                         } else {
-                                            throw e;
+                                            throw;
                                         }
                                     }
                                 }
