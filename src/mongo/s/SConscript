@@ -274,7 +274,6 @@ env.Library(
         'config_server_catalog_cache_loader.cpp',
         'config_server_client.cpp',
         'grid.cpp',
-        'periodic_balancer_settings_refresher.cpp',
         'shard_util.cpp',
         'sharding_egress_metadata_hook.cpp',
     ],
