@@ -7,6 +7,12 @@
  * Manual key rotation requires restarting a shard, so a persistent storage engine is necessary.
  * @tags: [requires_persistence]
  */
+
+// This test restarts a shard replica set, potentially changing the primary node, while
+// ShardingTest._connections remains stale with the old primary/secondaries information. The UUIDs
+// check does a primary only command against the shards using _connections and can fail.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 

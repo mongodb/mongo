@@ -1,6 +1,10 @@
 // replica set as solo shard
 // TODO: Add assertion code that catches hang
 
+// The UUID check must be able to contact the shard primaries, but this test manually stops 2/3
+// nodes of a replica set.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 
@@ -62,8 +66,14 @@
     assert.writeOK(bulk.execute({w: replNodes, wtimeout: 30000}));
 
     // Take down two nodes and make sure slaveOk reads still work
-    replSet1.stop(1);
-    replSet1.stop(2);
+    var nodes = replSet1.liveNodes;
+    var primary = nodes.master;
+    var secondary1 = nodes.slaves[0];
+    var secondary2 = nodes.slaves[1];
+    replSet1.stop(secondary1);
+    replSet1.stop(secondary2);
+    replSet1.waitForState(primary, ReplSetTest.State.SECONDARY);
+
     testDB.getMongo().adminCommand({setParameter: 1, logLevel: 1});
     testDB.getMongo().setSlaveOk();
     print("trying some queries");
