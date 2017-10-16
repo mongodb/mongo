@@ -97,8 +97,8 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-void massertNamespaceNotIndex(StringData ns, StringData caller) {
-    massert(17320,
+void uassertNamespaceNotIndex(StringData ns, StringData caller) {
+    uassert(17320,
             str::stream() << "cannot do " << caller << " on namespace with a $ in it: " << ns,
             NamespaceString::normal(ns));
 }
@@ -483,7 +483,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         return Status::OK();  // Post condition already met.
     }
 
-    massertNamespaceNotIndex(fullns.toString(), "dropCollection");
+    uassertNamespaceNotIndex(fullns.toString(), "dropCollection");
 
     BackgroundOperation::assertNoBgOpInProgForNs(fullns);
 
@@ -713,7 +713,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
             str::stream() << "Cannot create collection " << nss.ns()
                           << " - collection already exists.",
             getCollection(opCtx, nss) == nullptr);
-    massertNamespaceNotIndex(nss.ns(), "createCollection");
+    uassertNamespaceNotIndex(nss.ns(), "createCollection");
 
     uassert(14037,
             "can't create user databases on a --configsvr instance",
