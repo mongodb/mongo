@@ -31,6 +31,7 @@
 #include <atomic>
 
 #include "mongo/base/status.h"
+#include "mongo/config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
@@ -73,12 +74,12 @@ public:
                         transport::Mode transportMode);
 
     /*
-    * Any state may transition to EndSession in case of an error, otherwise the valid state
-    * transitions are:
-    * Source -> SourceWait -> Process -> SinkWait -> Source (standard RPC)
-    * Source -> SourceWait -> Process -> SinkWait -> Process -> SinkWait ... (exhaust)
-    * Source -> SourceWait -> Process -> Source (fire-and-forget)
-    */
+     * Any state may transition to EndSession in case of an error, otherwise the valid state
+     * transitions are:
+     * Source -> SourceWait -> Process -> SinkWait -> Source (standard RPC)
+     * Source -> SourceWait -> Process -> SinkWait -> Process -> SinkWait ... (exhaust)
+     * Source -> SourceWait -> Process -> Source (fire-and-forget)
+     */
     enum class State {
         Created,     // The session has been created, but no operations have been performed yet
         Source,      // Request a new Message from the network to handle
@@ -89,6 +90,18 @@ public:
         Ended        // The session has ended. It is illegal to call any method besides
                      // state() if this is the current state.
     };
+
+    /*
+     * When start() is called with Ownership::kOwned, the SSM will swap the Client/thread name
+     * whenever it runs a stage of the state machine, and then unswap them out when leaving the SSM.
+     *
+     * With Ownership::kStatic, it will assume that the SSM will only ever be run from one thread,
+     * and that thread will not be used for other SSM's. It will swap in the Client/thread name
+     * for the first run and leave them in place.
+     *
+     * kUnowned is used internally to mark that the SSM is inactive.
+     */
+    enum class Ownership { kUnowned, kOwned, kStatic };
 
     /*
      * runNext() will run the current state of the state machine. It also handles all the error
@@ -104,14 +117,12 @@ public:
     void runNext();
 
     /*
-     * scheduleNext() schedules a call to runNext() in the future. This will be implemented with
-     * an async TransportLayer.
+     * start() schedules a call to runNext() in the future.
      *
      * It is guaranteed to unwind the stack, and not call runNext() recursively, but is not
-     * guaranteed that runNext() will run after this returns.
+     * guaranteed that runNext() will run after this return
      */
-    void scheduleNext(
-        transport::ServiceExecutor::ScheduleFlags flags = transport::ServiceExecutor::kEmptyFlags);
+    void start(Ownership ownershipModel);
 
     /*
      * Gets the current state of connection for testing/diagnostic purposes.
@@ -147,29 +158,21 @@ private:
     friend class ThreadGuard;
 
     /*
-    * Terminates the associated transport Session if status indicate error.
-    *
-    * This will not block on the session terminating cleaning itself up, it returns immediately.
-    */
+     * Terminates the associated transport Session if status indicate error.
+     *
+     * This will not block on the session terminating cleaning itself up, it returns immediately.
+     */
     void _terminateAndLogIfError(Status status);
 
     /*
-     * This and scheduleFunc() are helper functions to schedule tasks on the serviceExecutor
-     * while maintaining a shared_ptr copy to anchor the lifetime of the SSM while waiting for
-     * callbacks to run.
+     * This is a helper function to schedule tasks on the serviceExecutor maintaining a shared_ptr
+     * copy to anchor the lifetime of the SSM while waiting for callbacks to run.
+     *
+     * If scheduling the function fails, the SSM will be terminated and cleaned up immediately
      */
-    template <typename Func>
-    void _scheduleFunc(Func&& func, transport::ServiceExecutor::ScheduleFlags flags) {
-        Status status = _serviceContext->getServiceExecutor()->schedule(
-            [ func = std::move(func), anchor = shared_from_this() ] { func(); }, flags);
-        if (!status.isOK()) {
-            // The service executor failed to schedule the task
-            // This could for example be that we failed to start
-            // a worker thread. Terminate this connection to
-            // leave the system in a valid state.
-            _terminateAndLogIfError(status);
-        }
-    }
+    void _scheduleNextWithGuard(ThreadGuard guard,
+                                transport::ServiceExecutor::ScheduleFlags flags,
+                                Ownership ownershipModel = Ownership::kOwned);
 
     /*
      * Gets the transport::Session associated with this connection
@@ -182,13 +185,13 @@ private:
      * runNext() and already own a ThreadGuard, they should call this with that guard as the
      * argument.
      */
-    void _runNextInGuard(ThreadGuard& guard);
+    void _runNextInGuard(ThreadGuard guard);
 
     /*
      * This function actually calls into the database and processes a request. It's broken out
      * into its own inline function for better readability.
      */
-    inline void _processMessage(ThreadGuard& guard);
+    inline void _processMessage(ThreadGuard guard);
 
     /*
      * These get called by the TransportLayer when requested network I/O has completed.
@@ -197,9 +200,16 @@ private:
     void _sinkCallback(Status status);
 
     /*
+     * Source/Sink message from the TransportLayer. These will invalidate the ThreadGuard just
+     * before waiting on the TL.
+     */
+    void _sourceMessage(ThreadGuard guard);
+    void _sinkMessage(ThreadGuard guard, Message toSink);
+
+    /*
      * Releases all the resources associated with the session and call the cleanupHook.
      */
-    void _cleanupSession(ThreadGuard& guard);
+    void _cleanupSession(ThreadGuard guard);
 
     AtomicWord<State> _state{State::Created};
 
@@ -218,8 +228,11 @@ private:
     boost::optional<MessageCompressorId> _compressorId;
     Message _inMessage;
 
-    AtomicWord<stdx::thread::id> _currentOwningThread;
-    std::atomic_flag _isOwned = ATOMIC_FLAG_INIT;  // NOLINT
+    AtomicWord<Ownership> _owned{Ownership::kUnowned};
+#if MONGO_CONFIG_DEBUG_BUILD
+    AtomicWord<stdx::thread::id> _owningThread;
+#endif
+    std::string _oldThreadName;
 };
 
 template <typename T>

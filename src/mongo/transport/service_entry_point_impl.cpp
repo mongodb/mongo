@@ -86,9 +86,9 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
 
     const bool quiet = serverGlobalParams.quiet.load();
     size_t connectionCount;
+    auto transportMode = _svcCtx->getServiceExecutor()->transportMode();
 
-    auto ssm = ServiceStateMachine::create(
-        _svcCtx, session, _svcCtx->getServiceExecutor()->transportMode());
+    auto ssm = ServiceStateMachine::create(_svcCtx, session, transportMode);
     {
         stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
         connectionCount = _sessions.size() + 1;
@@ -129,7 +129,11 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
 
     });
 
-    ssm->scheduleNext();
+    auto ownership = ServiceStateMachine::Ownership::kOwned;
+    if (transportMode == transport::Mode::kSynchronous) {
+        ownership = ServiceStateMachine::Ownership::kStatic;
+    }
+    ssm->start(ownership);
 }
 
 void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
