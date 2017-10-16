@@ -300,12 +300,11 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	struct timespec start, stop;
 	WT_BTREE *btree;
-	WT_CURSOR *las_cursor;
 	WT_DECL_RET;
 	WT_ITEM tmp;
 	WT_PAGE *page;
 	size_t addr_size;
-	uint32_t new_state, previous_state, session_flags;
+	uint32_t new_state, previous_state;
 	const uint8_t *addr;
 	bool timer;
 
@@ -411,12 +410,9 @@ skip_read:
 		 * entries.  Note that we are discarding updates so the page
 		 * must be marked available even if these operations fail.
 		 */
-		__wt_las_cursor(session, &las_cursor, &session_flags);
 		WT_TRET(__wt_las_remove_block(
-		    session, las_cursor, btree->id, ref->page_las->las_pageid));
+		    session, NULL, btree->id, ref->page_las->las_pageid));
 		__wt_free(session, ref->page_las);
-		WT_TRET(__wt_las_cursor_close(
-		    session, &las_cursor, session_flags));
 	}
 
 done:	WT_PUBLISH(ref->state, WT_REF_MEM);

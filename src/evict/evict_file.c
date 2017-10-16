@@ -16,12 +16,11 @@ int
 __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
 	WT_BTREE *btree;
-	WT_CURSOR *las_cursor;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
-	uint32_t session_flags, walk_flags;
+	uint32_t walk_flags;
 
 	dhandle = session->dhandle;
 	btree = dhandle->handle;
@@ -58,12 +57,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 		WT_ASSERT(session, !WT_IS_METADATA(dhandle));
 
-		__wt_las_cursor(session, &las_cursor, &session_flags);
-		WT_TRET(__wt_las_remove_block(
-		    session, las_cursor, btree->id, 0));
-		WT_TRET(__wt_las_cursor_close(
-		    session, &las_cursor, session_flags));
-		WT_RET(ret);
+		WT_RET(__wt_las_remove_block(session, NULL, btree->id, 0));
 	} else
 		FLD_SET(walk_flags, WT_READ_LOOKASIDE);
 
