@@ -67,7 +67,13 @@ const auto operationSessionDecoration =
 
 SessionCatalog::SessionCatalog(ServiceContext* serviceContext) : _serviceContext(serviceContext) {}
 
-SessionCatalog::~SessionCatalog() = default;
+SessionCatalog::~SessionCatalog() {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    for (const auto& entry : _txnTable) {
+        auto& sri = entry.second;
+        invariant(!sri->checkedOut);
+    }
+}
 
 void SessionCatalog::create(ServiceContext* service) {
     auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
@@ -145,12 +151,12 @@ ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx)
 
     auto sri = _getOrCreateSessionRuntimeInfo(opCtx, lsid, ul);
 
-    // Wait until the session is no longer in use
+    // Wait until the session is no longer checked out
     opCtx->waitForConditionOrInterrupt(
-        sri->availableCondVar, ul, [&sri]() { return sri->state != SessionRuntimeInfo::kInUse; });
+        sri->availableCondVar, ul, [&sri]() { return !sri->checkedOut; });
 
-    invariant(sri->state == SessionRuntimeInfo::kAvailable);
-    sri->state = SessionRuntimeInfo::kInUse;
+    invariant(!sri->checkedOut);
+    sri->checkedOut = true;
 
     return ScopedCheckedOutSession(opCtx, ScopedSession(std::move(sri)));
 }
@@ -183,7 +189,12 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
     const auto invalidateSessionFn = [&](WithLock, SessionRuntimeInfoMap::iterator it) {
         auto& sri = it->second;
         sri->txnState.invalidate();
-        _txnTable.erase(it);
+
+        // We cannot remove checked-out sessions from the cache, because operations expect to find
+        // them there to check back in
+        if (!sri->checkedOut) {
+            _txnTable.erase(it);
+        }
     };
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
@@ -223,9 +234,9 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
     invariant(it != _txnTable.end());
 
     auto& sri = it->second;
-    invariant(sri->state == SessionRuntimeInfo::kInUse);
+    invariant(sri->checkedOut);
 
-    sri->state = SessionRuntimeInfo::kAvailable;
+    sri->checkedOut = false;
     sri->availableCondVar.notify_one();
 }
 

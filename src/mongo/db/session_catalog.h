@@ -127,22 +127,10 @@ private:
     struct SessionRuntimeInfo {
         SessionRuntimeInfo(LogicalSessionId lsid) : txnState(std::move(lsid)) {}
 
-        enum State {
-            // Session can be checked out
-            kAvailable,
-
-            // Session is in use by another operation and the caller must wait to check it out
-            kInUse,
-
-            // Session is at the end of its lifetime and is in a state where its persistent
-            // information is being cleaned up. Sessions in this state can never be checked out. The
-            // reason to put the session in this state is to allow for cleanup to happen
-            // asynchronous and while not holding locks.
-            kInCleanup
-        };
-
-        // Current state of the runtime info for a session
-        State state{kAvailable};
+        // Current check-out state of the session. If set to false, the session can be checked out.
+        // If set to true, the session is in use by another operation and the caller must wait to
+        // check it out.
+        bool checkedOut{false};
 
         // Signaled when the state becomes available. Uses the transaction table's mutex to protect
         // the state transitions.
