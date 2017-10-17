@@ -939,6 +939,25 @@ var ReplSetTest = function(opts) {
                 }, "Awaiting keys", timeout);
             });
         }
+
+        // Set 'featureCompatibilityVersion' for the entire replica set, if specified.
+        if (TestData.replSetFeatureCompatibilityVersion) {
+            let setFCV = function() {
+                let fcv = TestData.replSetFeatureCompatibilityVersion;
+                print("Setting feature compatibility version for replica set to '" + fcv + "'");
+                assert.commandWorked(
+                    self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv}));
+
+                // Wait for the new 'featureCompatibilityVersion' to propagate to all nodes in the
+                // replica set. The 'setFeatureCompatibilityVersion' command only waits for
+                // replication to a majority of nodes by default.
+                self.awaitReplication();
+            };
+
+            // Authenticate before running the command.
+            asCluster(self.nodes, setFCV);
+        }
+
     };
 
     /**
