@@ -840,6 +840,11 @@ LockMode LockerImpl<IsForMMAPV1>::_getModeForMMAPV1FlushLock() const {
     }
 }
 
+template <bool IsForMMAPV1>
+bool LockerImpl<IsForMMAPV1>::isGlobalLockedRecursively() {
+    auto globalLockRequest = _requests.find(resourceIdGlobal);
+    return !globalLockRequest.finished() && globalLockRequest->recursiveCount > 1;
+}
 
 //
 // Auto classes

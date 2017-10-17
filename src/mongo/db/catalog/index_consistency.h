@@ -238,12 +238,6 @@ public:
      */
     bool scanLimitHit();
 
-    /**
-     * Yields the locks temporarily to allow Global/DB/Collection operations
-     * to perform their work that they couldn't while we held our lock.
-     */
-    void yield();
-
 private:
     OperationContext* _opCtx;
     Collection* _collection;

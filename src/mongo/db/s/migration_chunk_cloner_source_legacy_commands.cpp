@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
@@ -262,10 +263,14 @@ public:
 
         repl::OpTime opTime;
 
-        {
-            AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
-            opTime = autoCloner.getCloner()->nextSessionMigrationBatch(opCtx, &arrBuilder);
-        }
+        writeConflictRetry(opCtx,
+                           "Fetching session related oplogs for migration",
+                           NamespaceString::kRsOplogNamespace.ns(),
+                           [&]() {
+                               AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
+                               opTime = autoCloner.getCloner()->nextSessionMigrationBatch(
+                                   opCtx, &arrBuilder);
+                           });
 
         WriteConcernResult wcResult;
         WriteConcernOptions majorityWC(

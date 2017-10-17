@@ -307,6 +307,7 @@ public:
     virtual bool isLocked() const = 0;
     virtual bool isWriteLocked() const = 0;
     virtual bool isReadLocked() const = 0;
+    virtual bool isGlobalLockedRecursively() = 0;
 
     /**
      * Pending means we are currently trying to get a lock (could be the parallel batch writer

@@ -249,6 +249,7 @@ public:
     virtual bool isLocked() const;
     virtual bool isWriteLocked() const;
     virtual bool isReadLocked() const;
+    bool isGlobalLockedRecursively() override;
 
     virtual bool hasLockPending() const {
         return getWaitingResource().isValid();

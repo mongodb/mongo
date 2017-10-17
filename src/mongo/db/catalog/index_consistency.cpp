@@ -395,27 +395,6 @@ bool IndexConsistency::scanLimitHit() {
     return _isBackground && _tracker.intervalHasElapsed();
 }
 
-void IndexConsistency::yield() {
-
-    stdx::unique_lock<stdx::mutex> lock(_classMutex);
-
-    // Reset the yield tracker
-    _tracker.resetLastTime();
-
-    lock.unlock();
-    QueryYield::yieldAllLocks(_opCtx, nullptr, _nss);
-    lock.lock();
-
-    // Check if the operation was killed.
-    _opCtx->checkForInterrupt();
-
-    _yieldAtRecordId = boost::none;
-    _yieldAtIndexEntry.reset();
-
-    // Ensure it is safe to continue.
-    uassertStatusOK(_throwExceptionIfError());
-}
-
 void IndexConsistency::_addDocKey_inlock(const KeyString& ks, int indexNumber) {
 
     // Ignore indexes that weren't ready before we started validation.

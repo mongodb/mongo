@@ -163,6 +163,10 @@ public:
     virtual bool hasLockPending() const {
         invariant(false);
     }
+
+    bool isGlobalLockedRecursively() override {
+        return false;
+    }
 };
 
 }  // namespace mongo
