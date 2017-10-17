@@ -243,6 +243,7 @@ jsTestOptions = function() {
             mongosBinVersion: TestData.mongosBinVersion || "",
             shardMixedBinVersions: TestData.shardMixedBinVersions || false,
             networkMessageCompressors: TestData.networkMessageCompressors,
+            replSetFeatureCompatibilityVersion: TestData.replSetFeatureCompatibilityVersion,
             skipRetryOnNetworkError: TestData.skipRetryOnNetworkError,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,

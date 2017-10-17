@@ -9,7 +9,7 @@ selector:
   # Tests in the 'rollbackRefetchNoUUID' sub-directory are tests which exercise only those
   # operations or operation sequences that are supported by the 'rollbackViaRefetchNoUUID'
   # algorithm.
-  - jstests/replsets/rollbackRefetchNoUUID/*.js
+  - jstests/replsets/rollback_refetch_no_uuid/*.js
   # The tests listed below are rollback "machinery" tests, that should not depend on the specific
   # types of operations being rolled back. Therefore, they should be able to run on both the
   # 'rollbackViaRefetch' algorithm and the 'rollbackViaRefetchNoUUID' algorithm.

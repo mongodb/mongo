@@ -941,9 +941,10 @@ var ReplSetTest = function(opts) {
         }
 
         // Set 'featureCompatibilityVersion' for the entire replica set, if specified.
-        if (TestData.replSetFeatureCompatibilityVersion) {
-            let setFCV = function() {
-                let fcv = TestData.replSetFeatureCompatibilityVersion;
+        if (jsTest.options().replSetFeatureCompatibilityVersion) {
+            // Authenticate before running the command.
+            asCluster(self.nodes, function setFCV() {
+                let fcv = jsTest.options().replSetFeatureCompatibilityVersion;
                 print("Setting feature compatibility version for replica set to '" + fcv + "'");
                 assert.commandWorked(
                     self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv}));
@@ -952,10 +953,7 @@ var ReplSetTest = function(opts) {
                 // replica set. The 'setFeatureCompatibilityVersion' command only waits for
                 // replication to a majority of nodes by default.
                 self.awaitReplication();
-            };
-
-            // Authenticate before running the command.
-            asCluster(self.nodes, setFCV);
+            });
         }
 
     };
