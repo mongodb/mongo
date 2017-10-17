@@ -78,9 +78,6 @@ auto OperationContextGroup::adopt(UniqueOperationContext opCtx) -> Context {
     invariant(cp);
     stdx::lock_guard<stdx::mutex> lk(_lock);
     _contexts.emplace_back(std::move(opCtx));
-    if (_interrupted) {
-        interruptOne(cp, _interrupted);
-    }
     return Context(*cp, *this);
 }
 
@@ -101,15 +98,9 @@ auto OperationContextGroup::take(Context ctx) -> Context {
 void OperationContextGroup::interrupt(ErrorCodes::Error code) {
     invariant(code);
     stdx::lock_guard<stdx::mutex> lk(_lock);
-    _interrupted = code;
     for (auto&& uniqueOperationContext : _contexts) {
         interruptOne(uniqueOperationContext.get(), code);
     }
-}
-
-void OperationContextGroup::resetInterrupt() {
-    stdx::lock_guard<stdx::mutex> lk(_lock);
-    _interrupted = ErrorCodes::Error{};
 }
 
 bool OperationContextGroup::isEmpty() {

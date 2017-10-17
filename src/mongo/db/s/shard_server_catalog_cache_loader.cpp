@@ -283,8 +283,14 @@ ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
 }
 
 ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
-    _contexts.interrupt(ErrorCodes::InterruptedAtShutdown);
+    // Prevent further scheduling, then interrupt ongoing tasks.
     _threadPool.shutdown();
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _contexts.interrupt(ErrorCodes::InterruptedAtShutdown);
+        ++_term;
+    }
+
     _threadPool.join();
     invariant(_contexts.isEmpty());
 }
@@ -315,7 +321,6 @@ void ShardServerCatalogCacheLoader::onStepDown() {
 void ShardServerCatalogCacheLoader::onStepUp() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(_role != ReplicaSetRole::None);
-    _contexts.resetInterrupt();
     ++_term;
     _role = ReplicaSetRole::Primary;
 }
@@ -341,6 +346,22 @@ std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSinc
     uassertStatusOK(_threadPool.schedule(
         [ this, nss, version, callbackFn, notify, isPrimary, currentTerm ]() noexcept {
             auto context = _contexts.makeOperationContext(*Client::getCurrent());
+
+            {
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                // We may have missed an OperationContextGroup interrupt since this operation began
+                // but before the OperationContext was added to the group. So we'll check that
+                // we're still in the same _term.
+                if (_term != currentTerm) {
+                    callbackFn(context.opCtx(),
+                               Status{ErrorCodes::Interrupted,
+                                      "Unable to refresh routing table because replica set state "
+                                      "changed or node is shutting down."});
+                    notify->set();
+                    return;
+                }
+            }
+
             try {
                 if (isPrimary) {
                     _schedulePrimaryGetChunksSince(

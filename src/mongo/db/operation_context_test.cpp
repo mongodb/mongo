@@ -136,21 +136,8 @@ TEST(OperationContextTest, OpCtxGroup) {
         group1.interrupt(ErrorCodes::InternalError);
         ASSERT_FALSE(opCtx3->checkForInterruptNoAssert().isOK());
         ASSERT_FALSE((*opCtx4).checkForInterruptNoAssert().isOK());
-
-        auto serviceCtx3 = stdx::make_unique<ServiceContextNoop>();
-        auto client3 = serviceCtx3->makeClient("OperationContextTest3");
-        auto opCtx5 = group1.makeOperationContext(*client3);
-        ASSERT_FALSE(opCtx5->checkForInterruptNoAssert().isOK());  // interrupt is sticky
     }
     ASSERT_TRUE(group1.isEmpty());
-
-    {
-        group1.resetInterrupt();
-        auto serviceCtx1 = stdx::make_unique<ServiceContextNoop>();
-        auto client1 = serviceCtx1->makeClient("OperationContextTest3");
-        auto opCtx1 = group1.makeOperationContext(*client1);
-        ASSERT_TRUE(opCtx1->checkForInterruptNoAssert().isOK());  // interrupt unstuck
-    }
 
     OperationContextGroup group2;
     {

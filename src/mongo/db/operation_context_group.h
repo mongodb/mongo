@@ -60,7 +60,7 @@ public:
      * Makes an OperationContext on `client` and returns a Context object to track it.  On
      * destruction of the returned Context, the OperationContext is destroyed and its corresponding
      * entry in *this is erased.  If *this has been interrupted already, the new context will be
-     * interrupted immediately (taking and releasing the client lock).
+     * interrupted immediately.
      */
     Context makeOperationContext(Client& client);
 
@@ -68,7 +68,7 @@ public:
      * Takes ownership of the OperationContext from `ctx`, and returns a Context object to track it.
      * On destruction of the Context, its entry in *this is erased and its corresponding
      * OperationContext is destroyed. If *this has been interrupted already, `ctx` will be
-     * interrupted immediately (taking and releasing the client lock).
+     * interrupted immediately.
      */
     Context adopt(UniqueOperationContext ctx);
 
@@ -77,24 +77,14 @@ public:
      * Do this to protect an OperationContext from being interrupted along with the rest of its
      * group, or to expose `ctx` to this->interrupt().  Taking from a Context already in *this is
      * equivalent to moving from `ctx`. Taking a moved-from Context yields another moved-from
-     * Context.  If *this has been interrupted already, `ctx` will be interrupted immediately
-     * (taking and releasing the client lock).
+     * Context.
      */
     Context take(Context ctx);
 
     /*
-     * Interrupts all the OperationContexts maintained in *this. Contexts subsequently added to the
-     * group will be interrupted immediately until resetInterrupt() is called.  The lock is taken on
-     * each affected client while interrupting its operation.
-     *
-     * Note: Takes and releases each context's client lock.
+     * Interrupts all the OperationContexts maintained in *this.
      */
     void interrupt(ErrorCodes::Error);
-
-    /*
-     * Unsticks the interrupting state of *this.  Subsequently added contexts are not interrupted.
-     */
-    void resetInterrupt();
 
     /**
      * Reports whether the group has any OperationContexts.  This must be true before the destructor
@@ -107,7 +97,6 @@ private:
 
     stdx::mutex _lock;
     std::vector<UniqueOperationContext> _contexts;
-    ErrorCodes::Error _interrupted{};
 
 };  // class OperationContextGroup
 

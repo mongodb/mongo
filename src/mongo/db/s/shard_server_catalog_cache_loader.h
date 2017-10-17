@@ -351,9 +351,8 @@ private:
     // Map to track in progress persisted cache updates on the shard primary.
     TaskLists _taskLists;
 
-    // This value is increment every time this server changes from primary to secondary and vice
-    // versa. In this way, if a task is scheduled with one term value and then execution is
-    // attempted during another term, we can skip the operation because it is no longer valid.
+    // This value is bumped every time the set of currently scheduled tasks should no longer be
+    // running. This includes, replica set state transitions and shutdown.
     long long _term{0};
 
     // Indicates whether this server is the primary or not, so that the appropriate loading action
