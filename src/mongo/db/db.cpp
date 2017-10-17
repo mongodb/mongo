@@ -391,7 +391,10 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
     }
 }
 
-void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
+/**
+ * Return whether there are non-local databases.
+ */
+bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)";
 
     auto const storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
@@ -511,7 +514,8 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             severe() << "Please consult our documentation when trying to downgrade to a previous"
                         " major release";
             quickExit(EXIT_NEED_UPGRADE);
-            return;
+            // The below return should not be reached.
+            return true;
         }
 
         // Check if admin.system.version contains an invalid featureCompatibilityVersion.
@@ -642,6 +646,7 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     }
 
     LOG(1) << "done repairDatabases";
+    return nonLocalDatabases;
 }
 
 void initWireSpec() {
@@ -786,16 +791,28 @@ ExitCode _initAndListen(int listenPort) {
 
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
-    if (!storageGlobalParams.readOnly) {
-        if (!replSettings.usingReplSets() && !replSettings.isSlave() &&
-            storageGlobalParams.engine != "devnull") {
-            Lock::GlobalWrite lk(startupOpCtx.get());
-            FeatureCompatibilityVersion::setIfCleanStartup(
-                startupOpCtx.get(), repl::StorageInterface::get(serviceContext));
-        }
+    bool canCallFCVSetIfCleanStartup = !storageGlobalParams.readOnly &&
+        !(replSettings.isSlave() || storageGlobalParams.engine == "devnull");
+    if (canCallFCVSetIfCleanStartup && !replSettings.usingReplSets()) {
+        Lock::GlobalWrite lk(startupOpCtx.get());
+        FeatureCompatibilityVersion::setIfCleanStartup(startupOpCtx.get(),
+                                                       repl::StorageInterface::get(serviceContext));
     }
 
-    repairDatabasesAndCheckVersion(startupOpCtx.get());
+    bool nonLocalDatabases = repairDatabasesAndCheckVersion(startupOpCtx.get());
+
+    // Assert that the in-memory featureCompatibilityVersion parameter has been explicitly set. If
+    // we are part of a sharded cluster and are started up with no data files, we do not set the
+    // featureCompatibilityVersion until addShard is called. If we are part of a non-shard replica
+    // set and are also started up with no data files, we do not set the featureCompatibilityVersion
+    // until a primary is chosen. For these cases, we expect the in-memory
+    // featureCompatibilityVersion parameter to still be uninitialized until after startup.
+    if (canCallFCVSetIfCleanStartup &&
+        ((!replSettings.usingReplSets() &&
+          serverGlobalParams.clusterRole != ClusterRole::ShardServer) ||
+         nonLocalDatabases)) {
+        invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
+    }
 
     if (storageGlobalParams.upgrade) {
         log() << "finished checking dbs";
