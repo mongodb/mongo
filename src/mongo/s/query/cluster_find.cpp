@@ -41,7 +41,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
@@ -461,7 +460,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             Status{ErrorCodes::InternalError, "uninitialized cluster query result"};
         try {
             next = pinnedCursor.getValue().next(context);
-        } catch (const CloseChangeStreamException&) {
+        } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event
             // that invalidates the cursor. We should close the cursor and return without
             // error.

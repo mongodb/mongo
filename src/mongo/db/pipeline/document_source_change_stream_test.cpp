@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -512,8 +511,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
     // Transform into invalidate entry.
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedInvalidate);
     // Then throw an exception on the next call of getNext().
-    ASSERT_THROWS_CODE(
-        closeCursor->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
+    ASSERT_THROWS(closeCursor->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
 }
 
 TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) {
@@ -525,7 +523,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
     match->setSource(closeCursor.get());
 
     // Throw an exception on the call of getNext().
-    ASSERT_THROWS_CODE(match->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
+    ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
 }
 
 TEST_F(ChangeStreamStageTest, CloseCursorOnRetryNeededEntries) {
@@ -544,8 +542,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnRetryNeededEntries) {
     // Transform into RetryNeeded entry.
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedRetryNeeded);
     // Then throw an exception on the next call of getNext().
-    ASSERT_THROWS_CODE(
-        closeCursor->getNext(), CloseChangeStreamException, ErrorCodes::CloseChangeStream);
+    ASSERT_THROWS(closeCursor->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
 }
 
 }  // namespace

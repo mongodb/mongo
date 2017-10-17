@@ -34,7 +34,6 @@
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
-#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -208,7 +207,7 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
 
     // Close cursor if we have returned an invalidate entry.
     if (_shouldCloseCursor) {
-        throw CloseChangeStreamException();
+        uasserted(ErrorCodes::CloseChangeStream, "Change stream has been invalidated");
     }
 
     auto nextInput = pSource->getNext();

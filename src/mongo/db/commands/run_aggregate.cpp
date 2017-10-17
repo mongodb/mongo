@@ -43,7 +43,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/close_change_stream_exception.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
@@ -104,7 +103,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 
         try {
             state = cursor->getExecutor()->getNext(&next, nullptr);
-        } catch (const CloseChangeStreamException&) {
+        } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event
             // that invalidates the cursor. We should close the cursor and return without
             // error.
