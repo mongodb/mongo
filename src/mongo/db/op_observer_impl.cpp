@@ -42,8 +42,11 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(failCollectionUpdates);
 
 void OpObserverImpl::onCreateIndex(OperationContext* txn,
                                    const std::string& ns,
@@ -94,6 +97,20 @@ void OpObserverImpl::onInserts(OperationContext* txn,
 }
 
 void OpObserverImpl::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args) {
+    MONGO_FAIL_POINT_BLOCK(failCollectionUpdates, extraData) {
+        auto collElem = extraData.getData()["collectionNS"];
+        // If the failpoint specifies no collection or matches the existing one, fail.
+        if (!collElem || args.ns == collElem.String()) {
+            uasserted(40654,
+                      str::stream() << "failCollectionUpdates failpoint enabled, namespace: "
+                                    << args.ns
+                                    << ", update: "
+                                    << args.update
+                                    << " on document with "
+                                    << args.criteria);
+        }
+    }
+
     // Do not log a no-op operation; see SERVER-21738
     if (args.update.isEmpty()) {
         return;

@@ -248,8 +248,7 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
         client.runCommand(nss.db().toString(),
                           makeUpdateCommand(version, WriteConcernOptions::Majority),
                           updateResult);
-        uassertStatusOK(getStatusFromCommandResult(updateResult));
-        uassertStatusOK(getWriteConcernStatusFromCommandResult(updateResult));
+        uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
 
     } else if (version == FeatureCompatibilityVersionCommandParser::kVersion32) {
         // We update the featureCompatibilityVersion document stored in the "admin.system.version"
@@ -259,7 +258,7 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
         // concern to this update because we're going to do so anyway for the "dropIndexes" command.
         BSONObj updateResult;
         client.runCommand(nss.db().toString(), makeUpdateCommand(version, BSONObj()), updateResult);
-        uassertStatusOK(getStatusFromCommandResult(updateResult));
+        uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
 
         // We then drop the v=2 index on the "admin.system.version" collection to enable 3.2
         // secondaries to sync from this mongod.
