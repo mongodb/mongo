@@ -343,8 +343,7 @@ void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
     // collection.
     BSONObj updateResult;
     client.runCommand(nss.db().toString(), updateCmd.obj(), updateResult);
-    uassertStatusOK(getStatusFromCommandResult(updateResult));
-    uassertStatusOK(getWriteConcernStatusFromCommandResult(updateResult));
+    uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
 }
 /**
  * Read-only server parameter for featureCompatibilityVersion.

@@ -51,9 +51,12 @@
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FP_DECLARE(failCollectionUpdates);
 
 /**
  * Returns whether we're a master using master-slave replication.
@@ -317,6 +320,20 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+    MONGO_FAIL_POINT_BLOCK(failCollectionUpdates, extraData) {
+        auto collElem = extraData.getData()["collectionNS"];
+        // If the failpoint specifies no collection or matches the existing one, fail.
+        if (!collElem || args.nss.ns() == collElem.String()) {
+            uasserted(40654,
+                      str::stream() << "failCollectionUpdates failpoint enabled, namespace: "
+                                    << args.nss.ns()
+                                    << ", update: "
+                                    << args.update
+                                    << " on document with "
+                                    << args.criteria);
+        }
+    }
+
     // Do not log a no-op operation; see SERVER-21738
     if (args.update.isEmpty()) {
         return;

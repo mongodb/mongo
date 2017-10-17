@@ -141,9 +141,37 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // featureCompatibilityVersion cannot be set via setParameter.
     assert.commandFailed(adminDB.runCommand({setParameter: 1, featureCompatibilityVersion: "3.4"}));
 
+    // setFeatureCompatibilityVersion fails to downgrade to FCV=3.4 if the write fails.
+    assert.commandWorked(adminDB.runCommand({
+        configureFailPoint: "failCollectionUpdates",
+        data: {collectionNS: "admin.system.version"},
+        mode: "alwaysOn"
+    }));
+    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
+    checkFCV(adminDB, "3.6");
+    assert.commandWorked(adminDB.runCommand({
+        configureFailPoint: "failCollectionUpdates",
+        data: {collectionNS: "admin.system.version"},
+        mode: "off"
+    }));
+
     // featureCompatibilityVersion can be set to 3.4.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
     checkFCV(adminDB, "3.4");
+
+    // setFeatureCompatibilityVersion fails to upgrade to FCV=3.6 if the write fails.
+    assert.commandWorked(adminDB.runCommand({
+        configureFailPoint: "failCollectionUpdates",
+        data: {collectionNS: "admin.system.version"},
+        mode: "alwaysOn"
+    }));
+    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
+    checkFCV(adminDB, "3.4");
+    assert.commandWorked(adminDB.runCommand({
+        configureFailPoint: "failCollectionUpdates",
+        data: {collectionNS: "admin.system.version"},
+        mode: "off"
+    }));
 
     // featureCompatibilityVersion can be set to 3.6.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
