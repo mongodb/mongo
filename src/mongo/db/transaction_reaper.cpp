@@ -75,8 +75,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(TransactionRecordMinimumLifetimeMinutes,
 
 const auto kIdProjection = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
 const auto kSortById = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
-const auto kLastWriteTimestampFieldName =
-    SessionTxnRecord::kLastWriteOpTimeFieldName + "." + repl::OpTime::kTimestampFieldName;
+const auto kLastWriteDateFieldName = SessionTxnRecord::kLastWriteDateFieldName;
 
 /**
  * Makes the query we'll use to scan the transactions table.
@@ -85,11 +84,8 @@ const auto kLastWriteTimestampFieldName =
  * to pull records likely to be on the same chunks (because they sort near each other).
  */
 Query makeQuery(Date_t now) {
-    const Timestamp possiblyExpired(
-        duration_cast<Seconds>(
-            (now - Minutes(TransactionRecordMinimumLifetimeMinutes)).toDurationSinceEpoch()),
-        0);
-    Query query(BSON(kLastWriteTimestampFieldName << LT << possiblyExpired));
+    const Date_t possiblyExpired(now - Minutes(TransactionRecordMinimumLifetimeMinutes));
+    Query query(BSON(kLastWriteDateFieldName << LT << possiblyExpired));
     query.sort(kSortById);
     return query;
 }

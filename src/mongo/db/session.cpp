@@ -191,7 +191,8 @@ void Session::beginTxn(OperationContext* opCtx, TxnNumber txnNumber) {
 void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
                                           TxnNumber txnNumber,
                                           std::vector<StmtId> stmtIdsWritten,
-                                          const repl::OpTime& lastStmtIdWriteOpTime) {
+                                          const repl::OpTime& lastStmtIdWriteOpTime,
+                                          Date_t lastStmtIdWriteDate) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
@@ -205,7 +206,8 @@ void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
         }
     }
 
-    const auto updateRequest = _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime);
+    const auto updateRequest =
+        _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, lastStmtIdWriteDate);
 
     ul.unlock();
 
@@ -354,26 +356,32 @@ boost::optional<repl::OpTime> Session::_checkStatementExecuted(WithLock wl,
 
 UpdateRequest Session::_makeUpdateRequest(WithLock,
                                           TxnNumber newTxnNumber,
-                                          const repl::OpTime& newLastWriteOpTime) const {
+                                          const repl::OpTime& newLastWriteOpTime,
+                                          Date_t newLastWriteDate) const {
     UpdateRequest updateRequest(NamespaceString::kSessionTransactionsTableNamespace);
 
     if (_lastWrittenSessionRecord) {
-        updateRequest.setQuery(_lastWrittenSessionRecord->toBSON());
+        updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName
+                                    << _sessionId.toBSON()
+                                    << SessionTxnRecord::kTxnNumFieldName
+                                    << _lastWrittenSessionRecord->getTxnNum()
+                                    << SessionTxnRecord::kLastWriteOpTimeFieldName
+                                    << _lastWrittenSessionRecord->getLastWriteOpTime()));
         updateRequest.setUpdates(BSON("$set" << BSON(SessionTxnRecord::kTxnNumFieldName
                                                      << newTxnNumber
                                                      << SessionTxnRecord::kLastWriteOpTimeFieldName
-                                                     << newLastWriteOpTime)));
+                                                     << newLastWriteOpTime
+                                                     << SessionTxnRecord::kLastWriteDateFieldName
+                                                     << newLastWriteDate)));
     } else {
-        const auto updateBSON = [&] {
-            SessionTxnRecord newTxnRecord;
-            newTxnRecord.setSessionId(_sessionId);
-            newTxnRecord.setTxnNum(newTxnNumber);
-            newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
-            return newTxnRecord.toBSON();
-        }();
-
-        updateRequest.setQuery(updateBSON);
-        updateRequest.setUpdates(updateBSON);
+        updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName
+                                    << _sessionId.toBSON()
+                                    << SessionTxnRecord::kTxnNumFieldName
+                                    << newTxnNumber
+                                    << SessionTxnRecord::kLastWriteOpTimeFieldName
+                                    << newLastWriteOpTime));
+        updateRequest.setUpdates(
+            BSON("$set" << BSON(SessionTxnRecord::kLastWriteDateFieldName << newLastWriteDate)));
         updateRequest.setUpsert(true);
     }
 

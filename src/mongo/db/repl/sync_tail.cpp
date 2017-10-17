@@ -666,6 +666,8 @@ void fillWriterVectorsAndLastestSessionRecords(
             record.setSessionId(lsid);
             record.setTxnNum(*sessionInfo.getTxnNumber());
             record.setLastWriteOpTime(op.getOpTime());
+            invariant(op.getWallClockTime());
+            record.setLastWriteDate(*op.getWallClockTime());
 
             auto it = latestSessionRecords->find(lsid);
             if (it == latestSessionRecords->end()) {

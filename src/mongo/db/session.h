@@ -98,7 +98,8 @@ public:
     void onWriteOpCompletedOnPrimary(OperationContext* opCtx,
                                      TxnNumber txnNumber,
                                      std::vector<StmtId> stmtIdsWritten,
-                                     const repl::OpTime& lastStmtIdWriteOpTime);
+                                     const repl::OpTime& lastStmtIdWriteOpTime,
+                                     Date_t lastStmtIdWriteDate);
 
     /**
      * Called after a replication batch has been applied on a secondary node. Keeps the session
@@ -152,7 +153,8 @@ private:
 
     UpdateRequest _makeUpdateRequest(WithLock,
                                      TxnNumber newTxnNumber,
-                                     const repl::OpTime& newLastWriteTs) const;
+                                     const repl::OpTime& newLastWriteTs,
+                                     Date_t newLastWriteDate) const;
 
     void _registerUpdateCacheOnCommit(OperationContext* opCtx,
                                       TxnNumber newTxnNumber,
