@@ -90,11 +90,22 @@ auto runIfStandaloneOrPrimary(const NamespaceString& ns,
                               OperationContext* opCtx,
                               Callback callback)
     -> boost::optional<decltype(std::declval<Callback>()())> {
-    Lock::DBLock lk(opCtx, ns.db(), mode);
-    Lock::CollectionLock lock(opCtx->lockState(), SessionsCollection::kSessionsFullNS, mode);
+    bool isStandaloneOrPrimary;
+    {
+        Lock::DBLock lk(opCtx, ns.db(), mode);
+        Lock::CollectionLock lock(opCtx->lockState(), SessionsCollection::kSessionsFullNS, mode);
 
-    auto coord = mongo::repl::ReplicationCoordinator::get(opCtx);
-    if (coord->canAcceptWritesForDatabase(opCtx, ns.db())) {
+        auto coord = mongo::repl::ReplicationCoordinator::get(opCtx);
+
+        // There is a window here where we may transition from Primary to
+        // Secondary after we release the locks we take above. In this case,
+        // the callback we run below may return a NotMaster error, or a stale
+        // read. However, this is preferable to running the callback while
+        // we hold locks, since that can lead to a deadlock.
+        isStandaloneOrPrimary = coord->canAcceptWritesForDatabase(opCtx, ns.db());
+    }
+
+    if (isStandaloneOrPrimary) {
         return callback();
     }
 

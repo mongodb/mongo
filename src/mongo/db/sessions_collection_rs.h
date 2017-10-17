@@ -61,21 +61,44 @@ public:
     /**
      * Updates the last-use times on the given sessions to be greater than
      * or equal to the current time.
+     *
+     * If a step-down happens on this node as this method is running, it may fail.
      */
     Status refreshSessions(OperationContext* opCtx,
                            const LogicalSessionRecordSet& sessions) override;
 
     /**
      * Removes the authoritative records for the specified sessions.
+     *
+     * If a step-down happens on this node as this method is running, it may fail.
      */
     Status removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
 
+    /**
+     * Returns the subset of sessions from the given set that do not have entries
+     * in the sessions collection.
+     *
+     * If a step-down happens on this node as this method is running, it may
+     * return stale results.
+     */
     StatusWith<LogicalSessionIdSet> findRemovedSessions(
         OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
 
+    /**
+     * Removes the transaction records for the specified sessions from the
+     * transaction table.
+     *
+     * If a step-down happens on this node as this method is running, it may fail.
+     */
     Status removeTransactionRecords(OperationContext* opCtx,
                                     const LogicalSessionIdSet& sessions) override;
 
+    /**
+     * Helper for a shard server to run its transaction operations as a replica set
+     * member.
+     *
+     * If a step-down happens on this node as this method is running, it may fail.
+     */
     static Status removeTransactionRecordsHelper(OperationContext* opCtx,
                                                  const LogicalSessionIdSet& sessions);
 };
