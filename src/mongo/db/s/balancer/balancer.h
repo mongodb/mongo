@@ -108,7 +108,8 @@ public:
 
     /**
      * Potentially blocking method, which will return immediately if the balancer is not running a
-     * balancer round and will block until the current round completes otherwise.
+     * balancer round and will block until the current round completes otherwise. If the operation
+     * context's deadline is exceeded, it will throw an ExceededTimeLimit exception.
      */
     void joinCurrentRound(OperationContext* opCtx);
 
