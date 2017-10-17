@@ -85,6 +85,19 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                               tojson(authoritativeCollMetadata.collInfo) +
                               ", actual collection info on shard " + shardConnString + ": " +
                               tojson(actualCollMetadata));
+
+                print("checking " + shardConn + " config.collections" +
+                      " for UUID consistency with " + authoritativeCollMetadata._id);
+                const actualConfigMetadata =
+                    shardConn.getDB("config").getCollection("collections").find({
+                        "_id": dbName + "." + collName
+                    })[0];
+                assert.eq(authoritativeCollMetadata.collInfo.uuid,
+                          actualConfigMetadata.uuid,
+                          "authoritative collection info on config server: " +
+                              tojson(authoritativeCollMetadata.collInfo) +
+                              ", actual config info on shard " + shardConnString + ": " +
+                              tojson(actualConfigMetadata));
             }
         }
     } catch (e) {

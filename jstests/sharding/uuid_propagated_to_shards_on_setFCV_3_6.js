@@ -5,6 +5,10 @@
  * This should be true even if setFCV upgrade/downgrade is called repeatedly on the cluster, and
  * even if drops, recreates, and shardCollections are called in between the upgrades/downgrades.
  */
+
+// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     let st = new ShardingTest({shards: {rs0: {nodes: 1}}, other: {config: 3}});
 

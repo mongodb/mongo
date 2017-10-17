@@ -4,6 +4,9 @@
 // Migrations should be successful.
 //
 
+// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 load("./jstests/multiVersion/libs/verify_versions.js");
 
 (function() {

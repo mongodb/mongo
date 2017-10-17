@@ -92,6 +92,7 @@ protected:
 
         auto cm = ChunkManager::makeNew(
             kNss,
+            UUID::gen(),
             kShardKeyPattern,
             nullptr,
             false,

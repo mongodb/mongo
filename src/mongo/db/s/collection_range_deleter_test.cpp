@@ -110,6 +110,7 @@ void CollectionRangeDeleterTest::setUp() {
         const KeyPattern skPattern(kKeyPattern);
         auto cm = ChunkManager::makeNew(
             kNss,
+            UUID::gen(),
             kKeyPattern,
             nullptr,
             false,

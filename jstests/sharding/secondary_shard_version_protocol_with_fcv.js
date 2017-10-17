@@ -4,6 +4,10 @@
  * compatibility gets raised to 3.6. This is verified by reading orphans on secondaries in fcv 3.4,
  * then not seeing them after fcv 3.6 is set.
  */
+
+// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 

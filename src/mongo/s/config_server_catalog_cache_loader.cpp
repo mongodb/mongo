@@ -122,11 +122,12 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
             "No chunks were found for the collection",
             !changedChunks.empty());
 
-    return {coll.getEpoch(),
-            coll.getKeyPattern().toBSON(),
-            coll.getDefaultCollation(),
-            coll.getUnique(),
-            std::move(changedChunks)};
+    return CollectionAndChangedChunks(coll.getUUID(),
+                                      coll.getEpoch(),
+                                      coll.getKeyPattern().toBSON(),
+                                      coll.getDefaultCollation(),
+                                      coll.getUnique(),
+                                      std::move(changedChunks));
 }
 
 }  // namespace

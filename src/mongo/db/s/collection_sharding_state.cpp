@@ -418,7 +418,7 @@ void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadataAn
     // Extract which collection entry is being updated
     std::string refreshCollection;
     fassertStatusOK(
-        40477, bsonExtractStringField(query, ShardCollectionType::uuid.name(), &refreshCollection));
+        40477, bsonExtractStringField(query, ShardCollectionType::ns.name(), &refreshCollection));
 
     // Parse the '$set' update, which will contain the 'lastRefreshedCollectionVersion' if it is
     // present.
@@ -443,7 +443,7 @@ void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadataAndNotify(
     // Extract which collection entry is being deleted from the _id field.
     std::string deletedCollection;
     fassertStatusOK(
-        40479, bsonExtractStringField(query, ShardCollectionType::uuid.name(), &deletedCollection));
+        40479, bsonExtractStringField(query, ShardCollectionType::ns.name(), &deletedCollection));
 
     opCtx->recoveryUnit()->registerChange(
         new CollectionVersionLogOpHandler(opCtx, NamespaceString(deletedCollection)));

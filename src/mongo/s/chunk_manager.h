@@ -115,6 +115,7 @@ public:
      * chunk version, and adhere to the requirements of the routing table update algorithm.
      */
     static std::shared_ptr<ChunkManager> makeNew(NamespaceString nss,
+                                                 boost::optional<UUID>,
                                                  KeyPattern shardKeyPattern,
                                                  std::unique_ptr<CollatorInterface> defaultCollator,
                                                  bool unique,
@@ -235,6 +236,10 @@ public:
 
     std::string toString() const;
 
+    bool uuidMatches(UUID uuid) const {
+        return _uuid && *_uuid == uuid;
+    }
+
 private:
     /**
      * Represents a range of chunk keys [getMin(), getMax()) and the id of the shard on which they
@@ -275,6 +280,7 @@ private:
     static ChunkMapViews _constructChunkMapViews(const OID& epoch, const ChunkMap& chunkMap);
 
     ChunkManager(NamespaceString nss,
+                 boost::optional<UUID>,
                  KeyPattern shardKeyPattern,
                  std::unique_ptr<CollatorInterface> defaultCollator,
                  bool unique,
@@ -287,6 +293,9 @@ private:
 
     // Namespace to which this routing information corresponds
     const NamespaceString _nss;
+
+    // The invariant UUID of the collection.  This is optional in 3.6, except in change streams.
+    const boost::optional<UUID> _uuid;
 
     // The key pattern used to shard the collection
     const ShardKeyPattern _shardKeyPattern;

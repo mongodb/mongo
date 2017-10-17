@@ -91,7 +91,7 @@ Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& 
     // Set 'refreshing' to true.
     BSONObj update = BSON(ShardCollectionType::refreshing() << true);
     return updateShardCollectionsEntry(
-        opCtx, BSON(ShardCollectionType::uuid() << nss.ns()), update, false /*upsert*/);
+        opCtx, BSON(ShardCollectionType::ns() << nss.ns()), update, false /*upsert*/);
 }
 
 Status unsetPersistedRefreshFlags(OperationContext* opCtx,
@@ -103,10 +103,8 @@ Status unsetPersistedRefreshFlags(OperationContext* opCtx,
     updateBuilder.appendTimestamp(ShardCollectionType::lastRefreshedCollectionVersion(),
                                   refreshedVersion.toLong());
 
-    return updateShardCollectionsEntry(opCtx,
-                                       BSON(ShardCollectionType::uuid() << nss.ns()),
-                                       updateBuilder.obj(),
-                                       false /*upsert*/);
+    return updateShardCollectionsEntry(
+        opCtx, BSON(ShardCollectionType::ns() << nss.ns()), updateBuilder.obj(), false /*upsert*/);
 }
 
 StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
@@ -142,7 +140,7 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
 
-    Query fullQuery(BSON(ShardCollectionType::uuid() << nss.ns()));
+    Query fullQuery(BSON(ShardCollectionType::ns() << nss.ns()));
 
     try {
         DBDirectClient client(opCtx);
@@ -335,7 +333,7 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
                 NamespaceString{NamespaceString::kShardConfigCollectionsCollectionName});
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ShardCollectionType::uuid << nss.ns()));
+                entry.setQ(BSON(ShardCollectionType::ns << nss.ns()));
                 entry.setMulti(true);
                 return entry;
             }()});

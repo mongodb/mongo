@@ -95,6 +95,7 @@ std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
             return nullptr;
         }();
         return ChunkManager::makeNew(nss,
+                                     collectionAndChunks.uuid,
                                      KeyPattern(collectionAndChunks.shardKeyPattern),
                                      std::move(defaultCollator),
                                      collectionAndChunks.shardKeyIsUnique,

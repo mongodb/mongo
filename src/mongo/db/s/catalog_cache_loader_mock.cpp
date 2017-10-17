@@ -105,12 +105,13 @@ std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
                 uassertStatusOK(_swCollectionReturnValue);
                 uassertStatusOK(_swChunksReturnValue);
 
-                return CollectionAndChangedChunks{
+                return CollectionAndChangedChunks(
+                    _swCollectionReturnValue.getValue().getUUID(),
                     _swCollectionReturnValue.getValue().getEpoch(),
                     _swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
                     _swCollectionReturnValue.getValue().getDefaultCollation(),
                     _swCollectionReturnValue.getValue().getUnique(),
-                    _swChunksReturnValue.getValue()};
+                    _swChunksReturnValue.getValue());
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }

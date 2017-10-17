@@ -180,7 +180,7 @@ auto makeAMetadata(BSONObj const& keyPattern) -> std::unique_ptr<CollectionMetad
     auto range = ChunkRange(BSON("key" << MINKEY), BSON("key" << MAXKEY));
     auto chunk = ChunkType(testNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
     auto cm = ChunkManager::makeNew(
-        testNss, KeyPattern(keyPattern), nullptr, false, epoch, {std::move(chunk)});
+        testNss, UUID::gen(), KeyPattern(keyPattern), nullptr, false, epoch, {std::move(chunk)});
     return stdx::make_unique<CollectionMetadata>(std::move(cm), ShardId("this"));
 }
 

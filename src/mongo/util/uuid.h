@@ -180,7 +180,7 @@ public:
 private:
     UUID(const UUIDStorage& uuid) : _uuid(uuid) {}
 
-    UUIDStorage _uuid;  // UUID in network byte order
+    UUIDStorage _uuid{};  // UUID in network byte order
 };
 
 inline std::ostream& operator<<(std::ostream& s, const UUID& uuid) {

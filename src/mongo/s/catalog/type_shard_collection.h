@@ -35,6 +35,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -50,8 +51,8 @@ class StatusWith;
  *
  * Expected shard server config.collections collection format:
  *   {
- *      "_id" : "foo.bar",                               // will become UUID when available
- *      "ns" : "foo.bar",
+ *      "_id" : "foo.bar",
+ *      "uuid" : UUID,                                   // optional in 3.6
  *      "epoch" : ObjectId("58b6fd76132358839e409e47"),  // will remove when UUID becomes available
  *      "key" : {
  *          "_id" : 1
@@ -60,8 +61,8 @@ class StatusWith;
  *          "locale" : "fr_CA"
  *      },
  *      "unique" : false,
- *      "refreshing" : true,
- *      "lastRefreshedCollectionVersion" : Timestamp(1, 0)
+ *      "refreshing" : true,                                // optional
+ *      "lastRefreshedCollectionVersion" : Timestamp(1, 0)  // optional
  *   }
  *
  */
@@ -70,8 +71,8 @@ public:
     // Name of the collections collection on the shard server.
     static const std::string ConfigNS;
 
-    static const BSONField<std::string> uuid;
-    static const BSONField<std::string> ns;
+    static const BSONField<std::string> ns;  // "_id"
+    static const BSONField<UUID> uuid;
     static const BSONField<OID> epoch;
     static const BSONField<BSONObj> keyPattern;
     static const BSONField<BSONObj> defaultCollation;
@@ -79,12 +80,12 @@ public:
     static const BSONField<bool> refreshing;
     static const BSONField<Date_t> lastRefreshedCollectionVersion;
 
-    explicit ShardCollectionType(const NamespaceString& uuid,
-                                 const NamespaceString& nss,
-                                 const OID& epoch,
-                                 const KeyPattern& keyPattern,
-                                 const BSONObj& defaultCollation,
-                                 const bool& unique);
+    ShardCollectionType(NamespaceString nss,
+                        boost::optional<UUID> uuid,
+                        OID epoch,
+                        const KeyPattern& keyPattern,
+                        const BSONObj& defaultCollation,
+                        bool unique);
 
     /**
      * Constructs a new ShardCollectionType object from BSON. Also does validation of the contents.
@@ -101,20 +102,20 @@ public:
      */
     std::string toString() const;
 
-    const NamespaceString& getUUID() const {
-        return _uuid;
-    }
-    void setUUID(const NamespaceString& uuid);
-
     const NamespaceString& getNss() const {
         return _nss;
     }
-    void setNss(const NamespaceString& nss);
+    void setNss(NamespaceString nss);
+
+    const boost::optional<UUID> getUUID() const {
+        return _uuid;
+    }
+    void setUUID(UUID uuid);
 
     const OID& getEpoch() const {
         return _epoch;
     }
-    void setEpoch(const OID& epoch);
+    void setEpoch(OID epoch);
 
     const KeyPattern& getKeyPattern() const {
         return _keyPattern;
@@ -152,11 +153,11 @@ public:
     }
 
 private:
-    // Will become the UUID when available. Currently a duplicate of '_nss'.
-    NamespaceString _uuid;
-
     // The full namespace (with the database prefix).
     NamespaceString _nss;
+
+    // The UUID of the collection, if known.
+    boost::optional<UUID> _uuid;
 
     // Uniquely identifies this instance of the collection, in case of drop/create.
     OID _epoch;

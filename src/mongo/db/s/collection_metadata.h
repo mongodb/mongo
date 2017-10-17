@@ -172,6 +172,10 @@ public:
         return _cm;
     }
 
+    bool uuidMatches(UUID uuid) const {
+        return _cm->uuidMatches(uuid);
+    }
+
 private:
     struct Tracker {
         uint32_t usageCounter{0};

@@ -70,7 +70,8 @@ std::unique_ptr<CollectionMetadata> makeCollectionMetadataImpl(
             kNss, ChunkRange{nextMinKey, shardKeyPattern.globalMax()}, version, kOtherShard);
     }
 
-    auto cm = ChunkManager::makeNew(kNss, shardKeyPattern, nullptr, false, epoch, allChunks);
+    UUID uuid(UUID::gen());
+    auto cm = ChunkManager::makeNew(kNss, uuid, shardKeyPattern, nullptr, false, epoch, allChunks);
     return stdx::make_unique<CollectionMetadata>(cm, kThisShard);
 }
 

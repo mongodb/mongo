@@ -97,4 +97,5 @@ executor:
         TestData:
           mongosBinVersion: 'last-stable'
           shardMixedBinVersions: true
+          skipCheckingUUIDsConsistentAcrossCluster: true
       nodb: ''

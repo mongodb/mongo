@@ -5,6 +5,10 @@
  * "latest", not equal to "last-stable", and x.y compares equal to x.y.z, but that x.w does
  * not.
  */
+
+// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 
