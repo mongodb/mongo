@@ -274,15 +274,6 @@ protected:
 
     virtual void setKey(WT_CURSOR* cursor, RecordId id) const = 0;
 
-    /**
-     * Callers must have already checked the return value of a positioning method against
-     * 'WT_NOTFOUND'. This method allows for additional predicates to be considered on a validly
-     * positioned cursor. 'id' is an out parameter. Implementations are not required to fill it
-     * in. It's simply a possible optimization to avoid a future 'getKey' call if 'hasWrongPrefix'
-     * already did one.
-     */
-    virtual bool hasWrongPrefix(WT_CURSOR* cursor, RecordId* id) const = 0;
-
 private:
     class RandomCursor;
 
@@ -360,15 +351,6 @@ protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const;
 
     virtual void setKey(WT_CURSOR* cursor, RecordId id) const;
-
-    /**
-     * Callers must have already checked the return value of a positioning method against
-     * 'WT_NOTFOUND'. This method allows for additional predicates to be considered on a validly
-     * positioned cursor. 'id' is an out parameter. Implementations are not required to fill it
-     * in. It's simply a possible optimization to avoid a future 'getKey' call if 'hasWrongPrefix'
-     * already did one.
-     */
-    virtual bool hasWrongPrefix(WT_CURSOR* cursor, RecordId* id) const;
 };
 
 class PrefixedWiredTigerRecordStore final : public WiredTigerRecordStore {
@@ -392,15 +374,6 @@ protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const;
 
     virtual void setKey(WT_CURSOR* cursor, RecordId id) const;
-
-    /**
-     * Callers must have already checked the return value of a positioning method against
-     * 'WT_NOTFOUND'. This method allows for additional predicates to be considered on a validly
-     * positioned cursor. 'id' is an out parameter. Implementations are not required to fill it
-     * in. It's simply a possible optimization to avoid a future 'getKey' call if 'hasWrongPrefix'
-     * already did one.
-     */
-    virtual bool hasWrongPrefix(WT_CURSOR* cursor, RecordId* id) const;
 
 private:
     KVPrefix _prefix;

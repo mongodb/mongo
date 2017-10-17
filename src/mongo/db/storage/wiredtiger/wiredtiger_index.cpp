@@ -912,11 +912,16 @@ protected:
     void advanceWTCursor() {
         WT_CURSOR* c = _cursor->get();
         int ret = WT_READ_CHECK(_forward ? c->next(c) : c->prev(c));
-        if (ret == WT_NOTFOUND || hasWrongPrefix(c)) {
+        if (ret == WT_NOTFOUND) {
             _cursorAtEof = true;
             return;
         }
         invariantWTOK(ret);
+        if (hasWrongPrefix(c)) {
+            _cursorAtEof = true;
+            return;
+        }
+
         _cursorAtEof = false;
     }
 
