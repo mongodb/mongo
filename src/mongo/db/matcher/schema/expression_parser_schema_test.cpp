@@ -231,14 +231,14 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesNestedObjectMatc
         result.getValue()->matchesBSON(fromjson("{a: [{b: 0}, {b: [{c: 0}, {c: 'string'}]}]}")));
 }
 
-TEST(MatchExpressionParserSchemaTest, ObjectMatchSubExprRejectsTopLevelOperators) {
+TEST(MatchExpressionParserSchemaTest, ObjectMatchSubExprRejectsPathlessOperators) {
     auto query = fromjson(
         "{a: {$_internalSchemaObjectMatch: {"
-        "    $isolated: 1"
+        "    $expr: {$eq: ['$a', 5]}"
         "}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
 }
 
 //

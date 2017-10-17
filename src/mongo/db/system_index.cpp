@@ -99,7 +99,7 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
                                               const IndexSpec& spec) {
     try {
         auto indexSpecStatus = index_key_validate::validateIndexSpec(
-            spec.toBSON(), ns, serverGlobalParams.featureCompatibility);
+            opCtx, spec.toBSON(), ns, serverGlobalParams.featureCompatibility);
         BSONObj indexSpec = fassertStatusOK(40452, indexSpecStatus);
 
         log() << "No authorization index detected on " << ns
@@ -198,16 +198,20 @@ void createSystemIndexes(OperationContext* opCtx, Collection* collection) {
     if (ns == AuthorizationManager::usersCollectionNamespace) {
         auto indexSpec = fassertStatusOK(
             40455,
-            index_key_validate::validateIndexSpec(
-                v3SystemUsersIndexSpec.toBSON(), ns, serverGlobalParams.featureCompatibility));
+            index_key_validate::validateIndexSpec(opCtx,
+                                                  v3SystemUsersIndexSpec.toBSON(),
+                                                  ns,
+                                                  serverGlobalParams.featureCompatibility));
 
         fassertStatusOK(
             40456, collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));
     } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
         auto indexSpec = fassertStatusOK(
             40457,
-            index_key_validate::validateIndexSpec(
-                v3SystemRolesIndexSpec.toBSON(), ns, serverGlobalParams.featureCompatibility));
+            index_key_validate::validateIndexSpec(opCtx,
+                                                  v3SystemRolesIndexSpec.toBSON(),
+                                                  ns,
+                                                  serverGlobalParams.featureCompatibility));
 
         fassertStatusOK(
             40458, collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));

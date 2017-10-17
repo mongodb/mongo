@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/service_context.h"
@@ -209,6 +210,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
 }
 
 StatusWith<BSONObj> validateIndexSpec(
+    OperationContext* opCtx,
     const BSONObj& indexSpec,
     const NamespaceString& expectedNamespace,
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility) {
@@ -333,6 +335,34 @@ StatusWith<BSONObj> validateIndexSpec(
             }
 
             hasCollationField = true;
+        } else if (IndexDescriptor::kPartialFilterExprFieldName == indexSpecElemFieldName) {
+            if (indexSpecElem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "The field '"
+                                      << IndexDescriptor::kPartialFilterExprFieldName
+                                      << "' must be an object, but got "
+                                      << typeName(indexSpecElem.type())};
+            }
+
+            // Just use the simple collator, even though the index may have a separate collation
+            // specified or may inherit the default collation from the collection. It's legal to
+            // parse with the wrong collation, since the collation can be set on a MatchExpression
+            // after the fact. Here, we don't bother checking the collation after the fact, since
+            // this invocation of the parser is just for validity checking.
+            auto simpleCollator = nullptr;
+            boost::intrusive_ptr<ExpressionContext> expCtx(
+                new ExpressionContext(opCtx, simpleCollator));
+
+            // Special match expression features (e.g. $jsonSchema, $expr, ...) are not allowed in
+            // a partialFilterExpression on index creation.
+            auto statusWithMatcher =
+                MatchExpressionParser::parse(indexSpecElem.Obj(),
+                                             std::move(expCtx),
+                                             ExtensionsCallbackNoop(),
+                                             MatchExpressionParser::kBanAllSpecialFeatures);
+            if (!statusWithMatcher.isOK()) {
+                return statusWithMatcher.getStatus();
+            }
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().

@@ -73,6 +73,7 @@ const StringData kCommandName = "createIndexes"_sd;
  * malformed, then an error status is returned.
  */
 StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
+    OperationContext* opCtx,
     const NamespaceString& ns,
     const BSONObj& cmdObj,
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility) {
@@ -99,7 +100,7 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
                 }
 
                 auto indexSpecStatus = index_key_validate::validateIndexSpec(
-                    indexesElem.Obj(), ns, featureCompatibility);
+                    opCtx, indexesElem.Obj(), ns, featureCompatibility);
                 if (!indexSpecStatus.isOK()) {
                     return indexSpecStatus.getStatus();
                 }
@@ -242,7 +243,7 @@ public:
             return appendCommandStatus(result, status);
 
         auto specsWithStatus =
-            parseAndValidateIndexSpecs(ns, cmdObj, serverGlobalParams.featureCompatibility);
+            parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility);
         if (!specsWithStatus.isOK()) {
             return appendCommandStatus(result, specsWithStatus.getStatus());
         }

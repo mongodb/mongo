@@ -431,7 +431,7 @@ void State::prepTempCollection() {
                 BSON("key" << BSON("0" << 1) << "ns" << _config.incLong.ns() << "name"
                            << "_temp_0");
             auto indexSpec = uassertStatusOK(index_key_validate::validateIndexSpec(
-                rawIndexSpec, _config.incLong, serverGlobalParams.featureCompatibility));
+                _opCtx, rawIndexSpec, _config.incLong, serverGlobalParams.featureCompatibility));
 
             Status status = incColl->getIndexCatalog()
                                 ->createIndexOnEmptyCollection(_opCtx, indexSpec)
@@ -1122,7 +1122,8 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
                                      std::move(qr),
                                      expCtx,
                                      extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kIsolated);
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -1488,12 +1489,13 @@ public:
                 const ExtensionsCallbackReal extensionsCallback(opCtx, &config.nss);
 
                 const boost::intrusive_ptr<ExpressionContext> expCtx;
-                auto statusWithCQ =
-                    CanonicalQuery::canonicalize(opCtx,
-                                                 std::move(qr),
-                                                 expCtx,
-                                                 extensionsCallback,
-                                                 MatchExpressionParser::kAllowAllSpecialFeatures);
+                auto statusWithCQ = CanonicalQuery::canonicalize(
+                    opCtx,
+                    std::move(qr),
+                    expCtx,
+                    extensionsCallback,
+                    MatchExpressionParser::kAllowAllSpecialFeatures &
+                        ~MatchExpressionParser::AllowedFeatures::kIsolated);
                 if (!statusWithCQ.isOK()) {
                     uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                     return 0;

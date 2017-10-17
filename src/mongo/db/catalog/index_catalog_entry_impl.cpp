@@ -129,9 +129,16 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
         BSONObj filter = filterElement.Obj();
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(opCtx, _collator.get()));
+
+        // Parsing the partial filter expression is not expected to fail here since the
+        // expression would have been successfully parsed upstream during index creation. However,
+        // filters that were allowed in partial filter expressions prior to 3.6 may be present in
+        // the index catalog and must also successfully parse.
         StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(filter, std::move(expCtx));
-        // this should be checked in create, so can blow up here
+            MatchExpressionParser::parse(filter,
+                                         std::move(expCtx),
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::AllowedFeatures::kIsolated);
         invariantOK(statusWithMatcher.getStatus());
         _filterExpression = std::move(statusWithMatcher.getValue());
         LOG(2) << "have filter expression for " << _ns << " " << _descriptor->indexName() << " "

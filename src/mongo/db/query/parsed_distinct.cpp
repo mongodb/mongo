@@ -206,7 +206,8 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                                            std::move(qr),
                                            expCtx,
                                            extensionsCallback,
-                                           MatchExpressionParser::kAllowAllSpecialFeatures);
+                                           MatchExpressionParser::kAllowAllSpecialFeatures &
+                                               ~MatchExpressionParser::AllowedFeatures::kIsolated);
     if (!cq.isOK()) {
         return cq.getStatus();
     }

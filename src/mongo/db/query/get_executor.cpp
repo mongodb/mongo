@@ -1248,7 +1248,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
         collection ? static_cast<const ExtensionsCallback&>(
                          ExtensionsCallbackReal(opCtx, &collection->ns()))
                    : static_cast<const ExtensionsCallback&>(ExtensionsCallbackNoop()),
-        MatchExpressionParser::kAllowAllSpecialFeatures);
+        MatchExpressionParser::kAllowAllSpecialFeatures &
+            ~MatchExpressionParser::AllowedFeatures::kIsolated);
 
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
@@ -1505,7 +1506,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
                                      std::move(qr),
                                      expCtx,
                                      extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kIsolated);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

@@ -175,13 +175,18 @@ TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
 /**
  * Utility function to create a CanonicalQuery
  */
-unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
+unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
+                                        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+                                            MatchExpressionParser::kDefaultSpecialFeatures) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        opCtx.get(), std::move(qr), nullptr, ExtensionsCallbackNoop(), allowedFeatures);
+
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -205,22 +210,30 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
  * Test that CanonicalQuery::isIsolated() returns correctly.
  */
 TEST(CanonicalQueryTest, IsIsolatedReturnsTrueWithIsolated) {
-    unique_ptr<CanonicalQuery> cq = canonicalize("{$isolated: 1, x: 3}");
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$isolated: 1, x: 3}",
+                                                 MatchExpressionParser::kDefaultSpecialFeatures |
+                                                     MatchExpressionParser::kIsolated);
     ASSERT_TRUE(cq->isIsolated());
 }
 
 TEST(CanonicalQueryTest, IsIsolatedReturnsTrueWithAtomic) {
-    unique_ptr<CanonicalQuery> cq = canonicalize("{$atomic: 1, x: 3}");
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$atomic: 1, x: 3}",
+                                                 MatchExpressionParser::kDefaultSpecialFeatures |
+                                                     MatchExpressionParser::kIsolated);
     ASSERT_TRUE(cq->isIsolated());
 }
 
 TEST(CanonicalQueryTest, IsIsolatedReturnsFalseWithIsolated) {
-    unique_ptr<CanonicalQuery> cq = canonicalize("{$isolated: 0, x: 3}");
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$isolated: 0, x: 3}",
+                                                 MatchExpressionParser::kDefaultSpecialFeatures |
+                                                     MatchExpressionParser::kIsolated);
     ASSERT_FALSE(cq->isIsolated());
 }
 
 TEST(CanonicalQueryTest, IsIsolatedReturnsFalseWithAtomic) {
-    unique_ptr<CanonicalQuery> cq = canonicalize("{$atomic: 0, x: 3}");
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$atomic: 0, x: 3}",
+                                                 MatchExpressionParser::kDefaultSpecialFeatures |
+                                                     MatchExpressionParser::kIsolated);
     ASSERT_FALSE(cq->isIsolated());
 }
 

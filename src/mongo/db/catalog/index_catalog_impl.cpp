@@ -667,11 +667,17 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         // The collator must outlive the constructed MatchExpression.
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(opCtx, collator.get()));
+
+        // Parsing the partial filter expression is not expected to fail here since the
+        // expression would have been successfully parsed upstream during index creation. However,
+        // filters that were allowed in partial filter expressions prior to 3.6 may be present in
+        // the index catalog and must also successfully parse (e.g., partial index filters with the
+        // $isolated/$atomic option).
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterElement.Obj(),
                                          std::move(expCtx),
                                          ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kBanAllSpecialFeatures);
+                                         MatchExpressionParser::kIsolated);
         if (!statusWithMatcher.isOK()) {
             return statusWithMatcher.getStatus();
         }

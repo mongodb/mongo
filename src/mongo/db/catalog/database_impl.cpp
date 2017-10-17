@@ -1046,7 +1046,7 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
                 // enough, so we rewrite it here.
                 return {ErrorCodes::QueryFeatureNotAllowed,
                         str::stream() << "The featureCompatibilityVersion must be 3.6 to create a "
-                                         "collection validator using 3.6 query featuress. See "
+                                         "collection validator using 3.6 query features. See "
                                       << feature_compatibility_version::kDochubLink
                                       << "."};
             } else {

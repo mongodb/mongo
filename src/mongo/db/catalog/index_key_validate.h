@@ -53,6 +53,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
  * status is returned.
  */
 StatusWith<BSONObj> validateIndexSpec(
+    OperationContext* opCtx,
     const BSONObj& indexSpec,
     const NamespaceString& expectedNamespace,
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility);

@@ -400,8 +400,13 @@ StatusWithMatchExpression parseAtomicOrIsolated(
     const ExtensionsCallback* extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     DocumentParseLevel currentLevel) {
+    if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kIsolated) == 0u) {
+        return {Status(ErrorCodes::QueryFeatureNotAllowed,
+                       "$isolated ($atomic) is not allowed in this context")};
+    }
     if (currentLevel != DocumentParseLevel::kPredicateTopLevel) {
-        return {Status(ErrorCodes::FailedToParse, "$atomic/$isolated has to be at the top level")};
+        return {
+            Status(ErrorCodes::FailedToParse, "$isolated ($atomic) has to be at the top level")};
     }
     return {nullptr};
 }
