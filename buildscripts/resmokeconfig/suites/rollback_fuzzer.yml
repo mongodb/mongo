@@ -1,0 +1,11 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstestfuzz/out/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands

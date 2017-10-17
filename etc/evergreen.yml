@@ -786,7 +786,8 @@ functions:
           set -o errexit
           echo "jstestfuzz self-tests finished"
 
-          npm start -- --jsTestsDir ../jstests ${jstestfuzz_vars}
+          npm run ${npm_command|jstestfuzz} -- --jsTestsDir ../jstests ${jstestfuzz_vars}
+
     - command: archive.targz_pack
       params:
         target: "jstests.tgz"
@@ -1752,6 +1753,7 @@ test_lifecycle_excluded_tasks:
 - burn_in_tests
 - compile*
 - dbtest*
+- generational_jstestfuzz*
 - idl_tests
 - integration*
 - jepsen*
@@ -1760,6 +1762,7 @@ test_lifecycle_excluded_tasks:
 - mongos*
 - package
 - push
+- rollback_fuzzer*
 - unittests*
 
 tasks:
@@ -2154,6 +2157,34 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=generational_jstestfuzz --storageEngine=wiredTiger
+
+## rollback fuzzer ##
+- <<: *jstestfuzz_template
+  name: rollback_fuzzer
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 15
+      npm_command: rollback-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=rollback_fuzzer --storageEngine=mmapv1
+
+## rollback fuzzer WT ##
+- <<: *jstestfuzz_template
+  name: rollback_fuzzer_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 15
+      npm_command: rollback-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=rollback_fuzzer --storageEngine=wiredTiger
 
 ## jstestfuzz mmapv1 ##
 - <<: *jstestfuzz_template
@@ -6005,6 +6036,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: rollback_fuzzer
+  - name: rollback_fuzzer_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -6750,6 +6783,8 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_passthrough_WT
+  - name: rollback_fuzzer
+  - name: rollback_fuzzer_WT
   - name: serial_run
   - name: serial_run_WT
   - name: session_jscore_passthrough_WT
@@ -6968,6 +7003,8 @@ buildvariants:
     - rhel62-large
   - name: lint
   - name: burn_in_tests
+  - name: rollback_fuzzer
+  - name: rollback_fuzzer_WT
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
@@ -7228,6 +7265,8 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
+  - name: rollback_fuzzer
+  - name: rollback_fuzzer_WT
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
@@ -9403,6 +9442,7 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_passthrough_WT
   - name: rlp
+  - name: rollback_fuzzer_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough
@@ -9486,6 +9526,7 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
+  - name: rollback_fuzzer_WT
   - name: master_slave_WT
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough
@@ -9737,6 +9778,7 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
+  - name: rollback_fuzzer_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_auth
@@ -9773,6 +9815,8 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
+  - name: rollback_fuzzer
+  - name: rollback_fuzzer_WT
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
@@ -9984,6 +10028,8 @@ buildvariants:
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
+  - name: rollback_fuzzer
+  - name: rollback_fuzzer_WT
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
