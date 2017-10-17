@@ -1,6 +1,3 @@
-load('jstests/libs/write_concern_util.js');
-load('jstests/multiVersion/libs/auth_helpers.js');
-
 /**
  * This file tests that commands that do writes accept a write concern in a sharded cluster. This
  * test defines various database commands and what they expect to be true before and after the fact.
@@ -9,7 +6,14 @@ load('jstests/multiVersion/libs/auth_helpers.js');
  * replication between nodes to make sure the write concern is actually being waited for. This only
  * tests commands that get sent to config servers and must have w: majority specified. If these
  * commands fail, they should return an actual error, not just a writeConcernError.
+ *
+ * This test is labeled resource intensive because its total io_write is 70MB compared to a median
+ * of 5MB across all sharding tests in wiredTiger. Its total io_write is 1900MB compared to a median
+ * of 135MB in mmapv1.
+ * @tags: [resource_intensive]
  */
+load('jstests/libs/write_concern_util.js');
+load('jstests/multiVersion/libs/auth_helpers.js');
 
 (function() {
     "use strict";

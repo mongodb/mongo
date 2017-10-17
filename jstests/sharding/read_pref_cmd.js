@@ -1,3 +1,9 @@
+/**
+ * This test is labeled resource intensive because its total io_write is 47MB compared to a median
+ * of 5MB across all sharding tests in wiredTiger. Its total io_write is 1540MB compared to a median
+ * of 135MB in mmapv1.
+ * @tags: [resource_intensive]
+ */
 load("jstests/replsets/rslib.js");
 
 var NODE_COUNT = 2;

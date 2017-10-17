@@ -1,4 +1,11 @@
-// SERVER-2068
+/**
+ * SERVER-2068
+ *
+ * This test is labeled resource intensive because its total io_write is 131MB compared to a median
+ * of 5MB across all sharding tests in wiredTiger. Its total io_write is 1230MB compared to a median
+ * of 135MB in mmapv1.
+ * @tags: [resource_intensive]
+ */
 (function() {
 
     var chunkSize = 25;

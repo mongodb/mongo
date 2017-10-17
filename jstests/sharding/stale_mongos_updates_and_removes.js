@@ -10,6 +10,10 @@
  * versioned, because only one shard can be originally targeted for a point query on the shard key.
  *
  * All other multi updates and removes are sent to all shards and unversioned.
+ *
+ * This test is labeled resource intensive because its total io_write is 31MB compared to a median
+ * of 5MB across all sharding tests in wiredTiger.
+ * @tags: [resource_intensive]
  */
 
 // Create a new sharded collection with numDocs documents, with two docs sharing each shard key

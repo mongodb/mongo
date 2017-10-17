@@ -1,3 +1,8 @@
+/**
+ * This test is labeled resource intensive because its total io_write is 90MB compared to a median
+ * of 5MB across all sharding tests in wiredTiger.
+ * @tags: [resource_intensive]
+ */
 function shardSetup(shardConfig, dbName, collName) {
     var st = new ShardingTest(shardConfig);
     var db = st.getDB(dbName);

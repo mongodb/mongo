@@ -1,4 +1,10 @@
-// Tests whether new sharding is detected on insert by mongos
+/**
+ * Tests whether new sharding is detected on insert by mongos
+ *
+ * This test is labeled resource intensive because its total io_write is 650MB compared to a median
+ * of 135MB across all sharding tests in mmapv1.
+ * @tags: [resource_intensive]
+ */
 (function() {
     'use strict';
 

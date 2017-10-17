@@ -1,6 +1,12 @@
-// Test migrating a big chunk while deletions are happening within that chunk. Test is slightly
-// non-deterministic, since removes could happen before migrate starts. Protect against that by
-// making chunk very large.
+/**
+ * Test migrating a big chunk while deletions are happening within that chunk. Test is slightly
+ * non-deterministic, since removes could happen before migrate starts. Protect against that by
+ * making chunk very large.
+ *
+ * This test is labeled resource intensive because its total io_write is 88MB compared to a median
+ * of 5MB across all sharding tests in wiredTiger.
+ * @tags: [resource_intensive]
+ */
 (function() {
     'use strict';
 

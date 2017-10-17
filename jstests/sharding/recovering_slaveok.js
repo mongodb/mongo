@@ -1,6 +1,11 @@
-// This tests that slaveOk'd queries in sharded setups get correctly routed when a slave goes into
-// RECOVERING state, and don't break
-
+/**
+ * This tests that slaveOk'd queries in sharded setups get correctly routed when a slave goes into
+ * RECOVERING state, and don't break
+ *
+ * This test is labeled resource intensive because its total io_write is 748MB compared to a median
+ * of 135MB across all sharding tests in mmapv1.
+ * @tags: [resource_intensive]
+ */
 (function() {
     'use strict';
     load("jstests/replsets/rslib.js");

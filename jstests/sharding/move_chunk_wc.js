@@ -1,5 +1,3 @@
-load('jstests/libs/write_concern_util.js');
-
 /**
  * This commands tests that moveChunk gives a proper response when the writeConcern cannot be met.
  * The test creates a sharded cluster with shards and config servers of different sizes to see how
@@ -8,7 +6,12 @@ load('jstests/libs/write_concern_util.js');
  * It then passes a writeConcern too high for the to shard and sees that it fails. It then passes
  * a writeConcern too high for the from shard and sees that that fails. moveChunk does not yield
  * a writeConcernError. It should simply fail when the writeConcern is not met on the shards.
+ *
+ * This test is labeled resource intensive because its total io_write is 617MB compared to a median
+ * of 135MB across all sharding tests in mmapv1.
+ * @tags: [resource_intensive]
  */
+load('jstests/libs/write_concern_util.js');
 
 (function() {
     "use strict";

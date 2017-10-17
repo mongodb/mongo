@@ -1,7 +1,11 @@
-//
-// Tests autosplitting heuristics, and that the heuristic counting of chunk sizes
-// works as expected even after splitting.
-//
+/**
+ * Tests autosplitting heuristics, and that the heuristic counting of chunk sizes
+ * works as expected even after splitting.
+ *
+ * This test is labeled resource intensive because its total io_write is 53MB compared to a median
+ * of 5MB across all sharding tests in wiredTiger.
+ * @tags: [resource_intensive]
+ */
 (function() {
     'use strict';
 
