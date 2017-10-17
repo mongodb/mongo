@@ -988,8 +988,8 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	static int sn = 0;
 	WT_SESSION *session;
-	int exact, ret;
 	uint8_t bitfield;
+	int exact, ret;
 
 	session = cursor->session;
 

@@ -719,8 +719,10 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 static inline void
 __wt_struct_size_adjust(WT_SESSION_IMPL *session, size_t *sizep)
 {
-	size_t curr_size = *sizep;
-	size_t field_size, prev_field_size = 1;
+	size_t curr_size, field_size, prev_field_size;
+
+	curr_size = *sizep;
+	prev_field_size = 1;
 
 	while ((field_size = __wt_vsize_uint(curr_size)) != prev_field_size) {
 		curr_size += field_size - prev_field_size;

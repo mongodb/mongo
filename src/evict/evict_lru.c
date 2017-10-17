@@ -113,9 +113,11 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
 static int WT_CDECL
 __evict_lru_cmp(const void *a_arg, const void *b_arg)
 {
-	const WT_EVICT_ENTRY *a = a_arg, *b = b_arg;
+	const WT_EVICT_ENTRY *a, *b;
 	uint64_t a_score, b_score;
 
+	a = a_arg;
+	b = b_arg;
 	a_score = (a->ref == NULL ? UINT64_MAX : a->score);
 	b_score = (b->ref == NULL ? UINT64_MAX : b->score);
 

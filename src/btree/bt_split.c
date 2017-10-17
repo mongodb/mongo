@@ -1495,8 +1495,9 @@ __split_multi_inmem(
 			 * tombstone away: we may need it to correctly resolve
 			 * modifications.
 			 */
-			if (supd->onpage_upd->type == WT_UPDATE_DELETED &&
-			   prev_upd != NULL)
+			WT_ASSERT(session, prev_upd != NULL);
+			if (prev_upd != NULL &&
+			    prev_upd->type == WT_UPDATE_DELETED)
 				prev_upd = prev_upd->next;
 			if (prev_upd != NULL) {
 				__wt_update_obsolete_free(

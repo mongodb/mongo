@@ -272,7 +272,8 @@ __las_insert_block_verbose(
 	uint64_t ckpt_gen_current, ckpt_gen_last;
 	uint32_t pct_dirty, pct_full;
 
-	if (!WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE)) return;
+	if (!WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE))
+		return;
 
 	conn = S2C(session);
 	ckpt_gen_current = __wt_gen(session, WT_GEN_CHECKPOINT);

@@ -1152,21 +1152,23 @@ __rec_update_save(WT_SESSION_IMPL *session, WT_RECONCILE *r,
  */
 static int
 __rec_append_orig_value(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_UPDATE *first_upd, WT_CELL_UNPACK *unpack)
+    WT_PAGE *page, WT_UPDATE *upd, WT_CELL_UNPACK *unpack)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_UPDATE *append, *upd;
+	WT_UPDATE *append;
 	size_t size;
 
-	/*
-	 * If at least one self-contained update is globally visible, we're
-	 * done.
-	 */
-	for (upd = first_upd; upd != NULL; upd = upd->next)
+	/* Done if at least one self-contained update is globally visible. */
+	for (;; upd = upd->next) {
 		if (WT_UPDATE_DATA_VALUE(upd) &&
 		    __wt_txn_upd_visible_all(session, upd))
 			return (0);
+
+		/* Leave reference at the last item in the chain. */
+		if (upd->next == NULL)
+			break;
+	}
 
 	/*
 	 * We need the original on-page value for some reader: get a copy and
@@ -1196,8 +1198,6 @@ __rec_append_orig_value(WT_SESSION_IMPL *session,
 	 *
 	 * Append the new entry to the update list.
 	 */
-	for (upd = first_upd; upd->next != NULL; upd = upd->next)
-		;
 	WT_PUBLISH(upd->next, append);
 	__wt_cache_page_inmem_incr(session, page, size);
 
@@ -1215,16 +1215,21 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_INSERT *ins, void *ripcip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
 	WT_PAGE *page;
-	WT_UPDATE *first_ts_upd, *first_txn_upd, *first_upd, *upd;
+	WT_UPDATE *first_txn_upd, *first_upd, *upd;
 	wt_timestamp_t *timestampp;
 	size_t upd_memsize;
 	uint64_t max_txn, txnid;
 	bool all_visible, uncommitted;
 
+#ifdef HAVE_TIMESTAMPS
+	WT_UPDATE *first_ts_upd;
+	first_ts_upd = NULL;
+#endif
+
 	*updp = NULL;
 
 	page = r->page;
-	first_ts_upd = first_txn_upd = NULL;
+	first_txn_upd = NULL;
 	upd_memsize = 0;
 	max_txn = WT_TXN_NONE;
 	uncommitted = false;
@@ -1353,7 +1358,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 #ifdef HAVE_TIMESTAMPS
 	timestampp = first_ts_upd == NULL ? NULL : &first_ts_upd->timestamp;
 #else
-	WT_UNUSED(first_ts_upd);
 	timestampp = NULL;
 #endif
 	all_visible = *updp == first_txn_upd &&
@@ -1425,9 +1429,8 @@ check_original_value:
 	 * image is rewritten), or any reconciliation of a backing overflow
 	 * record that will be physically removed once it's no longer needed.
 	 */
-	if (*updp != NULL &&
-	    (F_ISSET(r, WT_REC_LOOKASIDE) ||
-	    (*updp != NULL && vpack != NULL &&
+	if (*updp != NULL && (F_ISSET(r, WT_REC_LOOKASIDE) ||
+	    (vpack != NULL &&
 	    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
 		WT_RET(
 		    __rec_append_orig_value(session, page, first_upd, vpack));

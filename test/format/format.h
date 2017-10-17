@@ -119,7 +119,6 @@ typedef struct {
 	bool workers_finished;			/* Operations completed */
 
 	pthread_rwlock_t backup_lock;		/* Backup running */
-	pthread_rwlock_t checkpoint_lock;	/* Checkpoint running */
 
 	WT_RAND_STATE rnd;			/* Global RNG state */
 

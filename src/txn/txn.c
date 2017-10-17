@@ -15,14 +15,16 @@
 static uint32_t
 __snapsort_partition(uint64_t *array, uint32_t f, uint32_t l, uint64_t pivot)
 {
-	uint32_t i = f - 1, j = l + 1;
+	uint32_t i, j;
 
+	i = f - 1;
+	j = l + 1;
 	for (;;) {
 		while (pivot < array[--j])
 			;
 		while (array[++i] < pivot)
 			;
-		if (i<j) {
+		if (i < j) {
 			uint64_t tmp = array[i];
 			array[i] = array[j];
 			array[j] = tmp;
