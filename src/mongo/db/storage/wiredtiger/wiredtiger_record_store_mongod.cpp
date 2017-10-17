@@ -136,9 +136,9 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
         return false;
     }
 
-    if (storageGlobalParams.repair) {
+    if (storageGlobalParams.repair || storageGlobalParams.readOnly) {
         LOG(1) << "not starting WiredTigerRecordStoreThread for " << ns
-               << " because we are in repair";
+               << " because we are either in repair or read-only mode";
         return false;
     }
 
