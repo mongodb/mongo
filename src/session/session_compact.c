@@ -250,7 +250,7 @@ __compact_worker(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 	u_int i, loop;
-	bool didwork;
+	bool another_pass;
 
 	/*
 	 * Reset the handles' compaction skip flag (we don't bother setting
@@ -274,7 +274,8 @@ __compact_worker(WT_SESSION_IMPL *session)
 	 */
 	for (loop = 0; loop < 100; ++loop) {
 		/* Step through the list of files being compacted. */
-		for (didwork = false, i = 0; i < session->op_handle_next; ++i) {
+		for (another_pass = false,
+		    i = 0; i < session->op_handle_next; ++i) {
 			/* Skip objects where there's no more work. */
 			if (session->op_handle[i]->compact_skip)
 				continue;
@@ -282,15 +283,43 @@ __compact_worker(WT_SESSION_IMPL *session)
 			session->compact_state = WT_COMPACT_RUNNING;
 			WT_WITH_DHANDLE(session,
 			    session->op_handle[i], ret = __wt_compact(session));
-			WT_ERR(ret);
 
-			/* If we did no work, skip this file in the future. */
-			if (session->compact_state == WT_COMPACT_SUCCESS)
-				didwork = true;
-			else
-				session->op_handle[i]->compact_skip = true;
+			/*
+			 * If successful and we did work, schedule another pass.
+			 * If successful and we did no work, skip this file in
+			 * the future.
+			 */
+			if (ret == 0) {
+				if (session->
+				    compact_state == WT_COMPACT_SUCCESS)
+					another_pass = true;
+				else
+					session->
+					    op_handle[i]->compact_skip = true;
+				continue;
+			}
+
+			/*
+			 * If compaction failed because checkpoint was running,
+			 * continue with the next handle. We might continue to
+			 * race with checkpoint on each handle, but that's OK,
+			 * we'll step through all the handles, and then we'll
+			 * block until a checkpoint completes.
+			 *
+			 * Just quit if eviction is the problem.
+			 */
+			if (ret == EBUSY) {
+				if (__wt_cache_stuck(session)) {
+					WT_ERR_MSG(session, EBUSY,
+					    "compaction halted by eviction "
+					    "pressure");
+				}
+				ret = 0;
+				another_pass = true;
+			}
+			WT_ERR(ret);
 		}
-		if (!didwork)
+		if (!another_pass)
 			break;
 
 		/*
@@ -320,9 +349,24 @@ __wt_session_compact(
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
+	bool no_eviction_set;
+
+	no_eviction_set = false;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, compact, config, cfg);
+
+	/*
+	 * Don't highjack the compaction thread for eviction; it's holding locks
+	 * blocking checkpoints and once an application is tapped for eviction,
+	 * it can spend a long time doing nothing else. (And, if we're tapping
+	 * application threads for eviction, compaction should quit, it's not
+	 * making anything better.)
+	 */
+	if (!F_ISSET(session, WT_SESSION_NO_EVICTION)) {
+		no_eviction_set = true;
+		F_SET(session, WT_SESSION_NO_EVICTION);
+	}
 
 	/* In-memory ignores compaction operations. */
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
@@ -392,6 +436,9 @@ err:	session->compact = NULL;
 	 * significant reconciliation structures/memory).
 	 */
 	WT_TRET(__wt_session_release_resources(session));
+
+	if (no_eviction_set)
+		F_CLR(session, WT_SESSION_NO_EVICTION);
 
 	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_compact_fail);

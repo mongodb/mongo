@@ -106,7 +106,7 @@ by a previous run of the example).  No data extraction or conversion is
 required in the application.
 
 Because the cursor was positioned in the table after the WT_CURSOR::insert
-call, we had to re-position it using the WT_CURSOR::first call; if we
+call, we had to re-position it using the WT_CURSOR::reset call; if we
 weren't using the cursor for the call to WT_CURSOR::insert above, this loop
 would simplify to:
 

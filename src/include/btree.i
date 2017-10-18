@@ -462,7 +462,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
 	 * real progress.
 	 */
 	if (rewrite)
-		(void)__wt_atomic_subv64(&cache->pages_inmem, 1);
+		(void)__wt_atomic_sub64(&cache->pages_inmem, 1);
 	else
 		(void)__wt_atomic_addv64(&cache->pages_evict, 1);
 }
@@ -1287,12 +1287,14 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Check whether a page can be evicted.
  */
 static inline bool
-__wt_page_can_evict(
-    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t *evict_flagsp)
+__wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 {
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	bool modified;
+
+	if (inmem_splitp != NULL)
+		*inmem_splitp = false;
 
 	page = ref->page;
 	mod = page->modify;
@@ -1318,8 +1320,8 @@ __wt_page_can_evict(
 	 * won't be written or discarded from the cache.
 	 */
 	if (__wt_leaf_page_can_split(session, page)) {
-		if (evict_flagsp != NULL)
-			FLD_SET(*evict_flagsp, WT_REC_INMEM_SPLIT);
+		if (inmem_splitp != NULL)
+			*inmem_splitp = true;
 		return (true);
 	}
 

@@ -259,6 +259,184 @@ __wt_las_cursor_close(
 }
 
 /*
+ * __las_insert_block_verbose --
+ *	Display a verbose message once per checkpoint with details about the
+ *	cache state when performing a lookaside table write.
+ */
+static void
+__las_insert_block_verbose(
+    WT_SESSION_IMPL *session, uint32_t btree_id, uint64_t las_pageid)
+{
+#ifdef HAVE_VERBOSE
+	WT_CONNECTION_IMPL *conn;
+	uint64_t ckpt_gen_current, ckpt_gen_last;
+	uint32_t pct_dirty, pct_full;
+
+	if (!WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE))
+		return;
+
+	conn = S2C(session);
+	ckpt_gen_current = __wt_gen(session, WT_GEN_CHECKPOINT);
+	ckpt_gen_last = conn->las_verb_gen_write;
+
+	/*
+	 * This message is throttled to one per checkpoint. To do this we
+	 * track the generation of the last checkpoint for which the message
+	 * was printed and check against the current checkpoint generation.
+	 */
+	if (ckpt_gen_current > ckpt_gen_last) {
+		/*
+		 * Attempt to atomically replace the last checkpoint generation
+		 * for which this message was printed. If the atomic swap fails
+		 * we have raced and the winning thread will print the message.
+		 */
+		if (__wt_atomic_casv64(&conn->las_verb_gen_write,
+		    ckpt_gen_last, ckpt_gen_current)) {
+			(void)__wt_eviction_clean_needed(session, &pct_full);
+			(void)__wt_eviction_dirty_needed(session, &pct_dirty);
+
+			__wt_verbose(session, WT_VERB_LOOKASIDE,
+			    "Page reconciliation triggered lookaside write"
+			    "file ID %" PRIu32 ", page ID %" PRIu64 ". "
+			    "Entries now in lookaside file: %" PRId64 ", "
+			    "cache dirty: %" PRIu32 "%% , "
+			    "cache use: %" PRIu32 "%%",
+			    btree_id, las_pageid,
+			    WT_STAT_READ(conn->stats, cache_lookaside_entries),
+			    pct_dirty, pct_full);
+		}
+	}
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(btree_id);
+	WT_UNUSED(las_pageid);
+#endif
+}
+
+/*
+ * __wt_las_insert_block --
+ *	Copy one set of saved updates into the database's lookaside buffer.
+ */
+int
+__wt_las_insert_block(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_CURSOR *cursor, WT_MULTI *multi, WT_ITEM *key)
+{
+	WT_ITEM las_timestamp, las_value;
+	WT_SAVE_UPD *list;
+	WT_UPDATE *upd;
+	uint64_t insert_cnt, las_counter, las_pageid;
+	uint32_t btree_id, i, slot;
+	uint8_t *p;
+
+	WT_CLEAR(las_timestamp);
+	WT_CLEAR(las_value);
+	insert_cnt = 0;
+
+	btree_id = S2BT(session)->id;
+	las_pageid = multi->las_pageid =
+	    __wt_atomic_add64(&S2BT(session)->las_pageid, 1);
+
+	/*
+	 * Make sure there are no leftover entries (e.g., from a handle
+	 * reopen).
+	 */
+	WT_RET(__wt_las_remove_block(session, cursor, btree_id, las_pageid));
+
+	/* Enter each update in the boundary's list into the lookaside store. */
+	for (las_counter = 0, i = 0,
+	    list = multi->supd; i < multi->supd_entries; ++i, ++list) {
+		/* Lookaside table key component: source key. */
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			p = key->mem;
+			WT_RET(
+			    __wt_vpack_uint(&p, 0, WT_INSERT_RECNO(list->ins)));
+			key->size = WT_PTRDIFF(p, key->data);
+			break;
+		case WT_PAGE_ROW_LEAF:
+			if (list->ins == NULL)
+				WT_RET(__wt_row_leaf_key(
+				    session, page, list->ripcip, key, false));
+			else {
+				key->data = WT_INSERT_KEY(list->ins);
+				key->size = WT_INSERT_KEY_SIZE(list->ins);
+			}
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
+
+		/*
+		 * Lookaside table value component: update reference. Updates
+		 * come from the row-store insert list (an inserted item), or
+		 * update array (an update to an original on-page item), or from
+		 * a column-store insert list (column-store format has no update
+		 * array, the insert list contains both inserted items and
+		 * updates to original on-page items). When rolling forward a
+		 * modify update from an original on-page item, we need an
+		 * on-page slot so we can find the original on-page item. When
+		 * rolling forward from an inserted item, no on-page slot is
+		 * possible.
+		 */
+		slot = UINT32_MAX;			/* Impossible slot */
+		if (list->ripcip != NULL)
+			slot = page->type == WT_PAGE_ROW_LEAF ?
+			    WT_ROW_SLOT(page, list->ripcip) :
+			    WT_COL_SLOT(page, list->ripcip);
+		upd = list->ins == NULL ?
+		    page->modify->mod_row_update[slot] : list->ins->upd;
+
+		/*
+		 * Walk the list of updates, storing each key/value pair into
+		 * the lookaside table. Skip aborted items (there's no point
+		 * to restoring them), and assert we never see a reserved item.
+		 */
+		do {
+			if (upd->txnid == WT_TXN_ABORTED)
+				continue;
+
+			switch (upd->type) {
+			case WT_UPDATE_DELETED:
+				las_value.size = 0;
+				break;
+			case WT_UPDATE_MODIFIED:
+			case WT_UPDATE_STANDARD:
+				las_value.data = upd->data;
+				las_value.size = upd->size;
+				break;
+			case WT_UPDATE_RESERVED:
+				WT_ASSERT(session,
+				    upd->type != WT_UPDATE_RESERVED);
+				continue;
+			}
+
+			cursor->set_key(cursor,
+			    btree_id, las_pageid, ++las_counter, key);
+
+#ifdef HAVE_TIMESTAMPS
+			las_timestamp.data = &upd->timestamp;
+			las_timestamp.size = WT_TIMESTAMP_SIZE;
+#endif
+			cursor->set_value(cursor,
+			    upd->txnid, &las_timestamp, upd->type, &las_value);
+
+			WT_RET(cursor->insert(cursor));
+			++insert_cnt;
+		} while ((upd = upd->next) != NULL);
+	}
+
+	__wt_free(session, multi->supd);
+	multi->supd_entries = 0;
+
+	if (insert_cnt > 0) {
+		WT_STAT_CONN_INCRV(
+		    session, cache_lookaside_entries, insert_cnt);
+		__las_insert_block_verbose(session, btree_id, las_pageid);
+	}
+	return (0);
+}
+
+/*
  * __wt_las_remove_block --
  *	Remove all records matching a key prefix from the lookaside store.
  */
@@ -269,10 +447,18 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM las_key;
 	uint64_t las_counter, las_pageid, remove_cnt;
-	uint32_t las_id;
+	uint32_t las_id, session_flags;
 	int exact;
+	bool local_cursor;
 
 	remove_cnt = 0;
+	session_flags = 0;		/* [-Wconditional-uninitialized] */
+
+	local_cursor = false;
+	if (cursor == NULL) {
+		__wt_las_cursor(session, &cursor, &session_flags);
+		local_cursor = true;
+	}
 
 	/*
 	 * Search for the block's unique prefix and step through all matching
@@ -301,6 +487,9 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	WT_STAT_CONN_DECRV(session, cache_lookaside_entries, remove_cnt);
+err:	if (local_cursor)
+		WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
+
+	WT_STAT_CONN_DECRV(session, cache_lookaside_entries, remove_cnt);
 	return (ret);
 }

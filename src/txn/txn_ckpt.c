@@ -519,7 +519,7 @@ __checkpoint_stats(
 	conn = S2C(session);
 
 	/*
-	 * Get time diff in microseconds.
+	 * Get time diff in milliseconds.
 	 */
 	msec = WT_TIMEDIFF_MS(*stop, *start);
 
@@ -549,11 +549,11 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session,
 	__wt_epoch(session, &stop);
 
 	/*
-	 * Get time diff in microseconds.
+	 * Get time diff in milliseconds.
 	 */
 	msec = WT_TIMEDIFF_MS(stop, *start);
 	__wt_verbose(session,
-	    WT_VERB_CHECKPOINT, "time: %" PRIu64 " us, gen: %" PRIu64
+	    WT_VERB_CHECKPOINT, "time: %" PRIu64 " ms, gen: %" PRIu64
 	    ": Full database checkpoint %s",
 	    msec, __wt_gen(session, WT_GEN_CHECKPOINT), msg);
 

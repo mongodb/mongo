@@ -29,6 +29,7 @@
 #include "format.h"
 #include "config.h"
 
+static void	   config_checkpoint(void);
 static void	   config_checksum(void);
 static void	   config_compression(const char *);
 static void	   config_encryption(void);
@@ -39,6 +40,7 @@ static void	   config_in_memory_reset(void);
 static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
 static void	   config_lrt(void);
+static void	   config_map_checkpoint(const char *, u_int *);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_encryption(const char *, u_int *);
@@ -159,6 +161,7 @@ config_setup(void)
 	if (!g.replay && g.run_cnt % 20 == 19 && !config_is_perm("threads"))
 		g.c_threads = 1;
 
+	config_checkpoint();
 	config_checksum();
 	config_compression("compression");
 	config_compression("logging_compression");
@@ -231,6 +234,28 @@ config_setup(void)
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
+}
+
+/*
+ * config_checkpoint --
+ *	Checkpoint configuration.
+ */
+static void
+config_checkpoint(void)
+{
+	/* Choose a checkpoint mode if nothing was specified. */
+	if (!config_is_perm("checkpoints"))
+		switch (mmrand(NULL, 1, 20)) {
+		case 1: case 2: case 3: case 4:		/* 20% */
+			config_single("checkpoints=wiredtiger", 0);
+			break;
+		case 5:					/* 5 % */
+			config_single("checkpoints=off", 0);
+			break;
+		default:				/* 75% */
+			config_single("checkpoints=on", 0);
+			break;
+		}
 }
 
 /*
@@ -823,7 +848,10 @@ config_single(const char *s, int perm)
 			*cp->vstr = NULL;
 		}
 
-		if (strncmp(s, "checksum", strlen("checksum")) == 0) {
+		if (strncmp(s, "checkpoints", strlen("checkpoints")) == 0) {
+			config_map_checkpoint(ep, &g.c_checkpoint_flag);
+			*cp->vstr = dstrdup(ep);
+		} else if (strncmp(s, "checksum", strlen("checksum")) == 0) {
 			config_map_checksum(ep, &g.c_checksum_flag);
 			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(
@@ -834,12 +862,12 @@ config_single(const char *s, int perm)
 		    s, "encryption", strlen("encryption")) == 0) {
 			config_map_encryption(ep, &g.c_encryption_flag);
 			*cp->vstr = dstrdup(ep);
-		} else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
-			config_map_isolation(ep, &g.c_isolation_flag);
-			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
 			config_map_file_type(ep, &g.type);
 			*cp->vstr = dstrdup(config_file_type(g.type));
+		} else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
+			config_map_isolation(ep, &g.c_isolation_flag);
+			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(s, "logging_compression",
 		    strlen("logging_compression")) == 0) {
 			config_map_compression(ep,
@@ -902,6 +930,24 @@ config_map_file_type(const char *s, u_int *vp)
 		*vp = ROW;
 	else
 		testutil_die(EINVAL, "illegal file type configuration: %s", s);
+}
+
+/*
+ * config_map_checkpoint --
+ *	Map a checkpoint configuration to a flag.
+ */
+static void
+config_map_checkpoint(const char *s, u_int *vp)
+{
+	/* Checkpoint configuration used to be 1/0, let it continue to work. */
+	if (strcmp(s, "on") == 0 || strcmp(s, "1") == 0)
+		*vp = CHECKPOINT_ON;
+	else if (strcmp(s, "off") == 0 || strcmp(s, "0") == 0)
+		*vp = CHECKPOINT_OFF;
+	else if (strcmp(s, "wiredtiger") == 0)
+		*vp = CHECKPOINT_WIREDTIGER;
+	else
+		testutil_die(EINVAL, "illegal checkpoint configuration: %s", s);
 }
 
 /*

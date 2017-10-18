@@ -38,7 +38,6 @@ flags = {
     'rec_write' : [
         'REC_CHECKPOINT',
         'REC_EVICT',
-        'REC_INMEM_SPLIT',
         'REC_IN_MEMORY',
         'REC_LOOKASIDE',
         'REC_SCRUB',

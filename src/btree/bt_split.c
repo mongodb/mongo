@@ -1495,8 +1495,8 @@ __split_multi_inmem(
 			 * tombstone away: we may need it to correctly resolve
 			 * modifications.
 			 */
-			if (supd->onpage_upd->type == WT_UPDATE_DELETED &&
-			   prev_upd != NULL)
+			if (prev_upd != NULL &&
+			    prev_upd->type == WT_UPDATE_DELETED)
 				prev_upd = prev_upd->next;
 			if (prev_upd != NULL) {
 				__wt_update_obsolete_free(
@@ -1620,8 +1620,11 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		break;
 	}
 
-	/* There should be an address or a disk image (or both). */
-	WT_ASSERT(session,
+	/*
+	 * There can be an address or a disk image or both, but if there is
+	 * neither, there must be a backing lookaside page.
+	 */
+	WT_ASSERT(session, multi->las_pageid != 0 ||
 	    multi->addr.addr != NULL || multi->disk_image != NULL);
 
 	/* If closing the file, there better be an address. */
@@ -1652,16 +1655,23 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		addr->type = multi->addr.type;
 		WT_RET(__wt_memdup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
-		if (multi->las_pageid != 0) {
-			WT_RET(__wt_calloc_one(session, &ref->page_las));
-			ref->page_las->las_pageid = multi->las_pageid;
+
+		ref->state = WT_REF_DISK;
+	}
+
+	/*
+	 * Copy any associated lookaside reference, potentially resetting
+	 * WT_REF.state. Regardless of a backing address, WT_REF_LOOKASIDE
+	 * overrides WT_REF_DISK.
+	 */
+	if (multi->las_pageid != 0) {
+		WT_RET(__wt_calloc_one(session, &ref->page_las));
+		ref->page_las->las_pageid = multi->las_pageid;
 #ifdef HAVE_TIMESTAMPS
-			__wt_timestamp_set(&ref->page_las->min_timestamp,
-			    &multi->las_min_timestamp);
+		__wt_timestamp_set(
+		    &ref->page_las->min_timestamp, &multi->las_min_timestamp);
 #endif
-			ref->state = WT_REF_LOOKASIDE;
-		} else
-			ref->state = WT_REF_DISK;
+		ref->state = WT_REF_LOOKASIDE;
 	}
 
 	/*

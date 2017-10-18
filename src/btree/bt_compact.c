@@ -31,17 +31,6 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	mod = page->modify;
 
 	/*
-	 * Ignore the root: it may not have a replacement address, and besides,
-	 * if anything else gets written, so will it.
-	 */
-	if (__wt_ref_is_root(ref))
-		return (0);
-
-	/* Ignore currently dirty pages, they will be written regardless. */
-	if (__wt_page_is_modified(page))
-		return (0);
-
-	/*
 	 * If the page is clean, test the original addresses.
 	 * If the page is a replacement, test the replacement addresses.
 	 * Ignore empty pages, they get merged into the parent.
@@ -86,6 +75,45 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 }
 
 /*
+ * __compact_rewrite_lock --
+ *	Lock out checkpoints and return if a page needs to be re-written.
+ */
+static int
+__compact_rewrite_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+
+	*skipp = true;					/* Default skip. */
+
+	btree = S2BT(session);
+
+	/*
+	 * Reviewing in-memory pages requires looking at page reconciliation
+	 * results, because we care about where the page is stored now, not
+	 * where the page was stored when we first read it into the cache.
+	 * We need to ensure we don't race with page reconciliation as it's
+	 * writing the page modify information.
+	 *
+	 * There are two ways we call reconciliation: checkpoints and eviction.
+	 * Get the tree's flush lock which blocks threads writing pages for
+	 * checkpoints. If checkpoint is holding the lock, quit working this
+	 * file, we'll visit it again in our next pass.
+	 *
+	 * Serializing with eviction is not quite as simple, and it gets done
+	 * in the underlying function that checks modification information.
+	 */
+	WT_RET(__wt_spin_trylock(session, &btree->flush_lock));
+
+	ret = __compact_rewrite(session, ref, skipp);
+
+	/* Unblock threads writing leaf pages. */
+	__wt_spin_unlock(session, &btree->flush_lock);
+
+	return (ret);
+}
+
+/*
  * __wt_compact --
  *	Compact a file.
  */
@@ -93,14 +121,12 @@ int
 __wt_compact(WT_SESSION_IMPL *session)
 {
 	WT_BM *bm;
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_REF *ref;
 	u_int i;
 	bool skip;
 
-	btree = S2BT(session);
-	bm = btree->bm;
+	bm = S2BT(session)->bm;
 	ref = NULL;
 
 	WT_STAT_DATA_INCR(session, session_compact);
@@ -114,26 +140,27 @@ __wt_compact(WT_SESSION_IMPL *session)
 	if (skip)
 		return (0);
 
-	/*
-	 * Reviewing in-memory pages requires looking at page reconciliation
-	 * results, because we care about where the page is stored now, not
-	 * where the page was stored when we first read it into the cache.
-	 * We need to ensure we don't race with page reconciliation as it's
-	 * writing the page modify information.
-	 *
-	 * There are two ways we call reconciliation: checkpoints and eviction.
-	 * Get the tree's flush lock which blocks threads writing pages for
-	 * checkpoints.
-	 */
-	__wt_spin_lock(session, &btree->flush_lock);
-
 	/* Walk the tree reviewing pages to see if they should be re-written. */
 	for (i = 0;;) {
-		/* Periodically check if we've run out of time. */
+		/*
+		 * Periodically check if we've timed out or eviction is stuck.
+		 * Quit if eviction is stuck, we're making the problem worse.
+		 */
 		if (++i > 100) {
 			WT_ERR(__wt_session_compact_check_timeout(session));
+
+			if (__wt_cache_stuck(session))
+				WT_ERR(EBUSY);
+
 			i = 0;
 		}
+
+		/*
+		 * Compact pulls pages into cache during the walk without
+		 * checking whether the cache is full.  Check now to throttle
+		 * compact to match eviction speed.
+		 */
+		WT_ERR(__wt_cache_eviction_check(session, false, NULL));
 
 		/*
 		 * Pages read for compaction aren't "useful"; don't update the
@@ -147,24 +174,33 @@ __wt_compact(WT_SESSION_IMPL *session)
 		if (ref == NULL)
 			break;
 
-		WT_ERR(__compact_rewrite(session, ref, &skip));
-		if (skip)
+		/*
+		 * Cheap checks that don't require locking.
+		 *
+		 * Ignore the root: it may not have a replacement address, and
+		 * besides, if anything else gets written, so will it.
+		 *
+		 * Ignore dirty pages, checkpoint writes them regardless.
+		 */
+		if (__wt_ref_is_root(ref))
+			continue;
+		if (__wt_page_is_modified(ref->page))
 			continue;
 
-		session->compact_state = WT_COMPACT_SUCCESS;
+		WT_ERR(__compact_rewrite_lock(session, ref, &skip));
+		if (skip)
+			continue;
 
 		/* Rewrite the page: mark the page and tree dirty. */
 		WT_ERR(__wt_page_modify_init(session, ref->page));
 		__wt_page_modify_set(session, ref->page);
 
+		session->compact_state = WT_COMPACT_SUCCESS;
 		WT_STAT_DATA_INCR(session, btree_compact_rewrite);
 	}
 
 err:	if (ref != NULL)
 		WT_TRET(__wt_page_release(session, ref, 0));
-
-	/* Unblock threads writing leaf pages. */
-	__wt_spin_unlock(session, &btree->flush_lock);
 
 	return (ret);
 }

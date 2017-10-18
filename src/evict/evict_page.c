@@ -10,7 +10,7 @@
 
 static int __evict_page_clean_update(WT_SESSION_IMPL *, WT_REF *, bool);
 static int __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, bool);
-static int __evict_review(WT_SESSION_IMPL *, WT_REF *, bool, uint32_t *);
+static int __evict_review(WT_SESSION_IMPL *, WT_REF *, bool, bool *);
 
 /*
  * __evict_exclusive_clear --
@@ -122,8 +122,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	uint32_t flags;
-	bool clean_page, tree_dead;
+	bool clean_page, inmem_split, tree_dead;
 
 	conn = S2C(session);
 
@@ -143,13 +142,13 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 * to make this check for clean pages, too: while unlikely eviction
 	 * would choose an internal page with children, it's not disallowed.
 	 */
-	WT_ERR(__evict_review(session, ref, closing, &flags));
+	WT_ERR(__evict_review(session, ref, closing, &inmem_split));
 
 	/*
 	 * If there was an in-memory split, the tree has been left in the state
 	 * we want: there is nothing more to do.
 	 */
-	if (LF_ISSET(WT_REC_INMEM_SPLIT))
+	if (inmem_split)
 		goto done;
 
 	/* Count evictions of internal pages during normal operation. */
@@ -428,7 +427,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  */
 static int
 __evict_review(
-    WT_SESSION_IMPL *session, WT_REF *ref, bool closing, uint32_t *flagsp)
+    WT_SESSION_IMPL *session, WT_REF *ref, bool closing, bool *inmem_splitp)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
@@ -437,11 +436,12 @@ __evict_review(
 	uint32_t flags;
 	bool lookaside_retry, *lookaside_retryp, modified;
 
+	*inmem_splitp = false;
+
 	conn = S2C(session);
 	flags = WT_REC_EVICT;
 	if (!WT_SESSION_IS_CHECKPOINT(session))
 		LF_SET(WT_REC_VISIBLE_ALL);
-	*flagsp = flags;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -508,9 +508,8 @@ __evict_review(
 			WT_RET(__wt_txn_update_oldest(
 			    session, WT_TXN_OLDEST_STRICT));
 
-		if (!__wt_page_can_evict(session, ref, flagsp))
+		if (!__wt_page_can_evict(session, ref, inmem_splitp))
 			return (EBUSY);
-		flags = *flagsp;
 
 		/*
 		 * Check for an append-only workload needing an in-memory
@@ -519,7 +518,7 @@ __evict_review(
 		 * the page stays in memory and the tree is left in the desired
 		 * state: avoid the usual cleanup.
 		 */
-		if (LF_ISSET(WT_REC_INMEM_SPLIT))
+		if (*inmem_splitp)
 			return (__wt_split_insert(session, ref));
 	}
 
@@ -609,7 +608,6 @@ __evict_review(
 		ret = __wt_reconcile(session, ref, NULL, flags, NULL);
 	}
 
-	*flagsp = flags;
 	WT_RET(ret);
 
 	/*

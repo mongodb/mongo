@@ -2577,11 +2577,13 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	WT_DECL_ITEM(logrec);
 	WT_DECL_RET;
 	size_t header_size, len;
-	uint32_t rectype = WT_LOGREC_MESSAGE;
-	const char *rec_fmt = WT_UNCHECKED_STRING(I);
+	uint32_t rectype;
+	const char *rec_fmt;
 	va_list ap_copy;
 
 	conn = S2C(session);
+	rectype = WT_LOGREC_MESSAGE;
+	rec_fmt = WT_UNCHECKED_STRING(I);
 
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		return (0);

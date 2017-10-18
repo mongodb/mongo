@@ -372,8 +372,8 @@ struct __wt_connection_impl {
 	 * checkpoint. To accomplish this we track the checkpoint generation
 	 * for the most recent read and write verbose messages.
 	 */
-	volatile uint64_t	las_verb_gen_read;
-	volatile uint64_t	las_verb_gen_write;
+	uint64_t las_verb_gen_read;
+	uint64_t las_verb_gen_write;
 
 	/* Set of btree IDs not being rolled back */
 	uint8_t *stable_rollback_bitstring;
