@@ -627,28 +627,49 @@ public:
     }
 
 private:
+    /**
+     * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
+     * size.
+     * Batches are limited to 10% of the oplog.
+     */
+    std::size_t _calculateBatchLimitBytes() {
+        auto opCtx = cc().makeOperationContext();
+        auto oplogMaxSizeResult =
+            _storageInterface->getOplogMaxSize(opCtx.get(), NamespaceString(rsOplogName));
+        auto oplogMaxSize = fassertStatusOK(40301, oplogMaxSizeResult);
+        return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
+    }
+
+    /**
+     * If slaveDelay is enabled, this function calculates the most recent timestamp of any oplog
+     * entries that can be be returned in a batch.
+     */
+    boost::optional<Date_t> _calculateSlaveDelayLatestTimestamp() {
+        auto service = cc().getServiceContext();
+        auto replCoord = ReplicationCoordinator::get(service);
+        auto slaveDelay = replCoord->getSlaveDelaySecs();
+        if (slaveDelay <= Seconds(0)) {
+            return {};
+        }
+        return Date_t::now() - slaveDelay;
+    }
+
     void run() {
         Client::initThread("ReplBatcher");
-        OperationContextImpl txn;
-        auto replCoord = ReplicationCoordinator::get(&txn);
 
-        const auto oplogMaxSize = fassertStatusOK(
-            40301, _storageInterface->getOplogMaxSize(&txn, NamespaceString(rsOplogName)));
-
-        // Batches are limited to 10% of the oplog.
         BatchLimits batchLimits;
         batchLimits.ops = replBatchLimitOperations;
-        batchLimits.bytes = std::min(oplogMaxSize / 10, size_t(replBatchLimitBytes));
+        batchLimits.bytes = _calculateBatchLimitBytes();
         while (!_inShutdown.load()) {
-            const auto slaveDelay = replCoord->getSlaveDelaySecs();
-            batchLimits.slaveDelayLatestTimestamp = (slaveDelay > Seconds(0))
-                ? (Date_t::now() - slaveDelay)
-                : boost::optional<Date_t>();
+            batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
 
             OpQueue ops;
             // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
-            while (!_inShutdown.load() &&
-                   !_syncTail->tryPopAndWaitForMore(&txn, &ops, batchLimits)) {
+            {
+                auto opCtx = cc().makeOperationContext();
+                while (!_inShutdown.load() &&
+                       !_syncTail->tryPopAndWaitForMore(opCtx.get(), &ops, batchLimits)) {
+                }
             }
 
             // For pausing replication in tests
