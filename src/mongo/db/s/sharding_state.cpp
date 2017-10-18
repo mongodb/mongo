@@ -650,7 +650,9 @@ ChunkVersion ShardingState::_refreshMetadata(OperationContext* txn, const Namesp
         auto css = CollectionShardingState::get(txn, nss);
 
         // We already have newer version
-        if (css->getMetadata() && css->getMetadata()->getCollVersion() >= cm->getVersion()) {
+        if (css->getMetadata() &&
+            css->getMetadata()->getCollVersion().epoch() == cm->getVersion().epoch() &&
+            css->getMetadata()->getCollVersion() >= cm->getVersion()) {
             LOG(1) << "Skipping refresh of metadata for " << nss << " "
                    << css->getMetadata()->getCollVersion() << " with an older " << cm->getVersion();
             return css->getMetadata()->getShardVersion();
@@ -664,7 +666,9 @@ ChunkVersion ShardingState::_refreshMetadata(OperationContext* txn, const Namesp
     auto css = CollectionShardingState::get(txn, nss);
 
     // We already have newer version
-    if (css->getMetadata() && css->getMetadata()->getCollVersion() >= cm->getVersion()) {
+    if (css->getMetadata() &&
+        css->getMetadata()->getCollVersion().epoch() == cm->getVersion().epoch() &&
+        css->getMetadata()->getCollVersion() >= cm->getVersion()) {
         LOG(1) << "Skipping refresh of metadata for " << nss << " "
                << css->getMetadata()->getCollVersion() << " with an older " << cm->getVersion();
         return css->getMetadata()->getShardVersion();
