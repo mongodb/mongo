@@ -94,12 +94,6 @@ public:
     void forceFail(std::string& errMsg);
 
     /**
-     * Blocks until state changes is not Migrating. In other words, can return when state
-     * becomes ReadyToCommit/Done/ErrorOccurred, etc.
-     */
-    void waitUntilReadyToCommit(OperationContext* opCtx);
-
-    /**
      * Returns the current state.
      */
     State getState();

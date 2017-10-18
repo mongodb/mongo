@@ -846,8 +846,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             setStateFail("Cannot go to critical section because secondaries cannot keep up");
             return;
         }
-
-        _sessionMigration->waitUntilReadyToCommit(opCtx);
     }
 
     {

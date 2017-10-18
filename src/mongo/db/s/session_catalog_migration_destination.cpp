@@ -483,11 +483,4 @@ void SessionCatalogMigrationDestination::forceFail(std::string& errMsg) {
     _errorOccurred(errMsg);
 }
 
-void SessionCatalogMigrationDestination::waitUntilReadyToCommit(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    while (_state == State::Migrating) {
-        opCtx->waitForConditionOrInterrupt(_isStateChanged, lk);
-    }
-}
-
 }  // namespace mongo
