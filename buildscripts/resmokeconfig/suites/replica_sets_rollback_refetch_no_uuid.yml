@@ -15,6 +15,7 @@ selector:
   # 'rollbackViaRefetch' algorithm and the 'rollbackViaRefetchNoUUID' algorithm.
   - jstests/replsets/double_rollback.js
   - jstests/replsets/double_rollback_early.js
+  - jstests/replsets/rollback_creates_rollback_directory.js
   - jstests/replsets/rollback_auth.js
   - jstests/replsets/rollback_too_new.js
   - jstests/replsets/rollback_views.js

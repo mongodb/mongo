@@ -32,7 +32,7 @@ load("jstests/replsets/rslib.js");
         assert.eq(0, db.getSiblingDB("abc").bar.find().itcount());
     };
 
-    var name = "rollback2js";
+    var name = "rollback_ddl_op_sequences";
     var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
     var nodes = replTest.nodeList();
 

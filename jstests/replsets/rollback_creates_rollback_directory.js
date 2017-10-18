@@ -8,13 +8,13 @@
 // inital sync from, so no primary will be elected. This test induces such a scenario, so cannot be
 // run on ephemeral storage engines.
 // @tags: [requires_persistence]
-
-var replTest = new ReplSetTest({name: 'rollback5', nodes: 3});
+var testName = "rollback_creates_rollback_directory";
+var replTest = new ReplSetTest({name: testName, nodes: 3});
 var nodes = replTest.nodeList();
 
 var conns = replTest.startSet();
 var r = replTest.initiate({
-    "_id": "rollback5",
+    "_id": testName,
     "members": [
         {"_id": 0, "host": nodes[0], priority: 3},
         {"_id": 1, "host": nodes[1]},
@@ -33,8 +33,8 @@ var A = a_conn.getDB("test");
 var B = b_conn.getDB("test");
 var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
-var Apath = MongoRunner.dataDir + "/rollback5-0/";
-var Bpath = MongoRunner.dataDir + "/rollback5-1/";
+var Apath = MongoRunner.dataDir + "/" + testName + "-0/";
+var Bpath = MongoRunner.dataDir + "/" + testName + "-1/";
 assert(master == conns[0], "conns[0] assumed to be master");
 assert(a_conn.host == master.host);
 
@@ -88,14 +88,14 @@ assert.eq(null, B.foo.findOne({key: 'value1'}).res);
 var rollbackDir = Bpath + "rollback/";
 assert(pathExists(rollbackDir), "rollback directory was not created!");
 
-print("rollback5.js SUCCESS");
+print(testName + ".js SUCCESS");
 replTest.stopSet(15);
 
 function wait(f) {
     var n = 0;
     while (!f()) {
         if (n % 4 == 0)
-            print("rollback5.js waiting");
+            print(testName + ".js waiting");
         if (++n == 4) {
             print("" + f);
         }
