@@ -562,12 +562,20 @@
             // Do any test-specific setup.
             test.setUp(staleMongos);
 
+            // Do dummy read from the stale mongos so it loads the routing table into memory once.
+            // Additionally, do a secondary read to ensure that the secondary has loaded the initial
+            // routing table -- the first read to the primary will refresh the mongos' shardVersion,
+            // which will then be used against the secondary to ensure the secondary is fresh.
+            assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
+            assert.commandWorked(freshMongos.getDB(db).runCommand({
+                find: coll,
+                $readPreference: {mode: 'secondary'},
+                readConcern: {'level': 'local'}
+            }));
+
             // Turn on system profiler on both secondaries.
             assert.commandWorked(st.rs0.getSecondary().getDB(db).setProfilingLevel(2));
             assert.commandWorked(st.rs1.getSecondary().getDB(db).setProfilingLevel(2));
-
-            // Do dummy read from the stale mongos so it loads the routing table into memory once.
-            assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
 
             scenarios[scenario](staleMongos, freshMongos, test, commandProfile);
 

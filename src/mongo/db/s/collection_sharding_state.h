@@ -241,38 +241,42 @@ public:
 
 private:
     /**
-     * Registers a task on the opCtx -- to run after writes from the oplog are committed and visible
-     * to reads -- to notify the catalog cache loader of a new collection version. The catalog
-     * cache's routing table for the collection will also be invalidated at that time so that the
-     * next caller to the catalog cache for routing information will provoke a routing table
-     * refresh.
+     * This runs on updates to the shard's persisted cache of the config server's
+     * config.collections collection.
      *
-     * This only runs on secondaries, and only when 'lastRefreshedCollectionVersion' is in 'update',
-     * meaning a chunk metadata refresh finished being applied to the collection's locally persisted
-     * metadata store.
+     * If an update occurs to the 'lastRefreshedCollectionVersion' field, registers a task on the
+     * opCtx -- to run after writes from the oplog are committed and visible to reads -- to notify
+     * the catalog cache loader of a new collection version and clear the routing table so the next
+     * caller with routing information will provoke a routing table refresh. When
+     * 'lastRefreshedCollectionVersion' is in 'update', it means that a chunk metadata refresh
+     * finished being applied to the collection's locally persisted metadata store.
+     *
+     * If an update occurs to the 'enterCriticalSectionSignal' field, simply clear the routing table
+     * immediately. This will provoke the next secondary caller to refresh through the primary,
+     * blocking behind the critical section.
      *
      * query - BSON with an _id that identifies which collections entry is being updated.
      * update - the update being applied to the collections entry.
      * updatedDoc - the document identified by 'query' with the 'update' applied.
      *
+     * This only runs on secondaries.
      * The global exclusive lock is expected to be held by the caller.
      */
-    void _onConfigRefreshCompleteInvalidateCachedMetadataAndNotify(OperationContext* opCtx,
-                                                                   const BSONObj& query,
-                                                                   const BSONObj& update,
-                                                                   const BSONObj& updatedDoc);
+    void _onConfigCollectionsUpdateOp(OperationContext* opCtx,
+                                      const BSONObj& query,
+                                      const BSONObj& update,
+                                      const BSONObj& updatedDoc);
 
     /**
-     * Registers a task on the opCtx -- to run after writes from the oplog are committed and visible
-     * to reads -- to notify the catalog cache loader of a new collection version. The catalog
-     * cache's routing table for the collection will also be invalidated at that time so that the
-     * next caller to the catalog cache for routing information will provoke a routing table
-     * refresh.
+     * Invalidates the in-memory routing table cache when a collection is dropped, so the next
+     * caller with routing information will provoke a routing table refresh and see the drop.
      *
-     * This only runs on secondaries
+     * Registers a task on the opCtx -- to run after writes from the oplog are committed and visible
+     * to reads.
      *
      * query - BSON with an _id field that identifies which collections entry is being updated.
      *
+     * This only runs on secondaries.
      * The global exclusive lock is expected to be held by the caller.
      */
     void _onConfigDeleteInvalidateCachedMetadataAndNotify(OperationContext* opCtx,

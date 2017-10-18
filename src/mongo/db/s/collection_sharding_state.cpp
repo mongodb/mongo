@@ -91,7 +91,8 @@ private:
 };
 
 /**
- * Used to notify the catalog cache loader of a new collection version.
+ * Used to notify the catalog cache loader of a new collection version and invalidate the in-memory
+ * routing table cache once the oplog updates are committed and become visible.
  */
 class CollectionVersionLogOpHandler final : public RecoveryUnit::Change {
 public:
@@ -99,8 +100,13 @@ public:
         : _opCtx(opCtx), _nss(nss) {}
 
     void commit() override {
-        Grid::get(_opCtx)->catalogCache()->invalidateShardedCollection(_nss);
         CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
+
+        invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+        // This is a hack to get around CollectionShardingState::refreshMetadata() requiring the X
+        // lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary measure until
+        // SERVER-31595 removes the X lock requirement.
+        CollectionShardingState::get(_opCtx, _nss)->markNotShardedAtStepdown();
     }
 
     void rollback() override {}
@@ -109,6 +115,17 @@ private:
     OperationContext* _opCtx;
     const NamespaceString _nss;
 };
+
+/**
+ * Caller must hold the global lock in some mode other than MODE_NONE.
+ */
+bool isStandaloneOrPrimary(OperationContext* opCtx) {
+    dassert(opCtx->lockState()->isLocked());
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    return !isReplSet || (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+                          repl::MemberState::RS_PRIMARY);
+}
 
 }  // unnamed namespace
 
@@ -307,8 +324,7 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (_nss == NamespaceString::kShardConfigCollectionsCollectionName) {
-            _onConfigRefreshCompleteInvalidateCachedMetadataAndNotify(
-                opCtx, query, update, updatedDoc);
+            _onConfigCollectionsUpdateOp(opCtx, query, update, updatedDoc);
         }
 
         if (ShardingState::get(opCtx)->enabled()) {
@@ -407,31 +423,44 @@ void CollectionShardingState::onDropCollection(OperationContext* opCtx,
     }
 }
 
-void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadataAndNotify(
-    OperationContext* opCtx,
-    const BSONObj& query,
-    const BSONObj& update,
-    const BSONObj& updatedDoc) {
+void CollectionShardingState::_onConfigCollectionsUpdateOp(OperationContext* opCtx,
+                                                           const BSONObj& query,
+                                                           const BSONObj& update,
+                                                           const BSONObj& updatedDoc) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-    // Extract which collection entry is being updated
-    std::string refreshCollection;
+    // Notification of routing table changes are only needed on secondaries.
+    if (isStandaloneOrPrimary(opCtx)) {
+        return;
+    }
+
+    // Extract which user collection was updated.
+    std::string updatedCollection;
     fassertStatusOK(
-        40477, bsonExtractStringField(query, ShardCollectionType::ns.name(), &refreshCollection));
+        40477, bsonExtractStringField(query, ShardCollectionType::ns.name(), &updatedCollection));
 
-    // Parse the '$set' update, which will contain the 'lastRefreshedCollectionVersion' if it is
-    // present.
-    BSONElement updateElement;
-    fassertStatusOK(40478,
-                    bsonExtractTypedField(update, StringData("$set"), Object, &updateElement));
-    BSONObj setField = updateElement.Obj();
+    // Parse the '$set' update.
+    BSONElement setElement;
+    Status setStatus = bsonExtractTypedField(update, StringData("$set"), Object, &setElement);
+    if (setStatus.isOK()) {
+        BSONObj setField = setElement.Obj();
+        const NamespaceString updatedNss(updatedCollection);
 
-    // If 'lastRefreshedCollectionVersion' is present, then a refresh completed and the catalog
-    // cache must be invalidated and the catalog cache loader notified of the new version.
-    if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
-        opCtx->recoveryUnit()->registerChange(
-            new CollectionVersionLogOpHandler(opCtx, NamespaceString(refreshCollection)));
+        // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().
+        AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
+
+        if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
+            opCtx->recoveryUnit()->registerChange(
+                new CollectionVersionLogOpHandler(opCtx, updatedNss));
+        }
+
+        if (setField.hasField(ShardCollectionType::enterCriticalSectionCounter.name())) {
+            // This is a hack to get around CollectionShardingState::refreshMetadata() requiring the
+            // X lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary measure until
+            // SERVER-31595 removes the X lock requirement.
+            CollectionShardingState::get(opCtx, updatedNss)->markNotShardedAtStepdown();
+        }
     }
 }
 
@@ -440,13 +469,21 @@ void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadataAndNotify(
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
+    // Notification of routing table changes are only needed on secondaries.
+    if (isStandaloneOrPrimary(opCtx)) {
+        return;
+    }
+
     // Extract which collection entry is being deleted from the _id field.
     std::string deletedCollection;
     fassertStatusOK(
         40479, bsonExtractStringField(query, ShardCollectionType::ns.name(), &deletedCollection));
+    const NamespaceString deletedNss(deletedCollection);
 
-    opCtx->recoveryUnit()->registerChange(
-        new CollectionVersionLogOpHandler(opCtx, NamespaceString(deletedCollection)));
+    // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().
+    AutoGetCollection autoColl(opCtx, deletedNss, MODE_IX);
+
+    opCtx->recoveryUnit()->registerChange(new CollectionVersionLogOpHandler(opCtx, deletedNss));
 }
 
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,

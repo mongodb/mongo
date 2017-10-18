@@ -143,13 +143,17 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
  * concern.
  *
  * Uses the $set operator on the update so that updates can be applied without resetting everything.
+ * 'inc' can be used to specify fields and their increments: it will be assigned to the $inc
+ * operator.
  *
  * If 'upsert' is true, expects neither 'refreshing' or 'lastRefreshedCollectionVersion' to be
  * present in the update: these refreshing fields should only be added to an existing document.
+ * Similarly, 'inc' should not specify 'upsert' true.
  */
 Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update,
+                                   const BSONObj& inc,
                                    const bool upsert);
 
 /**

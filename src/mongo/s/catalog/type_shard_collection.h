@@ -61,10 +61,12 @@ class StatusWith;
  *          "locale" : "fr_CA"
  *      },
  *      "unique" : false,
- *      "refreshing" : true,                                // optional
- *      "lastRefreshedCollectionVersion" : Timestamp(1, 0)  // optional
+ *      "refreshing" : true,                                 // optional
+ *      "lastRefreshedCollectionVersion" : Timestamp(1, 0),  // optional
+ *      "enterCriticalSectionCounter" : 4                    // optional
  *   }
  *
+ * enterCriticalSectionCounter is currently just an OpObserver signal, thus otherwise ignored here.
  */
 class ShardCollectionType {
 public:
@@ -79,6 +81,7 @@ public:
     static const BSONField<bool> unique;
     static const BSONField<bool> refreshing;
     static const BSONField<Date_t> lastRefreshedCollectionVersion;
+    static const BSONField<int> enterCriticalSectionCounter;
 
     ShardCollectionType(NamespaceString nss,
                         boost::optional<UUID> uuid,

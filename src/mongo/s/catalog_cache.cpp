@@ -193,6 +193,12 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
     return getCollectionRoutingInfo(opCtx, NamespaceString(ns));
 }
 
+StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    invalidateShardedCollection(nss);
+    return getCollectionRoutingInfo(opCtx, nss);
+}
+
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     invalidateShardedCollection(nss);

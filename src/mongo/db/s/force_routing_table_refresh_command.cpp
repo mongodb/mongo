@@ -37,8 +37,11 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
@@ -63,7 +66,7 @@ public:
     }
 
     bool slaveOk() const override {
-        return true;
+        return false;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -104,6 +107,25 @@ public:
                 !opCtx->getClient()->isInDirectClient());
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
+
+        {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+
+            // If the primary is in the critical section, secondaries must wait for the commit to
+            // finish on the primary in case a secondary's caller has an afterClusterTime inclusive
+            // of the commit (and new writes to the committed chunk) that hasn't yet propagated back
+            // to this shard. This ensures the read your own writes causal consistency guarantee.
+            auto css = CollectionShardingState::get(opCtx, nss);
+            if (css && css->getMigrationSourceManager()) {
+                auto criticalSectionSignal =
+                    css->getMigrationSourceManager()->getMigrationCriticalSectionSignal(true);
+                if (criticalSectionSignal) {
+                    auto& oss = OperationShardingState::get(opCtx);
+                    oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
+                    oss.waitForMigrationCriticalSectionSignal(opCtx);
+                }
+            }
+        }
 
         LOG(1) << "Forcing routing table refresh for " << nss;
 

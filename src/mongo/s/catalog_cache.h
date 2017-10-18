@@ -83,8 +83,14 @@ public:
                                                                      StringData ns);
 
     /**
-     * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed
-     * and returns a NamespaceNotSharded error if the collection is not sharded.
+     * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
+     */
+    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
+     * NamespaceNotSharded error if the collection is not sharded.
      */
     StatusWith<CachedCollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss);

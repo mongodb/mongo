@@ -88,8 +88,11 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                                      collAndChunks.shardKeyPattern,
                                                      collAndChunks.defaultCollation,
                                                      collAndChunks.shardKeyIsUnique);
-    Status status = updateShardCollectionsEntry(
-        opCtx, BSON(ShardCollectionType::ns() << nss.ns()), update.toBSON(), true /*upsert*/);
+    Status status = updateShardCollectionsEntry(opCtx,
+                                                BSON(ShardCollectionType::ns() << nss.ns()),
+                                                update.toBSON(),
+                                                BSONObj(),
+                                                true /*upsert*/);
     if (!status.isOK()) {
         return status;
     }

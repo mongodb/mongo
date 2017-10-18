@@ -332,13 +332,6 @@
     let freshMongos = st.s0;
     let staleMongos = st.s1;
 
-    assert.commandWorked(staleMongos.adminCommand({enableSharding: db}));
-    st.ensurePrimaryShard(db, st.shard0.shardName);
-
-    // Turn on system profiler on secondaries to collect data on all database operations.
-    assert.commandWorked(donorShardSecondary.getDB(db).setProfilingLevel(2));
-    assert.commandWorked(recipientShardSecondary.getDB(db).setProfilingLevel(2));
-
     let res = st.s.adminCommand({listCommands: 1});
     assert.commandWorked(res);
 
@@ -356,14 +349,25 @@
 
         jsTest.log("testing command " + tojson(test.command));
 
+        assert.commandWorked(staleMongos.adminCommand({enableSharding: db}));
+        st.ensurePrimaryShard(db, st.shard0.shardName);
         assert.commandWorked(staleMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
         assert.commandWorked(staleMongos.adminCommand({split: nss, middle: {x: 0}}));
 
-        // Do dummy read from the stale mongos so that it loads the routing table into memory once.
+        // Do dummy read from the stale mongos so it loads the routing table into memory once.
+        // Additionally, do a secondary read to ensure that the secondary has loaded the initial
+        // routing table -- the first read to the primary will refresh the mongos' shardVersion,
+        // which will then be used against the secondary to ensure the secondary is fresh.
         assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
+        assert.commandWorked(freshMongos.getDB(db).runCommand(
+            {find: coll, $readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
 
         // Do any test-specific setup.
         test.setUp(staleMongos);
+
+        // Turn on system profiler on secondaries to collect data on all database operations.
+        assert.commandWorked(donorShardSecondary.getDB(db).setProfilingLevel(2));
+        assert.commandWorked(recipientShardSecondary.getDB(db).setProfilingLevel(2));
 
         // Do a moveChunk from the fresh mongos to make the other mongos stale.
         // Use {w:2} (all) write concern so the metadata change gets persisted to the secondary
@@ -450,8 +454,10 @@
             });
         }
 
-        // Clean up the collection by dropping it. This also drops all associated indexes.
-        assert.commandWorked(freshMongos.getDB(db).runCommand({drop: coll}));
+        // Clean up the database by dropping it; this is the only way to drop the profiler
+        // collection on secondaries. This also drops all associated indexes.
+        // Do this from staleMongos, so staleMongos purges the database entry from its cache.
+        assert.commandWorked(staleMongos.getDB(db).runCommand({dropDatabase: 1}));
     }
 
     st.stop();

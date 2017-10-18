@@ -500,10 +500,8 @@ ChunkVersion ShardingState::_refreshMetadata(OperationContext* opCtx, const Name
                           << " before shard name has been set",
             shardId.isValid());
 
-    auto const catalogCache = Grid::get(opCtx)->catalogCache();
-    catalogCache->invalidateShardedCollection(nss);
-
-    const auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+    const auto routingInfo = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
     const auto cm = routingInfo.cm();
 
     if (!cm) {

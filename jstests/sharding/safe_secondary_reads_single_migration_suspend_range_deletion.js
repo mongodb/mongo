@@ -391,8 +391,13 @@
         assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
         assert.commandWorked(freshMongos.adminCommand({split: nss, middle: {x: 0}}));
 
-        // Do dummy read from the stale mongos so that it loads the routing table into memory once.
+        // Do dummy read from the stale mongos so it loads the routing table into memory once.
+        // Additionally, do a secondary read to ensure that the secondary has loaded the initial
+        // routing table -- the first read to the primary will refresh the mongos' shardVersion,
+        // which will then be used against the secondary to ensure the secondary is fresh.
         assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
+        assert.commandWorked(freshMongos.getDB(db).runCommand(
+            {find: coll, $readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
 
         // Do any test-specific setup.
         test.setUp(staleMongos);

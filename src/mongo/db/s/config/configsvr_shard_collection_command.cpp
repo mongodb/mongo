@@ -593,8 +593,7 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
     }
 
     // Reload the config info, after all the migrations
-    catalogCache->invalidateShardedCollection(nss);
-    routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+    routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, nss));
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Collection was successfully written as sharded but got dropped before it "
             "could be evenly distributed",

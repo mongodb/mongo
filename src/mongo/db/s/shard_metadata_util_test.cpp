@@ -73,6 +73,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
         ASSERT_OK(updateShardCollectionsEntry(operationContext(),
                                               BSON(ShardCollectionType::ns(kNss.ns())),
                                               shardCollectionType.toBSON(),
+                                              BSONObj(),
                                               true /*upsert*/));
         return shardCollectionType;
     }

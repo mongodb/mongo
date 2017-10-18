@@ -40,10 +40,12 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -58,6 +60,8 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+using namespace shardmetadatautil;
 
 namespace {
 
@@ -290,9 +294,29 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
         _critSecSignal = std::make_shared<Notification<void>>();
     }
 
+    _state = kCriticalSection;
+
+    // Persist a signal to secondaries that we've entered the critical section. This is will cause
+    // secondaries to refresh their routing table when next accessed, which will block behind the
+    // critical section. This ensures causal consistency by preventing a stale mongos with a cluster
+    // time inclusive of the migration config commit update from accessing secondary data.
+    // Note: this write must occur after the critSec flag is set, to ensure the secondary refresh
+    // will stall behind the flag.
+    Status signalStatus =
+        updateShardCollectionsEntry(opCtx,
+                                    BSON(ShardCollectionType::ns() << getNss().ns()),
+                                    BSONObj(),
+                                    BSON(ShardCollectionType::enterCriticalSectionCounter() << 1),
+                                    false /*upsert*/);
+    if (!signalStatus.isOK()) {
+        return {
+            ErrorCodes::OperationFailed,
+            str::stream() << "Failed to persist critical section signal for secondaries due to: "
+                          << signalStatus.toString()};
+    }
+
     log() << "Migration successfully entered critical section";
 
-    _state = kCriticalSection;
     scopedGuard.Dismiss();
     return Status::OK();
 }

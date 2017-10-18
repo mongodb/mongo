@@ -51,6 +51,8 @@ const BSONField<bool> ShardCollectionType::unique("unique");
 const BSONField<bool> ShardCollectionType::refreshing("refreshing");
 const BSONField<Date_t> ShardCollectionType::lastRefreshedCollectionVersion(
     "lastRefreshedCollectionVersion");
+const BSONField<int> ShardCollectionType::enterCriticalSectionCounter(
+    "enterCriticalSectionCounter");
 
 ShardCollectionType::ShardCollectionType(NamespaceString nss,
                                          boost::optional<UUID> uuid,
