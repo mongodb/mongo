@@ -747,32 +747,53 @@ public:
     }
 
 private:
+    /**
+     * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
+     * size.
+     * Batches are limited to 10% of the oplog.
+     */
+    std::size_t _calculateBatchLimitBytes() {
+        auto opCtx = cc().makeOperationContext();
+        auto storageInterface = StorageInterface::get(opCtx.get());
+        auto oplogMaxSizeResult =
+            storageInterface->getOplogMaxSize(opCtx.get(), NamespaceString::kRsOplogNamespace);
+        auto oplogMaxSize = fassertStatusOK(40301, oplogMaxSizeResult);
+        return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
+    }
+
+    /**
+     * If slaveDelay is enabled, this function calculates the most recent timestamp of any oplog
+     * entries that can be be returned in a batch.
+     */
+    boost::optional<Date_t> _calculateSlaveDelayLatestTimestamp() {
+        auto service = cc().getServiceContext();
+        auto replCoord = ReplicationCoordinator::get(service);
+        auto slaveDelay = replCoord->getSlaveDelaySecs();
+        if (slaveDelay <= Seconds(0)) {
+            return {};
+        }
+        auto fastClockSource = service->getFastClockSource();
+        return fastClockSource->now() - slaveDelay;
+    }
+
     void run() {
         Client::initThread("ReplBatcher");
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        const auto replCoord = ReplicationCoordinator::get(&opCtx);
-        const auto fastClockSource = opCtx.getServiceContext()->getFastClockSource();
-        const auto oplogMaxSize = fassertStatusOK(40301,
-                                                  StorageInterface::get(&opCtx)->getOplogMaxSize(
-                                                      &opCtx, NamespaceString::kRsOplogNamespace));
 
-        // Batches are limited to 10% of the oplog.
         BatchLimits batchLimits;
-        batchLimits.bytes = std::min(oplogMaxSize / 10, size_t(replBatchLimitBytes));
+        batchLimits.bytes = _calculateBatchLimitBytes();
 
         while (true) {
-            const auto slaveDelay = replCoord->getSlaveDelaySecs();
-            batchLimits.slaveDelayLatestTimestamp = (slaveDelay > Seconds(0))
-                ? (fastClockSource->now() - slaveDelay)
-                : boost::optional<Date_t>();
+            batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
 
             // Check this once per batch since users can change it at runtime.
             batchLimits.ops = replBatchLimitOperations.load();
 
             OpQueue ops;
             // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
-            while (!_syncTail->tryPopAndWaitForMore(&opCtx, &ops, batchLimits)) {
+            {
+                auto opCtx = cc().makeOperationContext();
+                while (!_syncTail->tryPopAndWaitForMore(opCtx.get(), &ops, batchLimits)) {
+                }
             }
 
             if (ops.empty() && !ops.mustShutdown()) {
