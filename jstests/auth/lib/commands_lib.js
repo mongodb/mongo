@@ -1680,7 +1680,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: roles_writeDbAdmin,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
                 privileges: [{
                     resource: {db: firstDbName, collection: "toCapped"},
                     actions: ["convertToCapped"]
@@ -1688,7 +1688,7 @@ var authCommandsLib = {
               },
               {
                 runOnDb: secondDbName,
-                roles: roles_writeDbAdminAny,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
                 privileges: [{
                     resource: {db: secondDbName, collection: "toCapped"},
                     actions: ["convertToCapped"]
@@ -2231,7 +2231,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: roles_writeDbAdmin,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
                 privileges: [{
                     resource: {db: firstDbName, collection: "x"},
                     actions: ["createCollection", "convertToCapped"]
@@ -2239,7 +2239,7 @@ var authCommandsLib = {
               },
               {
                 runOnDb: firstDbName,
-                roles: roles_writeDbAdmin,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
                 privileges: [{
                     resource: {db: firstDbName, collection: "x"},
                     actions: ["insert", "convertToCapped"]
@@ -2247,7 +2247,7 @@ var authCommandsLib = {
               },
               {
                 runOnDb: secondDbName,
-                roles: roles_writeDbAdminAny,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
                 privileges: [{
                     resource: {db: secondDbName, collection: "x"},
                     actions: ["createCollection", "convertToCapped"]
@@ -2255,7 +2255,7 @@ var authCommandsLib = {
               },
               {
                 runOnDb: secondDbName,
-                roles: roles_writeDbAdminAny,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
                 privileges: [{
                     resource: {db: secondDbName, collection: "x"},
                     actions: ["insert", "convertToCapped"]

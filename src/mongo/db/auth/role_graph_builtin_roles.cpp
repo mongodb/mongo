@@ -582,8 +582,8 @@ void addBackupPrivileges(PrivilegeVector* privileges) {
 void addRestorePrivileges(PrivilegeVector* privileges) {
     ActionSet actions;
     actions << ActionType::bypassDocumentValidation << ActionType::collMod
-            << ActionType::createCollection << ActionType::createIndex << ActionType::dropCollection
-            << ActionType::insert;
+            << ActionType::convertToCapped << ActionType::createCollection
+            << ActionType::createIndex << ActionType::dropCollection << ActionType::insert;
 
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forAnyNormalResource(), actions));
