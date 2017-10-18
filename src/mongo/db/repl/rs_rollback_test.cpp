@@ -563,8 +563,11 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
         _coordinator,
         _replicationProcess.get()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(
-        1, countLogLinesContaining("Dropped index in rollback: collection = test.t, index = a_1"));
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(
+                      str::stream() << "Dropped index in rollback for collection: test.t, UUID: "
+                                    << options.uuid->toString()
+                                    << ", index: a_1"));
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
@@ -779,10 +782,16 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
         ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_opCtx.get()));
         ASSERT_EQUALS(
             1,
-            countLogLinesContaining("Dropped index in rollback: collection = test.t, index = a_1"));
+            countLogLinesContaining(str::stream()
+                                    << "Dropped index in rollback for collection: test.t, UUID: "
+                                    << options.uuid->toString()
+                                    << ", index: a_1"));
         ASSERT_EQUALS(
             1,
-            countLogLinesContaining("Created index in rollback: collection = test.t, index = a_1"));
+            countLogLinesContaining(str::stream()
+                                    << "Created index in rollback for collection: test.t, UUID: "
+                                    << options.uuid->toString()
+                                    << ", index: a_1"));
         std::vector<IndexDescriptor*> indexes;
         indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("a" << 1), false, &indexes);
         ASSERT(indexes.size() == 1);
