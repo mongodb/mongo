@@ -49,7 +49,7 @@ public:
 
     virtual ~TransactionReaper() = 0;
 
-    virtual void reap(OperationContext* OperationContext) = 0;
+    virtual int reap(OperationContext* OperationContext) = 0;
 
     /**
      * The implementation of the sessions collections is different in replica sets versus sharded

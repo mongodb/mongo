@@ -29,6 +29,7 @@
 #pragma once
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "mongo/db/cursor_id.h"
@@ -369,8 +370,8 @@ public:
      */
     std::vector<GenericCursor> getAllCursors() const;
 
-    Status killCursorsWithMatchingSessions(OperationContext* opCtx,
-                                           const SessionKiller::Matcher& matcher);
+    std::pair<Status, int> killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                           const SessionKiller::Matcher& matcher);
 
     /**
      * Returns a list of all open cursors for the given session.
