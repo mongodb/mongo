@@ -451,6 +451,10 @@ int ProcessInfo::getResidentSize() {
     return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
 }
 
+double ProcessInfo::getMaxSystemFileCachePercentage() {
+    return 0.0;
+}
+
 double ProcessInfo::getSystemMemoryPressurePercentage() {
     return 0.0;
 }

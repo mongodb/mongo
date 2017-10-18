@@ -130,6 +130,10 @@ int ProcessInfo::getResidentSize() {
     return rss;
 }
 
+double ProcessInfo::getMaxSystemFileCachePercentage() {
+    return 0.0;
+}
+
 double ProcessInfo::getSystemMemoryPressurePercentage() {
     return 0.0;
 }
