@@ -889,8 +889,17 @@ functions:
         set -o errexit
         set -o verbose
 
+        ${activate_virtualenv}
+        # The Windows build variants are running python 2.7.3 and require TLS 1.2 from pyOpenSSL
+        pip install 'pyOpenSSL ; sys_platform == "win32" or sys_platform == "cygwin"'
+
         rm -rf /data/install /data/multiversion
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_edition|"base"} ${multiversion_platform_arch|"linux/x86_64"} "3.0" "3.2" "3.4"
+        python buildscripts/setup_multiversion_mongodb.py                   \
+          --installDir /data/install                                        \
+          --linkDir /data/multiversion                                      \
+          --edition ${multiversion_edition|base}                            \
+          --platformArchitecture ${multiversion_platform_arch|linux/x86_64} \
+          --useLatest 3.0 3.2 3.4
 
   "do snmp setup" :
     command: shell.exec
@@ -3189,6 +3198,7 @@ tasks:
   name: multiversion
   commands:
   - func: "do setup"
+  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -3200,6 +3210,7 @@ tasks:
   name: multiversion_auth
   commands:
   - func: "do setup"
+  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -3211,6 +3222,7 @@ tasks:
   name: multiversion_WT
   commands:
   - func: "do setup"
+  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -3222,6 +3234,7 @@ tasks:
   name: multiversion_multistorage_engine
   commands:
   - func: "do setup"
+  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -3783,6 +3796,7 @@ tasks:
   name: sharding_last_stable_mongos_and_mixed_shards
   commands:
   - func: "do setup"
+  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
