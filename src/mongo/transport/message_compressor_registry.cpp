@@ -112,17 +112,18 @@ void MessageCompressorRegistry::setSupportedCompressors(std::vector<std::string>
 }
 
 Status addMessageCompressionOptions(moe::OptionSection* options, bool forShell) {
-    auto ret =
+    auto& ret =
         options
             ->addOptionChaining("net.compression.compressors",
                                 "networkMessageCompressors",
                                 moe::String,
                                 "Comma-separated list of compressors to use for network messages")
-            .setDefault(moe::Value(kDefaultConfigValue.toString()))
             .setImplicit(moe::Value(kDisabledConfigValue.toString()));
-    if (forShell)
-        ret.hidden();
-
+    if (forShell) {
+        ret.setDefault(moe::Value(kDisabledConfigValue.toString())).hidden();
+    } else {
+        ret.setDefault(moe::Value(kDefaultConfigValue.toString()));
+    }
     return Status::OK();
 }
 
