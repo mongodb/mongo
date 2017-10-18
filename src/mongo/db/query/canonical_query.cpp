@@ -152,6 +152,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         newExpCtx.reset(new ExpressionContext(opCtx, collator.get()));
     } else {
         newExpCtx = expCtx;
+        invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
         qr->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);

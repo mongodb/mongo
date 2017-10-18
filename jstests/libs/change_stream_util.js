@@ -22,7 +22,8 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
      * Returns the cursor returned by the 'aggregate' command.
      */
     self.startWatchingChanges = function({pipeline, collection, includeToken, aggregateOptions}) {
-        aggregateOptions = aggregateOptions || {cursor: {batchSize: 1}};
+        aggregateOptions = aggregateOptions || {};
+        aggregateOptions.cursor = aggregateOptions.cursor || {batchSize: 1};
 
         if (!includeToken) {
             // Strip the oplog fields we aren't testing.

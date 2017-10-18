@@ -41,7 +41,7 @@ class DocumentSourceMatch : public DocumentSource {
 public:
     virtual ~DocumentSourceMatch() = default;
 
-    GetNextResult getNext() final;
+    GetNextResult getNext() override;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     BSONObjSet getOutputSorts() final {
         return pSource ? pSource->getOutputSorts()
@@ -156,7 +156,7 @@ public:
 
 protected:
     DocumentSourceMatch(const BSONObj& query,
-                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
     std::unique_ptr<MatchExpression> _expression;

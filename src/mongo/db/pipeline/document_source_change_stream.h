@@ -148,7 +148,9 @@ public:
      * Produce the BSON object representing the filter for the $match stage to filter oplog entries
      * to only those relevant for this $changeStream stage.
      */
-    static BSONObj buildMatchFilter(const NamespaceString& nss, Timestamp startFrom, bool isResume);
+    static BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    Timestamp startFrom,
+                                    bool isResume);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation
@@ -176,6 +178,14 @@ public:
         BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     const char* getSourceName() const final;
+
+    GetNextResult getNext() final {
+        // We should never execute this stage directly. We expect this stage to be absorbed into the
+        // cursor feeding the pipeline, and executing this stage may result in the use of the wrong
+        // collation. The comparisons against the oplog must use the simple collation, regardless of
+        // the collation on the ExpressionContext.
+        MONGO_UNREACHABLE;
+    }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 

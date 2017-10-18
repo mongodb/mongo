@@ -60,17 +60,14 @@ struct DepsTracker;
 class PipelineD {
 public:
     /**
-     * Create a Cursor wrapped in a DocumentSourceCursor, which is suitable
-     * to be the first source for a pipeline to begin with.  This source
-     * will feed the execution of the pipeline.
+     * If the first stage in the pipeline does not generate its own output documents, attaches a
+     * DocumentSourceCursor to the front of the pipeline which will output documents from the
+     * collection to feed into the pipeline.
      *
-     * This method looks for early pipeline stages that can be folded into
-     * the underlying cursor, and when a cursor can absorb those, they
-     * are removed from the head of the pipeline.  For example, an
-     * early match can be removed and replaced with a Cursor that will
-     * do an index scan.
-     *
-     * The cursor is added to the front of the pipeline's sources.
+     * This method looks for early pipeline stages that can be folded into the underlying
+     * PlanExecutor, and removes those stages from the pipeline when they can be absorbed by the
+     * PlanExecutor. For example, an early $match can be removed and replaced with a
+     * DocumentSourceCursor containing a PlanExecutor that will do an index scan.
      *
      * Callers must take care to ensure that 'nss' is locked in at least IS-mode.
      *

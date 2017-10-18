@@ -257,6 +257,9 @@ public:
                 !bool(css->getMetadata()));
 
         PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
+        // Optimize again, since there may be additional optimizations that can be done after adding
+        // the initial cursor stage.
+        pipeline->optimizePipeline();
 
         return Status::OK();
     }
@@ -860,11 +863,7 @@ void PipelineD::addCursorSource(Collection* collection,
 
         pSource->setProjection(deps.toProjection(), deps.toParsedDeps());
     }
-
-    // Add the initial DocumentSourceCursor to the front of the pipeline. Then optimize again in
-    // case the new stage can be absorbed with the first stages of the pipeline.
     pipeline->addInitialSource(pSource);
-    pipeline->optimizePipeline();
 }
 
 Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {

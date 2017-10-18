@@ -130,25 +130,30 @@ public:
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
         vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
 
+        // This match stage is a DocumentSourceOplogMatch, which we explicitly disallow from
+        // executing as a safety mechanism, since it needs to use the collection-default collation,
+        // even if the rest of the pipeline is using some other collation. To avoid ever executing
+        // that stage here, we'll up-convert it from the non-executable DocumentSourceOplogMatch to
+        // a fully-executable DocumentSourceMatch. This is safe because all of the unit tests will
+        // use the 'simple' collation.
         auto match = dynamic_cast<DocumentSourceMatch*>(stages[0].get());
         ASSERT(match);
+        auto executableMatch = DocumentSourceMatch::create(match->getQuery(), getExpCtx());
+
         auto mock = DocumentSourceMock::create(D(entry.toBSON()));
-        match->setSource(mock.get());
+        executableMatch->setSource(mock.get());
 
         // Check the oplog entry is transformed correctly.
         auto transform = stages[1].get();
         ASSERT(transform);
         ASSERT_EQ(string(transform->getSourceName()), DSChangeStream::kStageName);
-        transform->setSource(match);
+        transform->setSource(executableMatch.get());
 
         auto closeCursor = stages.back().get();
         ASSERT(closeCursor);
         closeCursor->setSource(transform);
 
-        // Include the mock stage in the "stages" so it won't get destroyed outside the function
-        // scope.
-        stages.insert(stages.begin(), mock);
-        return stages;
+        return {mock, executableMatch, transform, closeCursor};
     }
 
     OplogEntry createCommand(const BSONObj& oField,

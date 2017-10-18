@@ -86,7 +86,6 @@ const BSONObj DocumentSourceChangeStream::kSortSpec =
 namespace {
 
 static constexpr StringData kOplogMatchExplainName = "$_internalOplogMatch"_sd;
-
 }  // namespace
 
 intrusive_ptr<DocumentSourceOplogMatch> DocumentSourceOplogMatch::create(
@@ -231,18 +230,28 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
 
 }  // namespace
 
-BSONObj DocumentSourceChangeStream::buildMatchFilter(const NamespaceString& nss,
-                                                     Timestamp startFrom,
-                                                     bool isResume) {
+BSONObj DocumentSourceChangeStream::buildMatchFilter(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp startFrom, bool isResume) {
+    auto nss = expCtx->ns;
     auto target = nss.ns();
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
-    auto dropDatabase = BSON("o.dropDatabase" << 1);
-    auto dropCollection = BSON("o.drop" << nss.coll());
-    auto renameCollection = BSON("o.renameCollection" << target);
+    BSONArrayBuilder invalidatingCommands;
+    invalidatingCommands.append(BSON("o.dropDatabase" << 1));
+    invalidatingCommands.append(BSON("o.drop" << nss.coll()));
+    invalidatingCommands.append(BSON("o.renameCollection" << target));
+    if (expCtx->collation.isEmpty()) {
+        // If the user did not specify a collation, they should be using the collection's default
+        // collation. So a "create" command which has any collation present would invalidate the
+        // change stream, since that must mean the stream was created before the collection existed
+        // and used the simple collation, which is no longer the default.
+        invalidatingCommands.append(
+            BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
+    }
     // 1.1) Commands that are on target db and one of the above.
     auto commandsOnTargetDb =
-        BSON("ns" << nss.getCommandNS().ns() << OR(dropDatabase, dropCollection, renameCollection));
+        BSON("$and" << BSON_ARRAY(BSON("ns" << nss.getCommandNS().ns())
+                                  << BSON("$or" << invalidatingCommands.arr())));
     // 1.2) Supported commands that have arbitrary db namespaces in "ns" field.
     auto renameDropTarget = BSON("o.to" << target);
     // All supported commands that are either (1.1) or (1.2).
@@ -282,11 +291,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
-
-    uassert(40471,
-            "Only simple collation is currently allowed when using a $changeStream stage. Please "
-            "specify a collation of {locale: 'simple'} to open a $changeStream on this collection.",
-            !expCtx->getCollator());
 
     boost::optional<Timestamp> startFrom;
     if (!expCtx->inMongos) {
@@ -341,7 +345,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     invariant(expCtx->inMongos || static_cast<bool>(startFrom));
     if (startFrom) {
         stages.push_back(DocumentSourceOplogMatch::create(
-            buildMatchFilter(expCtx->ns, *startFrom, changeStreamIsResuming), expCtx));
+            buildMatchFilter(expCtx, *startFrom, changeStreamIsResuming), expCtx));
     }
 
     stages.push_back(createTransformationStage(elem.embeddedObject(), expCtx));
@@ -440,6 +444,8 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
             break;
         }
         case repl::OpTypeEnum::kCommand: {
+            // Any command that makes it through our filter is an invalidating command such as a
+            // drop.
             operationType = kInvalidateOpType;
             // Make sure the result doesn't have a document key.
             documentKey = Value();
@@ -479,7 +485,6 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     // If we're in a sharded environment, we'll need to merge the results by their sort key, so add
     // that as metadata.
     if (_expCtx->needsMerge) {
-        auto change = doc.peek();
         doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
     }
 

@@ -80,6 +80,39 @@ void ExpressionContext::checkForInterrupt() {
     }
 }
 
+ExpressionContext::CollatorStash::CollatorStash(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<CollatorInterface> newCollator)
+    : _expCtx(expCtx),
+      _originalCollation(_expCtx->collation),
+      _originalCollatorOwned(std::move(_expCtx->_ownedCollator)),
+      _originalCollatorUnowned(_expCtx->_collator) {
+    _expCtx->setCollator(std::move(newCollator));
+    _expCtx->collation =
+        _expCtx->getCollator() ? _expCtx->getCollator()->getSpec().toBSON().getOwned() : BSONObj();
+}
+
+ExpressionContext::CollatorStash::~CollatorStash() {
+    if (_originalCollatorOwned) {
+        _expCtx->setCollator(std::move(_originalCollatorOwned));
+    } else {
+        _expCtx->setCollator(_originalCollatorUnowned);
+        if (!_originalCollatorUnowned && _expCtx->_ownedCollator) {
+            // If the original collation was 'nullptr', we cannot distinguish whether it was owned
+            // or not. We always set '_ownedCollator' with the stash, so should reset it to null
+            // here.
+            _expCtx->_ownedCollator = nullptr;
+        }
+    }
+    _expCtx->collation = _originalCollation;
+}
+
+std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarilyChangeCollator(
+    std::unique_ptr<CollatorInterface> newCollator) {
+    // This constructor of CollatorStash is private, so we can't use make_unique().
+    return std::unique_ptr<CollatorStash>(new CollatorStash(this, std::move(newCollator)));
+}
+
 void ExpressionContext::setCollator(const CollatorInterface* collator) {
     _collator = collator;
 
