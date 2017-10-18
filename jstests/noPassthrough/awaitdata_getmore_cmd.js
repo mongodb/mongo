@@ -152,7 +152,9 @@
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.nextBatch.length, 0);
     assert.gte((new Date()) - now,
-               4000,
+               // SERVER-31502 Add some leniency here since our server-side wait may be woken up
+               // spuriously.
+               3900,
                "Insert not matching filter caused awaitData getMore to return prematurely.");
     insertshell();
 
