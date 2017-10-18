@@ -15,6 +15,7 @@ from . import testcases
 from .. import config as _config
 from .. import errors
 from .. import utils
+from ..core import network
 from ..utils import queue as _queue
 
 
@@ -52,14 +53,14 @@ class TestSuiteExecutor(object):
         self._suite = suite
 
         # Only start as many jobs as we need. Note this means that the number of jobs we run may not
-        # actually be _config.JOBS.
-        jobs_to_start = _config.JOBS
+        # actually be _config.JOBS or self._suite.options.num_jobs.
+        jobs_to_start = self._suite.options.num_jobs
         num_tests = len(suite.tests)
 
         if num_tests < jobs_to_start:
-            self.logger.info("Reducing the number of jobs from %d to %d since there are only %d "
-                             "test(s) to run.",
-                _config.JOBS, num_tests, num_tests)
+            self.logger.info(
+                "Reducing the number of jobs from %d to %d since there are only %d test(s) to run.",
+                self._suite.options.num_jobs, num_tests, num_tests)
             jobs_to_start = num_tests
 
         # Must be done after getting buildlogger configuration.
@@ -82,7 +83,7 @@ class TestSuiteExecutor(object):
                 return_code = 2
                 return
 
-            num_repeats = _config.REPEAT
+            num_repeats = self._suite.options.num_repeats
             while num_repeats > 0:
                 test_queue = self._make_test_queue()
 
@@ -111,7 +112,7 @@ class TestSuiteExecutor(object):
 
                 if not report.wasSuccessful():
                     return_code = 1
-                    if _config.FAIL_FAST:
+                    if self._suite.options.fail_fast:
                         break
 
                 # Clear the report so it can be reused for the next execution.
@@ -128,6 +129,12 @@ class TestSuiteExecutor(object):
         """
         Sets up a fixture for each job.
         """
+
+        # We reset the internal state of the PortAllocator before calling job.fixture.setup() so
+        # that ports used by the fixture during a test suite run earlier can be reused during this
+        # current test suite.
+        network.PortAllocator.reset()
+
         for job in self._jobs:
             try:
                 job.fixture.setup()
@@ -260,9 +267,9 @@ class TestSuiteExecutor(object):
         fixture = self._make_fixture(job_num, job_logger)
         hooks = self._make_hooks(job_num, fixture)
 
-        report = _report.TestReport(job_logger)
+        report = _report.TestReport(job_logger, self._suite.options)
 
-        return _job.Job(job_logger, fixture, hooks, report)
+        return _job.Job(job_logger, fixture, hooks, report, self._suite.options)
 
     def _make_test_queue(self):
         """

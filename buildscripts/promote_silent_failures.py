@@ -49,15 +49,15 @@ def main():
     # Count number of "silentfail" per test file.
     status_dict = collections.defaultdict(int)
     for test_info in test_report.test_infos:
-        if test_info.status == "silentfail":
+        if test_info.evergreen_status == "silentfail":
             status_dict[test_info.test_id] += 1
 
     # For test files with more than 1 "silentfail", convert status to "fail".
     for test_info in test_report.test_infos:
         if status_dict[test_info.test_id] >= 2:
-            test_info.status = "fail"
+            test_info.evergreen_status = "fail"
 
-    result_report = test_report.as_dict();
+    result_report = test_report.as_dict()
     if options.outfile != "-":
         with open(options.outfile, "w") as fp:
             json.dump(result_report, fp)

@@ -4,6 +4,8 @@ Configuration options for resmoke.py.
 
 from __future__ import absolute_import
 
+import collections
+import itertools
 import os
 import os.path
 import time
@@ -38,6 +40,7 @@ DEFAULTS = {
     "continueOnFailure": False,
     "dbpathPrefix": None,
     "dbtest": None,
+    "distroId": None,
     "dryRun": None,
     "excludeWithAnyTags": None,
     "includeWithAnyTags": None,
@@ -51,6 +54,7 @@ DEFAULTS = {
     "numClientsPerFixture": 1,
     "shellPort": None,
     "shellConnString": None,
+    "patchBuild": False,
     "repeat": 1,
     "reportFailureStatus": "fail",
     "reportFile": None,
@@ -64,11 +68,97 @@ DEFAULTS = {
     "storageEngineCacheSizeGB": None,
     "tagFile": None,
     "taskId": None,
+    "taskName": None,
     "transportLayer": None,
+    "variantName": None,
     "wiredTigerCollectionConfigString": None,
     "wiredTigerEngineConfigString": None,
     "wiredTigerIndexConfigString": None
 }
+
+
+_SuiteOptions = collections.namedtuple("_SuiteOptions", [
+    "description",
+    "fail_fast",
+    "include_tags",
+    "num_jobs",
+    "num_repeats",
+    "report_failure_status",
+])
+
+
+class SuiteOptions(_SuiteOptions):
+    """
+    A class for representing top-level options to resmoke.py that can also be set at the
+    suite-level.
+    """
+
+    INHERIT = object()
+    ALL_INHERITED = None
+
+    @classmethod
+    def combine(cls, *suite_options_list):
+        """
+        Returns a SuiteOptions instance representing the combination of all SuiteOptions in
+        'suite_options_list'.
+        """
+
+        combined_options = cls.ALL_INHERITED._asdict()
+        include_tags_list = []
+
+        for suite_options in suite_options_list:
+            for field in cls._fields:
+                value = getattr(suite_options, field)
+                if value is cls.INHERIT:
+                    continue
+
+                if field == "description":
+                    # We discard the description of each of the individual SuiteOptions when they
+                    # are combined.
+                    continue
+
+                if field == "include_tags":
+                    if value is not None:
+                        include_tags_list.append(value)
+                    continue
+
+                combined_value = combined_options[field]
+                if combined_value is not cls.INHERIT and combined_value != value:
+                    raise ValueError("Attempted to set '{}' option multiple times".format(field))
+                combined_options[field] = value
+
+        if include_tags_list:
+            combined_options["include_tags"] = {"$allOf": include_tags_list}
+
+        return cls(**combined_options)
+
+    def resolve(self):
+        """
+        Returns a SuiteOptions instance representing the options overridden at the suite-level and
+        the inherited options from the top-level.
+        """
+
+        description = None
+        include_tags = None
+        parent = dict(zip(SuiteOptions._fields, [
+            description,
+            FAIL_FAST,
+            include_tags,
+            JOBS,
+            REPEAT,
+            REPORT_FAILURE_STATUS,
+        ]))
+
+        options = self._asdict()
+        for field in SuiteOptions._fields:
+            if options[field] is SuiteOptions.INHERIT:
+                options[field] = parent[field]
+
+        return SuiteOptions(**options)
+
+
+SuiteOptions.ALL_INHERITED = SuiteOptions(**dict(zip(SuiteOptions._fields,
+                                                     itertools.repeat(SuiteOptions.INHERIT))))
 
 
 ##
@@ -92,6 +182,22 @@ DBTEST_EXECUTABLE = None
 # If set to "tests", then resmoke.py will output the tests that would be run by each suite (without
 # actually running them).
 DRY_RUN = None
+
+# The identifier for the Evergreen distro that resmoke.py is being run on.
+EVERGREEN_DISTRO_ID = None
+
+# If true, then resmoke.py is being run as part of a patch build in Evergreen.
+EVERGREEN_PATCH_BUILD = None
+
+# The identifier for the Evergreen task that resmoke.py is being run under. If set, then the
+# Evergreen task id value will be transmitted to logkeeper when creating builds and tests.
+EVERGREEN_TASK_ID = None
+
+# The name of the Evergreen task that resmoke.py is being run for.
+EVERGREEN_TASK_NAME = None
+
+# The name of the Evergreen build variant that resmoke.py is being run on.
+EVERGREEN_VARIANT_NAME = None
 
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None
@@ -163,7 +269,7 @@ SHELL_WRITE_MODE = None
 SHUFFLE = None
 
 # If true, the launching of jobs is staggered in resmoke.py.
-STAGGER_JOBS = None 
+STAGGER_JOBS = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine.
@@ -176,11 +282,7 @@ STORAGE_ENGINE_CACHE_SIZE = None
 # The tag file to use that associates tests with tags.
 TAG_FILE = None
 
-# If set, then the Evergreen task Id value will be transmitted to logkeeper when creating builds and
-# tests.
-TASK_ID = None
-
-# IF set, then mongod/mongos's started by resmoke.py will use the specified transport layer
+# If set, then mongod/mongos's started by resmoke.py will use the specified transport layer.
 TRANSPORT_LAYER = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
@@ -208,7 +310,6 @@ DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
 
 # External files or executables, used as suite selectors, that are created during the build and
 # therefore might not be available when creating a test membership map.
-EXTERNAL_SUITE_SELECTORS = [DEFAULT_UNIT_TEST_LIST,
+EXTERNAL_SUITE_SELECTORS = (DEFAULT_UNIT_TEST_LIST,
                             DEFAULT_INTEGRATION_TEST_LIST,
-                            DEFAULT_DBTEST_EXECUTABLE]
-
+                            DEFAULT_DBTEST_EXECUTABLE)

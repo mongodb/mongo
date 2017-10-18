@@ -235,7 +235,7 @@ class BuildloggerServer(object):
         response = handler.post(CREATE_BUILD_ENDPOINT, data={
             "builder": builder,
             "buildnum": build_num,
-            "task_id": _config.TASK_ID,
+            "task_id": _config.EVERGREEN_TASK_ID,
         })
 
         return response["id"]
@@ -255,7 +255,7 @@ class BuildloggerServer(object):
             "test_filename": test_filename,
             "command": test_command,
             "phase": self.config.get("build_phase", "unknown"),
-            "task_id": _config.TASK_ID,
+            "task_id": _config.EVERGREEN_TASK_ID,
         })
 
         return response["id"]

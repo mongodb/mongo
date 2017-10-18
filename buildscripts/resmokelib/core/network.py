@@ -112,3 +112,15 @@ class PortAllocator(object):
         """
         next_range_start = config.BASE_PORT + ((job_num + 1) * cls._PORTS_PER_JOB)
         return next_range_start - 1
+
+    @classmethod
+    def reset(cls):
+        """
+        Resets the internal state of the PortAllocator.
+
+        This method is intended to be called each time resmoke.py starts
+        a new test suite.
+        """
+
+        with cls._NUM_USED_PORTS_LOCK:
+            cls._NUM_USED_PORTS = collections.defaultdict(int)

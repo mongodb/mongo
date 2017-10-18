@@ -563,117 +563,34 @@ functions:
           path_value="$path_value:${task_path_suffix}"
         fi
 
-        preamble="PATH='$path_value'   \
-                  ${gcov_environment}  \
-                  ${rlp_environment}   \
-                  ${san_options}       \
-                  ${san_symbolizer}    \
-                  ${snmp_config_path}"
-        # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
-        # invocation. It must be placed between $preamble and $resmoke.
-        wrapper="${resmoke_wrapper}"
-        resmoke="${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py \
-                 ${resmoke_args}                   \
-                 $extra_args                       \
-                 ${test_flags}                     \
-                 --log=buildlogger                 \
-                 --staggerJobs=on                  \
-                 --taskId=${task_id}"
-
-        # Set variables for mainline builds. Patch builds will override these values below.
-        tag_file=etc/test_retrial.yml
-        retry_on_failure_options="--continueOnFailure --repeat=2"
-        resmoke_tags="retry_on_failure,                                \
-                      retry_on_failure|${task_name},                   \
-                      retry_on_failure|${task_name}|${build_variant},  \
-                      retry_on_failure|${task_name}|${build_variant}|${distro_id}"
-
-        # promote_silent_failures.py is only run on Evergreen mainline. Override in patch builds.
-        run_promote_silent_failures="${python|/opt/mongodbtoolchain/v2/bin/python2}  \
-                                     buildscripts/promote_silent_failures.py -o      \
-                                     report_unreliable.json report_unreliable.json"
-
-        # For patch builds, we run reliable and then unreliable tests and combine the reports.
         if [ "${is_patch|}" = "true" ]; then
-          tag_file=etc/test_lifecycle.yml
-          retry_on_failure_options=""
-          run_promote_silent_failures=""
-          resmoke_tags="unreliable,                                \
-                        unreliable|${task_name},                   \
-                        unreliable|${task_name}|${build_variant},  \
-                        unreliable|${task_name}|${build_variant}|${distro_id}"
+          extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
+        else
+          extra_args="$extra_args --tagFile=etc/test_retrial.yml"
         fi
 
-        # Remove spaces from the tags argument.
-        resmoke_tags=$(echo $resmoke_tags| tr -d " ")
+        # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
+        # invocation. It doesn't set any environment variables and should therefore come last in
+        # this list of expansions.
+        PATH="$path_value"                              \
+            ${gcov_environment}                         \
+            ${rlp_environment}                          \
+            ${san_options}                              \
+            ${san_symbolizer}                           \
+            ${snmp_config_path}                         \
+            ${resmoke_wrapper}                          \
+            $python buildscripts/evergreen_run_tests.py \
+                ${resmoke_args}                         \
+                $extra_args                             \
+                ${test_flags}                           \
+                --log=buildlogger                       \
+                --staggerJobs=on                        \
+                --taskId=${task_id}                     \
+                --taskName=${task_name}                 \
+                --variantName=${build_variant}          \
+                --distroId=${distro_id}                 \
+                --reportFile=report.json
 
-        # Set report file for reliable test run.
-        report_file=report_reliable.json
-
-        # Disable errexit, until we run combine_reports, so we can execute the reliable and
-        # unreliable tests.
-        set +o errexit
-
-        # If the "resmoke_wrapper" expansion is used for 'burn_in_tests' then add the reportFile.
-        echo "$wrapper" | grep -q burn_in_tests
-        add_report_file=$?
-        wrapper_report_file=""
-        if [ $add_report_file -eq 0 ]; then
-          wrapper_report_file="--reportFile=$report_file"
-        fi
-
-        # Set up resmoke to run without tagged tests.
-        resmoke_base="$resmoke                         \
-                 --excludeWithAnyTags='$resmoke_tags'  \
-                 --reportFailureStatus=fail            \
-                 --reportFile=$report_file             \
-                 --tagFile=$tag_file"
-
-        # Run reliable set of tests once.
-        eval $preamble $wrapper $wrapper_report_file $resmoke_base
-        reliable_exit_code=$?
-
-        # Set report file for unreliable test run.
-        report_file=report_unreliable.json
-
-        # Set up resmoke to run with only tagged tests.
-        resmoke_base="$resmoke                         \
-                 --includeWithAnyTags='$resmoke_tags'  \
-                 --reportFailureStatus=silentfail      \
-                 --reportFile=$report_file             \
-                 --tagFile=$tag_file                   \
-                 $retry_on_failure_options"
-
-        if [ $add_report_file -eq 0 ]; then
-          wrapper_report_file="--reportFile=$report_file"
-        fi
-
-        # Run unreliable set of tests.
-        eval $preamble $wrapper $wrapper_report_file $resmoke_base
-        unreliable_exit_code=$?
-
-        #  Reenable errexit, as the return from combine_reports will return the cumulative error.
-        set -o errexit
-
-        # If both executions of the test with an "retry_on_failure*" tag fail, promote the task as
-        # a failure. Only promote silent failures on mainline.
-        eval $run_promote_silent_failures
-
-        # Combine reliable and unreliable reports.
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -o report.json report_reliable.json report_unreliable.json
-
-        # We mask any errors from the resmoke runs above (by disabling errexit) until both have
-        # completed. If any of the resmoke runs failed due to non-test failures
-        # (i.e fixture failures), we need to exit with non-zero status.
-        if [ $reliable_exit_code -ne 0 ]; then
-          echo "resmoke.py reliable run failed with error code: $reliable_exit_code"
-          exit $reliable_exit_code
-        fi
-        # Ignoring the error code 1 that is returned when there are only silent failures.
-        if [ $unreliable_exit_code -ne 0 ] && [ $unreliable_exit_code -ne 1 ]; then
-          echo "resmoke.py unreliable run failed with error code: $unreliable_exit_code"
-          exit $unreliable_exit_code
-        fi
         fi # end if ${disable_unit_tests}
 
   "do jepsen setup" :
@@ -1368,6 +1285,10 @@ pre:
             else
               . ./venv/bin/activate
             fi
+
+            python=python
+          else
+            python=${python|/opt/mongodbtoolchain/v2/bin/python2}
           fi
        - key: posix_workdir
          value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
@@ -1412,11 +1333,6 @@ pre:
 
 
 post:
-  - command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -x -o report.json report_reliable.json report_unreliable.json
   - command: attach.results
     params:
       file_location: src/report.json
@@ -2080,17 +1996,19 @@ tasks:
     params:
       working_dir: src
       script: |
+        ${activate_virtualenv}
+
         # If this is a scheduled build, we check for changes against the last scheduled commit.
         if [ "${is_patch}" != "true" ]; then
           burn_in_args="--checkEvergreen"
         fi
         # Capture a list of new and modified tests.
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
+        $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
       task_path_suffix: /data/multiversion
-      resmoke_wrapper: ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
+      resmoke_wrapper: $python buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
       resmoke_args: --repeat=2
       run_multiple_jobs: true
 

@@ -31,7 +31,7 @@ class Suite(object):
     A suite of tests of a particular kind (e.g. C++ unit tests, dbtests, jstests).
     """
 
-    def __init__(self, suite_name, suite_config):
+    def __init__(self, suite_name, suite_config, suite_options=_config.SuiteOptions.ALL_INHERITED):
         """
         Initializes the suite with the specified name and configuration.
         """
@@ -39,6 +39,7 @@ class Suite(object):
 
         self._suite_name = suite_name
         self._suite_config = suite_config
+        self._suite_options = suite_options
 
         self.test_kind = self.get_test_kind_config()
         self.tests = self._get_tests_for_kind(self.test_kind)
@@ -83,11 +84,38 @@ class Suite(object):
         """
         return self._suite_name
 
+    def get_display_name(self):
+        """
+        Returns the name of the test suite with a unique identifier for its SuiteOptions.
+        """
+
+        if self.options.description is None:
+            return self.get_name()
+
+        return "{} ({})".format(self.get_name(), self.options.description)
+
     def get_selector_config(self):
         """
         Returns the "selector" section of the YAML configuration.
         """
-        return self._suite_config["selector"]
+
+        selector = self._suite_config["selector"].copy()
+
+        if self.options.include_tags is not None:
+            if "include_tags" in selector:
+                selector["include_tags"] = {"$allOf": [
+                    selector["include_tags"],
+                    self.options.include_tags,
+                ]}
+            elif "exclude_tags" in selector:
+                selector["exclude_tags"] = {"$anyOf": [
+                    selector["exclude_tags"],
+                    {"$not": self.options.include_tags},
+                ]}
+            else:
+                selector["include_tags"] = self.options.include_tags
+
+        return selector
 
     def get_executor_config(self):
         """
@@ -100,6 +128,17 @@ class Suite(object):
         Returns the "test_kind" section of the YAML configuration.
         """
         return self._suite_config["test_kind"]
+
+    @property
+    def options(self):
+        return self._suite_options.resolve()
+
+    def with_options(self, suite_options):
+        """
+        Returns a Suite instance with the specified resmokelib.config.SuiteOptions.
+        """
+
+        return Suite(self._suite_name, self._suite_config, suite_options)
 
     @synchronized
     def record_suite_start(self):
@@ -299,7 +338,7 @@ class Suite(object):
         for suite in suites:
             suite_sb = []
             suite.summarize(suite_sb)
-            sb.append("    %s: %s" % (suite.get_name(), "\n    ".join(suite_sb)))
+            sb.append("    %s: %s" % (suite.get_display_name(), "\n    ".join(suite_sb)))
 
         logger.info("=" * 80)
         logger.info("\n".join(sb))

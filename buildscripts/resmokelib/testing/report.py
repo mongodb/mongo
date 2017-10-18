@@ -19,7 +19,7 @@ class TestReport(unittest.TestResult):
     Records test status and timing information.
     """
 
-    def __init__(self, job_logger):
+    def __init__(self, job_logger, suite_options):
         """
         Initializes the TestReport with the buildlogger configuration.
         """
@@ -27,6 +27,7 @@ class TestReport(unittest.TestResult):
         unittest.TestResult.__init__(self)
 
         self.job_logger = job_logger
+        self.suite_options = suite_options
 
         self._lock = threading.Lock()
 
@@ -45,7 +46,8 @@ class TestReport(unittest.TestResult):
 
         # TestReports that are used when running tests need a JobLogger but combined reports don't
         # use the logger.
-        combined_report = cls(logging.loggers.EXECUTOR_LOGGER)
+        combined_report = cls(logging.loggers.EXECUTOR_LOGGER,
+                              _config.SuiteOptions.ALL_INHERITED.resolve())
         combining_time = time.time()
 
         for report in reports:
@@ -64,7 +66,14 @@ class TestReport(unittest.TestResult):
                     if test_info.status is None or test_info.return_code is None:
                         # Mark the test as having timed out if it was interrupted. It might have
                         # passed if the suite ran to completion, but we wouldn't know for sure.
+                        #
+                        # Until EVG-1536 is completed, we shouldn't distinguish between failures and
+                        # interrupted tests in the report.json file. In Evergreen, the behavior to
+                        # sort tests with the "timeout" test status after tests with the "pass" test
+                        # status effectively hides interrupted tests from the test results sidebar
+                        # unless sorting by the time taken.
                         test_info.status = "timeout"
+                        test_info.evergreen_status = "fail"
                         test_info.return_code = -2
 
                     # TestReport.stopTest() may not have been called.
@@ -154,8 +163,10 @@ class TestReport(unittest.TestResult):
         with self._lock:
             self.num_errored += 1
 
+            # We don't distinguish between test failures and Python errors in Evergreen.
             test_info = self._find_test_info(test)
             test_info.status = "error"
+            test_info.evergreen_status = "fail"
             test_info.return_code = test.return_code
 
     def setError(self, test):
@@ -168,7 +179,9 @@ class TestReport(unittest.TestResult):
             if test_info.end_time is None:
                 raise ValueError("stopTest was not called on %s" % (test.basename()))
 
+            # We don't distinguish between test failures and Python errors in Evergreen.
             test_info.status = "error"
+            test_info.evergreen_status = "fail"
             test_info.return_code = 2
 
         # Recompute number of success, failures, and errors.
@@ -190,6 +203,12 @@ class TestReport(unittest.TestResult):
 
             test_info = self._find_test_info(test)
             test_info.status = "fail"
+            if test_info.dynamic:
+                # Dynamic tests are used for data consistency checks, so the failures are never
+                # silenced.
+                test_info.evergreen_status = "fail"
+            else:
+                test_info.evergreen_status = self.suite_options.report_failure_status
             test_info.return_code = test.return_code
 
     def setFailure(self, test, return_code=1):
@@ -203,6 +222,12 @@ class TestReport(unittest.TestResult):
                 raise ValueError("stopTest was not called on %s" % (test.basename()))
 
             test_info.status = "fail"
+            if test_info.dynamic:
+                # Dynamic tests are used for data consistency checks, so the failures are never
+                # silenced.
+                test_info.evergreen_status = "fail"
+            else:
+                test_info.evergreen_status = self.suite_options.report_failure_status
             test_info.return_code = return_code
 
         # Recompute number of success, failures, and errors.
@@ -223,6 +248,7 @@ class TestReport(unittest.TestResult):
 
             test_info = self._find_test_info(test)
             test_info.status = "pass"
+            test_info.evergreen_status = "pass"
             test_info.return_code = test.return_code
 
     def wasSuccessful(self):
@@ -249,8 +275,7 @@ class TestReport(unittest.TestResult):
         """
 
         with self._lock:
-            return [test_info for test_info in self.test_infos
-                    if test_info.status in ("fail", "silentfail")]
+            return [test_info for test_info in self.test_infos if test_info.status == "fail"]
 
     def get_errored(self):
         """
@@ -270,40 +295,19 @@ class TestReport(unittest.TestResult):
         with self._lock:
             return [test_info for test_info in self.test_infos if test_info.status == "timeout"]
 
-    def as_dict(self, convert_failures=False):
+    def as_dict(self):
         """
         Return the test result information as a dictionary.
 
         Used to create the report.json file.
-
-        If 'convert_failures' is true, then "error" and "fail" test statuses are replaced with
-        _config.REPORT_FAILURE_STATUS in the returned dictionary.
         """
 
         results = []
         with self._lock:
             for test_info in self.test_infos:
-                status = test_info.status
-                if convert_failures:
-                    if status == "error" or status == "fail":
-                        # Don't distinguish between failures and errors.
-                        if test_info.dynamic:
-                            # Dynamic tests are used for data consistency checks, so the failures
-                            # are not silenced.
-                            status = "fail"
-                        else:
-                            status = _config.REPORT_FAILURE_STATUS
-                    elif status == "timeout":
-                        # Until EVG-1536 is completed, we shouldn't distinguish between failures and
-                        # interrupted tests in the report.json file. In Evergreen, the behavior to
-                        # sort tests with the "timeout" test status after tests with the "pass" test
-                        # status effectively hides interrupted tests from the test results sidebar
-                        # unless sorting by the time taken.
-                        status = "fail"
-
                 result = {
                     "test_file": test_info.test_id,
-                    "status": status,
+                    "status": test_info.evergreen_status,
                     "exit_code": test_info.return_code,
                     "start": test_info.start_time,
                     "end": test_info.end_time,
@@ -329,13 +333,14 @@ class TestReport(unittest.TestResult):
         Used when combining reports instances.
         """
 
-        report = cls(logging.loggers.EXECUTOR_LOGGER)
+        report = cls(logging.loggers.EXECUTOR_LOGGER, _config.SuiteOptions.ALL_INHERITED.resolve())
         for result in report_dict["results"]:
             # By convention, dynamic tests are named "<basename>:<hook name>".
             is_dynamic = ":" in result["test_file"]
             test_info = _TestInfo(result["test_file"], is_dynamic)
             test_info.url_endpoint = result.get("url")
             test_info.status = result["status"]
+            test_info.evergreen_status = test_info.status
             test_info.return_code = result["exit_code"]
             test_info.start_time = result["start"]
             test_info.end_time = result["end"]
@@ -403,5 +408,6 @@ class _TestInfo(object):
         self.start_time = None
         self.end_time = None
         self.status = None
+        self.evergreen_status = None
         self.return_code = None
         self.url_endpoint = None

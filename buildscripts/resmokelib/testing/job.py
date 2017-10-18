@@ -9,7 +9,6 @@ import sys
 
 from .. import config
 from .. import errors
-from .. import logging
 from ..utils import queue as _queue
 
 
@@ -18,7 +17,7 @@ class Job(object):
     Runs tests from a queue.
     """
 
-    def __init__(self, logger, fixture, hooks, report):
+    def __init__(self, logger, fixture, hooks, report, suite_options):
         """
         Initializes the job with the specified fixture and custom
         behaviors.
@@ -28,6 +27,7 @@ class Job(object):
         self.fixture = fixture
         self.hooks = hooks
         self.report = report
+        self.suite_options = suite_options
 
     def __call__(self, queue, interrupt_flag, teardown_flag=None):
         """
@@ -98,7 +98,7 @@ class Job(object):
         self._run_hooks_before_tests(test)
 
         test(self.report)
-        if config.FAIL_FAST and not self.report.wasSuccessful():
+        if self.suite_options.fail_fast and not self.report.wasSuccessful():
             self.logger.info("%s failed, so stopping..." % (test.shortDescription()))
             raise errors.StopExecution("%s failed" % (test.shortDescription()))
 
@@ -137,7 +137,7 @@ class Job(object):
             self.logger.exception("%s marked as a failure by a hook's before_test.",
                                   test.shortDescription())
             self._fail_test(test, sys.exc_info(), return_code=1)
-            if config.FAIL_FAST:
+            if self.suite_options.fail_fast:
                 raise errors.StopExecution("A hook's before_test failed")
 
         except:
@@ -171,7 +171,7 @@ class Job(object):
             self.logger.exception("%s marked as a failure by a hook's after_test.",
                                   test.shortDescription())
             self.report.setFailure(test, return_code=1)
-            if config.FAIL_FAST:
+            if self.suite_options.fail_fast:
                 raise errors.StopExecution("A hook's after_test failed")
 
         except:
