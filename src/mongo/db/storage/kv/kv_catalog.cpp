@@ -341,8 +341,7 @@ Status KVCatalog::newCollection(OperationContext* opCtx,
                                 StringData ns,
                                 const CollectionOptions& options,
                                 KVPrefix prefix) {
-    invariant(opCtx->lockState() == NULL ||
-              opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
 
     const string ident = _newUniqueIdent(ns, "collection");
 
@@ -508,8 +507,7 @@ Status KVCatalog::renameCollection(OperationContext* opCtx,
 }
 
 Status KVCatalog::dropCollection(OperationContext* opCtx, StringData ns) {
-    invariant(opCtx->lockState() == NULL ||
-              opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
     const NSToIdentMap::iterator it = _idents.find(ns.toString());
     if (it == _idents.end()) {
