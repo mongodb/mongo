@@ -666,7 +666,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             auto wcElem = e["writeConcern"];
                             if (wcElem.ok()) {
                                 builder.append("writeConcern", wcElem.Obj());
-                           }
+                            }
                             conn->runCommand(
                                 nsToDatabaseSubstring(ns).toString(), builder.done(), result);
                         } else {
