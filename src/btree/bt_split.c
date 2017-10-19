@@ -1665,6 +1665,12 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	 * overrides WT_REF_DISK.
 	 */
 	if (multi->las_pageid != 0) {
+		/*
+		 * We should not have a disk image if we did lookaside
+		 * eviction.
+		 */
+		WT_ASSERT(session, multi->disk_image == NULL);
+
 		WT_RET(__wt_calloc_one(session, &ref->page_las));
 		ref->page_las->las_pageid = multi->las_pageid;
 #ifdef HAVE_TIMESTAMPS
