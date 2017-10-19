@@ -60,7 +60,7 @@ TEST(BSONElement, BinDataToString) {
                                     0x81,
                                     0x64,
                                     0xff};  // Valid RFC4122v4 UUID, but with extra byte added.
-    unsigned char zeroLength[] = {};
+    unsigned char zeroLength[1] = {0};      // Not truly zero because Windows doesn't support that.
     StringData unknownType = "binary data\000with an unknown type"_sd;  // No terminating zero
     const BinDataType unknownBinDataType = BinDataType(42);
     builder.appendBinData("bintype0", sizeof(bintype0), BinDataGeneral, bintype0);
