@@ -31,8 +31,8 @@ void (*custom_die)(void) = NULL;
 const char *progname = "program name not set";
 
 /*
- * die --
- *	Report an error and quit.
+ * testutil_die --
+ *	Report an error and abort.
  */
 void
 testutil_die(int e, const char *fmt, ...)
@@ -53,8 +53,9 @@ testutil_die(int e, const char *fmt, ...)
 	if (e != 0)
 		fprintf(stderr, ": %s", wiredtiger_strerror(e));
 	fprintf(stderr, "\n");
+	fprintf(stderr, "process aborting\n");
 
-	exit(EXIT_FAILURE);
+	abort();
 }
 
 /*

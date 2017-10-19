@@ -89,8 +89,9 @@ __wt_nlpo2(uint32_t v)
 uint32_t
 __wt_log2_int(uint32_t n)
 {
-	uint32_t l = 0;
+	uint32_t l;
 
+	l = 0;
 	while (n >>= 1)
 		l++;
 	return (l);

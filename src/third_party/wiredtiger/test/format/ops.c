@@ -175,7 +175,7 @@ wts_ops(int lastrun)
 	if (g.c_backups)
 		testutil_check(
 		    __wt_thread_create(NULL, &backup_tid, backup, NULL));
-	if (g.c_checkpoints)
+	if (g.c_checkpoint_flag == CHECKPOINT_ON)
 		testutil_check(__wt_thread_create(
 		    NULL, &checkpoint_tid, checkpoint, NULL));
 	if (g.c_compact)
@@ -252,7 +252,7 @@ wts_ops(int lastrun)
 		testutil_check(__wt_thread_join(NULL, alter_tid));
 	if (g.c_backups)
 		testutil_check(__wt_thread_join(NULL, backup_tid));
-	if (g.c_checkpoints)
+	if (g.c_checkpoint_flag == CHECKPOINT_ON)
 		testutil_check(__wt_thread_join(NULL, checkpoint_tid));
 	if (g.c_compact)
 		testutil_check(__wt_thread_join(NULL, compact_tid));
@@ -988,8 +988,8 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	static int sn = 0;
 	WT_SESSION *session;
-	int exact, ret;
 	uint8_t bitfield;
+	int exact, ret;
 
 	session = cursor->session;
 

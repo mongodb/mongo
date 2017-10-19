@@ -113,9 +113,11 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
 static int WT_CDECL
 __evict_lru_cmp(const void *a_arg, const void *b_arg)
 {
-	const WT_EVICT_ENTRY *a = a_arg, *b = b_arg;
+	const WT_EVICT_ENTRY *a, *b;
 	uint64_t a_score, b_score;
 
+	a = a_arg;
+	b = b_arg;
 	a_score = (a->ref == NULL ? UINT64_MAX : a->score);
 	b_score = (b->ref == NULL ? UINT64_MAX : b->score);
 
@@ -1883,24 +1885,6 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
 		    F_ISSET(btree, WT_BTREE_LOOKASIDE))
 			goto fast;
-
-		/*
-		 * If application threads are blocked waiting for eviction (so
-		 * we are going to consider lookaside), and the only thing
-		 * preventing a clean page from being evicted is that it
-		 * contains historical data, mark it dirty so we can do
-		 * lookaside eviction.
-		 */
-		if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD |
-		    WT_CACHE_EVICT_DIRTY_HARD) &&
-		    !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE) &&
-		    !modified && page->modify != NULL &&
-		    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
-		    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp))) {
-			__wt_page_only_modify_set(session, page);
-			modified = true;
-			goto fast;
-		}
 
 		/* Skip clean pages if appropriate. */
 		if (!modified && !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))

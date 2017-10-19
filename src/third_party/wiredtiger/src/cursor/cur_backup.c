@@ -253,16 +253,11 @@ __backup_start(
 	WT_ERR(__wt_fopen(session, WT_BACKUP_TMP,
 	    WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &cb->bfs));
 	/*
-	 * If a list of targets was specified, work our way through them.
-	 * Else, generate a list of all database objects.
-	 *
-	 * Include log files if doing a full backup, and copy them before
-	 * copying data files to avoid rolling the metadata forward across
-	 * a checkpoint that completes during the backup.
+	 * If targets were specified, add them to the list. Otherwise it is a
+	 * full backup, add all database objects and log files to the list.
 	 */
 	target_list = false;
 	WT_ERR(__backup_uri(session, cfg, &target_list, &log_only));
-
 	if (!target_list) {
 		WT_ERR(__backup_log_append(session, cb, true));
 		WT_ERR(__backup_all(session));

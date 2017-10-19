@@ -18,9 +18,9 @@ static int usage(void);
 static int
 append_target(WT_SESSION *session, const char *target, char **bufp)
 {
-	static bool first = true;
 	static size_t len = 0, remain = 0;
 	static char *buf = NULL;
+	static bool first = true;
 
 						/* 20 bytes of slop */
 	if (buf == NULL || remain < strlen(target) + 20) {
