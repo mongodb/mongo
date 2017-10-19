@@ -50,6 +50,12 @@ void OrStage::addChild(PlanStage* child) {
     _children.emplace_back(child);
 }
 
+void OrStage::addChildren(Children childrenToAdd) {
+    _children.insert(_children.end(),
+                     std::make_move_iterator(childrenToAdd.begin()),
+                     std::make_move_iterator(childrenToAdd.end()));
+}
+
 bool OrStage::isEOF() {
     return _currentChild >= _children.size();
 }

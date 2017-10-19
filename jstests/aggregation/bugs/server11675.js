@@ -43,6 +43,19 @@ var server11675 = function() {
 
         var findRes = cursor.toArray();
         var aggRes = t.aggregate(pipeline).toArray();
+
+        // If the query doesn't specify its own sort, there is a possibility that find() and
+        // aggregate() will return the same results in different orders. We sort by _id on the
+        // client side, so that the results still count as equal.
+        if (!query.hasOwnProperty("sort")) {
+            findRes.sort(function(a, b) {
+                return a._id - b._id;
+            });
+            aggRes.sort(function(a, b) {
+                return a._id - b._id;
+            });
+        }
+
         assert.docEq(aggRes, findRes);
     };
 

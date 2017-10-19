@@ -57,6 +57,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
     bool requiresDocument = false;
     bool hasIndexKeyProjection = false;
 
+    bool wantTextScore = false;
     bool wantGeoNearPoint = false;
     bool wantGeoNearDistance = false;
     bool wantSortKey = false;
@@ -167,7 +168,9 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 }
 
                 // This clobbers everything else.
-                if (e2.valuestr() == QueryRequest::metaIndexKey) {
+                if (e2.valuestr() == QueryRequest::metaTextScore) {
+                    wantTextScore = true;
+                } else if (e2.valuestr() == QueryRequest::metaIndexKey) {
                     hasIndexKeyProjection = true;
                 } else if (e2.valuestr() == QueryRequest::metaGeoNearDistance) {
                     wantGeoNearDistance = true;
@@ -268,6 +271,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
     pp->_requiresDocument = requiresDocument;
 
     // Add meta-projections.
+    pp->_wantTextScore = wantTextScore;
     pp->_wantGeoNearPoint = wantGeoNearPoint;
     pp->_wantGeoNearDistance = wantGeoNearDistance;
     pp->_wantSortKey = wantSortKey;

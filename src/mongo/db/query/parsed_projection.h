@@ -82,6 +82,10 @@ public:
         return _source;
     }
 
+    bool wantTextScore() const {
+        return _wantTextScore;
+    }
+
     /**
      * Does the projection want geoNear metadata?  If so any geoNear stage should include them.
      */
@@ -179,6 +183,8 @@ private:
     bool _requiresDocument = true;
 
     BSONObj _source;
+
+    bool _wantTextScore = false;
 
     bool _wantGeoNearDistance = false;
 

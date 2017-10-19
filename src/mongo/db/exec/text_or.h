@@ -81,6 +81,8 @@ public:
 
     void addChild(unique_ptr<PlanStage> child);
 
+    void addChildren(Children childrenToAdd);
+
     bool isEOF() final;
 
     StageState doWork(WorkingSetID* out) final;
