@@ -46,6 +46,8 @@
 namespace mongo {
 namespace parsed_aggregation_projection {
 
+using expression::isPathPrefixOf;
+
 //
 // ProjectionSpecValidator
 //
@@ -54,22 +56,36 @@ Status ProjectionSpecValidator::validate(const BSONObj& spec) {
     return ProjectionSpecValidator(spec).validate();
 }
 
-Status ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(StringData path) {
-    for (auto&& seenPath : _seenPaths) {
-        if ((path == seenPath) || (expression::isPathPrefixOf(path, seenPath)) ||
-            (expression::isPathPrefixOf(seenPath, path))) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "specification contains two conflicting paths. "
-                                           "Cannot specify both '"
-                                        << path
-                                        << "' and '"
-                                        << seenPath
-                                        << "': "
-                                        << _rawObj.toString(),
-                          40176);
-        }
+Status ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(const std::string& path) {
+    auto result = _seenPaths.emplace(path);
+    auto pos = result.first;
+
+    // Check whether the path was a duplicate of an existing path.
+    auto conflictingPath = boost::make_optional(!result.second, *pos);
+
+    // Check whether the preceding path prefixes this path.
+    if (!conflictingPath && pos != _seenPaths.begin()) {
+        conflictingPath =
+            boost::make_optional(isPathPrefixOf(*std::prev(pos), path), *std::prev(pos));
     }
-    _seenPaths.emplace_back(path.toString());
+
+    // Check whether this path prefixes the subsequent path.
+    if (!conflictingPath && std::next(pos) != _seenPaths.end()) {
+        conflictingPath =
+            boost::make_optional(isPathPrefixOf(path, *std::next(pos)), *std::next(pos));
+    }
+
+    if (conflictingPath) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "specification contains two conflicting paths. "
+                                       "Cannot specify both '"
+                                    << path
+                                    << "' and '"
+                                    << *conflictingPath
+                                    << "': "
+                                    << _rawObj.toString(),
+                      40176);
+    }
     return Status::OK();
 }
 
