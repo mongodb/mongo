@@ -305,11 +305,6 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     _service->killCursorsWithMatchingSessions(opCtx, std::move(matcher)).ignore();
 }
 
-void LogicalSessionCacheImpl::clear() {
-    // TODO: What should this do?  Wasn't implemented before
-    MONGO_UNREACHABLE;
-}
-
 void LogicalSessionCacheImpl::endSessions(const LogicalSessionIdSet& sessions) {
     stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
     _endingSessions.insert(begin(sessions), end(sessions));

@@ -108,8 +108,6 @@ public:
 
     void vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override;
 
-    void clear() override;
-
     Status refreshNow(Client* client) override;
 
     Status reapNow(Client* client) override;

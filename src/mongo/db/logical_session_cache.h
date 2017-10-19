@@ -91,12 +91,6 @@ public:
     virtual void endSessions(const LogicalSessionIdSet& lsids) = 0;
 
     /**
-     * Removes all local records in this cache. Does not remove the corresponding
-     * authoritative session records from the sessions collection.
-     */
-    virtual void clear() = 0;
-
-    /**
      * Refreshes the cache synchronously. This flushes all pending refreshes and
      * inserts to the sessions collection.
      */
