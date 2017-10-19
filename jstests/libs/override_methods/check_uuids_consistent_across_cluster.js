@@ -88,10 +88,9 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
 
                 print("checking " + shardConn + " config.collections" +
                       " for UUID consistency with " + authoritativeCollMetadata._id);
+                const configDB = shardConn.getDB('config');
                 const actualConfigMetadata =
-                    shardConn.getDB("config").getCollection("collections").find({
-                        "_id": dbName + "." + collName
-                    })[0];
+                    configDB.cache.collections.find({"_id": dbName + "." + collName})[0];
                 assert.eq(authoritativeCollMetadata.collInfo.uuid,
                           actualConfigMetadata.uuid,
                           "authoritative collection info on config server: " +

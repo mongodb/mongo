@@ -51,7 +51,7 @@ using unittest::assertGet;
 using namespace shardmetadatautil;
 
 const NamespaceString kNss = NamespaceString("test.foo");
-const NamespaceString kChunkMetadataNss = NamespaceString("config.chunks.test.foo");
+const NamespaceString kChunkMetadataNss = NamespaceString("config.cache.chunks.test.foo");
 const ShardId kShardId = ShardId("shard0");
 const bool kUnique = false;
 

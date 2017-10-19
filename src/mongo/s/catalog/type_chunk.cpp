@@ -43,7 +43,7 @@
 namespace mongo {
 
 const std::string ChunkType::ConfigNS = "config.chunks";
-const std::string ChunkType::ShardNSPrefix = "config.chunks.";
+const std::string ChunkType::ShardNSPrefix = "config.cache.chunks.";
 
 const BSONField<std::string> ChunkType::name("_id");
 const BSONField<BSONObj> ChunkType::minShardID("_id");

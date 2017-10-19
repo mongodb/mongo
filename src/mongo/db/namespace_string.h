@@ -65,7 +65,8 @@ public:
 
     // Name for a shard's collections metadata collection, each document of which indicates the
     // state of a specific collection.
-    static constexpr StringData kShardConfigCollectionsCollectionName = "config.collections"_sd;
+    static constexpr StringData kShardConfigCollectionsCollectionName =
+        "config.cache.collections"_sd;
 
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration

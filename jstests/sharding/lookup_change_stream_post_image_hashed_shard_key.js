@@ -23,7 +23,7 @@
     });
 
     const mongosDB = st.s0.getDB(jsTestName());
-    const mongosColl = mongosDB[jsTestName()];
+    const mongosColl = mongosDB['coll'];
 
     assert.commandWorked(mongosDB.dropDatabase());
 
