@@ -894,7 +894,7 @@ functions:
         pip install 'pyOpenSSL ; sys_platform == "win32" or sys_platform == "cygwin"'
 
         rm -rf /data/install /data/multiversion
-        python buildscripts/setup_multiversion_mongodb.py                   \
+        $python buildscripts/setup_multiversion_mongodb.py                  \
           --installDir /data/install                                        \
           --linkDir /data/multiversion                                      \
           --edition ${multiversion_edition|base}                            \
