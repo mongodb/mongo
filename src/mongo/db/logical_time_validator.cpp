@@ -51,12 +51,12 @@ const auto getLogicalClockValidator =
 
 stdx::mutex validatorMutex;  // protects access to decoration instance of LogicalTimeValidator.
 
-std::vector<Privilege> advanceLogicalClockPrivilege;
+std::vector<Privilege> advanceClusterTimePrivilege;
 
-MONGO_INITIALIZER(InitializeAdvanceLogicalClockPrivilegeVector)(InitializerContext* const) {
+MONGO_INITIALIZER(InitializeAdvanceClusterTimePrivilegeVector)(InitializerContext* const) {
     ActionSet actions;
-    actions.addAction(ActionType::internal);
-    advanceLogicalClockPrivilege.emplace_back(ResourcePattern::forClusterResource(), actions);
+    actions.addAction(ActionType::advanceClusterTime);
+    advanceClusterTimePrivilege.emplace_back(ResourcePattern::forClusterResource(), actions);
     return Status::OK();
 }
 
@@ -184,7 +184,7 @@ bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
     // Note: returns true if auth is off, courtesy of
     // AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks.
     return AuthorizationSession::get(client)->isAuthorizedForPrivileges(
-        advanceLogicalClockPrivilege);
+        advanceClusterTimePrivilege);
 }
 
 bool LogicalTimeValidator::shouldGossipLogicalTime() {

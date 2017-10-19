@@ -30,6 +30,7 @@ selector:
   # New feature in v3.6 mongos
   - jstests/sharding/logical_time_metadata.js
   # New feature in v3.6 mongos and mongod.
+  - jstests/sharding/advance_cluster_time_action_type.js
   - jstests/sharding/advance_logical_time_with_valid_signature.js
   - jstests/sharding/after_cluster_time.js
   - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js

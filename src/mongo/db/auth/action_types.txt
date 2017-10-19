@@ -5,7 +5,7 @@
 # This means that the integer value assigned to each ActionType and used internally in ActionSet
 # also may change between versions.
 ["addShard",
-"advanceLogicalTime",
+"advanceClusterTime",
 "anyAction", # Special ActionType that represents *all* actions
 "appendOplogNote",
 "applicationMessage",
