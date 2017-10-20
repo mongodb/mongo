@@ -243,7 +243,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).targetVersion,
               "3.6");
     let adminInfos = adminDB.getCollectionInfos();
-    assert(!adminInfos[0].uuid,
+    assert(!adminInfos[0].info.uuid,
            "Expected collection with infos " + tojson(adminInfos) + " to not have a UUID.");
     MongoRunner.stopMongod(conn);
 
