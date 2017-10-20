@@ -195,6 +195,15 @@ OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
 }
 
 /**
+ * Creates a delete oplog entry with given optime and namespace.
+ */
+OplogEntry makeDeleteDocumentOplogEntry(OpTime opTime,
+                                        const NamespaceString& nss,
+                                        const BSONObj& documentToDelete) {
+    return OplogEntry(opTime, 1LL, OpTypeEnum::kDelete, nss, documentToDelete);
+}
+
+/**
  * Creates an update oplog entry with given optime and namespace.
  */
 OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
@@ -231,27 +240,13 @@ void appendSessionTransactionInfo(OplogEntry& entry,
     entry.setStatementId(stmtId);
 }
 
-Status IdempotencyTest::runOp(const OplogEntry& op) {
-    return runOps({op});
-}
-
-Status IdempotencyTest::runOps(std::vector<OplogEntry> ops) {
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
-    MultiApplier::OperationPtrs opsPtrs;
-    for (auto& op : ops) {
-        opsPtrs.push_back(&op);
-    }
-    AtomicUInt32 fetchCount(0);
-    return multiInitialSyncApply_noAbort(_opCtx.get(), &opsPtrs, &syncTail, &fetchCount);
-}
-
 Status IdempotencyTest::resetState() {
     return Status::OK();
 }
 
 void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, SequenceType sequenceType) {
     ASSERT_OK(resetState());
-    ASSERT_OK(runOps(ops));
+    ASSERT_OK(runOpsInitialSync(ops));
     auto state1 = validate();
     auto iterations = sequenceType == SequenceType::kEntireSequence ? 1 : ops.size();
 
@@ -260,22 +255,22 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
         std::vector<OplogEntry> fullSequence;
 
         if (sequenceType == SequenceType::kEntireSequence) {
-            ASSERT_OK(runOps(ops));
+            ASSERT_OK(runOpsInitialSync(ops));
             fullSequence.insert(fullSequence.end(), ops.begin(), ops.end());
         } else if (sequenceType == SequenceType::kAnyPrefix ||
                    sequenceType == SequenceType::kAnyPrefixOrSuffix) {
             std::vector<OplogEntry> prefix(ops.begin(), ops.begin() + i + 1);
-            ASSERT_OK(runOps(prefix));
+            ASSERT_OK(runOpsInitialSync(prefix));
             fullSequence.insert(fullSequence.end(), prefix.begin(), prefix.end());
         }
 
-        ASSERT_OK(runOps(ops));
+        ASSERT_OK(runOpsInitialSync(ops));
         fullSequence.insert(fullSequence.end(), ops.begin(), ops.end());
 
         if (sequenceType == SequenceType::kAnySuffix ||
             sequenceType == SequenceType::kAnyPrefixOrSuffix) {
             std::vector<OplogEntry> suffix(ops.begin() + i, ops.end());
-            ASSERT_OK(runOps(suffix));
+            ASSERT_OK(runOpsInitialSync(suffix));
             fullSequence.insert(fullSequence.end(), suffix.begin(), suffix.end());
         }
 

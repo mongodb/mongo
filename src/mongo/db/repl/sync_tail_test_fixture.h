@@ -60,8 +60,17 @@ protected:
         return Status::OK();
     }
 
+    OpTime nextOpTime() {
+        static long long lastSecond = 1;
+        return OpTime(Timestamp(Seconds(lastSecond++), 0), 1LL);
+    }
+
     void setUp() override;
     void tearDown() override;
+
+    Status runOpSteadyState(const OplogEntry& op);
+    Status runOpInitialSync(const OplogEntry& entry);
+    Status runOpsInitialSync(std::vector<OplogEntry> ops);
 };
 
 Status failedApplyCommand(OperationContext* opCtx, const BSONObj& theOperation, bool);

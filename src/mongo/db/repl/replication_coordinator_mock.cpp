@@ -102,7 +102,7 @@ Status ReplicationCoordinatorMock::waitForMemberState(MemberState expectedState,
 }
 
 bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState() const {
-    invariant(false);
+    return _memberState.primary() || _memberState.secondary();
 }
 
 Seconds ReplicationCoordinatorMock::getSlaveDelaySecs() const {

@@ -600,10 +600,9 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
 DEATH_TEST_F(SyncTailTest,
              MultiSyncApplyFailsWhenCollectionCreationTriesToMakeUUID,
              "Attempt to assign UUID to replicated collection") {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
     NamespaceString nss("foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
-
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
 
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
     _opCtx.reset();
@@ -612,19 +611,14 @@ DEATH_TEST_F(SyncTailTest,
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_STARTUP2));
     NamespaceString nss("foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
-
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
 
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
 
     _opCtx.reset();
     MultiApplier::OperationPtrs ops = {&op};
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, multiInitialSyncApply(&ops, nullptr, nullptr));
-
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
@@ -1086,7 +1080,7 @@ TEST_F(SyncTailTest,
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, loc: 'hi'}"));
     auto updateOp = update(1, fromjson("{$set: {loc: [1, 2]}}"));
     auto indexOp = buildIndex(fromjson("{loc: '2dsphere'}"), BSON("2dsphereIndexVersion" << 3));
@@ -1095,14 +1089,14 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), 16755);
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto indexOp = buildIndex(fromjson("{loc: '2dsphere'}"), BSON("2dsphereIndexVersion" << 3));
     auto dropIndexOp = dropIndex("loc_index");
     auto insertOp = insert(fromjson("{_id: 1, loc: 'hi'}"));
@@ -1111,14 +1105,14 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), 16755);
 }
 
 TEST_F(IdempotencyTest, Geo2dIndex) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, loc: [1]}"));
     auto updateOp = update(1, fromjson("{$set: {loc: [1, 2]}}"));
     auto indexOp = buildIndex(fromjson("{loc: '2d'}"));
@@ -1127,14 +1121,14 @@ TEST_F(IdempotencyTest, Geo2dIndex) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), 13068);
 }
 
 TEST_F(IdempotencyTest, UniqueKeyIndex) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, x: 5}"));
     auto updateOp = update(1, fromjson("{$set: {x: 6}}"));
     auto insertOp2 = insert(fromjson("{_id: 2, x: 5}"));
@@ -1144,7 +1138,7 @@ TEST_F(IdempotencyTest, UniqueKeyIndex) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
 }
 
@@ -1152,8 +1146,8 @@ TEST_F(IdempotencyTest, ParallelArrayError) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
-    ASSERT_OK(runOp(insert(fromjson("{_id: 1}"))));
+    ASSERT_OK(runOpInitialSync(createCollection()));
+    ASSERT_OK(runOpInitialSync(insert(fromjson("{_id: 1}"))));
 
     auto updateOp1 = update(1, fromjson("{$set: {x: [1, 2]}}"));
     auto updateOp2 = update(1, fromjson("{$set: {x: 1}}"));
@@ -1164,7 +1158,7 @@ TEST_F(IdempotencyTest, ParallelArrayError) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), ErrorCodes::CannotIndexParallelArrays);
 }
 
@@ -1172,8 +1166,8 @@ TEST_F(IdempotencyTest, IndexKeyTooLongError) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
-    ASSERT_OK(runOp(insert(fromjson("{_id: 1}"))));
+    ASSERT_OK(runOpInitialSync(createCollection()));
+    ASSERT_OK(runOpInitialSync(insert(fromjson("{_id: 1}"))));
 
     // Key size limit is 1024 for ephemeral storage engine, so two 800 byte fields cannot
     // co-exist.
@@ -1187,7 +1181,7 @@ TEST_F(IdempotencyTest, IndexKeyTooLongError) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), ErrorCodes::KeyTooLong);
 }
 
@@ -1195,8 +1189,8 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
-    ASSERT_OK(runOp(insert(fromjson("{_id: 1, x: 'hi'}"))));
+    ASSERT_OK(runOpInitialSync(createCollection()));
+    ASSERT_OK(runOpInitialSync(insert(fromjson("{_id: 1, x: 'hi'}"))));
 
     auto indexOp1 = buildIndex(fromjson("{x: 'text'}"), fromjson("{default_language: 'spanish'}"));
     auto dropIndexOp = dropIndex("x_index");
@@ -1206,7 +1200,7 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), ErrorCodes::IndexOptionsConflict);
 }
 
@@ -1214,7 +1208,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 1}"));
     auto updateOp = update(1, fromjson("{$unset: {language: 1}}"));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
@@ -1223,7 +1217,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), 17261);
 }
 
@@ -1231,7 +1225,7 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExi
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
     auto dropIndexOp = dropIndex("x_index");
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 1}"));
@@ -1240,7 +1234,7 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExi
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), 17261);
 }
 
@@ -1248,7 +1242,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', y: 1}"));
     auto updateOp = update(1, fromjson("{$unset: {y: 1}}"));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), fromjson("{language_override: 'y'}"));
@@ -1257,7 +1251,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), 17261);
 }
 
@@ -1265,7 +1259,7 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenText
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), fromjson("{language_override: 'y'}"));
     auto dropIndexOp = dropIndex("x_index");
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', y: 1}"));
@@ -1274,7 +1268,7 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenText
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), 17261);
 }
 
@@ -1282,7 +1276,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 'bad'}"));
     auto updateOp = update(1, fromjson("{$unset: {language: 1}}"));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
@@ -1291,7 +1285,7 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOps(ops);
+    auto status = runOpsInitialSync(ops);
     ASSERT_EQ(status.code(), 17262);
 }
 
@@ -1302,17 +1296,16 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
 
     auto runOpsAndValidate = [this, uuidObj]() {
         auto options1 = fromjson("{'validator' : {'phone' : {'$type' : 'string' } } }");
+        options1 = options1.addField(uuidObj.firstElement());
         auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
         auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
-        auto options2 = fromjson("{'validator' : {'phone' : {'$type' : 'number' } } }");
-        // The first collection will be dropped, so won't affect final validation. However, the
-        // final collection should have the correct UUID.
-        options2 = options2.addField(uuidObj.firstElement());
 
+        auto options2 = fromjson("{'validator' : {'phone' : {'$type' : 'number' } } }");
+        options2 = options2.addField(uuidObj.firstElement());
         auto createColl2 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options2);
 
         auto ops = {createColl1, dropColl, createColl2};
-        ASSERT_OK(runOps(ops));
+        ASSERT_OK(runOpsInitialSync(ops));
         auto state = validate();
 
         return state;
@@ -1325,7 +1318,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
 
 TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
     ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     CollectionUUID uuid = UUID::gen();
 
     auto runOpsAndValidate = [this, uuid]() {
@@ -1358,7 +1351,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
 
         auto ops = {insertOp1, insertOp2, updateOp, dropColl, createColl};
-        ASSERT_OK(runOps(ops));
+        ASSERT_OK(runOpsInitialSync(ops));
         auto state = validate();
 
         return state;
@@ -1371,24 +1364,26 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
 
 TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
     ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
+    CollectionUUID uuid = UUID::gen();
 
     auto options1 = BSON("idIndex" << BSON("key" << fromjson("{_id: 1}") << "name"
                                                  << "_id_"
                                                  << "v"
                                                  << 2
                                                  << "ns"
-                                                 << nss.ns()));
+                                                 << nss.ns())
+                                   << "uuid"
+                                   << uuid);
     auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
-    ASSERT_OK(runOp(createColl1));
+    ASSERT_OK(runOpInitialSync(createColl1));
 
-    CollectionUUID uuid = UUID::gen();
     auto runOpsAndValidate = [this, uuid]() {
         auto insertOp = insert(BSON("_id" << Decimal128(1)));
         auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
         auto createColl2 = createCollection(uuid);
 
         auto ops = {insertOp, dropColl, createColl2};
-        ASSERT_OK(runOps(ops));
+        ASSERT_OK(runOpsInitialSync(ops));
         auto state = validate();
 
         return state;
@@ -1401,12 +1396,15 @@ TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
 
 TEST_F(IdempotencyTest, CreateCollectionWithView) {
     ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
+    CollectionOptions options;
+    options.uuid = UUID::gen();
 
     // Create data collection
-    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOpInitialSync(createCollection()));
     // Create "system.views" collection
     auto viewNss = NamespaceString(nss.db(), "system.views");
-    ASSERT_OK(runOp(makeCreateCollectionOplogEntry(nextOpTime(), viewNss)));
+    ASSERT_OK(
+        runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), viewNss, options.toBSON())));
 
     auto viewDoc =
         BSON("_id" << NamespaceString(nss.db(), "view").ns() << "viewOn" << nss.coll() << "pipeline"
@@ -1421,8 +1419,9 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
 TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
     ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
-    ASSERT_OK(runOp(buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600))));
+    ASSERT_OK(runOpInitialSync(createCollection()));
+    ASSERT_OK(
+        runOpInitialSync(buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600))));
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
@@ -1436,8 +1435,9 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
 TEST_F(IdempotencyTest, CollModIndexNotFound) {
     ASSERT_OK(getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING));
 
-    ASSERT_OK(runOp(createCollection()));
-    ASSERT_OK(runOp(buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600))));
+    ASSERT_OK(runOpInitialSync(createCollection()));
+    ASSERT_OK(
+        runOpInitialSync(buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600))));
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
@@ -1448,7 +1448,7 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     testOpsAreIdempotent(ops);
 }
 
-TEST_F(IdempotencyTest, ResyncOnDropFCVCollection) {
+TEST_F(SyncTailTest, FailOnDropFCVCollection) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
@@ -1456,10 +1456,10 @@ TEST_F(IdempotencyTest, ResyncOnDropFCVCollection) {
     auto cmd = BSON("drop" << fcvNS.coll());
     auto op = makeCommandOplogEntry(
         nextOpTime(), NamespaceString(FeatureCompatibilityVersion::kCollection), cmd);
-    ASSERT_EQUALS(runOp(op), ErrorCodes::OplogOperationUnsupported);
+    ASSERT_EQUALS(runOpInitialSync(op), ErrorCodes::OplogOperationUnsupported);
 }
 
-TEST_F(IdempotencyTest, ResyncOnInsertFCVDocument) {
+TEST_F(SyncTailTest, FailOnInsertFCVDocument) {
     auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
     ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
     ASSERT_OK(
@@ -1467,7 +1467,7 @@ TEST_F(IdempotencyTest, ResyncOnInsertFCVDocument) {
 
     auto op = makeInsertDocumentOplogEntry(
         nextOpTime(), fcvNS, BSON("_id" << FeatureCompatibilityVersion::kParameterName));
-    ASSERT_EQUALS(runOp(op), ErrorCodes::OplogOperationUnsupported);
+    ASSERT_EQUALS(runOpInitialSync(op), ErrorCodes::OplogOperationUnsupported);
 }
 
 TEST_F(IdempotencyTest, InsertToFCVCollectionBesidesFCVDocumentSucceeds) {
@@ -1480,7 +1480,7 @@ TEST_F(IdempotencyTest, InsertToFCVCollectionBesidesFCVDocumentSucceeds) {
                                            fcvNS,
                                            BSON("_id"
                                                 << "other"));
-    ASSERT_OK(runOp(op));
+    ASSERT_OK(runOpInitialSync(op));
 }
 
 TEST_F(IdempotencyTest, DropDatabaseSucceeds) {
@@ -1490,7 +1490,208 @@ TEST_F(IdempotencyTest, DropDatabaseSucceeds) {
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     auto op = makeCommandOplogEntry(nextOpTime(), ns, BSON("dropDatabase" << 1));
-    ASSERT_OK(runOp(op));
+    ASSERT_OK(runOpInitialSync(op));
+}
+
+TEST_F(SyncTailTest, FailOnDropFCVCollectionInRecovering) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto cmd = BSON("drop" << fcvNS.coll());
+    auto op = makeCommandOplogEntry(nextOpTime(), fcvNS, cmd);
+    ASSERT_EQUALS(runOpSteadyState(op), ErrorCodes::OplogOperationUnsupported);
+}
+
+TEST_F(SyncTailTest, FailOnDeleteFCVDocumentInRecovering) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, options);
+
+    // Insert the fCV document.
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+    auto insertCmd = BSON("_id" << FeatureCompatibilityVersion::kParameterName
+                                << FeatureCompatibilityVersion::kVersionField
+                                << FeatureCompatibilityVersionCommandParser::kVersion36);
+    auto insertOp = makeInsertDocumentOplogEntry(nextOpTime(), fcvNS, insertCmd);
+    ASSERT_OK(runOpSteadyState(insertOp));
+
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto cmd = BSON("_id" << FeatureCompatibilityVersion::kParameterName);
+    auto op = makeDeleteDocumentOplogEntry(nextOpTime(), fcvNS, cmd);
+    ASSERT_EQUALS(runOpSteadyState(op), ErrorCodes::OplogOperationUnsupported);
+}
+
+TEST_F(SyncTailTest, SuccessOnUpdateFCV34TargetVersionUnsetDocumentInRecovering) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeUpdateDocumentOplogEntry(
+        nextOpTime(),
+        fcvNS,
+        BSON("_id" << FeatureCompatibilityVersion::kParameterName),
+        BSON("$set" << BSON(FeatureCompatibilityVersion::kVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion34)
+                    << "$unset"
+                    << BSON(FeatureCompatibilityVersion::kTargetVersionField << 1)));
+    ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SyncTailTest, FailOnUpdateFCV34TargetVersion34DocumentInRecovering) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeUpdateDocumentOplogEntry(
+        nextOpTime(),
+        fcvNS,
+        BSON("_id" << FeatureCompatibilityVersion::kParameterName),
+        BSON("$set" << BSON(FeatureCompatibilityVersion::kVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                            << FeatureCompatibilityVersion::kTargetVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion34)));
+    ASSERT_EQUALS(runOpSteadyState(op), ErrorCodes::OplogOperationUnsupported);
+}
+
+TEST_F(SyncTailTest, SuccessOnDropFCVCollectionInSecondary) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto cmd = BSON("drop" << fcvNS.coll());
+    auto op = makeCommandOplogEntry(nextOpTime(), fcvNS, cmd);
+    ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SyncTailTest, SuccessOnDeleteFCVDocumentInSecondary) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, options);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Insert the fCV document.
+    auto insertCmd = BSON("_id" << FeatureCompatibilityVersion::kParameterName
+                                << FeatureCompatibilityVersion::kVersionField
+                                << FeatureCompatibilityVersionCommandParser::kVersion36);
+    auto insertOp = makeInsertDocumentOplogEntry(nextOpTime(), fcvNS, insertCmd);
+    ASSERT_OK(runOpSteadyState(insertOp));
+
+    auto cmd = BSON("_id" << FeatureCompatibilityVersion::kParameterName);
+    auto op = makeDeleteDocumentOplogEntry(nextOpTime(), fcvNS, cmd);
+    ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SyncTailTest, SuccessOnUpdateFCV34TargetVersion34DocumentInSecondary) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto op = makeUpdateDocumentOplogEntry(
+        nextOpTime(),
+        fcvNS,
+        BSON("_id" << FeatureCompatibilityVersion::kParameterName),
+        BSON("$set" << BSON(FeatureCompatibilityVersion::kVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                            << FeatureCompatibilityVersion::kTargetVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion34)));
+    ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SyncTailTest, SuccessOnUpdateFCV36TargetVersionUnsetDocumentInRecovering) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, options);
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeUpdateDocumentOplogEntry(
+        nextOpTime(),
+        fcvNS,
+        BSON("_id" << FeatureCompatibilityVersion::kParameterName),
+        BSON("$set" << BSON(FeatureCompatibilityVersion::kVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion36)
+                    << "$unset"
+                    << BSON(FeatureCompatibilityVersion::kTargetVersionField << 1)));
+    ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SyncTailTest, SuccessOnUpdateFCV34TargetVersion36DocumentInRecovering) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeUpdateDocumentOplogEntry(
+        nextOpTime(),
+        fcvNS,
+        BSON("_id" << FeatureCompatibilityVersion::kParameterName),
+        BSON("$set" << BSON(FeatureCompatibilityVersion::kVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                            << FeatureCompatibilityVersion::kTargetVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion36)));
+    ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SyncTailTest, UpdateToFCVCollectionBesidesFCVDocumentSucceedsInRecovering) {
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeUpdateDocumentOplogEntry(
+        nextOpTime(),
+        fcvNS,
+        BSON("_id"
+             << "other"),
+        BSON("$set" << BSON(FeatureCompatibilityVersion::kVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                            << FeatureCompatibilityVersion::kTargetVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion34)));
+    ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SyncTailTest, UpgradeWithNoUUIDFailsInSecondary) {
+    // Set fCV to 3.4 so the node does not create a UUID for the collection.
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
+
+    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto op = makeUpdateDocumentOplogEntry(
+        nextOpTime(),
+        fcvNS,
+        BSON("_id" << FeatureCompatibilityVersion::kParameterName),
+        BSON("$set" << BSON(FeatureCompatibilityVersion::kVersionField
+                            << FeatureCompatibilityVersionCommandParser::kVersion36)
+                    << "$unset"
+                    << BSON(FeatureCompatibilityVersion::kTargetVersionField << 1)));
+    ASSERT_EQUALS(runOpSteadyState(op), ErrorCodes::IllegalOperation);
+}
+
+TEST_F(SyncTailTest, DropDatabaseSucceedsInRecovering) {
+    auto ns = NamespaceString("foo.bar");
+    ::mongo::repl::createCollection(_opCtx.get(), ns, CollectionOptions());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto op = makeCommandOplogEntry(nextOpTime(), ns, BSON("dropDatabase" << 1));
+    ASSERT_OK(runOpSteadyState(op));
 }
 
 }  // namespace
