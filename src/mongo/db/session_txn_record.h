@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -55,7 +54,5 @@ inline bool operator>(const SessionTxnRecord& lhs, const SessionTxnRecord& rhs) 
     return (lhs.getTxnNum() > rhs.getTxnNum()) ||
         (lhs.getTxnNum() == rhs.getTxnNum() && lhs.getLastWriteOpTime() > rhs.getLastWriteOpTime());
 }
-
-SessionTxnRecord makeSessionTxnRecord(LogicalSessionId lsid, TxnNumber txnNum, repl::OpTime opTime);
 
 }  // namespace mongo
