@@ -3227,15 +3227,6 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint_inlock(const OpTime& commit
     }
 }
 
-void ReplicationCoordinatorImpl::_updateCommitPoint_inlock() {
-    // Update the stable timestamp
-    _setStableTimestampForStorage_inlock();
-
-    auto committedOpTime = _topCoord->getLastCommittedOpTime();
-    // Notify waiters that the commit point moved.
-    _externalState->notifyOplogMetadataWaiters(committedOpTime);
-}
-
 OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _topCoord->getLastCommittedOpTime();

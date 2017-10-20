@@ -950,13 +950,6 @@ private:
     void _advanceCommitPoint_inlock(const OpTime& committedOpTime);
 
     /**
-     * Helper for advanceCommitPoint and updateLastCommittedOpTime. Notifies external waiters
-     * waiting on oplog metadata changes (not read or write concerns) of a change in
-     * lastCommittedOpTime and updates our committed snapshot.
-     */
-    void _updateCommitPoint_inlock();
-
-    /**
      * Scan the memberData and determine the highest last applied or last
      * durable optime present on a majority of servers; set _lastCommittedOpTime to this
      * new entry.  Wake any threads waiting for replication that now have their
