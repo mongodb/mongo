@@ -159,11 +159,11 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_DECL_RET;
 	WT_INSERT *new_ins = *new_insp;
 
-	/* Check for page write generation wrap. */
-	WT_RET(__page_write_gen_wrapped_check(page));
-
 	/* Clear references to memory we now own and must free on error. */
 	*new_insp = NULL;
+
+	/* Check for page write generation wrap. */
+	WT_RET(__page_write_gen_wrapped_check(page));
 
 	/*
 	 * Acquire the page's spinlock unless we already have exclusive access.
@@ -210,11 +210,11 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	u_int i;
 	bool simple;
 
-	/* Check for page write generation wrap. */
-	WT_RET(__page_write_gen_wrapped_check(page));
-
 	/* Clear references to memory we now own and must free on error. */
 	*new_insp = NULL;
+
+	/* Check for page write generation wrap. */
+	WT_RET(__page_write_gen_wrapped_check(page));
 
 	simple = true;
 	for (i = 0; i < skipdepth; i++)
@@ -265,11 +265,11 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_UPDATE *obsolete, *upd = *updp;
 	uint64_t txn;
 
-	/* Check for page write generation wrap. */
-	WT_RET(__page_write_gen_wrapped_check(page));
-
 	/* Clear references to memory we now own and must free on error. */
 	*updp = NULL;
+
+	/* Check for page write generation wrap. */
+	WT_RET(__page_write_gen_wrapped_check(page));
 
 	/*
 	 * All structure setup must be flushed before the structure is entered

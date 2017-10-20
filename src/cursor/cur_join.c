@@ -54,6 +54,7 @@ __curjoin_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_CURSOR_JOIN_ITER *iter;
 
 	*iterp = NULL;
+
 	WT_RET(__wt_calloc_one(session, iterp));
 	iter = *iterp;
 	iter->cjoin = cjoin;

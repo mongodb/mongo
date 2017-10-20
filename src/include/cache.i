@@ -128,7 +128,7 @@ __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 static inline uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache)
 {
-	return (cache->pages_inmem - cache->pages_evict);
+	return (cache->pages_inmem - cache->pages_evicted);
 }
 
 /*

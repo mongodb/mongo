@@ -22,8 +22,9 @@ __async_op_dequeue(WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL *session,
 	uint64_t sleep_usec;
 	uint32_t tries;
 
-	async = conn->async;
 	*op = NULL;
+
+	async = conn->async;
 	/*
 	 * Wait for work to do.  Work is available when async->head moves.
 	 * Then grab the slot containing the work.  If we lose, try again.
@@ -125,8 +126,9 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 
-	wt_session = (WT_SESSION *)session;
 	*cursorp = NULL;
+
+	wt_session = (WT_SESSION *)session;
 	/*
 	 * Compact doesn't need a cursor.
 	 */

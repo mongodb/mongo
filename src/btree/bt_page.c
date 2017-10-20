@@ -311,12 +311,13 @@ __inmem_col_var_repeats(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *np)
 	const WT_PAGE_HEADER *dsk;
 	uint32_t i;
 
+	*np = 0;
+
 	btree = S2BT(session);
 	dsk = page->dsk;
 	unpack = &_unpack;
 
 	/* Walk the page, counting entries for the repeats array. */
-	*np = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		if (__wt_cell_rle(unpack) > 1)

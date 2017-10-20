@@ -77,6 +77,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	uint32_t i;
 
 	*chunkp = NULL;
+
 	chunk = evict_chunk = flush_chunk = NULL;
 
 	WT_ASSERT(session, lsm_tree->queue_ref > 0);
@@ -130,7 +131,6 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	}
 
 err:	__wt_lsm_tree_readunlock(session, lsm_tree);
-
 	*chunkp = chunk;
 	return (ret);
 }
@@ -168,8 +168,8 @@ __wt_lsm_work_switch(
 
 	/* We've become responsible for freeing the work unit. */
 	entry = *entryp;
-	*ran = false;
 	*entryp = NULL;
+	*ran = false;
 
 	if (entry->lsm_tree->need_switch) {
 		WT_WITH_SCHEMA_LOCK(session,

@@ -73,6 +73,7 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 	WT_SESSION_IMPL *session;
 
 	*config_parserp = NULL;
+
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	WT_RET(__wt_calloc_one(session, &config_parser));
