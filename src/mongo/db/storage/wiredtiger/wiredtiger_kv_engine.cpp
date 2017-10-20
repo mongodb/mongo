@@ -201,7 +201,7 @@ public:
                         _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
                     }
                 }
-            } catch (const WriteConflictException& wce) {
+            } catch (const WriteConflictException&) {
                 // Temporary: remove this after WT-3483
                 warning() << "Checkpoint encountered a write conflict exception.";
             } catch (const AssertionException& exc) {

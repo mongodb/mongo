@@ -104,7 +104,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 
         try {
             state = cursor->getExecutor()->getNext(&next, nullptr);
-        } catch (const CloseChangeStreamException& ex) {
+        } catch (const CloseChangeStreamException&) {
             // This exception is thrown when a $changeStream stage encounters an event
             // that invalidates the cursor. We should close the cursor and return without
             // error.

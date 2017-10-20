@@ -482,7 +482,7 @@ void BackgroundSync::_produce() {
         }
         _oplogFetcher = std::move(oplogFetcherPtr);
         oplogFetcher = _oplogFetcher.get();
-    } catch (const mongo::DBException& ex) {
+    } catch (const mongo::DBException&) {
         fassertFailedWithStatus(34440, exceptionToStatus());
     }
 

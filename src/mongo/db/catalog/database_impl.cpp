@@ -311,7 +311,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) {
             }
 
             wunit.commit();
-        } catch (const WriteConflictException& exp) {
+        } catch (const WriteConflictException&) {
             warning() << "could not drop temp collection '" << ns << "' due to "
                                                                      "WriteConflictException";
             opCtx->recoveryUnit()->abandonSnapshot();

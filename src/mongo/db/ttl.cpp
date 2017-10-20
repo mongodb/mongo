@@ -109,7 +109,7 @@ public:
 
             try {
                 doTTLPass();
-            } catch (const WriteConflictException& e) {
+            } catch (const WriteConflictException&) {
                 LOG(1) << "got WriteConflictException";
             }
         }

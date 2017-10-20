@@ -791,7 +791,7 @@ public:
         try {
             if (_cursor)
                 _cursor->reset();
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             // Ignore since this is only called when we are about to kill our transaction
             // anyway.
         }

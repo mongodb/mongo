@@ -124,9 +124,9 @@ CIDR::CIDR(StringData s) try {
             (len >= 0) && (len <= _len));
     _len = len;
 
-} catch (const std::invalid_argument& e) {
+} catch (const std::invalid_argument&) {
     uasserted(ErrorCodes::UnsupportedFormat, "Non-numeric length in CIDR string");
-} catch (const std::out_of_range& e) {
+} catch (const std::out_of_range&) {
     uasserted(ErrorCodes::UnsupportedFormat, "Invalid length in CIDR string");
 }
 

@@ -143,7 +143,7 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
             // this should fail
             rs->updateRecord(t2.get(), id1, "c", 2, false, NULL).transitional_ignore();
             ASSERT(0);
-        } catch (WriteConflictException& dle) {
+        } catch (WriteConflictException&) {
             w2.reset(NULL);
             t2.reset(NULL);
         }
@@ -198,7 +198,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
                 // this should fail as our version of id1 is too old
                 rs->updateRecord(t2.get(), id1, "c", 2, false, NULL).transitional_ignore();
                 ASSERT(0);
-            } catch (WriteConflictException& dle) {
+            } catch (WriteConflictException&) {
             }
         }
     }

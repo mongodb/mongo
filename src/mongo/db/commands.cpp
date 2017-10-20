@@ -217,7 +217,7 @@ BSONObj Command::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest&
     try {
         bool ok = command->publicRun(opCtx, request, out);
         appendCommandStatus(out, ok);
-    } catch (const StaleConfigException& ex) {
+    } catch (const StaleConfigException&) {
         // These exceptions are intended to be handled at a higher level and cannot losslessly
         // round-trip through Status.
         throw;

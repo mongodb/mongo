@@ -126,7 +126,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
         try {
             DBDirectClient client(operationContext());
             ASSERT_EQUALS(client.count(nss.ns()), 0ULL);
-        } catch (const DBException& ex) {
+        } catch (const DBException&) {
             ASSERT(false);
         }
     }
@@ -156,7 +156,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
                 ASSERT_EQUALS(chunk.getShard(), foundChunk.getShard());
                 ASSERT_EQUALS(chunk.getVersion(), foundChunk.getVersion());
             }
-        } catch (const DBException& ex) {
+        } catch (const DBException&) {
             ASSERT(false);
         }
     }

@@ -2323,7 +2323,7 @@ TEST(LegacyInterface, BadType) {
     try {
         port = environment["port"].as<std::string>();
         FAIL("Expected exception trying to convert int to type string");
-    } catch (std::exception& e) {
+    } catch (std::exception&) {
     }
 }
 

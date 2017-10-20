@@ -1432,7 +1432,7 @@ bool DBClientConnection::call(Message& toSend,
         if (response.operation() == dbCompressed) {
             response = uassertStatusOK(_compressorManager.decompressMessage(response));
         }
-    } catch (const DBException& ex) {
+    } catch (const DBException&) {
         _failed = true;
         _port->shutdown();
         throw;

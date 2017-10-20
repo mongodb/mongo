@@ -442,7 +442,7 @@ public:
                 nextBatch->append(obj);
                 (*numResults)++;
             }
-        } catch (const CloseChangeStreamException& ex) {
+        } catch (const CloseChangeStreamException&) {
             // FAILURE state will make getMore command close the cursor even if it's tailable.
             *state = PlanExecutor::FAILURE;
             return Status::OK();

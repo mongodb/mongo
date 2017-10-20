@@ -84,7 +84,7 @@ StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::st
                           str::stream()
                               << "Incorrectly formatted PLAIN client message, empty password");
         }
-    } catch (std::out_of_range& exception) {
+    } catch (std::out_of_range&) {
         return Status(ErrorCodes::AuthenticationFailed,
                       mongoutils::str::stream() << "Incorrectly formatted PLAIN client message");
     }

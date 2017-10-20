@@ -132,7 +132,7 @@ libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexce
     global_db->transportLayer = stdx::make_unique<transport::TransportLayerMock>();
 
     return global_db;
-} catch (const std::exception& e) {
+} catch (const std::exception&) {
     last_error = LIBMONGODB_CAPI_ERROR_UNKNOWN;
     return nullptr;
 }
@@ -148,7 +148,7 @@ void db_destroy(libmongodbcapi_db* db) noexcept {
 
 int db_pump(libmongodbcapi_db* db) noexcept try {
     return LIBMONGODB_CAPI_ERROR_SUCCESS;
-} catch (const std::exception& e) {
+} catch (const std::exception&) {
     return LIBMONGODB_CAPI_ERROR_UNKNOWN;
 }
 
@@ -162,7 +162,7 @@ libmongodbcapi_client* client_new(libmongodbcapi_db* db) noexcept try {
 
     last_error = LIBMONGODB_CAPI_ERROR_SUCCESS;
     return rv;
-} catch (const std::exception& e) {
+} catch (const std::exception&) {
     last_error = LIBMONGODB_CAPI_ERROR_UNKNOWN;
     return nullptr;
 }
@@ -196,7 +196,7 @@ int client_wire_protocol_rpc(libmongodbcapi_client* client,
     *output = (void*)client->response.response.buf();
 
     return LIBMONGODB_CAPI_ERROR_SUCCESS;
-} catch (const std::exception& e) {
+} catch (const std::exception&) {
     return LIBMONGODB_CAPI_ERROR_UNKNOWN;
 }
 

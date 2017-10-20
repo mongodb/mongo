@@ -156,7 +156,7 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
             }
             wunit.commit();
             return;
-        } catch (const WriteConflictException& e) {
+        } catch (const WriteConflictException&) {
             continue;
         } catch (const DBException& e) {
             if (e.toStatus() == ErrorCodes::ExceededMemoryLimit)
@@ -361,10 +361,11 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
             progress->hit();
             n++;
             retries = 0;
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             CurOp::get(_opCtx)->debug().writeConflicts++;
             retries++;  // logAndBackoff expects this to be 1 on first call.
-            wce.logAndBackoff(retries, "index creation", _collection->ns().ns());
+            WriteConflictException::logAndBackoff(
+                retries, "index creation", _collection->ns().ns());
 
             // Can't use writeConflictRetry since we need to save/restore exec around call to
             // abandonSnapshot.

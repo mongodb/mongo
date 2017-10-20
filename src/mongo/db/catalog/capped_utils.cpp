@@ -227,10 +227,10 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
 
             // Go to the next document
             retries = 0;
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             CurOp::get(opCtx)->debug().writeConflicts++;
             retries++;  // logAndBackoff expects this to be 1 on first call.
-            wce.logAndBackoff(retries, "cloneCollectionAsCapped", fromNss.ns());
+            WriteConflictException::logAndBackoff(retries, "cloneCollectionAsCapped", fromNss.ns());
 
             // Can't use writeConflictRetry since we need to save/restore exec around call to
             // abandonSnapshot.

@@ -645,7 +645,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
                                                   cm->getVersion(),
                                                   ChunkRange(chunk->getMin(), chunk->getMax()),
                                                   splitPoints));
-    } catch (const DBException& ex) {
+    } catch (const DBException&) {
         log() << "Marking chunk " << redact(chunk->toString()) << " as jumbo.";
 
         chunk->markAsJumbo();

@@ -506,7 +506,7 @@ public:
         if (_cursor && !wt_keeptxnopen()) {
             try {
                 _cursor->reset(_cursor);
-            } catch (const WriteConflictException& wce) {
+            } catch (const WriteConflictException&) {
                 // Ignore since this is only called when we are about to kill our transaction
                 // anyway.
             }
@@ -1020,7 +1020,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
                 _cappedFirstRecord = firstRemainingId;
             }
         }
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         delete opCtx->releaseRecoveryUnit();
         opCtx->setRecoveryUnit(realRecoveryUnit, realRUstate);
         log() << "got conflict truncating capped, ignoring";
@@ -1095,7 +1095,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
 
             // Stash the truncate point for next time to cleanly skip over tombstones, etc.
             _oplogStones->firstRecord = stone->lastRecord;
-        } catch (const WriteConflictException& wce) {
+        } catch (const WriteConflictException&) {
             LOG(1) << "Caught WriteConflictException while truncating oplog entries, retrying";
         }
     }
@@ -1772,7 +1772,7 @@ void WiredTigerRecordStoreCursorBase::save() {
     try {
         if (_cursor)
             _cursor->reset();
-    } catch (const WriteConflictException& wce) {
+    } catch (const WriteConflictException&) {
         // Ignore since this is only called when we are about to kill our transaction
         // anyway.
     }
