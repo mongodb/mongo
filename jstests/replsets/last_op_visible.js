@@ -4,6 +4,8 @@
 // We then confirm that a writeConcern majority write will be seen as the lastVisibleOp by a
 // majority read.
 
+load("jstests/replsets/rslib.js");
+
 (function() {
     "use strict";
 
@@ -11,18 +13,10 @@
     var replTest = new ReplSetTest(
         {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}, waitForKeys: true});
 
-    try {
-        replTest.startSet();
-    } catch (e) {
-        var conn = MongoRunner.runMongod();
-        if (!conn.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
-            print("Skipping read_majority.js since storageEngine doesn't support it.");
-            MongoRunner.stopMongod(conn);
-            return;
-        }
-        throw e;
+    if (!startSetIfSupportsReadMajority(replTest)) {
+        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        return;
     }
-
     replTest.initiate();
 
     var primary = replTest.getPrimary();

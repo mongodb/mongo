@@ -60,7 +60,6 @@ public:
     bool isMaster() const;
     bool isFastSyncEnabled() const;
     bool isAutoResyncEnabled() const;
-    bool isMajorityReadConcernEnabled() const;
     Seconds getSlaveDelaySecs() const;
     int getPretouch() const;
     long long getOplogSizeBytes() const;
@@ -87,7 +86,6 @@ public:
     void setMaster(bool master);
     void setFastSyncEnabled(bool fastSyncEnabled);
     void setAutoResyncEnabled(bool autoResyncEnabled);
-    void setMajorityReadConcernEnabled(bool majorityReadConcernEnabled);
     void setSlaveDelaySecs(int slaveDelay);
     void setPretouch(int pretouch);
     void setOplogSizeBytes(long long oplogSizeBytes);
@@ -110,13 +108,6 @@ private:
     bool _autoResyncEnabled = false;
     Seconds _slaveDelaySecs = Seconds(0);
     long long _oplogSizeBytes = 0;  // --oplogSize
-
-    /**
-     * True means that the majorityReadConcern feature is enabled, either explicitly by the user or
-     * implicitly by a requiring feature such as CSRS. It does not mean that the storage engine
-     * supports snapshots or that the snapshot thread is running. Those are tracked separately.
-     */
-    bool _majorityReadConcernEnabled = false;
 
     // for master/slave replication
     std::string _source;  // --source

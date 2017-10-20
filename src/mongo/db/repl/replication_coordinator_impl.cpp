@@ -1139,9 +1139,6 @@ Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
                 "Waiting for replication not allowed while holding a lock"};
     }
 
-    const bool isMajorityReadConcern =
-        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
-
     if (readConcern.getArgsClusterTime() &&
         readConcern.getLevel() != ReadConcernLevel::kMajorityReadConcern &&
         readConcern.getLevel() != ReadConcernLevel::kLocalReadConcern) {
@@ -1150,11 +1147,10 @@ Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
                 "afterClusterTime"};
     }
 
-    if (isMajorityReadConcern && !getSettings().isMajorityReadConcernEnabled()) {
-        // This is an opt-in feature. Fail if the user didn't opt-in.
+    if (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern &&
+        !_externalState->isReadCommittedSupportedByStorageEngine(opCtx)) {
         return {ErrorCodes::ReadConcernMajorityNotEnabled,
-                "Majority read concern requested, but server was not started with "
-                "--enableMajorityReadConcern."};
+                "Majority read concern requested, but it is not supported by the storage engine."};
     }
 
     return Status::OK();

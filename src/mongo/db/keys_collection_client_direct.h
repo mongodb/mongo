@@ -57,8 +57,7 @@ public:
 
     /**
      * Returns false if getNewKeys uses readConcern level:local, so the documents returned can be
-     * rolled back. For level:majority support the nodes must always start with
-     * enableMajorityReadConcern parameter set to true.
+     * rolled back.
      */
     bool supportsMajorityReads() const final {
         return false;

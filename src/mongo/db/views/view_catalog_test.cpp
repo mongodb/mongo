@@ -151,7 +151,6 @@ public:
         repl::ReplSettings settings;
 
         settings.setReplSetString("viewCatalogTestSet/node1:12345");
-        settings.setMajorityReadConcernEnabled(true);
 
         repl::StorageInterface::set(service, stdx::make_unique<repl::StorageInterfaceMock>());
         auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(service, settings);

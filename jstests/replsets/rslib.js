@@ -306,17 +306,10 @@ var getLastOpTime;
      * @param options - The options passed to {@link ReplSetTest.startSet}
      */
     startSetIfSupportsReadMajority = function(replSetTest, options) {
-        try {
-            replSetTest.startSet(options);
-        } catch (e) {
-            var conn = MongoRunner.runMongod();
-            if (!conn.getDB("admin").serverStatus().storageEngine.supportsCommittedReads) {
-                MongoRunner.stopMongod(conn);
-                return false;
-            }
-            throw e;
-        }
-        return true;
+        replSetTest.startSet(options);
+        return replSetTest.nodes[0]
+            .adminCommand("serverStatus")
+            .storageEngine.supportsCommittedReads;
     };
 
     /**

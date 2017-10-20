@@ -86,7 +86,6 @@ BSONObj ReplCoordTest::addProtocolVersion(const BSONObj& configDoc, int protocol
 
 void ReplCoordTest::setUp() {
     _settings.setReplSetString("mySet/node1:12345,node2:54321");
-    _settings.setMajorityReadConcernEnabled(true);
 }
 
 void ReplCoordTest::tearDown() {

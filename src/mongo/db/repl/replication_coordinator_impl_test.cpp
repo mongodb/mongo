@@ -4065,9 +4065,7 @@ TEST_F(ReplCoordTest,
 }
 
 TEST_F(ReplCoordTest, NodeReturnsNotAReplicaSetWhenWaitUntilOpTimeIsRunAgainstAStandaloneNode) {
-    auto settings = ReplSettings();
-    settings.setMajorityReadConcernEnabled(true);
-    init(settings);
+    init(ReplSettings());
 
     auto opCtx = makeOperationContext();
 

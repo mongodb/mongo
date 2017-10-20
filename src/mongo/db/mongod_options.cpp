@@ -437,10 +437,15 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "specify index prefetching behavior (if secondary) [none|_id_only|all]")
         .format("(:?none)|(:?_id_only)|(:?all)", "(none/_id_only/all)");
 
-    rs_options.addOptionChaining("replication.enableMajorityReadConcern",
-                                 "enableMajorityReadConcern",
-                                 moe::Switch,
-                                 "enables majority readConcern");
+    // `enableMajorityReadConcern` is always enabled starting in 3.6, regardless of user
+    // settings. We're leaving the option in to not break existing deployment scripts. A warning
+    // will appear if explicitly set to false.
+    rs_options
+        .addOptionChaining("replication.enableMajorityReadConcern",
+                           "enableMajorityReadConcern",
+                           moe::Switch,
+                           "enables majority readConcern")
+        .setDefault(moe::Value(true));
 
     // Sharding Options
 
@@ -1129,8 +1134,11 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     if (params.count("replication.enableMajorityReadConcern")) {
-        replSettings.setMajorityReadConcernEnabled(
-            params["replication.enableMajorityReadConcern"].as<bool>());
+        bool val = params["replication.enableMajorityReadConcern"].as<bool>();
+        if (!val) {
+            warning() << "enableMajorityReadConcern startup parameter was supplied, but its value "
+                         "was ignored; majority read concern cannot be disabled.";
+        }
     }
 
     if (params.count("storage.indexBuildRetry")) {
@@ -1196,7 +1204,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
         if (clusterRoleParam == "configsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-            replSettings.setMajorityReadConcernEnabled(true);
 
             // If we haven't explicitly specified a journal option, default journaling to true for
             // the config server role

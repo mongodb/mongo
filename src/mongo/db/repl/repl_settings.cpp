@@ -68,10 +68,6 @@ bool ReplSettings::isAutoResyncEnabled() const {
     return _autoResyncEnabled;
 }
 
-bool ReplSettings::isMajorityReadConcernEnabled() const {
-    return _majorityReadConcernEnabled;
-}
-
 Seconds ReplSettings::getSlaveDelaySecs() const {
     return _slaveDelaySecs;
 }
@@ -121,10 +117,6 @@ void ReplSettings::setFastSyncEnabled(bool fastSyncEnabled) {
 
 void ReplSettings::setAutoResyncEnabled(bool autoResyncEnabled) {
     _autoResyncEnabled = autoResyncEnabled;
-}
-
-void ReplSettings::setMajorityReadConcernEnabled(bool majorityReadConcernEnabled) {
-    _majorityReadConcernEnabled = majorityReadConcernEnabled;
 }
 
 void ReplSettings::setSlaveDelaySecs(int slaveDelay) {
