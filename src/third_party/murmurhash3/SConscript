@@ -4,5 +4,9 @@ env = env.Clone()
 
 env.InjectThirdPartyIncludePaths(libraries=['boost'])
 
+if env.TargetOSIs('windows'):
+    # C4141: 'inline': used more than once
+    env.Append(CCFLAGS=['/wd4141'])
+
 env.Append(CPPPATH=['#src', '$BUILD_DIR'])
 env.Library("murmurhash3", ["MurmurHash3.cpp"])

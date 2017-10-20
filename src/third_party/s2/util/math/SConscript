@@ -10,6 +10,9 @@ env.Append(CCFLAGS=['-Isrc/third_party/gflags-2.0/src'])
 if env.TargetOSIs('solaris'):
     # Enables declaration of isinf() on Solaris
     env.Append(CPPDEFINES=['__C99FEATURES__'])
+elif env.TargetOSIs('windows'):
+    # C4305: 'initializing': truncation from '...' to '...'
+    env.Append(CCFLAGS=['/wd4305'])
 
 env.Library("math",
           [ "mathutil.cc",

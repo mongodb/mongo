@@ -332,8 +332,13 @@ env.Append(CPPDEFINES=cpp_defines)
 if env.TargetOSIs('windows'):
     extra_defines = ['WINDOWS', 'WNT', 'winnt']
     env.Append(CPPDEFINES=extra_defines)
+    # C4273: '...': inconsistent dll linkage
+    env.Append(CCFLAGS=['/wd4273'])
+    # C4477: incorrect scanf format string
+    env.Append(CCFLAGS=['/wd4477'])
 
-for to_remove in ['-Werror', '-Wall', '-W']:
+
+for to_remove in ['-Werror', '-Wall', '-W', '/W3']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 env.Library(

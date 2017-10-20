@@ -7,6 +7,11 @@ env = env.Clone()
 env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 env.Append(CCFLAGS=['-Isrc/third_party/gflags-2.0/src'])
 
+if env.TargetOSIs('windows'):
+    # C4996: 'memccpy': The POSIX name for this item is deprecated. Instead, use the ISO C and C++
+    # conformant name: _memccpy. See online help for details
+    env.Append(CCFLAGS=['/wd4996'])
+
 env.Library(
     "coding",
     [ 

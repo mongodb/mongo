@@ -15,6 +15,9 @@ try:
             '-DHAVE_IO_H',
             '-DHAVE_WINSOCK2_H',
         ])
+
+        # C4996: '...': was declared deprecated
+        env.Append(CCFLAGS=['/wd4996'])
     elif env.TargetOSIs('solaris'):
         env.AppendUnique(CCFLAGS=[
             '-DHAVE_DIRENT_H',

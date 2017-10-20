@@ -44,6 +44,10 @@ for to_remove in ['-Werror', '-Wall', '-W']:
 if env.ToolchainIs('clang', 'GCC'):
     env.Append(CCFLAGS=['-Wno-sign-compare'])
 
+if env.TargetOSIs('windows'):
+    # C4996: '...': was declared deprecated
+    env.Append(CCFLAGS=['/wd4996'])
+
 i18nEnv = env.Clone()
 i18nEnv.Append(
     CPPDEFINES=[
