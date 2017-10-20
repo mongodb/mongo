@@ -1708,6 +1708,9 @@ struct __wt_session {
 	 * @config{read_timestamp, read using the specified timestamp.  The
 	 * supplied value should not be older than the current oldest timestamp.
 	 * See @ref transaction_timestamps., a string; default empty.}
+	 * @config{round_to_oldest, if read timestamp is earlier than oldest
+	 * timestamp\, read timestamp will be rounded to oldest timestamp., a
+	 * boolean flag; default \c false.}
 	 * @config{snapshot, use a named\, in-memory snapshot\, see @ref
 	 * transaction_named_snapshots., a string; default empty.}
 	 * @config{sync, whether to sync log records when the transaction
