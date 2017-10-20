@@ -203,6 +203,18 @@ public:
         insertThread.join();
     }
 
+    void finishSessionExpectSuccess(SessionCatalogMigrationDestination* sessionMigration) {
+        sessionMigration->finish();
+        // migration always fetches at least twice to transition from committing to done.
+        returnOplog({});
+        returnOplog({});
+
+        sessionMigration->join();
+
+        ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done ==
+                    sessionMigration->getState());
+    }
+
 private:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override {
@@ -250,14 +262,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyWhenNothingToTr
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
 
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
-
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
-
-    sessionMigration.join();
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
@@ -266,7 +271,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
@@ -286,13 +290,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
     oplog3.setStatementId(5);
 
     returnOplog({oplog1, oplog2, oplog3});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
@@ -316,7 +315,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
@@ -339,13 +337,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
     oplog3.setStatementId(5);
 
     returnOplog({oplog1, oplog2, oplog3});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, txnNum);
@@ -362,7 +355,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparate
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
@@ -385,13 +377,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparate
 
     returnOplog({oplog1, oplog2});
     returnOplog({oplog3});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
@@ -416,7 +403,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo sessionInfo1;
     sessionInfo1.setSessionId(sessionId1);
@@ -440,11 +426,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
     oplog3.setStatementId(5);
 
     returnOplog({oplog1, oplog2, oplog3});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
+    finishSessionExpectSuccess(&sessionMigration);
 
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
@@ -478,7 +461,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
@@ -515,13 +497,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
     oplog2.setStatementId(45);
 
     returnOplog({oplog1, oplog2});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
@@ -544,8 +521,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
 
     sessionMigration.start(getServiceContext());
 
-    sessionMigration.finish();
-
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
     sessionInfo.setTxnNumber(2);
@@ -567,13 +542,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
     updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog, updateOplog});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
@@ -635,7 +605,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
@@ -658,13 +627,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
     updateOplog.setPostImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({postImageOplog, updateOplog});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
@@ -726,7 +690,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
@@ -750,11 +713,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
 
     returnOplog({preImageOplog});
     returnOplog({updateOplog});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
+    finishSessionExpectSuccess(&sessionMigration);
 
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
@@ -830,7 +790,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo oldSessionInfo;
     oldSessionInfo.setSessionId(sessionId);
@@ -846,11 +805,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
     oplog2.setStatementId(45);
 
     returnOplog({oplog1, oplog2});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
+    finishSessionExpectSuccess(&sessionMigration);
 
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
@@ -874,7 +830,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo oldSessionInfo;
     oldSessionInfo.setSessionId(sessionId);
@@ -891,6 +846,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     newSessionInfo.setSessionId(sessionId);
     newSessionInfo.setTxnNumber(20);
 
+    // Ensure that the previous oplog has been processed before proceeding.
+    returnOplog({});
+
     insertDocWithSessionInfo(newSessionInfo,
                              kNs,
                              BSON("_id"
@@ -902,13 +860,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     oplog2.setStatementId(45);
 
     returnOplog({oplog2});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto session = getSessionWithTxn(opCtx, sessionId, 20);
     TransactionHistoryIterator historyIter(session->getLastWriteOpTime(20));
@@ -1045,7 +998,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
@@ -1058,6 +1010,9 @@ TEST_F(SessionCatalogMigrationDestinationTest,
 
     returnOplog({oplog1});
 
+    // Ensure that the previous oplog has been processed before proceeding.
+    returnOplog({});
+
     insertDocWithSessionInfo(sessionInfo,
                              kNs,
                              BSON("_id"
@@ -1069,13 +1024,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     oplog2.setStatementId(45);
 
     returnOplog({oplog2});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
     TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
@@ -1339,7 +1289,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
-    sessionMigration.finish();
 
     OplogEntry oplog1(
         OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
@@ -1355,13 +1304,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
     oplog3.setStatementId(45);
 
     returnOplog({oplog1, oplog2, oplog3});
-    // migration always fetches at least twice to transition from committing to done.
-    returnOplog({});
-    returnOplog({});
 
-    sessionMigration.join();
-
-    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    finishSessionExpectSuccess(&sessionMigration);
 
     auto session = getSessionWithTxn(opCtx, sessionId, 19);
     TransactionHistoryIterator historyIter(session->getLastWriteOpTime(19));
