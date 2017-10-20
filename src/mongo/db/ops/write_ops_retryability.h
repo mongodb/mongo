@@ -39,14 +39,12 @@ class FindAndModifyRequest;
 class OperationContext;
 
 /**
- * Returns the single write result corresponding to the given oplog entry for insert, update, and
- * delete commands, i.e. the single write result that would have been returned by the statement that
- * would have resulted in the given oplog entry. The oplog entries are assumed to be properly
- * formed and have the correct op type.
+ * Returns the single write result corresponding to the given oplog entry for document update. I.e.,
+ * the single write result that would have been returned by the statement that would have resulted
+ * in the given oplog entry. The oplog entries are assumed to be properly formed and have the
+ * correct op type.
  */
-SingleWriteResult parseOplogEntryForInsert(const repl::OplogEntry& entry);
 SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry);
-SingleWriteResult parseOplogEntryForDelete(const repl::OplogEntry& entry);
 
 /**
  * Populates the passed-in builder with the result of a findAndModify based on the oplog entries

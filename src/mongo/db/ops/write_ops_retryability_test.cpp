@@ -48,42 +48,6 @@ const BSONObj kNestedOplog(BSON("$sessionMigrateInfo" << 1));
 
 using WriteOpsRetryability = ServiceContextMongoDTest;
 
-TEST_F(WriteOpsRetryability, ParseOplogEntryForInsert) {
-    const auto entry = assertGet(
-        repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
-                                          << "i"
-                                          << "ns"
-                                          << "a.b"
-                                          << "o"
-                                          << BSON("_id" << 1 << "x" << 5))));
-
-    auto res = parseOplogEntryForInsert(entry);
-
-    ASSERT_EQ(res.getN(), 1);
-    ASSERT_EQ(res.getNModified(), 0);
-    ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSONObj());
-}
-
-TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedInsert) {
-    repl::OplogEntry innerOplog(repl::OpTime(Timestamp(50, 10), 1),
-                                0,
-                                repl::OpTypeEnum::kInsert,
-                                NamespaceString("a.b"),
-                                BSON("_id" << 2));
-    repl::OplogEntry insertOplog(repl::OpTime(Timestamp(60, 10), 1),
-                                 0,
-                                 repl::OpTypeEnum::kNoop,
-                                 NamespaceString("a.b"),
-                                 kNestedOplog,
-                                 innerOplog.toBSON());
-
-    auto res = parseOplogEntryForInsert(insertOplog);
-
-    ASSERT_EQ(res.getN(), 1);
-    ASSERT_EQ(res.getNModified(), 0);
-    ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSONObj());
-}
-
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
     const auto entry = assertGet(
         repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
@@ -159,52 +123,6 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpsert) {
     ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSON("_id" << 2));
 }
 
-TEST_F(WriteOpsRetryability, ParseOplogEntryForDelete) {
-    const auto entry = assertGet(
-        repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
-                                          << "d"
-                                          << "ns"
-                                          << "a.b"
-                                          << "o"
-                                          << BSON("_id" << 1 << "x" << 5))));
-
-    auto res = parseOplogEntryForDelete(entry);
-
-    ASSERT_EQ(res.getN(), 1);
-    ASSERT_EQ(res.getNModified(), 0);
-    ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSONObj());
-}
-
-TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedDelete) {
-    repl::OplogEntry innerOplog(repl::OpTime(Timestamp(50, 10), 1),
-                                0,
-                                repl::OpTypeEnum::kDelete,
-                                NamespaceString("a.b"),
-                                BSON("_id" << 2));
-    repl::OplogEntry deleteOplog(repl::OpTime(Timestamp(60, 10), 1),
-                                 0,
-                                 repl::OpTypeEnum::kNoop,
-                                 NamespaceString("a.b"),
-                                 kNestedOplog,
-                                 innerOplog.toBSON());
-
-    auto res = parseOplogEntryForDelete(deleteOplog);
-
-    ASSERT_EQ(res.getN(), 1);
-    ASSERT_EQ(res.getNModified(), 0);
-    ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSONObj());
-}
-
-TEST_F(WriteOpsRetryability, ShouldFailIfParsingDeleteOplogForInsert) {
-    repl::OplogEntry deleteOplog(repl::OpTime(Timestamp(50, 10), 1),
-                                 0,
-                                 repl::OpTypeEnum::kDelete,
-                                 NamespaceString("a.b"),
-                                 BSON("_id" << 2));
-
-    ASSERT_THROWS(parseOplogEntryForInsert(deleteOplog), AssertionException);
-}
-
 TEST_F(WriteOpsRetryability, ShouldFailIfParsingDeleteOplogForUpdate) {
     repl::OplogEntry deleteOplog(repl::OpTime(Timestamp(50, 10), 1),
                                  0,
@@ -213,16 +131,6 @@ TEST_F(WriteOpsRetryability, ShouldFailIfParsingDeleteOplogForUpdate) {
                                  BSON("_id" << 2));
 
     ASSERT_THROWS(parseOplogEntryForUpdate(deleteOplog), AssertionException);
-}
-
-TEST_F(WriteOpsRetryability, ShouldFailIfParsingInsertOplogForDelete) {
-    repl::OplogEntry insertOplog(repl::OpTime(Timestamp(50, 10), 1),
-                                 0,
-                                 repl::OpTypeEnum::kInsert,
-                                 NamespaceString("a.b"),
-                                 BSON("_id" << 2));
-
-    ASSERT_THROWS(parseOplogEntryForDelete(insertOplog), AssertionException);
 }
 
 class FindAndModifyRetryability : public MockReplCoordServerFixture {

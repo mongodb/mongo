@@ -38,7 +38,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/session_txn_record.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
@@ -85,16 +85,11 @@ const auto kLastWriteTimestampFieldName =
  * to pull records likely to be on the same chunks (because they sort near each other).
  */
 Query makeQuery(Date_t now) {
-    Timestamp possiblyExpired(
+    const Timestamp possiblyExpired(
         duration_cast<Seconds>(
             (now - Minutes(TransactionRecordMinimumLifetimeMinutes)).toDurationSinceEpoch()),
         0);
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder subbob(bob.subobjStart(kLastWriteTimestampFieldName));
-        subbob.append("$lt", possiblyExpired);
-    }
-    Query query(bob.obj());
+    Query query(BSON(kLastWriteTimestampFieldName << LT << possiblyExpired));
     query.sort(kSortById);
     return query;
 }

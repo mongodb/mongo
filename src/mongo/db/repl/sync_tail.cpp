@@ -69,7 +69,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
-#include "mongo/db/session_txn_record.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
@@ -552,6 +552,19 @@ void scheduleTxnTableUpdates(OperationContext* opCtx,
 }
 
 /**
+ * A session txn record is greater (i.e. later) than another if its transaction number is greater,
+ * or if its transaction number is the same, and its last write optime is greater.
+ *
+ * Records can only be compared meaningfully if they are for the same session id.
+ */
+bool isSessionTxnRecordLaterThan(const SessionTxnRecord& lhs, const SessionTxnRecord& rhs) {
+    invariant(lhs.getSessionId() == rhs.getSessionId());
+
+    return (lhs.getTxnNum() > rhs.getTxnNum()) ||
+        (lhs.getTxnNum() == rhs.getTxnNum() && lhs.getLastWriteOpTime() > rhs.getLastWriteOpTime());
+}
+
+/**
  * Caches per-collection properties which are relevant for oplog application, so that they don't
  * have to be retrieved repeatedly for each op.
  */
@@ -612,6 +625,7 @@ void fillWriterVectorsAndLastestSessionRecords(
     SessionRecordMap* latestSessionRecords) {
     const auto serviceContext = opCtx->getServiceContext();
     const auto storageEngine = serviceContext->getGlobalStorageEngine();
+
     const bool supportsDocLocking = storageEngine->supportsDocLocking();
     const uint32_t numWriters = writerVectors->size();
 
@@ -656,7 +670,7 @@ void fillWriterVectorsAndLastestSessionRecords(
             auto it = latestSessionRecords->find(lsid);
             if (it == latestSessionRecords->end()) {
                 latestSessionRecords->emplace(lsid, std::move(record));
-            } else if (record > it->second) {
+            } else if (isSessionTxnRecordLaterThan(record, it->second)) {
                 (*latestSessionRecords)[lsid] = std::move(record);
             }
         }

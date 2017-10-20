@@ -34,7 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/session_txn_record.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 
@@ -134,6 +134,8 @@ public:
     boost::optional<repl::OplogEntry> checkStatementExecuted(OperationContext* opCtx,
                                                              TxnNumber txnNumber,
                                                              StmtId stmtId) const;
+
+    bool checkStatementExecutedNoOplogEntryFetch(TxnNumber txnNumber, StmtId stmtId) const;
 
 private:
     void _beginTxn(WithLock, TxnNumber txnNumber);

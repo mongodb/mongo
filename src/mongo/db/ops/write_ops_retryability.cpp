@@ -173,27 +173,6 @@ repl::OplogEntry getInnerNestedOplogEntry(const repl::OplogEntry& entry) {
 
 }  // namespace
 
-SingleWriteResult parseOplogEntryForInsert(const repl::OplogEntry& entry) {
-    if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
-        return parseOplogEntryForInsert(getInnerNestedOplogEntry(entry));
-    }
-
-    uassert(40636,
-            str::stream() << "insert retry request is not compatible with previous write in the "
-                             "transaction of type: "
-                          << OpType_serializer(entry.getOpType())
-                          << ", oplogTs: "
-                          << entry.getTimestamp().toString()
-                          << ", oplog: "
-                          << redact(entry.toBSON()),
-            entry.getOpType() == repl::OpTypeEnum::kInsert);
-
-    SingleWriteResult res;
-    res.setN(1);
-    res.setNModified(0);
-    return res;
-}
-
 SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
     SingleWriteResult res;
     // Upserts are stored as inserts.
@@ -220,27 +199,6 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
                                 << redact(entry.toBSON()));
     }
 
-    return res;
-}
-
-SingleWriteResult parseOplogEntryForDelete(const repl::OplogEntry& entry) {
-    if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
-        return parseOplogEntryForDelete(getInnerNestedOplogEntry(entry));
-    }
-
-    uassert(40637,
-            str::stream() << "delete retry request is not compatible with previous write in the "
-                             "transaction of type: "
-                          << OpType_serializer(entry.getOpType())
-                          << ", oplogTs: "
-                          << entry.getTimestamp().toString()
-                          << ", oplog: "
-                          << redact(entry.toBSON()),
-            entry.getOpType() == repl::OpTypeEnum::kDelete);
-
-    SingleWriteResult res;
-    res.setN(1);
-    res.setNModified(0);
     return res;
 }
 

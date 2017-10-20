@@ -424,6 +424,13 @@ StmtId getStmtIdForWriteOp(OperationContext* opCtx, const T& wholeOp, size_t opI
                                  : kUninitializedStmtId;
 }
 
+SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
+    SingleWriteResult res;
+    res.setN(1);
+    res.setNModified(0);
+    return res;
+}
+
 }  // namespace
 
 WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& wholeOp) {
@@ -482,9 +489,9 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
             const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
             if (opCtx->getTxnNumber()) {
                 auto session = OperationContextSession::get(opCtx);
-                if (auto entry =
-                        session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
-                    out.results.emplace_back(parseOplogEntryForInsert(*entry));
+                if (session->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(),
+                                                                     stmtId)) {
+                    out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
                     continue;
                 }
             }
@@ -758,9 +765,8 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
             auto session = OperationContextSession::get(opCtx);
-            if (auto entry =
-                    session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
-                out.results.emplace_back(parseOplogEntryForDelete(*entry));
+            if (session->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(), stmtId)) {
+                out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
                 continue;
             }
         }

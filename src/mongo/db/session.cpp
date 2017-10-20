@@ -267,6 +267,11 @@ boost::optional<repl::OplogEntry> Session::checkStatementExecuted(OperationConte
     MONGO_UNREACHABLE;
 }
 
+bool Session::checkStatementExecutedNoOplogEntryFetch(TxnNumber txnNumber, StmtId stmtId) const {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    return bool(_checkStatementExecuted(lg, txnNumber, stmtId));
+}
+
 void Session::_beginTxn(WithLock wl, TxnNumber txnNumber) {
     _checkValid(wl);
 
