@@ -205,7 +205,7 @@ class MultiVersionDownloader(object):
 
         urls = []
         requested_version_parts = get_version_parts(version)
-        for link_version, link_url in self.links.iteritems():
+        for link_version, link_url in self.links.items():
             link_version_parts = get_version_parts(link_version)
             if link_version_parts[:len(requested_version_parts)] == requested_version_parts:
                 # The 'link_version' is a candidate for the requested 'version' if
@@ -236,11 +236,11 @@ class MultiVersionDownloader(object):
             else:
                 print("Falling back to generic architecture.")
 
-        urls.sort(key=lambda (version, _): get_version_parts(version, for_sorting=True))
+        urls.sort(key=lambda version__: get_version_parts(version__[0], for_sorting=True))
         full_version = urls[-1][0]
         url = urls[-1][1]
         extract_dir = url.split("/")[-1][:-4]
-        file_suffix = os.path.splitext(urlparse.urlparse(url).path)[1]
+        file_suffix = os.path.splitext(urllib.parse.urlparse(url).path)[1]
 
         # Only download if we don't already have the directory.
         # Note, we cannot detect if 'latest' has already been downloaded, as the name

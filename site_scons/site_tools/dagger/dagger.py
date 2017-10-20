@@ -40,8 +40,8 @@ import sys
 
 import SCons
 
-import graph
-import graph_consts
+from . import graph
+from . import graph_consts
 
 
 LIB_DB = [] # Stores every SCons library nodes
@@ -269,7 +269,7 @@ def write_obj_db(target, source, env):
     for obj in OBJ_DB:
         __generate_file_rels(obj, g)
 
-    for exe in EXE_DB.keys():
+    for exe in list(EXE_DB.keys()):
         __generate_exe_rels(exe, g)
 
     # target is given as a list of target SCons nodes - this builder is only responsible for

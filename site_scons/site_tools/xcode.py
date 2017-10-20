@@ -9,4 +9,4 @@ def generate(env):
 
     if 'DEVELOPER_DIR' in os.environ:
         env['ENV']['DEVELOPER_DIR'] = os.environ['DEVELOPER_DIR']
-        print "NOTE: Xcode detected; propagating DEVELOPER_DIR from shell environment to subcommands"
+        print("NOTE: Xcode detected; propagating DEVELOPER_DIR from shell environment to subcommands")

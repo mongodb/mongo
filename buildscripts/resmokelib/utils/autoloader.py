@@ -2,7 +2,7 @@
 Utility for loading all modules within a package.
 """
 
-from __future__ import absolute_import
+
 
 import importlib
 import pkgutil

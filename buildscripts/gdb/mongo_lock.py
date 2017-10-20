@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 
 import gdb
 import gdb.printing
@@ -239,8 +239,8 @@ def find_mutex_holder(graph, thread_dict, show):
                                                             mutex_waiter_lwpid))
     if graph:
         graph.add_edge(Thread(mutex_waiter_id, mutex_waiter_lwpid),
-                       Lock(long(mutex_value), "Mutex"))
-        graph.add_edge(Lock(long(mutex_value), "Mutex"), Thread(mutex_holder_id, mutex_holder))
+                       Lock(int(mutex_value), "Mutex"))
+        graph.add_edge(Lock(int(mutex_value), "Mutex"), Thread(mutex_holder_id, mutex_holder))
 
 
 def find_lock_manager_holders(graph, thread_dict, show):
@@ -270,8 +270,8 @@ def find_lock_manager_holders(graph, thread_dict, show):
                 lock_head, lock_request["mode"], lock_thread_id, lock_thread_lwpid) +
                 " waited on by thread 0x{:x} (LWP {})".format(thread_dict[lwpid], lwpid))
         if graph:
-            graph.add_edge(Thread(thread_dict[lwpid], lwpid), Lock(long(lock_head), "MongoDB lock"))
-            graph.add_edge(Lock(long(lock_head), "MongoDB lock"),
+            graph.add_edge(Thread(thread_dict[lwpid], lwpid), Lock(int(lock_head), "MongoDB lock"))
+            graph.add_edge(Lock(int(lock_head), "MongoDB lock"),
                            Thread(lock_thread_id, lock_thread_lwpid))
         lock_request_ptr = lock_request["next"]
 

@@ -45,7 +45,7 @@ def add_diacritic_mapping(codepoint):
     # c : recomposed unicode character with diacritics removed
     a = chr(codepoint)
     d = normalize('NFD', a)
-    r = u''
+    r = ''
 
     for i in range(len(d)):
         if ord(d[i]) not in diacritics:

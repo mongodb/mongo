@@ -2,7 +2,7 @@
 Driver of the test execution framework.
 """
 
-from __future__ import absolute_import
+
 
 import threading
 import time
@@ -72,7 +72,7 @@ class TestSuiteExecutor(object):
             jobs_to_start = num_tests
 
         # Must be done after getting buildlogger configuration.
-        self._jobs = [self._make_job(job_num) for job_num in xrange(jobs_to_start)]
+        self._jobs = [self._make_job(job_num) for job_num in range(jobs_to_start)]
 
     def run(self):
         """
@@ -304,7 +304,7 @@ class TestSuiteExecutor(object):
             queue.put(test_case)
 
         # Add sentinel value for each job to indicate when there are no more items to process.
-        for _ in xrange(len(self._jobs)):
+        for _ in range(len(self._jobs)):
             queue.put(None)
 
         return queue

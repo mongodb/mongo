@@ -241,12 +241,12 @@ class ProjFileGenerator(object):
 
 def main():
     if len(sys.argv) != 2:
-        print r"Usage: python buildscripts\make_vcxproj.py FILE_NAME"
+        print(r"Usage: python buildscripts\make_vcxproj.py FILE_NAME")
         return
 
     with ProjFileGenerator(sys.argv[1]) as projfile:
-        with open("compile_commands.json", "rb") as sjh:
-            contents = sjh.read().decode('utf-8')
+        with open("compile_commands.json", "r") as sjh:
+            contents = sjh.read()
             commands = json.loads(contents)
 
         for command in commands:

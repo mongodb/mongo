@@ -15,7 +15,7 @@
 # pylint: disable=too-many-lines
 """Transform idl.syntax trees from the parser into well-defined idl.ast trees."""
 
-from __future__ import absolute_import, print_function, unicode_literals
+
 
 import re
 from typing import cast, List, Set, Union
@@ -735,7 +735,7 @@ def _validate_enum_int(ctxt, idl_enum):
     min_value = min(int_values_set)
     max_value = max(int_values_set)
 
-    valid_int = {x for x in xrange(min_value, max_value + 1)}
+    valid_int = {x for x in range(min_value, max_value + 1)}
 
     if valid_int != int_values_set:
         ctxt.add_enum_non_continuous_range_error(idl_enum, idl_enum.name)

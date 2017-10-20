@@ -7,8 +7,8 @@ Usage:
     python buildscsripts/fetch_test_lifecycle.py evergreen-project revision
 """
 
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import logging
 import optparse

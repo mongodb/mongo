@@ -18,7 +18,7 @@ IDL compiler driver.
 Orchestrates the 3 passes (parser, binder, and generator) together.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
+
 
 import io
 import logging

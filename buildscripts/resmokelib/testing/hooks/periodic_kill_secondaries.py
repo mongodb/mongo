@@ -3,7 +3,7 @@ Testing hook for verifying correctness of a secondary's behavior during
 an unclean shutdown.
 """
 
-from __future__ import absolute_import
+
 
 import sys
 import time

@@ -227,7 +227,7 @@ def hasDuplicateActionTypes(actionTypes):
     prevActionType = sortedActionTypes[0]
     for actionType in sortedActionTypes[1:]:
         if actionType == prevActionType:
-            print 'Duplicate actionType %s\n' % actionType
+            print('Duplicate actionType %s\n' % actionType)
             didFail = True
         prevActionType = actionType
 
@@ -240,7 +240,7 @@ def parseActionTypesFromFile(actionTypesFilename):
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
-        print "Usage: generate_action_types.py <path to action_types.txt> <header file path> <source file path>"
+        print("Usage: generate_action_types.py <path to action_types.txt> <header file path> <source file path>")
         sys.exit(-1)
 
     actionTypes = parseActionTypesFromFile(sys.argv[1])

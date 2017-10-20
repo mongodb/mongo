@@ -18,7 +18,7 @@ import sys
 import tarfile
 import tempfile
 import threading
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from distutils import spawn
 from optparse import OptionParser
 
@@ -81,7 +81,7 @@ def get_eslint_from_cache(dest_file, platform, arch):
     # Download the file
     print("Downloading ESLint %s from %s, saving to %s" % (ESLINT_VERSION,
                                                            url, temp_tar_file))
-    urllib.urlretrieve(url, temp_tar_file)
+    urllib.request.urlretrieve(url, temp_tar_file)
 
     eslint_distfile = ESLINT_SOURCE_TAR_BASE.substitute(platform=platform, arch=arch)
     extract_eslint(temp_tar_file, eslint_distfile)

@@ -2,7 +2,7 @@
 Configuration options for resmoke.py.
 """
 
-from __future__ import absolute_import
+
 
 import collections
 import itertools
@@ -63,7 +63,7 @@ DEFAULTS = {
     "repeat": 1,
     "report_failure_status": "fail",
     "report_file": None,
-    "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
+    "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
     "shell_conn_string": None,
     "shell_port": None,

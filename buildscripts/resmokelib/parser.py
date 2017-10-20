@@ -2,7 +2,7 @@
 Parser for command line arguments.
 """
 
-from __future__ import absolute_import
+
 
 import os
 import os.path

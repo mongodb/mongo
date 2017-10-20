@@ -17,8 +17,8 @@ NODE_SYM = 2
 NODE_FILE = 3
 NODE_EXE = 4
 
-RELATIONSHIP_TYPES = range(1, 9)
-NODE_TYPES = range(1, 5)
+RELATIONSHIP_TYPES = list(range(1, 9))
+NODE_TYPES = list(range(1, 5))
 
 
 """Error/query codes"""

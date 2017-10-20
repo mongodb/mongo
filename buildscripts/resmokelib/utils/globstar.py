@@ -2,7 +2,7 @@
 Filename globbing utility.
 """
 
-from __future__ import absolute_import
+
 
 import glob as _glob
 import os
@@ -145,7 +145,7 @@ def _list_dir(pathname):
     """
 
     try:
-        (_root, dirs, files) = os.walk(pathname).next()
+        (_root, dirs, files) = next(os.walk(pathname))
         return (dirs, files)
     except StopIteration:
         return None  # 'pathname' directory does not exist

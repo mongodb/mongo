@@ -4,9 +4,9 @@
 Utility for computing test failure rates from the Evergreen API.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import collections
 import datetime
@@ -20,7 +20,7 @@ import time
 import warnings
 
 try:
-    from urlparse import urlparse
+    from urllib.parse import urlparse
 except ImportError:
     from urllib.parse import urlparse
 
@@ -31,7 +31,7 @@ import yaml
 LOGGER = logging.getLogger(__name__)
 
 if sys.version_info[0] == 2:
-    _STRING_TYPES = (basestring,)
+    _STRING_TYPES = (str,)
 else:
     _STRING_TYPES = (str,)
 

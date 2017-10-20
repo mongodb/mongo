@@ -2,7 +2,7 @@
 Tests for buildscripts/update_test_lifecycle.py.
 """
 
-from __future__ import absolute_import
+
 
 import collections
 import copy

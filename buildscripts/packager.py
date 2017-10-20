@@ -345,7 +345,7 @@ def main(argv):
     prefix = args.prefix
     if prefix is None:
       prefix = tempfile.mkdtemp()
-    print "Working in directory %s" % prefix
+    print("Working in directory %s" % prefix)
 
     os.chdir(prefix)
     try:
@@ -384,14 +384,14 @@ def crossproduct(*seqs):
 
 def sysassert(argv):
     """Run argv and assert that it exited with status 0."""
-    print "In %s, running %s" % (os.getcwd(), " ".join(argv))
+    print("In %s, running %s" % (os.getcwd(), " ".join(argv)))
     sys.stdout.flush()
     sys.stderr.flush()
     assert(subprocess.Popen(argv).wait()==0)
 
 def backtick(argv):
     """Run argv and return its output string."""
-    print "In %s, running %s" % (os.getcwd(), " ".join(argv))
+    print("In %s, running %s" % (os.getcwd(), " ".join(argv)))
     sys.stdout.flush()
     sys.stderr.flush()
     return subprocess.Popen(argv, stdout=subprocess.PIPE).communicate()[0]
@@ -423,11 +423,11 @@ def unpack_binaries_into(build_os, arch, spec, where):
         sysassert(["tar", "xvzf", rootdir+"/"+tarfile(build_os, arch, spec)])
         release_dir = glob('mongodb-linux-*')[0]
         for releasefile in "bin", "GNU-AGPL-3.0", "README", "THIRD-PARTY-NOTICES", "MPL-2":
-            print "moving file: %s/%s" % (release_dir, releasefile)
+            print("moving file: %s/%s" % (release_dir, releasefile))
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
     except Exception:
-        exc=sys.exc_value
+        exc=sys.exc_info()[1]
         os.chdir(rootdir)
         raise exc
     os.chdir(rootdir)
@@ -443,7 +443,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # directory, so the debian directory is needed in all cases (and
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
-        print "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
+        print("Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir))
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         sysassert(["sh", "-c", "(cd \"%s\" && git archive %s %s/ ) | (cd \"%s\" && tar xvf -)" % (srcdir, spec.metadata_gitspec(), pkgdir, sdir)])
     # Splat the binaries under sdir.  The "build" stages of the
@@ -576,7 +576,7 @@ def move_repos_into_place(src, dst):
             os.mkdir(dname)
             break
         except OSError:
-            exc=sys.exc_value
+            exc=sys.exc_info()[1]
             if exc.errno == errno.EEXIST:
                 pass
             else:
@@ -596,7 +596,7 @@ def move_repos_into_place(src, dst):
             os.symlink(dname, tmpnam)
             break
         except OSError: # as exc: # Python >2.5
-            exc=sys.exc_value
+            exc=sys.exc_info()[1]
             if exc.errno == errno.EEXIST:
                 pass
             else:
@@ -614,7 +614,7 @@ def move_repos_into_place(src, dst):
                os.symlink(os.readlink(dst), oldnam)
                break
            except OSError: # as exc: # Python >2.5
-               exc=sys.exc_value
+               exc=sys.exc_info()[1]
                if exc.errno == errno.EEXIST:
                    pass
                else:
@@ -767,7 +767,7 @@ def ensure_dir(filename):
     try:
         os.makedirs(dirpart)
     except OSError: # as exc: # Python >2.5
-        exc=sys.exc_value
+        exc=sys.exc_info()[1]
         if exc.errno == errno.EEXIST:
             pass
         else:

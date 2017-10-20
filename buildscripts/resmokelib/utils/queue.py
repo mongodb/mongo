@@ -7,17 +7,17 @@ in order for KeyboardInterrupt exceptions to get propagated.
 See https://bugs.python.org/issue1167930 for more details.
 """
 
-from __future__ import absolute_import
 
-import Queue
+
+import queue
 import time
 
 
 # Exception that is raised when get_nowait() is called on an empty Queue.
-Empty = Queue.Empty
+Empty = queue.Empty
 
 
-class Queue(Queue.Queue):
+class Queue(queue.Queue):
     """
     A multi-producer, multi-consumer queue.
     """

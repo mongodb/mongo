@@ -2,7 +2,7 @@
 Interface for customizing the behavior of a test fixture.
 """
 
-from __future__ import absolute_import
+
 
 from ...logging import loggers
 from ...utils import registry
@@ -26,8 +26,6 @@ class Hook(object):
     """
     The common interface all Hooks will inherit from.
     """
-
-    __metaclass__ = registry.make_registry_metaclass(_HOOKS)
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 

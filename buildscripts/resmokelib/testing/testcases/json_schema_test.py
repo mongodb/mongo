@@ -2,7 +2,7 @@
 unittest.TestCase for JSON Schema tests.
 """
 
-from __future__ import absolute_import
+
 
 from . import interface
 from ... import config

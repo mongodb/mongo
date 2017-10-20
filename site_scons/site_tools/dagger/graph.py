@@ -4,10 +4,10 @@ import abc
 import json
 import copy
 
-import graph_consts
+from . import graph_consts
 
 if sys.version_info >= (3, 0):
-    basestring = str
+    str = str
 
 class Graph(object):
     """Graph class for storing the build dependency graph. The graph stores the
@@ -20,7 +20,7 @@ class Graph(object):
         """
         A graph can be initialized with a .json file, graph object, or with no args
         """
-        if isinstance(input, basestring):
+        if isinstance(input, str):
             if input.endswith('.json'):
                 with open(input, 'r') as f:
                     data = json.load(f, encoding="ascii")
@@ -141,7 +141,7 @@ class Graph(object):
             node_dict["id"] = id
             node_dict["node"] = {}
 
-            for property, value in vars(node).iteritems():
+            for property, value in vars(node).items():
                 if isinstance(value, set):
                     node_dict["node"][property] = list(value)
                 else:
@@ -170,10 +170,9 @@ class Graph(object):
                 sum(len(x) for x in self._edges.values()), hash(self))
 
 
-class NodeInterface(object):
+class NodeInterface(object, metaclass=abc.ABCMeta):
     """Abstract base class for all Node Objects - All nodes must have an id and name
     """
-    __metaclass__ = abc.ABCMeta
 
     @abc.abstractproperty
     def id(self):
@@ -190,7 +189,7 @@ class NodeLib(NodeInterface):
     def __init__(self, id, name, input=None):
         if isinstance(input, dict):
             should_fail = False
-            for k, v in input.iteritems():
+            for k, v in input.items():
                 try:
                     if isinstance(v, list):
                         setattr(self, k, set(v))
@@ -310,7 +309,7 @@ class NodeSymbol(NodeInterface):
         if isinstance(input, dict):
             should_fail = False
 
-            for k, v in input.iteritems():
+            for k, v in input.items():
                 try:
                     if isinstance(v, list):
                         setattr(self, k, set(v))
@@ -435,7 +434,7 @@ class NodeFile(NodeInterface):
     def __init__(self, id, name, input=None):
         if isinstance(input, dict):
             should_fail = False
-            for k, v in input.iteritems():
+            for k, v in input.items():
                 try:
                     if isinstance(v, list):
                         setattr(self, k, set(v))
@@ -551,7 +550,7 @@ class NodeExe(NodeInterface):
     def __init__(self, id, name, input=None):
         if isinstance(input, dict):
             should_fail = False
-            for k, v in input.iteritems():
+            for k, v in input.items():
                 try:
                     if isinstance(v, list):
                         setattr(self, k, set(v))

@@ -21,7 +21,7 @@ This is a lossy translation from the IDL Syntax tree as the IDL AST only contain
 the enums and structs that need code generated for them, and just enough information to do that.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
+
 
 from typing import List, Union, Any, Optional, Tuple
 

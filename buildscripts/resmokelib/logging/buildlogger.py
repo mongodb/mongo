@@ -2,7 +2,7 @@
 Defines handlers for communicating with a buildlogger server.
 """
 
-from __future__ import absolute_import
+
 
 import functools
 import json
@@ -267,7 +267,7 @@ class BuildloggerServer(object):
     def __init__(self):
         tmp_globals = {}
         self.config = {}
-        execfile(_BUILDLOGGER_CONFIG, tmp_globals, self.config)
+        exec(compile(open(_BUILDLOGGER_CONFIG).read(), _BUILDLOGGER_CONFIG, 'exec'), tmp_globals, self.config)
 
         # Rename "slavename" to "username" if present.
         if "slavename" in self.config and "username" not in self.config:

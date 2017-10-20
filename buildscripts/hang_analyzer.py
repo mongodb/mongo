@@ -12,7 +12,7 @@ A prototype hang analyzer for Evergreen integration to help investigate test tim
 Supports Linux, MacOS X, Solaris, and Windows.
 """
 
-import StringIO
+import io
 import csv
 import glob
 import itertools
@@ -177,7 +177,7 @@ class WindowsProcessList(object):
 
         ret = callo([ps, "/FO", "CSV"], logger)
 
-        b = StringIO.StringIO(ret)
+        b = io.StringIO(ret)
         csvReader = csv.reader(b)
 
         p = [[int(row[1]), row[0]] for row in csvReader if row[1] != "PID"]
@@ -270,7 +270,7 @@ class DarwinProcessList(object):
 
         ret = callo([ps, "-axco", "pid,comm"], logger)
 
-        b = StringIO.StringIO(ret)
+        b = io.StringIO(ret)
         csvReader = csv.reader(b, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         p = [[int(row[0]), row[1]] for row in csvReader if row[0] != "PID"]
@@ -411,7 +411,7 @@ class LinuxProcessList(object):
 
         ret = callo([ps, "-eo", "pid,args"], logger)
 
-        b = StringIO.StringIO(ret)
+        b = io.StringIO(ret)
         csvReader = csv.reader(b, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         p = [[int(row[0]), os.path.split(row[1])[1]] for row in csvReader if row[0] != "PID"]
@@ -433,7 +433,7 @@ class SolarisProcessList(object):
 
         ret = callo([ps, "-eo", "pid,args"], logger)
 
-        b = StringIO.StringIO(ret)
+        b = io.StringIO(ret)
         csvReader = csv.reader(b, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         p = [[int(row[0]), os.path.split(row[1])[1]] for row in csvReader if row[0] != "PID"]
@@ -545,7 +545,7 @@ def signal_process(logger, pid, signalnum):
 
         logger.info("Waiting for process to report")
         time.sleep(5)
-    except OSError, e:
+    except OSError as e:
         logger.error("Hit OS error trying to signal process: %s" % str(e))
 
     except AttributeError:

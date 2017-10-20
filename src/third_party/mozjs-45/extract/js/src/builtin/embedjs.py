@@ -108,7 +108,7 @@ def preprocess(cxx, preprocessorOption, source, args = []):
   outputArg = shlex.split(preprocessorOption + tmpOut)
 
   with open(tmpIn, 'wb') as input:
-    input.write(source)
+    input.write(source.encode("utf-8"))
   print(' '.join(cxx + outputArg + args + [tmpIn]))
   result = subprocess.Popen(cxx + outputArg + args + [tmpIn]).wait()
   if (result != 0):

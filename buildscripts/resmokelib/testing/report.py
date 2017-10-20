@@ -3,7 +3,7 @@ Extension to the unittest.TestResult to support additional test status
 and timing information for the report.json file.
 """
 
-from __future__ import absolute_import
+
 
 import copy
 import threading

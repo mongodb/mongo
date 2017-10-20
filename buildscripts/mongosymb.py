@@ -36,7 +36,7 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hi
         """Makes a map from binary load address to description of library from the somap, which is
         a list of dictionaries describing individual loaded libraries.
         """
-        return { so_entry["b"] : so_entry for so_entry in somap_list if so_entry.has_key("b") }
+        return { so_entry["b"] : so_entry for so_entry in somap_list if "b" in so_entry }
 
     base_addr_map = make_base_addr_map(trace_doc["processInfo"]["somap"])
 
@@ -50,7 +50,7 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hi
             addr_base = frame["b"]
         else:
             addr_base = soinfo.get("vmaddr", "0")
-        addr = long(addr_base, 16) + long(frame["o"], 16)
+        addr = int(addr_base, 16) + int(frame["o"], 16)
         # addr currently points to the return address which is the one *after* the call. x86 is
         # variable length so going backwards is difficult. However llvm-symbolizer seems to do the
         # right thing if we just subtract 1 byte here. This has the downside of also adjusting the

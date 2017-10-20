@@ -2,7 +2,7 @@
 Replica set fixture for executing JSTests against.
 """
 
-from __future__ import absolute_import
+
 
 import os.path
 import time
@@ -85,7 +85,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.replset_name = self.mongod_options.get("replSet", "rs")
 
         if not self.nodes:
-            for i in xrange(self.num_nodes):
+            for i in range(self.num_nodes):
                 node = self._new_mongod(i, self.replset_name)
                 self.nodes.append(node)
 

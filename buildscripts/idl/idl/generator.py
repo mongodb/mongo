@@ -15,7 +15,7 @@
 # pylint: disable=too-many-lines
 """IDL C++ Code Generator."""
 
-from __future__ import absolute_import, print_function, unicode_literals
+
 
 from abc import ABCMeta, abstractmethod
 import io
@@ -123,10 +123,8 @@ def _get_all_fields(struct):
     return sorted([field for field in all_fields], key=lambda f: f.cpp_name)
 
 
-class _FieldUsageCheckerBase(object):
+class _FieldUsageCheckerBase(object, metaclass=ABCMeta):
     """Check for duplicate fields, and required fields as needed."""
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -1602,8 +1600,8 @@ def _generate_header(spec, file_name):
     str_value = generate_header_str(spec)
 
     # Generate structs
-    with io.open(file_name, mode='wb') as file_handle:
-        file_handle.write(str_value.encode())
+    with io.open(file_name, mode='w') as file_handle:
+        file_handle.write(str_value)
 
 
 def generate_source_str(spec, target_arch, header_file_name):
@@ -1625,8 +1623,8 @@ def _generate_source(spec, target_arch, file_name, header_file_name):
     str_value = generate_source_str(spec, target_arch, header_file_name)
 
     # Generate structs
-    with io.open(file_name, mode='wb') as file_handle:
-        file_handle.write(str_value.encode())
+    with io.open(file_name, mode='w') as file_handle:
+        file_handle.write(str_value)
 
 
 def generate_code(spec, target_arch, output_base_dir, header_file_name, source_file_name):

@@ -2,8 +2,8 @@
 import sys
 import codecs
 
-import cpplint
-import utils
+from . import cpplint
+from . import utils
 
 class CheckForConfigH:
     def __init__(self):

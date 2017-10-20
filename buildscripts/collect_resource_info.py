@@ -4,8 +4,8 @@
 Collect system resource information on processes running in Evergreen on a given interval.
 """
 
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 from datetime import datetime
 import optparse

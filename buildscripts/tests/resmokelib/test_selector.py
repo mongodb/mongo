@@ -1,7 +1,7 @@
 
 """Unit tests for the buildscripts.resmokelib.selector module."""
 
-from __future__ import absolute_import
+
 
 import fnmatch
 import unittest
@@ -189,7 +189,7 @@ class TestTestList(unittest.TestCase):
 
     def test_roots_unknown_file(self):
         roots = ["dir/subdir1/unknown"]
-        with self.assertRaisesRegexp(ValueError, "Unrecognized test file: dir/subdir1/unknown"):
+        with self.assertRaisesRegex(ValueError, "Unrecognized test file: dir/subdir1/unknown"):
             selector._TestList(self.test_file_explorer, roots, tests_are_files=True)
 
     def test_include_files(self):
@@ -223,7 +223,7 @@ class TestTestList(unittest.TestCase):
     def test_exclude_files_no_match(self):
         roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*"]
         test_list = selector._TestList(self.test_file_explorer, roots)
-        with self.assertRaisesRegexp(ValueError, "Unrecognized test file: .*$"):
+        with self.assertRaisesRegex(ValueError, "Unrecognized test file: .*$"):
             test_list.exclude_files(["dir/subdir2/test26.js"])
 
     def test_exclude_files_glob(self):
@@ -494,7 +494,7 @@ class TestFilterTests(unittest.TestCase):
 
     def test_jstest_unknown_file(self):
         config = {"roots": ["dir/subdir1/*.js", "dir/subdir1/unknown"]}
-        with self.assertRaisesRegexp(ValueError, "Unrecognized test file: dir/subdir1/unknown"):
+        with self.assertRaisesRegex(ValueError, "Unrecognized test file: dir/subdir1/unknown"):
             selector.filter_tests("js_test", config, self.test_file_explorer)
 
     def test_json_schema_exclude_files(self):

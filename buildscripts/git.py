@@ -1,6 +1,6 @@
 """Module to run git commands on a repository."""
 
-from __future__ import absolute_import
+
 
 import logging
 import os

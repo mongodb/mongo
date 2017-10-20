@@ -2,7 +2,7 @@
 Utility to support asynchronously signaling the current process.
 """
 
-from __future__ import absolute_import
+
 
 import atexit
 import os

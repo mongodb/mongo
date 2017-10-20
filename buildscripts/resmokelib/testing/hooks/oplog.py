@@ -3,7 +3,7 @@ Testing hook for verifying members of a replica set have matching
 oplogs.
 """
 
-from __future__ import absolute_import
+
 
 import os.path
 

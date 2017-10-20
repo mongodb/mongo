@@ -1,6 +1,6 @@
 """Module to access a JIRA server."""
 
-from __future__ import absolute_import
+
 
 import jira
 

@@ -5,7 +5,7 @@ import logging
 
 import SCons
 
-import dagger
+from . import dagger
 
 def generate(env, **kwargs):
     """The entry point for our tool. However, the builder for
