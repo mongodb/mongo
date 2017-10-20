@@ -160,8 +160,6 @@ selector:
   - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
-  exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
 
 executor:
   config:

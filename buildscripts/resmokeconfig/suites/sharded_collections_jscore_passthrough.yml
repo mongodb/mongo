@@ -76,8 +76,9 @@ selector:
   - jstests/core/mr1.js
   - jstests/core/mr3.js
   - jstests/core/mr4.js
+  # TODO: SERVER-30052
+  - jstests/core/queryoptimizer3.js
   exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation

@@ -181,8 +181,6 @@ selector:
   - jstests/core/list_all_local_sessions.js # Too many users authenticated
   - jstests/core/list_all_sessions.js # Too many users authenticated
   - jstests/core/list_sessions.js # Too many users authenticated
-  exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
 
 executor:
   config:
