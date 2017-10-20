@@ -9,20 +9,20 @@
 TestData.skipGossipingClusterTime = true;
 
 (function() {
-    var testInvalidAuthStates = function(replSetTest, expectedState) {
+    var testInvalidAuthStates = function(replSetTest) {
         print("check that 0 is in recovering");
-        replSetTest.waitForState(replSetTest.nodes[0], expectedState);
+        replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
 
         print("shut down 1, 0 still in recovering.");
         replSetTest.stop(1);
         sleep(5);
 
-        replSetTest.waitForState(replSetTest.nodes[0], expectedState);
+        replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
 
         print("shut down 2, 0 becomes a secondary.");
         replSetTest.stop(2);
 
-        replSetTest.waitForState(replSetTest.nodes[0], expectedState);
+        replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.SECONDARY);
 
         replSetTest.restart(1, {"keyFile": key1});
         replSetTest.restart(2, {"keyFile": key1});
@@ -63,7 +63,7 @@ TestData.skipGossipingClusterTime = true;
     // auth to all nodes with auth
     replSetTest.nodes[1].getDB("admin").auth("foo", "bar");
     replSetTest.nodes[2].getDB("admin").auth("foo", "bar");
-    testInvalidAuthStates(replSetTest, ReplSetTest.State.RECOVERING);
+    testInvalidAuthStates(replSetTest);
 
     print("restart mongod with bad keyFile");
 
@@ -74,7 +74,7 @@ TestData.skipGossipingClusterTime = true;
     replSetTest.nodes[0].getDB("admin").auth("foo", "bar");
     replSetTest.nodes[1].getDB("admin").auth("foo", "bar");
     replSetTest.nodes[2].getDB("admin").auth("foo", "bar");
-    testInvalidAuthStates(replSetTest, ReplSetTest.State.RECOVERING);
+    testInvalidAuthStates(replSetTest);
 
     replSetTest.stop(0);
     m = replSetTest.restart(0, {"keyFile": key1});
