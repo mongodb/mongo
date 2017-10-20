@@ -40,7 +40,11 @@ namespace {
 const std::unique_ptr<ClockSource> clock = stdx::make_unique<ClockSourceMock>();
 
 const void* pointerOf(int data) {
+#pragma warning(push)
+// C4312: 'reinterpret_cast': conversion from 'int' to 'const void *' of greater size
+#pragma warning(disable : 4312)
     return reinterpret_cast<const void*>(data);
+#pragma warning(pop)
 }
 
 TEST(RecordAccessTrackerTest, TouchRecordTwice) {

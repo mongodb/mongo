@@ -250,7 +250,7 @@ private:
     /** raw recv, same semantics as ::recv */
     int _recv(char* buf, int max);
 
-    int _fd;
+    SOCKET _fd;
     uint64_t _fdCreationMicroSec;
     SockAddr _local;
     SockAddr _remote;

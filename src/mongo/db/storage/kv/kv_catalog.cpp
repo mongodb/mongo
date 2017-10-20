@@ -70,7 +70,7 @@ void appendPositionsOfBitsSet(uint64_t value, StringBuilder* sb) {
             *sb << ", ";
         }
         *sb << lowestSetBitPosition;
-        value ^= (1 << lowestSetBitPosition);
+        value ^= (1ULL << lowestSetBitPosition);
         firstIteration = false;
     }
     *sb << " ]";

@@ -291,7 +291,12 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     // get OS version info
     ZeroMemory(&osvi, sizeof(osvi));
     osvi.dwOSVersionInfoSize = sizeof(osvi);
+#pragma warning(push)
+// GetVersionEx is deprecated
+#pragma warning(disable : 4996)
     if (GetVersionEx((OSVERSIONINFO*)&osvi)) {
+#pragma warning(pop)
+
         verstr << osvi.dwMajorVersion << "." << osvi.dwMinorVersion;
         if (osvi.wServicePackMajor)
             verstr << " SP" << osvi.wServicePackMajor;

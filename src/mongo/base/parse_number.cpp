@@ -173,7 +173,12 @@ Status parseNumberFromStringWithBase(StringData wholeString, int base, NumberTyp
     if (magnitude > maxMagnitude)
         return Status(ErrorCodes::FailedToParse, "Overflow");
 
+#pragma warning(push)
+// C4146: unary minus operator applied to unsigned type, result still unsigned
+#pragma warning(disable : 4146)
     *result = NumberType(isNegative ? -magnitude : magnitude);
+#pragma warning(pop)
+
     return Status::OK();
 }
 

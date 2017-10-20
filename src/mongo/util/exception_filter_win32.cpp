@@ -32,7 +32,12 @@
 
 #include "mongo/platform/basic.h"
 
+#pragma warning(push)
+// C4091: 'typedef ': ignored on left of '' when no variable is declared
+#pragma warning(disable : 4091)
 #include <DbgHelp.h>
+#pragma warning(pop)
+
 #include <ostream>
 
 #include "mongo/config.h"
@@ -150,7 +155,7 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
         }
         sprintf_s(addressString,
                   sizeof(addressString),
-                  " 0x%p",
+                  " 0x%llx",
                   excPointers->ExceptionRecord->ExceptionInformation[1]);
         log() << "*** access violation was a " << acTypeString << addressString;
     }

@@ -71,7 +71,7 @@ const double kInt32MinAsDouble = kInt32Min;
 const uint32_t kUInt32Zero = 0;
 const uint32_t kUInt32Max = std::numeric_limits<uint32_t>::max();
 const int64_t kUInt32MaxAsInt64 = kUInt32Max;
-const float kUInt32MaxAsFloat = kUInt32Max;
+const float kUInt32MaxAsFloat = static_cast<float>(kUInt32Max);
 const double kUInt32MaxAsDouble = kUInt32Max;
 
 // 64-bit integer values
@@ -79,14 +79,15 @@ const int64_t kInt64Zero = 0;
 const int64_t kInt64Max = std::numeric_limits<int64_t>::max();
 const int64_t kInt64Min = std::numeric_limits<int64_t>::lowest();
 const uint64_t kInt64MaxAsUInt64 = kInt64Max;
-const double kInt64MaxAsDouble = kInt64Max;
+const double kInt64MaxAsDouble = static_cast<double>(kInt64Max);
 const double kInt64MinAsDouble = kInt64Min;
 
 // Unsigned 64-bit integer values
 const uint64_t kUInt64Zero = 0;
 const uint64_t kUInt64Max = std::numeric_limits<uint64_t>::max();
-const float kUInt64MaxAsFloat = kUInt64Max;
-const double kUInt64MaxAsDouble = kUInt64Max;
+const float kUInt64MaxAsFloat = static_cast<float>(kUInt64Max);
+const double kUInt64MaxAsDouble = static_cast<double>(kUInt64Max);
+
 
 // Long long values
 const long long kLongLongMax = std::numeric_limits<long long>::max();

@@ -173,7 +173,7 @@ namespace boost {
                 return (pos_type(off));
             }
             else {
-                BOOST_ASSERT(0); // §27.4.3.2 allows undefined-behaviour here
+                BOOST_ASSERT(0); // 27.4.3.2 allows undefined-behaviour here
                 return pos_type(off_type(-1));
             }
         }

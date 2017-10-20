@@ -1502,6 +1502,10 @@ elif env.TargetOSIs('windows'):
     #     object called lock on the stack.
     env.Append( CCFLAGS=["/we4013", "/we4099", "/we4930"] )
 
+    # Warnings as errors
+    if not has_option("disable-warnings-as-errors"):
+        env.Append( CCFLAGS=["/WX"] )
+
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS", "_SCL_SECURE_NO_WARNINGS"] )
 
     # this would be for pre-compiled headers, could play with it later

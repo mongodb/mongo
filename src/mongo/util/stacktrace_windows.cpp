@@ -31,7 +31,12 @@
 
 #include "mongo/util/stacktrace.h"
 
+#pragma warning(push)
+// C4091: 'typedef ': ignored on left of '' when no variable is declared
+#pragma warning(disable : 4091)
 #include <DbgHelp.h>
+#pragma warning(pop)
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/optional.hpp>
 #include <cstdio>
@@ -213,7 +218,7 @@ static void getsymbolAndOffset(HANDLE process,
     std::string symbolString(symbolInfo->Name);
     static const size_t bufferSize = 32;
     std::unique_ptr<char[]> symbolOffset(new char[bufferSize]);
-    _snprintf(symbolOffset.get(), bufferSize, "+0x%x", displacement64);
+    _snprintf(symbolOffset.get(), bufferSize, "+0x%llux", displacement64);
     symbolString += symbolOffset.get();
     returnedSymbolAndOffset->swap(symbolString);
 }

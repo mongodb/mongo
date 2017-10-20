@@ -42,6 +42,10 @@
 #define UTF8(x) x
 #endif
 
+// Convert integer literals that are > 127 to unsigned char before converting to char
+// to avoid MSVC C4309: truncation of constant value
+#define C(x) static_cast<char>(static_cast<unsigned char>(x))
+
 namespace mongo {
 namespace unicode {
 
@@ -92,7 +96,7 @@ TEST(UnicodeString, RemoveDiacritics) {
     const char test1[] = UTF8("¿CUÁNTOS AÑOS TIENES TÚ?");
 
     // NFD Normalized Text ("Café").
-    const char test2[] = {'C', 'a', 'f', 'e', static_cast<char>(0xcc), static_cast<char>(0x81), 0};
+    const char test2[] = {'C', 'a', 'f', 'e', C(0xcc), C(0x81), 0};
 
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
         UTF8("¿CUANTOS ANOS TIENES TU?"), test1, kCaseSensitive, kNormal);
@@ -146,7 +150,7 @@ TEST(UnicodeString, CaseFoldingAndRemoveDiacritics) {
     const char test2[] = UTF8("¿CUÁNTOS AÑOS TIENES TÚ?");
 
     // NFD Normalized Text ("CAFÉ").
-    const char test3[] = {'C', 'A', 'F', 'E', static_cast<char>(0xcc), static_cast<char>(0x81), 0};
+    const char test3[] = {'C', 'A', 'F', 'E', C(0xCc), C(0x81), 0};
 
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("ποσο χρονων εισαι?"), test1, 0, kNormal);
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("¿cuantos anos tienes tu?"), test2, 0, kNormal);
@@ -192,25 +196,23 @@ TEST(UnicodeString, SubstringMatchTurkish) {
 
 TEST(UnicodeString, BadUTF8) {
     // Overlong.
-    const char invalid1[] = {static_cast<char>(0xC0), static_cast<char>(0xAF), 0};
+    const char invalid1[] = {C(0xC0), C(0xAF), 0};
 
     // Invalid code positions.
-    const char invalid2[] = {
-        static_cast<char>(0xED), static_cast<char>(0xA0), static_cast<char>(0x80), 0};
-    const char invalid3[] = {
-        static_cast<char>(0xC2), static_cast<char>(0x41), static_cast<char>(0x42), 0};
+    const char invalid2[] = {C(0xED), C(0xA0), C(0x80), 0};
+    const char invalid3[] = {C(0xC2), static_cast<char>(0x41), static_cast<char>(0x42), 0};
     const char invalid4[] = {static_cast<char>(0x61),
-                             static_cast<char>(0xF1),
-                             static_cast<char>(0x80),
-                             static_cast<char>(0x80),
-                             static_cast<char>(0xE1),
-                             static_cast<char>(0x80),
-                             static_cast<char>(0xC2),
+                             C(0xF1),
+                             C(0x80),
+                             C(0x80),
+                             C(0xE1),
+                             C(0x80),
+                             C(0xC2),
                              static_cast<char>(0x62),
-                             static_cast<char>(0x80),
+                             C(0x80),
                              static_cast<char>(0x63),
-                             static_cast<char>(0x80),
-                             static_cast<char>(0xBF),
+                             C(0x80),
+                             C(0xBF),
                              static_cast<char>(0x64),
                              0};
 
@@ -240,16 +242,16 @@ TEST(UnicodeString, UTF32ToUTF8) {
     original.push_back(0);
 
     std::string expected_result;
-    expected_result.push_back(0x4D);
-    expected_result.push_back(0xD0);
-    expected_result.push_back(0xB0);
-    expected_result.push_back(0xE4);
-    expected_result.push_back(0xBA);
-    expected_result.push_back(0x8C);
-    expected_result.push_back(0xF0);
-    expected_result.push_back(0x90);
-    expected_result.push_back(0x8C);
-    expected_result.push_back(0x82);
+    expected_result.push_back(C(0x4D));
+    expected_result.push_back(C(0xD0));
+    expected_result.push_back(C(0xB0));
+    expected_result.push_back(C(0xE4));
+    expected_result.push_back(C(0xBA));
+    expected_result.push_back(C(0x8C));
+    expected_result.push_back(C(0xF0));
+    expected_result.push_back(C(0x90));
+    expected_result.push_back(C(0x8C));
+    expected_result.push_back(C(0x82));
     expected_result.push_back(0);
 
     std::string result(11, '\0');

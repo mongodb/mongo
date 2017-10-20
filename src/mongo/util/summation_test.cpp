@@ -67,7 +67,12 @@ std::vector<long long> longValues = {
     1LL << 52,
     1LL << 53,
     limits::max() / 2,
+
+#pragma warning(push)
+// C4308: negative integral constant converted to unsigned type
+#pragma warning(disable : 4308)
     static_cast<long long>(1ULL << 63) - (1ULL << (63 - 53 - 1)),  // Halfway between two doubles
+#pragma warning(pop)
     limits::max() - 1,
     limits::max()};
 

@@ -46,7 +46,8 @@ TEST(Builder, String1) {
 
 TEST(Builder, StringBuilderAddress) {
     const void* longPtr = reinterpret_cast<const void*>(-1);
-    const void* shortPtr = reinterpret_cast<const void*>(0xDEADBEEF);
+    const void* shortPtr = reinterpret_cast<const void*>(static_cast<uintptr_t>(0xDEADBEEF));
+
     const void* nullPtr = NULL;
 
     StringBuilder sb;

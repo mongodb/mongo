@@ -847,7 +847,11 @@ double GeoHashConverter::sizeOfDiag(const GeoHash& a) const {
 double GeoHashConverter::sizeEdge(unsigned level) const {
     invariant(level >= 0);
     invariant((int)level <= _params.bits);
+#pragma warning(push)
+// C4146: unary minus operator applied to unsigned type, result still unsigned
+#pragma warning(disable : 4146)
     return ldexp(_params.max - _params.min, -level);
+#pragma warning(pop)
 }
 
 // Convert from a double in [0, (max-min)*scaling] to [min, max]

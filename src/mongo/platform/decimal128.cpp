@@ -776,8 +776,13 @@ namespace {
 // Get the representation of 1 with 17 zeros (half of decimal128's 34 digit precision)
 const std::uint64_t t17 = 100ull * 1000 * 1000 * 1000 * 1000 * 1000;
 // Get the low 64 bits of 34 consecutive decimal 9's
-// t17 * 17 gives 1 with 34 0's, so subtract 1 to get all 9's
-const std::uint64_t t34lo64 = t17 * t17 - 1;
+// t17 * 17 gives 1 with 34 0's, so subtract 1 to get all 9's == 4003012203950112767
+// Using the computed constant avoids a MSVC warning.
+// Computed by running the calculations in Python, and verified with static_assert.
+const std::uint64_t t34lo64 = 4003012203950112767ULL;
+#if defined(__GNUC__)
+static_assert(t34lo64 == t17 * t17 - 1, "precomputed constant is wrong");
+#endif
 // Mod t17 by 2^32 to get the low 32 bits of t17's binary representation
 const std::uint64_t t17lo32 = t17 % (1ull << 32);
 // Divide t17 by 2^32 to get the high 32 bits of t17's binary representation

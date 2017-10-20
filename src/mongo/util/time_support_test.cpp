@@ -50,6 +50,11 @@ char tzEnvString[] = "TZ=EST+5EDT";
 #else
 char tzEnvString[] = "TZ=America/New_York";
 #endif
+
+#pragma warning(push)
+// C4996:  The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant
+// name: _putenv. See online help for details.
+#pragma warning(disable : 4996)
 MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
     if (-1 == putenv(tzEnvString)) {
         return Status(ErrorCodes::BadValue, errnoWithDescription());
@@ -57,6 +62,7 @@ MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
     tzset();
     return Status::OK();
 }
+#pragma warning(pop)
 
 TEST(TimeFormatting, DateAsISO8601UTCString) {
     ASSERT_EQUALS(std::string("1970-01-01T00:00:00.000Z"), dateToISOStringUTC(Date_t()));

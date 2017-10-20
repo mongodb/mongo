@@ -314,7 +314,7 @@ TEST_F(DocumentSourceCursorTest, SerializationRespectsExplainModes) {
 TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorStillUsableAfterTimeout) {
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     const bool capped = true;
-    const bool cappedSize = 1024;
+    const long long cappedSize = 1024;
     ASSERT_TRUE(client.createCollection(nss.ns(), cappedSize, capped));
     client.insert(nss.ns(), BSON("a" << 1));
 
@@ -392,7 +392,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
 TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKilled) {
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     const bool capped = true;
-    const bool cappedSize = 1024;
+    const long long cappedSize = 1024;
     ASSERT_TRUE(client.createCollection(nss.ns(), cappedSize, capped));
     client.insert(nss.ns(), BSON("a" << 1));
 
