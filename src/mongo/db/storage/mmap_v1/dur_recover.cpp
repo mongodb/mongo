@@ -265,9 +265,13 @@ RecoveryJob::RecoveryJob()
       _lastSeqSkipped(0),
       _appliedAnySections(false) {}
 
+#pragma warning(push)
+// C4722: 'mongo::dur::RecoveryJob::~RecoveryJob': destructor never returns, potential memory leak
+#pragma warning(disable : 4722)
 RecoveryJob::~RecoveryJob() {
     invariant(!"RecoveryJob is intentionally leaked with a bare call to operator new()");
 }
+#pragma warning(pop)
 
 void RecoveryJob::close(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mx);

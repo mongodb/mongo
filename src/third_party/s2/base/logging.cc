@@ -38,7 +38,11 @@ LogMessageWarning::LogMessageWarning(const char* file, int line) :
 LogMessageFatal::LogMessageFatal(const char* file, int line) :
         LogMessageBase(mongo::severe(), file, line) { }
 
+#pragma warning(push)
+// C4722: 'LogMessageFatal::~LogMessageFatal': destructor never returns, potential memory leak
+#pragma warning(disable : 4722)
 LogMessageFatal::~LogMessageFatal() {
     _lsb.~LogstreamBuilder();
     fassertFailed(40048);
 }
+#pragma warning(pop)
