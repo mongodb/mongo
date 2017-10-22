@@ -106,7 +106,7 @@ flags = {
         'CONN_EVICTION_NO_LOOKASIDE',
         'CONN_EVICTION_RUN',
         'CONN_IN_MEMORY',
-        'CONN_LAS_OPEN',
+        'CONN_LOOKASIDE_OPEN',
         'CONN_LEAK_MEMORY',
         'CONN_LSM_MERGE',
         'CONN_PANIC',

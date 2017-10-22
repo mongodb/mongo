@@ -1971,8 +1971,6 @@ int
 __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
     bool open_metadata, uint32_t session_flags, WT_SESSION_IMPL **sessionp)
 {
-	WT_DECL_RET;
-	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 
 	*sessionp = NULL;
@@ -1988,22 +1986,6 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	 * flag to avoid this: internal sessions are not closed automatically.
 	 */
 	F_SET(session, session_flags | WT_SESSION_INTERNAL);
-
-	/*
-	 * Optionally acquire a lookaside table cursor (or clear caller's flag).
-	 * Acquiring the lookaside table cursor requires various locks; we've
-	 * seen problems in the past where deadlocks happened because sessions
-	 * deadlocked getting the cursor late in the process.  Be defensive,
-	 * get it now.
-	 */
-	if (!F_ISSET(conn, WT_CONN_LAS_OPEN))
-		F_CLR(session, WT_SESSION_LOOKASIDE_CURSOR);
-	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR) &&
-	    (ret = __wt_las_cursor_open(session, &session->las_cursor)) != 0) {
-		wt_session = &session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-		return (ret);
-	}
 
 	*sessionp = session;
 	return (0);
