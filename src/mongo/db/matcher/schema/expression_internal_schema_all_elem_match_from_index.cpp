@@ -76,4 +76,13 @@ void InternalSchemaAllElemMatchFromIndexMatchExpression::serialize(BSONObjBuilde
     subArray.doneFast();
     allElemMatchBob.doneFast();
 }
+
+MatchExpression::ExpressionOptimizerFunc
+InternalSchemaAllElemMatchFromIndexMatchExpression::getOptimizer() const {
+    return [](std::unique_ptr<MatchExpression> expression) {
+        static_cast<InternalSchemaAllElemMatchFromIndexMatchExpression&>(*expression)
+            ._expression->optimizeFilter();
+        return expression;
+    };
+}
 }  //  namespace mongo

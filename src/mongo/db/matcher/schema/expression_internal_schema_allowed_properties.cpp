@@ -172,4 +172,19 @@ std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression:
                             _otherwise->shallowClone()));
     return {std::move(clone)};
 }
+
+MatchExpression::ExpressionOptimizerFunc
+InternalSchemaAllowedPropertiesMatchExpression::getOptimizer() const {
+    return [](std::unique_ptr<MatchExpression> expression) {
+        auto& allowedPropertiesExpr =
+            static_cast<InternalSchemaAllowedPropertiesMatchExpression&>(*expression);
+
+        for (auto& property : allowedPropertiesExpr._patternProperties) {
+            property.second->optimizeFilter();
+        }
+        allowedPropertiesExpr._otherwise->optimizeFilter();
+
+        return expression;
+    };
+}
 }  // namespace mongo

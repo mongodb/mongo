@@ -77,9 +77,7 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
+    ExpressionOptimizerFunc getOptimizer() const final;
 
     std::unique_ptr<MatchExpression> _sub;
 };

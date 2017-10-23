@@ -89,4 +89,13 @@ std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::s
     invariantOK(clone->init(path(), _index, _expression->shallowClone()));
     return std::move(clone);
 }
+
+MatchExpression::ExpressionOptimizerFunc
+InternalSchemaMatchArrayIndexMatchExpression::getOptimizer() const {
+    return [](std::unique_ptr<MatchExpression> expression) {
+        static_cast<InternalSchemaMatchArrayIndexMatchExpression&>(*expression)
+            ._expression->optimizeFilter();
+        return expression;
+    };
+}
 }  // namespace mongo

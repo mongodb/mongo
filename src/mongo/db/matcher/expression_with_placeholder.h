@@ -94,10 +94,17 @@ public:
         return stdx::make_unique<ExpressionWithPlaceholder>(_placeholder, _filter->shallowClone());
     }
 
+    /*
+     * Uses MatchExpression::optimize() to replace the Expression part of this
+     * ExpressionWithPlaceholder with an optimized expression. If the rewritten expression operates
+     * on a different field, we also update the placeholder to match.
+     */
+    void optimizeFilter();
+
 private:
     // The top-level field that _filter is over.
-    const boost::optional<std::string> _placeholder;
-    const std::unique_ptr<MatchExpression> _filter;
+    boost::optional<std::string> _placeholder;
+    std::unique_ptr<MatchExpression> _filter;
 };
 
 }  // namespace mongo

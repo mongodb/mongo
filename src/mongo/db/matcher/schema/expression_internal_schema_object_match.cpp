@@ -73,4 +73,14 @@ std::unique_ptr<MatchExpression> InternalSchemaObjectMatchExpression::shallowClo
     return std::move(clone);
 }
 
+MatchExpression::ExpressionOptimizerFunc InternalSchemaObjectMatchExpression::getOptimizer() const {
+    return [](std::unique_ptr<MatchExpression> expression) {
+        auto& objectMatchExpression =
+            static_cast<InternalSchemaObjectMatchExpression&>(*expression);
+        objectMatchExpression._sub =
+            MatchExpression::optimize(std::move(objectMatchExpression._sub));
+
+        return expression;
+    };
+}
 }  // namespace mongo

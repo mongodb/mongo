@@ -159,9 +159,7 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
+    ExpressionOptimizerFunc getOptimizer() const final;
 
     /**
      * Helper function for matches() and matchesSingleElement().

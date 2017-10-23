@@ -114,4 +114,18 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> ExpressionWithPlaceholder
     return {std::move(exprWithPlaceholder)};
 }
 
+void ExpressionWithPlaceholder::optimizeFilter() {
+    _filter = MatchExpression::optimize(std::move(_filter));
+
+    auto newPlaceholder = parseTopLevelFieldName(_filter.get());
+    invariantOK(newPlaceholder.getStatus());
+
+    if (newPlaceholder.getValue()) {
+        _placeholder = newPlaceholder.getValue()->toString();
+        dassert(std::regex_match(*_placeholder, placeholderRegex));
+    } else {
+        _placeholder = boost::none;
+    }
+}
+
 }  // namespace mongo
