@@ -465,7 +465,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     _shardingOnTransitionToPrimaryHook(opCtx);
     _dropAllTempCollections(opCtx);
 
-    serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(true);
+    serverGlobalParams.validateFeaturesAsMaster.store(true);
 
     return opTimeToReturn;
 }

@@ -172,7 +172,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
         } else if (fieldName == "validator" && !isView) {
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                 MatchExpressionParser::kBanAllSpecialFeatures;
-            if (!serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() ||
+            if (!serverGlobalParams.validateFeaturesAsMaster.load() ||
                 serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
                 // Note that we don't enforce this restriction on the secondary or on backup
                 // instances, as indicated by !validateFeaturesAsMaster.

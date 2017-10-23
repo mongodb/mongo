@@ -61,7 +61,7 @@ protected:
 
         serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::k36);
-        serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(true);
+        serverGlobalParams.validateFeaturesAsMaster.store(true);
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first

@@ -224,17 +224,17 @@ struct ServerGlobalParams {
             return (isFullyUpgradedTo36() || isUpgradingTo36());
         }
 
-        // Feature validation differs depending on the role of a mongod in a replica set or
-        // master/slave configuration. Masters/primaries can accept user-initiated writes and
-        // validate based on the feature compatibility version. A secondary/slave (which is not also
-        // a master) always validates in "3.4" mode so that it can sync 3.4 features, even when in
-        // "3.2" feature compatibility mode.
-        AtomicWord<bool> validateFeaturesAsMaster{true};
-
     private:
         AtomicWord<Version> _version{Version::kUnset};
 
     } featureCompatibility;
+
+    // Feature validation differs depending on the role of a mongod in a replica set or
+    // master/slave configuration. Masters/primaries can accept user-initiated writes and
+    // validate based on the feature compatibility version. A secondary/slave (which is not also
+    // a master) always validates in the upgraded mode so that it can sync new features, even
+    // when in the downgraded feature compatibility mode.
+    AtomicWord<bool> validateFeaturesAsMaster{true};
 
     std::vector<std::string> disabledSecureAllocatorDomains;
 };

@@ -313,7 +313,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
                 "$changeStream cannot be used in a view definition"};
     }
 
-    if (serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() &&
+    if (serverGlobalParams.validateFeaturesAsMaster.load() &&
         !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
         auto status = validInViewUnder34FeatureCompatibility(expCtx, *pipelineStatus.getValue());
         if (!status.isOK()) {

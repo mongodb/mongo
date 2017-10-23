@@ -2534,7 +2534,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
         // _canAcceptNonLocalWrites should already be set above.
         invariant(!_canAcceptNonLocalWrites);
 
-        serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
+        serverGlobalParams.validateFeaturesAsMaster.store(false);
         result = kActionCloseAllConnections;
     } else {
         result = kActionFollowerModeStateChange;

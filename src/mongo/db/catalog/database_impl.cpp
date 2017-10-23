@@ -1024,7 +1024,7 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
         // permitted in collection validators.
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
             MatchExpressionParser::kBanAllSpecialFeatures;
-        if (!serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() ||
+        if (!serverGlobalParams.validateFeaturesAsMaster.load() ||
             serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
             // Note that we don't enforce this feature compatibility check when we are on
             // the secondary or on a backup instance, as indicated by !validateFeaturesAsMaster.

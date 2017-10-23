@@ -932,7 +932,7 @@ ExitCode _initAndListen(int listenPort) {
 
         if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave()) ||
             !internalValidateFeaturesAsMaster) {
-            serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
+            serverGlobalParams.validateFeaturesAsMaster.store(false);
         }
     }
 
