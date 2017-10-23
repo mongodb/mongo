@@ -150,10 +150,11 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	uint64_t bucket, hash;
 	uint32_t flags;
 
+	*blockp = block = NULL;
+
 	__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename);
 
 	conn = S2C(session);
-	*blockp = block = NULL;
 	hash = __wt_hash_city64(filename, strlen(filename));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	__wt_spin_lock(session, &conn->block_lock);

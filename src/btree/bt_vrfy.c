@@ -696,9 +696,10 @@ __verify_overflow_cell(
 	const WT_PAGE_HEADER *dsk;
 	uint32_t cell_num, i;
 
+	*found = false;
+
 	btree = S2BT(session);
 	unpack = &_unpack;
-	*found = false;
 
 	/*
 	 * If a tree is empty (just created), it won't have a disk image;

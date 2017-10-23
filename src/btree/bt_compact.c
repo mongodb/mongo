@@ -220,6 +220,8 @@ __wt_compact_page_skip(
 	u_int type;
 
 	WT_UNUSED(context);
+	*skipp = false;				/* Default to reading */
+
 	/*
 	 * Skip deleted pages, rewriting them doesn't seem useful; in a better
 	 * world we'd write the parent to delete the page.
@@ -228,8 +230,6 @@ __wt_compact_page_skip(
 		*skipp = true;
 		return (0);
 	}
-
-	*skipp = false;				/* Default to reading */
 
 	/*
 	 * If the page is in-memory, we want to look at it (it may have been

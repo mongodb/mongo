@@ -64,14 +64,16 @@ struct __wt_cache {
 	uint64_t bytes_dirty_leaf;
 	uint64_t pages_dirty_leaf;
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
-	volatile uint64_t pages_evict;
-	uint64_t pages_evicted;		/* Pages evicted during a pass */
+	uint64_t pages_evicted;
 	uint64_t bytes_image;		/* Bytes of disk images */
 	uint64_t bytes_inmem;		/* Bytes/pages in memory */
 	uint64_t pages_inmem;
 	uint64_t bytes_internal;	/* Bytes of internal pages */
 	uint64_t bytes_read;		/* Bytes read into memory */
 	uint64_t bytes_written;
+
+	volatile uint64_t eviction_progress;	/* Eviction progress count */
+	uint64_t last_eviction_progress;/* Tracked eviction progress */
 
 	uint64_t app_waits;		/* User threads waited for cache */
 	uint64_t app_evicts;		/* Pages evicted by user threads */
@@ -109,6 +111,18 @@ struct __wt_cache {
 					   scrubs */
 
 	u_int overhead_pct;	        /* Cache percent adjustment */
+
+	/*
+	 * Eviction thread tuning information.
+	 */
+	uint32_t evict_tune_datapts_needed;         /* Data needed to tune */
+	struct timespec evict_tune_last_action_time;/* Time of last action */
+	struct timespec evict_tune_last_time;	    /* Time of last check */
+	uint32_t evict_tune_num_points;	            /* Number of values tried */
+	uint64_t evict_tune_progress_last;	    /* Progress counter */
+	uint64_t evict_tune_progress_rate_max;	    /* Max progress rate */
+	bool evict_tune_stable;	                    /* Are we stable? */
+	uint32_t evict_tune_workers_best;           /* Best performing value */
 
 	/*
 	 * Pass interrupt counter.

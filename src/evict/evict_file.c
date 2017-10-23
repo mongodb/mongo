@@ -53,7 +53,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	 * the tree are removed.
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
-	    F_ISSET(S2C(session), WT_CONN_LAS_OPEN) &&
+	    F_ISSET(S2C(session), WT_CONN_LOOKASIDE_OPEN) &&
 	    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 		WT_ASSERT(session, !WT_IS_METADATA(dhandle));
 

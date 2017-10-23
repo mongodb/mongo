@@ -1362,7 +1362,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 #endif
 	all_visible = *updp == first_txn_upd &&
 	    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
-	    __wt_txn_visible_all(session, max_txn, timestampp) :
+	    !uncommitted && __wt_txn_visible_all(session, max_txn, timestampp) :
 	    __wt_txn_visible(session, max_txn, timestampp));
 
 	if (all_visible)
@@ -1422,6 +1422,12 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 #endif
 
 check_original_value:
+	/*
+	 * Paranoia: check that we didn't choose an update that has since been
+	 * rolled back.
+	 */
+	WT_ASSERT(session, *updp == NULL || (*updp)->txnid != WT_TXN_ABORTED);
+
 	/*
 	 * Returning an update means the original on-page value might be lost,
 	 * and that's a problem if there's a reader that needs it. There are

@@ -445,17 +445,15 @@ err:		if (cursor != NULL)
 
 	/*
 	 * Opening a cursor on a non-existent data source will set ret to
-	 * either of ENOENT or WT_NOTFOUND at this point.  However,
+	 * either of ENOENT or WT_NOTFOUND at this point. However,
 	 * applications may reasonably do this inside a transaction to check
 	 * for the existence of a table or index.
 	 *
-	 * Prefer WT_NOTFOUND here: that does not force running transactions to
-	 * roll back.  It will be mapped back to ENOENT.
+	 * Failure in opening a cursor should not set an error on the
+	 * transaction and WT_NOTFOUND will be mapped to ENOENT.
 	 */
-	if (ret == ENOENT)
-		ret = WT_NOTFOUND;
 
-	API_END_RET_NOTFOUND_MAP(session, ret);
+	API_END_RET_NO_TXN_ERROR(session, ret);
 }
 
 /*
@@ -1973,8 +1971,6 @@ int
 __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
     bool open_metadata, uint32_t session_flags, WT_SESSION_IMPL **sessionp)
 {
-	WT_DECL_RET;
-	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 
 	*sessionp = NULL;
@@ -1990,22 +1986,6 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	 * flag to avoid this: internal sessions are not closed automatically.
 	 */
 	F_SET(session, session_flags | WT_SESSION_INTERNAL);
-
-	/*
-	 * Optionally acquire a lookaside table cursor (or clear caller's flag).
-	 * Acquiring the lookaside table cursor requires various locks; we've
-	 * seen problems in the past where deadlocks happened because sessions
-	 * deadlocked getting the cursor late in the process.  Be defensive,
-	 * get it now.
-	 */
-	if (!F_ISSET(conn, WT_CONN_LAS_OPEN))
-		F_CLR(session, WT_SESSION_LOOKASIDE_CURSOR);
-	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR) &&
-	    (ret = __wt_las_cursor_open(session, &session->las_cursor)) != 0) {
-		wt_session = &session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-		return (ret);
-	}
 
 	*sessionp = session;
 	return (0);

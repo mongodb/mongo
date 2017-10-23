@@ -104,11 +104,11 @@ __log_slot_close(
 	int count;
 #endif
 
+	*releasep = false;
+
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-	WT_ASSERT(session, releasep != NULL);
 	conn = S2C(session);
 	log = conn->log;
-	*releasep = 0;
 	if (slot == NULL)
 		return (WT_NOTFOUND);
 retry:
@@ -149,7 +149,7 @@ retry:
 	 */
 	WT_STAT_CONN_INCR(session, log_slot_closes);
 	if (WT_LOG_SLOT_DONE(new_state))
-		*releasep = 1;
+		*releasep = true;
 	slot->slot_end_lsn = slot->slot_start_lsn;
 	/*
 	 * A thread setting the unbuffered flag sets the unbuffered size after

@@ -159,9 +159,9 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	conn = S2C(session);
-
 	*dead_handlesp = 0;
+
+	conn = S2C(session);
 
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (WT_DHANDLE_CAN_DISCARD(dhandle))

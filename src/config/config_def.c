@@ -240,6 +240,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_begin_transaction[] = {
 	{ "name", "string", NULL, NULL, NULL, 0 },
 	{ "priority", "int", NULL, "min=-100,max=100", NULL, 0 },
 	{ "read_timestamp", "string", NULL, NULL, NULL, 0 },
+	{ "round_to_oldest", "boolean", NULL, NULL, NULL, 0 },
 	{ "snapshot", "string", NULL, NULL, NULL, 0 },
 	{ "sync", "boolean", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
@@ -1210,8 +1211,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_alter, 4
 	},
 	{ "WT_SESSION.begin_transaction",
-	  "isolation=,name=,priority=0,read_timestamp=,snapshot=,sync=",
-	  confchk_WT_SESSION_begin_transaction, 6
+	  "isolation=,name=,priority=0,read_timestamp=,"
+	  "round_to_oldest=false,snapshot=,sync=",
+	  confchk_WT_SESSION_begin_transaction, 7
 	},
 	{ "WT_SESSION.checkpoint",
 	  "drop=,force=false,name=,target=,use_timestamp=true",

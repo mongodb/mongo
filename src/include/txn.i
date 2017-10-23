@@ -152,8 +152,9 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 {
 	WT_TXN *txn;
 
-	txn = &session->txn;
 	*opp = NULL;
+
+	txn = &session->txn;
 
 	/*
 	 * We're about to perform an update.

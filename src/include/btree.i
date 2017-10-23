@@ -170,20 +170,16 @@ __wt_cache_decr_check_size(
 	if (__wt_atomic_subsize(vp, v) < WT_EXABYTE)
 		return;
 
+	/*
+	 * It's a bug if this accounting underflowed but allow the application
+	 * to proceed - the consequence is we use more cache than configured.
+	 */
+	*vp = 0;
+	__wt_errx(session,
+	    "%s went negative with decrement of %" WT_SIZET_FMT, fld, v);
+
 #ifdef HAVE_DIAGNOSTIC
-	(void)__wt_atomic_addsize(vp, v);
-
-	{
-	static bool first = true;
-
-	if (!first)
-		return;
-	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
-	first = false;
-	}
-#else
-	WT_UNUSED(fld);
-	WT_UNUSED(session);
+	__wt_abort(session);
 #endif
 }
 
@@ -198,37 +194,17 @@ __wt_cache_decr_check_uint64(
 	if (__wt_atomic_sub64(vp, v) < WT_EXABYTE)
 		return;
 
-#ifdef HAVE_DIAGNOSTIC
-	(void)__wt_atomic_add64(vp, v);
-
-	{
-	static bool first = true;
-
-	if (!first)
-		return;
-	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
-	first = false;
-	}
-#else
-	WT_UNUSED(fld);
-	WT_UNUSED(session);
-#endif
-}
-
-/*
- * __wt_cache_decr_zero_uint64 --
- *	Decrement a uint64_t cache value and zero it on underflow.
- */
-static inline void
-__wt_cache_decr_zero_uint64(
-    WT_SESSION_IMPL *session, uint64_t *vp, size_t v, const char *fld)
-{
-	if (__wt_atomic_sub64(vp, v) < WT_EXABYTE)
-		return;
-
-	__wt_errx(
-	    session, "%s went negative: decrementing %" WT_SIZET_FMT, fld, v);
+	/*
+	 * It's a bug if this accounting underflowed but allow the application
+	 * to proceed - the consequence is we use more cache than configured.
+	 */
 	*vp = 0;
+	__wt_errx(session,
+	    "%s went negative with decrement of %" WT_SIZET_FMT, fld, v);
+
+#ifdef HAVE_DIAGNOSTIC
+	__wt_abort(session);
+#endif
 }
 
 /*
@@ -368,10 +344,10 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	cache = S2C(session)->cache;
 
 	if (WT_PAGE_IS_INTERNAL(page))
-		__wt_cache_decr_zero_uint64(session,
+		__wt_cache_decr_check_uint64(session,
 		    &cache->pages_dirty_intl, 1, "dirty internal page count");
 	else
-		__wt_cache_decr_zero_uint64(session,
+		__wt_cache_decr_check_uint64(session,
 		    &cache->pages_dirty_leaf, 1, "dirty leaf page count");
 
 	modify = page->modify;
@@ -438,33 +414,41 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
 		if (WT_PAGE_IS_INTERNAL(page)) {
-			__wt_cache_decr_zero_uint64(session,
+			__wt_cache_decr_check_uint64(session,
 			    &btree->bytes_dirty_intl,
 			    modify->bytes_dirty, "WT_BTREE.bytes_dirty_intl");
-			__wt_cache_decr_zero_uint64(session,
+			__wt_cache_decr_check_uint64(session,
 			    &cache->bytes_dirty_intl,
 			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl");
 		} else if (!btree->lsm_primary) {
-			__wt_cache_decr_zero_uint64(session,
+			__wt_cache_decr_check_uint64(session,
 			    &btree->bytes_dirty_leaf,
 			    modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
-			__wt_cache_decr_zero_uint64(session,
+			__wt_cache_decr_check_uint64(session,
 			    &cache->bytes_dirty_leaf,
 			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
 		}
 	}
 
-	/* Update pages and bytes evicted. */
+	/* Update bytes and pages evicted. */
 	(void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
+	(void)__wt_atomic_addv64(&cache->pages_evicted, 1);
 
 	/*
-	 * Don't count rewrites as eviction: there's no guarantee we are making
-	 * real progress.
+	 * Track if eviction makes progress.  This is used in various places to
+	 * determine whether eviction is stuck.
+	 *
+	 * We don't count rewrites as progress.
+	 *
+	 * Further, if a page was read with eviction disabled, we don't count
+	 * evicting a it as progress.  Since disabling eviction allows pages to
+	 * be read even when the cache is full, we want to avoid workloads
+	 * repeatedly reading a page with eviction disabled (e.g., from the
+	 * metadata), then evicting that page and deciding that is a sign that
+	 * eviction is unstuck.
 	 */
-	if (rewrite)
-		(void)__wt_atomic_sub64(&cache->pages_inmem, 1);
-	else
-		(void)__wt_atomic_addv64(&cache->pages_evict, 1);
+	if (!rewrite && !F_ISSET_ATOMIC(page, WT_PAGE_READ_NO_EVICT))
+		(void)__wt_atomic_addv64(&cache->eviction_progress, 1);
 }
 
 /*

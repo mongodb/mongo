@@ -28,11 +28,10 @@ __wt_posix_directory_list(WT_FILE_SYSTEM *file_system,
 	int tret;
 	char **entries;
 
-	session = (WT_SESSION_IMPL *)wt_session;
-
 	*dirlistp = NULL;
 	*countp = 0;
 
+	session = (WT_SESSION_IMPL *)wt_session;
 	dirp = NULL;
 	dirallocsz = 0;
 	entries = NULL;

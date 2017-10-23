@@ -607,7 +607,10 @@ timestamp(void *arg)
 	 * once every 15 seconds.
 	 */
 	while (!g.workers_finished) {
-		/* Find the lowest committed timestamp. */
+		/*
+		 * Find the lowest committed timestamp. The timestamp thread
+		 * starts before the operational threads, wait for them.
+		 */
 		oldest_timestamp = UINT64_MAX;
 		for (i = 0; i < g.c_threads; ++i) {
 			tinfo = tinfo_list[i];
@@ -615,15 +618,20 @@ timestamp(void *arg)
 			    tinfo->timestamp < oldest_timestamp)
 				oldest_timestamp = tinfo->timestamp;
 		}
+		if (oldest_timestamp == UINT64_MAX) {
+			__wt_sleep(1, 0);
+			continue;
+		}
 
 		/*
 		 * Don't get more than 100 transactions or more than 15 seconds
 		 * out of date.
 		 */
-		if (oldest_timestamp >= g.timestamp ||
-		    g.timestamp - oldest_timestamp < 100) {
+		WT_READ_BARRIER();
+		testutil_assert(oldest_timestamp <= g.timestamp);
+		if (g.timestamp - oldest_timestamp < 100) {
 			__wt_seconds((WT_SESSION_IMPL *)session, &now);
-			if (g.timestamp == 0 || difftime(now, last) < 15) {
+			if (difftime(now, last) < 15) {
 				__wt_sleep(1, 0);
 				continue;
 			}

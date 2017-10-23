@@ -575,6 +575,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	bool busy, decrease_ok, grow, pool_full;
 
 	*adjustedp = false;
+
 	cp = __wt_process.cache_pool;
 	grow = false;
 	pool_full = cp->currently_used >= cp->size;
