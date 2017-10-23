@@ -179,6 +179,21 @@ StatusWith<long long> MatchExpressionParser::parseIntegerElementToLong(BSONEleme
     return number;
 }
 
+StatusWith<int> MatchExpressionParser::parseIntegerElementToInt(BSONElement elem) {
+    auto parsedLong = MatchExpressionParser::parseIntegerElementToLong(elem);
+    if (!parsedLong.isOK()) {
+        return parsedLong.getStatus();
+    }
+
+    auto valueLong = parsedLong.getValue();
+    if (valueLong < std::numeric_limits<int>::min() ||
+        valueLong > std::numeric_limits<int>::max()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Cannot represent " << elem << " in an int"};
+    }
+    return static_cast<int>(valueLong);
+}
+
 namespace {
 
 // Forward declarations.
