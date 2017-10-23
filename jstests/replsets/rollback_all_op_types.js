@@ -219,28 +219,49 @@
                 assert.commandWorked(db.runCommand({convertToCapped: collName, size: 1024}));
             },
         }],
-        // TODO: Re-enable once SERVER-31295 is completed.
-        // "applyOps": [{
-        //     init: (db, collName) => {
-        //         assert.commandWorked(db.createCollection(collName));
-        //     },
-        //     // In 3.6 only document CRUD operations are grouped into a single applyOps oplog
-        //     // entry.
-        //     op: (db, collName) => {
-        //         let coll = db.getCollection(collName);
-        //         let opsToApply = [
-        //             {op: "i", ns: coll.getFullName(), o: {_id: 0}},
-        //             {
-        //               op: "u",
-        //               ns: coll.getFullName(),
-        //               o: {_id: 0, val: 1},
-        //               o2: {_id: 0},
-        //             },
-        //             {op: "d", ns: coll.getFullName(), o: {_id: 0}}
-        //         ];
-        //         assert.commandWorked(db.adminCommand({applyOps: opsToApply}));
-        //     }
-        // }]
+        "applyOps": [
+            {
+              description: "multipleCRUDOps",
+              init: (db, collName) => {
+                  assert.commandWorked(db.createCollection(collName));
+              },
+              // In 3.6 only document CRUD operations are grouped into a single applyOps oplog
+              // entry.
+              op: (db, collName) => {
+                  let collInfo = db.getCollectionInfos({name: collName})[0];
+                  let uuid = collInfo.info.uuid;
+                  let coll = db.getCollection(collName);
+                  let opsToApply = [
+                      {op: "i", ns: coll.getFullName(), ui: uuid, o: {_id: 0}},
+                      {
+                        op: "u",
+                        ns: coll.getFullName(),
+                        ui: uuid,
+                        o: {_id: 0, val: 1},
+                        o2: {_id: 0},
+                      },
+                      {op: "d", ns: coll.getFullName(), ui: uuid, o: {_id: 0}}
+                  ];
+                  assert.commandWorked(db.adminCommand({applyOps: opsToApply}));
+              }
+            },
+            // TODO: Re-enable once SERVER-31300 is completed.
+            // {
+            //   description: "opWithoutUUID",
+            //   init: (db, collName) => {
+            //       assert.commandWorked(db.createCollection(collName));
+            //   },
+            //   // In 3.6 only document CRUD operations are grouped into a single applyOps oplog
+            //   // entry.
+            //   op: (db, collName) => {
+            //       let coll = db.getCollection(collName);
+            //       let opsToApply = [
+            //           {op: "i", ns: coll.getFullName(), o: {_id: 0}},
+            //       ];
+            //       assert.commandWorked(db.adminCommand({applyOps: opsToApply}));
+            //   }
+            // }
+        ]
     };
 
     let testCollName = "test";
@@ -283,6 +304,17 @@
      */
     let RollbackOps = (node) => {
 
+        // Returns a new object with any metadata fields from the given command object removed.
+        function basicCommandObj(fullCommandObj) {
+            let basicCommandObj = {};
+            for (let field in fullCommandObj) {
+                if (fullCommandObj.hasOwnProperty(field) && !field.startsWith("$")) {
+                    basicCommandObj[field] = fullCommandObj[field];
+                }
+            }
+            return basicCommandObj;
+        }
+
         // Execute the operation given by 'opFn'. 'opName' is the string identifier of the
         // operation to be executed.
         function executeOp(opName, opFn) {
@@ -290,7 +322,8 @@
             // and log it, to improve diagnostics.
             const runCommandOriginal = Mongo.prototype.runCommand;
             Mongo.prototype.runCommand = function(dbName, commandObj, options) {
-                jsTestLog("Executing command '" + opName + "': \n" + tojson(commandObj));
+                jsTestLog("Executing command for '" + opName + "' test: \n" +
+                          tojson(basicCommandObj(commandObj)));
                 return runCommandOriginal.apply(this, arguments);
             };
 
