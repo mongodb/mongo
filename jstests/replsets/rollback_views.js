@@ -131,5 +131,9 @@ load("jstests/replsets/rslib.js");
     printjson(checkFinalResults([a2, b2], ["coll", "system.views"], ["y"]));
     printjson(checkFinalResults([a3, b3], ["coll", "system.views"], ["z"]));
 
+    // Verify data consistency between nodes.
+    replTest.checkReplicatedDataHashes();
+    replTest.checkOplogs();
+
     replTest.stopSet();
 }());

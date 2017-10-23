@@ -142,4 +142,8 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
         {a: 1}, {writeConcern: {w: 'majority', wtimeout: replTest.kDefaultTimeoutMS}}));
     assert.eq(doCommittedRead(newPrimaryColl), 'new');
     assert.eq(doCommittedRead(oldPrimaryColl), 'new');
+
+    // Verify data consistency between nodes.
+    replTest.checkReplicatedDataHashes();
+    replTest.checkOplogs();
 }());

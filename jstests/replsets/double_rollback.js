@@ -140,4 +140,8 @@
         writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}
     }));
 
+    // Verify data consistency between nodes.
+    rst.checkReplicatedDataHashes();
+    rst.checkOplogs();
+
 }());

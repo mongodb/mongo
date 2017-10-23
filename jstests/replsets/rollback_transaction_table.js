@@ -215,6 +215,7 @@
 
     // Confirm the nodes are consistent.
     replTest.checkReplicatedDataHashes(testName);
+    replTest.checkOplogs();
 
     replTest.stopSet();
 }());

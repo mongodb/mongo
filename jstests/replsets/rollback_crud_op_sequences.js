@@ -141,5 +141,9 @@ load("jstests/replsets/rslib.js");
     checkFinalResults(a);
     checkFinalResults(b);
 
+    // Verify data consistency between nodes.
+    replTest.checkReplicatedDataHashes();
+    replTest.checkOplogs();
+
     replTest.stopSet(15);
 }());

@@ -88,6 +88,10 @@ assert.eq(null, B.foo.findOne({key: 'value1'}).res);
 var rollbackDir = Bpath + "rollback/";
 assert(pathExists(rollbackDir), "rollback directory was not created!");
 
+// Verify data consistency between nodes.
+replTest.checkReplicatedDataHashes();
+replTest.checkOplogs();
+
 print(testName + ".js SUCCESS");
 replTest.stopSet(15);
 

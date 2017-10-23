@@ -129,4 +129,12 @@
                ReplSetTest.State.ROLLBACK,
                "node 2 is doing steady-state replication with state=ROLLBACK!");
     waitForState(nodes[2], ReplSetTest.State.SECONDARY);
+
+    // Re-connect all nodes.
+    nodes[1].reconnect([nodes[0], nodes[3], nodes[4]]);
+
+    // Verify data consistency between nodes.
+    rst.checkReplicatedDataHashes();
+    rst.checkOplogs();
+
 }());

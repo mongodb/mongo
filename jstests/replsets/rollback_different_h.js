@@ -94,4 +94,8 @@ assert.soon(function() {
     }
 }, "collection on A and B did not match after rollback");
 
+// Verify data consistency between nodes.
+replTest.checkReplicatedDataHashes();
+replTest.checkOplogs();
+
 replTest.stopSet();

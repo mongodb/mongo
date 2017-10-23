@@ -199,5 +199,11 @@
     checkFinalResults(a);
     checkFinalResults(b);
 
+    // Verify data consistency between nodes.
+    authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
+        replTest.checkReplicatedDataHashes();
+        replTest.checkOplogs();
+    });
+
     replTest.stopSet();
 }());
