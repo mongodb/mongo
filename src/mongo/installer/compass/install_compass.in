@@ -124,9 +124,9 @@ def download_and_install_compass():
         sys.exit(1)
 
     if platform.startswith('linux') and not is_supported_distro():
-        print 'You are using an unsupported Linux distribution.'
-        ' Please visit: <some link here> to view available'
-        ' community supported packages.'
+        print 'You are using an unsupported Linux distribution. Please visit:'
+        ' https://compass.mongodb.com/community-supported-platforms to view'
+        ' available community supported packages.'
         sys.exit(1)
 
     if platform.machine() != 'x86_64':
