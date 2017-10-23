@@ -3698,17 +3698,17 @@ TEST_F(ReplCoordTest,
 
 /**
  * Tests to ensure that ReplicationCoordinator correctly calculates and updates the stable
- * timestamp.
+ * optime.
  */
-class StableTimestampTest : public ReplCoordTest {
+class StableOpTimeTest : public ReplCoordTest {
 protected:
     /**
      * Return a string representation of the given set 's'.
      */
-    std::string timestampSetString(std::set<Timestamp> s) {
+    std::string opTimeSetString(std::set<OpTime> s) {
         std::stringstream ss;
         ss << "{ ";
-        for (Timestamp const& el : s) {
+        for (auto const& el : s) {
             ss << el << " ";
         }
         ss << "}";
@@ -3728,153 +3728,155 @@ protected:
     }
 };
 
-// An equality assertion for two std::set<Timestamp> values. Prints the elements of each set when
-// the assertion fails. Only to be used in a 'StableTimestampTest' unit test function.
-#define ASSERT_TIMESTAMP_SET_EQ(a, b) \
-    ASSERT(a == b) << (timestampSetString(a) + " != " + timestampSetString(b));
+// An equality assertion for two std::set<OpTime> values. Prints the elements of each set when
+// the assertion fails. Only to be used in a 'StableOpTimeTest' unit test function.
+#define ASSERT_OPTIME_SET_EQ(a, b) \
+    ASSERT(a == b) << (opTimeSetString(a) + " != " + opTimeSetString(b));
 
-TEST_F(StableTimestampTest, CalculateStableTimestamp) {
+TEST_F(StableOpTimeTest, CalculateStableOpTime) {
 
     /**
-     * Tests the 'ReplicationCoordinatorImpl::_calculateStableTimestamp' method.
+     * Tests the 'ReplicationCoordinatorImpl::_calculateStableOpTime' method.
      */
 
     initReplSetMode();
     auto repl = getReplCoord();
-    Timestamp commitPoint;
-    boost::optional<Timestamp> expectedStableTimestamp, stableTimestamp;
-    std::set<Timestamp> stableTimestampCandidates;
+    OpTime commitPoint;
+    boost::optional<OpTime> expectedStableOpTime, stableOpTime;
+    std::set<OpTime> stableOpTimeCandidates;
+    long long term = 0;
 
-    // There is a valid stable timestamp less than the commit point.
-    commitPoint = {0, 3};
-    stableTimestampCandidates = {{0, 0}, {0, 1}, {0, 2}, {0, 4}};
-    expectedStableTimestamp = Timestamp(0, 2);
-    stableTimestamp =
-        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
-    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+    // There is a valid stable optime less than the commit point.
+    commitPoint = OpTime({0, 3}, term);
+    stableOpTimeCandidates = {
+        OpTime({0, 0}, term), OpTime({0, 1}, term), OpTime({0, 2}, term), OpTime({0, 4}, term)};
+    expectedStableOpTime = OpTime({0, 2}, term);
+    stableOpTime = repl->calculateStableOpTime_forTest(stableOpTimeCandidates, commitPoint);
+    ASSERT_EQ(expectedStableOpTime, stableOpTime);
 
-    // There is a valid stable timestamp equal to the commit point.
-    commitPoint = Timestamp(0, 2);
-    stableTimestampCandidates = {{0, 0}, {0, 1}, {0, 2}, {0, 3}};
-    expectedStableTimestamp = Timestamp(0, 2);
-    stableTimestamp =
-        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
-    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+    // There is a valid stable optime equal to the commit point.
+    commitPoint = OpTime({0, 2}, term);
+    stableOpTimeCandidates = {
+        OpTime({0, 0}, term), OpTime({0, 1}, term), OpTime({0, 2}, term), OpTime({0, 3}, term)};
+    expectedStableOpTime = OpTime({0, 2}, term);
+    stableOpTime = repl->calculateStableOpTime_forTest(stableOpTimeCandidates, commitPoint);
+    ASSERT_EQ(expectedStableOpTime, stableOpTime);
 
-    // There is a valid stable timestamp, all candidates are smaller than the commit point.
-    commitPoint = Timestamp(0, 4);
-    stableTimestampCandidates = {{0, 1}, {0, 2}, {0, 3}};
-    expectedStableTimestamp = Timestamp(0, 3);
-    stableTimestamp =
-        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
-    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+    // There is a valid stable optime, all candidates are smaller than the commit point.
+    commitPoint = OpTime({0, 4}, term);
+    stableOpTimeCandidates = {OpTime({0, 1}, term), OpTime({0, 2}, term), OpTime({0, 3}, term)};
+    expectedStableOpTime = OpTime({0, 3}, term);
+    stableOpTime = repl->calculateStableOpTime_forTest(stableOpTimeCandidates, commitPoint);
+    ASSERT_EQ(expectedStableOpTime, stableOpTime);
 
-    // There is no valid stable timestamp, all candidates are greater than the commit point.
-    commitPoint = Timestamp(0, 0);
-    stableTimestampCandidates = {{0, 1}, {0, 2}, {0, 3}};
-    expectedStableTimestamp = boost::none;
-    stableTimestamp =
-        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
-    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+    // There is no valid stable optime, all candidates are greater than the commit point.
+    commitPoint = OpTime({0, 0}, term);
+    stableOpTimeCandidates = {OpTime({0, 1}, term), OpTime({0, 2}, term), OpTime({0, 3}, term)};
+    expectedStableOpTime = boost::none;
+    stableOpTime = repl->calculateStableOpTime_forTest(stableOpTimeCandidates, commitPoint);
+    ASSERT_EQ(expectedStableOpTime, stableOpTime);
 
     // There are no timestamp candidates.
-    commitPoint = Timestamp(0, 0);
-    stableTimestampCandidates = {};
-    expectedStableTimestamp = boost::none;
-    stableTimestamp =
-        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
-    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+    commitPoint = OpTime({0, 0}, term);
+    stableOpTimeCandidates = {};
+    expectedStableOpTime = boost::none;
+    stableOpTime = repl->calculateStableOpTime_forTest(stableOpTimeCandidates, commitPoint);
+    ASSERT_EQ(expectedStableOpTime, stableOpTime);
 
     // There is a single timestamp candidate which is equal to the commit point.
-    commitPoint = Timestamp(0, 1);
-    stableTimestampCandidates = {{0, 1}};
-    expectedStableTimestamp = Timestamp(0, 1);
-    stableTimestamp =
-        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
-    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+    commitPoint = OpTime({0, 1}, term);
+    stableOpTimeCandidates = {OpTime({0, 1}, term)};
+    expectedStableOpTime = OpTime({0, 1}, term);
+    stableOpTime = repl->calculateStableOpTime_forTest(stableOpTimeCandidates, commitPoint);
+    ASSERT_EQ(expectedStableOpTime, stableOpTime);
 
     // There is a single timestamp candidate which is greater than the commit point.
-    commitPoint = Timestamp(0, 0);
-    stableTimestampCandidates = {{0, 1}};
-    expectedStableTimestamp = boost::none;
-    stableTimestamp =
-        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
-    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+    commitPoint = OpTime({0, 0}, term);
+    stableOpTimeCandidates = {OpTime({0, 1}, term)};
+    expectedStableOpTime = boost::none;
+    stableOpTime = repl->calculateStableOpTime_forTest(stableOpTimeCandidates, commitPoint);
+    ASSERT_EQ(expectedStableOpTime, stableOpTime);
 
     // There is a single timestamp candidate which is less than the commit point.
-    commitPoint = Timestamp(0, 2);
-    stableTimestampCandidates = {{0, 1}};
-    expectedStableTimestamp = Timestamp(0, 1);
-    stableTimestamp =
-        repl->calculateStableTimestamp_forTest(stableTimestampCandidates, commitPoint);
-    ASSERT_EQ(expectedStableTimestamp, stableTimestamp);
+    commitPoint = OpTime({0, 2}, term);
+    stableOpTimeCandidates = {OpTime({0, 1}, term)};
+    expectedStableOpTime = OpTime({0, 1}, term);
+    stableOpTime = repl->calculateStableOpTime_forTest(stableOpTimeCandidates, commitPoint);
+    ASSERT_EQ(expectedStableOpTime, stableOpTime);
 }
 
-TEST_F(StableTimestampTest, CleanupStableTimestampCandidates) {
+TEST_F(StableOpTimeTest, CleanupStableOpTimeCandidates) {
 
     /**
-     * Tests the 'ReplicationCoordinatorImpl::_cleanupStableTimestampCandidates' method.
+     * Tests the 'ReplicationCoordinatorImpl::_cleanupStableOpTimeCandidates' method.
      */
 
     initReplSetMode();
     auto repl = getReplCoord();
-    Timestamp stableTimestamp;
-    std::set<Timestamp> timestampCandidates, expectedTimestampCandidates;
+    OpTime stableOpTime;
+    std::set<OpTime> opTimeCandidates, expectedOpTimeCandidates;
+    long long term = 0;
 
-    // Cleanup should remove all timestamp candidates < the stable timestamp.
-    stableTimestamp = Timestamp(0, 3);
-    timestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
-    expectedTimestampCandidates = {{0, 3}, {0, 4}};
-    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
-    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+    // Cleanup should remove all timestamp candidates < the stable optime.
+    stableOpTime = OpTime({0, 3}, term);
+    opTimeCandidates = {
+        OpTime({0, 1}, term), OpTime({0, 2}, term), OpTime({0, 3}, term), OpTime({0, 4}, term)};
+    expectedOpTimeCandidates = {OpTime({0, 3}, term), OpTime({0, 4}, term)};
+    repl->cleanupStableOpTimeCandidates_forTest(&opTimeCandidates, stableOpTime);
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 
-    // Cleanup should remove all timestamp candidates if they are all < the stable timestamp.
-    stableTimestamp = Timestamp(0, 5);
-    timestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
-    expectedTimestampCandidates = {};
-    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
-    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+    // Cleanup should remove all timestamp candidates if they are all < the stable optime.
+    stableOpTime = OpTime({0, 5}, term);
+    opTimeCandidates = {
+        OpTime({0, 1}, term), OpTime({0, 2}, term), OpTime({0, 3}, term), OpTime({0, 4}, term)};
+    expectedOpTimeCandidates = {};
+    repl->cleanupStableOpTimeCandidates_forTest(&opTimeCandidates, stableOpTime);
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 
-    // Cleanup should have no effect when stable timestamp is less than all candidates.
-    stableTimestamp = Timestamp(0, 0);
-    timestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
-    expectedTimestampCandidates = {{0, 1}, {0, 2}, {0, 3}, {0, 4}};
-    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
-    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+    // Cleanup should have no effect when stable optime is less than all candidates.
+    stableOpTime = OpTime({0, 0}, term);
+    opTimeCandidates = {
+        OpTime({0, 1}, term), OpTime({0, 2}, term), OpTime({0, 3}, term), OpTime({0, 4}, term)};
+    expectedOpTimeCandidates = {
+        OpTime({0, 1}, term), OpTime({0, 2}, term), OpTime({0, 3}, term), OpTime({0, 4}, term)};
+    repl->cleanupStableOpTimeCandidates_forTest(&opTimeCandidates, stableOpTime);
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 
-    // Cleanup should have no effect for a single candidate that is equal to stable timestamp.
-    stableTimestamp = Timestamp(0, 1);
-    timestampCandidates = {{0, 1}};
-    expectedTimestampCandidates = {{0, 1}};
-    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
-    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+    // Cleanup should have no effect for a single candidate that is equal to stable optime.
+    stableOpTime = OpTime({0, 1}, term);
+    opTimeCandidates = {OpTime({0, 1}, term)};
+    expectedOpTimeCandidates = {OpTime({0, 1}, term)};
+    repl->cleanupStableOpTimeCandidates_forTest(&opTimeCandidates, stableOpTime);
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 
     // Cleanup should leave an empty candidate list unchanged.
-    stableTimestamp = Timestamp(0, 0);
-    timestampCandidates = {};
-    expectedTimestampCandidates = {};
-    repl->cleanupStableTimestampCandidates_forTest(&timestampCandidates, stableTimestamp);
-    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+    stableOpTime = OpTime({0, 0}, term);
+    opTimeCandidates = {};
+    expectedOpTimeCandidates = {};
+    repl->cleanupStableOpTimeCandidates_forTest(&opTimeCandidates, stableOpTime);
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 }
 
 
-TEST_F(StableTimestampTest, SetMyLastAppliedSetsStableTimestampForStorage) {
+TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
 
     /**
      * Test that 'setMyLastAppliedOpTime' sets the stable timestamp properly for the storage engine
      * and that timestamp cleanup occurs. This test is not meant to fully exercise the stable
-     * timestamp calculation logic.
+     * optime calculation logic.
      */
 
     initReplSetMode();
     auto repl = getReplCoord();
     Timestamp stableTimestamp;
+    long long term = 0;
 
-    // There should be no stable timestamp candidates until setMyLastAppliedOpTime is called.
+    // There should be no stable optime candidates until setMyLastAppliedOpTime is called.
     repl->advanceCommitPoint(OpTime({1, 2}, 0));
     ASSERT_EQUALS(SnapshotName::min(), getStorageInterface()->getStableTimestamp());
 
-    // Check that the stable timestamp is updated when we set the applied optime.
+    // Check that the stable timestamp is updated for the storage engine when we set the applied
+    // optime.
     repl->setMyLastAppliedOpTime(OpTime({1, 1}, 0));
     stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
     ASSERT_EQUALS(Timestamp(1, 1), stableTimestamp);
@@ -3884,61 +3886,62 @@ TEST_F(StableTimestampTest, SetMyLastAppliedSetsStableTimestampForStorage) {
     stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
     ASSERT_EQUALS(Timestamp(1, 2), stableTimestamp);
 
-    auto timestampCandidates = repl->getStableTimestampCandidates_forTest();
-    std::set<Timestamp> expectedTimestampCandidates = {{1, 2}};
-    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+    auto opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
+    std::set<OpTime> expectedOpTimeCandidates = {OpTime({1, 2}, term)};
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 }
 
-TEST_F(StableTimestampTest, AdvanceCommitPointSetsStableTimestampForStorage) {
+TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
 
     /**
-     * Test that 'advanceCommitPoint' sets the stable timestamp for the storage engine and that
-     * timestamp cleanup occurs. This test is not meant to fully exercise the stable timestamp
+     * Test that 'advanceCommitPoint' sets the stable optime for the storage engine and that
+     * timestamp cleanup occurs. This test is not meant to fully exercise the stable optime
      * calculation logic.
      */
 
     initReplSetMode();
     auto repl = getReplCoord();
     Timestamp stableTimestamp;
+    long long term = 0;
 
-    // Add two stable timestamp candidates.
-    repl->setMyLastAppliedOpTime(OpTime({1, 1}, 0));
-    repl->setMyLastAppliedOpTime(OpTime({1, 2}, 0));
+    // Add two stable optime candidates.
+    repl->setMyLastAppliedOpTime(OpTime({1, 1}, term));
+    repl->setMyLastAppliedOpTime(OpTime({1, 2}, term));
 
-    // Set a commit point and check the stable timestamp.
-    repl->advanceCommitPoint(OpTime({1, 1}, 0));
+    // Set a commit point and check the stable optime.
+    repl->advanceCommitPoint(OpTime({1, 1}, term));
     stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
     ASSERT_EQUALS(Timestamp(1, 1), stableTimestamp);
 
-    // Check that the stable timestamp is updated when we advance the commit point.
-    repl->advanceCommitPoint(OpTime({1, 2}, 0));
+    // Check that the stable timestamp is updated for the storage engine when we advance the
+    // commit point.
+    repl->advanceCommitPoint(OpTime({1, 2}, term));
     stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
     ASSERT_EQUALS(Timestamp(1, 2), stableTimestamp);
 
     // Check that timestamp candidate cleanup occurs.
-    auto timestampCandidates = getReplCoord()->getStableTimestampCandidates_forTest();
-    std::set<Timestamp> expectedTimestampCandidates = {{1, 2}};
-    ASSERT_TIMESTAMP_SET_EQ(expectedTimestampCandidates, timestampCandidates);
+    auto opTimeCandidates = getReplCoord()->getStableOpTimeCandidates_forTest();
+    std::set<OpTime> expectedOpTimeCandidates = {OpTime({1, 2}, term)};
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 }
 
-TEST_F(StableTimestampTest, SetMyLastAppliedDoesntAddTimestampCandidateInMasterSlaveMode) {
+TEST_F(StableOpTimeTest, SetMyLastAppliedDoesntAddTimestampCandidateInMasterSlaveMode) {
 
     /**
-     * Test that 'setMyLastAppliedOpTime' doesn't add timestamp candidates to the stable timestamp
+     * Test that 'setMyLastAppliedOpTime' doesn't add timestamp candidates to the stable optime
      * list when running in master-slave mode.
      */
 
     initMasterSlaveMode();
     auto repl = getReplCoord();
-    Timestamp stableTimestamp;
 
-    ASSERT(repl->getStableTimestampCandidates_forTest().empty());
+    ASSERT(repl->getStableOpTimeCandidates_forTest().empty());
 
     repl->setMyLastAppliedOpTime(OpTime({0, 1}, 0));
     repl->setMyLastAppliedOpTime(OpTime({0, 2}, 0));
 
     // Make sure no timestamps candidates were added.
-    ASSERT(repl->getStableTimestampCandidates_forTest().empty());
+    ASSERT(repl->getStableOpTimeCandidates_forTest().empty());
 }
 
 TEST_F(ReplCoordTest, NodeReturnsShutdownInProgressWhenWaitingUntilAnOpTimeDuringShutdown) {

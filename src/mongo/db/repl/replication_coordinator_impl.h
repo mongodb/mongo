@@ -379,11 +379,10 @@ public:
     /**
      * Simple test wrappers that expose private methods.
      */
-    boost::optional<Timestamp> calculateStableTimestamp_forTest(
-        const std::set<Timestamp>& candidates, const Timestamp& commitPoint);
-    void cleanupStableTimestampCandidates_forTest(std::set<Timestamp>* candidates,
-                                                  Timestamp stableTimestamp);
-    std::set<Timestamp> getStableTimestampCandidates_forTest();
+    boost::optional<OpTime> calculateStableOpTime_forTest(const std::set<OpTime>& candidates,
+                                                          const OpTime& commitPoint);
+    void cleanupStableOpTimeCandidates_forTest(std::set<OpTime>* candidates, OpTime stableOpTime);
+    std::set<OpTime> getStableOpTimeCandidates_forTest();
 
     /**
      * Non-blocking version of updateTerm.
@@ -998,23 +997,22 @@ private:
     void _updateCommittedSnapshot_inlock(SnapshotInfo newCommittedSnapshot);
 
     /**
-     * Calculates the 'stable' replication timestamp given a set of timestamp candidates and the
-     * current commit point. The stable timestamp is the greatest timestamp in 'candidates' that is
+     * Calculates the 'stable' replication optime given a set of optime candidates and the
+     * current commit point. The stable optime is the greatest optime in 'candidates' that is
      * also less than or equal to 'commitPoint'.
      */
-    boost::optional<Timestamp> _calculateStableTimestamp(const std::set<Timestamp>& candidates,
-                                                         const Timestamp& commitPoint);
+    boost::optional<OpTime> _calculateStableOpTime(const std::set<OpTime>& candidates,
+                                                   const OpTime& commitPoint);
 
     /**
-     * Removes any timestamps from the timestamp set 'candidates' that are less than
-     * 'stableTimestamp'.
+     * Removes any optimes from the optime set 'candidates' that are less than
+     * 'stableOpTime'.
      */
-    void _cleanupStableTimestampCandidates(std::set<Timestamp>* candidates,
-                                           Timestamp stableTimestamp);
+    void _cleanupStableOpTimeCandidates(std::set<OpTime>* candidates, OpTime stableOpTime);
 
     /**
-     * Calculates and sets the value of the 'stable' replication timestamp for the storage engine.
-     * See ReplicationCoordinatorImpl::_calculateStableTimestamp for a definition of 'stable', in
+     * Calculates and sets the value of the 'stable' replication optime for the storage engine.
+     * See ReplicationCoordinatorImpl::_calculateStableOpTime for a definition of 'stable', in
      * this context.
      */
     void _setStableTimestampForStorage_inlock();
@@ -1284,11 +1282,11 @@ private:
     // When engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
     boost::optional<SnapshotInfo> _currentCommittedSnapshot;  // (M)
 
-    // A set of timestamps that are used for computing the replication system's current 'stable'
-    // timestamp. Every time a node's applied optime is updated, it will be added to this set.
-    // Timestamps that are older than the current stable timestamp should get removed from this set.
+    // A set of optimes that are used for computing the replication system's current 'stable'
+    // optime. Every time a node's applied optime is updated, it will be added to this set.
+    // Optimes that are older than the current stable optime should get removed from this set.
     // This set should also be cleared if a rollback occurs.
-    std::set<Timestamp> _stableTimestampCandidates;  // (M)
+    std::set<OpTime> _stableOpTimeCandidates;  // (M)
 
     // Used to signal threads that are waiting for new committed snapshots.
     stdx::condition_variable _currentCommittedSnapshotCond;  // (M)
