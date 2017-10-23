@@ -8,10 +8,6 @@
  * 6. Export a collection.
  * 7. Drop the collection.
  * 8. Import the collection.
- * 9. Add data to the oplog.rs collection.
- * 10. Ensure that the document doesn't exist yet.
- * 11. Now play the mongooplog tool.
- * 12. Make sure that the oplog was played
 */
 
 (function() {
@@ -89,33 +85,6 @@
 
     var x = master.getDB("foo").getCollection("bar").count();
     assert.eq(x, 100, "mongoimport should have successfully imported the collection");
-
-    var doc = {_id: 5, x: 17};
-    var oplogEntry = {ts: new Timestamp(), "op": "i", "ns": "foo.bar", "o": doc, "v": NumberInt(2)};
-    assert.writeOK(master.getDB("local").oplog.rs.insert(oplogEntry));
-
-    assert.eq(100,
-              master.getDB("foo").getCollection("bar").count(),
-              "count before running mongooplog was not 100 as expected");
-
-    exitCode = MongoRunner.runMongoTool("mongooplog", {
-        from: "127.0.0.1:" + replTest.ports[0],
-        host: replSetConnString,
-    });
-    assert.eq(0, exitCode, "mongooplog failed to replay the oplog");
-
-    print("finished running mongooplog to replay the oplog");
-
-    var foundDocs = master.getDB("foo").getCollection("bar").find({_id: 5}).toArray();
-    assert.eq(foundDocs.length, 1, "mongooplog expected to have inserted one document");
-    assert.docEq(foundDocs[0], doc, "document inserted by mongooplog expected to match");
-    //    assert.soon(function() {
-    //      var numDocs = master.getDB("foo").getCollection("bar").count();
-    //      if (numDocs == 101) {
-    //          return true;
-    //      }
-    //      return false;
-    //    }, "count after running " + "mongooplog was not 101 as expected");
 
     print("all tests successful, stopping replica set");
 

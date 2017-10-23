@@ -442,7 +442,7 @@ functions:
 
         . ./${set_tools_gopath|set_gopath.sh}
 
-        build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog"
+        build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
 
         if [ "${build_mongoreplay}" = "true" ]; then
             build_tools="$build_tools mongoreplay"
@@ -1711,7 +1711,7 @@ timeout:
           ${set_sudo}
         fi
 
-        hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
+        hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongoreplay,mongorestore,mongostat,mongotop"
 
         if [ ${hang_analyzer_dump_core|true} = true ]; then
           hang_analyzer_option="-c $hang_analyzer_option"

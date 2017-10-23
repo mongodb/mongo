@@ -37,10 +37,6 @@
         <File Id="f_mongoimport" Name="mongoimport.exe" Source="$(var.ToolBinarySource)\mongoimport.exe"
               DiskId ="1" KeyPath="yes"/>
       </Component>
-      <Component Id="c_mongooplog" Guid="FAD84CBB-4666-4C22-A0DF-E1D2AEEC1601">
-        <File Id="f_mongooplog" Name="mongooplog.exe" Source="$(var.ToolBinarySource)\mongooplog.exe"
-              DiskId ="1" KeyPath="yes"/>
-      </Component>
       <Component Id="c_mongoperf" Guid="B046CCD2-39DC-4CB4-8A58-A7790148C41E">
         <File Id="f_mongoperf" Name="mongoperf.exe" Source="$(var.BinarySource)\mongoperf.exe"
               DiskId ="1" KeyPath="yes"/>

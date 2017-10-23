@@ -332,7 +332,7 @@ mongod = env.Program(
 env.Default(env.Install('#/', mongod))
 
 # tools
-rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles", "mongooplog" ]
+rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles" ]
 
 # mongoperf
 env.Install(

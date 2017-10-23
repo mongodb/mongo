@@ -261,7 +261,6 @@ fi
 %{_bindir}/mongoexport
 %{_bindir}/mongofiles
 %{_bindir}/mongoimport
-%{_bindir}/mongooplog
 %{_bindir}/mongoperf
 %{_bindir}/mongorestore
 %{_bindir}/mongotop
@@ -272,7 +271,6 @@ fi
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
-%{_mandir}/man1/mongooplog.1*
 %{_mandir}/man1/mongoperf.1*
 %{_mandir}/man1/mongorestore.1*
 %{_mandir}/man1/mongotop.1*

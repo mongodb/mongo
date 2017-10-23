@@ -2,9 +2,9 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <?if $(var.Edition) = Enterprise ?>
-      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongodecrypt, mongofiles, mongoldap, mongooplog, mongoperf)" />
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongodecrypt, mongofiles, mongoldap, mongoperf)" />
     <?else?>
-      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongofiles, mongooplog, mongoperf)" />
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongofiles, mongoperf)" />
     <?endif?>
     <FeatureGroup Id="fg_MongoDBAll">
       <Feature Id="ProductFeature"
@@ -88,7 +88,6 @@
                 Level ="1">
           <ComponentRef Id="c_bsondump"/>
           <ComponentRef Id="c_mongofiles"/>
-          <ComponentRef Id="c_mongooplog"/>
           <ComponentRef Id="c_mongoperf"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
