@@ -28,6 +28,7 @@
 
 import os, subprocess
 from run import wt_builddir
+from wttest import WiredTigerTestCase
 
 # suite_subprocess.py
 #    Run a subprocess within the test suite
@@ -117,6 +118,28 @@ class suite_subprocess:
             print 'ERROR: ' + filename + ' should not be empty (this command expected error output)'
         self.assertNotEqual(filesize, 0, filename + ': expected to not be empty')
 
+    def verbose_env(self, envvar):
+        return envvar + '=' + str(os.environ.get(envvar)) + '\n'
+
+    def show_outputs(self, procargs, message, filenames):
+        out = 'ERROR: wt command ' + message + ': ' + str(procargs) + '\n' + \
+              self.verbose_env('PATH') + \
+              self.verbose_env('LD_LIBRARY_PATH') + \
+              self.verbose_env('DYLD_LIBRARY_PATH') + \
+              self.verbose_env('PYTHONPATH') + \
+              'output files follow:'
+        WiredTigerTestCase.prout(out)
+        for filename in filenames:
+            maxbytes = 1024*100
+            with open(filename, 'r') as f:
+                contents = f.read(maxbytes)
+                if len(contents) > 0:
+                    if len(contents) >= maxbytes:
+                        contents += '...\n'
+                    sepline = '*' * 50 + '\n'
+                    out = sepline + filename + '\n' + sepline + contents
+                    WiredTigerTestCase.prout(out)
+
     # Run the wt utility.
     def runWt(self, args, infilename=None,
         outfilename=None, errfilename=None, closeconn=True,
@@ -155,10 +178,16 @@ class suite_subprocess:
                     returncode = subprocess.call(
                         procargs, stdout=wtout, stderr=wterr)
         if failure:
+            if returncode == 0:
+                self.show_outputs(procargs, "expected failure, got success",
+                                  [wtoutname, wterrname])
             self.assertNotEqual(returncode, 0,
                 'expected failure: "' + \
                 str(procargs) + '": exited ' + str(returncode))
         else:
+            if returncode != 0:
+                self.show_outputs(procargs, "expected success, got failure",
+                                  [wtoutname, wterrname])
             self.assertEqual(returncode, 0,
                 'expected success: "' + \
                 str(procargs) + '": exited ' + str(returncode))
