@@ -41,6 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/logger/redaction.h"
 
 namespace mongo {
 namespace {
@@ -188,6 +189,11 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // If the collection with the requested UUID already exists, but with a different
                 // name, just rename it to 'newCollName'.
                 if (catalog.lookupCollectionByUUID(uuid)) {
+                    uassert(40655,
+                            str::stream() << "Invalid name " << redact(newCollName.ns())
+                                          << " for UUID "
+                                          << uuid.toString(),
+                            currentName.db() == newCollName.db());
                     Status status =
                         db->renameCollection(opCtx, currentName.ns(), newCollName.ns(), stayTemp);
                     if (!status.isOK())
