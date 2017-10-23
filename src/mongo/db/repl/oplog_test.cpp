@@ -100,8 +100,17 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
     {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opTime =
-            logOp(opCtx.get(), "n", nss, {}, msgObj, nullptr, false, {}, kUninitializedStmtId, {});
+        opTime = logOp(opCtx.get(),
+                       "n",
+                       nss,
+                       {},
+                       msgObj,
+                       nullptr,
+                       false,
+                       Date_t::now(),
+                       {},
+                       kUninitializedStmtId,
+                       {});
         ASSERT_FALSE(opTime.isNull());
         wunit.commit();
     }
@@ -213,7 +222,8 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
     // logOp() must be called while holding lock because ephemeralForTest storage engine does not
     // support concurrent updates to its internal state.
     const auto msgObj = BSON("msg" << nss.ns());
-    auto opTime = logOp(opCtx, "n", nss, {}, msgObj, nullptr, false, {}, kUninitializedStmtId, {});
+    auto opTime = logOp(
+        opCtx, "n", nss, {}, msgObj, nullptr, false, Date_t::now(), {}, kUninitializedStmtId, {});
     ASSERT_FALSE(opTime.isNull());
 
     ASSERT(opTimeNssMap->find(opTime) == opTimeNssMap->end())

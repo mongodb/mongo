@@ -110,7 +110,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                  Session* session,
                                  std::vector<InsertStatement>::const_iterator begin,
                                  std::vector<InsertStatement>::const_iterator end,
-                                 bool fromMigrate);
+                                 bool fromMigrate,
+                                 Date_t wallClockTime);
 
 /**
  * @param opstr
@@ -124,6 +125,9 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
  * For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
  *
+ * wallClockTime this specifies the wall-clock timestamp of then this oplog entry was generated. It
+ *   is purely informational, may not be monotonically increasing and is not interpreted in any way
+ *   by the replication subsystem.
  * oplogLink this contains the timestamp that points to the previous write that will be
  *   linked via prevTs, and the timestamps of the oplog entry that contains the document
  *   before/after update was applied. The timestamps are ignored if isNull() is true.
@@ -138,6 +142,7 @@ OpTime logOp(OperationContext* opCtx,
              const BSONObj& obj,
              const BSONObj* o2,
              bool fromMigrate,
+             Date_t wallClockTime,
              const OperationSessionInfo& sessionInfo,
              StmtId stmtId,
              const OplogLink& oplogLink);

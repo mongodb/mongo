@@ -408,6 +408,7 @@ OpTime logOp(OperationContext* opCtx,
              const BSONObj& obj,
              const BSONObj* o2,
              bool fromMigrate,
+             Date_t wallClockTime,
              const OperationSessionInfo& sessionInfo,
              StmtId statementId,
              const OplogLink& oplogLink) {
@@ -434,7 +435,7 @@ OpTime logOp(OperationContext* opCtx,
                                fromMigrate,
                                slot.opTime,
                                slot.hash,
-                               Date_t::now(),
+                               wallClockTime,
                                sessionInfo,
                                statementId,
                                oplogLink);
@@ -451,7 +452,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                  Session* session,
                                  std::vector<InsertStatement>::const_iterator begin,
                                  std::vector<InsertStatement>::const_iterator end,
-                                 bool fromMigrate) {
+                                 bool fromMigrate,
+                                 Date_t wallClockTime) {
     invariant(begin != end);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
@@ -468,7 +470,6 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
 
     WriteUnitOfWork wuow(opCtx);
-    auto wallTime = Date_t::now();
 
     OperationSessionInfo sessionInfo;
     OplogLink oplogLink;
@@ -497,7 +498,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                           fromMigrate,
                                           insertStatementOplogSlot.opTime,
                                           insertStatementOplogSlot.hash,
-                                          wallTime,
+                                          wallClockTime,
                                           sessionInfo,
                                           begin[i].stmtId,
                                           oplogLink));
