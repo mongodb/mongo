@@ -346,7 +346,8 @@ public:
     };
 
     /**
-     * Returns the TimeZoneDatabase object associated with the specified service context.
+     * Returns the TimeZoneDatabase object associated with the specified service context or nullptr
+     * if none exists.
      */
     static const TimeZoneDatabase* get(ServiceContext* serviceContext);
 

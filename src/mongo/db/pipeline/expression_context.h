@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/util/intrusive_counter.h"
@@ -141,6 +142,8 @@ public:
 
     OperationContext* opCtx;
 
+    const TimeZoneDatabase* timeZoneDatabase;
+
     // Collation requested by the user for this pipeline. Empty if the user did not request a
     // collation.
     BSONObj collation;
@@ -153,8 +156,10 @@ public:
 protected:
     static const int kInterruptCheckPeriod = 128;
 
-    ExpressionContext(NamespaceString nss)
-        : ns(std::move(nss)), variablesParseState(variables.useIdGenerator()) {}
+    ExpressionContext(NamespaceString nss, const TimeZoneDatabase* tzDb)
+        : ns(std::move(nss)),
+          timeZoneDatabase(tzDb),
+          variablesParseState(variables.useIdGenerator()) {}
 
     /**
      * Sets '_ownedCollator' and resets '_collator', 'documentComparator' and 'valueComparator'.

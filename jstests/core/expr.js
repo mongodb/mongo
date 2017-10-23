@@ -59,6 +59,21 @@
     assert.writeOK(coll.insert({a: 0}));
     assert.eq(1, coll.find({$expr: {$eq: ["$a", 0]}}).itcount());
 
+    // $expr with time zone expression across getMore (SERVER-31664).
+    coll.drop();
+    assert.writeOK(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
+
+    let res = assert.commandWorked(db.runCommand({
+        find: coll.getName(),
+        filter: {$expr: {$eq: [1, {$dayOfMonth: {date: "$a", timezone: "America/New_York"}}]}},
+        batchSize: 0
+    }));
+    assert.eq(0, res.cursor.firstBatch.length);
+
+    let cursorId = res.cursor.id;
+    res = assert.commandWorked(db.runCommand({getMore: cursorId, collection: coll.getName()}));
+    assert.eq(1, res.cursor.nextBatch.length);
+
     // $expr with unbound variable throws.
     assert.throws(function() {
         coll.find({$expr: {$eq: ["$a", "$$unbound"]}}).itcount();

@@ -42,13 +42,20 @@ namespace mongo {
  */
 class ExpressionContextForTest : public ExpressionContext {
 public:
+    static constexpr TimeZoneDatabase* kNullTimeZoneDatabase = nullptr;
+
     ExpressionContextForTest()
         : ExpressionContextForTest(NamespaceString{"test"_sd, "namespace"_sd}) {}
 
     ExpressionContextForTest(NamespaceString nss)
-        : ExpressionContext(std::move(nss)), _testOpCtx(_serviceContext.makeOperationContext()) {
+        : ExpressionContext(std::move(nss), kNullTimeZoneDatabase),
+          _testOpCtx(_serviceContext.makeOperationContext()) {
         TimeZoneDatabase::set(_serviceContext.getServiceContext(),
                               stdx::make_unique<TimeZoneDatabase>());
+
+        // As we don't have the TimeZoneDatabase prior to ExpressionContext construction, we must
+        // initialize with a nullptr and set post-construction.
+        timeZoneDatabase = TimeZoneDatabase::get(_serviceContext.getServiceContext());
         opCtx = _testOpCtx.get();
     }
 

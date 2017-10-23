@@ -262,9 +262,14 @@ public:
         stdx::condition_variable& cv, stdx::unique_lock<stdx::mutex>& m, Date_t deadline) noexcept;
 
     /**
-     * Returns the service context under which this operation context runs.
+     * Returns the service context under which this operation context runs, or nullptr if there is
+     * no such service context.
      */
     ServiceContext* getServiceContext() const {
+        if (!_client) {
+            return nullptr;
+        }
+
         return _client->getServiceContext();
     }
 

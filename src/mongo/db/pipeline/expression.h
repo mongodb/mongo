@@ -519,8 +519,10 @@ public:
                               << timeZoneId.toString()
                               << ")",
                 timeZoneId.getType() == BSONType::String);
-        auto timeZone = TimeZoneDatabase::get(getExpressionContext()->opCtx->getServiceContext())
-                            ->getTimeZone(timeZoneId.getString());
+
+        invariant(getExpressionContext()->timeZoneDatabase);
+        auto timeZone =
+            getExpressionContext()->timeZoneDatabase->getTimeZone(timeZoneId.getString());
         return evaluateDate(date, timeZone);
     }
 

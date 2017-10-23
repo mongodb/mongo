@@ -183,6 +183,92 @@
     assert.writeOK(coll.insert({a: 4}));
     assertFailsValidation(coll.insert({a: 5}));
 
+    // The validator supports $expr with the date extraction expressions (with a timezone
+    // specified).
+    coll.drop();
+    assert.commandWorked(db.createCollection(collName, {
+        validator:
+            {$expr: {$eq: [1, {$dayOfMonth: {date: "$a", timezone: "America/New_York"}}]}}
+    }));
+    assert.writeOK(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
+    assertFailsValidation(coll.insert({a: ISODate("2017-10-01T00:00:00")}));
+
+    // The validator supports $expr with a $dateToParts expression.
+    coll.drop();
+    assert.commandWorked(db.createCollection(collName, {
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                      "year": 2017,
+                      "month": 10,
+                      "day": 1,
+                      "hour": 18,
+                      "minute": 0,
+                      "second": 0,
+                      "millisecond": 0
+                    },
+                    {$dateToParts: {date: "$a", timezone: "America/New_York"}}
+                ]
+            }
+        }
+    }));
+    assert.writeOK(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
+    assertFailsValidation(coll.insert({a: ISODate("2017-10-01T00:00:00")}));
+
+    // The validator supports $expr with $dateToString expression.
+    coll.drop();
+    assert.commandWorked(db.createCollection(collName, {
+        validator: {
+            $expr: {
+                $eq: [
+                    "2017-07-04 14:56:42 +0000 (0 minutes)",
+                    {
+                      $dateToString: {
+                          format: "%Y-%m-%d %H:%M:%S %z (%Z minutes)",
+                          date: "$date",
+                          timezone: "$tz"
+                      }
+                    }
+                ]
+            }
+        }
+    }));
+    assert.writeOK(coll.insert({date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "UTC"}));
+    assertFailsValidation(
+        coll.insert({date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "America/New_York"}));
+
+    // The validator supports $expr with $dateFromParts expression.
+    coll.drop();
+    assert.commandWorked(db.createCollection(collName, {
+        validator: {
+            $expr: {
+                $eq: [
+                    ISODate("2016-12-31T15:00:00Z"),
+                    {'$dateFromParts': {year: "$year", "timezone": "$timezone"}}
+                ]
+            }
+        }
+    }));
+    assert.writeOK(coll.insert({_id: 0, year: 2017, month: 6, day: 19, timezone: "Asia/Tokyo"}));
+    assertFailsValidation(
+        coll.insert({_id: 1, year: 2022, month: 1, day: 1, timezone: "America/New_York"}));
+
+    // The validator supports $expr with $dateFromString expression.
+    coll.drop();
+    assert.commandWorked(db.createCollection(collName, {
+        validator: {
+            $expr: {
+                $eq: [
+                    ISODate("2017-07-04T15:56:02Z"),
+                    {'$dateFromString': {dateString: "$date", timezone: 'America/New_York'}}
+                ]
+            }
+        }
+    }));
+    assert.writeOK(coll.insert({_id: 0, date: "2017-07-04T11:56:02"}));
+    assertFailsValidation(coll.insert({_id: 1, date: "2015-02-02T11:00:00"}));
+
     // The validator can contain an $expr that may throw at runtime.
     coll.drop();
     assert.commandWorked(

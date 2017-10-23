@@ -68,7 +68,6 @@ long long seconds(Date_t date) {
 }  // namespace
 
 const TimeZoneDatabase* TimeZoneDatabase::get(ServiceContext* serviceContext) {
-    invariant(getTimeZoneDatabase(serviceContext));
     return getTimeZoneDatabase(serviceContext).get();
 }
 

@@ -57,6 +57,9 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
 }
 ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator)
     : opCtx(opCtx),
+      timeZoneDatabase(opCtx && opCtx->getServiceContext()
+                           ? TimeZoneDatabase::get(opCtx->getServiceContext())
+                           : nullptr),
       variablesParseState(variables.useIdGenerator()),
       _collator(collator),
       _documentComparator(_collator),
@@ -87,7 +90,8 @@ void ExpressionContext::setCollator(const CollatorInterface* collator) {
 
 intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns,
                                                              boost::optional<UUID> uuid) const {
-    intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(std::move(ns));
+    intrusive_ptr<ExpressionContext> expCtx =
+        new ExpressionContext(std::move(ns), timeZoneDatabase);
 
     expCtx->uuid = std::move(uuid);
     expCtx->explain = explain;
