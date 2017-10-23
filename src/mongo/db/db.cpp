@@ -787,15 +787,10 @@ ExitCode _initAndListen(int listenPort) {
     bool nonLocalDatabases = repairDatabasesAndCheckVersion(startupOpCtx.get());
 
     // Assert that the in-memory featureCompatibilityVersion parameter has been explicitly set. If
-    // we are part of a sharded cluster and are started up with no data files, we do not set the
-    // featureCompatibilityVersion until addShard is called. If we are part of a non-shard replica
-    // set and are also started up with no data files, we do not set the featureCompatibilityVersion
-    // until a primary is chosen. For these cases, we expect the in-memory
+    // we are part of a replica set and are started up with no data files, we do not set the
+    // featureCompatibilityVersion until a primary is chosen. For this case, we expect the in-memory
     // featureCompatibilityVersion parameter to still be uninitialized until after startup.
-    if (canCallFCVSetIfCleanStartup &&
-        ((!replSettings.usingReplSets() &&
-          serverGlobalParams.clusterRole != ClusterRole::ShardServer) ||
-         nonLocalDatabases)) {
+    if (canCallFCVSetIfCleanStartup && (!replSettings.usingReplSets() || nonLocalDatabases)) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
 

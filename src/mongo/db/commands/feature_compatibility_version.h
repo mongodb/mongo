@@ -118,8 +118,9 @@ public:
     static void unsetTargetUpgradeOrDowngrade(OperationContext* opCtx, StringData version);
 
     /**
-     * If there are no non-local databases and we are not running with --shardsvr, set
-     * featureCompatibilityVersion to the latest value.
+     * If there are no non-local databases, store the featureCompatibilityVersion document. If we
+     * are not running with --shardsvr, set the version to be the upgrade value. If we are running
+     * with --shardsvr, set the version to be the downgrade value.
      */
     static void setIfCleanStartup(OperationContext* opCtx,
                                   repl::StorageInterface* storageInterface);

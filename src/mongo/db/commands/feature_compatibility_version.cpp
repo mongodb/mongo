@@ -202,49 +202,59 @@ void FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(OperationContext
 
 void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
                                                     repl::StorageInterface* storageInterface) {
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-        std::vector<std::string> dbNames;
-        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-        storageEngine->listDatabases(&dbNames);
+    // A clean startup means there are no databases on disk besides the local database.
+    std::vector<std::string> dbNames;
+    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    storageEngine->listDatabases(&dbNames);
 
-        for (auto&& dbName : dbNames) {
-            if (dbName != "local") {
-                return;
-            }
+    for (auto&& dbName : dbNames) {
+        if (dbName != "local") {
+            return;
         }
+    }
 
-        UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-        NamespaceString nss(FeatureCompatibilityVersion::kCollection);
+    // If the server was not started with --shardsvr, the default featureCompatibilityVersion on
+    // clean startup is the upgrade version. If it was started with --shardsvr, the default
+    // featureCompatibilityVersion is the downgrade version, so that it can be safely added to a
+    // downgrade version cluster. The config server will run setFeatureCompatibilityVersion as part
+    // of addShard.
+    const bool storeUpgradeVersion = serverGlobalParams.clusterRole != ClusterRole::ShardServer;
 
-        {
-            AutoGetOrCreateDb autoDB(opCtx, nss.db(), MODE_X);
+    UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
+    NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 
-            // We reached this point because the only database that exists on the server is "local"
-            // and we have just created an empty "admin" database. Therefore, it is safe to create
-            // the "admin.system.version" collection.
-            invariant(autoDB.justCreated());
+    {
+        AutoGetOrCreateDb autoDB(opCtx, nss.db(), MODE_X);
 
+        // We reached this point because the only database that exists on the server is "local"
+        // and we have just created an empty "admin" database. Therefore, it is safe to create
+        // the "admin.system.version" collection.
+        invariant(autoDB.justCreated());
+
+        if (storeUpgradeVersion) {
             // We update the value of the version server parameter so that the admin.system.version
             // collection gets a UUID.
             serverGlobalParams.featureCompatibility.setVersion(
                 ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
-
-            uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
         }
 
-        // We then insert the featureCompatibilityVersion document into the "admin.system.version"
-        // collection. The server parameter will be updated on commit by the op observer.
-        uassertStatusOK(storageInterface->insertDocument(
-            opCtx,
-            nss,
-            repl::TimestampedBSONObj{BSON("_id"
-                                          << FeatureCompatibilityVersion::kParameterName
-                                          << FeatureCompatibilityVersion::kVersionField
-                                          << FeatureCompatibilityVersionCommandParser::kVersion36),
-                                     SnapshotName()},
-            repl::OpTime::kUninitializedTerm));  // No timestamp or term because this write is not
-                                                 // replicated.
+        uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
     }
+
+    // We then insert the featureCompatibilityVersion document into the "admin.system.version"
+    // collection. The server parameter will be updated on commit by the op observer.
+    uassertStatusOK(storageInterface->insertDocument(
+        opCtx,
+        nss,
+        repl::TimestampedBSONObj{
+            BSON("_id" << FeatureCompatibilityVersion::kParameterName
+                       << FeatureCompatibilityVersion::kVersionField
+                       << (storeUpgradeVersion
+                               ? FeatureCompatibilityVersionCommandParser::kVersion36
+                               : FeatureCompatibilityVersionCommandParser::kVersion34)),
+            SnapshotName()},
+        repl::OpTime::kUninitializedTerm));  // No timestamp or term because this write is not
+                                             // replicated.
 }
 
 namespace {

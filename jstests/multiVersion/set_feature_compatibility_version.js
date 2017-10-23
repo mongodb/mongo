@@ -216,6 +216,15 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     checkFCV(adminDB, "3.4");
     MongoRunner.stopMongod(conn);
 
+    // A 3.6 mongod started with --shardsvr and clean data files gets featureCompatibilityVersion
+    // 3.4.
+    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, shardsvr: ""});
+    assert.neq(
+        null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+    adminDB = conn.getDB("admin");
+    checkFCV(adminDB, "3.4");
+    MongoRunner.stopMongod(conn);
+
     const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
     // Fail to start up if no featureCompatibilityVersion is present.
     doStartupFailTests(/*withUUIDs*/ true, dbpath);
@@ -466,8 +475,10 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     });
     latestShard.startSet();
     latestShard.initiate();
-    assert.commandWorked(mongosAdminDB.runCommand({addShard: latestShard.getURL()}));
     let latestShardPrimaryAdminDB = latestShard.getPrimary().getDB("admin");
+    // The featureCompatibilityVersion is 3.4 before the shard is added.
+    checkFCV(latestShardPrimaryAdminDB, "3.4");
+    assert.commandWorked(mongosAdminDB.runCommand({addShard: latestShard.getURL()}));
     checkFCV(latestShardPrimaryAdminDB, "3.4");
 
     // Shard some collections before upgrade, to ensure UUIDs are generated for them on upgrade.
