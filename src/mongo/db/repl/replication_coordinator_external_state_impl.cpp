@@ -215,6 +215,8 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
     return _replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx);
 }
 
+// This function acquires the LockManager locks on oplog, so it cannot be called while holding
+// ReplicationCoordinatorImpl's mutex.
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OperationContext* opCtx, ReplicationCoordinator* replCoord) {
 

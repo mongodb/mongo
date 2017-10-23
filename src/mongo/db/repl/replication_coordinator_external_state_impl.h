@@ -68,8 +68,6 @@ public:
         ReplicationProcess* replicationProcess);
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
-    // The implementation acquires the LockManager locks on oplog, so it cannot be called while
-    // holding ReplicationCoordinatorImpl's mutex.
     virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) override;
     virtual void stopDataReplication(OperationContext* opCtx) override;
