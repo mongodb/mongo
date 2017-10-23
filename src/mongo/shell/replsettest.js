@@ -1667,9 +1667,11 @@ var ReplSetTest = function(opts) {
                     if (!bsonBinaryEqual(oplogEntry, otherOplogEntry)) {
                         var query = prevOplogEntry ? {ts: {$lte: prevOplogEntry.ts}} : {};
                         rst.nodes.forEach(node => this.dumpOplog(node, query, 100));
-                        assert(false,
-                               msgPrefix + ", non-matching oplog entry for nodes: " +
-                                   firstReader.mongo.host + " " + readers[i].mongo.host);
+                        var log = msgPrefix +
+                            ", non-matching oplog entries for the following nodes: \n" +
+                            firstReader.mongo.host + ": " + tojsononeline(oplogEntry) + "\n" +
+                            readers[i].mongo.host + ": " + tojsononeline(otherOplogEntry);
+                        assert(false, log);
                     }
                 }
                 prevOplogEntry = oplogEntry;
