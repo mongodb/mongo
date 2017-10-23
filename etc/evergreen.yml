@@ -9742,6 +9742,7 @@ buildvariants:
     test_flags: --storageEngine=rocksdb
     use_scons_cache: true
     build_mongoreplay: true
+  stepback: false
   tasks:
   - name: compile
     distros:
