@@ -39,6 +39,7 @@ selector:
   - jstests/sharding/change_stream_invalidation.js
   - jstests/sharding/change_stream_remove_shard.js
   - jstests/sharding/change_streams.js
+  - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/close_cursor_on_chunk_migration_to_new_shards.js
   - jstests/sharding/close_cursor_on_chunk_migration_to_new_shards.js
   - jstests/sharding/enable_sharding_basic.js
