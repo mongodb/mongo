@@ -425,9 +425,12 @@ Status _collModInternal(OperationContext* opCtx,
     // don't implicitly upgrade them on collMod either.
     if (upgradeUUID && !nss.isSystemDotIndexes()) {
         if (uuid && !coll->uuid()) {
+            log() << "Assigning UUID " << uuid.get().toString() << " to collection " << coll->ns();
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
             cce->addUUID(opCtx, uuid.get(), coll);
         } else if (!uuid && coll->uuid()) {
+            log() << "Removing UUID " << coll->uuid().get().toString() << " from collection "
+                  << coll->ns();
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
             cce->removeUUID(opCtx);
         }
