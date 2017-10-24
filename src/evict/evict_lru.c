@@ -1899,14 +1899,15 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 
 		/*
 		 * If application threads are blocked on eviction of clean
-		 * pages, and the only thing preventing a clean page from being
-		 * evicted is that it contains historical data, mark it dirty
+		 * pages, and the only thing preventing a clean leaf page from
+		 * being evicted is it contains historical data, mark it dirty
 		 * so we can do lookaside eviction.  We also mark the tree
 		 * dirty to avoid an assertion that we don't discard dirty
 		 * pages from a clean tree.
 		 */
 		if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD) &&
 		    !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE) &&
+		    !WT_PAGE_IS_INTERNAL(page) &&
 		    !modified && page->modify != NULL &&
 		    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
 		    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp))) {
