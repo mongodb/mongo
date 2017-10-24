@@ -237,6 +237,26 @@ TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedN
     ASSERT_EQ(2ul, namespaceSet.size());
 }
 
+TEST_F(DocumentSourceLookUpTest, RejectLookupWhenDepthLimitIsExceeded) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    expCtx->subPipelineDepth = DocumentSourceLookUp::kMaxSubPipelineDepth;
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
+                           BSON("$lookup" << BSON("from"
+                                                  << "coll"
+                                                  << "pipeline"
+                                                  << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                                  << "as"
+                                                  << "as"))
+                               .firstElement(),
+                           expCtx),
+                       AssertionException,
+                       ErrorCodes::MaxSubPipelineDepthExceeded);
+}
+
 TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
     // Temporarily set FCV to 3.6 for $changeStream.
     EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);

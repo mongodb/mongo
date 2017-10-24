@@ -192,6 +192,9 @@ public:
 
     TailableMode tailableMode = TailableMode::kNormal;
 
+    // Tracks the depth of nested aggregation sub-pipelines. Used to enforce depth limits.
+    size_t subPipelineDepth = 0;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 

@@ -48,6 +48,8 @@ namespace mongo {
 class DocumentSourceLookUp final : public DocumentSourceNeedsMongoProcessInterface,
                                    public SplittableDocumentSource {
 public:
+    static constexpr size_t kMaxSubPipelineDepth = 20;
+
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,

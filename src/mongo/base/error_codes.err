@@ -229,6 +229,7 @@ error_code("SessionTransferIncomplete", 228)
 error_code("MustDowngrade", 229)
 error_code("DNSHostNotFound", 230)
 error_code("DNSProtocolError", 231)
+error_code("MaxSubPipelineDepthExceeded", 232)
 
 # Error codes 4000-8999 are reserved.
 
