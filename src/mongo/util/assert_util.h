@@ -113,7 +113,7 @@ protected:
     }
 
     DBException(int code, StringData msg)
-        : DBException(Status(code ? ErrorCodes::fromInt(code) : ErrorCodes::UnknownError, msg)) {}
+        : DBException(Status(code ? ErrorCodes::Error(code) : ErrorCodes::UnknownError, msg)) {}
 
 private:
     static void traceIfNeeded(const DBException& e);

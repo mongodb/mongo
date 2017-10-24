@@ -199,10 +199,10 @@ TEST(Cloning, OKIsNotRefCounted) {
 }
 
 TEST(Parsing, CodeToEnum) {
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, ErrorCodes::fromInt(ErrorCodes::TypeMismatch));
-    ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::fromInt(ErrorCodes::UnknownError));
-    ASSERT_EQUALS(ErrorCodes::MaxError, ErrorCodes::fromInt(ErrorCodes::MaxError));
-    ASSERT_EQUALS(ErrorCodes::OK, ErrorCodes::fromInt(0));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, ErrorCodes::Error(int(ErrorCodes::TypeMismatch)));
+    ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::Error(int(ErrorCodes::UnknownError)));
+    ASSERT_EQUALS(ErrorCodes::MaxError, ErrorCodes::Error(int(ErrorCodes::MaxError)));
+    ASSERT_EQUALS(ErrorCodes::OK, ErrorCodes::Error(0));
 }
 
 TEST(Transformers, ExceptionToStatus) {

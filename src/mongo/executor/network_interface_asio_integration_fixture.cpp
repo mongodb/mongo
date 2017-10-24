@@ -154,7 +154,7 @@ void NetworkInterfaceASIOIntegrationFixture::assertWriteError(StringData db,
     ASSERT_OK(getStatusFromCommandResult(res.data));
     ASSERT(res.data["writeErrors"]);
     auto firstWriteError = res.data["writeErrors"].embeddedObject().firstElement().embeddedObject();
-    Status writeErrorStatus(ErrorCodes::fromInt(firstWriteError.getIntField("code")),
+    Status writeErrorStatus(ErrorCodes::Error(firstWriteError.getIntField("code")),
                             firstWriteError.getStringField("errmsg"));
     ASSERT_EQ(reason, writeErrorStatus);
 }

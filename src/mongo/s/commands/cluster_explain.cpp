@@ -165,7 +165,7 @@ Status ClusterExplain::validateShardResults(const vector<Strategy::CommandResult
             // Try to pass up the error code from the shard.
             ErrorCodes::Error error = ErrorCodes::OperationFailed;
             if (shardResults[i].result["code"].isNumber()) {
-                error = ErrorCodes::fromInt(shardResults[i].result["code"].numberInt());
+                error = ErrorCodes::Error(shardResults[i].result["code"].numberInt());
             }
 
             return Status(error,

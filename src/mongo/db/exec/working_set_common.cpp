@@ -188,7 +188,7 @@ void WorkingSetCommon::getStatusMemberObject(const WorkingSet& ws,
 // static
 Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
     invariant(WorkingSetCommon::isValidStatusMemberObject(memberObj));
-    return Status(ErrorCodes::fromInt(memberObj["code"].numberInt()), memberObj["errmsg"]);
+    return Status(ErrorCodes::Error(memberObj["code"].numberInt()), memberObj["errmsg"]);
 }
 
 // static
@@ -203,7 +203,7 @@ std::string WorkingSetCommon::toStatusString(const BSONObj& obj) {
         Status unknownStatus(ErrorCodes::UnknownError, "no details available");
         return unknownStatus.toString();
     }
-    Status status(ErrorCodes::fromInt(obj.getIntField("code")), obj.getStringField("errmsg"));
+    Status status(ErrorCodes::Error(obj.getIntField("code")), obj.getStringField("errmsg"));
     return status.toString();
 }
 

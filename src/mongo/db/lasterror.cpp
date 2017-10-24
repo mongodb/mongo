@@ -53,7 +53,7 @@ void LastError::setLastError(int code, std::string msg) {
     _code = code;
     _msg = std::move(msg);
 
-    if (ErrorCodes::isNotMasterError(ErrorCodes::fromInt(_code)))
+    if (ErrorCodes::isNotMasterError(ErrorCodes::Error(_code)))
         _hadNotMasterError = true;
 }
 
@@ -91,7 +91,7 @@ bool LastError::appendSelf(BSONObjBuilder& b, bool blankErr) const {
 
     if (_code) {
         b.append("code", _code);
-        b.append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(_code)));
+        b.append("codeName", ErrorCodes::errorString(ErrorCodes::Error(_code)));
     }
     if (_updatedExisting != NotUpdate)
         b.appendBool("updatedExisting", _updatedExisting == True);

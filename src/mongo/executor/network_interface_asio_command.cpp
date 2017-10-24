@@ -271,7 +271,7 @@ void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
 
 void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_code& ec) {
     ErrorCodes::Error errorCode = (ec.category() == mongoErrorCategory())
-        ? ErrorCodes::fromInt(ec.value())
+        ? ErrorCodes::Error(ec.value())
         : ErrorCodes::HostUnreachable;
     _completeOperation(op, {errorCode, ec.message(), Milliseconds(now() - op->_start)});
 }

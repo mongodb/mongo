@@ -48,7 +48,7 @@ public:
     }
 
     std::string message(int ev) const override {
-        return ErrorCodes::errorString(ErrorCodes::fromInt(ev));
+        return ErrorCodes::errorString(ErrorCodes::Error(ev));
     }
 
     // We don't really want to override this function, but to override the second we need to,
@@ -58,7 +58,7 @@ public:
     }
 
     bool equivalent(const std::error_code& code, int condition) const noexcept override {
-        switch (ErrorCodes::fromInt(condition)) {
+        switch (ErrorCodes::Error(condition)) {
             case ErrorCodes::OK:
                 // Make ErrorCodes::OK to be equivalent to the default constructed error code.
                 return code == std::error_code();
@@ -77,11 +77,11 @@ const std::error_category& mongoErrorCategory() {
 }
 
 std::error_code make_error_code(ErrorCodes::Error code) {
-    return std::error_code(ErrorCodes::fromInt(code), mongoErrorCategory());
+    return std::error_code(ErrorCodes::Error(code), mongoErrorCategory());
 }
 
 std::error_condition make_error_condition(ErrorCodes::Error code) {
-    return std::error_condition(ErrorCodes::fromInt(code), mongoErrorCategory());
+    return std::error_condition(ErrorCodes::Error(code), mongoErrorCategory());
 }
 
 }  // namespace mongo

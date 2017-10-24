@@ -89,7 +89,7 @@ Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
             return Status::OK();
         }
 
-        auto error = response.isErrCodeSet() ? ErrorCodes::fromInt(response.getErrCode())
+        auto error = response.isErrCodeSet() ? ErrorCodes::Error(response.getErrCode())
                                              : ErrorCodes::UnknownError;
         return Status(error, response.getErrMessage());
     };
@@ -112,7 +112,7 @@ Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
             return Status::OK();
         }
 
-        auto error = response.isErrCodeSet() ? ErrorCodes::fromInt(response.getErrCode())
+        auto error = response.isErrCodeSet() ? ErrorCodes::Error(response.getErrCode())
                                              : ErrorCodes::UnknownError;
         return Status(error, response.getErrMessage());
     };

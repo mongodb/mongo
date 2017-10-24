@@ -56,7 +56,7 @@ inline Status errorCodeToStatus(const std::error_code& ec) {
     // If the ec.category() is a mongoErrorCategory() then this error was propogated from
     // mongodb code and we should just pass the error cdoe along as-is.
     ErrorCodes::Error errorCode = (ec.category() == mongoErrorCategory())
-        ? ErrorCodes::fromInt(ec.value())
+        ? ErrorCodes::Error(ec.value())
         // Otherwise it's an error code from the network and we should pass it along as a
         // SocketException
         : ErrorCodes::SocketException;

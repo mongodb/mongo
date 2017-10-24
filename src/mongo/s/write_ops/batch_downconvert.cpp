@@ -87,14 +87,14 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
                code == ErrorCodes::WriteConcernFailed || code == ErrorCodes::PrimarySteppedDown) {
         // Write concern errors that get returned as regular errors (result may not be ok: 1.0)
         errors->wcError.reset(new WriteConcernErrorDetail());
-        errors->wcError->setErrCode(ErrorCodes::fromInt(code));
+        errors->wcError->setErrCode(ErrorCodes::Error(code));
         errors->wcError->setErrMessage(errMsg);
     } else if (!isOK) {
         //
         // !!! SOME GLE ERROR OCCURRED, UNKNOWN WRITE RESULT !!!
         //
 
-        return Status(ErrorCodes::fromInt(code ? code : ErrorCodes::UnknownError), errMsg);
+        return Status(ErrorCodes::Error(code ? code : ErrorCodes::UnknownError), errMsg);
     } else if (!err.empty()) {
         // Write error
         errors->writeError.reset(new WriteErrorDetail);

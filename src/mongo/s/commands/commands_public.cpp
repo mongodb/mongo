@@ -487,7 +487,7 @@ public:
         int code = getUniqueCodeFromCommandResults(results);
         if (code != 0) {
             output.append("code", code);
-            output.append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(code)));
+            output.append("codeName", ErrorCodes::errorString(ErrorCodes::Error(code)));
         }
 
         if (errored) {

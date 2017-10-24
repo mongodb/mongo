@@ -507,8 +507,7 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
 
         const auto failBeforeCommitExceptionElem = data["failBeforeCommitExceptionCode"];
         if (!failBeforeCommitExceptionElem.eoo()) {
-            const auto failureCode =
-                ErrorCodes::fromInt(int(failBeforeCommitExceptionElem.Number()));
+            const auto failureCode = ErrorCodes::Error(int(failBeforeCommitExceptionElem.Number()));
             uasserted(failureCode,
                       str::stream() << "Failing write for " << _sessionId << ":" << newTxnNumber
                                     << " due to failpoint. The write must not be reflected.");

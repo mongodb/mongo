@@ -70,7 +70,7 @@ BSONObj WriteConcernErrorDetail::toBSON() const {
 
     if (_isErrCodeSet) {
         builder.append(errCode(), _errCode);
-        builder.append(errCodeName(), ErrorCodes::errorString(ErrorCodes::fromInt(_errCode)));
+        builder.append(errCodeName(), ErrorCodes::errorString(ErrorCodes::Error(_errCode)));
     }
 
     if (_isErrInfoSet)
@@ -96,7 +96,7 @@ bool WriteConcernErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
         return false;
     _isErrCodeSet = fieldState == FieldParser::FIELD_SET;
     if (_isErrCodeSet) {
-        _errCode = ErrorCodes::fromInt(errCodeValue);
+        _errCode = ErrorCodes::Error(errCodeValue);
     }
 
     fieldState = FieldParser::extract(source, errInfo, &_errInfo, errMsg);

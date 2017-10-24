@@ -73,15 +73,6 @@ public:
     static Error fromString(StringData name);
 
     /**
-     * Casts an integer "code" to an Error.  Unrecognized codes are preserved, meaning
-     * that the result of a call to fromInt() may not be one of the values in the
-     * Error enumeration.
-     */
-    static Error fromInt(int code) {
-        return static_cast<Error>(code);
-    }
-
-    /**
      * Generic predicate to test if a given error code is in a category.
      *
      * This version is intended to simplify forwarding by Status and DBException. Non-generic

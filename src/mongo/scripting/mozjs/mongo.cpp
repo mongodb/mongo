@@ -623,8 +623,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
 
         bool ok = conn->runCommand("admin", command, inputObj);
 
-        ErrorCodes::Error code =
-            ErrorCodes::fromInt(inputObj[saslCommandCodeFieldName].numberInt());
+        ErrorCodes::Error code = ErrorCodes::Error(inputObj[saslCommandCodeFieldName].numberInt());
 
         if (!ok || code != ErrorCodes::OK) {
             if (code == ErrorCodes::OK)

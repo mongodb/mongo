@@ -601,19 +601,19 @@ const WriteConcernErrorDetail* BatchedCommandResponse::getWriteConcernError() co
 
 Status BatchedCommandResponse::toStatus() const {
     if (!getOk()) {
-        return Status(ErrorCodes::fromInt(getErrCode()), getErrMessage());
+        return Status(ErrorCodes::Error(getErrCode()), getErrMessage());
     }
 
     if (isErrDetailsSet()) {
         const WriteErrorDetail* errDetail = getErrDetails().front();
 
-        return Status(ErrorCodes::fromInt(errDetail->getErrCode()), errDetail->getErrMessage());
+        return Status(ErrorCodes::Error(errDetail->getErrCode()), errDetail->getErrMessage());
     }
 
     if (isWriteConcernErrorSet()) {
         const WriteConcernErrorDetail* errDetail = getWriteConcernError();
 
-        return Status(ErrorCodes::fromInt(errDetail->getErrCode()), errDetail->getErrMessage());
+        return Status(ErrorCodes::Error(errDetail->getErrCode()), errDetail->getErrMessage());
     }
 
     return Status::OK();

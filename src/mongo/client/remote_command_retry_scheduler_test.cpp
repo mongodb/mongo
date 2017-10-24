@@ -176,7 +176,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryPolicy) {
     // Doesn't matter what "shouldRetryOnError()" returns since we won't be retrying the remote
     // command.
     for (int i = 0; i < int(ErrorCodes::MaxError); ++i) {
-        auto error = ErrorCodes::fromInt(i);
+        auto error = ErrorCodes::Error(i);
         ASSERT_FALSE(policy->shouldRetryOnError(error));
     }
 }
@@ -189,7 +189,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryPolicy) {
     ASSERT_EQUALS(5U, policy->getMaximumAttempts());
     ASSERT_EQUALS(Milliseconds(100), policy->getMaximumResponseElapsedTotal());
     for (int i = 0; i < int(ErrorCodes::MaxError); ++i) {
-        auto error = ErrorCodes::fromInt(i);
+        auto error = ErrorCodes::Error(i);
         if (error == ErrorCodes::InternalError || error == ErrorCodes::FailedToParse ||
             error == ErrorCodes::InvalidNamespace) {
             ASSERT_TRUE(policy->shouldRetryOnError(error));

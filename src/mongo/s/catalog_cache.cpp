@@ -145,7 +145,7 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
             auto shardStatus =
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId);
             if (!shardStatus.isOK()) {
-                return {ErrorCodes::fromInt(40371),
+                return {ErrorCodes::Error(40371),
                         str::stream() << "The primary shard for collection " << nss.ns()
                                       << " could not be loaded due to error "
                                       << shardStatus.getStatus().toString()};
