@@ -5,14 +5,7 @@
 (function() {
     "use strict";
 
-    let checkFCV = function(adminDB, version, targetVersion) {
-        let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        assert.commandWorked(res);
-        assert.eq(res.featureCompatibilityVersion, version);
-        let doc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
-        assert.eq(doc.version, version);
-        assert.eq(doc.targetVersion, targetVersion);
-    };
+    load("jstests/libs/feature_compatibility_version.js");
 
     let setFCV = function(adminDB, version) {
         assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: version}));

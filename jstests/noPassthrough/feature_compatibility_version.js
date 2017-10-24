@@ -4,84 +4,124 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/feature_compatibility_version.js");
+
+    /**
+     * Checks that the featureCompatibilityVersion document is missing, and the
+     * featureCompatibilityVersion server parameter is "3.4".
+     */
+    let checkFCVDocumentMissing = function(adminDB) {
+        assert.eq(null, adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}));
+
+        let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        assert.commandWorked(res);
+        assert.eq("3.4", res.featureCompatibilityVersion.version, tojson(res));
+        assert.eq(null, res.featureCompatibilityVersion.targetVersion, tojson(res));
+    };
+
     const conn = MongoRunner.runMongod({});
     assert.neq(null, conn, "mongod was unable to start up");
 
     let adminDB = conn.getDB("admin");
 
     // Initially the featureCompatibilityVersion is 3.6.
-    let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.6", res.featureCompatibilityVersion);
+    checkFCV(adminDB, "3.6");
 
     // Updating the featureCompatibilityVersion document changes the featureCompatibilityVersion
     // server parameter.
     assert.writeOK(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
                                                  {$set: {version: "3.4"}}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.4", res.featureCompatibilityVersion);
+    checkFCV(adminDB, "3.4");
 
     assert.writeOK(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
-                                                 {$set: {version: "3.6"}}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.6", res.featureCompatibilityVersion);
+                                                 {$set: {version: "3.4", targetVersion: "3.6"}}));
+    checkFCV(adminDB, "3.4", "3.6");
+
+    assert.writeOK(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
+                                                 {$set: {version: "3.4", targetVersion: "3.4"}}));
+    checkFCV(adminDB, "3.4", "3.4");
+
+    assert.writeOK(
+        adminDB.system.version.update({_id: "featureCompatibilityVersion"},
+                                      {$set: {version: "3.6"}, $unset: {targetVersion: true}}));
+    checkFCV(adminDB, "3.6");
 
     // Updating the featureCompatibilityVersion document with an invalid version fails.
     assert.writeErrorWithCode(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
                                                             {$set: {version: "3.2"}}),
                               ErrorCodes.BadValue);
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.6", res.featureCompatibilityVersion);
+    checkFCV(adminDB, "3.6");
+
+    // Updating the featureCompatibilityVersion document with an invalid targetVersion fails.
+    assert.writeErrorWithCode(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
+                                                            {$set: {targetVersion: "3.4"}}),
+                              ErrorCodes.BadValue);
+    checkFCV(adminDB, "3.6");
+
+    assert.writeErrorWithCode(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
+                                                            {$set: {targetVersion: "3.6"}}),
+                              ErrorCodes.BadValue);
+    checkFCV(adminDB, "3.6");
 
     // Deleting the featureCompatibilityVersion document changes the featureCompatibilityVersion
     // server parameter to 3.4.
     assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.4", res.featureCompatibilityVersion);
+    checkFCVDocumentMissing(adminDB);
 
     // Inserting a featureCompatibilityVersion document with an invalid version fails.
     assert.writeErrorWithCode(
         adminDB.system.version.insert({_id: "featureCompatibilityVersion", version: "3.2"}),
         ErrorCodes.BadValue);
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.4", res.featureCompatibilityVersion);
+    checkFCVDocumentMissing(adminDB);
 
     assert.writeErrorWithCode(
         adminDB.system.version.insert({_id: "featureCompatibilityVersion", version: "3.8"}),
         ErrorCodes.BadValue);
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.4", res.featureCompatibilityVersion);
+    checkFCVDocumentMissing(adminDB);
+
+    // Inserting a featureCompatibilityVersion document with an invalid targetVersion fails.
+    assert.writeErrorWithCode(
+        adminDB.system.version.insert(
+            {_id: "featureCompatibilityVersion", version: "3.6", targetVersion: "3.4"}),
+        ErrorCodes.BadValue);
+    checkFCVDocumentMissing(adminDB);
+
+    assert.writeErrorWithCode(
+        adminDB.system.version.insert(
+            {_id: "featureCompatibilityVersion", version: "3.6", targetVersion: "3.6"}),
+        ErrorCodes.BadValue);
+    checkFCVDocumentMissing(adminDB);
 
     // Inserting the featureCompatibilityVersion document changes the featureCompatibilityVersion
     // server parameter.
     assert.writeOK(
         adminDB.system.version.insert({_id: "featureCompatibilityVersion", version: "3.4"}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.4", res.featureCompatibilityVersion);
+    checkFCV(adminDB, "3.4");
 
     assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.4", res.featureCompatibilityVersion);
+    checkFCVDocumentMissing(adminDB);
+
+    assert.writeOK(adminDB.system.version.insert(
+        {_id: "featureCompatibilityVersion", version: "3.4", targetVersion: "3.6"}));
+    checkFCV(adminDB, "3.4", "3.6");
+
+    assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
+    checkFCVDocumentMissing(adminDB);
+
+    assert.writeOK(adminDB.system.version.insert(
+        {_id: "featureCompatibilityVersion", version: "3.4", targetVersion: "3.4"}));
+    checkFCV(adminDB, "3.4", "3.4");
+
+    assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
+    checkFCVDocumentMissing(adminDB);
 
     assert.writeOK(
         adminDB.system.version.insert({_id: "featureCompatibilityVersion", version: "3.6"}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.6", res.featureCompatibilityVersion);
+    checkFCV(adminDB, "3.6");
 
     // Dropping the admin database changes the featureCompatibilityVersion server parameter to 3.4.
     adminDB.dropDatabase();
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.4", res.featureCompatibilityVersion);
+    checkFCVDocumentMissing(adminDB);
 
     MongoRunner.stopMongod(conn);
 }());

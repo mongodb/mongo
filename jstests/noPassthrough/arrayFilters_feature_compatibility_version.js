@@ -19,9 +19,6 @@
     //
 
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.4", res.featureCompatibilityVersion);
 
     // Update.
     res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]});
@@ -54,9 +51,6 @@
     //
 
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
-    res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.6", res.featureCompatibilityVersion);
 
     // Update.
     assert.writeOK(coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]}));

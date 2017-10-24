@@ -10,6 +10,7 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/feature_compatibility_version.js");
     load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
 
     // Set feature compatibility version on the given node. Note that setting FCV requires a
@@ -17,10 +18,7 @@
     function setFCV(node, featureCompatibilityVersion) {
         assert.commandWorked(
             node.adminCommand({setFeatureCompatibilityVersion: featureCompatibilityVersion}));
-        let res = node.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        assert.commandWorked(
-            res, "failed to set feature compatibility version to " + featureCompatibilityVersion);
-        assert.eq(featureCompatibilityVersion, res.featureCompatibilityVersion);
+        checkFCV(node.getDB("admin"), featureCompatibilityVersion);
     }
 
     // Restart the primary of the given ReplSetTest.

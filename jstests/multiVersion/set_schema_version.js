@@ -3,6 +3,7 @@
     "use strict";
 
     load("jstests/replsets/rslib.js");
+    load("jstests/libs/feature_compatibility_version.js");
     load("jstests/libs/get_index_helpers.js");
 
     const latest = "latest";
@@ -28,16 +29,6 @@
                 }
             }
         });
-    };
-
-    let checkFCV = function(adminDB, version, is34) {
-        if (!is34) {
-            let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-            assert.commandWorked(res);
-            assert.eq(res.featureCompatibilityVersion, version);
-        }
-        assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-                  version);
     };
 
     let setFCV = function(adminDB, version) {
@@ -102,7 +93,7 @@
         let downgradeAdminDB = downgradeConn.getDB("admin");
 
         // Check FCV document
-        checkFCV(downgradeAdminDB, "3.4", true);
+        checkFCV34(downgradeAdminDB, "3.4");
 
         // Ensure there are no UUIDs
         checkCollectionUUIDs(downgradeAdminDB, true);
@@ -185,10 +176,10 @@
 
         // Initially featureCompatibilityVersion document is 3.4 on primary and secondaries.
         checkCollectionUUIDs(downgradePrimaryAdminDB, true);
-        checkFCV(downgradePrimaryAdminDB, "3.4", true);
+        checkFCV34(downgradePrimaryAdminDB, "3.4");
         for (let j = 0; j < downgradeSecondaries.length; j++) {
             let secondaryAdminDB = downgradeSecondaries[j].getDB("admin");
-            checkFCV(secondaryAdminDB, "3.4", true);
+            checkFCV34(secondaryAdminDB, "3.4");
 
             // Ensure no collections have UUIDs
             checkCollectionUUIDs(secondaryAdminDB, true);

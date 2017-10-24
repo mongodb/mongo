@@ -448,15 +448,36 @@ public:
                           ) {}
 
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
-        std::string version;
-        if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
-            b.append(name,
-                     FeatureCompatibilityVersion::toString(
-                         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36));
-        } else {
-            b.append(name,
-                     FeatureCompatibilityVersion::toString(
-                         ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34));
+        BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
+        switch (serverGlobalParams.featureCompatibility.getVersion()) {
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36:
+                featureCompatibilityVersionBuilder.append(
+                    FeatureCompatibilityVersion::kVersionField,
+                    FeatureCompatibilityVersionCommandParser::kVersion36);
+                return;
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
+                featureCompatibilityVersionBuilder.append(
+                    FeatureCompatibilityVersion::kVersionField,
+                    FeatureCompatibilityVersionCommandParser::kVersion34);
+                return;
+            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
+                featureCompatibilityVersionBuilder.append(
+                    FeatureCompatibilityVersion::kVersionField,
+                    FeatureCompatibilityVersionCommandParser::kVersion34);
+                featureCompatibilityVersionBuilder.append(
+                    FeatureCompatibilityVersion::kTargetVersionField,
+                    FeatureCompatibilityVersionCommandParser::kVersion36);
+                return;
+            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
+                featureCompatibilityVersionBuilder.append(
+                    FeatureCompatibilityVersion::kVersionField,
+                    FeatureCompatibilityVersionCommandParser::kVersion34);
+                featureCompatibilityVersionBuilder.append(
+                    FeatureCompatibilityVersion::kTargetVersionField,
+                    FeatureCompatibilityVersionCommandParser::kVersion34);
+                return;
+            default:
+                MONGO_UNREACHABLE;
         }
     }
 
