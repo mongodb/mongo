@@ -31,6 +31,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 
@@ -63,7 +64,9 @@ public:
      *
      * Task executor is used to run replSetUpdatePosition command on sync source.
      */
-    void run(executor::TaskExecutor* executor, BackgroundSync* bgsync);
+    void run(executor::TaskExecutor* executor,
+             BackgroundSync* bgsync,
+             ReplicationCoordinator* replCoord);
 
     /// Signals the run() method to terminate.
     void shutdown();
@@ -72,7 +75,9 @@ private:
     /* Inform the sync target of our current position in the oplog, as well as the positions
      * of all secondaries chained through us.
      */
-    Status _updateUpstream(OperationContext* txn, BackgroundSync* bgsync, Reporter* reporter);
+    Status _updateUpstream(ReplicationCoordinator* replCoord,
+                           BackgroundSync* bgsync,
+                           Reporter* reporter);
 
     // protects cond, _shutdownSignaled, _keepAliveInterval, and _positionChanged.
     stdx::mutex _mtx;
