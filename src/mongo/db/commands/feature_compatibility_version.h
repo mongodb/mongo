@@ -41,16 +41,6 @@ class BSONObj;
 class OperationContext;
 
 /**
- * Store state of featureCompatibilityVersion document.
- **/
-struct FeatureCompatibilityVersionInfo {
-    ServerGlobalParams::FeatureCompatibility::Version version;
-
-    FeatureCompatibilityVersionInfo()
-        : version(ServerGlobalParams::FeatureCompatibility::Version::kUnset) {}
-};
-
-/**
  * Startup parameter to ignore featureCompatibilityVersion checks. This parameter cannot be set if
  * the node is started with --replSet, --master, or --slave. This should never be set by end users.
  */
@@ -73,9 +63,9 @@ public:
 
     /**
      * Parses the featureCompatibilityVersion document from admin.system.version, and returns the
-     * version.
+     * state represented by the combination of the targetVersion and version.
      */
-    static StatusWith<FeatureCompatibilityVersionInfo> parse(
+    static StatusWith<ServerGlobalParams::FeatureCompatibility::Version> parse(
         const BSONObj& featureCompatibilityVersionDoc);
 
     static StringData toString(ServerGlobalParams::FeatureCompatibility::Version version) {

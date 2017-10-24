@@ -528,33 +528,33 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                                      versionColl,
                                      BSON("_id" << FeatureCompatibilityVersion::kParameterName),
                                      featureCompatibilityVersion)) {
-                    auto swVersionInfo =
+                    auto swVersion =
                         FeatureCompatibilityVersion::parse(featureCompatibilityVersion);
-                    if (!swVersionInfo.isOK()) {
-                        severe() << swVersionInfo.getStatus();
+                    if (!swVersion.isOK()) {
+                        severe() << swVersion.getStatus();
                         fassertFailedNoTrace(40283);
                     }
                     fcvDocumentExists = true;
-                    auto versionInfo = swVersionInfo.getValue();
-                    serverGlobalParams.featureCompatibility.setVersion(versionInfo.version);
+                    auto version = swVersion.getValue();
+                    serverGlobalParams.featureCompatibility.setVersion(version);
 
                     // On startup, if the version is in an upgrading or downrading state, print a
                     // warning.
-                    if (versionInfo.version ==
+                    if (version ==
                         ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36) {
                         log() << "** WARNING: A featureCompatibilityVersion upgrade did not "
                               << "complete." << startupWarningsLog;
                         log() << "**          The current featureCompatibilityVersion is "
-                              << FeatureCompatibilityVersion::toString(versionInfo.version) << "."
+                              << FeatureCompatibilityVersion::toString(version) << "."
                               << startupWarningsLog;
                         log() << "**          To fix this, use the setFeatureCompatibilityVersion "
                               << "command to resume upgrade to 3.6." << startupWarningsLog;
-                    } else if (versionInfo.version == ServerGlobalParams::FeatureCompatibility::
-                                                          Version::kDowngradingTo34) {
+                    } else if (version == ServerGlobalParams::FeatureCompatibility::Version::
+                                              kDowngradingTo34) {
                         log() << "** WARNING: A featureCompatibilityVersion downgrade did not "
                               << "complete. " << startupWarningsLog;
                         log() << "**          The current featureCompatibilityVersion is "
-                              << FeatureCompatibilityVersion::toString(versionInfo.version) << "."
+                              << FeatureCompatibilityVersion::toString(version) << "."
                               << startupWarningsLog;
                         log() << "**          To fix this, use the setFeatureCompatibilityVersion "
                               << "command to resume downgrade to 3.4." << startupWarningsLog;
