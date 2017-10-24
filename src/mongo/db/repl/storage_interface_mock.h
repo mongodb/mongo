@@ -221,6 +221,13 @@ public:
         return Status{ErrorCodes::IllegalOperation, "putSingleton not implemented."};
     }
 
+    Status updateSingleton(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const BSONObj& query,
+                           const BSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "updateSingleton not implemented."};
+    }
+
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONElement& idKey) override {

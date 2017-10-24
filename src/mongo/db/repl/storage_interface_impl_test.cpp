@@ -1755,6 +1755,32 @@ TEST_F(StorageInterfaceImplTest, PutSingletonUpdatesFirstDocumentWhenCollectionI
     _assertDocumentsInCollectionEquals(opCtx, nss, {BSON("_id" << 0 << "x" << 2), doc2});
 }
 
+TEST_F(StorageInterfaceImplTest, UpdateSingletonNeverUpserts) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto update = BSON("$set" << BSON("_id" << 0 << "x" << 1));
+    ASSERT_OK(storage.updateSingleton(opCtx, nss, {}, update));
+    ASSERT_EQ(ErrorCodes::CollectionIsEmpty, storage.findSingleton(opCtx, nss));
+    _assertDocumentsInCollectionEquals(opCtx, nss, std::vector<mongo::BSONObj>());
+}
+
+TEST_F(StorageInterfaceImplTest, UpdateSingletonUpdatesDocumentWhenCollectionIsNotEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    ASSERT_OK(
+        storage.insertDocument(opCtx, nss, {doc1, SnapshotName(0)}, OpTime::kUninitializedTerm));
+    auto update = BSON("$set" << BSON("x" << 1));
+    ASSERT_OK(storage.updateSingleton(opCtx, nss, BSON("_id" << 0), update));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "x" << 1),
+                      unittest::assertGet(storage.findSingleton(opCtx, nss)));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {BSON("_id" << 0 << "x" << 1)});
+}
+
 TEST_F(StorageInterfaceImplTest, FindByIdReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

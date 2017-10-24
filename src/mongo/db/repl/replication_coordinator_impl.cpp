@@ -2450,6 +2450,8 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
         return status;
     }
 
+    _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx);
+
     auto lastAppliedOpTime = getMyLastAppliedOpTime();
 
     // Since the JournalListener has not yet been set up, we must manually set our

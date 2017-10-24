@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 
+#include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -94,16 +95,7 @@ boost::optional<MinValidDocument> ReplicationConsistencyMarkersImpl::_getMinVali
 void ReplicationConsistencyMarkersImpl::_updateMinValidDocument(OperationContext* opCtx,
                                                                 const BSONObj& updateSpec) {
     Status status = _storageInterface->putSingleton(opCtx, _minValidNss, updateSpec);
-
-    // If the collection doesn't exist, create it and try again.
-    if (status == ErrorCodes::NamespaceNotFound) {
-        status = _storageInterface->createCollection(opCtx, _minValidNss, CollectionOptions());
-        fassertStatusOK(40509, status);
-
-        status = _storageInterface->putSingleton(opCtx, _minValidNss, updateSpec);
-    }
-
-    fassertStatusOK(40467, status);
+    invariantOK(status);
 }
 
 void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationContext* opCtx) {
@@ -112,11 +104,22 @@ void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationCont
     // This initializes the values of the required fields if they are not already set.
     // If one of the fields is already set, the $max will prefer the existing value since it
     // will always be greater than the provided ones.
-    _updateMinValidDocument(opCtx,
-                            BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
-                                                << Timestamp()
-                                                << MinValidDocument::kMinValidTermFieldName
-                                                << OpTime::kUninitializedTerm)));
+    auto spec = BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
+                                    << Timestamp()
+                                    << MinValidDocument::kMinValidTermFieldName
+                                    << OpTime::kUninitializedTerm));
+
+    Status status = _storageInterface->putSingleton(opCtx, _minValidNss, spec);
+
+    // If the collection doesn't exist, create it and try again.
+    if (status == ErrorCodes::NamespaceNotFound) {
+        status = _storageInterface->createCollection(opCtx, _minValidNss, CollectionOptions());
+        fassertStatusOK(40509, status);
+
+        status = _storageInterface->putSingleton(opCtx, _minValidNss, spec);
+    }
+
+    fassertStatusOK(40467, status);
 }
 
 bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opCtx) const {
@@ -185,11 +188,28 @@ void ReplicationConsistencyMarkersImpl::setMinValidToAtLeast(OperationContext* o
                                                              const OpTime& minValid) {
     LOG(3) << "setting minvalid to at least: " << minValid.toString() << "(" << minValid.toBSON()
            << ")";
-    _updateMinValidDocument(opCtx,
-                            BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
-                                                << minValid.getTimestamp()
-                                                << MinValidDocument::kMinValidTermFieldName
-                                                << minValid.getTerm())));
+
+    auto& termField = MinValidDocument::kMinValidTermFieldName;
+    auto& tsField = MinValidDocument::kMinValidTimestampFieldName;
+
+    // Always update both fields of optime.
+    auto updateSpec =
+        BSON("$set" << BSON(tsField << minValid.getTimestamp() << termField << minValid.getTerm()));
+    BSONObj query;
+    if (minValid.getTerm() == OpTime::kUninitializedTerm) {
+        // Only compare timestamps in PV0, but update both fields of optime.
+        // e.g { ts: { $lt: Timestamp 1508961481000|2 } }
+        query = BSON(tsField << LT << minValid.getTimestamp());
+    } else {
+        // Set the minValid only if the given term is higher or the terms are the same but
+        // the given timestamp is higher.
+        // e.g. { $or: [ { t: { $lt: 1 } }, { t: 1, ts: { $lt: Timestamp 1508961481000|6 } } ] }
+        query = BSON(
+            OR(BSON(termField << LT << minValid.getTerm()),
+               BSON(termField << minValid.getTerm() << tsField << LT << minValid.getTimestamp())));
+    }
+    Status status = _storageInterface->updateSingleton(opCtx, _minValidNss, query, updateSpec);
+    invariantOK(status);
 }
 
 void ReplicationConsistencyMarkersImpl::removeOldOplogDeleteFromPointField(

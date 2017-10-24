@@ -114,6 +114,11 @@ public:
                         const NamespaceString& nss,
                         const BSONObj& update) override;
 
+    Status updateSingleton(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const BSONObj& query,
+                           const BSONObj& update) override;
+
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONElement& idKey) override;

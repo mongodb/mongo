@@ -742,19 +742,13 @@ StatusWith<BSONObj> makeUpsertQuery(const BSONElement& idKey) {
     return query;
 }
 
-Status _upsertWithQuery(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const BSONObj& query,
-                        const BSONObj& update) {
-    UpdateRequest request(nss);
-    request.setQuery(query);
-    request.setUpdates(update);
-    request.setUpsert(true);
+Status _updateWithQuery(OperationContext* opCtx, const UpdateRequest& request) {
     invariant(!request.isMulti());  // We only want to update one document for performance.
     invariant(!request.shouldReturnAnyDocs());
     invariant(PlanExecutor::NO_YIELD == request.getYieldPolicy());
 
-    return writeConflictRetry(opCtx, "_upsertWithQuery", nss.ns(), [&] {
+    auto& nss = request.getNamespaceString();
+    return writeConflictRetry(opCtx, "_updateWithQuery", nss.ns(), [&] {
         // ParsedUpdate needs to be inside the write conflict retry loop because it may create a
         // CanonicalQuery whose ownership will be transferred to the plan executor in
         // getExecutorUpdate().
@@ -769,7 +763,7 @@ Status _upsertWithQuery(OperationContext* opCtx,
             autoColl,
             nss,
             str::stream() << "Unable to update documents in " << nss.ns() << " using query "
-                          << query);
+                          << request.getQuery());
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }
@@ -848,7 +842,22 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const BSONObj& update) {
-    return _upsertWithQuery(opCtx, nss, {}, update);
+    UpdateRequest request(nss);
+    request.setQuery({});
+    request.setUpdates(update);
+    request.setUpsert(true);
+    return _updateWithQuery(opCtx, request);
+}
+
+Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const BSONObj& query,
+                                             const BSONObj& update) {
+    UpdateRequest request(nss);
+    request.setQuery(query);
+    request.setUpdates(update);
+    invariant(!request.isUpsert());
+    return _updateWithQuery(opCtx, request);
 }
 
 Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,

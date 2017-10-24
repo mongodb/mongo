@@ -45,6 +45,7 @@
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/service_context.h"
@@ -521,8 +522,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
     // Start data replication after the config has been installed.
     if (shouldStartDataReplication) {
-        _externalState->startThreads(_settings);
         auto opCtx = cc().makeOperationContext();
+        _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx.get());
+        _externalState->startThreads(_settings);
         _startDataReplication(opCtx.get());
     }
 }

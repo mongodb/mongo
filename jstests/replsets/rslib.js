@@ -13,6 +13,7 @@ var waitForState;
 var reInitiateWithoutThrowingOnAbortedMember;
 var awaitRSClientHosts;
 var getLastOpTime;
+var setLogVerbosity;
 
 (function() {
     "use strict";
@@ -433,4 +434,19 @@ var getLastOpTime;
         var connStatus = replSetStatus.members.filter(m => m.self)[0];
         return connStatus.optime;
     };
+
+    /**
+     * Set log verbosity on all given nodes.
+     * e.g. setLogVerbosity(replTest.nodes, { "replication": {"verbosity": 3} });
+     */
+    setLogVerbosity = function(nodes, logVerbosity) {
+        var verbosity = {
+            "setParameter": 1,
+            "logComponentVerbosity": logVerbosity,
+        };
+        nodes.forEach(function(node) {
+            assert.commandWorked(node.adminCommand(verbosity));
+        });
+    };
+
 }());
