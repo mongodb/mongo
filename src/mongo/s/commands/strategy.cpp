@@ -242,6 +242,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
     auto const commandName = request.getCommandName();
     auto const command = Command::findCommand(commandName);
     if (!command) {
+        ON_BLOCK_EXIT([opCtx, &builder] { appendRequiredFieldsToResponse(opCtx, &builder); });
         Command::appendCommandStatus(
             builder,
             {ErrorCodes::CommandNotFound, str::stream() << "no such cmd: " << commandName});
@@ -282,6 +283,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
 
             continue;
         } catch (const DBException& e) {
+            ON_BLOCK_EXIT([opCtx, &builder] { appendRequiredFieldsToResponse(opCtx, &builder); });
             builder.resetToEmpty();
             command->incrementCommandsFailed();
             Command::appendCommandStatus(builder, e.toStatus());
@@ -406,6 +408,7 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
             reply->reset();
             auto bob = reply->getInPlaceReplyBuilder(0);
             Command::appendCommandStatus(bob, ex.toStatus());
+            appendRequiredFieldsToResponse(opCtx, &bob);
 
             return;  // From lambda. Don't try executing if parsing failed.
         }
@@ -421,6 +424,7 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
             reply->reset();
             auto bob = reply->getInPlaceReplyBuilder(0);
             Command::appendCommandStatus(bob, ex.toStatus());
+            appendRequiredFieldsToResponse(opCtx, &bob);
         }
     }();
 

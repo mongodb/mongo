@@ -251,6 +251,31 @@ private:
     const bool _maintenanceModeSet;
 };
 
+// Called from the error contexts where request may not be available.
+// It only attaches clusterTime and operationTime.
+void appendReplyMetadataOnError(OperationContext* opCtx, BSONObjBuilder* metadataBob) {
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool isReplSet =
+        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+
+    if (isReplSet) {
+        if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+            if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+                // No need to sign cluster times for internal clients.
+                SignedLogicalTime currentTime(
+                    LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
+                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                logicalTimeMetadata.writeToMetadata(metadataBob);
+            } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
+                auto currentTime =
+                    validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                logicalTimeMetadata.writeToMetadata(metadataBob);
+            }
+        }
+    }
+}
+
 void appendReplyMetadata(OperationContext* opCtx,
                          const OpMsgRequest& request,
                          BSONObjBuilder* metadataBob) {
@@ -430,7 +455,9 @@ bool runCommandImpl(OperationContext* opCtx,
 
         auto result = Command::appendCommandStatus(inPlaceReplyBob, rcStatus);
         inPlaceReplyBob.doneFast();
-        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        BSONObjBuilder metadataBob;
+        appendReplyMetadataOnError(opCtx, &metadataBob);
+        replyBuilder->setMetadata(metadataBob.done());
         return result;
     }
 
@@ -441,7 +468,9 @@ bool runCommandImpl(OperationContext* opCtx,
                 inPlaceReplyBob,
                 {ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
             inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            BSONObjBuilder metadataBob;
+            appendReplyMetadataOnError(opCtx, &metadataBob);
+            replyBuilder->setMetadata(metadataBob.done());
             return result;
         }
 
@@ -451,7 +480,9 @@ bool runCommandImpl(OperationContext* opCtx,
         if (!wcResult.isOK()) {
             auto result = Command::appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
             inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            BSONObjBuilder metadataBob;
+            appendReplyMetadataOnError(opCtx, &metadataBob);
+            replyBuilder->setMetadata(metadataBob.done());
             return result;
         }
 
@@ -486,7 +517,9 @@ bool runCommandImpl(OperationContext* opCtx,
             inPlaceReplyBob.resetToEmpty();
             auto result = Command::appendCommandStatus(inPlaceReplyBob, linearizableReadStatus);
             inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            BSONObjBuilder metadataBob;
+            appendReplyMetadataOnError(opCtx, &metadataBob);
+            replyBuilder->setMetadata(metadataBob.done());
             return result;
         }
     }
@@ -791,11 +824,14 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
             if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
                 throw;
 
+            auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
+            BSONObjBuilder metadataBob;
+            appendReplyMetadataOnError(opCtx, &metadataBob);
             // Otherwise, reply with the parse error. This is useful for cases where parsing fails
             // due to user-supplied input, such as the document too deep error. Since we failed
             // during parsing, we can't log anything about the command.
             LOG(1) << "assertion while parsing command: " << ex.toString();
-            _generateErrorResponse(opCtx, replyBuilder.get(), ex, rpc::makeEmptyMetadata());
+            _generateErrorResponse(opCtx, replyBuilder.get(), ex, metadataBob.obj(), operationTime);
 
             return;  // From lambda. Don't try executing if parsing failed.
         }
@@ -828,10 +864,13 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
 
             execCommandDatabase(opCtx, c, request, replyBuilder.get());
         } catch (const DBException& ex) {
+            BSONObjBuilder metadataBob;
+            appendReplyMetadataOnError(opCtx, &metadataBob);
+            auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "': " << ex.toString();
 
-            _generateErrorResponse(opCtx, replyBuilder.get(), ex, rpc::makeEmptyMetadata());
+            _generateErrorResponse(opCtx, replyBuilder.get(), ex, metadataBob.obj(), operationTime);
         }
     }();
 
