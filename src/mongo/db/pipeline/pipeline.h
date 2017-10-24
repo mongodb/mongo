@@ -248,6 +248,11 @@ public:
     bool needsMongosMerger() const;
 
     /**
+     * Returns 'true' if any stage in the pipeline must run on a shard.
+     */
+    bool needsShard() const;
+
+    /**
      * Returns true if the pipeline can run on mongoS, but is not obliged to; that is, it can run
      * either on mongoS or on a shard.
      */

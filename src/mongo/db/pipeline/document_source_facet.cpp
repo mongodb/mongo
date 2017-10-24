@@ -249,19 +249,31 @@ DocumentSource::StageConstraints DocumentSourceFacet::constraints(
     });
 
     // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
-    // This means that if any stage in any of the $facet pipelines requires the primary shard, then
-    // the entire $facet must happen on the merger, and the merger must be the primary shard.
-    const bool needsPrimaryShard =
-        std::any_of(_facets.begin(), _facets.end(), [&](const auto& facet) {
-            const auto sources = facet.pipeline->getSources();
-            return std::any_of(sources.begin(), sources.end(), [&](const auto source) {
-                return source->constraints().hostRequirement == HostTypeRequirement::kPrimaryShard;
-            });
-        });
+    // This means that if any stage in any of the $facet pipelines needs to run on the primary shard
+    // or on mongoS, then the entire $facet stage must run there.
+    static const std::set<HostTypeRequirement> definitiveHosts = {
+        HostTypeRequirement::kMongoS, HostTypeRequirement::kPrimaryShard};
+
+    HostTypeRequirement host = HostTypeRequirement::kNone;
+
+    // Iterate through each pipeline to determine the HostTypeRequirement for the $facet stage.
+    // Because we have already validated that there are no conflicting HostTypeRequirements during
+    // parsing, if we observe any of the 'definitiveHosts' types in any of the pipelines then the
+    // entire $facet stage must run on that host and iteration can stop. At the end of this process,
+    // 'host' will be the $facet's final HostTypeRequirement.
+    for (auto fi = _facets.begin(); fi != _facets.end() && !definitiveHosts.count(host); fi++) {
+        const auto& sources = fi->pipeline->getSources();
+        for (auto si = sources.begin(); si != sources.end() && !definitiveHosts.count(host); si++) {
+            const auto hostReq = (*si)->constraints().resolvedHostTypeRequirement(pExpCtx);
+            if (hostReq != HostTypeRequirement::kNone) {
+                host = hostReq;
+            }
+        }
+    }
 
     return {StreamType::kBlocking,
             PositionRequirement::kNone,
-            needsPrimaryShard ? HostTypeRequirement::kPrimaryShard : HostTypeRequirement::kAnyShard,
+            host,
             mayUseDisk ? DiskUseRequirement::kWritesTmpData : DiskUseRequirement::kNoDiskUse,
             FacetRequirement::kNotAllowed};
 }
@@ -292,11 +304,30 @@ DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
 
+    boost::optional<std::string> needsMongoS;
+    boost::optional<std::string> needsShard;
+
     std::vector<FacetPipeline> facetPipelines;
     for (auto&& rawFacet : extractRawPipelines(elem)) {
         const auto facetName = rawFacet.first;
 
         auto pipeline = uassertStatusOK(Pipeline::parseFacetPipeline(rawFacet.second, expCtx));
+
+        // Validate that none of the facet pipelines have any conflicting HostTypeRequirements. This
+        // verifies both that all stages within each pipeline are consistent, and that the pipelines
+        // are consistent with one another.
+        if (!needsShard && pipeline->needsShard()) {
+            needsShard.emplace(facetName);
+        }
+        if (!needsMongoS && pipeline->needsMongosMerger()) {
+            needsMongoS.emplace(facetName);
+        }
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "$facet pipeline '" << *needsMongoS
+                              << "' must run on mongoS, but '"
+                              << *needsShard
+                              << "' requires a shard",
+                !(needsShard && needsMongoS));
 
         facetPipelines.emplace_back(facetName, std::move(pipeline));
     }

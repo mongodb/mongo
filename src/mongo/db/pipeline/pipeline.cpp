@@ -471,6 +471,14 @@ bool Pipeline::needsMongosMerger() const {
     });
 }
 
+bool Pipeline::needsShard() const {
+    return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
+        auto hostType = stage->constraints().resolvedHostTypeRequirement(pCtx);
+        return (hostType == HostTypeRequirement::kAnyShard ||
+                hostType == HostTypeRequirement::kPrimaryShard);
+    });
+}
+
 bool Pipeline::canRunOnMongos() const {
     return _pipelineCanRunOnMongoS().isOK();
 }

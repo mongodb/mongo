@@ -204,6 +204,51 @@
             expectedCount: 300
         });
 
+        // Test that $facet is merged on mongoS if all pipelines are mongoS-mergeable regardless of
+        // 'allowDiskUse'.
+        assertMergeOnMongoS({
+            testName: "agg_mongos_merge_facet_all_pipes_eligible_for_mongos",
+            pipeline: [
+                {$match: {_id: {$gte: -200, $lte: 200}}},
+                {
+                  $facet: {
+                      pipe1: [{$match: {_id: {$gt: 0}}}, {$skip: 10}, {$limit: 150}],
+                      pipe2: [{$match: {_id: {$lt: 0}}}, {$project: {_id: 0, a: 1}}]
+                  }
+                }
+            ],
+            allowDiskUse: allowDiskUse,
+            expectedCount: 1
+        });
+
+        // Test that $facet is merged on mongoD if any pipeline requires a primary shard merge,
+        // regardless of 'allowDiskUse'.
+        assertMergeOnMongoD({
+            testName: "agg_mongos_merge_facet_pipe_needs_primary_shard_disk_use_" + allowDiskUse,
+            pipeline: [
+                {$match: {_id: {$gte: -200, $lte: 200}}},
+                {
+                  $facet: {
+                      pipe1: [{$match: {_id: {$gt: 0}}}, {$skip: 10}, {$limit: 150}],
+                      pipe2: [
+                          {$match: {_id: {$lt: 0}}},
+                          {
+                            $lookup: {
+                                from: unshardedColl.getName(),
+                                localField: "_id",
+                                foreignField: "_id",
+                                as: "lookupField"
+                            }
+                          }
+                      ]
+                  }
+                }
+            ],
+            mergeType: "primaryShard",
+            allowDiskUse: allowDiskUse,
+            expectedCount: 1
+        });
+
         // Test that a pipeline whose merging half can be run on mongos using only the mongos
         // execution machinery returns the correct results.
         // TODO SERVER-30882 Find a way to assert that all stages get absorbed by mongos.
@@ -271,6 +316,23 @@
             ],
             allowDiskUse: allowDiskUse,
             expectedCount: 200
+        });
+
+        // Test that $facet is only merged on mongoS if all pipelines are mongoS-mergeable when
+        // 'allowDiskUse' is not set.
+        assertMergeOnMongoX({
+            testName: "agg_mongos_merge_facet_allow_disk_use",
+            pipeline: [
+                {$match: {_id: {$gte: -200, $lte: 200}}},
+                {
+                  $facet: {
+                      pipe1: [{$match: {_id: {$gt: 0}}}, {$skip: 10}, {$limit: 150}],
+                      pipe2: [{$match: {_id: {$lt: 0}}}, {$sort: {a: -1}}]
+                  }
+                }
+            ],
+            allowDiskUse: allowDiskUse,
+            expectedCount: 1
         });
 
         // Test that $bucketAuto is only merged on mongoS if 'allowDiskUse' is not set.
@@ -344,6 +406,9 @@
             {$group: {_id: "$_id", doc: {$push: "$$CURRENT"}}},
             {$unwind: "$doc"},
             {$replaceRoot: {newRoot: "$doc"}},
+            {$facet: {facetPipe: [{$match: {_id: {$gte: -200, $lte: 200}}}]}},
+            {$unwind: "$facetPipe"},
+            {$replaceRoot: {newRoot: "$facetPipe"}},
             {
               $redact: {
                   $cond:

@@ -174,6 +174,32 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
     ASSERT_TRUE(facetStage.get());
 }
 
+TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithinSinglePipeline) {
+    auto ctx = getExpCtx();
+    ctx->inMongos = true;
+
+    auto spec = fromjson(
+        "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
+        "{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
+}
+
+TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcrossPipelines) {
+    auto ctx = getExpCtx();
+    ctx->inMongos = true;
+
+    auto spec = fromjson(
+        "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], mongosPipe: "
+        "[{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
+}
+
 //
 // Evaluation.
 //
@@ -675,7 +701,7 @@ TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPr
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
-           DocumentSource::StageConstraints::HostTypeRequirement::kAnyShard);
+           DocumentSource::StageConstraints::HostTypeRequirement::kNone);
 }
 
 }  // namespace
