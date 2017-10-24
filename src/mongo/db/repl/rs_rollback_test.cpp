@@ -1267,18 +1267,21 @@ TEST_F(RSRollbackTest, RollbackRenameCollectionInDatabaseWithDropTargetTrueComma
     }
 }
 
-TEST_F(RSRollbackTest, RollbackRenamingCollectionsToEachOther) {
-    createOplog(_opCtx.get());
 
-    CollectionOptions coll1Options;
-    coll1Options.uuid = UUID::gen();
-    auto collection1 = _createCollection(_opCtx.get(), "test.y", coll1Options);
+void _testRollbackRenamingCollectionsToEachOther(OperationContext* opCtx,
+                                                 ReplicationCoordinator* replicationCoordinator,
+                                                 ReplicationProcess* replicationProcess,
+                                                 const CollectionOptions& coll1Options,
+                                                 const CollectionOptions& coll2Options) {
+    createOplog(opCtx);
+
+    auto collection1 = _createCollection(opCtx, "test.y", coll1Options);
     auto collection1UUID = collection1->uuid().get();
 
-    CollectionOptions coll2Options;
-    coll2Options.uuid = UUID::gen();
-    auto collection2 = _createCollection(_opCtx.get(), "test.x", coll2Options);
+    auto collection2 = _createCollection(opCtx, "test.x", coll2Options);
     auto collection2UUID = collection2->uuid().get();
+
+    ASSERT_NOT_EQUALS(collection1UUID, collection2UUID);
 
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -1307,26 +1310,37 @@ TEST_F(RSRollbackTest, RollbackRenamingCollectionsToEachOther) {
         commonOperation,
     })));
 
-    ASSERT_OK(syncRollback(_opCtx.get(),
+    ASSERT_OK(syncRollback(opCtx,
                            OplogInterfaceMock({renameCollectionOperationZtoY,
                                                renameCollectionOperationYtoX,
                                                renameCollectionOperationXtoZ,
                                                commonOperation}),
                            rollbackSource,
                            {},
-                           _coordinator,
-                           _replicationProcess.get()));
+                           replicationCoordinator,
+                           replicationProcess));
 
     {
 
-        AutoGetCollectionForReadCommand coll1(_opCtx.get(), NamespaceString("test.x"));
+        AutoGetCollectionForReadCommand coll1(opCtx, NamespaceString("test.x"));
         ASSERT_TRUE(coll1.getCollection());
         ASSERT_EQUALS(coll1.getCollection()->uuid().get(), collection1UUID);
 
-        AutoGetCollectionForReadCommand coll2(_opCtx.get(), NamespaceString("test.y"));
+        AutoGetCollectionForReadCommand coll2(opCtx, NamespaceString("test.y"));
         ASSERT_TRUE(coll2.getCollection());
         ASSERT_EQUALS(coll2.getCollection()->uuid().get(), collection2UUID);
     }
+}
+
+TEST_F(RSRollbackTest, RollbackRenamingCollectionsToEachOtherWithoutValidationOptions) {
+    CollectionOptions coll1Options;
+    coll1Options.uuid = UUID::gen();
+
+    CollectionOptions coll2Options;
+    coll2Options.uuid = UUID::gen();
+
+    _testRollbackRenamingCollectionsToEachOther(
+        _opCtx.get(), _coordinator, _replicationProcess.get(), coll1Options, coll2Options);
 }
 
 TEST_F(RSRollbackTest, RollbackDropCollectionThenRenameCollectionToDroppedCollectionNS) {
