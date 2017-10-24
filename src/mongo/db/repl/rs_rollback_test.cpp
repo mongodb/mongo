@@ -182,16 +182,13 @@ OplogInterfaceMock::Operation makeCreateIndexOplogEntry(Collection* collection,
                                                         BSONObj key,
                                                         std::string indexName,
                                                         int time) {
-    auto indexSpec = BSON("createIndexes"
-                          << "t"
-                          << "ns"
-                          << collection->ns().ns()
-                          << "v"
-                          << static_cast<int>(kIndexVersion)
-                          << "key"
-                          << key
-                          << "name"
-                          << indexName);
+    auto indexSpec =
+        BSON("createIndexes" << collection->ns().coll() << "ns" << collection->ns().ns() << "v"
+                             << static_cast<int>(kIndexVersion)
+                             << "key"
+                             << key
+                             << "name"
+                             << indexName);
 
     return std::make_pair(BSON("ts" << Timestamp(Seconds(time), 0) << "h" << 1LL << "op"
                                     << "c"
@@ -232,6 +229,23 @@ OplogInterfaceMock::Operation makeRenameCollectionOplogEntry(const NamespaceStri
                   << "o"
                   << obj),
         RecordId(opTime.getTimestamp().getSecs()));
+}
+
+// Create an index on the given collection. Returns the number of indexes that exist on the
+// collection after the given index is created.
+int createIndexForColl(OperationContext* opCtx,
+                       Collection* coll,
+                       NamespaceString nss,
+                       BSONObj indexSpec) {
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+    MultiIndexBlock indexer(opCtx, coll);
+    ASSERT_OK(indexer.init(indexSpec).getStatus());
+    WriteUnitOfWork wunit(opCtx);
+    indexer.commit();
+    wunit.commit();
+    auto indexCatalog = coll->getIndexCatalog();
+    ASSERT(indexCatalog);
+    return indexCatalog->numIndexesReady(opCtx);
 }
 
 TEST_F(RSRollbackTest, InconsistentMinValid) {
@@ -523,26 +537,15 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
     createOplog(_opCtx.get());
     CollectionOptions options;
     options.uuid = UUID::gen();
-    auto collection = _createCollection(_opCtx.get(), "test.t", options);
-    auto indexSpec = BSON("ns"
-                          << "test.t"
-                          << "v"
-                          << static_cast<int>(kIndexVersion)
-                          << "key"
-                          << BSON("a" << 1)
-                          << "name"
-                          << "a_1");
-    {
-        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_X);
-        MultiIndexBlock indexer(_opCtx.get(), collection);
-        ASSERT_OK(indexer.init(indexSpec).getStatus());
-        WriteUnitOfWork wunit(_opCtx.get());
-        indexer.commit();
-        wunit.commit();
-        auto indexCatalog = collection->getIndexCatalog();
-        ASSERT(indexCatalog);
-        ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_opCtx.get()));
-    }
+    NamespaceString nss("test", "coll");
+    auto collection = _createCollection(_opCtx.get(), nss.toString(), options);
+    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
+                               << BSON("a" << 1)
+                               << "name"
+                               << "a_1");
+
+    int numIndexes = createIndexForColl(_opCtx.get(), collection, nss, indexSpec);
+    ASSERT_EQUALS(2, numIndexes);
 
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -564,12 +567,14 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
         _replicationProcess.get()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
-                  countLogLinesContaining(
-                      str::stream() << "Dropped index in rollback for collection: test.t, UUID: "
-                                    << options.uuid->toString()
-                                    << ", index: a_1"));
+                  countLogLinesContaining(str::stream()
+                                          << "Dropped index in rollback for collection: "
+                                          << nss.toString()
+                                          << ", UUID: "
+                                          << options.uuid->toString()
+                                          << ", index: a_1"));
     {
-        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -733,27 +738,16 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
     createOplog(_opCtx.get());
     CollectionOptions options;
     options.uuid = UUID::gen();
-    auto collection = _createCollection(_opCtx.get(), "test.t", options);
+    NamespaceString nss("test", "coll");
+    auto collection = _createCollection(_opCtx.get(), nss.toString(), options);
 
-    auto indexSpec = BSON("ns"
-                          << "test.t"
-                          << "v"
-                          << static_cast<int>(kIndexVersion)
-                          << "key"
-                          << BSON("b" << 1)
-                          << "name"
-                          << "a_1");
-    {
-        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_X);
-        MultiIndexBlock indexer(_opCtx.get(), collection);
-        ASSERT_OK(indexer.init(indexSpec).getStatus());
-        WriteUnitOfWork wunit(_opCtx.get());
-        indexer.commit();
-        wunit.commit();
-        auto indexCatalog = collection->getIndexCatalog();
-        ASSERT(indexCatalog);
-        ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_opCtx.get()));
-    }
+    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
+                               << BSON("b" << 1)
+                               << "name"
+                               << "a_1");
+
+    int numIndexes = createIndexForColl(_opCtx.get(), collection, nss, indexSpec);
+    ASSERT_EQUALS(2, numIndexes);
 
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -776,22 +770,24 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
         _replicationProcess.get()));
     stopCapturingLogMessages();
     {
-        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_opCtx.get()));
-        ASSERT_EQUALS(
-            1,
-            countLogLinesContaining(str::stream()
-                                    << "Dropped index in rollback for collection: test.t, UUID: "
-                                    << options.uuid->toString()
-                                    << ", index: a_1"));
-        ASSERT_EQUALS(
-            1,
-            countLogLinesContaining(str::stream()
-                                    << "Created index in rollback for collection: test.t, UUID: "
-                                    << options.uuid->toString()
-                                    << ", index: a_1"));
+        ASSERT_EQUALS(1,
+                      countLogLinesContaining(str::stream()
+                                              << "Dropped index in rollback for collection: "
+                                              << nss.toString()
+                                              << ", UUID: "
+                                              << options.uuid->toString()
+                                              << ", index: a_1"));
+        ASSERT_EQUALS(1,
+                      countLogLinesContaining(str::stream()
+                                              << "Created index in rollback for collection: "
+                                              << nss.toString()
+                                              << ", UUID: "
+                                              << options.uuid->toString()
+                                              << ", index: a_1"));
         std::vector<IndexDescriptor*> indexes;
         indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("a" << 1), false, &indexes);
         ASSERT(indexes.size() == 1);
@@ -846,6 +842,174 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
                   countLogLinesContaining(
                       "Missing index name in createIndexes operation on rollback, document: "));
 }
+
+// Generators of standard index keys and names given an index 'id'.
+std::string idxKey(std::string id) {
+    return "key_" + id;
+};
+std::string idxName(std::string id) {
+    return "index_" + id;
+};
+
+// Create an index spec object given the namespace and the index 'id'.
+BSONObj idxSpec(NamespaceString nss, std::string id) {
+    return BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
+                     << BSON(idxKey(id) << 1)
+                     << "name"
+                     << idxName(id));
+}
+
+// Returns the number of indexes that exist on the given collection.
+int numIndexesOnColl(OperationContext* opCtx, NamespaceString nss, Collection* coll) {
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+    auto indexCatalog = coll->getIndexCatalog();
+    ASSERT(indexCatalog);
+    return indexCatalog->numIndexesReady(opCtx);
+}
+
+TEST_F(RSRollbackTest, RollbackDropIndexOnCollectionWithTwoExistingIndexes) {
+    createOplog(_opCtx.get());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    NamespaceString nss("test", "coll");
+    auto coll = _createCollection(_opCtx.get(), nss.toString(), options);
+
+    // Create the necessary indexes. Index 0 is created and dropped in the sequence of ops that will
+    // be rolled back, so we only create index 1.
+    int numIndexes = createIndexForColl(_opCtx.get(), coll, nss, idxSpec(nss, "1"));
+    ASSERT_EQUALS(2, numIndexes);
+
+    auto commonOp = std::make_pair(BSON("ts" << Timestamp(1, 0) << "h" << 1LL), RecordId(1));
+
+    // The ops that will be rolled back.
+    auto createIndex0Op = makeCreateIndexOplogEntry(coll, BSON(idxKey("0") << 1), idxName("0"), 2);
+    auto createIndex1Op = makeCreateIndexOplogEntry(coll, BSON(idxKey("1") << 1), idxName("1"), 3);
+    auto dropIndex0Op = makeDropIndexOplogEntry(coll, BSON(idxKey("0") << 1), idxName("0"), 4);
+
+    auto remoteOplog = {commonOp};
+    auto localOplog = {dropIndex0Op, createIndex1Op, createIndex0Op, commonOp};
+
+    // Set up the mock rollback source and then run rollback.
+    RollbackSourceMock rollbackSource(stdx::make_unique<OplogInterfaceMock>(remoteOplog));
+    ASSERT_OK(syncRollback(_opCtx.get(),
+                           OplogInterfaceMock(localOplog),
+                           rollbackSource,
+                           {},
+                           _coordinator,
+                           _replicationProcess.get()));
+
+    // Make sure the collection indexes are in the proper state post-rollback.
+    ASSERT_EQUALS(1, numIndexesOnColl(_opCtx.get(), nss, coll));
+}
+
+TEST_F(RSRollbackTest, RollbackTwoIndexDropsPrecededByTwoIndexCreationsOnSameCollection) {
+    createOplog(_opCtx.get());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    NamespaceString nss("test", "coll");
+    auto coll = _createCollection(_opCtx.get(), nss.toString(), options);
+
+    auto commonOp = std::make_pair(BSON("ts" << Timestamp(1, 0) << "h" << 1LL), RecordId(1));
+
+    // The ops that will be rolled back.
+    auto createIndex0Op = makeCreateIndexOplogEntry(coll, BSON(idxKey("0") << 1), idxName("0"), 2);
+    auto createIndex1Op = makeCreateIndexOplogEntry(coll, BSON(idxKey("1") << 1), idxName("1"), 3);
+    auto dropIndex0Op = makeDropIndexOplogEntry(coll, BSON(idxKey("0") << 1), idxName("0"), 4);
+    auto dropIndex1Op = makeDropIndexOplogEntry(coll, BSON(idxKey("1") << 1), idxName("1"), 5);
+
+    auto remoteOplog = {commonOp};
+    auto localOplog = {dropIndex1Op, dropIndex0Op, createIndex1Op, createIndex0Op, commonOp};
+
+    // Set up the mock rollback source and then run rollback.
+    RollbackSourceMock rollbackSource(stdx::make_unique<OplogInterfaceMock>(remoteOplog));
+    ASSERT_OK(syncRollback(_opCtx.get(),
+                           OplogInterfaceMock(localOplog),
+                           rollbackSource,
+                           {},
+                           _coordinator,
+                           _replicationProcess.get()));
+
+    // Make sure the collection indexes are in the proper state post-rollback.
+    ASSERT_EQUALS(1, numIndexesOnColl(_opCtx.get(), nss, coll));
+}
+
+TEST_F(RSRollbackTest, RollbackMultipleCreateIndexesOnSameCollection) {
+    createOplog(_opCtx.get());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    NamespaceString nss("test", "coll");
+    auto coll = _createCollection(_opCtx.get(), nss.toString(), options);
+
+    auto commonOp = std::make_pair(BSON("ts" << Timestamp(1, 0) << "h" << 1LL), RecordId(1));
+
+    // Create all of the necessary indexes.
+    createIndexForColl(_opCtx.get(), coll, nss, idxSpec(nss, "0"));
+    createIndexForColl(_opCtx.get(), coll, nss, idxSpec(nss, "1"));
+    createIndexForColl(_opCtx.get(), coll, nss, idxSpec(nss, "2"));
+    ASSERT_EQUALS(4, numIndexesOnColl(_opCtx.get(), nss, coll));
+
+    // The ops that will be rolled back.
+    auto createIndex0Op = makeCreateIndexOplogEntry(coll, BSON(idxKey("0") << 1), idxName("0"), 2);
+    auto createIndex1Op = makeCreateIndexOplogEntry(coll, BSON(idxKey("1") << 1), idxName("1"), 3);
+    auto createIndex2Op = makeCreateIndexOplogEntry(coll, BSON(idxKey("2") << 1), idxName("2"), 4);
+
+    auto remoteOplog = {commonOp};
+    auto localOplog = {createIndex2Op, createIndex1Op, createIndex0Op, commonOp};
+
+    // Set up the mock rollback source and then run rollback.
+    RollbackSourceMock rollbackSource(stdx::make_unique<OplogInterfaceMock>(remoteOplog));
+    ASSERT_OK(syncRollback(_opCtx.get(),
+                           OplogInterfaceMock(localOplog),
+                           rollbackSource,
+                           {},
+                           _coordinator,
+                           _replicationProcess.get()));
+
+    // Make sure the collection indexes are in the proper state post-rollback.
+    ASSERT_EQUALS(1, numIndexesOnColl(_opCtx.get(), nss, coll));
+}
+
+TEST_F(RSRollbackTest, RollbackCreateDropRecreateIndexOnCollection) {
+    createOplog(_opCtx.get());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    NamespaceString nss("test", "coll");
+    auto coll = _createCollection(_opCtx.get(), nss.toString(), options);
+
+    // Create the necessary indexes. Index 0 is created, dropped, and created again in the
+    // sequence of ops, so we create that index.
+    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
+                               << BSON(idxKey("0") << 1)
+                               << "name"
+                               << idxName("0"));
+
+    int numIndexes = createIndexForColl(_opCtx.get(), coll, nss, indexSpec);
+    ASSERT_EQUALS(2, numIndexes);
+
+    auto commonOp = std::make_pair(BSON("ts" << Timestamp(1, 0) << "h" << 1LL), RecordId(1));
+
+    // The ops that will be rolled back.
+    auto createIndex0Op = makeCreateIndexOplogEntry(coll, BSON(idxKey("0") << 1), idxName("0"), 2);
+    auto dropIndex0Op = makeDropIndexOplogEntry(coll, BSON(idxKey("0") << 1), idxName("0"), 3);
+    auto createIndex0AgainOp =
+        makeCreateIndexOplogEntry(coll, BSON(idxKey("0") << 1), idxName("0"), 4);
+
+    auto remoteOplog = {commonOp};
+    auto localOplog = {createIndex0AgainOp, dropIndex0Op, createIndex0Op, commonOp};
+
+    // Set up the mock rollback source and then run rollback.
+    RollbackSourceMock rollbackSource(stdx::make_unique<OplogInterfaceMock>(remoteOplog));
+    ASSERT_OK(syncRollback(_opCtx.get(),
+                           OplogInterfaceMock(localOplog),
+                           rollbackSource,
+                           {},
+                           _coordinator,
+                           _replicationProcess.get()));
+
+    // Make sure the collection indexes are in the proper state post-rollback.
+    ASSERT_EQUALS(1, numIndexesOnColl(_opCtx.get(), nss, coll));
+}
+
 
 TEST_F(RSRollbackTest, RollbackUnknownCommand) {
     createOplog(_opCtx.get());

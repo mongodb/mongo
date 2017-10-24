@@ -122,19 +122,47 @@ void FixUpInfo::removeRedundantOperations() {
 }
 
 bool FixUpInfo::removeRedundantIndexCommands(UUID uuid, std::string indexName) {
+    LOG(2) << "Attempting to remove redundant index operations from the set of indexes to create "
+              "for collection "
+           << uuid << ", for index '" << indexName << "'";
+
+    // See if there are any indexes to create for this collection.
     auto indexes = indexesToCreate.find(uuid);
-    if (indexes != indexesToCreate.end()) {
-        invariant(indexesToCreate.count(uuid) == 1);
-        invariant((*indexes).second.count(indexName) == 1);
-        (*indexes).second.erase(indexName);
-        if ((*indexes).second.empty()) {
-            indexesToCreate.erase(uuid);
-        }
-        log() << "Index " << indexName
-              << " was previously dropped. The createIndexes command is canceled out.";
-        return true;
+
+    // There are no indexes to create for this collection UUID, so there are no index creation
+    // operations to remove.
+    if (indexes == indexesToCreate.end()) {
+        LOG(2)
+            << "Collection " << uuid
+            << " has no indexes to create. Not removing any index creation operations for index '"
+            << indexName << "'.";
+        return false;
     }
-    return false;
+
+    // This is the set of all indexes to create for the given collection UUID. Keep a reference so
+    // we can modify the original object.
+    std::map<std::string, BSONObj>* indexesToCreateForColl = &(indexes->second);
+
+    // If this index was not previously added to the set of indexes that need to be created for this
+    // collection, then we do nothing.
+    if (indexesToCreateForColl->find(indexName) == indexesToCreateForColl->end()) {
+        LOG(2) << "Index '" << indexName << "' was not previously set to be created for collection "
+               << uuid << ". Not removing any index creation operations.";
+        return false;
+    }
+
+    // This index was previously added to the set of indexes to create for this collection, so we
+    // remove it from that set.
+    LOG(2) << "Index '" << indexName << "' was previously set to be created for collection " << uuid
+           << ". Removing this redundant index creation operation.";
+    indexesToCreateForColl->erase(indexName);
+    // If there are now no remaining indexes to create for this collection, remove it from
+    // the set of collections that we need to create indexes for.
+    if (indexesToCreateForColl->empty()) {
+        indexesToCreate.erase(uuid);
+    }
+
+    return true;
 }
 
 void FixUpInfo::recordRollingBackDrop(const NamespaceString& nss, OpTime opTime, UUID uuid) {
