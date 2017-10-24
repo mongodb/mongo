@@ -7,7 +7,6 @@ MongoDB Tools
  - **mongodump/mongorestore** - _Dump MongoDB backups to disk in .BSON format, or restore them to a live database_
  - **mongostat** - _Monitor live MongoDB servers, replica sets, or sharded clusters_
  - **mongofiles** - _Read, write, delete, or update files in [GridFS](http://docs.mongodb.org/manual/core/gridfs/)_
- - **mongooplog** - _Replay oplog entries between MongoDB servers_
  - **mongotop** - _Monitor read/write activity on a mongo server_
  - **mongoreplay** - _Capture, observe, and replay traffic for MongoDB_
 

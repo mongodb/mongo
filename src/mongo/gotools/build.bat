@@ -9,7 +9,7 @@ call set_gopath.bat
 
 if not exist "%cd%\bin" mkdir "%cd%\bin"
 
-for %%i in (bsondump, mongostat, mongofiles, mongoexport, mongoimport, mongorestore, mongodump, mongotop, mongooplog) do (
+for %%i in (bsondump, mongostat, mongofiles, mongoexport, mongoimport, mongorestore, mongodump, mongotop) do (
 	echo Building %%i
 
 	go build -o "%cd%\bin\%%i.exe" "%cd%\%%i\main\%%i.go"

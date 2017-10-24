@@ -29,7 +29,6 @@ setgopath() {
 		cp -r `pwd`/mongoexport .gopath/src/$TOOLS_PKG
 		cp -r `pwd`/mongofiles .gopath/src/$TOOLS_PKG
 		cp -r `pwd`/mongoimport .gopath/src/$TOOLS_PKG
-		cp -r `pwd`/mongooplog .gopath/src/$TOOLS_PKG
 		cp -r `pwd`/mongorestore .gopath/src/$TOOLS_PKG
 		cp -r `pwd`/mongostat .gopath/src/$TOOLS_PKG
 		cp -r `pwd`/mongotop .gopath/src/$TOOLS_PKG
