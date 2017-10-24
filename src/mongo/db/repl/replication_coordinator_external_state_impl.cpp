@@ -96,7 +96,8 @@ ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl
     : _startedThreads(false), _nextThreadId(0) {}
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
-void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& settings) {
+void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& settings,
+                                                           ReplicationCoordinator* replCoord) {
     stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_startedThreads) {
         return;
@@ -106,7 +107,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     BackgroundSync* bgsync = BackgroundSync::get();
     _producerThread.reset(new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync)));
     _syncSourceFeedbackThread.reset(
-        new stdx::thread(stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback)));
+        new stdx::thread(stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback, replCoord)));
     if (settings.isMajorityReadConcernEnabled() || enableReplSnapshotThread) {
         _snapshotThread = SnapshotThread::start(getGlobalServiceContext());
     }

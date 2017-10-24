@@ -50,6 +50,7 @@ namespace repl {
 
 class LastVote;
 class ReplSettings;
+class ReplicationCoordinator;
 
 /**
  * This class represents the interface the ReplicationCoordinator uses to interact with the
@@ -69,7 +70,7 @@ public:
      *
      * NOTE: Only starts threads if they are not already started,
      */
-    virtual void startThreads(const ReplSettings& settings) = 0;
+    virtual void startThreads(const ReplSettings& settings, ReplicationCoordinator* replCoord) = 0;
 
     /**
      * Starts the Master/Slave threads and sets up logOp

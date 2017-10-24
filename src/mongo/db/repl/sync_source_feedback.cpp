@@ -72,7 +72,7 @@ bool SyncSourceFeedback::replAuthenticate() {
     return _connection->authenticateInternalUser();
 }
 
-bool SyncSourceFeedback::_connect(OperationContext* txn, const HostAndPort& host) {
+bool SyncSourceFeedback::_connect(const ReplicaSetConfig& rsConfig, const HostAndPort& host) {
     if (hasConnection()) {
         return true;
     }
@@ -94,7 +94,6 @@ bool SyncSourceFeedback::_connect(OperationContext* txn, const HostAndPort& host
     }
 
     // Update keepalive value from config.
-    auto rsConfig = repl::ReplicationCoordinator::get(txn)->getConfig();
     _keepAliveInterval = rsConfig.getElectionTimeoutPeriod() / 2;
 
     return hasConnection();
@@ -106,8 +105,7 @@ void SyncSourceFeedback::forwardSlaveProgress() {
     _cond.notify_all();
 }
 
-Status SyncSourceFeedback::updateUpstream(OperationContext* txn, bool oldStyle) {
-    auto replCoord = repl::ReplicationCoordinator::get(txn);
+Status SyncSourceFeedback::updateUpstream(ReplicationCoordinator* replCoord, bool oldStyle) {
     if (replCoord->getMemberState().primary()) {
         // Primary has no one to send updates to.
         return Status::OK();
@@ -164,16 +162,16 @@ void SyncSourceFeedback::shutdown() {
     _cond.notify_all();
 }
 
-void SyncSourceFeedback::run() {
+void SyncSourceFeedback::run(ReplicationCoordinator* replCoord) {
     Client::initThread("SyncSourceFeedback");
 
     while (true) {  // breaks once _shutdownSignaled is true
-        auto txn = cc().makeOperationContext();
+
         {
             stdx::unique_lock<stdx::mutex> lock(_mtx);
             while (!_positionChanged && !_shutdownSignaled) {
                 if (_cond.wait_for(lock, _keepAliveInterval) == stdx::cv_status::timeout) {
-                    MemberState state = ReplicationCoordinator::get(txn.get())->getMemberState();
+                    MemberState state = replCoord->getMemberState();
                     if (!(state.primary() || state.startup())) {
                         break;
                     }
@@ -187,7 +185,7 @@ void SyncSourceFeedback::run() {
             _positionChanged = false;
         }
 
-        MemberState state = ReplicationCoordinator::get(txn.get())->getMemberState();
+        MemberState state = replCoord->getMemberState();
         if (state.primary() || state.startup()) {
             _resetConnection();
             continue;
@@ -199,13 +197,13 @@ void SyncSourceFeedback::run() {
         }
         if (!hasConnection()) {
             // fix connection if need be
-            if (target.empty() || !_connect(txn.get(), target)) {
+            if (target.empty() || !_connect(replCoord->getConfig(), target)) {
                 // Loop back around again; the keepalive functionality will cause us to retry
                 continue;
             }
         }
         bool oldFallBackValue = _fallBackToOldUpdatePosition;
-        Status status = updateUpstream(txn.get(), _fallBackToOldUpdatePosition);
+        Status status = updateUpstream(replCoord, _fallBackToOldUpdatePosition);
         if (!status.isOK()) {
             if (_fallBackToOldUpdatePosition != oldFallBackValue) {
                 stdx::unique_lock<stdx::mutex> lock(_mtx);

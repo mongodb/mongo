@@ -52,7 +52,8 @@ public:
 
     ReplicationCoordinatorExternalStateMock();
     virtual ~ReplicationCoordinatorExternalStateMock();
-    virtual void startThreads(const ReplSettings& settings) override;
+    virtual void startThreads(const ReplSettings& settings,
+                              ReplicationCoordinator* replCoord) override;
     virtual void startMasterSlave(OperationContext*);
     virtual void shutdown(OperationContext*);
     virtual Status initializeReplSetStorage(OperationContext* txn,

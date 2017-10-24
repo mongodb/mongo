@@ -31,6 +31,7 @@
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
@@ -51,7 +52,7 @@ public:
      * update occurs within the _keepAliveInterval, progress is forwarded to let the upstream node
      * know that this node, along with the alive nodes chaining through it, are still alive.
      */
-    void run();
+    void run(ReplicationCoordinator* replCoord);
 
     /// Signals the run() method to terminate.
     void shutdown();
@@ -71,14 +72,14 @@ private:
      * "oldStyle" indicates whether or not the upstream node is pre-3.2.2 and needs the older style
      * ReplSetUpdatePosition commands as a result.
      */
-    Status updateUpstream(OperationContext* txn, bool oldStyle);
+    Status updateUpstream(ReplicationCoordinator* replCoord, bool oldStyle);
 
     bool hasConnection() {
         return _connection.get();
     }
 
     /// Connect to sync target.
-    bool _connect(OperationContext* txn, const HostAndPort& host);
+    bool _connect(const ReplicaSetConfig& rsConfig, const HostAndPort& host);
 
     // the member we are currently syncing from
     HostAndPort _syncTarget;
