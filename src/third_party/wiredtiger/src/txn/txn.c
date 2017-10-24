@@ -443,13 +443,65 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len > 0) {
 #ifdef HAVE_TIMESTAMPS
 		wt_timestamp_t ts;
+		WT_TXN_GLOBAL *txn_global;
+		char timestamp_buf[2 * WT_TIMESTAMP_SIZE + 1];
+		bool round_to_oldest;
 
+		txn_global = &S2C(session)->txn_global;
 		WT_RET(__wt_txn_parse_timestamp(session, "read", &ts, &cval));
-		WT_RET(__wt_timestamp_validate(session,
-		    &ts, &cval, true, false, false));
-		__wt_timestamp_set(&txn->read_timestamp, &ts);
+
+		/*
+		 * Read the configuration here to reduce the span of the
+		 * critical section.
+		 */
+		WT_RET(__wt_config_gets_def(session,
+		    cfg, "round_to_oldest", 0, &cval));
+		round_to_oldest = cval.val;
+		/*
+		 * This code is not using the timestamp validate function to
+		 * avoid a race between checking and setting transaction
+		 * timestamp.
+		 */
+		__wt_readlock(session, &txn_global->rwlock);
+		if (__wt_timestamp_cmp(&ts, &txn_global->oldest_timestamp) < 0)
+		{
+			WT_RET(__wt_timestamp_to_hex_string(session,
+			    timestamp_buf, &ts));
+			/*
+			 * If given read timestamp is earlier than oldest
+			 * timestamp then round the read timestamp to
+			 * oldest timestamp.
+			 */
+			if (round_to_oldest)
+				__wt_timestamp_set(&txn->read_timestamp,
+				    &txn_global->oldest_timestamp);
+			else {
+				__wt_readunlock(session, &txn_global->rwlock);
+				WT_RET_MSG(session, EINVAL, "read timestamp "
+				    "%s older than oldest timestamp",
+				    timestamp_buf);
+			}
+		} else {
+			__wt_timestamp_set(&txn->read_timestamp, &ts);
+			/*
+			 * Reset to avoid a verbose message as read
+			 * timestamp is not rounded to oldest timestamp.
+			 */
+			round_to_oldest = false;
+		}
+
 		__wt_txn_set_read_timestamp(session);
+		__wt_readunlock(session, &txn_global->rwlock);
 		txn->isolation = WT_ISO_SNAPSHOT;
+		if (round_to_oldest) {
+			/*
+			 * This message is generated here to reduce the span of
+			 * critical section.
+			 */
+			__wt_verbose(session, WT_VERB_TIMESTAMP, "Read "
+			    "timestamp %s : Rounded to oldest timestamp",
+			    timestamp_buf);
+		}
 #else
 		WT_RET_MSG(session, EINVAL, "read_timestamp requires a "
 		    "version of WiredTiger built with timestamp support");
@@ -586,7 +638,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_TIMESTAMPS
 		WT_ERR(__wt_txn_parse_timestamp(session, "commit", &ts, &cval));
 		WT_ERR(__wt_timestamp_validate(session,
-		    &ts, &cval, true, true, true));
+		    "commit", &ts, &cval, true, true, true));
 		__wt_timestamp_set(&txn->commit_timestamp, &ts);
 		__wt_txn_set_commit_timestamp(session);
 #else
@@ -830,7 +882,9 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		case WT_TXN_OP_BASIC:
 		case WT_TXN_OP_BASIC_TS:
 		case WT_TXN_OP_INMEM:
-		       WT_ASSERT(session, op->u.upd->txnid == txn->id);
+			WT_ASSERT(session, op->u.upd->txnid == txn->id);
+			WT_ASSERT(session, S2C(session)->las_fileid == 0 ||
+			    op->fileid != S2C(session)->las_fileid);
 			op->u.upd->txnid = WT_TXN_ABORTED;
 			break;
 		case WT_TXN_OP_REF:

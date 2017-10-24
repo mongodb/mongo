@@ -377,13 +377,12 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	uint64_t orig_pages_evicted;
+
+	/* Assume there has been no progress. */
+	*did_work = false;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	WT_ASSERT(session, did_work != NULL);
-	*did_work = false;
-	orig_pages_evicted = cache->pages_evicted;
 
 	/* Evict pages from the cache as needed. */
 	WT_RET(__evict_pass(session));
@@ -411,46 +410,58 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 		__wt_readunlock(session, &conn->dhandle_lock);
 		WT_RET(ret);
 
-		cache->pages_evicted = 0;
-	} else if (cache->pages_evicted != cache->pages_evict) {
-		cache->pages_evicted = cache->pages_evict;
+		/* Make sure we'll notice next time we're stuck. */
+		cache->last_eviction_progress = 0;
+		return (0);
+	}
+
+	/* Track if work was done. */
+	*did_work = cache->eviction_progress != cache->last_eviction_progress;
+	cache->last_eviction_progress = cache->eviction_progress;
+
+	/* Eviction is stuck, check if we have made progress. */
+	if (*did_work) {
 #if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 		__wt_epoch(session, &cache->stuck_time);
-	} else if (!F_ISSET(conn, WT_CONN_IN_MEMORY)) {
-		/*
-		 * If we're stuck for 5 minutes in diagnostic mode, or the
-		 * verbose evict_stuck flag is configured, log the cache
-		 * and transaction state.
-		 *
-		 * If we're stuck for 5 minutes in diagnostic mode, give up.
-		 *
-		 * We don't do this check for in-memory workloads because
-		 * application threads are not blocked by the cache being full.
-		 * If the cache becomes full of clean pages, we can be
-		 * servicing reads while the cache appears stuck to eviction.
-		 */
-		__wt_epoch(session, &now);
-		if (WT_TIMEDIFF_SEC(now, cache->stuck_time) > 300) {
-#if defined(HAVE_DIAGNOSTIC)
-			__wt_err(session, ETIMEDOUT,
-			    "Cache stuck for too long, giving up");
-			ret = ETIMEDOUT;
-			WT_TRET(__wt_verbose_dump_txn(session));
-			WT_TRET(__wt_verbose_dump_cache(session));
-			return (ret);
-#elif defined(HAVE_VERBOSE)
-			if (WT_VERBOSE_ISSET(session, WT_VERB_EVICT_STUCK)) {
-				WT_RET(__wt_verbose_dump_txn(session));
-				WT_RET(__wt_verbose_dump_cache(session));
-
-				/* Reset the timer. */
-				__wt_epoch(session, &cache->stuck_time);
-			}
 #endif
+		return (0);
+	}
+
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
+	/*
+	 * If we're stuck for 5 minutes in diagnostic mode, or the verbose
+	 * evict_stuck flag is configured, log the cache and transaction state.
+	 *
+	 * If we're stuck for 5 minutes in diagnostic mode, give up.
+	 *
+	 * We don't do this check for in-memory workloads because application
+	 * threads are not blocked by the cache being full. If the cache becomes
+	 * full of clean pages, we can be servicing reads while the cache
+	 * appears stuck to eviction.
+	 */
+	if (F_ISSET(conn, WT_CONN_IN_MEMORY))
+		return (0);
+
+	__wt_epoch(session, &now);
+	if (WT_TIMEDIFF_SEC(now, cache->stuck_time) > 300) {
+#if defined(HAVE_DIAGNOSTIC)
+		__wt_err(session, ETIMEDOUT,
+		    "Cache stuck for too long, giving up");
+		ret = ETIMEDOUT;
+		WT_TRET(__wt_verbose_dump_txn(session));
+		WT_TRET(__wt_verbose_dump_cache(session));
+		return (ret);
+#elif defined(HAVE_VERBOSE)
+		if (WT_VERBOSE_ISSET(session, WT_VERB_EVICT_STUCK)) {
+			WT_RET(__wt_verbose_dump_txn(session));
+			WT_RET(__wt_verbose_dump_cache(session));
+
+			/* Reset the timer. */
+			__wt_epoch(session, &cache->stuck_time);
 		}
 #endif
 	}
-	*did_work = cache->pages_evicted != orig_pages_evicted;
+#endif
 	return (0);
 }
 
@@ -622,7 +633,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t oldest_id, pages_evicted, prev_oldest_id;
+	uint64_t eviction_progress, oldest_id, prev_oldest_id;
 	u_int loop;
 
 	conn = S2C(session);
@@ -630,7 +641,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 	txn_global = &conn->txn_global;
 
 	/* Track whether pages are being evicted and progress is made. */
-	pages_evicted = cache->pages_evict;
+	eviction_progress = cache->eviction_progress;
 	prev_oldest_id = txn_global->oldest_id;
 	WT_CLEAR(prev);
 
@@ -705,7 +716,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * treat the cache as stuck and start rolling back
 		 * transactions and writing updates to the lookaside table.
 		 */
-		if (pages_evicted == cache->pages_evict) {
+		if (eviction_progress == cache->eviction_progress) {
 			if (WT_TIMEDIFF_MS(now, prev) >= 20 &&
 			    F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD |
 			    WT_CACHE_EVICT_DIRTY_HARD)) {
@@ -757,7 +768,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 				    cache->evict_aggressive_score);
 			}
 			loop = 0;
-			pages_evicted = cache->pages_evict;
+			eviction_progress = cache->eviction_progress;
 		}
 	}
 	return (0);
@@ -959,7 +970,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	uint64_t delta_msec, delta_pages;
-	uint64_t pgs_evicted_cur, pgs_evicted_persec_cur, time_diff;
+	uint64_t eviction_progress, eviction_progress_rate, time_diff;
 	int32_t cur_threads, i, target_threads, thread_surplus;
 
 	conn = S2C(session);
@@ -972,16 +983,16 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	if (conn->evict_threads_max == conn->evict_threads_min)
 		return;
 
-	pgs_evicted_cur = 0;
+	eviction_progress_rate = 0;
 
 	__wt_epoch(session, &current_time);
-	time_diff = WT_TIMEDIFF_MS(current_time, conn->evict_tune_last_time);
+	time_diff = WT_TIMEDIFF_MS(current_time, cache->evict_tune_last_time);
 
 	/*
 	 * If we have reached the stable state and have not run long enough to
 	 * surpass the forced re-tuning threshold, return.
 	 */
-	if (conn->evict_tune_stable) {
+	if (cache->evict_tune_stable) {
 		if (time_diff < EVICT_FORCE_RETUNE)
 			return;
 
@@ -989,11 +1000,11 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 		 * Stable state was reached a long time ago. Let's re-tune.
 		 * Reset all the state.
 		 */
-		conn->evict_tune_stable = false;
-		conn->evict_tune_last_action_time.tv_sec = 0;
-		conn->evict_tune_pgs_last = 0;
-		conn->evict_tune_num_points = 0;
-		conn->evict_tune_pg_sec_max = 0;
+		cache->evict_tune_stable = false;
+		cache->evict_tune_last_action_time.tv_sec = 0;
+		cache->evict_tune_progress_last = 0;
+		cache->evict_tune_num_points = 0;
+		cache->evict_tune_progress_rate_max = 0;
 
 		/* Reduce the number of eviction workers by one */
 		thread_surplus =
@@ -1017,10 +1028,10 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			return;
 
 	/*
-	 * Measure the number of evicted pages so far. Eviction rate correlates
-	 * to performance, so this is our metric of success.
+	 * Measure the evicted progress so far. Eviction rate correlates to
+	 * performance, so this is our metric of success.
 	 */
-	pgs_evicted_cur = cache->pages_evict;
+	eviction_progress = cache->eviction_progress;
 
 	/*
 	 * If we have recorded the number of pages evicted at the end of
@@ -1029,21 +1040,21 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	 * measurement interval.
 	 * Otherwise, we just record the number of evicted pages and return.
 	 */
-	if (conn->evict_tune_pgs_last == 0)
+	if (cache->evict_tune_progress_last == 0)
 		goto done;
 
-	delta_msec = WT_TIMEDIFF_MS(current_time, conn->evict_tune_last_time);
-	delta_pages = pgs_evicted_cur - conn->evict_tune_pgs_last;
-	pgs_evicted_persec_cur = (delta_pages * WT_THOUSAND) / delta_msec;
-	conn->evict_tune_num_points++;
+	delta_msec = WT_TIMEDIFF_MS(current_time, cache->evict_tune_last_time);
+	delta_pages = eviction_progress - cache->evict_tune_progress_last;
+	eviction_progress_rate = (delta_pages * WT_THOUSAND) / delta_msec;
+	cache->evict_tune_num_points++;
 
 	/*
 	 * Keep track of the maximum eviction throughput seen and the number
 	 * of workers corresponding to that throughput.
 	 */
-	if (pgs_evicted_persec_cur > conn->evict_tune_pg_sec_max) {
-		conn->evict_tune_pg_sec_max = pgs_evicted_persec_cur;
-		conn->evict_tune_workers_best =
+	if (eviction_progress_rate > cache->evict_tune_progress_rate_max) {
+		cache->evict_tune_progress_rate_max = eviction_progress_rate;
+		cache->evict_tune_workers_best =
 		    conn->evict_threads.current_threads;
 	}
 
@@ -1057,8 +1068,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	 * we will go back to the best observed number of workers and
 	 * settle into a stable state.
 	 */
-	if (conn->evict_tune_num_points >= conn->evict_tune_datapts_needed) {
-		if (conn->evict_tune_workers_best ==
+	if (cache->evict_tune_num_points >= cache->evict_tune_datapts_needed) {
+		if (cache->evict_tune_workers_best ==
 		    conn->evict_threads.current_threads &&
 		    conn->evict_threads.current_threads <
 		    conn->evict_threads_max) {
@@ -1066,7 +1077,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			 * Keep adding workers. We will check again
 			 * at the next check point.
 			 */
-			conn->evict_tune_datapts_needed += WT_MIN(
+			cache->evict_tune_datapts_needed += WT_MIN(
 			    EVICT_TUNE_DATAPT_MIN,
 			    (conn->evict_threads_max -
 			    conn->evict_threads.current_threads) /
@@ -1079,7 +1090,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			 */
 			thread_surplus =
 			    (int32_t)conn->evict_threads.current_threads -
-			    (int32_t)conn->evict_tune_workers_best;
+			    (int32_t)cache->evict_tune_workers_best;
 
 			for (i = 0; i < thread_surplus; i++) {
 				__wt_thread_group_stop_one(
@@ -1089,8 +1100,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			}
 			WT_STAT_CONN_SET(session,
 			    cache_eviction_stable_state_workers,
-			    conn->evict_tune_workers_best);
-			conn->evict_tune_stable = true;
+			    cache->evict_tune_workers_best);
+			cache->evict_tune_stable = true;
 			WT_STAT_CONN_SET(session, cache_eviction_active_workers,
 			    conn->evict_threads.current_threads);
 			goto done;
@@ -1103,8 +1114,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	 * we must accumulate before deciding if we should keep adding workers
 	 * or settle on a previously tried stable number of workers.
 	 */
-	if (conn->evict_tune_last_action_time.tv_sec == 0)
-		conn->evict_tune_datapts_needed = EVICT_TUNE_DATAPT_MIN;
+	if (cache->evict_tune_last_action_time.tv_sec == 0)
+		cache->evict_tune_datapts_needed = EVICT_TUNE_DATAPT_MIN;
 
 	if (F_ISSET(cache, WT_CACHE_EVICT_ALL)) {
 		cur_threads = (int32_t)conn->evict_threads.current_threads;
@@ -1121,14 +1132,14 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			__wt_verbose(session,
 			    WT_VERB_EVICTSERVER, "%s", "added worker thread");
 		}
-		conn->evict_tune_last_action_time = current_time;
+		cache->evict_tune_last_action_time = current_time;
 	}
 
 	WT_STAT_CONN_SET(session, cache_eviction_active_workers,
 	    conn->evict_threads.current_threads);
 
-done:	conn->evict_tune_last_time = current_time;
-	conn->evict_tune_pgs_last = pgs_evicted_cur;
+done:	cache->evict_tune_last_time = current_time;
+	cache->evict_tune_progress_last = eviction_progress;
 }
 
 /*
@@ -2022,6 +2033,9 @@ __evict_get_ref(
 	uint32_t candidates;
 	bool is_app, server_only, urgent_ok;
 
+	*btreep = NULL;
+	*refp = NULL;
+
 	cache = S2C(session)->cache;
 	is_app = !F_ISSET(session, WT_SESSION_INTERNAL);
 	server_only = is_server && !WT_EVICT_HAS_WORKERS(session);
@@ -2029,8 +2043,6 @@ __evict_get_ref(
 	    !WT_EVICT_HAS_WORKERS(session) ||
 	    (is_app && __wt_cache_aggressive(session));
 	urgent_queue = cache->evict_urgent_queue;
-	*btreep = NULL;
-	*refp = NULL;
 
 	WT_STAT_CONN_INCR(session, cache_eviction_get_ref);
 
@@ -2255,7 +2267,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	uint64_t init_evict_count, max_pages_evicted;
+	uint64_t initial_progress, max_progress;
 	bool timer;
 
 	conn = S2C(session);
@@ -2282,7 +2294,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	if (timer)
 		__wt_epoch(session, &enter);
 
-	for (init_evict_count = cache->pages_evict;; ret = 0) {
+	for (initial_progress = cache->eviction_progress;; ret = 0) {
 		/*
 		 * A pathological case: if we're the oldest transaction in the
 		 * system and the eviction server is stuck trying to find space,
@@ -2307,12 +2319,12 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		if (!busy && txn_state->pinned_id != WT_TXN_NONE &&
 		    txn_global->current != txn_global->oldest_id)
 			busy = true;
-		max_pages_evicted = busy ? 5 : 20;
+		max_progress = busy ? 5 : 20;
 
 		/* See if eviction is still needed. */
 		if (!__wt_eviction_needed(session, busy, &pct_full) ||
-		    (pct_full < 100 &&
-		    cache->pages_evict > init_evict_count + max_pages_evicted))
+		    (pct_full < 100 && cache->eviction_progress >
+		    initial_progress + max_progress))
 			break;
 
 		/*

@@ -593,9 +593,9 @@ __wt_lsm_manager_pop_entry(
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *entry;
 
+	*entryp = entry = NULL;
+
 	manager = &S2C(session)->lsm_manager;
-	*entryp = NULL;
-	entry = NULL;
 
 	/*
 	 * Pop the entry off the correct queue based on our work type.

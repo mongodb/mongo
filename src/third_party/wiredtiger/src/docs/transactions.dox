@@ -154,9 +154,9 @@ Named snapshots are not durable: they do not survive WT_CONNECTION::close.
 Some applications have their own notion of time, including an expected commit
 order for transactions that may be inconsistent with the order assigned by
 WiredTiger.  We assume that applications can represent their notion of a
-timestamp as an integral value of some size that generally increases over
-time.  For example, a simple 64-bit integer could be incremented to generate
-transaction timestamps, if that is sufficient for the application.
+timestamp as an unsigned integral value of some size that generally increases
+over time.  For example, a simple 64-bit integer could be incremented to
+generate transaction timestamps, if that is sufficient for the application.
 
 The application's timestamp size is specified as a number of bytes at build
 time, with <code>configure --with-timestamp-size=X</code>.  The default
@@ -167,6 +167,13 @@ Applications can assign explicit commit timestamps to transactions, then read
 "as of" a timestamp.  Timestamps are communicated to WiredTiger using a
 hexadecimal encoding, so the encoded value can be twice as long as the raw
 timestamp value.
+
+WiredTiger also provides the ability to set a different commit timestamp for
+different set of updates in a single transaction. This can be done by calling
+WT_SESSION::timestamp_transaction repeatedly to set a new commit timestamp
+between a set of updates for the current transaction. This gives the ability to
+commit several updates with different read "as of" timestamp in a single
+transaction.
 
 Setting a read timestamp in WT_SESSION::begin_transaction forces a transaction
 to run at snapshot isolation and ignore any commits with a newer timestamp.
@@ -182,7 +189,12 @@ known stable location that is sufficient for durability.  During a checkpoint
 the state of a table will be saved only as of the stable timestamp.  Newer
 updates after that stable timestamp will not be included in the checkpoint.
 That can be overridden in the call to WT_SESSION::checkpoint.  It is expected
-that the stable timestamp is updated frequently.
+that the stable timestamp is updated frequently. Setting a stable location
+provides the ability, if needed, to rollback to this location by placing a call
+to WT_CONNECTION::rollback_to_stable. With the rollback, however, WiredTiger
+does not automatically reset the maximum commit timestamp it is tracking. The
+application should explicitly do so by setting a commit timestamp in
+WT_CONNECTION::set_timestamp.
 
 Commit timestamps cannot be set in the past of any read timestamp that has
 been used.  This is enforced by assertions in diagnostic builds, if

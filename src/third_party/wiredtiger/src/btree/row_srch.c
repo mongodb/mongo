@@ -23,9 +23,10 @@ __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	WT_ITEM key;
 	int cmp, i;
 
+	*donep = 0;
+
 	btree = S2BT(session);
 	collator = btree->collator;
-	*donep = 0;
 
 	if ((ins = WT_SKIP_LAST(ins_head)) == NULL)
 		return (0);

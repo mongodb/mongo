@@ -101,6 +101,15 @@
 	API_END(s, ret);						\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 
+/*
+ * Used in cases where transaction error should not be set, but the error is
+ * returned from the API. Success is passed to the API_END macro.  If the
+ * method is about to return WT_NOTFOUND map it to ENOENT.
+ */
+#define	API_END_RET_NO_TXN_ERROR(s, ret)				\
+	API_END(s, 0);							\
+	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
+
 #define	CONNECTION_API_CALL(conn, s, n, config, cfg)			\
 	s = (conn)->default_session;					\
 	API_CALL(s, WT_CONNECTION, n, NULL, config, cfg)

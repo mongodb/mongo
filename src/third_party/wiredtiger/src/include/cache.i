@@ -128,7 +128,7 @@ __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 static inline uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache)
 {
-	return (cache->pages_inmem - cache->pages_evict);
+	return (cache->pages_inmem - cache->pages_evicted);
 }
 
 /*
@@ -194,13 +194,12 @@ __wt_cache_bytes_other(WT_CACHE *cache)
 {
 	uint64_t bytes_image, bytes_inmem;
 
-	bytes_image = cache->bytes_image;
-	bytes_inmem = cache->bytes_inmem;
-
 	/*
-	 * The reads above could race with changes to the values, so protect
-	 * against underflow.
+	 * Reads can race with changes to the values, so only read once and
+	 * check for the race.
 	 */
+	bytes_image = *(volatile uint64_t *)&cache->bytes_image;
+	bytes_inmem = *(volatile uint64_t *)&cache->bytes_inmem;
 	return ((bytes_image > bytes_inmem) ? 0 :
 	    __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_image));
 }

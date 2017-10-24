@@ -30,7 +30,6 @@
 #   Timestamps: make sure they don't end up in metadata
 #
 
-from helper import copy_wiredtiger_home
 import random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest

@@ -499,8 +499,13 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 		testutil_check(
 		    session->commit_transaction(session, config_buf));
 
-		/* After the commit, update our last timestamp. */
-		tinfo->timestamp = ts;
+		/*
+		 * Update the thread's last-committed timestamp. Don't let the
+		 * compiler re-order this statement, if we were to race with
+		 * the timestamp thread, it might see our thread update before
+		 * the transaction commit.
+		 */
+		WT_PUBLISH(tinfo->timestamp, ts);
 	} else
 		testutil_check(session->commit_transaction(session, NULL));
 	++tinfo->commit;

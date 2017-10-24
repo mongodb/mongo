@@ -53,14 +53,14 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_DECL_RET;
 	uint8_t *endp;
 
-	ci = NULL;
-
 	/*
 	 * Sometimes we don't find a root page (we weren't given a checkpoint,
 	 * or the checkpoint was empty).  In that case we return an empty root
 	 * address, set that up now.
 	 */
 	*root_addr_sizep = 0;
+
+	ci = NULL;
 
 #ifdef HAVE_VERBOSE
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {

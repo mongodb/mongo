@@ -54,6 +54,7 @@ __lsm_worker_general_op(
 	bool force;
 
 	*completed = false;
+
 	/*
 	 * Return if this thread cannot process a bloom, drop or flush.
 	 */

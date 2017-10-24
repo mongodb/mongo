@@ -296,7 +296,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Read a page from the file.
  */
 static int
-__page_read(WT_SESSION_IMPL *session, WT_REF *ref)
+__page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	struct timespec start, stop;
 	WT_BTREE *btree;
@@ -304,7 +304,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_ITEM tmp;
 	WT_PAGE *page;
 	size_t addr_size;
-	uint32_t new_state, previous_state;
+	uint32_t page_flags, new_state, previous_state;
 	const uint8_t *addr;
 	bool timer;
 
@@ -372,9 +372,12 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * the allocated copy of the disk image on return, the in-memory object
 	 * steals it.
 	 */
-	WT_ERR(__wt_page_inmem(session, ref, tmp.data,
-	    WT_DATA_IN_ITEM(&tmp) ?
-	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
+	page_flags =
+	    WT_DATA_IN_ITEM(&tmp) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED;
+	if (LF_ISSET(WT_READ_NO_EVICT) ||
+	    F_ISSET(session, WT_SESSION_NO_EVICTION))
+		FLD_SET(page_flags, WT_PAGE_READ_NO_EVICT);
+	WT_ERR(__wt_page_inmem(session, ref, tmp.data, page_flags, &page));
 	tmp.mem = NULL;
 
 skip_read:
@@ -499,7 +502,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			if (!LF_ISSET(WT_READ_NO_EVICT))
 				WT_RET(__wt_cache_eviction_check(
 				    session, 1, NULL));
-			WT_RET(__page_read(session, ref));
+			WT_RET(__page_read(session, ref, flags));
 
 			/*
 			 * We just read a page, don't evict it before we have a
