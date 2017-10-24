@@ -62,7 +62,7 @@ protected:
         ConfigServerTestFixture::setUp();
 
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::k36);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         serverGlobalParams.validateFeaturesAsMaster.store(true);
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();

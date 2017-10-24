@@ -775,7 +775,7 @@ TEST(RoleGraphTest, AddRoleFromDocument) {
     };
 
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
 
     RoleGraph graph;
 

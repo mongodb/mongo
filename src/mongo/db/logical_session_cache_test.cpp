@@ -67,7 +67,7 @@ public:
     LogicalSessionCacheTest()
         : _service(std::make_shared<MockServiceLiasonImpl>()),
           _sessions(std::make_shared<MockSessionsCollectionImpl>()),
-          _fcv(EnsureFCV::Version::k36) {}
+          _fcv(EnsureFCV::Version::kFullyUpgradedTo36) {}
 
     void setUp() override {
         auto localManagerState = stdx::make_unique<AuthzManagerExternalStateMock>();

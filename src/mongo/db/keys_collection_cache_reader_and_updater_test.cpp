@@ -55,7 +55,7 @@ protected:
         ConfigServerTestFixture::setUp();
 
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::k36);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         serverGlobalParams.validateFeaturesAsMaster.store(true);
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
@@ -458,7 +458,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
 
 TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeysInFeatureCompatiblityVersion34) {
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
 
     KeysCollectionCacheReaderAndUpdater updater("dummy", catalogClient(), Seconds(5));
 
@@ -475,7 +475,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeysInFeatureCompatiblityVersion34) {
 
     // Increase the feature compatibility version and verify keys are found after refresh.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
 
     {
         auto keyStatus = updater.refresh(operationContext());

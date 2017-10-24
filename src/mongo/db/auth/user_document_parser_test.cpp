@@ -232,7 +232,7 @@ public:
 
     void setUp() {
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::k36);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         user.reset(new User(UserName("spencer", "test")));
         adminUser.reset(new User(UserName("admin", "admin")));
     }
@@ -646,7 +646,7 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtraction) {
 
 TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtractionAndRetreival) {
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
     enableIPv6(true);
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
         BSON("user"

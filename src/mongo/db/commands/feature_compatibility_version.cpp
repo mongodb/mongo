@@ -62,7 +62,7 @@ Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVe
 StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibilityVersion::parse(
     const BSONObj& featureCompatibilityVersionDoc) {
     ServerGlobalParams::FeatureCompatibility::Version version =
-        ServerGlobalParams::FeatureCompatibility::Version::kUnset;
+        ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior;
     std::string versionString;
     std::string targetVersionString;
 
@@ -133,7 +133,7 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
         } else if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion34) {
             version = ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34;
         } else {
-            version = ServerGlobalParams::FeatureCompatibility::Version::k34;
+            version = ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34;
         }
 
     } else if (versionString == FeatureCompatibilityVersionCommandParser::kVersion36) {
@@ -150,7 +150,7 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
                                         << feature_compatibility_version::kDochubLink
                                         << ".");
         } else {
-            version = ServerGlobalParams::FeatureCompatibility::Version::k36;
+            version = ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36;
         }
     } else {
         return Status(ErrorCodes::BadValue,
@@ -297,7 +297,7 @@ void uassertDuringInvalidUpgradeOp(OperationContext* opCtx,
         return;
     }
 
-    if (version != ServerGlobalParams::FeatureCompatibility::Version::k36) {
+    if (version != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
         // Only check this assertion if we're completing an upgrade to 3.6.
         return;
     }
@@ -346,7 +346,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
 
         // Close all connections from internal clients with binary versions lower than 3.6.
-        if (newVersion == ServerGlobalParams::FeatureCompatibility::Version::k36 ||
+        if (newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36 ||
             newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36) {
             opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
                 transport::Session::kLatestVersionInternalClientKeepOpen |
@@ -371,7 +371,7 @@ void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONOb
           << FeatureCompatibilityVersionCommandParser::kVersion34;
     opCtx->recoveryUnit()->onCommit([]() {
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::k34);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
     });
 }
 
@@ -388,7 +388,7 @@ void FeatureCompatibilityVersion::onDropCollection(OperationContext* opCtx) {
           << FeatureCompatibilityVersionCommandParser::kVersion34;
     opCtx->recoveryUnit()->onCommit([]() {
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::k34);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
     });
 }
 
@@ -452,11 +452,11 @@ public:
         if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
             b.append(name,
                      FeatureCompatibilityVersion::toString(
-                         ServerGlobalParams::FeatureCompatibility::Version::k36));
+                         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36));
         } else {
             b.append(name,
                      FeatureCompatibilityVersion::toString(
-                         ServerGlobalParams::FeatureCompatibility::Version::k34));
+                         ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34));
         }
     }
 

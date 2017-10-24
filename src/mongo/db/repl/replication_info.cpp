@@ -364,7 +364,7 @@ public:
         // connect.
         if (internalClientElement &&
             serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k36) {
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
             result.append("minWireVersion", WireSpec::instance().incoming.maxWireVersion);
         } else {
             result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);

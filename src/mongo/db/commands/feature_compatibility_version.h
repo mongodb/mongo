@@ -70,15 +70,15 @@ public:
 
     static StringData toString(ServerGlobalParams::FeatureCompatibility::Version version) {
         switch (version) {
-            case ServerGlobalParams::FeatureCompatibility::Version::k36:
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36:
                 return FeatureCompatibilityVersionCommandParser::kVersion36;
-            case ServerGlobalParams::FeatureCompatibility::Version::k34:
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
                 return FeatureCompatibilityVersionCommandParser::kVersion34;
             case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
                 return FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo36;
             case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
                 return FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo34;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUnset:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
                 return FeatureCompatibilityVersionCommandParser::kVersionUnset;
             default:
                 MONGO_UNREACHABLE;

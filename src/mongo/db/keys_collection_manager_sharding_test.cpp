@@ -60,7 +60,7 @@ protected:
         ConfigServerTestFixture::setUp();
 
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::k36);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         serverGlobalParams.validateFeaturesAsMaster.store(true);
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
@@ -376,7 +376,7 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
 
 TEST_F(KeysManagerShardedTest, ShouldNotReturnKeysInFeatureCompatibilityVersion34) {
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
 
     keyManager()->startMonitoring(getServiceContext());
     keyManager()->enableKeyGenerator(operationContext(), true);

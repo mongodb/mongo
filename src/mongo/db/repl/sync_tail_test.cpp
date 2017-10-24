@@ -1666,7 +1666,7 @@ TEST_F(SyncTailTest, UpdateToFCVCollectionBesidesFCVDocumentSucceedsInRecovering
 TEST_F(SyncTailTest, UpgradeWithNoUUIDFailsInSecondary) {
     // Set fCV to 3.4 so the node does not create a UUID for the collection.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
 
     auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
     ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());

@@ -77,7 +77,7 @@ class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
 public:
     ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
     ChangeStreamStageTestNoSetup(NamespaceString nsString)
-        : AggregationContextFixture(nsString), _ensureFCV(EnsureFCV::Version::k36) {}
+        : AggregationContextFixture(nsString), _ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36) {}
 
 private:
     EnsureFCV _ensureFCV;

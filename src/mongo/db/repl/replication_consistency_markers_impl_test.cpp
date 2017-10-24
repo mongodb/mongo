@@ -317,7 +317,7 @@ TEST_F(ReplicationConsistencyMarkersTest, OplogTruncateAfterPointUpgrade) {
 
     // Set the feature compatibility version to 3.6.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
 
     // Check that we see no oplog truncate after point in FCV 3.6.
     ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
@@ -325,7 +325,7 @@ TEST_F(ReplicationConsistencyMarkersTest, OplogTruncateAfterPointUpgrade) {
 
     // Set the feature compatibility version to 3.4.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
 
     // Check that we see the old oplog delete from point in FCV 3.4.
     ASSERT_EQ(consistencyMarkers.getOplogTruncateAfterPoint(opCtx), time1);
@@ -348,7 +348,7 @@ TEST_F(ReplicationConsistencyMarkersTest, OplogTruncateAfterPointUpgrade) {
 
     // Set the feature compatibility version to 3.6.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
 
     // Check that after removing the old oplog delete from point, that we do not see the oplog
     // truncate after point in FCV 3.6.

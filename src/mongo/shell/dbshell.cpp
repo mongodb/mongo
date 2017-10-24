@@ -96,7 +96,7 @@ const auto kDefaultMongoURL = "mongodb://127.0.0.1:27017"_sd;
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion36, ("EndStartupOptionSetup"))
 (InitializerContext* context) {
     mongo::serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::k36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
     return Status::OK();
 }
 }  // namespace

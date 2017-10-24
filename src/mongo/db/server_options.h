@@ -152,38 +152,45 @@ struct ServerGlobalParams {
          *
          * The legal enum (and featureCompatiblityVersion document) states are:
          *
-         * k34
-         * (3.4, Unset) aka fully 3.4: Only 3.4 features are available, and new and existing storage
-         *                             engine entries use the 3.4 format
+         * kFullyDowngradedTo34
+         * (3.4, Unset): Only 3.4 features are available, and new and existing storage
+         *               engine entries use the 3.4 format
          *
          * kUpgradingTo36
-         * (3.4, 3.6) aka upgrading: Only 3.4 features are available, but new storage engine entries
-         *                           use the 3.6 format, and existing entries may have either the
-         *                           3.4 or 3.6 format
+         * (3.4, 3.6): Only 3.4 features are available, but new storage engine entries
+         *             use the 3.6 format, and existing entries may have either the
+         *             3.4 or 3.6 format
          *
-         * k36
-         * (3.6, Unset) aka fully 3.6: 3.6 features are available, and new and existing storage
-         *                             engine entries use the 3.6 format
+         * kFullyUpgradedTo36
+         * (3.6, Unset): 3.6 features are available, and new and existing storage
+         *               engine entries use the 3.6 format
          *
          * kDowngradingTo34
-         * (3.4, 3.4) aka downgrading: Only 3.4 features are available and new storage engine
-         *                             entries use the 3.4 format, but existing entries may have
-         *                             either the 3.4 or 3.6 format
+         * (3.4, 3.4): Only 3.4 features are available and new storage engine
+         *             entries use the 3.4 format, but existing entries may have
+         *             either the 3.4 or 3.6 format
          *
-         * kUnset
-         * (Unset, Unset) aka uninitialized: This is the case on startup before the fCV document is
-         *                                   loaded into memory. isVersionInitialized() will return
-         *                                   false, and getVersion() will return the default (k34).
+         * kUnsetDefault34Behavior
+         * (Unset, Unset): This is the case on startup before the fCV document is
+         *                 loaded into memory. isVersionInitialized() will return
+         *                 false, and getVersion() will return the default
+         *                 (kFullyDowngradedTo34).
          *
          */
-        enum class Version { k34, kUpgradingTo36, k36, kDowngradingTo34, kUnset };
+        enum class Version {
+            kFullyDowngradedTo34,
+            kUpgradingTo36,
+            kFullyUpgradedTo36,
+            kDowngradingTo34,
+            kUnsetDefault34Behavior
+        };
 
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */
         const bool isVersionInitialized() const {
-            return _version.load() != Version::kUnset;
+            return _version.load() != Version::kUnsetDefault34Behavior;
         }
 
         /**
@@ -192,29 +199,33 @@ struct ServerGlobalParams {
          */
         const Version getVersion() const {
             Version v = _version.load();
-            return (v == Version::kUnset) ? Version::k34 : v;
+            return (v == Version::kUnsetDefault34Behavior) ? Version::kFullyDowngradedTo34 : v;
         }
 
         void reset() {
-            _version.store(Version::k34);
+            _version.store(Version::kFullyDowngradedTo34);
         }
 
         void setVersion(Version version) {
             return _version.store(version);
         }
 
+        // Deprecated. Please use getVersion() directly instead.
         const bool isFullyUpgradedTo36() {
-            return (getVersion() == Version::k36);
+            return (getVersion() == Version::kFullyUpgradedTo36);
         }
 
+        // Deprecated. Please use getVersion() directly instead.
         const bool isUpgradingTo36() {
             return (getVersion() == Version::kUpgradingTo36);
         }
 
+        // Deprecated. Please use getVersion() directly instead.
         const bool isFullyDowngradedTo34() {
-            return (getVersion() == Version::k34);
+            return (getVersion() == Version::kFullyDowngradedTo34);
         }
 
+        // Deprecated. Please use getVersion() directly instead.
         const bool isDowngradingTo34() {
             return (getVersion() == Version::kDowngradingTo34);
         }
@@ -225,7 +236,7 @@ struct ServerGlobalParams {
         }
 
     private:
-        AtomicWord<Version> _version{Version::kUnset};
+        AtomicWord<Version> _version{Version::kUnsetDefault34Behavior};
 
     } featureCompatibility;
 

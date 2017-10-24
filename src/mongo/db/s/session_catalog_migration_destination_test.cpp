@@ -84,7 +84,7 @@ class SessionCatalogMigrationDestinationTest : public ShardingMongodTestFixture 
 public:
     void setUp() override {
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::k36);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         ShardingMongodTestFixture::setUp();
 

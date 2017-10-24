@@ -180,7 +180,7 @@ TEST_F(ViewCatalogFixture, CreateViewOnDifferentDatabase) {
 
 // TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
 TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesSucceedsUnder36FCV) {
-    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
 
     const NamespaceString viewOn("db.coll");
 
@@ -229,7 +229,7 @@ TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesSucceedsUnder36FCV) {
 
 // TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
 TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesFailsUnder34FCV) {
-    EnsureFCV ensureFCV(EnsureFCV::Version::k34);
+    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyDowngradedTo34);
 
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
@@ -313,7 +313,7 @@ TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
 
 TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStage) {
     // Temporarily set the feature version to 3.6 for $changeStream.
-    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
 
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
@@ -489,7 +489,7 @@ TEST_F(ViewCatalogFixture, ModifyViewOnInvalidCollectionName) {
 
 TEST_F(ReplViewCatalogFixture, ModifyViewWithPipelineFailsOnIneligibleStage) {
     // Temporarily set the feature version to 3.6 for $changeStream.
-    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
 
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");

@@ -239,7 +239,7 @@ TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedN
 
 TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
     // Temporarily set FCV to 3.6 for $changeStream.
-    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
 
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");
@@ -257,7 +257,7 @@ TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
 
 TEST_F(ReplDocumentSourceLookUpTest, RejectsSubPipelineWithChangeStreamStage) {
     // Temporarily set FCV to 3.6 for $changeStream.
-    EnsureFCV ensureFCV(EnsureFCV::Version::k36);
+    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
 
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");
