@@ -274,15 +274,18 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
 
     if (ns().isSystem() && !ns().isDropPendingNamespace()) {
         return {ErrorCodes::InvalidOptions,
-                "Document validators not allowed on system collections."};
+                str::stream() << "Document validators not allowed on system collection "
+                              << ns().ns()
+                              << (_uuid ? " with UUID " + _uuid->toString() : "")};
     }
 
     if (ns().isOnInternalDb()) {
         return {ErrorCodes::InvalidOptions,
-                str::stream() << "Document validators are not allowed on collections in"
-                              << " the "
+                str::stream() << "Document validators are not allowed on collection " << ns().ns()
+                              << (_uuid ? " with UUID " + _uuid->toString() : "")
+                              << " in the "
                               << ns().db()
-                              << " database"};
+                              << " internal database"};
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, _collator.get()));
