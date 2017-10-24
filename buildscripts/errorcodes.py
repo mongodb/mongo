@@ -54,16 +54,15 @@ def assignErrorCodes():
 def parseSourceFiles( callback ):
     """Walks MongoDB sourcefiles and invokes callback for each AssertLocation found."""
 
-    quick = [ "assert" , "Exception"]
+    quick = ["assert", "Exception", "ErrorCodes::Error"]
 
     patterns = [
         re.compile( r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE ) ,
-        re.compile( r"(?:DB|Assertion)Exception\s*\(\s*(\d+)", re.MULTILINE ),
+        re.compile( r"(?:DB|Assertion)Exception\s*[({]\s*(\d+)", re.MULTILINE ),
         re.compile( r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
                     re.MULTILINE ),
+        re.compile( r"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE )
     ]
-
-    bad = [ re.compile( r"^\s*assert *\(" ) ]
 
     for sourceFile in utils.getAllSourceFiles(prefix='src/mongo/'):
         if list_files:
@@ -74,13 +73,6 @@ def parseSourceFiles( callback ):
 
             if not any([zz in text for zz in quick]):
                 continue
-
-            # TODO: move check for bad assert type to the linter.
-            for b in bad:
-                if b.search(text):
-                    msg = "Bare assert prohibited. Replace with [umwdf]assert"
-                    print( "%s: %s" % (sourceFile, msg) )
-                    raise Exception(msg)
 
             matchiters = [p.finditer(text) for p in patterns]
             for matchiter in matchiters:

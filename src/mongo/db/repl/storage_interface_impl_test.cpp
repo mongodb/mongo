@@ -338,7 +338,8 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfDocumentHasBadFi
         {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId << "bad field" << 3),
          SnapshotName(0)}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(badDocs)));
-    ASSERT_EQUALS(ErrorCodes::Error(40415), storage.getRollbackID(opCtx).getStatus());
+    ASSERT_EQUALS(ErrorCodes::duplicateCodeForTest(40415),
+                  storage.getRollbackID(opCtx).getStatus());
 }
 
 TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotInt) {
@@ -622,7 +623,7 @@ TEST_F(StorageInterfaceImplTest,
     }
 
     auto status = storage.createCollection(opCtx, nss, CollectionOptions());
-    ASSERT_EQUALS(ErrorCodes::Error(28838), status);
+    ASSERT_EQUALS(ErrorCodes::duplicateCodeForTest(28838), status);
     ASSERT_STRING_CONTAINS(status.reason(), "cannot create a non-capped oplog collection");
 }
 

@@ -288,7 +288,7 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
             return _master.get();
 
         monitor->failedHost(_masterHost,
-                            {ErrorCodes::Error(40332), "Last known master host cannot be reached"});
+                            {ErrorCodes::Error(40657), "Last known master host cannot be reached"});
         h = monitor->getMasterOrUassert();  // old master failed, try again.
     }
 
@@ -320,7 +320,7 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
         const std::string message = str::stream() << "can't connect to new replica set master ["
                                                   << _masterHost.toString() << "]"
                                                   << (errmsg.empty() ? "" : ", err: ") << errmsg;
-        monitor->failedHost(_masterHost, {ErrorCodes::Error(40333), message});
+        monitor->failedHost(_masterHost, {ErrorCodes::Error(40659), message});
         uasserted(ErrorCodes::FailedToSatisfyReadPreference, message);
     }
 
@@ -350,7 +350,7 @@ bool DBClientReplicaSet::checkLastHost(const ReadPreferenceSetting* readPref) {
     // Make sure we don't think the host is down.
     if (_lastSlaveOkConn->isFailed() || !_getMonitor()->isHostUp(_lastSlaveOkHost)) {
         _invalidateLastSlaveOkCache(
-            {ErrorCodes::Error(40334), "Last slave connection is no longer available"});
+            {ErrorCodes::Error(40660), "Last slave connection is no longer available"});
         return false;
     }
 

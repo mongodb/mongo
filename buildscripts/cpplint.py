@@ -1676,6 +1676,12 @@ def CheckForMongoVolatile(filename, clean_lines, linenum, error):
           'Illegal use of the volatile storage keyword, use AtomicWord instead '
           'from "mongo/platform/atomic_word.h"')
 
+def CheckForNonMongoAssert(filename, clean_lines, linenum, error):
+  line = clean_lines.elided[linenum]
+  if re.search(r'\bassert\s*\(', line):
+    error(filename, linenum, 'mongodb/assert', 5,
+          'Illegal use of the bare assert function, use a function from assert_utils.h instead.')
+
 def CheckForCopyright(filename, lines, error):
   """Logs an error if no Copyright message appears at the top of the file."""
 
@@ -5820,6 +5826,7 @@ def ProcessLine(filename, file_extension, clean_lines, line,
   CheckForMongoPolyfill(filename, clean_lines, line, error)
   CheckForMongoAtomic(filename, clean_lines, line, error)
   CheckForMongoVolatile(filename, clean_lines, line, error)
+  CheckForNonMongoAssert(filename, clean_lines, line, error)
   if nesting_state.InAsmBlock(): return
   CheckForFunctionLengths(filename, clean_lines, line, function_state, error)
   CheckForMultilineCommentsAndStrings(filename, clean_lines, line, error)

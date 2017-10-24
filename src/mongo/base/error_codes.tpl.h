@@ -73,6 +73,17 @@ public:
     static Error fromString(StringData name);
 
     /**
+     * Reuses a unique numeric code in a way that supresses the duplicate code detection. This
+     * should only be used when testing error cases to ensure that the code under test fails in the
+     * right place. It should NOT be used in non-test code to either make a new error site (use
+     * ErrorCodes::Error(CODE) for that) or to see if a specific failure case occurred (use named
+     * codes for that).
+     */
+    static Error duplicateCodeForTest(int code) {
+        return static_cast<Error>(code);
+    }
+
+    /**
      * Generic predicate to test if a given error code is in a category.
      *
      * This version is intended to simplify forwarding by Status and DBException. Non-generic

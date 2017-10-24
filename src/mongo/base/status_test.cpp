@@ -202,7 +202,7 @@ TEST(Parsing, CodeToEnum) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, ErrorCodes::Error(int(ErrorCodes::TypeMismatch)));
     ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::Error(int(ErrorCodes::UnknownError)));
     ASSERT_EQUALS(ErrorCodes::MaxError, ErrorCodes::Error(int(ErrorCodes::MaxError)));
-    ASSERT_EQUALS(ErrorCodes::OK, ErrorCodes::Error(0));
+    ASSERT_EQUALS(ErrorCodes::OK, ErrorCodes::duplicateCodeForTest(0));
 }
 
 TEST(Transformers, ExceptionToStatus) {

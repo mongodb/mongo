@@ -60,7 +60,7 @@ TEST_F(UglyBSONFixture, DuplicateFields) {
                                     << BSONArray()
                                     << "documents"
                                     << BSONArray()),
-                               ErrorCodes::Error(40413));
+                               ErrorCodes::duplicateCodeForTest(40413));
 }
 
 }  // namespace

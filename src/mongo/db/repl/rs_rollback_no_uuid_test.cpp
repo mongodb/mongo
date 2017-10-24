@@ -240,7 +240,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
                            _replicationProcess.get())
             .transitional_ignore(),
         AssertionException,
-        ErrorCodes::Error(40362));
+        ErrorCodes::duplicateCodeForTest(40362));
 }
 
 TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
