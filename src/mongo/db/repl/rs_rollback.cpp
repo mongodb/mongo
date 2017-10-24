@@ -806,7 +806,7 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
     // Creates the oplog entry to temporarily rename the collection that is
     // preventing the renameCollection command from rolling back to a unique
     // namespace.
-    auto tmpNameResult = db->makeUniqueCollectionNamespace(opCtx, "system.tmp%%%%%");
+    auto tmpNameResult = db->makeUniqueCollectionNamespace(opCtx, "rollback.tmp%%%%%");
     if (!tmpNameResult.isOK()) {
         severe() << "Unable to generate temporary namespace to rename collection " << info.renameTo
                  << " out of the way. " << tmpNameResult.getStatus().reason();

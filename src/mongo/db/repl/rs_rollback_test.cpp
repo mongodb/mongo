@@ -1343,6 +1343,26 @@ TEST_F(RSRollbackTest, RollbackRenamingCollectionsToEachOtherWithoutValidationOp
         _opCtx.get(), _coordinator, _replicationProcess.get(), coll1Options, coll2Options);
 }
 
+TEST_F(RSRollbackTest, RollbackRenamingCollectionsToEachOtherWithValidationOptions) {
+    CollectionOptions coll1Options;
+    coll1Options.uuid = UUID::gen();
+    coll1Options.validator = BSON("x" << BSON("$exists" << 1));
+    coll1Options.validationLevel = "moderate";
+    coll1Options.validationAction = "warn";
+
+    CollectionOptions coll2Options;
+    coll2Options.uuid = UUID::gen();
+    coll2Options.validator = BSON("y" << BSON("$exists" << 1));
+    coll2Options.validationLevel = "strict";
+    coll2Options.validationAction = "error";
+
+    // renameOutOfTheWay() uses a temporary namespace to rename either of the two collections
+    // affected by rollback. The temporary namespace should be able to support collections with
+    // validation enabled.
+    _testRollbackRenamingCollectionsToEachOther(
+        _opCtx.get(), _coordinator, _replicationProcess.get(), coll1Options, coll2Options);
+}
+
 TEST_F(RSRollbackTest, RollbackDropCollectionThenRenameCollectionToDroppedCollectionNS) {
     createOplog(_opCtx.get());
 
