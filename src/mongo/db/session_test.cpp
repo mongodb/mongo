@@ -84,17 +84,8 @@ protected:
         repl::OplogLink link;
         link.prevOpTime = prevOpTime;
 
-        return repl::logOp(opCtx,
-                           "n",
-                           nss,
-                           kUUID,
-                           BSON("TestValue" << 0),
-                           nullptr,
-                           false,
-                           Date_t::now(),
-                           osi,
-                           stmtId,
-                           link);
+        return repl::logOp(
+            opCtx, "n", nss, kUUID, BSON("TestValue" << 0), nullptr, false, osi, stmtId, link);
     }
 };
 

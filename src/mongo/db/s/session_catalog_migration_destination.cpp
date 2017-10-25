@@ -242,10 +242,6 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     result.txnNum = sessionInfo.getTxnNumber().value();
     const auto stmtId = *oplogEntry.getStatementId();
 
-    // Session oplog entries must always contain wall clock time, because we will not be
-    // transferring anything from a previous version of the server
-    invariant(oplogEntry.getWallClockTime());
-
     auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, result.sessionId);
     scopedSession->beginTxn(opCtx, result.txnNum);
 
@@ -289,7 +285,6 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                                                           object,
                                                           &object2,
                                                           true,
-                                                          *oplogEntry.getWallClockTime(),
                                                           sessionInfo,
                                                           stmtId,
                                                           oplogLink);

@@ -117,15 +117,9 @@ BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
     return cmdObjBuilder.obj();
 }
 
-Date_t getWallClockTimeForOpLog(OperationContext* opCtx) {
-    auto const clockSource = opCtx->getServiceContext()->getFastClockSource();
-    return clockSource->now();
-}
-
 struct OpTimeBundle {
     repl::OpTime writeOpTime;
     repl::OpTime prePostImageOpTime;
-    Date_t wallClockTime;
 };
 
 /**
@@ -152,7 +146,6 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     }
 
     OpTimeBundle opTimes;
-    opTimes.wallClockTime = getWallClockTimeForOpLog(opCtx);
 
     if (!storeObj.isEmpty() && opCtx->getTxnNumber()) {
         auto noteUpdateOpTime = repl::logOp(opCtx,
@@ -162,7 +155,6 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                             storeObj,
                                             nullptr,
                                             false,
-                                            opTimes.wallClockTime,
                                             sessionInfo,
                                             args.stmtId,
                                             {});
@@ -183,7 +175,6 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                       args.update,
                                       &args.criteria,
                                       args.fromMigrate,
-                                      opTimes.wallClockTime,
                                       sessionInfo,
                                       args.stmtId,
                                       oplogLink);
@@ -212,20 +203,10 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     }
 
     OpTimeBundle opTimes;
-    opTimes.wallClockTime = getWallClockTimeForOpLog(opCtx);
 
     if (deletedDoc && opCtx->getTxnNumber()) {
-        auto noteOplog = repl::logOp(opCtx,
-                                     "n",
-                                     nss,
-                                     uuid,
-                                     deletedDoc.get(),
-                                     nullptr,
-                                     false,
-                                     opTimes.wallClockTime,
-                                     sessionInfo,
-                                     stmtId,
-                                     {});
+        auto noteOplog = repl::logOp(
+            opCtx, "n", nss, uuid, deletedDoc.get(), nullptr, false, sessionInfo, stmtId, {});
         opTimes.prePostImageOpTime = noteOplog;
         oplogLink.preImageOpTime = noteOplog;
     }
@@ -237,7 +218,6 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                       deleteState.documentKey,
                                       nullptr,
                                       fromMigrate,
-                                      opTimes.wallClockTime,
                                       sessionInfo,
                                       stmtId,
                                       oplogLink);
@@ -269,7 +249,6 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                     builder.done(),
                     nullptr,
                     fromMigrate,
-                    getWallClockTimeForOpLog(opCtx),
                     {},
                     kUninitializedStmtId,
                     {});
@@ -281,7 +260,6 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                     indexDoc,
                     nullptr,
                     fromMigrate,
-                    getWallClockTimeForOpLog(opCtx),
                     {},
                     kUninitializedStmtId,
                     {});
@@ -304,8 +282,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                bool fromMigrate) {
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
 
-    const auto opTimeList = repl::logInsertOps(
-        opCtx, nss, uuid, session, begin, end, fromMigrate, getWallClockTimeForOpLog(opCtx));
+    const auto opTimeList = repl::logInsertOps(opCtx, nss, uuid, session, begin, end, fromMigrate);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
 
@@ -443,17 +420,7 @@ void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
                                          const BSONObj& msgObj,
                                          const boost::optional<BSONObj> o2MsgObj) {
     const BSONObj* o2MsgPtr = o2MsgObj ? o2MsgObj.get_ptr() : nullptr;
-    repl::logOp(opCtx,
-                "n",
-                nss,
-                uuid,
-                msgObj,
-                o2MsgPtr,
-                false,
-                getWallClockTimeForOpLog(opCtx),
-                {},
-                kUninitializedStmtId,
-                {});
+    repl::logOp(opCtx, "n", nss, uuid, msgObj, o2MsgPtr, false, {}, kUninitializedStmtId, {});
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
@@ -486,17 +453,8 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
 
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx,
-                    "c",
-                    cmdNss,
-                    options.uuid,
-                    cmdObj,
-                    nullptr,
-                    false,
-                    getWallClockTimeForOpLog(opCtx),
-                    {},
-                    kUninitializedStmtId,
-                    {});
+        repl::logOp(
+            opCtx, "c", cmdNss, options.uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -534,17 +492,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
 
     if (!nss.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx,
-                    "c",
-                    cmdNss,
-                    uuid,
-                    cmdObj,
-                    &o2Obj,
-                    false,
-                    getWallClockTimeForOpLog(opCtx),
-                    {},
-                    kUninitializedStmtId,
-                    {});
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, &o2Obj, false, {}, kUninitializedStmtId, {});
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -574,17 +522,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
     const NamespaceString cmdNss{dbName, "$cmd"};
     const auto cmdObj = BSON("dropDatabase" << 1);
 
-    repl::logOp(opCtx,
-                "c",
-                cmdNss,
-                {},
-                cmdObj,
-                nullptr,
-                false,
-                getWallClockTimeForOpLog(opCtx),
-                {},
-                kUninitializedStmtId,
-                {});
+    repl::logOp(opCtx, "c", cmdNss, {}, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
 
     if (dbName == FeatureCompatibilityVersion::kDatabase) {
         FeatureCompatibilityVersion::onDropCollection(opCtx);
@@ -607,17 +545,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     repl::OpTime dropOpTime;
     if (!collectionName.isSystemDotProfile()) {
         // Do not replicate system.profile modifications
-        dropOpTime = repl::logOp(opCtx,
-                                 "c",
-                                 cmdNss,
-                                 uuid,
-                                 cmdObj,
-                                 nullptr,
-                                 false,
-                                 getWallClockTimeForOpLog(opCtx),
-                                 {},
-                                 kUninitializedStmtId,
-                                 {});
+        dropOpTime = repl::logOp(
+            opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
     }
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
@@ -654,17 +583,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     const auto cmdNss = nss.getCommandNS();
     const auto cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
 
-    repl::logOp(opCtx,
-                "c",
-                cmdNss,
-                uuid,
-                cmdObj,
-                &indexInfo,
-                false,
-                getWallClockTimeForOpLog(opCtx),
-                {},
-                kUninitializedStmtId,
-                {});
+    repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, &indexInfo, false, {}, kUninitializedStmtId, {});
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
@@ -691,17 +610,8 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
 
     const auto cmdObj = builder.done();
 
-    const auto renameOpTime = repl::logOp(opCtx,
-                                          "c",
-                                          cmdNss,
-                                          uuid,
-                                          cmdObj,
-                                          nullptr,
-                                          false,
-                                          getWallClockTimeForOpLog(opCtx),
-                                          {},
-                                          kUninitializedStmtId,
-                                          {});
+    const auto renameOpTime =
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
 
     if (fromCollection.isSystemDotViews())
         DurableViewCatalog::onExternalChange(opCtx, fromCollection);
@@ -737,17 +647,7 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
                                 const std::string& dbName,
                                 const BSONObj& applyOpCmd) {
     const NamespaceString cmdNss{dbName, "$cmd"};
-    repl::logOp(opCtx,
-                "c",
-                cmdNss,
-                {},
-                applyOpCmd,
-                nullptr,
-                false,
-                getWallClockTimeForOpLog(opCtx),
-                {},
-                kUninitializedStmtId,
-                {});
+    repl::logOp(opCtx, "c", cmdNss, {}, applyOpCmd, nullptr, false, {}, kUninitializedStmtId, {});
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
@@ -761,17 +661,7 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
 
     if (!collectionName.isSystemDotProfile()) {
         // Do not replicate system.profile modifications
-        repl::logOp(opCtx,
-                    "c",
-                    cmdNss,
-                    uuid,
-                    cmdObj,
-                    nullptr,
-                    false,
-                    getWallClockTimeForOpLog(opCtx),
-                    {},
-                    kUninitializedStmtId,
-                    {});
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false, {}, kUninitializedStmtId, {});
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
