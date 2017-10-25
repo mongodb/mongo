@@ -60,7 +60,4 @@ structs:
                 type: optime
                 description: "The optime timestamp component of the last write on this
                               transaction."
-            lastWriteDate:
-                type: date
-                description: "Wall clock time of the last write which happened on on this
-                              transaction."
+
