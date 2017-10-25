@@ -84,8 +84,17 @@ protected:
         repl::OplogLink link;
         link.prevOpTime = prevOpTime;
 
-        return repl::logOp(
-            opCtx, "n", nss, kUUID, BSON("TestValue" << 0), nullptr, false, osi, stmtId, link);
+        return repl::logOp(opCtx,
+                           "n",
+                           nss,
+                           kUUID,
+                           BSON("TestValue" << 0),
+                           nullptr,
+                           false,
+                           Date_t::now(),
+                           osi,
+                           stmtId,
+                           link);
     }
 };
 
@@ -354,6 +363,8 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
 
+        const auto wallClockTime = Date_t::now();
+
         auto opTime = repl::logOp(opCtx(),
                                   "i",
                                   kNss,
@@ -361,6 +372,7 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
                                   BSON("x" << 1),
                                   &Session::kDeadEndSentinel,
                                   false,
+                                  wallClockTime,
                                   osi,
                                   1,
                                   {});
@@ -377,6 +389,8 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
 
+        const auto wallClockTime = Date_t::now();
+
         auto opTime = repl::logOp(opCtx(),
                                   "n",
                                   kNss,
@@ -384,6 +398,7 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
                                   {},
                                   &Session::kDeadEndSentinel,
                                   false,
+                                  wallClockTime,
                                   osi,
                                   kIncompleteHistoryStmtId,
                                   link);
