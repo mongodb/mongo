@@ -150,10 +150,12 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
         geoNear.append("minDistance", minDistance);
 
     geoNear.append("query", query);
-    if (pExpCtx->getCollator()) {
-        geoNear.append("collation", pExpCtx->getCollator()->getSpec().toBSON());
-    } else {
-        geoNear.append("collation", CollationSpec::kSimpleSpec);
+    if (!pExpCtx->collation.isEmpty()) {
+        if (pExpCtx->getCollator()) {
+            geoNear.append("collation", pExpCtx->getCollator()->getSpec().toBSON());
+        } else {
+            geoNear.append("collation", CollationSpec::kSimpleSpec);
+        }
     }
 
     geoNear.append("spherical", spherical);
