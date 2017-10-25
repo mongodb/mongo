@@ -378,6 +378,11 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
         return;
     }
 
+    // This is necessary to ensure that the oplog contains at least one visible document prior to
+    // setting an externally visible lastApplied.  That way if any other node attempts to read from
+    // this node's oplog, it won't appear empty.
+    _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+
     _storage->setInitialDataTimestamp(opCtx->getServiceContext(),
                                       SnapshotName(lastApplied.getValue().opTime.getTimestamp()));
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
@@ -810,11 +815,6 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
             return;
         }
-
-        // This is necessary to ensure that the seed doc is visible in the oplog prior to setting
-        // _lastApplied.  That way if any other node attempts to read from this node's oplog, it
-        // won't appear empty.
-        _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx.get());
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
