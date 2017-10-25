@@ -205,6 +205,7 @@ void TransportLayerLegacy::_closeConnection(Connection* conn) {
 
 void TransportLayerLegacy::shutdown() {
     _running.store(false);
+    ListeningSockets::get()->closeAll();
     _listener->shutdown();
     if (_listenerThread.joinable()) {
         _listenerThread.join();

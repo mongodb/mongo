@@ -1223,8 +1223,11 @@ void shutdownTask() {
     auto const client = Client::getCurrent();
     auto const serviceContext = client->getServiceContext();
 
-    log(LogComponent::kNetwork) << "shutdown: going to close listening sockets...";
-    ListeningSockets::get()->closeAll();
+    // Shutdown the TransportLayer so that new connections aren't accepted
+    if (auto tl = serviceContext->getTransportLayer()) {
+        log(LogComponent::kNetwork) << "shutdown: going to close listening sockets...";
+        tl->shutdown();
+    }
 
     if (serviceContext->getGlobalStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;
@@ -1286,14 +1289,6 @@ void shutdownTask() {
     // When running under address sanitizer, we get false positive leaks due to disorder around
     // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
     // harder to dry up the server from active connections before going on to really shut down.
-
-    // Shutdown the TransportLayer so that new connections aren't accepted
-    if (auto tl = serviceContext->getTransportLayer()) {
-        log(LogComponent::kNetwork)
-            << "shutdown: going to close all sockets because ASAN is active...";
-
-        tl->shutdown();
-    }
 
     // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
     if (auto sep = serviceContext->getServiceEntryPoint()) {
