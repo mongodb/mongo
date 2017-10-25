@@ -64,6 +64,21 @@
         coll.find({$expr: {$eq: ["$a", "$$unbound"]}}).itcount();
     });
 
+    // $and with $expr child containing an invalid expression throws.
+    assert.throws(function() {
+        coll.find({$and: [{a: 0}, {$expr: {$anyElementTrue: undefined}}]}).itcount();
+    });
+
+    // $or with $expr child containing an invalid expression throws.
+    assert.throws(function() {
+        coll.find({$or: [{a: 0}, {$expr: {$anyElementTrue: undefined}}]}).itcount();
+    });
+
+    // $nor with $expr child containing an invalid expression throws.
+    assert.throws(function() {
+        coll.find({$nor: [{a: 0}, {$expr: {$anyElementTrue: undefined}}]}).itcount();
+    });
+
     // $expr with division by zero throws.
     assert.throws(function() {
         coll.find({$expr: {$divide: [1, "$a"]}}).itcount();

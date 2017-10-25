@@ -491,6 +491,24 @@ TEST_F(ExprMatchTest, SetCollatorChangesCollationUsedForComparisons) {
                               << "cba")));
 }
 
+TEST_F(ExprMatchTest, FailGracefullyOnInvalidExpression) {
+    ASSERT_THROWS_CODE(createMatcher(fromjson("{$expr: {$anyElementTrue: undefined}}")),
+                       AssertionException,
+                       17041);
+    ASSERT_THROWS_CODE(
+        createMatcher(fromjson("{$and: [{x: 1},{$expr: {$anyElementTrue: undefined}}]}")),
+        AssertionException,
+        17041);
+    ASSERT_THROWS_CODE(
+        createMatcher(fromjson("{$or: [{x: 1},{$expr: {$anyElementTrue: undefined}}]}")),
+        AssertionException,
+        17041);
+    ASSERT_THROWS_CODE(
+        createMatcher(fromjson("{$nor: [{x: 1},{$expr: {$anyElementTrue: undefined}}]}")),
+        AssertionException,
+        17041);
+}
+
 TEST(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {
     BSONObj expression = BSON("$expr" << BSON("$multiply" << BSON_ARRAY(2 << 2)));
     BSONObj expressionEquiv = BSON("$expr" << BSON("$const" << 4));

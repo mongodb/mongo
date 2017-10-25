@@ -38,8 +38,9 @@
 namespace mongo {
 
 ListOfMatchExpression::~ListOfMatchExpression() {
-    for (unsigned i = 0; i < _expressions.size(); i++)
+    for (unsigned i = 0; i < _expressions.size(); i++) {
         delete _expressions[i];
+    }
     _expressions.clear();
 }
 
@@ -70,7 +71,12 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
         for (auto& childExpression : children) {
             // Since 'childExpression' is a reference to a member of the ListOfMatchExpression's
             // child array, this assignment replaces the original child with the optimized child.
+            // We must set this child's entry in '_expressions' to null after assigning ownership to
+            // 'childExpressionPtr'. Otherwise, if the call to optimize() throws we will attempt to
+            // free twice.
             std::unique_ptr<MatchExpression> childExpressionPtr(childExpression);
+            childExpression = nullptr;
+
             auto optimizedExpression = MatchExpression::optimize(std::move(childExpressionPtr));
             childExpression = optimizedExpression.release();
         }
@@ -85,7 +91,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                     // Move this child out of the children array.
                     std::unique_ptr<ListOfMatchExpression> childExpressionPtr(
                         static_cast<ListOfMatchExpression*>(childExpression));
-                    childExpression = nullptr;  // NULL out this child's entry in _expressions, so
+                    childExpression = nullptr;  // Null out this child's entry in _expressions, so
                                                 // that it will be deleted by the erase call below.
 
                     // Move all of the grandchildren from the child expression to
