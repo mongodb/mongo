@@ -367,18 +367,13 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.writeOK(
         primaryAdminDB.getSiblingDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
 
-    // Test that a 3.4 secondary crashes when syncing from a 3.6 primary and the
+    // Test that a 3.4 secondary can no longer replicate from the primary after the
     // featureCompatibilityVersion is set to 3.6.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
-    assert.soon(function() {
-        try {
-            secondaryAdminDB.runCommand({ping: 1});
-        } catch (e) {
-            return true;
-        }
-        return false;
-    }, "Expected 3.4 secondary to terminate due to replicating featureCompatibilityVersion=3.6");
-    rst.stop(secondary, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    checkFCV34(secondaryAdminDB, "3.4");
+    assert.writeOK(primaryAdminDB.getSiblingDB("test").coll.insert({shouldReplicate: false}));
+    assert.eq(secondaryAdminDB.getSiblingDB("test").coll.find({shouldReplicate: false}).itcount(),
+              0);
     rst.stopSet();
 
     // A mixed 3.4/3.6 replica set without a featureCompatibilityVersion document unfortunately

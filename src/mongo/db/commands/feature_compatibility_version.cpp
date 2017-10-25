@@ -337,8 +337,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
 
         // Close all connections from internal clients with binary versions lower than 3.6.
-        if (newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36 ||
-            newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36) {
+        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
             opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
                 transport::Session::kLatestVersionInternalClientKeepOpen |
                 transport::Session::kExternalClientKeepOpen);

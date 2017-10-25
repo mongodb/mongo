@@ -359,12 +359,12 @@ public:
         result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
         result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
 
-        // If the featureCompatibilityVersion is 3.6, respond with minWireVersion=maxWireVersion.
-        // Then if the connection is from a mongod/mongos of an earlier version, it will fail to
-        // connect.
+        // If the featureCompatibilityVersion is 3.6 (or upgrading or downgrading), respond with
+        // minWireVersion=maxWireVersion. Then if the connection is from a mongod/mongos of an
+        // earlier version, it will fail to connect.
         if (internalClientElement &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+            serverGlobalParams.featureCompatibility.getVersion() !=
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
             result.append("minWireVersion", WireSpec::instance().incoming.maxWireVersion);
         } else {
             result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
