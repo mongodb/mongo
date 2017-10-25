@@ -131,33 +131,63 @@ TEST(PipelineOptimizationTest, MoveMultipleSkipsAndLimitsBeforeProject) {
 }
 
 TEST(PipelineOptimizationTest, MoveMatchBeforeAddFieldsIfInvolvedFieldsNotRelated) {
-    assertPipelineOptimizesTo("[{$addFields : {a : 1}}, {$match : {b : 1}}]",
-                              "[{$match : {b : 1}}, {$addFields : {a : {$const : 1}}}]");
+    string inputPipe = "[{$addFields : {a : 1}}, {$match : {b : 1}}]";
+
+    string outputPipe = "[{$match : {b : {$eq : 1}}}, {$addFields : {a : {$const : 1}}}]";
+
+    string serializedPipe = "[{$match: {b : 1}}, {$addFields: {a : {$const : 1}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchDoesNotMoveBeforeAddFieldsIfInvolvedFieldsAreRelated) {
-    assertPipelineOptimizesTo("[{$addFields : {a : 1}}, {$match : {a : 1}}]",
-                              "[{$addFields : {a : {$const : 1}}}, {$match : {a : 1}}]");
+    string inputPipe = "[{$addFields : {a : 1}}, {$match : {a : 1}}]";
+
+    string outputPipe = "[{$addFields : {a : {$const : 1}}}, {$match : {a : {$eq : 1}}}]";
+
+    string serializedPipe = "[{$addFields : {a : {$const : 1}}}, {$match: {a : 1}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchOnTopLevelFieldDoesNotMoveBeforeAddFieldsOfNestedPath) {
-    assertPipelineOptimizesTo("[{$addFields : {'a.b' : 1}}, {$match : {a : 1}}]",
-                              "[{$addFields : {a : {b : {$const : 1}}}}, {$match : {a : 1}}]");
+    string inputPipe = "[{$addFields : {'a.b' : 1}}, {$match : {a : 1}}]";
+
+    string outputPipe = "[{$addFields : {a : {b : {$const : 1}}}}, {$match : {a : {$eq : 1}}}]";
+
+    string serializedPipe = "[{$addFields: {a: {b: {$const: 1}}}}, {$match: {a: 1}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchOnNestedFieldDoesNotMoveBeforeAddFieldsOfPrefixOfPath) {
-    assertPipelineOptimizesTo("[{$addFields : {a : 1}}, {$match : {'a.b' : 1}}]",
-                              "[{$addFields : {a : {$const : 1}}}, {$match : {'a.b' : 1}}]");
+    string inputPipe = "[{$addFields : {a : 1}}, {$match : {'a.b' : 1}}]";
+
+    string outputPipe = "[{$addFields : {a : {$const : 1}}}, {$match : {'a.b' : {$eq : 1}}}]";
+
+    string serializedPipe = "[{$addFields : {a : {$const : 1}}}, {$match : {'a.b' : 1}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MoveMatchOnNestedFieldBeforeAddFieldsOfDifferentNestedField) {
-    assertPipelineOptimizesTo("[{$addFields : {'a.b' : 1}}, {$match : {'a.c' : 1}}]",
-                              "[{$match : {'a.c' : 1}}, {$addFields : {a : {b : {$const : 1}}}}]");
+    string inputPipe = "[{$addFields : {'a.b' : 1}}, {$match : {'a.c' : 1}}]";
+
+    string outputPipe = "[{$match : {'a.c' : {$eq : 1}}}, {$addFields : {a : {b : {$const : 1}}}}]";
+
+    string serializedPipe = "[{$match : {'a.c' : 1}}, {$addFields : {a : {b: {$const : 1}}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MoveMatchBeforeAddFieldsWhenMatchedFieldIsPrefixOfAddedFieldName) {
-    assertPipelineOptimizesTo("[{$addFields : {abcd : 1}}, {$match : {abc : 1}}]",
-                              "[{$match : {abc : 1}}, {$addFields : {abcd: {$const: 1}}}]");
+    string inputPipe = "[{$addFields : {abcd : 1}}, {$match : {abc : 1}}]";
+
+    string outputPipe = "[{$match : {abc : {$eq : 1}}}, {$addFields : {abcd: {$const: 1}}}]";
+
+    string serializedPipe = "[{$match : {abc : 1}}, {$addFields : {abcd : {$const : 1}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, SkipSkipLimitBecomesLimitSkip) {
@@ -183,7 +213,7 @@ TEST(PipelineOptimizationTest, SortMatchProjSkipLimBecomesMatchTopKSortSkipProj)
         "]";
 
     std::string outputPipe =
-        "[{$match: {a: 1}}"
+        "[{$match: {a: {$eq: 1}}}"
         ",{$sort: {sortKey: {a: 1}, limit: 8}}"
         ",{$skip: 3}"
         ",{$project: {_id: true, a: true}}"
@@ -213,16 +243,28 @@ TEST(PipelineOptimizationTest, RemoveEmptyMatch) {
 }
 
 TEST(PipelineOptimizationTest, RemoveMultipleEmptyMatches) {
-    assertPipelineOptimizesTo("[{$match: {}}, {$match: {}}]", "[{$match: {$and: [{}, {}]}}]");
+    string inputPipe = "[{$match: {}}, {$match: {}}]";
+
+    string outputPipe = "[{$match: {}}]";
+
+    string serializedPipe = "[{$match: {$and: [{}, {}]}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, DoNotRemoveNonEmptyMatch) {
-    assertPipelineOptimizesTo("[{$match: {_id: 1}}]", "[{$match: {_id: 1}}]");
+    string inputPipe = "[{$match: {_id: 1}}]";
+
+    string outputPipe = "[{$match: {_id: {$eq : 1}}}]";
+
+    string serializedPipe = "[{$match: {_id: 1}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MoveMatchBeforeSort) {
     std::string inputPipe = "[{$sort: {b: 1}}, {$match: {a: 2}}]";
-    std::string outputPipe = "[{$match: {a: 2}}, {$sort: {sortKey: {b: 1}}}]";
+    std::string outputPipe = "[{$match: {a: {$eq : 2}}}, {$sort: {sortKey: {b: 1}}}]";
     std::string serializedPipe = "[{$match: {a: 2}}, {$sort: {b: 1}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
@@ -326,10 +368,14 @@ TEST(PipelineOptimizationTest, LookupShouldSwapWithMatch) {
         "'z'}}, "
         " {$match: {'independent': 0}}]";
     string outputPipe =
-        "[{$match: {independent: 0}}, "
+        "[{$match: {independent: {$eq : 0}}}, "
         " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z'}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string serializedPipe =
+        "[{$match: {independent: 0}}, "
+        "{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z'}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldSwapWithMatch) {
@@ -337,9 +383,13 @@ TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldSwapWithMatch) {
         "[{$lookup: {from: 'lookupColl', as: 'asField', pipeline: []}}, "
         " {$match: {'independent': 0}}]";
     string outputPipe =
-        "[{$match: {independent: 0}}, "
+        "[{$match: {independent: {$eq : 0}}}, "
         " {$lookup: {from: 'lookupColl', as: 'asField', let: {}, pipeline: []}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string serializedPipe =
+        "[{$match: {independent: 0}}, "
+        "{$lookup: {from: 'lookupColl', as: 'asField', let: {}, pipeline: []}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldSplitMatch) {
@@ -363,8 +413,13 @@ TEST(PipelineOptimizationTest, LookupShouldNotAbsorbMatchOnAs) {
     string outputPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z'}}, "
+        " {$match: {'asField.subfield': {$eq : 0}}}]";
+    string serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
         " {$match: {'asField.subfield': 0}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindMatch) {
@@ -525,7 +580,7 @@ TEST(PipelineOptimizationTest, LookupDoesNotAbsorbElemMatch) {
         "             } "
         "           } "
         " }, "
-        " {$match: {x: {$elemMatch: {a: 1}}}}]";
+        " {$match: {x: {$elemMatch: {a: {$eq: 1}}}}}]";
     string serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
         " {$unwind: {path: '$x'}}, "
@@ -569,8 +624,11 @@ TEST(PipelineOptimizationTest, LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMo
 TEST(PipelineOptimizationTest, MatchShouldDuplicateItselfBeforeRedact) {
     string inputPipe = "[{$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
     string outputPipe =
-        "[{$match: {a: 1, b:12}}, {$redact: {$const: 'prune'}}, {$match: {a: 1, b:12}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+        "[{$match: {$and: [{a: {$eq: 1}}, {b: {$eq: 12}}]}}, {$redact: {$const: 'prune'}}, "
+        "{$match: {$and: [{a: {$eq: 1}}, {b: {$eq: 12}}]}}]";
+    string serializedPipe =
+        "[{$match: {a: 1, b: 12}}, {$redact: {$const: 'prune'}}, {$match: {a: 1, b: 12}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchShouldSwapWithUnwind) {
@@ -578,9 +636,10 @@ TEST(PipelineOptimizationTest, MatchShouldSwapWithUnwind) {
         "[{$unwind: '$a.b.c'}, "
         "{$match: {'b': 1}}]";
     string outputPipe =
-        "[{$match: {'b': 1}}, "
+        "[{$match: {'b': {$eq : 1}}}, "
         "{$unwind: {path: '$a.b.c'}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string serializedPipe = "[{$match: {b: 1}}, {$unwind: {path: '$a.b.c'}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchOnPrefixShouldNotSwapOnUnwind) {
@@ -589,8 +648,9 @@ TEST(PipelineOptimizationTest, MatchOnPrefixShouldNotSwapOnUnwind) {
         "{$match: {'a.b': 1}}]";
     string outputPipe =
         "[{$unwind: {path: '$a.b.c'}}, "
-        "{$match: {'a.b': 1}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+        "{$match: {'a.b': {$eq : 1}}}]";
+    string serializedPipe = "[{$unwind: {path: '$a.b.c'}}, {$match: {'a.b': 1}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchShouldSplitOnUnwind) {
@@ -612,8 +672,10 @@ TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWithElemMatch) {
         "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
     string outputPipe =
         "[{$unwind: {path: '$a.b'}}, "
-        "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+        "{$match: {a: {$elemMatch: {b: {$eq : {d: 1}}}}}}]";
+    string serializedPipe =
+        "[{$unwind : {path : '$a.b'}}, {$match : {a : {$elemMatch : {b : {d : 1}}}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWhenMatchingOnIndexField) {
@@ -741,7 +803,7 @@ TEST(PipelineOptimizationTest, GraphLookupShouldSwapWithMatch) {
         " {$match: {independent: 'x'}}"
         "]";
     string outputPipe =
-        "[{$match: {independent: 'x'}},"
+        "[{$match: {independent: {$eq : 'x'}}},"
         " {$graphLookup: {"
         "    from: 'lookupColl',"
         "    as: 'results',"
@@ -749,18 +811,28 @@ TEST(PipelineOptimizationTest, GraphLookupShouldSwapWithMatch) {
         "    connectFromField: 'from',"
         "    startWith: '$startVal'"
         " }}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string serializedPipe =
+        "[{$match: {independent: 'x'}}, "
+        " {$graphLookup: {"
+        "   from: 'lookupColl',"
+        "   as: 'results',"
+        "   connectToField: 'to',"
+        "   connectFromField: 'from',"
+        "   startWith: '$startVal'"
+        " }}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, ExclusionProjectShouldSwapWithIndependentMatch) {
     string inputPipe = "[{$project: {redacted: 0}}, {$match: {unrelated: 4}}]";
-    string outputPipe = "[{$match: {unrelated: 4}}, {$project: {redacted: false}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string outputPipe = "[{$match: {unrelated: {$eq : 4}}}, {$project: {redacted: false}}]";
+    string serializedPipe = "[{$match : {unrelated : 4}}, {$project : {redacted : false}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, ExclusionProjectShouldNotSwapWithMatchOnExcludedFields) {
     std::string pipeline =
-        "[{$project: {subdoc: {redacted: false}}}, {$match: {'subdoc.redacted': 4}}]";
+        "[{$project: {subdoc: {redacted: false}}}, {$match: {'subdoc.redacted': {$eq : 4}}}]";
     assertPipelineOptimizesTo(pipeline, pipeline);
 }
 
@@ -777,15 +849,24 @@ TEST(PipelineOptimizationTest, MatchShouldSplitIfPartIsIndependentOfExclusionPro
 
 TEST(PipelineOptimizationTest, InclusionProjectShouldSwapWithIndependentMatch) {
     string inputPipe = "[{$project: {included: 1}}, {$match: {included: 4}}]";
-    string outputPipe = "[{$match: {included: 4}}, {$project: {_id: true, included: true}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string outputPipe =
+        "[{$match: {included: {$eq : 4}}}, {$project: {_id: true, included: true}}]";
+    string serializedPipe =
+        "[{$match : {included : 4}}, {$project : {_id: true, included : true}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, InclusionProjectShouldNotSwapWithMatchOnFieldsNotIncluded) {
-    string pipeline =
+    string inputPipe =
         "[{$project: {_id: true, included: true, subdoc: {included: true}}},"
         " {$match: {notIncluded: 'x', unrelated: 4}}]";
-    assertPipelineOptimizesTo(pipeline, pipeline);
+    string outputPipe =
+        "[{$project: {_id: true, included: true, subdoc: {included: true}}},"
+        " {$match: {$and: [{notIncluded: {$eq: 'x'}}, {unrelated: {$eq: 4}}]}}]";
+    string serializedPipe =
+        "[{$project: {_id: true, included: true, subdoc: {included: true}}},"
+        " {$match: {notIncluded: 'x', unrelated: 4}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchShouldSplitIfPartIsIndependentOfInclusionProjection) {
@@ -815,18 +896,23 @@ TEST(PipelineOptimizationTest, NeighboringMatchesShouldCoalesce) {
     string inputPipe =
         "[{$match: {x: 'x'}},"
         " {$match: {y: 'y'}}]";
-    string outputPipe = "[{$match: {$and: [{x: 'x'}, {y: 'y'}]}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string outputPipe = "[{$match: {$and: [{x: {$eq: 'x'}}, {y: {$eq : 'y'}}]}}]";
+    string serializedPipe = "[{$match: {$and: [{x: 'x'}, {y: 'y'}]}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchShouldNotSwapBeforeLimit) {
-    string pipeline = "[{$limit: 3}, {$match: {y: 'y'}}]";
-    assertPipelineOptimizesTo(pipeline, pipeline);
+    string inputPipe = "[{$limit: 3}, {$match: {y: 'y'}}]";
+    string outputPipe = "[{$limit: 3}, {$match: {y: {$eq : 'y'}}}]";
+    string serializedPipe = "[{$limit: 3}, {$match: {y: 'y'}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchShouldNotSwapBeforeSkip) {
-    string pipeline = "[{$skip: 3}, {$match: {y: 'y'}}]";
-    assertPipelineOptimizesTo(pipeline, pipeline);
+    string inputPipe = "[{$skip: 3}, {$match: {y: 'y'}}]";
+    string outputPipe = "[{$skip: 3}, {$match: {y: {$eq : 'y'}}}]";
+    string serializedPipe = "[{$skip: 3}, {$match: {y: 'y'}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchShouldMoveAcrossProjectRename) {
@@ -1051,17 +1137,38 @@ TEST(PipelineOptimizationTest, MatchOnObjectMatchShouldNotSwapSinceCategoryIsOth
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: {$eq: 1}}}}}]";
+    string serializedPipe =
+        "[{$project: {_id: true, a: '$b'}},"
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$project: {redacted: false}}, "
         "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$project: {redacted: false}},"
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: {$eq: 1}}}}}]";
+    serializedPipe =
+        "[{$project: {redacted: false}},"
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
         "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: {$eq: 1}}}}}]";
+    serializedPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {a: {$_internalSchemaObjectMatch: {b: 1}}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 // Descriptive test. The following internal match expression *could* participate in pipeline
@@ -1113,7 +1220,23 @@ TEST(PipelineOptimizationTest, MatchOnAllowedPropertiesShouldNotSwapSinceCategor
             patternProperties: [], 
             otherwise: {i: 1}
         }}}])";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe = R"(
+        [{$project: {_id: true, a: '$b'}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ['b'], 
+            namePlaceholder: 'i', 
+            patternProperties: [], 
+            otherwise: {i: {$eq : 1}}
+        }}}])";
+    string serializedPipe = R"(
+        [{$project: {_id: true, a: '$b'}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ['b'], 
+            namePlaceholder: 'i', 
+            patternProperties: [], 
+            otherwise: {i : 1}}
+        }}])";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe = R"(
         [{$project: {redacted: false}}, 
@@ -1123,7 +1246,23 @@ TEST(PipelineOptimizationTest, MatchOnAllowedPropertiesShouldNotSwapSinceCategor
             patternProperties: [], 
             otherwise: {i: 1}
         }}}])";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe = R"(
+        [{$project: {redacted: false}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ['b'], 
+            namePlaceholder: 'i', 
+            patternProperties: [], 
+            otherwise: {i: {$eq: 1}
+        }}}}])";
+    serializedPipe = R"(
+        [{$project: {redacted: false}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ['b'], 
+            namePlaceholder: 'i', 
+            patternProperties: [], 
+            otherwise: {i: 1}
+        }}}])";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe = R"(
         [{$addFields : {a : {$const: 1}}}, 
@@ -1133,7 +1272,23 @@ TEST(PipelineOptimizationTest, MatchOnAllowedPropertiesShouldNotSwapSinceCategor
             patternProperties: [], 
             otherwise: {i: 1}
         }}}])";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe = R"(
+        [{$addFields: {a: {$const: 1}}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ["b"], 
+            namePlaceholder: "i", 
+            patternProperties: [], 
+            otherwise: {i: {$eq: 1}
+        }}}}])";
+    serializedPipe = R"(
+        [{$addFields : {a : {$const: 1}}}, 
+        {$match: {$_internalSchemaAllowedProperties: {
+            properties: ['b'], 
+            namePlaceholder: 'i', 
+            patternProperties: [], 
+            otherwise: {i: 1}
+        }}}])";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 // Descriptive test. The following internal match expression *could* participate in pipeline
@@ -1142,17 +1297,35 @@ TEST(PipelineOptimizationTest, MatchOnCondShouldNotSwapSinceCategoryIsOther) {
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {$_internalSchemaCond: [{a: {$eq : 1}}, {b: {$eq : 1}}, {c: {$eq : 1}}]}}]";
+    string serializedPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$project: {redacted: false}}, "
         "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {$_internalSchemaCond: [{a: {$eq : 1}}, {b: {$eq: 1}}, {c: {$eq: 1}}]}}]";
+    serializedPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
         "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {$_internalSchemaCond: [{a: {$eq : 1}}, {b: {$eq: 1}}, {c: {$eq : 1}}]}}]";
+    serializedPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 // Descriptive test. The following internal match expression *could* participate in pipeline
@@ -1180,17 +1353,35 @@ TEST(PipelineOptimizationTest, MatchOnInternalSchemaTypeShouldNotSwapSinceCatego
     string inputPipe =
         "[{$project: {_id: true, a: '$b'}}, "
         "{$match: {a: {$_internalSchemaType: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    string outputPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        " {$match: {a: {$_internalSchemaType: [1]}}}]";
+    string serializedPipe =
+        "[{$project: {_id: true, a: '$b'}}, "
+        "{$match: {a: {$_internalSchemaType: 1}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$project: {redacted: false}}, "
         "{$match: {a: {$_internalSchemaType: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$project: {redacted: false}}, "
+        " {$match: {a: {$_internalSchemaType: [1]}}}]";
+    serializedPipe =
+        "[{$project: {redacted: false}}, "
+        "{$match: {a: {$_internalSchemaType: 1}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
         "{$match: {b: {$_internalSchemaType: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        " {$match: {b: {$_internalSchemaType: [1]}}}]";
+    serializedPipe =
+        "[{$addFields : {a : {$const: 1}}}, "
+        "{$match: {b: {$_internalSchemaType: 1}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchOnMinLengthShouldSwapWithAdjacentStage) {
@@ -1278,28 +1469,40 @@ TEST(PipelineOptimizationTest, MatchOnXorShouldSwapIfEverySubExpressionIsEligibl
     string outputPipe =
         "[{$match: {$_internalSchemaXor: [{b: {$eq: 1}}, {d: {$eq: 1}}]}}, "
         "{$project: {_id: true, a: '$b', c: '$d'}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, outputPipe);
 
     inputPipe =
         "[{$project: {redacted: false}}, "
         "{$match: {$_internalSchemaXor: [{a: 1}, {b: 1}]}}]";
     outputPipe =
-        "[{$match: {$_internalSchemaXor: [{a: 1}, {b: 1}]}}, "
+        "[{$match: {$_internalSchemaXor: [{a: {$eq : 1}}, {b: {$eq : 1}}]}}, "
         "{$project: {redacted: false}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string serializedPipe =
+        "[{$match: {$_internalSchemaXor: [{a: 1}, {b: 1}]}}, "
+        " {$project: {redacted: false}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
         "{$match: {$_internalSchemaXor: [{b: 1}, {c: 1}]}}]";
     outputPipe =
-        "[{$match: {$_internalSchemaXor: [{b: 1}, {c: 1}]}}, "
+        "[{$match: {$_internalSchemaXor: [{b: {$eq: 1}}, {c: {$eq: 1}}]}}, "
         "{$addFields: {a: {$const: 1}}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    serializedPipe =
+        "[{$match: {$_internalSchemaXor: [{b: 1}, {c: 1}]}}, "
+        "{$addFields : {a : {$const: 1}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =
         "[{$addFields : {a : {$const: 1}}}, "
         "{$match: {$_internalSchemaXor: [{b: 1}, {a: 1}]}}]";
-    assertPipelineOptimizesTo(inputPipe, inputPipe);
+    outputPipe =
+        "[{$addFields: {a: {$const: 1}}}, "
+        "{$match: {$_internalSchemaXor: [{b: {$eq: 1}}, {a: {$eq: 1}}]}}]";
+    serializedPipe =
+        "[{$addFields: {a: {$const: 1}}}, "
+        "{$match: {$_internalSchemaXor: [{b: 1}, {a: 1}]}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchOnFmodShouldSwapWithAdjacentStage) {
@@ -1491,7 +1694,7 @@ class UnwindNotFinal : public Base {
         return "[{$unwind: {path: '$a'}}, {$match: {a:1}}]}";
     }
     string shardPipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$match: {a:1}}]}";
+        return "[{$unwind: {path: '$a'}}, {$match: {a:{$eq:1}}}]}";
     }
     string mergePipeJson() {
         return "[]}";
@@ -1503,7 +1706,7 @@ class UnwindWithOther : public Base {
         return "[{$match: {a:1}}, {$unwind: {path: '$a'}}]}";
     }
     string shardPipeJson() {
-        return "[{$match: {a:1}}]}";
+        return "[{$match: {a:{$eq:1}}}]}";
     }
     string mergePipeJson() {
         return "[{$unwind: {path: '$a'}}]}";
@@ -1601,7 +1804,7 @@ class ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj : public Base {
                "]";
     }
     string shardPipeJson() {
-        return "[{$match: {a: 1}}"
+        return "[{$match: {a: {$eq : 1}}}"
                ",{$sort: {sortKey: {a: 1}, limit: 8}}"
                ",{$project: {_id: true, a: true}}"
                "]";

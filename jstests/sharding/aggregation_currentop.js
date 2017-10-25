@@ -361,7 +361,7 @@
 
         const expectedStages = [
             {$currentOp: {idleConnections: true, allUsers: false, truncateOps: false}},
-            {$match: {desc: "test"}}
+            {$match: {desc: {$eq: "test"}}}
         ];
 
         if (isMongos) {

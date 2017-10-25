@@ -718,10 +718,10 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheNonCorrelatedSubPipelinePrefix) {
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
 
-    auto expectedPipe =
-        fromjson(str::stream() << "[{mock: {}}, {$match: {x:1}}, {$sort: {sortKey: {x: 1}}}, "
-                               << sequentialCacheStageObj()
-                               << ", {$addFields: {varField: {$const: 5} }}]");
+    auto expectedPipe = fromjson(
+        str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
+                      << sequentialCacheStageObj()
+                      << ", {$addFields: {varField: {$const: 5} }}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -752,15 +752,11 @@ TEST_F(DocumentSourceLookUpTest,
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
 
-    // TODO: The '$$var1' in this expression actually gets optimized to a constant expression with
-    // value 5, but the explain output does not reflect that change. SERVER-31292 will make that
-    // optimization visible here, so we will need to replace '$$var1' with a $const expression for
-    // this test to pass.
-    auto expectedPipe =
-        fromjson(str::stream() << "[{mock: {}}, {$match: {x:1}}, {$sort: {sortKey: {x: 1}}}, "
-                               << sequentialCacheStageObj()
-                               << ", {$facet: {facetPipe: [{$group: {_id: '$_id'}}, {$match: "
-                                  "{$expr: {$eq: ['$_id', '$$var1']}}}]}}]");
+    auto expectedPipe = fromjson(
+        str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
+                      << sequentialCacheStageObj()
+                      << ", {$facet: {facetPipe: [{$group: {_id: '$_id'}}, {$match: "
+                         "{$and: [{_id: {$eq: 5}}, {$expr: {$eq: ['$_id', {$const: 5}]}}]}}]}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -829,11 +825,11 @@ TEST_F(DocumentSourceLookUpTest,
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
-        str::stream()
-        << "[{mock: {}}, {$match: {x: 1}}, {$sort: {sortKey: {x: 1}}}, {$project: {_id: false, "
-           "projectedField: {$let: {vars: {var1: {$const: 'abc'}}, in: '$$var1'}}}},"
-        << sequentialCacheStageObj()
-        << ", {$addFields: {varField: {$sum: ['$x', {$const: 5}]}}}]");
+        str::stream() << "[{mock: {}}, {$match: {x: {$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
+                         "{$project: {_id: false, "
+                         "projectedField: {$let: {vars: {var1: {$const: 'abc'}}, in: '$$var1'}}}},"
+                      << sequentialCacheStageObj()
+                      << ", {$addFields: {varField: {$sum: ['$x', {$const: 5}]}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -863,13 +859,13 @@ TEST_F(DocumentSourceLookUpTest, ShouldInsertCacheBeforeCorrelatedNestedLookup) 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
 
-    auto expectedPipe =
-        fromjson(str::stream() << "[{mock: {}}, {$match: {x:1}}, {$sort: {sortKey: {x: 1}}}, "
-                               << sequentialCacheStageObj()
-                               << ", {$lookup: {from: 'coll', as: 'subas', let: {}, pipeline: "
-                                  "[{$match: {x: 1}}, {$lookup: {from: 'coll', as: 'subsubas', "
-                                  "pipeline: [{$match: {$expr: {$eq: ['$y', '$$var1']}}}]}}]}}, "
-                                  "{$addFields: {varField: {$const: 5}}}]");
+    auto expectedPipe = fromjson(
+        str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
+                      << sequentialCacheStageObj()
+                      << ", {$lookup: {from: 'coll', as: 'subas', let: {}, pipeline: "
+                         "[{$match: {x: 1}}, {$lookup: {from: 'coll', as: 'subsubas', "
+                         "pipeline: [{$match: {$expr: {$eq: ['$y', '$$var1']}}}]}}]}}, "
+                         "{$addFields: {varField: {$const: 5}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -899,12 +895,12 @@ TEST_F(DocumentSourceLookUpTest,
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
 
-    auto expectedPipe =
-        fromjson(str::stream() << "[{mock: {}}, {$match: {x:1}}, {$sort: {sortKey: {x: 1}}}, "
-                                  "{$lookup: {from: 'coll', as: 'subas', let: {var1: '$y'}, "
-                                  "pipeline: [{$match: {$expr: { $eq: ['$z', '$$var1']}}}]}}, "
-                               << sequentialCacheStageObj()
-                               << ", {$addFields: {varField: {$const: 5} }}]");
+    auto expectedPipe = fromjson(
+        str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
+                         "{$lookup: {from: 'coll', as: 'subas', let: {var1: '$y'}, "
+                         "pipeline: [{$match: {$expr: { $eq: ['$z', '$$var1']}}}]}}, "
+                      << sequentialCacheStageObj()
+                      << ", {$addFields: {varField: {$const: 5} }}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -930,13 +926,13 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheEntirePipelineIfNonCorrelated) {
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
 
-    auto expectedPipe =
-        fromjson(str::stream()
-                 << "[{mock: {}}, {$match: {x:1}}, {$sort: {sortKey: {x: 1}}}, {$lookup: {from: "
-                    "'coll', as: 'subas', let: {}, pipeline: [{$match: {y: 5}}]}}, {$addFields: "
-                    "{constField: {$const: 5}}}, "
-                 << sequentialCacheStageObj()
-                 << "]");
+    auto expectedPipe = fromjson(
+        str::stream()
+        << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, {$lookup: {from: "
+           "'coll', as: 'subas', let: {}, pipeline: [{$match: {y: 5}}]}}, {$addFields: "
+           "{constField: {$const: 5}}}, "
+        << sequentialCacheStageObj()
+        << "]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }

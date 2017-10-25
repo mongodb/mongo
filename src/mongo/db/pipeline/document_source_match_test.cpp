@@ -49,6 +49,8 @@ using std::string;
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceMatchTest = AggregationContextFixture;
 
+constexpr auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
+
 TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
     auto expCtx = getExpCtx();
     auto assertExpectedRedactSafePortion = [&expCtx](string input, string safePortion) {
@@ -615,6 +617,18 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
     ASSERT_TRUE(match->getNext().isEOF());
     ASSERT_TRUE(match->getNext().isEOF());
     ASSERT_TRUE(match->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceMatchTest, ShouldShowOptimizationsInExplainOutputWhenOptimized) {
+    const auto match = DocumentSourceMatch::create(fromjson("{$and: [{a: 1}]}"), getExpCtx());
+
+    auto optimizedMatch = match->optimize();
+
+    auto expectedMatch = fromjson("{$match: {a:{$eq: 1}}}");
+
+    ASSERT_VALUE_EQ(
+        Value((static_cast<DocumentSourceMatch*>(optimizedMatch.get()))->serialize(kExplain)),
+        Value(expectedMatch));
 }
 
 }  // namespace

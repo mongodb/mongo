@@ -60,6 +60,11 @@ const char* DocumentSourceMatch::getSourceName() const {
 }
 
 Value DocumentSourceMatch::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+    if (explain) {
+        BSONObjBuilder builder;
+        _expression->serialize(&builder);
+        return Value(DOC(getSourceName() << Document(builder.obj())));
+    }
     return Value(DOC(getSourceName() << Document(getQuery())));
 }
 
@@ -495,7 +500,6 @@ DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                  : DepsTracker::MetadataAvailable::kNoMetadata) {
     StatusWithMatchExpression status = uassertStatusOK(MatchExpressionParser::parse(
         _predicate, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
-
     _expression = std::move(status.getValue());
     getDependencies(&_dependencies);
 }
