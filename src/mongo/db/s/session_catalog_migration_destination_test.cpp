@@ -298,17 +298,14 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry oplog2(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     oplog2.setOperationSessionInfo(sessionInfo);
     oplog2.setStatementId(45);
-    oplog2.setWallClockTime(Date_t::now());
 
     OplogEntry oplog3(OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 60));
     oplog3.setOperationSessionInfo(sessionInfo);
     oplog3.setStatementId(5);
-    oplog3.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1, oplog2, oplog3});
 
@@ -350,19 +347,16 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
     sessionInfo.setTxnNumber(txnNum++);
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry oplog2(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     sessionInfo.setTxnNumber(txnNum++);
     oplog2.setOperationSessionInfo(sessionInfo);
     oplog2.setStatementId(45);
-    oplog2.setWallClockTime(Date_t::now());
 
     OplogEntry oplog3(OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 60));
     sessionInfo.setTxnNumber(txnNum);
     oplog3.setOperationSessionInfo(sessionInfo);
     oplog3.setStatementId(5);
-    oplog3.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1, oplog2, oplog3});
 
@@ -394,19 +388,17 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparate
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry oplog2(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     oplog2.setOperationSessionInfo(sessionInfo);
     oplog2.setStatementId(45);
-    oplog2.setWallClockTime(Date_t::now());
 
     OplogEntry oplog3(OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 60));
     oplog3.setOperationSessionInfo(sessionInfo);
     oplog3.setStatementId(5);
-    oplog3.setWallClockTime(Date_t::now());
 
     // Return in 2 batches
+
     returnOplog({oplog1, oplog2});
     returnOplog({oplog3});
 
@@ -452,17 +444,14 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(sessionInfo1);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry oplog2(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     oplog2.setOperationSessionInfo(sessionInfo2);
     oplog2.setStatementId(45);
-    oplog2.setWallClockTime(Date_t::now());
 
     OplogEntry oplog3(OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 60));
     oplog3.setOperationSessionInfo(sessionInfo2);
     oplog3.setStatementId(5);
-    oplog3.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1, oplog2, oplog3});
 
@@ -529,7 +518,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
                       origInnerOplog1.toBSON());
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry oplog2(OpTime(Timestamp(1080, 2), 1),
                       0,
@@ -540,7 +528,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
                       origInnerOplog2.toBSON());
     oplog2.setOperationSessionInfo(sessionInfo);
     oplog2.setStatementId(45);
-    oplog2.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1, oplog2});
 
@@ -578,7 +565,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, BSON("x" << 100));
     preImageOplog.setOperationSessionInfo(sessionInfo);
     preImageOplog.setStatementId(45);
-    preImageOplog.setWallClockTime(Date_t::now());
 
     OplogEntry updateOplog(OpTime(Timestamp(80, 2), 1),
                            0,
@@ -589,7 +575,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setWallClockTime(Date_t::now());
     updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog, updateOplog});
@@ -667,7 +652,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, BSON("x" << 100));
     postImageOplog.setOperationSessionInfo(sessionInfo);
     postImageOplog.setStatementId(45);
-    postImageOplog.setWallClockTime(Date_t::now());
 
     OplogEntry updateOplog(OpTime(Timestamp(80, 2), 1),
                            0,
@@ -678,7 +662,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setWallClockTime(Date_t::now());
     updateOplog.setPostImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({postImageOplog, updateOplog});
@@ -756,7 +739,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, BSON("x" << 100));
     preImageOplog.setOperationSessionInfo(sessionInfo);
     preImageOplog.setStatementId(45);
-    preImageOplog.setWallClockTime(Date_t::now());
 
     OplogEntry updateOplog(OpTime(Timestamp(80, 2), 1),
                            0,
@@ -767,7 +749,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setWallClockTime(Date_t::now());
     updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog});
@@ -860,12 +841,10 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(oldSessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry oplog2(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     oplog2.setOperationSessionInfo(oldSessionInfo);
     oplog2.setStatementId(45);
-    oplog2.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1, oplog2});
 
@@ -904,7 +883,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(oldSessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1});
 
@@ -924,7 +902,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     OplogEntry oplog2(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     oplog2.setOperationSessionInfo(oldSessionInfo);
     oplog2.setStatementId(45);
-    oplog2.setWallClockTime(Date_t::now());
 
     returnOplog({oplog2});
 
@@ -1005,7 +982,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWith
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog.setOperationSessionInfo(sessionInfo);
     oplog.setStatementId(23);
-    oplog.setWallClockTime(Date_t::now());
 
     returnOplog({oplog});
 
@@ -1028,7 +1004,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWith
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog.setOperationSessionInfo(sessionInfo);
     oplog.setStatementId(23);
-    oplog.setWallClockTime(Date_t::now());
 
     returnOplog({oplog});
 
@@ -1052,7 +1027,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyForResponseWith
     OplogEntry oplog(
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog.setOperationSessionInfo(sessionInfo);
-    oplog.setWallClockTime(Date_t::now());
 
     returnOplog({oplog});
 
@@ -1079,7 +1053,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1});
 
@@ -1095,7 +1068,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     OplogEntry oplog2(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     oplog2.setOperationSessionInfo(sessionInfo);
     oplog2.setStatementId(45);
-    oplog2.setWallClockTime(Date_t::now());
 
     returnOplog({oplog2});
 
@@ -1136,19 +1108,17 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForConsecutivePreImage
     sessionInfo.setSessionId(sessionId);
     sessionInfo.setTxnNumber(2);
 
-    OplogEntry preImageOplog1(
+    OplogEntry preImageOplog(
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, BSON("x" << 100));
-    preImageOplog1.setOperationSessionInfo(sessionInfo);
-    preImageOplog1.setStatementId(45);
-    preImageOplog1.setWallClockTime(Date_t::now());
+    preImageOplog.setOperationSessionInfo(sessionInfo);
+    preImageOplog.setStatementId(45);
 
     OplogEntry preImageOplog2(
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, BSON("x" << 100));
     preImageOplog2.setOperationSessionInfo(sessionInfo);
     preImageOplog2.setStatementId(45);
-    preImageOplog2.setWallClockTime(Date_t::now());
 
-    returnOplog({preImageOplog1, preImageOplog2});
+    returnOplog({preImageOplog, preImageOplog2});
 
     sessionMigration.join();
 
@@ -1175,7 +1145,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, BSON("x" << 100));
     preImageOplog.setOperationSessionInfo(sessionInfo);
     preImageOplog.setStatementId(45);
-    preImageOplog.setWallClockTime(Date_t::now());
 
     OplogEntry updateOplog(OpTime(Timestamp(80, 2), 1),
                            0,
@@ -1187,7 +1156,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     sessionInfo.setSessionId(makeLogicalSessionIdForTest());
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setWallClockTime(Date_t::now());
     updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog, updateOplog});
@@ -1217,7 +1185,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForPreImageOplogWithNo
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, BSON("x" << 100));
     preImageOplog.setOperationSessionInfo(sessionInfo);
     preImageOplog.setStatementId(45);
-    preImageOplog.setWallClockTime(Date_t::now());
 
     OplogEntry updateOplog(OpTime(Timestamp(80, 2), 1),
                            0,
@@ -1229,7 +1196,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForPreImageOplogWithNo
     sessionInfo.setTxnNumber(56);
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setWallClockTime(Date_t::now());
     updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({preImageOplog, updateOplog});
@@ -1260,7 +1226,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, BSON("x" << 100));
     preImageOplog.setOperationSessionInfo(sessionInfo);
     preImageOplog.setStatementId(45);
-    preImageOplog.setWallClockTime(Date_t::now());
 
     OplogEntry updateOplog(OpTime(Timestamp(80, 2), 1),
                            0,
@@ -1271,7 +1236,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setWallClockTime(Date_t::now());
 
     returnOplog({preImageOplog, updateOplog});
 
@@ -1301,7 +1265,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry updateOplog(OpTime(Timestamp(80, 2), 1),
                            0,
@@ -1312,7 +1275,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setWallClockTime(Date_t::now());
     updateOplog.setPreImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({oplog1, updateOplog});
@@ -1343,7 +1305,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry updateOplog(OpTime(Timestamp(80, 2), 1),
                            0,
@@ -1354,7 +1315,6 @@ TEST_F(SessionCatalogMigrationDestinationTest,
                            BSON("$set" << BSON("x" << 101)));
     updateOplog.setOperationSessionInfo(sessionInfo);
     updateOplog.setStatementId(45);
-    updateOplog.setWallClockTime(Date_t::now());
     updateOplog.setPostImageOpTime(repl::OpTime(Timestamp(100, 2), 1));
 
     returnOplog({oplog1, updateOplog});
@@ -1384,17 +1344,14 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
         OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry oplog2(OpTime(Timestamp(70, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     oplog2.setOperationSessionInfo(sessionInfo);
     oplog2.setStatementId(30);
-    oplog2.setWallClockTime(Date_t::now());
 
     OplogEntry oplog3(OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 80));
     oplog3.setOperationSessionInfo(sessionInfo);
     oplog3.setStatementId(45);
-    oplog3.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1, oplog2, oplog3});
 
@@ -1438,18 +1395,15 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithIncompleteHistory
         OpTime(Timestamp(100, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 100));
     oplog1.setOperationSessionInfo(sessionInfo);
     oplog1.setStatementId(23);
-    oplog1.setWallClockTime(Date_t::now());
 
     OplogEntry oplog2(
         OpTime(Timestamp(80, 2), 1), 0, OpTypeEnum::kNoop, kNs, 0, {}, Session::kDeadEndSentinel);
     oplog2.setOperationSessionInfo(sessionInfo);
     oplog2.setStatementId(kIncompleteHistoryStmtId);
-    oplog2.setWallClockTime(Date_t::now());
 
     OplogEntry oplog3(OpTime(Timestamp(60, 2), 1), 0, OpTypeEnum::kInsert, kNs, 0, BSON("x" << 60));
     oplog3.setOperationSessionInfo(sessionInfo);
     oplog3.setStatementId(5);
-    oplog3.setWallClockTime(Date_t::now());
 
     returnOplog({oplog1, oplog2, oplog3});
     // migration always fetches at least twice to transition from committing to done.
