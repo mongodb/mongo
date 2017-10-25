@@ -267,51 +267,49 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     auto oplogLink = extractPrePostImageTs(lastResult, oplogEntry);
     oplogLink.prevOpTime = scopedSession->getLastWriteOpTime(result.txnNum);
 
-    writeConflictRetry(opCtx,
-                       "SessionOplogMigration",
-                       NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                       [&] {
-                           // Need to take global lock here so repl::logOp will not unlock it and
-                           // trigger the invariant that disallows unlocking global lock while
-                           // inside a WUOW. Grab a DBLock here instead of plain GlobalLock to make
-                           // sure the MMAPV1 flush lock will be lock/unlocked correctly. Take the
-                           // transaction table db lock to ensure the same lock ordering with normal
-                           // replicated updates to the table.
-                           Lock::DBLock lk(opCtx,
-                                           NamespaceString::kSessionTransactionsTableNamespace.db(),
-                                           MODE_IX);
-                           WriteUnitOfWork wunit(opCtx);
+    writeConflictRetry(
+        opCtx,
+        "SessionOplogMigration",
+        NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        [&] {
+            // Need to take global lock here so repl::logOp will not unlock it and trigger the
+            // invariant that disallows unlocking global lock while inside a WUOW. Grab a DBLock
+            // here instead of plain GlobalLock to make sure the MMAPV1 flush lock will be
+            // lock/unlocked correctly. Take the transaction table db lock to ensure the same lock
+            // ordering with normal replicated updates to the table.
+            Lock::DBLock lk(
+                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
+            WriteUnitOfWork wunit(opCtx);
 
-                           result.oplogTime = repl::logOp(opCtx,
-                                                          "n",
-                                                          oplogEntry.getNamespace(),
-                                                          oplogEntry.getUuid(),
-                                                          object,
-                                                          &object2,
-                                                          true,
-                                                          *oplogEntry.getWallClockTime(),
-                                                          sessionInfo,
-                                                          stmtId,
-                                                          oplogLink);
+            result.oplogTime = repl::logOp(opCtx,
+                                           "n",
+                                           oplogEntry.getNamespace(),
+                                           oplogEntry.getUuid(),
+                                           object,
+                                           &object2,
+                                           true,
+                                           *oplogEntry.getWallClockTime(),
+                                           sessionInfo,
+                                           stmtId,
+                                           oplogLink);
 
-                           auto oplogOpTime = result.oplogTime;
-                           uassert(40633,
-                                   str::stream()
-                                       << "Failed to create new oplog entry for oplog with opTime: "
-                                       << oplogEntry.getOpTime().toString()
-                                       << ": "
-                                       << redact(oplogBSON),
-                                   !oplogOpTime.isNull());
+            auto oplogOpTime = result.oplogTime;
+            uassert(40633,
+                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
+                                  << oplogEntry.getOpTime().toString()
+                                  << ": "
+                                  << redact(oplogBSON),
+                    !oplogOpTime.isNull());
 
-                           // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post
-                           // image, because the next oplog will contain the real operation.
-                           if (!result.isPrePostImage) {
-                               scopedSession->onWriteOpCompletedOnPrimary(
-                                   opCtx, result.txnNum, {stmtId}, oplogOpTime);
-                           }
+            // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post
+            // image, because the next oplog will contain the real operation.
+            if (!result.isPrePostImage) {
+                scopedSession->onWriteOpCompletedOnPrimary(
+                    opCtx, result.txnNum, {stmtId}, oplogOpTime, *oplogEntry.getWallClockTime());
+            }
 
-                           wunit.commit();
-                       });
+            wunit.commit();
+        });
 
     return result;
 }

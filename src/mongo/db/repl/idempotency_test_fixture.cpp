@@ -191,7 +191,9 @@ OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
 OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToInsert) {
-    return OplogEntry(opTime, 1LL, OpTypeEnum::kInsert, nss, documentToInsert);
+    auto oplogEntry = OplogEntry(opTime, 1LL, OpTypeEnum::kInsert, nss, documentToInsert);
+    oplogEntry.setWallClockTime(Date_t::now());
+    return oplogEntry;
 }
 
 /**
@@ -200,7 +202,9 @@ OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
 OplogEntry makeDeleteDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToDelete) {
-    return OplogEntry(opTime, 1LL, OpTypeEnum::kDelete, nss, documentToDelete);
+    auto oplogEntry = OplogEntry(opTime, 1LL, OpTypeEnum::kDelete, nss, documentToDelete);
+    oplogEntry.setWallClockTime(Date_t::now());
+    return oplogEntry;
 }
 
 /**
@@ -210,7 +214,10 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToUpdate,
                                         const BSONObj& updatedDocument) {
-    return OplogEntry(opTime, 1LL, OpTypeEnum::kUpdate, nss, updatedDocument, documentToUpdate);
+    auto oplogEntry =
+        OplogEntry(opTime, 1LL, OpTypeEnum::kUpdate, nss, updatedDocument, documentToUpdate);
+    oplogEntry.setWallClockTime(Date_t::now());
+    return oplogEntry;
 }
 
 /**

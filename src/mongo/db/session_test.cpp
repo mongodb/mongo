@@ -128,7 +128,7 @@ TEST_F(SessionTest, SessionEntryWrittenAtFirstWrite) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime);
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime, Date_t::now());
         wuow.commit();
 
         return opTime;
@@ -160,7 +160,7 @@ TEST_F(SessionTest, StartingNewerTransactionUpdatesThePersistedSession) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, stmtId, prevOpTime);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {stmtId}, opTime);
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {stmtId}, opTime, Date_t::now());
         wuow.commit();
 
         return opTime;
@@ -218,7 +218,7 @@ TEST_F(SessionTest, SessionTransactionsCollectionNotDefaultCreated) {
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
     const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-    ASSERT_THROWS(session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime),
+    ASSERT_THROWS(session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime, Date_t::now()),
                   AssertionException);
 }
 
@@ -234,7 +234,7 @@ TEST_F(SessionTest, CheckStatementExecuted) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, stmtId, prevOpTime);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {stmtId}, opTime);
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {stmtId}, opTime, Date_t::now());
         wuow.commit();
 
         return opTime;
@@ -291,7 +291,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime);
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime, Date_t::now());
         wuow.commit();
     }
 
@@ -299,9 +299,10 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum - 1, 0);
-        ASSERT_THROWS_CODE(session.onWriteOpCompletedOnPrimary(opCtx(), txnNum - 1, {0}, opTime),
-                           AssertionException,
-                           ErrorCodes::ConflictingOperationInProgress);
+        ASSERT_THROWS_CODE(
+            session.onWriteOpCompletedOnPrimary(opCtx(), txnNum - 1, {0}, opTime, Date_t::now()),
+            AssertionException,
+            ErrorCodes::ConflictingOperationInProgress);
     }
 }
 
@@ -319,9 +320,10 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
 
     session.invalidate();
 
-    ASSERT_THROWS_CODE(session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime),
-                       AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime, Date_t::now()),
+        AssertionException,
+        ErrorCodes::ConflictingOperationInProgress);
 }
 
 TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
@@ -336,7 +338,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime);
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {0}, opTime, Date_t::now());
 
         session.invalidate();
 
@@ -376,7 +378,7 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
                                   osi,
                                   1,
                                   {});
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {1}, opTime);
+        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {1}, opTime, wallClockTime);
         wuow.commit();
 
         return opTime;
@@ -403,7 +405,8 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
                                   kIncompleteHistoryStmtId,
                                   link);
 
-        session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {kIncompleteHistoryStmtId}, opTime);
+        session.onWriteOpCompletedOnPrimary(
+            opCtx(), txnNum, {kIncompleteHistoryStmtId}, opTime, wallClockTime);
         wuow.commit();
     }
 

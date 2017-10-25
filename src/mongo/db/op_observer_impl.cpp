@@ -77,13 +77,17 @@ void onWriteOpCompleted(OperationContext* opCtx,
                         const NamespaceString& nss,
                         Session* session,
                         std::vector<StmtId> stmtIdsWritten,
-                        const repl::OpTime& lastStmtIdWriteOpTime) {
+                        const repl::OpTime& lastStmtIdWriteOpTime,
+                        Date_t lastStmtIdWriteDate) {
     if (lastStmtIdWriteOpTime.isNull())
         return;
 
     if (session) {
-        session->onWriteOpCompletedOnPrimary(
-            opCtx, *opCtx->getTxnNumber(), std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
+        session->onWriteOpCompletedOnPrimary(opCtx,
+                                             *opCtx->getTxnNumber(),
+                                             std::move(stmtIdsWritten),
+                                             lastStmtIdWriteOpTime,
+                                             lastStmtIdWriteDate);
     }
 }
 
@@ -304,8 +308,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                bool fromMigrate) {
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
 
-    const auto opTimeList = repl::logInsertOps(
-        opCtx, nss, uuid, session, begin, end, fromMigrate, getWallClockTimeForOpLog(opCtx));
+    const auto lastWriteDate = getWallClockTimeForOpLog(opCtx);
+
+    const auto opTimeList =
+        repl::logInsertOps(opCtx, nss, uuid, session, begin, end, fromMigrate, lastWriteDate);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
 
@@ -319,7 +325,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         }
     }
 
-    auto lastOpTime = opTimeList.empty() ? repl::OpTime() : opTimeList.back();
+    const auto lastOpTime = opTimeList.empty() ? repl::OpTime() : opTimeList.back();
     if (nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
     } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
@@ -339,7 +345,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         return stmt.stmtId;
     });
 
-    onWriteOpCompleted(opCtx, nss, session, stmtIdsWritten, lastOpTime);
+    onWriteOpCompleted(opCtx, nss, session, stmtIdsWritten, lastOpTime, lastWriteDate);
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
@@ -389,8 +395,12 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, args.updatedDoc);
     }
 
-    onWriteOpCompleted(
-        opCtx, args.nss, session, std::vector<StmtId>{args.stmtId}, opTime.writeOpTime);
+    onWriteOpCompleted(opCtx,
+                       args.nss,
+                       session,
+                       std::vector<StmtId>{args.stmtId},
+                       opTime.writeOpTime,
+                       opTime.wallClockTime);
 }
 
 auto OpObserverImpl::aboutToDelete(OperationContext* opCtx,
@@ -434,7 +444,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, deleteState.documentKey);
     }
 
-    onWriteOpCompleted(opCtx, nss, session, std::vector<StmtId>{stmtId}, opTime.writeOpTime);
+    onWriteOpCompleted(
+        opCtx, nss, session, std::vector<StmtId>{stmtId}, opTime.writeOpTime, opTime.wallClockTime);
 }
 
 void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
