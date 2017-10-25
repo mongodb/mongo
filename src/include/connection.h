@@ -268,6 +268,15 @@ struct __wt_connection_impl {
 	uint64_t  ckpt_time_recent;	/* Checkpoint time recent/total */
 	uint64_t  ckpt_time_total;
 
+	/* Checkpoint stats and verbosity timers */
+	struct timespec ckpt_timer_start;
+	struct timespec ckpt_timer_scrub_end;
+
+	/* Checkpoint progress message data */
+	uint64_t ckpt_progress_msg_count;
+	uint64_t ckpt_write_bytes;
+	uint64_t ckpt_write_pages;
+
 	uint32_t stat_flags;		/* Options declared in flags.py */
 
 					/* Connection statistics */

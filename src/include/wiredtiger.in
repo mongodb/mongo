@@ -2201,11 +2201,11 @@ struct __wt_connection {
 	 * if WiredTiger is configured with --enable-verbose.  Options are given
 	 * as a list\, such as <code>"verbose=[evictserver\,read]"</code>., a
 	 * list\, with values chosen from the following options: \c "api"\, \c
-	 * "block"\, \c "checkpoint"\, \c "compact"\, \c "evict"\, \c
-	 * "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\, \c
-	 * "log"\, \c "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c
-	 * "metadata"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c
-	 * "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
+	 * "block"\, \c "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\,
+	 * \c "evict"\, \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c
+	 * "handleops"\, \c "log"\, \c "lookaside_activity"\, \c "lsm"\, \c
+	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
+	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
 	 * "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
 	 * \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c
 	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
@@ -2841,9 +2841,9 @@ struct __wt_connection {
  * WiredTiger is configured with --enable-verbose.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
  * values chosen from the following options: \c "api"\, \c "block"\, \c
- * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evict_stuck"\, \c
- * "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\, \c
- * "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
+ * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c "evict"\, \c
+ * "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\,
+ * \c "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
  * "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c
  * "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c
  * "split"\, \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c
