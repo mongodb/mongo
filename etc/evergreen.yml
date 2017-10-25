@@ -146,16 +146,19 @@ variables:
 # Templates used by powercycle
 - &powercycle_remote_credentials
   private_key_file: $(${posix_workdir})/powercycle.pem
-  private_key_remote: ${kitchen_private_key}
-  aws_key_remote: ${kitchen_aws_key}
-  aws_secret_remote: ${kitchen_aws_secret}
+  private_key_remote: ${powercycle_private_key}
+  aws_key_remote: ${powercycle_aws_key}
+  aws_secret_remote: ${powercycle_aws_secret}
 
 # TODO: Remove psutil from virtualenv_requirements when BUILD-3083 is done
 - &powercycle_ec2_instance
   aws_ec2_yml: aws_ec2.yml
   remote_dir: powercycle
+  secret_port: "20001"
+  security_groups: mci powercycle_testing
   ssh_identity: -i ${private_key_file}
-  ssh_key_id: ${kitchen_ssh_key_id}
+  ssh_key_id: ${powercycle_ssh_key_id}
+  standard_port: "20000"
   virtualenv_dir: venv_powercycle
   virtualenv_requirements: psutil
 
@@ -175,10 +178,11 @@ variables:
   ec2_artifacts: ${log_path} ${backup_path_after} ${backup_path_before}
   program_options: --logLevel debug --backupPathBefore  ${backup_path_before} --backupPathAfter ${backup_path_after}
   connection_options: --sshUserHost ${ip_address} --sshConnection \"${ssh_identity} ${ssh_connection_options}\"
-  test_options: --testLoops 25 --seedDocNum 10000 --rsync --validate remote --canary remote
+  test_options: --testLoops 25 --seedDocNum 10000 --rsync --validate local --canary remote
   crash_options: --crashMethod internal --crashWaitTime 30 --jitterForCrashWaitTime 5
+  client_options: --numCrudClients 5 --numFsmClients 5
   mongodb_options: --rootDir ${remote_dir}-${task_id} --mongodbBinDir ${remote_dir}
-  mongod_options: --dbPath ${db_path} --logPath ${log_path}
+  mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath ${db_path} --logPath ${log_path}
   mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1\"
 
 #######################################
@@ -830,56 +834,67 @@ functions:
         fi
 
   "run powercycle test" :
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o verbose
-        set -o errexit
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          set -o errexit
 
-        ${activate_virtualenv}
-        if [ ! -z "${virtualenv_requirements}" ]; then
-          easy_install ${virtualenv_requirements}
-        fi
+          ${activate_virtualenv}
+          if [ ! -z "${virtualenv_requirements}" ]; then
+            pip install ${virtualenv_requirements}
+          fi
 
-        ${set_sudo}
-        if [ ! -z $sudo ]; then
-          remote_sudo="--remoteSudo"
-        fi
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          set -o errexit
 
-        # The virtaulenv bin_dir is different for Linux and Windows
-        bin_dir=$(find $VIRTUAL_ENV -name activate | sed -e "s,$VIRTUAL_ENV,,;s,activate,,;s,/,,g")
-        cmds="source ${virtualenv_dir|venv}/$bin_dir/activate"
-        cmds="$cmds; python -u"
-        # The remote python operates in a virtualenv
-        remote_python="--remotePython \"$cmds\""
+          ${activate_virtualenv}
 
-        start_time=$(date +%s)
-        status="\"pass\""
-        failures=0
+          ${set_sudo}
+          if [ ! -z $sudo ]; then
+            remote_sudo="--remoteSudo"
+          fi
 
-        set +o errexit
-        eval python -u pytests/powertest.py \
-          "${connection_options} \
-          ${program_options}     \
-          $remote_sudo           \
-          $remote_python         \
-          ${test_options}        \
-          ${crash_options}       \
-          ${mongodb_options}     \
-          ${mongod_options}      \
-          ${mongod_extra_options}"
-        exit_code=$?
+          # The virtaulenv bin_dir is different for Linux and Windows
+          bin_dir=$(find $VIRTUAL_ENV -name activate | sed -e "s,$VIRTUAL_ENV,,;s,activate,,;s,/,,g")
+          cmds="source ${virtualenv_dir|venv}/$bin_dir/activate"
+          cmds="$cmds; python -u"
+          # The remote python operates in a virtualenv
+          remote_python="--remotePython \"$cmds\""
 
-        # Create report.json
-        end_time=$(date +%s)
-        elapsed_secs=$((end_time-start_time))
-        if [ $exit_code -ne 0 ]; then
-          status="\"fail\""
-          failures=1
-        fi
-        echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > report.json
-        exit $exit_code
+          start_time=$(date +%s)
+          status="\"pass\""
+          failures=0
+
+          set +o errexit
+          eval python -u pytests/powertest.py \
+            "${connection_options} \
+            ${program_options}     \
+            $remote_sudo           \
+            $remote_python         \
+            ${test_options}        \
+            ${crash_options}       \
+            ${client_options}      \
+            ${mongodb_options}     \
+            ${mongod_options}      \
+            ${mongod_extra_options}"
+          exit_code=$?
+
+          # Create report.json
+          end_time=$(date +%s)
+          elapsed_secs=$((end_time-start_time))
+          if [ $exit_code -ne 0 ]; then
+            status="\"fail\""
+            failures=1
+          fi
+          echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > report.json
+          exit $exit_code
 
   "do multiversion setup" :
     command: shell.exec
@@ -1087,11 +1102,17 @@ functions:
 
           set -o errexit
           ${activate_virtualenv}
-          easy_install --upgrade boto3
+          pip install boto3
+
+          for security_group in ${security_groups}
+          do
+            security_groups="$security_groups -s $security_group"
+          done
 
           # Clone another instance of this host in EC2.
           buildscripts/launch_evergreen_ec2_instance.sh \
             -k ${ssh_key_id}                            \
+            $security_groups                            \
             -t "AMI Evergreen ${task_id}"               \
             -y ${aws_ec2_yml}
 
@@ -1220,7 +1241,7 @@ functions:
             cmds="$cmds; virtualenv --python \$python_loc --system-site-packages ${virtualenv_dir|venv}"
             cmds="$cmds; activate=\$(find ${virtualenv_dir|venv} -name 'activate')"
             cmds="$cmds; source \$activate"
-            cmds="$cmds; easy_install ${virtualenv_requirements}"
+            cmds="$cmds; pip install ${virtualenv_requirements}"
             ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
             ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
               --verbose                                        \
@@ -1240,7 +1261,7 @@ functions:
           if [ -z "${ec2_artifacts}" ]; then
             exit 0
           fi
-          cmd="${tar|tar} czvf ec2_artifacts.tgz ${ec2_artifacts}"
+          cmd="${tar|tar} czf ec2_artifacts.tgz ${ec2_artifacts}"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
             --verbose                                        \
@@ -1427,6 +1448,27 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: Remote EC2 Artifacts - Execution ${execution}
+      optional: true
+
+  # Gather and archive the local client logs.
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        client_logs=$(ls crud*.log fsm*.log 2> /dev/null)
+        if [ ! -z "$client_logs" ]; then
+          ${tar|tar} czf client-logs.tgz $client_logs
+        fi
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/client-logs.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/client_logs/mongo-client-logs-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Client logs - Execution ${execution}
       optional: true
 
   # Process and save coverage data.
@@ -4026,8 +4068,11 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
+    # Disable the CRUD & FSM clients for mmapv1.
+    # mongod will not start if it crashed mongod while creating a namespace (SERVER-26499).
     vars:
       <<: *powercycle_test
+      client_options: --numCrudClients 0 --numFsmClients 0
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine mmapv1\"
 
 - name: powercycle_WT

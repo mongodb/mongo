@@ -14,19 +14,24 @@ function _usage_ {
 usage: $0 options
 This script supports the following parameters for Windows & Linux platforms:
   -k <ssh_key_id>,     [REQUIRED] The ssh key id used to access the new AWS EC2 instance.
-  -t <tag_name>,       [OPTIONAL] The tag name of the new AWS EC2 instance.
   -y <aws_ec2_yml>,    [REQUIRED] YAML file name where to store the new AWS EC2 instance
                        information. This file will be used in etc/evergreen.yml for
                        macro expansion of variables used in other functions.
+  -s <security_group>, [OPTIONAL] The security group to be used for the new AWS EC2 instance.
+                       To specify more than one group, invoke this option each time.
+  -t <tag_name>,       [OPTIONAL] The tag name of the new AWS EC2 instance.
 EOF
 }
 
 # Parse command line options
-while getopts "y:k:t:?" option
+while getopts "k:s:t:y:?" option
 do
    case $option in
      k)
         ssh_key_id=$OPTARG
+        ;;
+     s)
+        sec_groups="$sec_groups $OPTARG"
         ;;
      t)
         tag_name=$OPTARG
@@ -50,6 +55,11 @@ if [ -z $ssh_key_id ]; then
   echo "Must specify ssh_key_id"
   exit 1
 fi
+
+for sec_group in $sec_groups
+do
+  security_groups="$security_groups --securityGroup $sec_group"
+done
 
 # Get the AMI information on the current host so we can launch a similar EC2 instance.
 # See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html#instancedata-data-retrieval
@@ -133,7 +143,8 @@ aws_ec2=$(python buildscripts/aws_ec2.py \
           --instanceType $instance_type  \
           --keyName $ssh_key_id          \
           --mode create                  \
-          --tagName "$tag_name"           \
+          $security_groups               \
+          --tagName "$tag_name"          \
           --tagOwner "$USER"             \
           $block_device_option | tr -cd "[:print:]\n")
 echo "Spawned new AMI EC2 instance: $aws_ec2"

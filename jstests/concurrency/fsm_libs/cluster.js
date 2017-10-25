@@ -617,7 +617,10 @@ var Cluster = function(options) {
         var res = adminDB.runCommand({getCmdLineOpts: 1});
         assert.commandWorked(res, 'failed to get command line options');
 
-        var wiredTigerOptions = res.parsed.storage.wiredTiger || {};
+        var wiredTigerOptions = {};
+        if (res.parsed && res.parsed.storage) {
+            wiredTigerOptions = res.parsed.storage.wiredTiger || {};
+        }
         var wiredTigerCollectionConfig = wiredTigerOptions.collectionConfig || {};
         var wiredTigerConfigString = wiredTigerCollectionConfig.configString || '';
 

@@ -116,7 +116,7 @@ var runner = (function() {
     }
 
     function validateCleanupOptions(options) {
-        var allowedKeys = ['dropDatabaseBlacklist', 'keepExistingDatabases'];
+        var allowedKeys = ['dropDatabaseBlacklist', 'keepExistingDatabases', 'validateCollections'];
 
         Object.keys(options).forEach(function(option) {
             assert.contains(option,
@@ -135,6 +135,12 @@ var runner = (function() {
                       typeof options.keepExistingDatabases,
                       'expected keepExistingDatabases to be a boolean');
         }
+
+        options.validateCollections =
+            options.hasOwnProperty('validateCollections') ? options.validateCollections : true;
+        assert.eq('boolean',
+                  typeof options.validateCollections,
+                  'expected validateCollections to be a boolean');
 
         return options;
     }
@@ -441,7 +447,8 @@ var runner = (function() {
         jsTest.log('End of schedule');
     }
 
-    function cleanupWorkload(workload, context, cluster, errors, header, dbHashBlacklist) {
+    function cleanupWorkload(
+        workload, context, cluster, errors, header, dbHashBlacklist, cleanupOptions) {
         // Returns true if the workload's teardown succeeds and false if the workload's
         // teardown fails.
 
@@ -458,7 +465,9 @@ var runner = (function() {
         }
 
         try {
-            cluster.validateAllCollections(phase);
+            if (cleanupOptions.validateCollections) {
+                cluster.validateAllCollections(phase);
+            }
         } catch (e) {
             errors.push(new WorkloadFailure(
                 e.toString(), e.stack, 'main', header + ' validating collections'));
@@ -509,7 +518,8 @@ var runner = (function() {
                               errors,
                               maxAllowedThreads,
                               dbHashBlacklist,
-                              configServerData) {
+                              configServerData,
+                              cleanupOptions) {
         var cleanup = [];
         var teardownFailed = false;
         var startTime = Date.now();  // Initialize in case setupWorkload fails below.
@@ -588,9 +598,13 @@ var runner = (function() {
         } finally {
             // Call each foreground workload's teardown function. After all teardowns have completed
             // check if any of them failed.
-            var cleanupResults =
-                cleanup.map(workload => cleanupWorkload(
-                                workload, context, cluster, errors, 'Foreground', dbHashBlacklist));
+            var cleanupResults = cleanup.map(workload => cleanupWorkload(workload,
+                                                                         context,
+                                                                         cluster,
+                                                                         errors,
+                                                                         'Foreground',
+                                                                         dbHashBlacklist,
+                                                                         cleanupOptions));
             teardownFailed = cleanupResults.some(success => (success === false));
 
             totalTime = Date.now() - startTime;
@@ -622,8 +636,8 @@ var runner = (function() {
         validateExecutionOptions(executionMode, executionOptions);
         Object.freeze(executionOptions);  // immutable after validation (and normalization)
 
-        Object.freeze(cleanupOptions);  // immutable prior to validation
         validateCleanupOptions(cleanupOptions);
+        Object.freeze(cleanupOptions);  // immutable after validation (and normalization)
 
         if (executionMode.composed) {
             clusterOptions.sameDB = true;
@@ -743,7 +757,8 @@ var runner = (function() {
                                      errors,
                                      maxAllowedThreads,
                                      dbHashBlacklist,
-                                     configServerData);
+                                     configServerData,
+                                     cleanupOptions);
                 });
             } finally {
                 // Set a flag so background threads know to terminate.
@@ -755,9 +770,13 @@ var runner = (function() {
         } finally {
             try {
                 // Call each background workload's teardown function.
-                bgCleanup.forEach(
-                    bgWorkload => cleanupWorkload(
-                        bgWorkload, bgContext, cluster, errors, 'Background', dbHashBlacklist));
+                bgCleanup.forEach(bgWorkload => cleanupWorkload(bgWorkload,
+                                                                bgContext,
+                                                                cluster,
+                                                                errors,
+                                                                'Background',
+                                                                dbHashBlacklist,
+                                                                cleanupOptions));
                 // TODO: Call cleanupWorkloadData() on background workloads here if no background
                 // workload teardown functions fail.
 
