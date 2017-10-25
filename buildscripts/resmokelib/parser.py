@@ -441,8 +441,8 @@ def get_named_suites():
     Returns the list of suites available to execute.
     """
 
-    # Skip "with_server" and "no_server" because they do not define any test files to run.
-    executor_only = set(["with_server", "no_server"])
+    # Skip "with_server*" and "no_server" because they do not define any test files to run.
+    executor_only = set(["with_server", "with_external_server", "no_server"])
     suite_names = [suite for suite in resmokeconfig.NAMED_SUITES if suite not in executor_only]
     suite_names.sort()
     return suite_names
