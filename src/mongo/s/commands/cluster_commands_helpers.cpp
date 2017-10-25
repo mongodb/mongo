@@ -270,9 +270,15 @@ bool appendRawResponses(OperationContext* opCtx,
                         BSONObjBuilder* output,
                         std::vector<AsyncRequestsSender::Response> shardResponses,
                         std::set<ErrorCodes::Error> ignoredErrors) {
-    BSONObjBuilder subobj;    // Stores raw responses by ConnectionString
-    BSONObjBuilder errors;    // Stores errors by ConnectionString
-    int commonErrCode = -1;   // Stores the overall error code
+    // Always include ShardNotFound as an ignored error, since this node may not have realized a
+    // shard has been removed.
+    ignoredErrors.insert(ErrorCodes::ShardNotFound);
+
+    BSONObjBuilder subobj;  // Stores raw responses by ConnectionString
+
+    // Stores all errors; we will remove ignoredErrors later if some shard returned success.
+    std::vector<std::pair<std::string, Status>> errors;  // Stores errors by ConnectionString
+
     BSONElement wcErrorElem;  // Stores the first writeConcern error we encounter
     ShardId wcErrorShardId;   // Stores the shardId for the first writeConcern error we encounter
     bool hasWCError = false;  // Whether we have encountered a writeConcern error yet
@@ -282,45 +288,43 @@ bool appendRawResponses(OperationContext* opCtx,
         const auto swShard =
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardResponse.shardId);
         if (ErrorCodes::ShardNotFound == swShard.getStatus().code()) {
-            // If a shard got removed, ignore its response.
+            // Store the error by ShardId, since we cannot know the shard connection string, and it
+            // is only used for reporting.
+            errors.push_back(std::make_pair(shardResponse.shardId.toString(), swShard.getStatus()));
             continue;
         }
         const auto shard = uassertStatusOK(swShard);
         const auto shardConnStr = shard->getConnString().toString();
 
-        auto status = shardResponse.swResponse.getStatus();
+        Status sendStatus = shardResponse.swResponse.getStatus();
+        if (!sendStatus.isOK()) {
+            // Convert the error status back into the form of a command result and append it as the
+            // raw response.
+            BSONObjBuilder statusObjBob;
+            Command::appendCommandStatus(statusObjBob, sendStatus);
+            subobj.append(shardConnStr, statusObjBob.obj());
 
-        if (status.isOK()) {
-            status = getStatusFromCommandResult(shardResponse.swResponse.getValue().data);
-
-            // Report the first writeConcern error we see.
-            if (!hasWCError) {
-                if ((wcErrorElem = shardResponse.swResponse.getValue().data["writeConcernError"])) {
-                    wcErrorShardId = shardResponse.shardId;
-                    hasWCError = true;
-                }
-            }
-
-            if (status.isOK() || ignoredErrors.find(status.code()) != ignoredErrors.end()) {
-                subobj.append(shardConnStr,
-                              Command::filterCommandReplyForPassthrough(
-                                  shardResponse.swResponse.getValue().data));
-                continue;
-            }
+            errors.push_back(std::make_pair(shardConnStr, sendStatus));
+            continue;
         }
 
-        errors.append(shardConnStr, status.reason());
+        // Got a response from the shard.
 
-        if (commonErrCode == -1) {
-            commonErrCode = status.code();
-        } else if (commonErrCode != status.code()) {
-            commonErrCode = 0;
+        auto& resObj = shardResponse.swResponse.getValue().data;
+
+        // Append the shard's raw response.
+        subobj.append(shardConnStr, Command::filterCommandReplyForPassthrough(resObj));
+
+        auto commandStatus = getStatusFromCommandResult(resObj);
+        if (!commandStatus.isOK()) {
+            errors.push_back(std::make_pair(shardConnStr, std::move(commandStatus)));
         }
 
-        // Convert the error status back into the format of a command result.
-        BSONObjBuilder statusObjBob;
-        Command::appendCommandStatus(statusObjBob, status);
-        subobj.append(shard->getConnString().toString(), statusObjBob.obj());
+        // Report the first writeConcern error we see.
+        if (!hasWCError && (wcErrorElem = resObj["writeConcernError"])) {
+            wcErrorShardId = shardResponse.shardId;
+            hasWCError = true;
+        }
     }
 
     output->append("raw", subobj.done());
@@ -329,7 +333,28 @@ bool appendRawResponses(OperationContext* opCtx,
         appendWriteConcernErrorToCmdResponse(wcErrorShardId, wcErrorElem, *output);
     }
 
-    BSONObj errobj = errors.done();
+    // If any shard returned success, filter out ignored errors
+    bool someShardReturnedOK = (errors.size() != shardResponses.size());
+
+    BSONObjBuilder errorBob;
+    int commonErrCode = -1;
+    auto it = errors.begin();
+    while (it != errors.end()) {
+        if (someShardReturnedOK && ignoredErrors.find(it->second.code()) != ignoredErrors.end()) {
+            // Ignore the error.
+            it = errors.erase(it);
+        } else {
+            errorBob.append(it->first, it->second.reason());
+            if (commonErrCode == -1) {
+                commonErrCode = it->second.code();
+            } else if (commonErrCode != it->second.code()) {
+                commonErrCode = 0;
+            }
+            ++it;
+        }
+    }
+    BSONObj errobj = errorBob.obj();
+
     if (!errobj.isEmpty()) {
         *errmsg = errobj.toString();
 

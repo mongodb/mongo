@@ -126,9 +126,9 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherOnlyVersionI
  *
  * If all shards that errored had the same error, writes the common error code to 'output'. Writes a
  * string representation of all errors to 'errmsg.' Errors codes in 'ignoredErrors' are not treated
- * as errors.
+ * as errors if any shard returned success.
  *
- * Returns true if all the shards reported success.
+ * Returns true if any shard reports success and only ignored errors occur.
  */
 bool appendRawResponses(OperationContext* opCtx,
                         std::string* errmsg,
