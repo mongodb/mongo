@@ -52,12 +52,6 @@ MultiApplier::MultiApplier(executor::TaskExecutor* executor,
       _onCompletion(onCompletion) {
     uassert(ErrorCodes::BadValue, "null replication executor", executor);
     uassert(ErrorCodes::BadValue, "empty list of operations", !operations.empty());
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "last operation missing 'ts' field: " << operations.back().raw,
-            operations.back().raw.hasField("ts"));
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "'ts' in last operation not a timestamp: " << operations.back().raw,
-            BSONType::bsonTimestamp == operations.back().raw.getField("ts").type());
     uassert(ErrorCodes::BadValue, "apply operation function cannot be null", applyOperation);
     uassert(ErrorCodes::BadValue, "multi apply function cannot be null", multiApply);
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
