@@ -579,6 +579,7 @@ functions:
         PATH="$path_value"                              \
             ${gcov_environment}                         \
             ${rlp_environment}                          \
+            ${lang_environment}                         \
             ${san_options}                              \
             ${san_symbolizer}                           \
             ${snmp_config_path}                         \
@@ -5389,6 +5390,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1604
+    lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform_arch: "ubuntu1604"
     multiversion_edition: "targeted"
@@ -8368,6 +8370,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
+    lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -8432,6 +8435,7 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
+    lang_environment: LANG=C
     compile_flags: --link-model=dynamic --ssl CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
     use_scons_cache: true
     build_mongoreplay: true
@@ -9831,6 +9835,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     multiversion_platform_arch: "ubuntu1604"
@@ -9994,6 +9999,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
@@ -10042,6 +10048,7 @@ buildvariants:
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
+    lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     multiversion_platform_arch: "ubuntu1604"
@@ -10205,6 +10212,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under {A,UB}SAN build.
@@ -10232,6 +10240,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under {A,UB}SAN build.
@@ -10382,6 +10391,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    lang_environment: LANG=C
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     build_mongoreplay: false
@@ -10525,6 +10535,7 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
+    lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
