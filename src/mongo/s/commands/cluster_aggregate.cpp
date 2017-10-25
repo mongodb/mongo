@@ -54,16 +54,13 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/commands/pipeline_s.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_query_knobs.h"
-#include "mongo/s/query/document_source_router_adapter.h"
 #include "mongo/s/query/establish_cursors.h"
-#include "mongo/s/query/router_exec_stage.h"
-#include "mongo/s/query/router_stage_merge.h"
-#include "mongo/s/query/router_stage_pipeline.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -71,104 +68,6 @@
 namespace mongo {
 
 namespace {
-
-/**
- * Class to provide access to mongos-specific implementations of methods required by some document
- * sources.
- */
-class MongosProcessInterface final
-    : public DocumentSourceNeedsMongoProcessInterface::MongoProcessInterface {
-public:
-    MongosProcessInterface(OperationContext* opCtx) : _opCtx(opCtx) {}
-
-    virtual ~MongosProcessInterface() = default;
-
-    void setOperationContext(OperationContext* opCtx) override {
-        _opCtx = opCtx;
-    }
-
-    DBClientBase* directClient() override {
-        MONGO_UNREACHABLE;
-    }
-
-    bool isSharded(const NamespaceString& ns) override {
-        MONGO_UNREACHABLE;
-    }
-
-    BSONObj insert(const NamespaceString& ns, const std::vector<BSONObj>& objs) override {
-        MONGO_UNREACHABLE;
-    }
-
-    CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
-                                          const NamespaceString& ns) override {
-        MONGO_UNREACHABLE;
-    }
-
-    void appendLatencyStats(const NamespaceString& nss,
-                            bool includeHistograms,
-                            BSONObjBuilder* builder) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    Status appendStorageStats(const NamespaceString& nss,
-                              const BSONObj& param,
-                              BSONObjBuilder* builder) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    Status appendRecordCount(const NamespaceString& nss, BSONObjBuilder* builder) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    BSONObj getCollectionOptions(const NamespaceString& nss) override {
-        MONGO_UNREACHABLE;
-    }
-
-    Status renameIfOptionsAndIndexesHaveNotChanged(
-        const BSONObj& renameCommandObj,
-        const NamespaceString& targetNs,
-        const BSONObj& originalCollectionOptions,
-        const std::list<BSONObj>& originalIndexes) override {
-        MONGO_UNREACHABLE;
-    }
-
-    /**
-     * Constructs an executable pipeline targeted to a remote shard. Returns
-     * ErrorCodes::InternalError if 'rawPipeline' specifies a pipeline that does not target a single
-     * shard.
-     */
-    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions pipelineOptions = {}) override;
-
-    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) override {
-        MONGO_UNREACHABLE;
-    }
-
-    std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
-                                       CurrentOpUserMode userMode,
-                                       CurrentOpTruncateMode truncateMode) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    std::string getShardName(OperationContext* opCtx) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    std::vector<FieldPath> collectDocumentKeyFields(UUID) const override {
-        MONGO_UNREACHABLE;
-    }
-
-private:
-    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipelineWithOneRemote(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    OperationContext* _opCtx;
-};
-
 // Given a document representing an aggregation command such as
 //
 //   {aggregate: "myCollection", pipeline: [], ...},
@@ -594,15 +493,8 @@ BSONObj establishMergingMongosCursor(
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors) {
 
     // Inject the MongosProcessInterface for sources which need it.
-    const auto& sources = pipelineForMerging->getSources();
-    for (auto&& source : sources) {
-        DocumentSourceNeedsMongoProcessInterface* needsMongoProcessInterface =
-            dynamic_cast<DocumentSourceNeedsMongoProcessInterface*>(source.get());
-        if (needsMongoProcessInterface) {
-            needsMongoProcessInterface->injectMongoProcessInterface(
-                std::make_shared<MongosProcessInterface>(opCtx));
-        }
-    }
+    PipelineS::injectMongosInterface(pipelineForMerging.get());
+
     ClusterClientCursorParams params(
         requestedNss,
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
@@ -681,104 +573,6 @@ BSONObj establishMergingMongosCursor(
     Command::appendCommandStatus(cursorResponse, Status::OK());
 
     return cursorResponse.obj();
-}
-
-/**
- * This is a special type of RouterExecStage that is used to iterate remote cursors that were
- * created internally and do not represent a client cursor, such as those used in $changeStream's
- * updateLookup functionality.
- *
- * The purpose of this class is to provide ownership over a ClusterClientCursorParams struct without
- * creating a ClusterClientCursor, which would show up in the server stats for this mongos.
- */
-class RouterStageInternalCursor final : public RouterExecStage {
-public:
-    RouterStageInternalCursor(OperationContext* opCtx,
-                              std::unique_ptr<ClusterClientCursorParams>&& params,
-                              std::unique_ptr<RouterExecStage> child)
-        : RouterExecStage(opCtx, std::move(child)), _params(std::move(params)) {}
-
-    StatusWith<ClusterQueryResult> next(ExecContext execContext) {
-        return getChildStage()->next(execContext);
-    }
-
-private:
-    std::unique_ptr<ClusterClientCursorParams> _params;
-};
-
-StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> MongosProcessInterface::makePipeline(
-    const std::vector<BSONObj>& rawPipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const MakePipelineOptions pipelineOptions) {
-    // For the time being we don't expect any callers with options other than these.
-    invariant(pipelineOptions.optimize);
-    invariant(pipelineOptions.attachCursorSource);
-    invariant(!pipelineOptions.forceInjectMongoProcessInterface);
-
-    // 'expCtx' may represent the settings for an aggregation pipeline on a different namespace
-    // than the DocumentSource this MongodImplementation is injected into, but both
-    // ExpressionContext instances should still have the same OperationContext.
-    invariant(_opCtx == expCtx->opCtx);
-
-    // Explain is not supported for auxiliary lookups.
-    invariant(!expCtx->explain);
-    return makePipelineWithOneRemote(rawPipeline, expCtx);
-}
-
-StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>>
-MongosProcessInterface::makePipelineWithOneRemote(
-    const std::vector<BSONObj>& rawPipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
-    // Temporarily remove any deadline from this operation, we don't want to timeout while doing
-    // this lookup.
-    OperationContext::DeadlineStash deadlineStash(expCtx->opCtx);
-
-    // Generate the command object for the targeted shards.
-    AggregationRequest aggRequest(expCtx->ns, rawPipeline);
-    LiteParsedPipeline liteParsedPipeline(aggRequest);
-    auto parsedPipeline = Pipeline::parse(rawPipeline, expCtx);
-    if (!parsedPipeline.isOK()) {
-        return parsedPipeline.getStatus();
-    }
-    parsedPipeline.getValue()->optimizePipeline();
-
-    auto targetStatus = establishShardCursors(expCtx,
-                                              expCtx->ns,
-                                              aggRequest.serializeToCommandObj().toBson(),
-                                              aggRequest,
-                                              liteParsedPipeline,
-                                              std::move(parsedPipeline.getValue()));
-
-    if (!targetStatus.isOK()) {
-        return targetStatus.getStatus();
-    }
-    auto targetingResults = std::move(targetStatus.getValue());
-    if (targetingResults.remoteCursors.size() != 1) {
-        return {ErrorCodes::InternalError,
-                str::stream() << "Unable to target pipeline to single shard: "
-                              << Value(rawPipeline).toString()};
-    }
-    invariant(!targetingResults.pipelineForMerging);
-
-    auto params = stdx::make_unique<ClusterClientCursorParams>(
-        expCtx->ns,
-        AuthorizationSession::get(expCtx->opCtx->getClient())->getAuthenticatedUserNames(),
-        ReadPreferenceSetting::get(expCtx->opCtx));
-    params->remotes = std::move(targetingResults.remoteCursors);
-
-    // We will transfer ownership of the params to the RouterStageInternalCursor, but need a
-    // reference to them to construct the RouterStageMerge.
-    auto* unownedParams = params.get();
-    auto mergeStage = stdx::make_unique<RouterStageMerge>(
-        expCtx->opCtx,
-        Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        unownedParams);
-    auto routerExecutionTree = stdx::make_unique<RouterStageInternalCursor>(
-        expCtx->opCtx, std::move(params), std::move(mergeStage));
-
-    return Pipeline::create(
-        {DocumentSourceRouterAdapter::create(expCtx, std::move(routerExecutionTree))}, expCtx);
 }
 
 }  // namespace

@@ -117,5 +117,10 @@ public:
     std::vector<FieldPath> collectDocumentKeyFields(UUID) const override {
         MONGO_UNREACHABLE;
     }
+
+    boost::optional<Document> lookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, const Document& filter) {
+        MONGO_UNREACHABLE;
+    }
 };
 }  // namespace mongo

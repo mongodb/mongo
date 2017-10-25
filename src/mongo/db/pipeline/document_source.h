@@ -839,6 +839,15 @@ public:
          */
         virtual std::vector<FieldPath> collectDocumentKeyFields(UUID) const = 0;
 
+        /**
+         * Returns zero or one documents matching the input filter, or throws if more than one match
+         * was found. The passed ExpressionContext may use a different namespace than the
+         * ExpressionContext used to construct the MongoProcessInterface. Returns boost::none if no
+         * matching documents were found, including cases where the given namespace does not exist.
+         */
+        virtual boost::optional<Document> lookupSingleDocument(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx, const Document& filter) = 0;
+
         // Add new methods as needed.
     };
 

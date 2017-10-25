@@ -68,6 +68,9 @@ DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::getNext() {
         return input;
     }
 
+    // Temporarily remove any deadline from this operation to avoid timeout during lookup.
+    OperationContext::DeadlineStash deadlineStash(pExpCtx->opCtx);
+
     MutableDocument output(input.releaseDocument());
     output[kFullDocumentFieldName] = lookupPostImage(output.peek());
     return output.freeze();
@@ -93,9 +96,10 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     // Make sure we have a well-formed input.
     auto nss = assertNamespaceMatches(updateOp);
 
-    auto documentKey = assertFieldHasType(
-        updateOp, DocumentSourceChangeStream::kDocumentKeyField, BSONType::Object);
-    auto matchSpec = BSON("$match" << documentKey);
+    auto documentKey = assertFieldHasType(updateOp,
+                                          DocumentSourceChangeStream::kDocumentKeyField,
+                                          BSONType::Object)
+                           .getDocument();
 
     // Extract the UUID from resume token and do change stream lookups by UUID.
     auto resumeToken =
@@ -104,29 +108,11 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     // TODO SERVER-29134 we need to extract the namespace from the document and set them on the new
     // ExpressionContext if we're getting notifications from an entire database.
     auto foreignExpCtx = pExpCtx->copyWith(nss, resumeToken.getData().uuid);
-    auto pipelineStatus = _mongoProcessInterface->makePipeline({matchSpec}, foreignExpCtx);
-    if (pipelineStatus.getStatus() == ErrorCodes::NamespaceNotFound) {
-        // We couldn't find the collection with UUID, it may have been dropped.
-        return Value(BSONNULL);
-    }
-    auto pipeline = uassertStatusOK(std::move(pipelineStatus));
+    auto lookedUpDoc = _mongoProcessInterface->lookupSingleDocument(foreignExpCtx, documentKey);
 
-    if (auto first = pipeline->getNext()) {
-        auto lookedUpDocument = Value(*first);
-        if (auto next = pipeline->getNext()) {
-            uasserted(40580,
-                      str::stream() << "found more than document with documentKey "
-                                    << documentKey.toString()
-                                    << " while looking up post image after change: ["
-                                    << lookedUpDocument.toString()
-                                    << ", "
-                                    << next->toString()
-                                    << "]");
-        }
-        return lookedUpDocument;
-    }
-    // We couldn't find it with the documentKey, it may have been deleted.
-    return Value(BSONNULL);
+    // Check whether the lookup returned any documents. Even if the lookup itself succeeded, it may
+    // not have returned any results if the document was deleted in the time since the update op.
+    return (lookedUpDoc ? Value(*lookedUpDoc) : Value(BSONNULL));
 }
 
 }  // namespace mongo

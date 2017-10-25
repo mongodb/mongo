@@ -90,7 +90,7 @@ public:
     StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions opts) final {
+        const MakePipelineOptions opts = MakePipelineOptions{}) final {
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
         if (!pipeline.isOK()) {
             return pipeline.getStatus();
@@ -111,6 +111,27 @@ public:
                                         Pipeline* pipeline) final {
         pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
         return Status::OK();
+    }
+
+    boost::optional<Document> lookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, const Document& filter) {
+        auto swPipeline = makePipeline({BSON("$match" << filter)}, expCtx);
+        if (swPipeline == ErrorCodes::NamespaceNotFound) {
+            return boost::none;
+        }
+        auto pipeline = uassertStatusOK(std::move(swPipeline));
+
+        auto lookedUpDocument = pipeline->getNext();
+        if (auto next = pipeline->getNext()) {
+            uasserted(ErrorCodes::TooManyMatchingDocuments,
+                      str::stream() << "found more than one document matching " << filter.toString()
+                                    << " ["
+                                    << (*lookedUpDocument).toString()
+                                    << ", "
+                                    << (*next).toString()
+                                    << "]");
+        }
+        return lookedUpDocument;
     }
 
 private:
@@ -248,7 +269,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
     lookupChangeStage->injectMongoProcessInterface(
         std::make_shared<MockMongoProcessInterface>(std::move(foreignCollection)));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40580);
+    ASSERT_THROWS_CODE(
+        lookupChangeStage->getNext(), AssertionException, ErrorCodes::TooManyMatchingDocuments);
 }
 
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {

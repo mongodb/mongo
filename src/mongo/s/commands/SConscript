@@ -79,6 +79,7 @@ env.Library(
         'cluster_write_cmd.cpp',
         'commands_public.cpp',
         'kill_sessions_remote.cpp',
+        'pipeline_s.cpp',
         'strategy.cpp',
         env.Idlc('cluster_multicast.idl')[0],
     ],
