@@ -208,10 +208,24 @@ bool OplogEntry::isCrudOpType() const {
 BSONElement OplogEntry::getIdElement() const {
     invariant(isCrudOpType());
     if (getOpType() == OpTypeEnum::kUpdate) {
+        // We cannot use getOperationToApply() here because the BSONObj will go out out of scope
+        // after we return the BSONElement.
         return getObject2()->getField("_id");
     } else {
         return getObject()["_id"];
     }
+}
+
+BSONObj OplogEntry::getOperationToApply() const {
+    if (getOpType() != OpTypeEnum::kUpdate) {
+        return getObject();
+    }
+
+    if (auto optionalObj = getObject2()) {
+        return *optionalObj;
+    }
+
+    return {};
 }
 
 OplogEntry::CommandType OplogEntry::getCommandType() const {

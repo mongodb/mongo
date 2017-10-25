@@ -2068,7 +2068,45 @@ TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
         RSFatalException);
 }
 
-TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
+TEST(RSRollbackTest, LocalUpdateEntryWithoutO2IsFatal) {
+    const auto validOplogEntry = BSON("op"
+                                      << "u"
+                                      << "ui"
+                                      << UUID::gen()
+                                      << "ts"
+                                      << Timestamp(1, 1)
+                                      << "t"
+                                      << 1LL
+                                      << "h"
+                                      << 1LL
+                                      << "ns"
+                                      << "test.t"
+                                      << "o"
+                                      << BSON("_id" << 1 << "a" << 1)
+                                      << "o2"
+                                      << BSON("_id" << 1));
+    FixUpInfo fui;
+    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry, false));
+    const auto invalidOplogEntry = BSON("op"
+                                        << "u"
+                                        << "ui"
+                                        << UUID::gen()
+                                        << "ts"
+                                        << Timestamp(1, 1)
+                                        << "t"
+                                        << 1LL
+                                        << "h"
+                                        << 1LL
+                                        << "ns"
+                                        << "test.t"
+                                        << "o"
+                                        << BSON("_id" << 1 << "a" << 1));
+    ASSERT_THROWS(
+        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
+        RSFatalException);
+}
+
+TEST(RSRollbackTest, LocalUpdateEntryWithEmptyO2IsFatal) {
     const auto validOplogEntry = BSON("op"
                                       << "u"
                                       << "ui"

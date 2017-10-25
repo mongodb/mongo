@@ -103,6 +103,14 @@ public:
     BSONElement getIdElement() const;
 
     /**
+     * Returns the document representing the operation to apply.
+     * For commands and insert/delete operations, this will be the document in the 'o' field.
+     * For update operations, this will be the document in the 'o2' field.
+     * An empty document returned by this function indicates that we have a malformed OplogEntry.
+     */
+    BSONObj getOperationToApply() const;
+
+    /**
      * Returns the type of command of the oplog entry. Must be called on a command op.
      */
     CommandType getCommandType() const;

@@ -235,7 +235,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
     BSONObj fixedObj = bob.obj();
 
     // Parse the oplog entry.
-    auto oplogEntry = OplogEntry(fixedObj);
+    const OplogEntry oplogEntry(fixedObj);
 
     if (isNestedApplyOpsCommand) {
         LOG(2) << "Updating rollback FixUpInfo for nested applyOps oplog entry: "
@@ -254,9 +254,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                                              << redact(oplogEntry.toBSON()));
     }
 
-    BSONObj obj =
-        oplogEntry.raw.getObjectField(oplogEntry.getOpType() == OpTypeEnum::kUpdate ? "o2" : "o");
-
+    auto obj = oplogEntry.getOperationToApply();
     if (obj.isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no object field: "
                                              << redact(oplogEntry.toBSON()));
@@ -264,7 +262,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
 
     // If the operation being rolled back has a txnNumber, then the corresponding entry in the
     // session transaction table needs to be refetched.
-    auto operationSessionInfo = oplogEntry.getOperationSessionInfo();
+    const auto& operationSessionInfo = oplogEntry.getOperationSessionInfo();
     auto txnNumber = operationSessionInfo.getTxnNumber();
     if (txnNumber) {
         auto sessionId = operationSessionInfo.getSessionId();
@@ -567,7 +565,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
 
     // If we are inserting/updating/deleting a document in the oplog entry, we will update
     // the doc._id field when we actually insert the docID into the docsToRefetch set.
-    DocID doc = DocID(oplogEntry.raw, BSONElement(), *uuid);
+    DocID doc = DocID(fixedObj, BSONElement(), *uuid);
 
     doc._id = oplogEntry.getIdElement();
     if (doc._id.eoo()) {

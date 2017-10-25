@@ -424,20 +424,20 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 namespace {
 
 // The pool threads call this to prefetch each op
-void prefetchOp(const BSONObj& op) {
+void prefetchOp(const OplogEntry& oplogEntry) {
     initializePrefetchThread();
 
-    const char* ns = op.getStringField("ns");
-    if (ns && (ns[0] != '\0')) {
+    const auto& nss = oplogEntry.getNamespace();
+    if (!nss.isEmpty()) {
         try {
             // one possible tweak here would be to stay in the read lock for this database
             // for multiple prefetches if they are for the same database.
             const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
             OperationContext& opCtx = *opCtxPtr;
-            AutoGetCollectionForReadCommand ctx(&opCtx, NamespaceString(ns));
+            AutoGetCollectionForReadCommand ctx(&opCtx, nss);
             Database* db = ctx.getDb();
             if (db) {
-                prefetchPagesForReplicatedOp(&opCtx, db, op);
+                prefetchPagesForReplicatedOp(&opCtx, db, oplogEntry);
             }
         } catch (const DBException& e) {
             LOG(2) << "ignoring exception in prefetchOp(): " << redact(e) << endl;
@@ -452,7 +452,7 @@ void prefetchOp(const BSONObj& op) {
 void prefetchOps(const MultiApplier::Operations& ops, OldThreadPool* prefetcherPool) {
     invariant(prefetcherPool);
     for (auto&& op : ops) {
-        prefetcherPool->schedule([&] { prefetchOp(op.raw); });
+        prefetcherPool->schedule([&] { prefetchOp(op); });
     }
     prefetcherPool->join();
 }
@@ -928,10 +928,8 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
         }
 
         // Extract some info from ops that we'll need after releasing the batch below.
-        const auto firstOpTimeInBatch =
-            fassertStatusOK(40299, OpTime::parseFromOplogEntry(ops.front().raw));
-        const auto lastOpTimeInBatch =
-            fassertStatusOK(28773, OpTime::parseFromOplogEntry(ops.back().raw));
+        const auto firstOpTimeInBatch = ops.front().getOpTime();
+        const auto lastOpTimeInBatch = ops.back().getOpTime();
 
         // Make sure the oplog doesn't go back in time or repeat an entry.
         if (firstOpTimeInBatch <= replCoord->getMyLastAppliedOpTime()) {
@@ -1029,7 +1027,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     int curVersion = entry.getVersion();
     if (curVersion != OplogEntry::kOplogVersion) {
         severe() << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
-                 << curVersion << " in oplog entry: " << redact(entry.raw);
+                 << curVersion << " in oplog entry: " << redact(entry.toBSON());
         fassertFailedNoTrace(18820);
     }
 
@@ -1391,13 +1389,13 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
             const Status status = syncApply(opCtx, entry->raw, oplogApplicationMode);
 
             if (!status.isOK()) {
-                severe() << "Error applying operation (" << redact(entry->raw)
+                severe() << "Error applying operation (" << redact(entry->toBSON())
                          << "): " << causedBy(redact(status));
                 return status;
             }
         } catch (const DBException& e) {
             severe() << "writer worker caught exception: " << redact(e)
-                     << " on: " << redact(entry->raw);
+                     << " on: " << redact(entry->toBSON());
             return e.toStatus();
         }
     }
@@ -1443,7 +1441,7 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
                 // sync source.
                 if (s != ErrorCodes::UpdateOperationFailed) {
                     error() << "Error applying operation: " << redact(s) << " ("
-                            << redact(entry.raw) << ")";
+                            << redact(entry.toBSON()) << ")";
                     return s;
                 }
 
@@ -1459,7 +1457,7 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
             }
 
             severe() << "writer worker caught exception: " << causedBy(redact(e))
-                     << " on: " << redact(entry.raw);
+                     << " on: " << redact(entry.toBSON());
             return e.toStatus();
         }
     }
