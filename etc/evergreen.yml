@@ -281,7 +281,7 @@ functions:
         fi
         set -o errexit
 
-        ${path_prefix} ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+        ${path_prefix} ${asan_symbolizer} ${enable_lsan} ${lang_environment} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
   "run jstestfuzz":
     - command: shell.exec
@@ -3022,6 +3022,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1604
+    lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
@@ -4998,6 +4999,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
+    lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -6025,6 +6027,7 @@ buildvariants:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     path_prefix: PATH=$PATH:/usr/lib/llvm-3.8/bin
     enable_lsan: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
+    lang_environment: LANG=C
     compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: -j1 # Avoid starting too many mongod's under ASAN build.
