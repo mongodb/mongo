@@ -46,6 +46,7 @@ selector:
   - jstests/sharding/change_streams_establishment_finds_new_shards.js
   - jstests/sharding/change_streams_shards_start_in_sync.js
   - jstests/sharding/change_streams_unsharded_becomes_sharded.js
+  - jstests/sharding/change_streams_primary_shard_unaware.js
   - jstests/sharding/enable_sharding_basic.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/kill_sessions.js
