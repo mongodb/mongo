@@ -53,6 +53,10 @@ Status::Status(ErrorCodes::Error code, StringData reason) : Status(code, reason.
 Status::Status(ErrorCodes::Error code, const mongoutils::str::stream& reason)
     : Status(code, std::string(reason)) {}
 
+Status Status::withContext(StringData reasonPrefix) const {
+    return isOK() ? Status::OK() : Status(code(), reasonPrefix + causedBy(reason()));
+}
+
 std::ostream& operator<<(std::ostream& os, const Status& status) {
     return os << status.codeString() << " " << status.reason();
 }

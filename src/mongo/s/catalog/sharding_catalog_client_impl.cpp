@@ -1004,7 +1004,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
                                    << ". Result: " << response.getValue().response;
         }
 
-        return Status(status.code(), errMsg);
+        return status.withContext(errMsg);
     }
 
     return Status::OK();

@@ -1379,11 +1379,7 @@ Status InitialSyncer::_checkForShutdownAndConvertStatus_inlock(const Status& sta
         return Status(ErrorCodes::CallbackCanceled, message + ": initial syncer is shutting down");
     }
 
-    if (!status.isOK()) {
-        return Status(status.code(), message + ": " + status.reason());
-    }
-
-    return Status::OK();
+    return status.withContext(message);
 }
 
 Status InitialSyncer::_scheduleWorkAndSaveHandle_inlock(

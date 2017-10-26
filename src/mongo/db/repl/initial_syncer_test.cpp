@@ -3850,10 +3850,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempts.nFields(), 1) << attempts;
     BSONObj attempt0 = attempts["0"].Obj();
     ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
-    ASSERT_EQUALS(
-        attempt0.getStringField("status"),
-        std::string(
-            "FailedToParse: error cloning databases: fail on clone -- listDBs injected failure"))
+    ASSERT_EQUALS(attempt0.getStringField("status"),
+                  std::string("FailedToParse: error cloning databases :: caused by :: fail on "
+                              "clone -- listDBs injected failure"))
         << attempt0;
     ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
@@ -3958,10 +3957,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempts.nFields(), 1) << progress;
     attempt0 = attempts["0"].Obj();
     ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
-    ASSERT_EQUALS(
-        attempt0.getStringField("status"),
-        std::string(
-            "FailedToParse: error cloning databases: fail on clone -- listDBs injected failure"))
+    ASSERT_EQUALS(attempt0.getStringField("status"),
+                  std::string("FailedToParse: error cloning databases :: caused by :: fail on "
+                              "clone -- listDBs injected failure"))
         << attempt0;
     ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
@@ -4007,10 +4005,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     attempt0 = attempts["0"].Obj();
     ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
-    ASSERT_EQUALS(
-        attempt0.getStringField("status"),
-        std::string(
-            "FailedToParse: error cloning databases: fail on clone -- listDBs injected failure"))
+    ASSERT_EQUALS(attempt0.getStringField("status"),
+                  std::string("FailedToParse: error cloning databases :: caused by :: fail on "
+                              "clone -- listDBs injected failure"))
         << attempt0;
     ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))

@@ -71,6 +71,9 @@ public:
      *
      * For OK Statuses prefer using Status::OK(). If code is OK, the remaining arguments are
      * ignored.
+     *
+     * For adding context to the reason string, use withContext/addContext rather than making a new
+     * Status manually.
      */
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, std::string reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
@@ -85,6 +88,18 @@ public:
     inline Status& operator=(Status&& other) noexcept;
 
     inline ~Status();
+
+    /**
+     * Returns a new Status with the same data as this, but with the reason string prefixed with
+     * reasonPrefix and our standard " :: caused by :: " separator. The new reason is not visible to
+     * any other Statuses that share the same ErrorInfo object.
+     *
+     * No-op when called on an OK status.
+     */
+    Status withContext(StringData reasonPrefix) const;
+    void addContext(StringData reasonPrefix) {
+        *this = this->withContext(reasonPrefix);
+    }
 
     /**
      * Only compares codes. Ignores reason strings.

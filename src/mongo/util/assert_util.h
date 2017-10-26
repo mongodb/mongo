@@ -69,12 +69,12 @@ public:
         return reason().c_str();
     }
 
-    virtual void addContext(const std::string& str) {
-        _status = Status(code(), str + causedBy(reason()));
+    virtual void addContext(StringData context) {
+        _status.addContext(context);
     }
 
-    Status toStatus(const std::string& context) const {
-        return Status(code(), context + causedBy(*this));
+    Status toStatus(StringData context) const {
+        return _status.withContext(context);
     }
     const Status& toStatus() const {
         return _status;

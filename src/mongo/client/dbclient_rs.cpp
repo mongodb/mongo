@@ -540,10 +540,10 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const string& ns,
 
                 return checkSlaveQueryResult(std::move(cursor));
             } catch (const DBException& ex) {
-                const Status status = ex.toStatus();
-                lastNodeErrMsg = str::stream() << "can't query replica set node "
-                                               << _lastSlaveOkHost << ": " << status.reason();
-                _invalidateLastSlaveOkCache({status.code(), lastNodeErrMsg});
+                const Status status = ex.toStatus(str::stream() << "can't query replica set node "
+                                                                << _lastSlaveOkHost);
+                lastNodeErrMsg = status.reason();
+                _invalidateLastSlaveOkCache(status);
             }
         }
 
@@ -589,11 +589,10 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
 
                 return conn->findOne(ns, query, fieldsToReturn, queryOptions);
             } catch (const DBException& ex) {
-                const Status status = ex.toStatus();
-                lastNodeErrMsg = str::stream() << "can't findone replica set node "
-                                               << _lastSlaveOkHost.toString() << ": "
-                                               << status.reason();
-                _invalidateLastSlaveOkCache({status.code(), lastNodeErrMsg});
+                const Status status = ex.toStatus(str::stream() << "can't findone replica set node "
+                                                                << _lastSlaveOkHost.toString());
+                lastNodeErrMsg = status.reason();
+                _invalidateLastSlaveOkCache(status);
             }
         }
 
@@ -779,11 +778,11 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
                     _lazyState._secondaryQueryOk = true;
                     _lazyState._lastClient = conn;
                 } catch (const DBException& ex) {
-                    const Status status = ex.toStatus();
-                    lastNodeErrMsg = str::stream() << "can't callLazy replica set node "
-                                                   << _lastSlaveOkHost.toString() << ": "
-                                                   << status.reason();
-                    _invalidateLastSlaveOkCache({status.code(), lastNodeErrMsg});
+                    const Status status =
+                        ex.toStatus(str::stream() << "can't callLazy replica set node "
+                                                  << _lastSlaveOkHost.toString());
+                    lastNodeErrMsg = status.reason();
+                    _invalidateLastSlaveOkCache(status);
 
                     continue;
                 }

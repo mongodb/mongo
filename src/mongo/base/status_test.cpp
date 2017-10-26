@@ -62,6 +62,18 @@ TEST(Basic, Compare) {
     ASSERT_NE(errMax, Status::OK());
 }
 
+TEST(Basic, WithContext) {
+    const Status orig(ErrorCodes::MaxError, "error");
+
+    const auto copy = orig.withContext("context");
+    ASSERT_EQ(copy.code(), ErrorCodes::MaxError);
+    ASSERT(str::startsWith(copy.reason(), "context ")) << copy.reason();
+    ASSERT(str::endsWith(copy.reason(), " error")) << copy.reason();
+
+    ASSERT_EQ(orig.code(), ErrorCodes::MaxError);
+    ASSERT_EQ(orig.reason(), "error");
+}
+
 TEST(Cloning, Copy) {
     Status orig(ErrorCodes::MaxError, "error");
     ASSERT_EQUALS(orig.refCount(), 1U);
