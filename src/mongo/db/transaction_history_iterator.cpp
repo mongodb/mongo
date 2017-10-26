@@ -49,7 +49,6 @@ repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
     invariant(hasNext());
 
     DBDirectClient client(opCtx);
-    // TODO: SERVER-29843 oplogReplay option might be needed to activate fast ts search.
     auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace.ns(), _nextOpTime.asQuery());
 
     uassert(ErrorCodes::IncompleteTransactionHistory,

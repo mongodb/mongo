@@ -30,9 +30,10 @@
 
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/timer.h"
 
@@ -41,15 +42,15 @@ namespace mongo {
 class RecordCursor;
 
 /**
- * OplogStart walks a collection backwards to find the first object in the collection that
- * matches the query.  It's used by replication to efficiently find where the oplog should be
- * replayed from.
+ * OplogStart walks a collection backwards to find the first object in the collection that matches
+ * the timestamp.  It's used by replication to efficiently find where the oplog should be replayed
+ * from.
  *
- * The oplog is always a capped collection.  In capped collections, documents are oriented on
- * disk according to insertion order.  The oplog inserts documents with increasing timestamps.
- * Queries on the oplog look for entries that are after a certain time.  Therefore if we
- * navigate backwards, the last document we encounter that satisfies our query (over the
- * timestamp) is the first document we must scan from to answer the query.
+ * The oplog is always a capped collection.  In capped collections, documents are oriented on disk
+ * according to insertion order.  The oplog inserts documents with increasing timestamps.  Queries
+ * on the oplog look for entries that are after a certain time.  Therefore if we navigate backwards,
+ * the first document we encounter that is less than or equal to the timestamp is the first document
+ * we should scan.
  *
  * Why isn't this a normal reverse table scan, you may ask?  We could be correct if we used a
  * normal reverse collection scan.  However, that's not fast enough.  Since we know all
@@ -65,7 +66,7 @@ public:
     // Does not take ownership.
     OplogStart(OperationContext* opCtx,
                const Collection* collection,
-               MatchExpression* filter,
+               Timestamp timestamp,
                WorkingSet* ws);
 
     StageState doWork(WorkingSetID* out) final;
@@ -137,7 +138,11 @@ private:
 
     std::string _ns;
 
-    MatchExpression* _filter;
+    // '_filter' matches documents whose "ts" field is less than or equal to 'timestamp'. Once we
+    // have found a document matching '_filter', we know that we're at or behind the starting point
+    // and can start scanning forwards again.
+    BSONObj _filterBSON;
+    LTEMatchExpression _filter;
 
     static int _backwardsScanTime;
 };

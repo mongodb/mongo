@@ -31,6 +31,7 @@
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
@@ -77,7 +78,11 @@ protected:
         ASSERT_OK(statusWithCQ.getStatus());
         _cq = std::move(statusWithCQ.getValue());
         _oplogws.reset(new WorkingSet());
-        _stage.reset(new OplogStart(&_opCtx, collection(), _cq->root(), _oplogws.get()));
+        const auto timestamp = query[repl::OpTime::kTimestampFieldName]
+                                   .embeddedObjectUserCheck()
+                                   .firstElement()
+                                   .timestamp();
+        _stage = stdx::make_unique<OplogStart>(&_opCtx, collection(), timestamp, _oplogws.get());
     }
 
     void assertWorkingSetMemberHasId(WorkingSetID id, int expectedId) {
@@ -112,10 +117,10 @@ class OplogStartIsOldest : public Base {
 public:
     void run() {
         for (int i = 0; i < 10; ++i) {
-            client()->insert(nss.ns(), BSON("_id" << i << "ts" << i));
+            client()->insert(nss.ns(), BSON("_id" << i << "ts" << Timestamp(1000, i)));
         }
 
-        setupFromQuery(BSON("ts" << BSON("$gte" << 10)));
+        setupFromQuery(BSON("ts" << BSON("$gte" << Timestamp(1000, 10))));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         // collection scan needs to be initialized
@@ -136,10 +141,10 @@ class OplogStartIsNewest : public Base {
 public:
     void run() {
         for (int i = 0; i < 10; ++i) {
-            client()->insert(nss.ns(), BSON("_id" << i << "ts" << i));
+            client()->insert(nss.ns(), BSON("_id" << i << "ts" << Timestamp(1000, i)));
         }
 
-        setupFromQuery(BSON("ts" << BSON("$gte" << 1)));
+        setupFromQuery(BSON("ts" << BSON("$gte" << Timestamp(1000, 0))));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         // collection scan needs to be initialized
@@ -163,10 +168,10 @@ class OplogStartIsNewestExtentHop : public Base {
 public:
     void run() {
         for (int i = 0; i < 10; ++i) {
-            client()->insert(nss.ns(), BSON("_id" << i << "ts" << i));
+            client()->insert(nss.ns(), BSON("_id" << i << "ts" << Timestamp(1000, i)));
         }
 
-        setupFromQuery(BSON("ts" << BSON("$gte" << 1)));
+        setupFromQuery(BSON("ts" << BSON("$gte" << Timestamp(1000, 1))));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         // ensure that we go into extent hopping mode immediately
@@ -194,7 +199,7 @@ public:
         buildCollection();
 
         WorkingSetID id = WorkingSet::INVALID_ID;
-        setupFromQuery(BSON("ts" << BSON("$gte" << tsGte())));
+        setupFromQuery(BSON("ts" << BSON("$gte" << Timestamp(1000, tsGte()))));
 
         // ensure that we go into extent hopping mode immediately
         _stage->setBackwardsScanTime(0);
@@ -225,7 +230,9 @@ protected:
 
         // Populate documents.
         for (int i = 0; i < numDocs(); ++i) {
-            client()->insert(nss.ns(), BSON("_id" << i << "ts" << i << "payload" << payload8k()));
+            client()->insert(
+                nss.ns(),
+                BSON("_id" << i << "ts" << Timestamp(1000, i + 1) << "payload" << payload8k()));
         }
     }
 

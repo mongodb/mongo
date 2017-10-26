@@ -38,6 +38,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
@@ -66,7 +67,15 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
       _wsidForFetch(_workingSet->allocate()) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
+    _specificStats.maxTs = params.maxTs;
     invariant(!_params.shouldTrackLatestOplogTimestamp || _params.collection->ns().isOplog());
+
+    if (params.maxTs) {
+        _endConditionBSON = BSON("$gte" << *(params.maxTs));
+        _endCondition = stdx::make_unique<GTEMatchExpression>();
+        invariantOK(_endCondition->init(repl::OpTime::kTimestampFieldName,
+                                        _endConditionBSON.firstElement()));
+    }
 }
 
 PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
@@ -188,7 +197,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 }
 
 Status CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
-    auto tsElem = record.data.toBson()["ts"];
+    auto tsElem = record.data.toBson()[repl::OpTime::kTimestampFieldName];
     if (tsElem.type() != BSONType::bsonTimestamp) {
         Status status(ErrorCodes::InternalError,
                       str::stream() << "CollectionScan was asked to track latest operation time, "
@@ -211,6 +220,10 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
         }
         *out = memberID;
         return PlanStage::ADVANCED;
+    } else if (_endCondition && Filter::passes(member, _endCondition.get())) {
+        _workingSet->free(memberID);
+        _commonStats.isEOF = true;
+        return PlanStage::IS_EOF;
     } else {
         _workingSet->free(memberID);
         return PlanStage::NEED_TIME;

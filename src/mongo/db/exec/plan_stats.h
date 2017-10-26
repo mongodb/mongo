@@ -206,6 +206,11 @@ struct CollectionScanStats : public SpecificStats {
     // >0 if we're traversing the collection forwards. <0 if we're traversing it
     // backwards.
     int direction;
+
+    // If present, indicates that the collection scan will stop and return EOF the first time it
+    // sees a document that does not pass the filter and has a "ts" Timestamp field greater than
+    // 'maxTs'.
+    boost::optional<Timestamp> maxTs;
 };
 
 struct CountStats : public SpecificStats {

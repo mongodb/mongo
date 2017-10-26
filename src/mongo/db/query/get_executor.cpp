@@ -72,6 +72,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -496,20 +497,66 @@ namespace {
 
 /**
  * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
- * Such predicates can be used for the oplog start hack.
  */
-bool isOplogTsPred(const mongo::MatchExpression* me) {
+bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
     if (mongo::MatchExpression::GT != me->matchType() &&
         mongo::MatchExpression::GTE != me->matchType()) {
         return false;
     }
 
-    return mongoutils::str::equals(me->path().rawData(), "ts");
+    return me->path() == repl::OpTime::kTimestampFieldName;
 }
 
-mongo::BSONElement extractOplogTsOptime(const mongo::MatchExpression* me) {
-    invariant(isOplogTsPred(me));
-    return static_cast<const mongo::ComparisonMatchExpression*>(me)->getData();
+/**
+ * Extracts the lower and upper bounds on the "ts" field from 'me'. This only examines comparisons
+ * of "ts" against a Timestamp at the top level or inside a top-level $and.
+ */
+std::pair<boost::optional<Timestamp>, boost::optional<Timestamp>> extractTsRange(
+    const MatchExpression* me, bool topLevel = true) {
+    boost::optional<Timestamp> min;
+    boost::optional<Timestamp> max;
+
+    if (me->matchType() == MatchExpression::AND && topLevel) {
+        for (size_t i = 0; i < me->numChildren(); ++i) {
+            boost::optional<Timestamp> childMin;
+            boost::optional<Timestamp> childMax;
+            std::tie(childMin, childMax) = extractTsRange(me->getChild(i), false);
+            if (childMin && (!min || childMin.get() > min.get())) {
+                min = childMin;
+            }
+            if (childMax && (!max || childMax.get() < max.get())) {
+                max = childMax;
+            }
+        }
+        return {min, max};
+    }
+
+    if (!ComparisonMatchExpression::isComparisonMatchExpression(me) ||
+        me->path() != repl::OpTime::kTimestampFieldName) {
+        return {min, max};
+    }
+
+    auto rawElem = static_cast<const ComparisonMatchExpression*>(me)->getData();
+    if (rawElem.type() != BSONType::bsonTimestamp) {
+        return {min, max};
+    }
+
+    switch (me->matchType()) {
+        case MatchExpression::EQ:
+            min = rawElem.timestamp();
+            max = rawElem.timestamp();
+            return {min, max};
+        case MatchExpression::GT:
+        case MatchExpression::GTE:
+            min = rawElem.timestamp();
+            return {min, max};
+        case MatchExpression::LT:
+        case MatchExpression::LTE:
+            max = rawElem.timestamp();
+            return {min, max};
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
@@ -531,40 +578,21 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
         cq->setCollator(collection->getDefaultCollator()->clone());
     }
 
-    // A query can only do oplog start finding if it has a top-level $gt or $gte predicate over
-    // the "ts" field (the operation's timestamp). Find that predicate and pass it to
-    // the OplogStart stage.
-    MatchExpression* tsExpr = NULL;
-    if (MatchExpression::AND == cq->root()->matchType()) {
-        // The query has an AND at the top-level. See if any of the children
-        // of the AND are $gt or $gte predicates over 'ts'.
-        for (size_t i = 0; i < cq->root()->numChildren(); ++i) {
-            MatchExpression* me = cq->root()->getChild(i);
-            if (isOplogTsPred(me)) {
-                tsExpr = me;
-                break;
-            }
-        }
-    } else if (isOplogTsPred(cq->root())) {
-        // The root of the tree is a $gt or $gte predicate over 'ts'.
-        tsExpr = cq->root();
-    }
+    boost::optional<Timestamp> minTs, maxTs;
+    std::tie(minTs, maxTs) = extractTsRange(cq->root());
 
-    if (NULL == tsExpr) {
+    if (!minTs) {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       "OplogReplay query does not contain top-level "
-                      "$gt or $gte over the 'ts' field.");
+                      "$eq, $gt, or $gte over the 'ts' field.");
     }
 
     boost::optional<RecordId> startLoc = boost::none;
 
     // See if the RecordStore supports the oplogStartHack
-    const BSONElement tsElem = extractOplogTsOptime(tsExpr);
-    if (tsElem.type() == bsonTimestamp) {
-        StatusWith<RecordId> goal = oploghack::keyForOptime(tsElem.timestamp());
-        if (goal.isOK()) {
-            startLoc = collection->getRecordStore()->oplogStartHack(opCtx, goal.getValue());
-        }
+    StatusWith<RecordId> goal = oploghack::keyForOptime(*minTs);
+    if (goal.isOK()) {
+        startLoc = collection->getRecordStore()->oplogStartHack(opCtx, goal.getValue());
     }
 
     if (startLoc) {
@@ -575,7 +603,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
         // Fallback to trying the OplogStart stage.
         unique_ptr<WorkingSet> oplogws = make_unique<WorkingSet>();
         unique_ptr<OplogStart> stage =
-            make_unique<OplogStart>(opCtx, collection, tsExpr, oplogws.get());
+            make_unique<OplogStart>(opCtx, collection, *minTs, oplogws.get());
         // Takes ownership of oplogws and stage.
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(oplogws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
@@ -587,13 +615,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
         startLoc = RecordId();
         PlanExecutor::ExecState state = exec->getNext(NULL, startLoc.get_ptr());
 
-        // This is normal.  The start of the oplog is the beginning of the collection.
         if (PlanExecutor::IS_EOF == state) {
-            return getExecutor(
-                opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, plannerOptions);
-        }
-        // This is not normal.  An error was encountered.
-        if (PlanExecutor::ADVANCED != state) {
+            // EOF from the OplogStart stage means that the starting point is prior to the very
+            // first document in the oplog. In this case, we should start from the beginning of the
+            // collection.
+            startLoc = boost::none;
+        } else if (PlanExecutor::ADVANCED != state) {
+            // This is not normal.  An error was encountered.
             return Status(ErrorCodes::InternalError, "quick oplog start location had error...?");
         }
     }
@@ -601,17 +629,20 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
     // Build our collection scan...
     CollectionScanParams params;
     params.collection = collection;
-    params.start = *startLoc;
+    if (startLoc) {
+        params.start = *startLoc;
+    }
+    params.maxTs = maxTs;
     params.direction = CollectionScanParams::FORWARD;
     params.tailable = cq->getQueryRequest().isTailable();
     params.shouldTrackLatestOplogTimestamp =
         plannerOptions & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
 
-    // If the query is just tsExpr, we know that every document in the collection after the first
-    // matching one must also match. To avoid wasting time running the match expression on every
-    // document to be returned, we tell the CollectionScan stage to stop applying the filter once it
-    // finds the first match.
-    if (cq->root() == tsExpr) {
+    // If the query is just a lower bound on "ts", we know that every document in the collection
+    // after the first matching one must also match. To avoid wasting time running the match
+    // expression on every document to be returned, we tell the CollectionScan stage to stop
+    // applying the filter once it finds the first match.
+    if (isOplogTsLowerBoundPred(cq->root())) {
         params.stopApplyingFilterAfterFirstMatch = true;
     }
 

@@ -49,9 +49,6 @@ selector:
   - jstests/core/remove6.js
   - jstests/core/removea.js
 
-  # TODO SERVER-29843 / SERVER-31328: Investigate enabling these workloads once performance of
-  # retrying completed writes has improved.
-  #
   # These tests time out on slower machines because of too many retryable operations:
   - jstests/core/explain3.js
   - jstests/core/geo2.js

@@ -32,7 +32,7 @@
 
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -97,6 +97,11 @@ private:
 
     // The filter is not owned by us.
     const MatchExpression* _filter;
+
+    // If a document does not pass '_filter' but passes '_endCondition', stop scanning and return
+    // IS_EOF.
+    BSONObj _endConditionBSON;
+    std::unique_ptr<GTEMatchExpression> _endCondition;
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
 

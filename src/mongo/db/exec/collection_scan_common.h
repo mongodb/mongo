@@ -49,6 +49,10 @@ struct CollectionScanParams {
     // not being invalidated before the first call to work(...).
     RecordId start;
 
+    // If present, the collection scan will stop and return EOF the first time it sees a document
+    // that does not pass the filter and has 'ts' greater than 'maxTs'.
+    boost::optional<Timestamp> maxTs;
+
     Direction direction = FORWARD;
 
     // Do we want the scan to be 'tailable'?  Only meaningful if the collection is capped.
