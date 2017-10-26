@@ -241,6 +241,20 @@ def execute_cmd(cmd, use_file=False):
     return error_code, output
 
 
+def get_aws_crash_options(option):
+    """ Returns a tuple (instance_id, address_type) of the AWS crash option. """
+    if ":" in option:
+        return tuple(option.split(":"))
+    return option, None
+
+
+def get_user_host(user_host):
+    """ Returns a tuple (user, host) from the user_host string. """
+    if "@" in user_host:
+        return tuple(user_host.split("@"))
+    return None, user_host
+
+
 def parse_options(options):
     """ Parses options and returns a dict.
 
@@ -1060,10 +1074,9 @@ def crash_server(options, crash_canary, canary_port, local_ops, script_name, cli
     LOGGER.info("Crashing server in %d seconds", crash_wait_time)
     time.sleep(crash_wait_time)
 
-    crash_func = local_ops.shell
-
     if options.crash_method == "mpower":
         # Provide time for power to dissipate by sleeping 10 seconds before turning it back on.
+        crash_func = local_ops.shell
         crash_args = ["""
             echo 0 > /dev/{crash_options} ;
             sleep 10 ;
@@ -1072,7 +1085,6 @@ def crash_server(options, crash_canary, canary_port, local_ops, script_name, cli
             user_host=options.ssh_crash_user_host,
             ssh_connection_options=options.ssh_crash_options,
             shell_binary="/bin/sh")
-        crash_func = local_ops.shell
 
     elif options.crash_method == "internal":
         if options.canary == "remote":
@@ -1084,6 +1096,7 @@ def crash_server(options, crash_canary, canary_port, local_ops, script_name, cli
         else:
             canary = ""
             canary_cmd = ""
+        crash_func = local_ops.shell
         crash_args = ["{} {} --remoteOperation {} {} {} crash_server".format(
             options.remote_python,
             script_name,
@@ -1094,11 +1107,12 @@ def crash_server(options, crash_canary, canary_port, local_ops, script_name, cli
     elif options.crash_method == "aws_ec2":
         ec2 = aws_ec2.AwsEc2()
         crash_func = ec2.control_instance
-        crash_args = ["force-stop", options.crash_options]
+        instance_id, _ = get_aws_crash_options(options.crash_options)
+        crash_args = ["force-stop", instance_id, 60, True]
 
     else:
         LOGGER.error("Unsupported crash method '%s' provided", options.crash_method)
-        return False
+        return
 
     # Invoke the crash canary function, right before crashing the server.
     if crash_canary and options.canary == "local":
@@ -1445,6 +1459,18 @@ Examples:
                              help="Crash methods: {} [default: '%default']".format(crash_methods),
                              default="internal")
 
+    aws_address_types = [
+        "private_ip_address", "public_ip_address", "private_dns_name", "public_dns_name"]
+    crash_options.add_option("--crashOptions",
+                             dest="crash_options",
+                             help="Secondary argument (REQUIRED) for the following --crashMethod:"
+                                  " 'aws_ec2': specify EC2 'instance_id[:address_type]'."
+                                  " The address_type is one of {} and defaults to"
+                                  " 'public_ip_address'."
+                                  " 'mpower': specify output<num> to turn off/on, i.e.,"
+                                  " 'output1'.".format(aws_address_types),
+                             default=None)
+
     crash_options.add_option("--crashWaitTime",
                              dest="crash_wait_time",
                              help="Time, in seconds, to wait before issuing crash [default:"
@@ -1468,14 +1494,6 @@ Examples:
     crash_options.add_option("--sshCrashOptions",
                              dest="ssh_crash_options",
                              help="The crash host's ssh connection options, i.e., '-i ident.pem'",
-                             default=None)
-
-    crash_options.add_option("--crashOptions",
-                             dest="crash_options",
-                             help="Secondary argument for the following --crashMethod:"
-                                  " 'aws_ec2': specify EC2 instance_id."
-                                  " 'mpower': specify output<num> to turn off/on, i.e.,"
-                                  " 'output1'.",
                              default=None)
 
     # MongoDB options
@@ -1686,6 +1704,21 @@ Examples:
         print("{}:{}".format(script_name, __version__))
         sys.exit(0)
 
+    # Setup the crash options
+    if ((options.crash_method == "aws_ec2" or options.crash_method == "mpower") and
+            options.crash_options is None):
+        parser.error("Missing required argument --crashOptions for crashMethod '{}'".format(
+            options.crash_method))
+
+    if options.crash_method == "aws_ec2":
+        instance_id, address_type = get_aws_crash_options(options.crash_options)
+        address_type = address_type if address_type is not None else "public_ip_address"
+        if address_type not in aws_address_types:
+            LOGGER.error("Invalid crashOptions address_type '%s' specified for crashMethod"
+                         " 'aws_ec2', specify one of %s", address_type, aws_address_types)
+            sys.exit(1)
+        options.crash_options = "{}:{}".format(instance_id, address_type)
+
     # Initialize the mongod options
     if not options.root_dir:
         options.root_dir = "mongodb-powertest-{}".format(int(time.time()))
@@ -1768,7 +1801,8 @@ Examples:
 
     # The remote mongod host comes from the ssh_user_host,
     # which may be specified as user@host.
-    mongod_host = options.ssh_user_host.rsplit()[-1].rsplit("@")[-1]
+    ssh_user, ssh_host = get_user_host(options.ssh_user_host)
+    mongod_host = ssh_host
 
     ssh_connection_options = "{} {}".format(
         default_ssh_connection_options,
@@ -2027,6 +2061,28 @@ Examples:
         # Wait a bit after sending command to crash the server to avoid connecting to the
         # server before the actual crash occurs.
         time.sleep(10)
+
+        # The EC2 instance address changes if the crash_method is 'aws_ec2'.
+        if options.crash_method == "aws_ec2":
+            ec2 = aws_ec2.AwsEc2()
+            ret, aws_status = ec2.control_instance(
+                mode="start", image_id=instance_id, wait_time_secs=60, show_progress=True)
+            LOGGER.info("Start instance: %d %s****", ret, aws_status)
+            if not hasattr(aws_status, address_type):
+                raise Exception("Cannot determine address_type {} from AWS EC2 status {}".format(
+                    address_type, aws_status))
+            ssh_host = getattr(aws_status, address_type)
+            if ssh_user is None:
+                ssh_user_host = ssh_host
+            else:
+                ssh_user_host = "{}@{}".format(ssh_user, ssh_host)
+            mongod_host = ssh_host
+            local_ops = LocalToRemoteOperations(
+                user_host=ssh_user_host,
+                ssh_connection_options=ssh_connection_options,
+                ssh_options=ssh_options,
+                use_shell=True)
+
         canary_doc = copy.deepcopy(orig_canary_doc)
 
         kill_processes(crud_pids + fsm_pids)

@@ -176,11 +176,11 @@ variables:
 
 - &powercycle_test
   ec2_artifacts: ${log_path} ${backup_path_after} ${backup_path_before}
-  program_options: --logLevel debug --backupPathBefore  ${backup_path_before} --backupPathAfter ${backup_path_after}
+  program_options: --logLevel info --backupPathBefore  ${backup_path_before} --backupPathAfter ${backup_path_after}
   connection_options: --sshUserHost ${ip_address} --sshConnection \"${ssh_identity} ${ssh_connection_options}\"
-  test_options: --testLoops 25 --seedDocNum 10000 --rsync --validate local --canary remote
-  crash_options: --crashMethod internal --crashWaitTime 30 --jitterForCrashWaitTime 5
-  client_options: --numCrudClients 5 --numFsmClients 5
+  test_options: --testLoops 25 --seedDocNum 10000 --rsync --validate local --canary local
+  crash_options: "--crashMethod aws_ec2 --crashOptions ${instance_id}:private_ip_address --crashWaitTime 30 --jitterForCrashWaitTime 5"
+  client_options: --numCrudClients 10 --numFsmClients 10
   mongodb_options: --rootDir ${remote_dir}-${task_id} --mongodbBinDir ${remote_dir}
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath ${db_path} --logPath ${log_path}
   mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1\"
@@ -1252,6 +1252,25 @@ functions:
           fi
 
   "copy EC2 artifacts":
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          if [ -z "${ec2_artifacts}" ]; then
+            exit 0
+          fi
+          # Ensure we use the latest ip_address, as it could change if the EC2 instance
+          # has been stopped and started.
+          ${activate_virtualenv}
+          aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode status)
+          ip_address=$(echo $aws_ec2 | sed -e "s/.*private_ip_address: //; s/ .*//")
+          sed -i -e "s/${ip_address}/$ip_address/" ${aws_ec2_yml}
+
+    - command: expansions.update
+      params:
+        file: src/${aws_ec2_yml}
+
     - command: shell.exec
       params:
         shell: bash
@@ -4068,11 +4087,11 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
-    # Disable the CRUD & FSM clients for mmapv1.
+    # Disable the FSM clients for mmapv1.
     # mongod will not start if it crashed mongod while creating a namespace (SERVER-26499).
     vars:
       <<: *powercycle_test
-      client_options: --numCrudClients 0 --numFsmClients 0
+      client_options: --numCrudClients 10 --numFsmClients 0
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine mmapv1\"
 
 - name: powercycle_WT
