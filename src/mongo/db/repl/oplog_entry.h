@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 
@@ -61,6 +62,21 @@ public:
 
     static StatusWith<OplogEntry> parse(const BSONObj& object);
 
+    OplogEntry(OpTime opTime,
+               long long hash,
+               OpTypeEnum opType,
+               const NamespaceString& nss,
+               const boost::optional<UUID>& uuid,
+               const boost::optional<bool>& fromMigrate,
+               int version,
+               const BSONObj& oField,
+               const boost::optional<BSONObj>& o2Field,
+               const OperationSessionInfo& sessionInfo,
+               const boost::optional<mongo::Date_t>& wallClockTime,
+               const boost::optional<StmtId>& statementId,
+               const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
+               const boost::optional<OpTime>& preImageOpTime,
+               const boost::optional<OpTime>& postImageOpTime);
     OplogEntry(OpTime opTime,
                long long hash,
                OpTypeEnum opType,

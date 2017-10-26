@@ -74,6 +74,63 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
     MONGO_UNREACHABLE;
 }
 
+/**
+ * Returns a document representing an oplog entry with the given fields.
+ */
+BSONObj makeOplogEntryDoc(OpTime opTime,
+                          long long hash,
+                          OpTypeEnum opType,
+                          const NamespaceString& nss,
+                          const boost::optional<UUID>& uuid,
+                          const boost::optional<bool>& fromMigrate,
+                          int64_t version,
+                          const BSONObj& oField,
+                          const boost::optional<BSONObj>& o2Field,
+                          const OperationSessionInfo& sessionInfo,
+                          const boost::optional<mongo::Date_t>& wallClockTime,
+                          const boost::optional<StmtId>& statementId,
+                          const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
+                          const boost::optional<OpTime>& preImageOpTime,
+                          const boost::optional<OpTime>& postImageOpTime) {
+    BSONObjBuilder builder;
+    sessionInfo.serialize(&builder);
+    builder.append(OplogEntryBase::kTimestampFieldName, opTime.getTimestamp());
+    builder.append(OplogEntryBase::kTermFieldName, opTime.getTerm());
+    builder.append(OplogEntryBase::kHashFieldName, hash);
+    builder.append(OplogEntryBase::kVersionFieldName, version);
+    builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
+    builder.append(OplogEntryBase::kNamespaceFieldName, nss.toString());
+    if (uuid) {
+        uuid->appendToBuilder(&builder, OplogEntryBase::kUuidFieldName);
+    }
+    if (fromMigrate) {
+        builder.append(OplogEntryBase::kFromMigrateFieldName, fromMigrate.get());
+    }
+    builder.append(OplogEntryBase::kObjectFieldName, oField);
+    if (o2Field) {
+        builder.append(OplogEntryBase::kObject2FieldName, o2Field.get());
+    }
+    if (wallClockTime) {
+        builder.append(OplogEntryBase::kWallClockTimeFieldName, wallClockTime.get());
+    }
+    if (statementId) {
+        builder.append(OplogEntryBase::kStatementIdFieldName, statementId.get());
+    }
+    if (prevWriteOpTimeInTransaction) {
+        const BSONObj localObject = prevWriteOpTimeInTransaction.get().toBSON();
+        builder.append(OplogEntryBase::kPrevWriteOpTimeInTransactionFieldName, localObject);
+    }
+    if (preImageOpTime) {
+        const BSONObj localObject = preImageOpTime.get().toBSON();
+        builder.append(OplogEntryBase::kPreImageOpTimeFieldName, localObject);
+    }
+    if (postImageOpTime) {
+        const BSONObj localObject = postImageOpTime.get().toBSON();
+        builder.append(OplogEntryBase::kPostImageOpTimeFieldName, localObject);
+    }
+    return builder.obj();
+}
+
 }  // namespace
 
 const int OplogEntry::kOplogVersion = 2;
@@ -99,27 +156,60 @@ OplogEntry::OplogEntry(BSONObj rawInput)
         _commandType = parseCommandType(getObject());
     }
 }
+
+OplogEntry::OplogEntry(OpTime opTime,
+                       long long hash,
+                       OpTypeEnum opType,
+                       const NamespaceString& nss,
+                       const boost::optional<UUID>& uuid,
+                       const boost::optional<bool>& fromMigrate,
+                       int version,
+                       const BSONObj& oField,
+                       const boost::optional<BSONObj>& o2Field,
+                       const OperationSessionInfo& sessionInfo,
+                       const boost::optional<mongo::Date_t>& wallClockTime,
+                       const boost::optional<StmtId>& statementId,
+                       const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
+                       const boost::optional<OpTime>& preImageOpTime,
+                       const boost::optional<OpTime>& postImageOpTime)
+    : OplogEntry(makeOplogEntryDoc(opTime,
+                                   hash,
+                                   opType,
+                                   nss,
+                                   uuid,
+                                   fromMigrate,
+                                   version,
+                                   oField,
+                                   o2Field,
+                                   sessionInfo,
+                                   wallClockTime,
+                                   statementId,
+                                   prevWriteOpTimeInTransaction,
+                                   preImageOpTime,
+                                   postImageOpTime)) {}
+
 OplogEntry::OplogEntry(OpTime opTime,
                        long long hash,
                        OpTypeEnum opType,
                        NamespaceString nss,
                        int version,
                        const BSONObj& oField,
-                       const boost::optional<BSONObj>& o2Field) {
-    setTimestamp(opTime.getTimestamp());
-    setTerm(opTime.getTerm());
-    setHash(hash);
-    setOpType(opType);
-    setNamespace(nss);
-    setVersion(version);
-    setObject(oField);
-    if (o2Field) {
-        setObject2(o2Field);
-    }
-
-    // This is necessary until we remove `raw` in SERVER-29200.
-    raw = toBSON();
-}
+                       const boost::optional<BSONObj>& o2Field)
+    : OplogEntry(opTime,          // optime
+                 hash,            // hash
+                 opType,          // op type
+                 nss,             // namespace
+                 boost::none,     // uuid
+                 boost::none,     // fromMigrate
+                 version,         // version
+                 oField,          // o
+                 o2Field,         // o2
+                 {},              // sessionInfo
+                 boost::none,     // wall clock time
+                 boost::none,     // statement id
+                 boost::none,     // optime of previous write within same transaction
+                 boost::none,     // pre-image optime
+                 boost::none) {}  // post-image optime
 
 OplogEntry::OplogEntry(OpTime opTime,
                        long long hash,
