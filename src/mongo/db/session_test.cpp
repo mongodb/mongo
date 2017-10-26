@@ -48,6 +48,34 @@ namespace {
 const NamespaceString kNss("TestDB", "TestColl");
 const OptionalCollectionUUID kUUID;
 
+/**
+ * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+ */
+repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
+                                repl::OpTypeEnum opType,
+                                BSONObj object,
+                                OperationSessionInfo sessionInfo,
+                                boost::optional<Date_t> wallClockTime,
+                                boost::optional<StmtId> stmtId,
+                                boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
+    return repl::OplogEntry(
+        opTime,                        // optime
+        0,                             // hash
+        opType,                        // opType
+        kNss,                          // namespace
+        boost::none,                   // uuid
+        boost::none,                   // fromMigrate
+        0,                             // version
+        object,                        // o
+        boost::none,                   // o2
+        sessionInfo,                   // sessionInfo
+        wallClockTime,                 // wall clock time
+        stmtId,                        // statement id
+        prevWriteOpTimeInTransaction,  // optime of previous write within same transaction
+        boost::none,                   // pre-image optime
+        boost::none);                  // post-image optime
+}
+
 class SessionTest : public MockReplCoordServerFixture {
 protected:
     void setUp() final {
@@ -365,29 +393,36 @@ TEST_F(SessionTest, IncompleteHistoryDueToOpLogTruncation) {
         osi.setSessionId(sessionId);
         osi.setTxnNumber(txnNum);
 
-        repl::OplogEntry entry0(
-            repl::OpTime(Timestamp(100, 0), 0), 0, repl::OpTypeEnum::kInsert, kNss, BSON("x" << 0));
-        entry0.setOperationSessionInfo(osi);
-        entry0.setStatementId(0);
-        entry0.setWallClockTime(Date_t::now());
+        auto entry0 =
+            makeOplogEntry(repl::OpTime(Timestamp(100, 0), 0),  // optime
+                           repl::OpTypeEnum::kInsert,           // op type
+                           BSON("x" << 0),                      // o
+                           osi,                                 // session info
+                           Date_t::now(),                       // wall clock time
+                           0,                                   // statement id
+                           boost::none);  // optime of previous write within same transaction
 
         // Intentionally skip writing the oplog entry for statement 0, so that it appears as if the
         // chain of log entries is broken because of oplog truncation
 
-        repl::OplogEntry entry1(
-            repl::OpTime(Timestamp(100, 1), 0), 0, repl::OpTypeEnum::kInsert, kNss, BSON("x" << 1));
-        entry1.setOperationSessionInfo(osi);
-        entry1.setPrevWriteOpTimeInTransaction(entry0.getOpTime());
-        entry1.setStatementId(1);
-        entry1.setWallClockTime(Date_t::now());
+        auto entry1 =
+            makeOplogEntry(repl::OpTime(Timestamp(100, 1), 0),  // optime
+                           repl::OpTypeEnum::kInsert,           // op type
+                           BSON("x" << 1),                      // o
+                           osi,                                 // session info
+                           Date_t::now(),                       // wall clock time
+                           1,                                   // statement id
+                           entry0.getOpTime());  // optime of previous write within same transaction
         insertOplogEntry(entry1);
 
-        repl::OplogEntry entry2(
-            repl::OpTime(Timestamp(100, 2), 0), 0, repl::OpTypeEnum::kInsert, kNss, BSON("x" << 2));
-        entry1.setOperationSessionInfo(osi);
-        entry2.setPrevWriteOpTimeInTransaction(entry1.getOpTime());
-        entry2.setStatementId(2);
-        entry2.setWallClockTime(Date_t::now());
+        auto entry2 =
+            makeOplogEntry(repl::OpTime(Timestamp(100, 2), 0),  // optime
+                           repl::OpTypeEnum::kInsert,           // op type
+                           BSON("x" << 2),                      // o
+                           osi,                                 // session info
+                           Date_t::now(),                       // wall clock time
+                           2,                                   // statement id
+                           entry1.getOpTime());  // optime of previous write within same transaction
         insertOplogEntry(entry2);
 
         DBDirectClient client(opCtx());

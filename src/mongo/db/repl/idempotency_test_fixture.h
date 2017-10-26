@@ -152,10 +152,17 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
 
 OplogEntry makeCommandOplogEntry(OpTime opTime, const NamespaceString& nss, const BSONObj& command);
 
-void appendSessionTransactionInfo(OplogEntry& entry,
-                                  LogicalSessionId lsid,
-                                  TxnNumber txnNum,
-                                  StmtId stmtId);
+OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,
+                                                       const NamespaceString& nss,
+                                                       const BSONObj& documentToInsert,
+                                                       OperationSessionInfo info);
+
+OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(OpTime opTime,
+                                                                const NamespaceString& nss,
+                                                                const BSONObj& documentToInsert,
+                                                                LogicalSessionId lsid,
+                                                                TxnNumber txnNum,
+                                                                StmtId stmtId);
 
 }  // namespace repl
 }  // namespace mongo

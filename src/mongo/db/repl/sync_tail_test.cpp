@@ -77,6 +77,31 @@ namespace repl {
 namespace {
 
 /**
+ * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+ */
+repl::OplogEntry makeOplogEntry(NamespaceString nss) {
+    return repl::OplogEntry(OpTime(Timestamp(1, 1), 1),       // optime
+                            1LL,                              // hash
+                            OpTypeEnum::kDelete,              // opType
+                            nss,                              // namespace
+                            boost::none,                      // uuid
+                            boost::none,                      // fromMigrate
+                            repl::OplogEntry::kOplogVersion,  // version
+                            BSONObj(),                        // o
+                            boost::none,                      // o2
+                            {},                               // sessionInfo
+                            boost::none,                      // wall clock time
+                            boost::none,                      // statement id
+                            boost::none,   // optime of previous write within same transaction
+                            boost::none,   // pre-image optime
+                            boost::none);  // post-image optime
+}
+
+repl::OplogEntry makeOplogEntry(StringData ns) {
+    return makeOplogEntry(NamespaceString(ns));
+}
+
+/**
  * Testing-only SyncTail that returns user-provided "document" for getMissingDoc().
  */
 class SyncTailWithLocalDocumentFetcher : public SyncTail {
@@ -560,35 +585,54 @@ TEST_F(SyncTailTest, MultiApplyUpdatesTheTransactionTable) {
 
     // Entries with a session id and a txnNumber update the transaction table.
     auto lsidSingle = makeLogicalSessionIdForTest();
-    auto opSingle = makeInsertDocumentOplogEntry(
-        {Timestamp(Seconds(1), 0), 1LL}, NamespaceString("test.0"), BSON("x" << 1));
-    appendSessionTransactionInfo(opSingle, lsidSingle, 5LL, 0);
+    auto opSingle =
+        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(1), 0), 1LL},
+                                                             NamespaceString("test.0"),
+                                                             BSON("x" << 1),
+                                                             lsidSingle,
+                                                             5LL,
+                                                             0);
 
     // For entries with the same session, the entry with a larger txnNumber is saved.
     auto lsidDiffTxn = makeLogicalSessionIdForTest();
-    auto opDiffTxnSmaller = makeInsertDocumentOplogEntry(
-        {Timestamp(Seconds(2), 0), 1LL}, NamespaceString("test.1"), BSON("x" << 0));
-    appendSessionTransactionInfo(opDiffTxnSmaller, lsidDiffTxn, 10LL, 1);
-    auto opDiffTxnLarger = makeInsertDocumentOplogEntry(
-        {Timestamp(Seconds(3), 0), 1LL}, NamespaceString("test.1"), BSON("x" << 1));
-    appendSessionTransactionInfo(opDiffTxnLarger, lsidDiffTxn, 20LL, 1);
+    auto opDiffTxnSmaller =
+        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(2), 0), 1LL},
+                                                             NamespaceString("test.1"),
+                                                             BSON("x" << 0),
+                                                             lsidDiffTxn,
+                                                             10LL,
+                                                             1);
+    auto opDiffTxnLarger =
+        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(3), 0), 1LL},
+                                                             NamespaceString("test.1"),
+                                                             BSON("x" << 1),
+                                                             lsidDiffTxn,
+                                                             20LL,
+                                                             1);
 
     // For entries with the same session and txnNumber, the later optime is saved.
     auto lsidSameTxn = makeLogicalSessionIdForTest();
-    auto opSameTxnLater = makeInsertDocumentOplogEntry(
-        {Timestamp(Seconds(6), 0), 1LL}, NamespaceString("test.2"), BSON("x" << 0));
-    appendSessionTransactionInfo(opSameTxnLater, lsidSameTxn, 30LL, 0);
-    auto opSameTxnSooner = makeInsertDocumentOplogEntry(
-        {Timestamp(Seconds(5), 0), 1LL}, NamespaceString("test.2"), BSON("x" << 1));
-    appendSessionTransactionInfo(opSameTxnSooner, lsidSameTxn, 30LL, 1);
+    auto opSameTxnLater =
+        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(6), 0), 1LL},
+                                                             NamespaceString("test.2"),
+                                                             BSON("x" << 0),
+                                                             lsidSameTxn,
+                                                             30LL,
+                                                             0);
+    auto opSameTxnSooner =
+        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(5), 0), 1LL},
+                                                             NamespaceString("test.2"),
+                                                             BSON("x" << 1),
+                                                             lsidSameTxn,
+                                                             30LL,
+                                                             1);
 
     // Entries with a session id but no txnNumber do not lead to updates.
     auto lsidNoTxn = makeLogicalSessionIdForTest();
-    auto opNoTxn = makeInsertDocumentOplogEntry(
-        {Timestamp(Seconds(7), 0), 1LL}, NamespaceString("test.3"), BSON("x" << 0));
-    auto info = opNoTxn.getOperationSessionInfo();
+    OperationSessionInfo info;
     info.setSessionId(lsidNoTxn);
-    opNoTxn.setOperationSessionInfo(info);
+    auto opNoTxn = makeInsertDocumentOplogEntryWithSessionInfo(
+        {Timestamp(Seconds(7), 0), 1LL}, NamespaceString("test.3"), BSON("x" << 0), info);
 
     // Apply the batch and verify the transaction collection was properly updated for each scenario.
     auto writerPool = SyncTail::makeWriterPool();
@@ -697,7 +741,7 @@ TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperat
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToApplyOperation) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    OplogEntry op(OpTime(Timestamp(1, 1), 1), 1LL, OpTypeEnum::kDelete, nss, BSONObj());
+    auto op = makeOplogEntry(nss);
     auto syncApply = [](OperationContext*, const BSONObj&, OplogApplication::Mode) -> Status {
         return {ErrorCodes::OperationFailed, ""};
     };
@@ -708,7 +752,7 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToAppl
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    OplogEntry op(OpTime(Timestamp(1, 1), 1), 1LL, OpTypeEnum::kDelete, nss, BSONObj());
+    auto op = makeOplogEntry(nss);
     auto syncApply = [](OperationContext*, const BSONObj&, OplogApplication::Mode) -> Status {
         uasserted(ErrorCodes::OperationFailed, "");
         MONGO_UNREACHABLE;
@@ -719,15 +763,10 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
 }
 
 TEST_F(SyncTailTest, MultiSyncApplySortsOperationsStablyByNamespaceBeforeApplying) {
-    int x = 0;
-    auto makeOp = [&x](const char* ns) -> OplogEntry {
-        return OplogEntry(
-            OpTime(Timestamp(1, 1), 1), 1LL, OpTypeEnum::kDelete, NamespaceString(ns), BSONObj());
-    };
-    auto op1 = makeOp("test.t1");
-    auto op2 = makeOp("test.t1");
-    auto op3 = makeOp("test.t2");
-    auto op4 = makeOp("test.t3");
+    auto op1 = makeOplogEntry("test.t1");
+    auto op2 = makeOplogEntry("test.t1");
+    auto op3 = makeOplogEntry("test.t2");
+    auto op4 = makeOplogEntry("test.t3");
     MultiApplier::Operations operationsApplied;
     auto syncApply =
         [&operationsApplied](OperationContext*, const BSONObj& op, OplogApplication::Mode) {
