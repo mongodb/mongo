@@ -171,9 +171,14 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& r
         request.target);
 }
 
-NetworkInterfaceASIO::AsyncCommand* NetworkInterfaceASIO::AsyncOp::command() {
+NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::command() {
     MONGO_ASYNC_OP_INVARIANT(_command.is_initialized(), "Command is not yet initialized");
-    return _command.get_ptr();
+
+    return *_command;
+}
+
+bool NetworkInterfaceASIO::AsyncOp::commandIsInitialized() const {
+    return _command.is_initialized();
 }
 
 void NetworkInterfaceASIO::AsyncOp::finish(ResponseStatus&& rs) {

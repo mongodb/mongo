@@ -289,7 +289,8 @@ private:
         // has to form the command manually (e.g. to use a specific requestBuilder).
         Status beginCommand(Message&& newCommand, const HostAndPort& target);
 
-        AsyncCommand* command();
+        AsyncCommand& command();
+        bool commandIsInitialized() const;
 
         void finish(TaskExecutor::ResponseStatus&& status);
 
