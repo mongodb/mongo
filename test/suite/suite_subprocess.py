@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, subprocess
+import os, subprocess, sys
 from run import wt_builddir
 from wttest import WiredTigerTestCase
 
@@ -154,10 +154,17 @@ class suite_subprocess:
         wterrname = errfilename or "wt.err"
         with open(wterrname, "w") as wterr:
             with open(wtoutname, "w") as wtout:
-                procargs = [os.path.join(wt_builddir, "wt")]
+                # Prefer running the actual 'wt' executable rather than the
+                # 'wt' script created by libtool. On OS/X with System Integrity
+                # Protection enabled, running a shell script strips
+                # environment variables needed to run 'wt'.
+                if sys.platform == "darwin":
+                    wtexe = os.path.join(wt_builddir, ".libs", "wt")
+                else:
+                    wtexe = os.path.join(wt_builddir, "wt")
+                procargs = [ wtexe ]
                 if self._gdbSubprocess:
-                    procargs = [os.path.join(wt_builddir, "libtool"),
-                                "--mode=execute", "gdb", "--args"] + procargs
+                    procargs = [ "gdb", "--args" ] + procargs
                 procargs.extend(args)
                 if self._gdbSubprocess:
                     infilepart = ""
