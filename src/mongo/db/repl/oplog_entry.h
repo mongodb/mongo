@@ -39,6 +39,7 @@ namespace repl {
 
 /**
  * A parsed oplog entry that inherits from the OplogEntryBase parsed by the IDL.
+ * This class is immutable.
  */
 class OplogEntry : public OplogEntryBase {
 public:
