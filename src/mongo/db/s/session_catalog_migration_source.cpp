@@ -70,6 +70,46 @@ boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx
     return uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
 }
 
+/**
+ * Creates an OplogEntry using the given field values
+ */
+repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
+                                long long hash,
+                                repl::OpTypeEnum opType,
+                                const BSONObj& oField,
+                                const boost::optional<BSONObj>& o2Field,
+                                const OperationSessionInfo& sessionInfo,
+                                const boost::optional<StmtId>& statementId) {
+    return repl::OplogEntry(opTime,                           // optime
+                            hash,                             // hash
+                            opType,                           // op type
+                            {},                               // namespace
+                            boost::none,                      // uuid
+                            boost::none,                      // fromMigrate
+                            repl::OplogEntry::kOplogVersion,  // version
+                            oField,                           // o
+                            o2Field,                          // o2
+                            sessionInfo,                      // session info
+                            boost::none,                      // wall clock time
+                            statementId,                      // statement id
+                            boost::none,   // optime of previous write within same transaction
+                            boost::none,   // pre-image optime
+                            boost::none);  // post-image optime
+}
+
+/**
+ * Creates a special "write history lost" sentinel oplog entry.
+ */
+repl::OplogEntry makeSentinelOplogEntry(OperationSessionInfo sessionInfo) {
+    return makeOplogEntry({},                         // optime
+                          hashGenerator.nextInt64(),  // hash
+                          repl::OpTypeEnum::kNoop,    // op type
+                          {},                         // o
+                          Session::kDeadEndSentinel,  // o2
+                          sessionInfo,                // session info
+                          kIncompleteHistoryStmtId);  // statement id
+}
+
 }  // unnamed namespace
 
 SessionCatalogMigrationSource::SessionCatalogMigrationSource(NamespaceString ns)
@@ -305,18 +345,10 @@ repl::OplogEntry SessionCatalogMigrationSource::SessionOplogIterator::getNext(
 
             // If the rollbackId hasn't changed, this means that the oplog has been truncated.
             // So, we return the special "write  history lost" sentinel.
-            repl::OplogEntry oplog({},
-                                   hashGenerator.nextInt64(),
-                                   repl::OpTypeEnum::kNoop,
-                                   {},
-                                   repl::OplogEntry::kOplogVersion,
-                                   {},
-                                   Session::kDeadEndSentinel);
             OperationSessionInfo sessionInfo;
             sessionInfo.setSessionId(_record.getSessionId());
             sessionInfo.setTxnNumber(_record.getTxnNum());
-            oplog.setOperationSessionInfo(sessionInfo);
-            oplog.setStatementId(kIncompleteHistoryStmtId);
+            auto oplog = makeSentinelOplogEntry(sessionInfo);
 
             _writeHistoryIterator.reset();
 
