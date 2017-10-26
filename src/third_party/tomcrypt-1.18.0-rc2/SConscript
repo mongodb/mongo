@@ -19,6 +19,12 @@ env.Prepend(CPPPATH=[
     'src/headers',
 ])
 
+env.Append(
+    CPPDEFINES=[
+        'LTC_NO_PROTOTYPES',
+    ]
+)
+
 env.Library(
     target="tomcrypt",
     source= [
