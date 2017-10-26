@@ -345,7 +345,9 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     if (o2)
         b.append("o2", *o2);
 
-    if (wallTime != Date_t{} && serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+    if (wallTime != Date_t{} &&
+        (serverGlobalParams.featureCompatibility.getVersion() ==
+         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
         b.appendDate("wall", wallTime);
     }
 

@@ -118,7 +118,8 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "cannot initiate featureCompatibilityVersion upgrade while a previous "
                     "featureCompatibilityVersion downgrade has not completed",
-                    !serverGlobalParams.featureCompatibility.isDowngradingTo34());
+                    serverGlobalParams.featureCompatibility.getVersion() !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34);
 
             FeatureCompatibilityVersion::setTargetUpgrade(opCtx);
 
@@ -154,7 +155,8 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "cannot initiate featureCompatibilityVersion downgrade while a previous "
                     "featureCompatibilityVersion upgrade has not completed",
-                    !serverGlobalParams.featureCompatibility.isUpgradingTo36());
+                    serverGlobalParams.featureCompatibility.getVersion() !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
 
             FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
 

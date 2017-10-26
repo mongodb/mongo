@@ -199,7 +199,8 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
 
 void LogicalSessionCacheImpl::_refresh(Client* client) {
     // Do not run this job if we are not in FCV 3.6
-    if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
         LOG(1) << "Skipping session refresh job while feature compatibility version is not 3.6";
         return;
     }

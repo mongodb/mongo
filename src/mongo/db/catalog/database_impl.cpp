@@ -772,7 +772,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         auto coordinator = repl::ReplicationCoordinator::get(opCtx);
         bool okayCreation =
             (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-             !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36() ||
+             (serverGlobalParams.featureCompatibility.getVersion() !=
+              ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) ||
              coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) ||
              nss.isSystemDotProfile());  // system.profile is special as it's not replicated
         if (!okayCreation) {
@@ -1025,7 +1026,8 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
             MatchExpressionParser::kBanAllSpecialFeatures;
         if (!serverGlobalParams.validateFeaturesAsMaster.load() ||
-            serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+            (serverGlobalParams.featureCompatibility.getVersion() ==
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
             // Note that we don't enforce this feature compatibility check when we are on
             // the secondary or on a backup instance, as indicated by !validateFeaturesAsMaster.
             allowedFeatures |= MatchExpressionParser::kJSONSchema;

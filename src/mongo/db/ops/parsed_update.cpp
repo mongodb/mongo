@@ -160,7 +160,8 @@ Status ParsedUpdate::parseUpdate() {
 
 Status ParsedUpdate::parseArrayFilters() {
     if (!_request->getArrayFilters().empty() &&
-        !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+        (serverGlobalParams.featureCompatibility.getVersion() !=
+         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream()
                           << "The featureCompatibilityVersion must be 3.6 to use arrayFilters. See "

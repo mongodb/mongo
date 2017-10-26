@@ -173,7 +173,8 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                 MatchExpressionParser::kBanAllSpecialFeatures;
             if (!serverGlobalParams.validateFeaturesAsMaster.load() ||
-                serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+                (serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
                 // Note that we don't enforce this restriction on the secondary or on backup
                 // instances, as indicated by !validateFeaturesAsMaster.
                 allowedFeatures |= MatchExpressionParser::kJSONSchema;

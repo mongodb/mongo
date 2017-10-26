@@ -498,7 +498,8 @@ void WiredTigerKVEngine::cleanShutdown() {
         // Only downgrade when the fCV document has been explicitly initialized and is 3.4.
         const bool needsDowngrade = !_readOnly &&
             serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.isFullyDowngradedTo34();
+            (serverGlobalParams.featureCompatibility.getVersion() ==
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
 
         invariantWTOK(_conn->close(_conn, closeConfig));
         _conn = nullptr;

@@ -340,9 +340,11 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                     << " as a shard: "
                                     << status.reason());
     }
-    if ((serverGlobalParams.featureCompatibility.isFullyUpgradedTo36() &&
+    if (((serverGlobalParams.featureCompatibility.getVersion() ==
+          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
          maxWireVersion < WireVersion::LATEST_WIRE_VERSION) ||
-        (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36() &&
+        ((serverGlobalParams.featureCompatibility.getVersion() !=
+          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
          maxWireVersion < WireVersion::LATEST_WIRE_VERSION - 1)) {
         return {ErrorCodes::IncompatibleServerVersion,
                 str::stream() << "Cannot add " << connectionString.toString()

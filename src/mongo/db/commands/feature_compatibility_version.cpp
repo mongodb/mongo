@@ -275,7 +275,8 @@ void uassertDuringRollbackOnDowngradeOp(
     ServerGlobalParams::FeatureCompatibility::Version newVersion,
     std::string msg) {
     if ((newVersion != ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34) ||
-        (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36())) {
+        (serverGlobalParams.featureCompatibility.getVersion() !=
+         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
         // This is only the start of a downgrade operation if we're currently upgraded to 3.6.
         return;
     }

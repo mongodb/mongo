@@ -213,7 +213,8 @@ Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& 
 
     auto afterClusterTime = readConcernArgs.getArgsClusterTime();
     if (afterClusterTime) {
-        if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36() &&
+        if ((serverGlobalParams.featureCompatibility.getVersion() !=
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
             ShardingState::get(opCtx)->enabled()) {
             return {ErrorCodes::InvalidOptions,
                     "readConcern afterClusterTime is not available in featureCompatibilityVersion "

@@ -236,7 +236,8 @@ void KeysCollectionManagerSharding::PeriodicRunner::_doPeriodicRefresh(
         Milliseconds nextWakeup = kRefreshIntervalIfErrored;
 
         // No need to refresh keys in FCV 3.4, since key generation will be disabled.
-        if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
             auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
             if (latestKeyStatusWith.getStatus().isOK()) {
                 errorCount = 0;

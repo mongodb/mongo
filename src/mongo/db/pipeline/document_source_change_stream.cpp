@@ -278,7 +278,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             << "The featureCompatibilityVersion must be 3.6 to use the $changeStream stage. See "
             << feature_compatibility_version::kDochubLink
             << ".",
-        serverGlobalParams.featureCompatibility.isFullyUpgradedTo36());
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
 
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableMode::kTailableAndAwaitData;

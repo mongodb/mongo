@@ -1204,7 +1204,8 @@ void shutdownTask() {
             opCtx = uniqueOpCtx.get();
         }
 
-        if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+        if (serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
             log(LogComponent::kReplication) << "shutdown: removing all drop-pending collections...";
             repl::DropPendingCollectionReaper::get(serviceContext)
                 ->dropCollectionsOlderThan(opCtx, repl::OpTime::max());

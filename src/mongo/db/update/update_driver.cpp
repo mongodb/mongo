@@ -198,7 +198,8 @@ Status UpdateDriver::parse(
     } else if (_modOptions.fromOplogApplication) {
         updateSemantics = UpdateSemantics::kModifierInterface;
     } else {
-        updateSemantics = (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36())
+        updateSemantics = (serverGlobalParams.featureCompatibility.getVersion() !=
+                           ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)
             ? UpdateSemantics::kModifierInterface
             : UpdateSemantics::kUpdateNode;
     }

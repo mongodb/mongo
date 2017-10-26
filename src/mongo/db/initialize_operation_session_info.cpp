@@ -46,7 +46,8 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
         return;
     }
 
-    if (!serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
         return;
     }
 

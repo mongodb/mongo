@@ -101,7 +101,8 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
         if (signedTime.getTime() != LogicalTime::kUninitialized) {
             // Cluster times are only sent by sharding aware mongod servers, so this point is only
             // reached in sharded clusters.
-            if (serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
                 auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
                 if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
                     if (!logicalTimeValidator) {

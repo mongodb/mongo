@@ -210,29 +210,10 @@ struct ServerGlobalParams {
             return _version.store(version);
         }
 
-        // Deprecated. Please use getVersion() directly instead.
-        const bool isFullyUpgradedTo36() {
-            return (getVersion() == Version::kFullyUpgradedTo36);
-        }
-
-        // Deprecated. Please use getVersion() directly instead.
-        const bool isUpgradingTo36() {
-            return (getVersion() == Version::kUpgradingTo36);
-        }
-
-        // Deprecated. Please use getVersion() directly instead.
-        const bool isFullyDowngradedTo34() {
-            return (getVersion() == Version::kFullyDowngradedTo34);
-        }
-
-        // Deprecated. Please use getVersion() directly instead.
-        const bool isDowngradingTo34() {
-            return (getVersion() == Version::kDowngradingTo34);
-        }
-
         // This determines whether to give Collections UUIDs upon creation.
         const bool isSchemaVersion36() {
-            return (isFullyUpgradedTo36() || isUpgradingTo36());
+            return (getVersion() == Version::kFullyUpgradedTo36 ||
+                    getVersion() == Version::kUpgradingTo36);
         }
 
     private:

@@ -314,7 +314,8 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
     }
 
     if (serverGlobalParams.validateFeaturesAsMaster.load() &&
-        !serverGlobalParams.featureCompatibility.isFullyUpgradedTo36()) {
+        serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
         auto status = validInViewUnder34FeatureCompatibility(expCtx, *pipelineStatus.getValue());
         if (!status.isOK()) {
             return status;
