@@ -88,7 +88,6 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t btree_id)
 	uint32_t las_id, session_flags;
 	const uint8_t *p;
 	uint8_t upd_type;
-	int exact;
 
 	cursor = NULL;
 	page = ref->page;
@@ -112,14 +111,9 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t btree_id)
 	 * in-order updates for a subsequent key. We process all of the updates
 	 * for a key and then insert those updates into the page, then all the
 	 * updates for the next key, and so on.
-	 *
-	 * Search for the block's unique prefix, stepping through any matching
-	 * records.
 	 */
-	cursor->set_key(cursor,
-	    btree_id, ref->page_las->las_pageid, (uint64_t)0, &las_key);
-	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
-		ret = cursor->next(cursor);
+	ret = __wt_las_cursor_position(
+	    cursor, btree_id, ref->page_las->las_pageid);
 	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor,
 		    &las_id, &las_pageid, &las_counter, &las_key));
@@ -483,14 +477,18 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				/*
 				 * Skip lookaside pages if reading as of a
 				 * timestamp and all the updates are in the
-				 * future.
+				 * future.  If we skip a lookaside page, the
+				 * tree cannot be left clean: it must be
+				 * visited by future checkpoints.
 				 */
 				if (F_ISSET(
 				    &session->txn, WT_TXN_HAS_TS_READ) &&
 				    __wt_timestamp_cmp(
 				    &ref->page_las->min_timestamp,
-				    &session->txn.read_timestamp) > 0)
+				    &session->txn.read_timestamp) > 0) {
+					__wt_tree_modify_set(session);
 					return (WT_NOTFOUND);
+				}
 #endif
 			}
 
