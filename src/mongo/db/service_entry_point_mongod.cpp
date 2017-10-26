@@ -445,7 +445,8 @@ bool runCommandImpl(OperationContext* opCtx,
 
     BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
 
-    Status rcStatus = waitForReadConcern(opCtx, repl::ReadConcernArgs::get(opCtx));
+    Status rcStatus = waitForReadConcern(
+        opCtx, repl::ReadConcernArgs::get(opCtx), command->allowsAfterClusterTime(cmd));
     if (!rcStatus.isOK()) {
         if (rcStatus == ErrorCodes::ExceededTimeLimit) {
             const int debugLevel =

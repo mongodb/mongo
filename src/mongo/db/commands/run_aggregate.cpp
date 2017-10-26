@@ -295,7 +295,7 @@ Status waitForMajorityReadConcern(OperationContext* opCtx) {
     if (!originalRC.hasLevel()) {
         // If the read concern level is not specified, upgrade it to "majority".
         const repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kMajorityReadConcern);
-        auto rcStatus = waitForReadConcern(opCtx, readConcern);
+        auto rcStatus = waitForReadConcern(opCtx, readConcern, true);
         if (!rcStatus.isOK()) {
             return rcStatus;
         }

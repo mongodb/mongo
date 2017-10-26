@@ -47,6 +47,10 @@ public:
         return false;
     }
 
+    bool allowsAfterClusterTime(const BSONObj& cmdObj) const final {
+        return false;
+    }
+
     bool slaveOk() const final {
         return true;
     }

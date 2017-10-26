@@ -86,6 +86,10 @@ public:
         return false;
     }
 
+    virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const override {
+        return false;
+    }
+
     bool slaveOk() const override {
         return true;
     }

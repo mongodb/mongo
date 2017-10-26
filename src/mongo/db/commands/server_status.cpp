@@ -75,7 +75,9 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-
+    virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const override {
+        return false;
+    }
     virtual void help(stringstream& help) const {
         help << "returns lots of administrative server statistics";
     }

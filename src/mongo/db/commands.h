@@ -208,6 +208,13 @@ public:
                                              const BSONObj& cmdObj) const = 0;
 
     /**
+     * Returns true if command allows afterClusterTime in its readConcern. The command may not allow
+     * it if it is specifically intended not to take any LockManager locks. Waiting for
+     * afterClusterTime takes the MODE_IS lock.
+     */
+    virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const = 0;
+
+    /**
      * Returns LogicalOp for this command.
      */
     virtual LogicalOp getLogicalOp() const = 0;
@@ -319,6 +326,10 @@ public:
     bool supportsNonLocalReadConcern(const std::string& dbName,
                                      const BSONObj& cmdObj) const override {
         return false;
+    }
+
+    bool allowsAfterClusterTime(const BSONObj& cmdObj) const override {
+        return true;
     }
 
     LogicalOp getLogicalOp() const override {

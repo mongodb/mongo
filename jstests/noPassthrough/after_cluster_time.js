@@ -38,6 +38,34 @@
         }),
         ErrorCodes.InvalidOptions,
         "expected afterClusterTime read with non-zero timestamp to fail on standalone mongod");
-
     MongoRunner.stopMongod(standalone);
+
+    var rst = new ReplSetTest({nodes: 1});
+    rst.startSet();
+    rst.initiate();
+    var adminDBRS = rst.getPrimary().getDB("admin");
+
+    var res = adminDBRS.runCommand({ping: 1});
+    assert.commandWorked(res);
+    assert(res.hasOwnProperty("$clusterTime"), tojson(res));
+    assert(res.$clusterTime.hasOwnProperty("clusterTime"), tojson(res));
+    var clusterTime = res.$clusterTime.clusterTime;
+    // afterClusterTime is not allowed in  ping command.
+    assert.commandFailedWithCode(
+        adminDBRS.runCommand({ping: 1, readConcern: {afterClusterTime: clusterTime}}),
+        ErrorCodes.InvalidOptions,
+        "expected afterClusterTime fail in ping");
+
+    // afterClusterTime is not allowed in serverStatus command.
+    assert.commandFailedWithCode(
+        adminDBRS.runCommand({serverStatus: 1, readConcern: {afterClusterTime: clusterTime}}),
+        ErrorCodes.InvalidOptions,
+        "expected afterClusterTime fail in serverStatus");
+
+    // afterClusterTime is not allowed in currentOp command.
+    assert.commandFailedWithCode(
+        adminDBRS.runCommand({currentOp: 1, readConcern: {afterClusterTime: clusterTime}}),
+        ErrorCodes.InvalidOptions,
+        "expected afterClusterTime fail in serverStatus");
+
 }());
