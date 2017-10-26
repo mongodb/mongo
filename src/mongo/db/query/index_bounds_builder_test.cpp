@@ -1046,8 +1046,9 @@ TEST(SimpleRegexTest, RootedLiteralNestedEscapeEnd) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
-// A regular expression with the "|" character is not considered simple. See SERVER-15235.
-TEST(SimpleRegexTest, PipeCharacterDisallowed) {
+// An anchored regular expression that uses the "|" operator is not considered "simple" and has
+// non-tight index bounds.
+TEST(SimpleRegexTest, PipeCharacterUsesInexactBounds) {
     IndexEntry testIndex = IndexEntry(BSONObj());
     IndexBoundsBuilder::BoundsTightness tightness;
     string prefix = IndexBoundsBuilder::simpleRegex("^(a(a|$)|b", "", testIndex, &tightness);
@@ -1055,10 +1056,52 @@ TEST(SimpleRegexTest, PipeCharacterDisallowed) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
 }
 
-TEST(SimpleRegexTest, PipeCharacterDisallowed2) {
+TEST(SimpleRegexTest, PipeCharacterUsesInexactBoundsWithTwoPrefixes) {
     IndexEntry testIndex = IndexEntry(BSONObj());
     IndexBoundsBuilder::BoundsTightness tightness;
     string prefix = IndexBoundsBuilder::simpleRegex("^(a(a|$)|^b", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
+}
+
+TEST(SimpleRegexTest, PipeCharacterPrecededByEscapedBackslashUsesInexactBounds) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    IndexBoundsBuilder::BoundsTightness tightness;
+    string prefix = IndexBoundsBuilder::simpleRegex(R"(^a\\|b)", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
+
+    prefix = IndexBoundsBuilder::simpleRegex(R"(^(foo\\|bar)\\|baz)", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
+}
+
+// However, a regular expression with an escaped pipe (that is, using no special meaning) can use
+// exact index bounds.
+TEST(SimpleRegexTest, PipeCharacterEscapedWithBackslashUsesExactBounds) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    IndexBoundsBuilder::BoundsTightness tightness;
+    string prefix = IndexBoundsBuilder::simpleRegex(R"(^a\|b)", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "a|b");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+
+    prefix = IndexBoundsBuilder::simpleRegex(R"(^\|1\|2\|\|)", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "|1|2||");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(SimpleRegexTest, FalsePositiveOnPipeInQEEscapeSequenceUsesInexactBounds) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    IndexBoundsBuilder::BoundsTightness tightness;
+    string prefix = IndexBoundsBuilder::simpleRegex(R"(^\Q|\E)", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
+}
+
+TEST(SimpleRegexTest, FalsePositiveOnPipeInCharacterClassUsesInexactBounds) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    IndexBoundsBuilder::BoundsTightness tightness;
+    string prefix = IndexBoundsBuilder::simpleRegex(R"(^[|])", "", testIndex, &tightness);
     ASSERT_EQUALS(prefix, "");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
 }
