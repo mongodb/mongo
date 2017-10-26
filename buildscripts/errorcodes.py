@@ -86,17 +86,20 @@ def parseSourceFiles( callback ):
             for matchiter in matchiters:
                 for match in matchiter:
                     code = match.group(1)
-                    span = match.span()
+                    codeOffset = match.start(1)
 
+                    # Note that this will include the text of the full match but will report the
+                    # position of the beginning of the code portion rather than the beginning of the
+                    # match. This is to position editors on the spot that needs to change.
                     thisLoc = AssertLocation(sourceFile,
-                                             span[1],
-                                             text[span[0]:span[1]],
+                                             codeOffset,
+                                             text[match.start():match.end()],
                                              code)
 
                     callback( thisLoc )
 
 # Converts an absolute position in a file into a line number.
-def getLineForPosition(loc, _file_cache={}):
+def getLineAndColumnForPosition(loc, _file_cache={}):
     if loc.sourceFile not in _file_cache:
         with open(loc.sourceFile) as f:
             text = f.read()
@@ -105,7 +108,10 @@ def getLineForPosition(loc, _file_cache={}):
                 line_offsets.append(line_offsets[-1] + len(line))
             _file_cache[loc.sourceFile] = line_offsets
 
-    return bisect.bisect(_file_cache[loc.sourceFile], loc.byteOffset)
+    # These are both 1-based, but line is handled by starting the list with 0.
+    line = bisect.bisect(_file_cache[loc.sourceFile], loc.byteOffset)
+    column = loc.byteOffset - _file_cache[loc.sourceFile][line - 1] + 1
+    return (line, column)
 
 def isTerminated( lines ):
     """Given .cpp/.h source lines as text, determine if assert is terminated."""
@@ -165,13 +171,15 @@ def readErrorCodes():
         code = "0"
         bad = seen[code]
         errors.append( bad )
+        line, col = getLineAndColumnForPosition(bad)
         print( "ZERO_CODE:" )
-        print( "  %s:%d:%s" % (bad.sourceFile, getLineForPosition(bad), bad.lines) )
+        print( "  %s:%d:%d:%s" % (bad.sourceFile, line, col, bad.lines) )
 
     for code, locations in dups.items():
         print( "DUPLICATE IDS: %s" % code )
         for loc in locations:
-            print( "  %s:%d:%s" % (loc.sourceFile, getLineForPosition(loc), loc.lines) )
+            line, col = getLineAndColumnForPosition(loc)
+            print( "  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines) )
 
     return (codes, errors)
 
@@ -188,13 +196,14 @@ def replaceBadCodes( errors, nextCode ):
     skip_errors = [e for e in errors if int(e.code) != 0]
 
     for loc in skip_errors:
-        print ("SKIPPING NONZERO code=%s: %s:%s"
-                % (loc.code, loc.sourceFile, getLineForPosition(loc)))
+        line, col = getLineAndColumnForPosition(loc)
+        print ("SKIPPING NONZERO code=%s: %s:%d:%d"
+                % (loc.code, loc.sourceFile, line, col))
 
     # Dedupe, sort, and reverse so we don't have to update offsets as we go.
     for assertLoc in reversed(sorted(set(zero_errors))):
         (sourceFile, byteOffset, lines, code) = assertLoc
-        lineNum = getLineForPosition(assertLoc)
+        lineNum, _ = getLineAndColumnForPosition(assertLoc)
         print "UPDATING_FILE: %s:%s" % (sourceFile, lineNum)
 
         ln = lineNum - 1
@@ -204,11 +213,11 @@ def replaceBadCodes( errors, nextCode ):
 
             f.seek(0)
             text = f.read()
-            assert text[byteOffset-1] == '0'
+            assert text[byteOffset] == '0'
             f.seek(0)
-            f.write(text[:byteOffset-1])
+            f.write(text[:byteOffset])
             f.write(str(nextCode))
-            f.write(text[byteOffset:])
+            f.write(text[byteOffset+1:])
             f.seek(0)
 
             print "LINE_%d_AFTER :%s" % (lineNum, f.readlines()[ln].rstrip())
