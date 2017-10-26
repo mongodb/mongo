@@ -45,6 +45,8 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
+using std::string;
+
 namespace mongo {
 
 bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {

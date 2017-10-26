@@ -84,6 +84,7 @@ using std::set;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
+using std::string;
 
 namespace mongo {
 namespace repl {

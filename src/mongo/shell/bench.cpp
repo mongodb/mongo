@@ -48,6 +48,8 @@
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 
+using std::string;
+
 namespace mongo {
 namespace {
 
