@@ -52,7 +52,9 @@ enum ExitCode : int {
     EXIT_WINDOWS_SERVICE_STOP = 49,
     EXIT_POSSIBLE_CORRUPTION =
         60,  // this means we detected a possible corruption situation, like a buf overflow
-    EXIT_WATCHDOG = 61,   // Internal Watchdog has terminated mongod
+    EXIT_WATCHDOG = 61,  // Internal Watchdog has terminated mongod
+    EXIT_NEED_DOWNGRADE =
+        62,  // The current binary version is not appropriate to run on the existing datafiles.
     EXIT_UNCAUGHT = 100,  // top level exception that wasn't caught
     EXIT_TEST = 101
 };

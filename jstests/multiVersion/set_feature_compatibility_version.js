@@ -42,6 +42,12 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             null,
             conn,
             "expected mongod to fail when data files are present and no admin database is found.");
+        if (!withUUIDs) {
+            conn =
+                MongoRunner.runMongod({dbpath: dbpath, binVersion: downgrade, noCleanData: true});
+            assert.neq(null, conn, "expected 3.4 to startup when the admin database is missing");
+            MongoRunner.stopMongod(conn);
+        }
 
         // Fail to start up if no featureCompatibilityVersion document is present and non-local
         // databases are present.
@@ -55,6 +61,12 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             null,
             conn,
             "expected mongod to fail when data files are present and no featureCompatibilityVersion document is found.");
+        if (!withUUIDs) {
+            conn =
+                MongoRunner.runMongod({dbpath: dbpath, binVersion: downgrade, noCleanData: true});
+            assert.neq(null, conn, "expected 3.4 to startup when the FCV document is missing");
+            MongoRunner.stopMongod(conn);
+        }
     };
 
     let setupMissingFCVDoc = function(version, dbpath) {
@@ -263,7 +275,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     conn = setupMissingFCVDoc(downgrade, dbpath);
     recoverMMapJournal(isMMAPv1, conn, dbpath);
     returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
-    assert.neq(returnCode, 0, "expected mongod --repair to fail if no collections have UUIDs.");
+    let exitNeedsDowngradeCode = 62;
+    assert.eq(
+        returnCode,
+        exitNeedsDowngradeCode,
+        "Expected running --repair with the latest mongod to fail because no collections have UUIDs. MongoDB 3.4 is required.");
 
     // If the featureCompatibilityVersion document is present but there are no collection UUIDs,
     // --repair should not attempt to restore the document and thus not fassert.

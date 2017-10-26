@@ -180,8 +180,8 @@ using std::endl;
 
 namespace {
 
-void restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
-                                                       const std::vector<std::string>& dbNames) {
+Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
+                                                         const std::vector<std::string>& dbNames) {
     bool isMmapV1 = opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1();
     // Check whether there are any collections with UUIDs.
     bool collsHaveUuids = false;
@@ -204,8 +204,8 @@ void restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
     }
 
     if (!collsHaveUuids) {
-        severe() << "Can't restore featureCompatibilityVersion document. First upgrade to 3.4.";
-        fassertFailedNoTrace(40653);
+        return {ErrorCodes::MustDowngrade,
+                "Cannot restore featureCompatibilityVersion document. A 3.4 binary must be used."};
     }
 
     // Restore the featureCompatibilityVersion document if it is missing.
@@ -267,6 +267,7 @@ void restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
                                versionColl,
                                BSON("_id" << FeatureCompatibilityVersion::kParameterName),
                                featureCompatibilityVersion));
+    return Status::OK();
 }
 
 const NamespaceString startupLogCollectionName("local.startup_log");
@@ -392,9 +393,10 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
 }
 
 /**
- * Return whether there are non-local databases.
+ * Return an error status if the wrong mongod version was used for these datafiles. The boolean
+ * represents whether there are non-local databases.
  */
-bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
+StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)";
 
     auto const storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
@@ -423,7 +425,10 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                               versionColl,
                               BSON("_id" << FeatureCompatibilityVersion::kParameterName),
                               featureCompatibilityVersion)) {
-            restoreMissingFeatureCompatibilityVersionDocument(opCtx, dbNames);
+            auto status = restoreMissingFeatureCompatibilityVersionDocument(opCtx, dbNames);
+            if (!status.isOK()) {
+                return status;
+            }
         }
     }
 
@@ -514,8 +519,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             severe() << "Please consult our documentation when trying to downgrade to a previous"
                         " major release";
             quickExit(EXIT_NEED_UPGRADE);
-            // The below return should not be reached.
-            return true;
+            MONGO_UNREACHABLE;
         }
 
         // Check if admin.system.version contains an invalid featureCompatibilityVersion.
@@ -532,7 +536,12 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                         FeatureCompatibilityVersion::parse(featureCompatibilityVersion);
                     if (!swVersion.isOK()) {
                         severe() << swVersion.getStatus();
-                        fassertFailedNoTrace(40283);
+                        // Note this error path captures all cases of an FCV document existing,
+                        // but with any value other than "3.4" or "3.6". This includes unexpected
+                        // cases with no path forward such as the FCV value not being a string.
+                        return {ErrorCodes::MustDowngrade,
+                                "Cannot parse the feature compatibility document. If you are "
+                                "trying to upgrade from 3.2, please use a 3.4 binary."};
                     }
                     fcvDocumentExists = true;
                     auto version = swVersion.getValue();
@@ -628,21 +637,22 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // Fail to start up if there is no featureCompatibilityVersion document and there are non-local
     // databases present.
     if (!fcvDocumentExists && nonLocalDatabases) {
-        severe() << "Unable to start up mongod due to missing featureCompatibilityVersion "
-                 << "document. ";
         if (collsHaveUuids) {
+            severe()
+                << "Unable to start up mongod due to missing featureCompatibilityVersion document.";
             if (opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
-                severe() << "Please run with --journalOptions "
-                         << static_cast<int>(MMAPV1Options::JournalRecoverOnly)
-                         << " to recover the journal and then run with --repair to restore the "
-                            "document.";
+                severe()
+                    << "Please run with --journalOptions "
+                    << static_cast<int>(MMAPV1Options::JournalRecoverOnly)
+                    << " to recover the journal. Then run with --repair to restore the document.";
             } else {
                 severe() << "Please run with --repair to restore the document.";
             }
+            fassertFailedNoTrace(40652);
         } else {
-            severe() << "Please upgrade to 3.4.";
+            return {ErrorCodes::MustDowngrade,
+                    "There is no feature compatibility document. A 3.4 binary must be used."};
         }
-        fassertFailedNoTrace(40652);
     }
 
     LOG(1) << "done repairDatabases";
@@ -784,13 +794,32 @@ ExitCode _initAndListen(int listenPort) {
                                                        repl::StorageInterface::get(serviceContext));
     }
 
-    bool nonLocalDatabases = repairDatabasesAndCheckVersion(startupOpCtx.get());
+    auto swNonLocalDatabases = repairDatabasesAndCheckVersion(startupOpCtx.get());
+    if (!swNonLocalDatabases.isOK()) {
+        // SERVER-31611 introduced a return value to `repairDatabasesAndCheckVersion`. Previously,
+        // a failing condition would fassert. SERVER-31611 covers a case where the binary (3.6) is
+        // refusing to start up because it refuses acknowledgement of FCV 3.2 and requires the
+        // user to start up with an older binary. Thus shutting down the server must leave the
+        // datafiles in a state that the older binary can start up. This requires going through a
+        // clean shutdown.
+        //
+        // The invariant is *not* a statement that `repairDatabasesAndCheckVersion` must return
+        // `MustDowngrade`. Instead, it is meant as a guardrail to protect future developers from
+        // accidentally buying into this behavior. New errors that are returned from the method
+        // may or may not want to go through a clean shutdown, and they likely won't want the
+        // program to return an exit code of `EXIT_NEED_DOWNGRADE`.
+        severe(LogComponent::kControl) << "** IMPORTANT: "
+                                       << swNonLocalDatabases.getStatus().reason();
+        invariant(swNonLocalDatabases == ErrorCodes::MustDowngrade);
+        exitCleanly(EXIT_NEED_DOWNGRADE);
+    }
 
     // Assert that the in-memory featureCompatibilityVersion parameter has been explicitly set. If
     // we are part of a replica set and are started up with no data files, we do not set the
     // featureCompatibilityVersion until a primary is chosen. For this case, we expect the in-memory
     // featureCompatibilityVersion parameter to still be uninitialized until after startup.
-    if (canCallFCVSetIfCleanStartup && (!replSettings.usingReplSets() || nonLocalDatabases)) {
+    if (canCallFCVSetIfCleanStartup &&
+        (!replSettings.usingReplSets() || swNonLocalDatabases.getValue())) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
 
@@ -1030,8 +1059,9 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 }
 
 /*
- * This function should contain the startup "actions" that we take based on the startup config.  It
- * is intended to separate the actions from "storage" and "validation" of our startup configuration.
+ * This function should contain the startup "actions" that we take based on the startup config.
+ * It is intended to separate the actions from "storage" and "validation" of our startup
+ * configuration.
  */
 void startupConfigActions(const std::vector<std::string>& args) {
     // The "command" option is deprecated.  For backward compatibility, still support the "run"
@@ -1185,8 +1215,8 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManage
 #define __has_feature(x) 0
 #endif
 
-// NOTE: This function may be called at any time after registerShutdownTask is called below. It must
-// not depend on the prior execution of mongo initializers or the existence of threads.
+// NOTE: This function may be called at any time after registerShutdownTask is called below. It
+// must not depend on the prior execution of mongo initializers or the existence of threads.
 void shutdownTask() {
     Client::initThreadIfNotAlready();
 
@@ -1226,8 +1256,8 @@ void shutdownTask() {
             }
         }
 
-        // This can wait a long time while we drain the secondary's apply queue, especially if it is
-        // building an index.
+        // This can wait a long time while we drain the secondary's apply queue, especially if it
+        // is building an index.
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
 
         ShardingState::get(serviceContext)->shutDown(opCtx);
