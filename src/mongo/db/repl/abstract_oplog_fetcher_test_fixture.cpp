@@ -37,6 +37,35 @@
 namespace mongo {
 namespace repl {
 
+namespace {
+
+/**
+ * Creates an OplogEntry using given field values.
+ */
+repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
+                                long long hash,
+                                repl::OpTypeEnum opType,
+                                NamespaceString nss,
+                                BSONObj object) {
+    return repl::OplogEntry(opTime,                           // optime
+                            hash,                             // hash
+                            opType,                           // opType
+                            nss,                              // namespace
+                            boost::none,                      // uuid
+                            boost::none,                      // fromMigrate
+                            repl::OplogEntry::kOplogVersion,  // version
+                            object,                           // o
+                            boost::none,                      // o2
+                            {},                               // sessionInfo
+                            boost::none,                      // wall clock time
+                            boost::none,                      // statement id
+                            boost::none,   // optime of previous write within same transaction
+                            boost::none,   // pre-image optime
+                            boost::none);  // post-image optime
+}
+
+}  // namespace
+
 ShutdownState::ShutdownState() = default;
 
 Status ShutdownState::getStatus() const {
@@ -48,11 +77,11 @@ void ShutdownState::operator()(const Status& status) {
 }
 
 BSONObj AbstractOplogFetcherTest::makeNoopOplogEntry(OpTimeWithHash opTimeWithHash) {
-    return OplogEntry(opTimeWithHash.opTime,
-                      opTimeWithHash.value,
-                      OpTypeEnum::kNoop,
-                      NamespaceString("test.t"),
-                      BSONObj())
+    return makeOplogEntry(opTimeWithHash.opTime,
+                          opTimeWithHash.value,
+                          OpTypeEnum::kNoop,
+                          NamespaceString("test.t"),
+                          BSONObj())
         .toBSON();
 }
 

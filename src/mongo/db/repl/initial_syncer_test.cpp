@@ -564,12 +564,21 @@ OplogEntry makeOplogEntry(int t,
         oField = BSON("dropIndexes"
                       << "a_1");
     }
-    return OplogEntry(OpTime(Timestamp(t, 1), 1),
-                      static_cast<long long>(t),
-                      opType,
-                      NamespaceString("a.a"),
-                      version,
-                      oField);
+    return OplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                      static_cast<long long>(t),   // hash
+                      opType,                      // op type
+                      NamespaceString("a.a"),      // namespace
+                      boost::none,                 // uuid
+                      boost::none,                 // fromMigrate
+                      version,                     // version
+                      oField,                      // o
+                      boost::none,                 // o2
+                      {},                          // sessionInfo
+                      boost::none,                 // wall clock time
+                      boost::none,                 // statement id
+                      boost::none,   // optime of previous write within same transaction
+                      boost::none,   // pre-image optime
+                      boost::none);  // post-image optime
 }
 
 BSONObj makeOplogEntryObj(int t,

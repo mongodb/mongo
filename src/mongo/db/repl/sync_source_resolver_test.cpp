@@ -297,7 +297,21 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
  * Generates oplog entries with the given optime.
  */
 BSONObj _makeOplogEntry(Timestamp ts, long long term) {
-    return OplogEntry(OpTime(ts, term), 1LL, OpTypeEnum::kNoop, NamespaceString("a.a"), BSONObj())
+    return OplogEntry(OpTime(ts, term),                 // optime
+                      1LL,                              // hash
+                      OpTypeEnum::kNoop,                // op type
+                      NamespaceString("a.a"),           // namespace
+                      boost::none,                      // uuid
+                      boost::none,                      // fromMigrate
+                      repl::OplogEntry::kOplogVersion,  // version
+                      BSONObj(),                        // o
+                      boost::none,                      // o2
+                      {},                               // sessionInfo
+                      boost::none,                      // wall clock time
+                      boost::none,                      // statement id
+                      boost::none,  // optime of previous write within same transaction
+                      boost::none,  // pre-image optime
+                      boost::none)  // post-image optime
         .toBSON();
 }
 

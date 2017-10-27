@@ -67,8 +67,21 @@ Status applyOperation(MultiApplier::OperationPtrs*) {
  * Generates oplog entries with the given number used for the timestamp.
  */
 OplogEntry makeOplogEntry(int ts) {
-    return OplogEntry(
-        OpTime(Timestamp(ts, 1), 1), 1LL, OpTypeEnum::kNoop, NamespaceString("a.a"), BSONObj());
+    return OplogEntry(OpTime(Timestamp(ts, 1), 1),  // optime
+                      1LL,                          // hash
+                      OpTypeEnum::kNoop,            // op type
+                      NamespaceString("a.a"),       // namespace
+                      boost::none,                  // uuid
+                      boost::none,                  // fromMigrate
+                      OplogEntry::kOplogVersion,    // version
+                      BSONObj(),                    // o
+                      boost::none,                  // o2
+                      {},                           // sessionInfo
+                      boost::none,                  // wall clock time
+                      boost::none,                  // statement id
+                      boost::none,   // optime of previous write within same transaction
+                      boost::none,   // pre-image optime
+                      boost::none);  // post-image optime
 }
 
 TEST_F(MultiApplierTest, InvalidConstruction) {
