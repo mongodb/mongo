@@ -93,27 +93,36 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
     while (it.hasNext()) {
-        const auto entry = it.next(opCtx);
-        invariant(entry.getStatementId());
+        try {
+            const auto entry = it.next(opCtx);
+            invariant(entry.getStatementId());
 
-        if (*entry.getStatementId() == kIncompleteHistoryStmtId) {
-            // Only the dead end sentinel can have this id for oplog write history
-            invariant(entry.getObject2());
-            invariant(entry.getObject2()->woCompare(Session::kDeadEndSentinel) == 0);
-            result.hasIncompleteHistory = true;
-            continue;
-        }
+            if (*entry.getStatementId() == kIncompleteHistoryStmtId) {
+                // Only the dead end sentinel can have this id for oplog write history
+                invariant(entry.getObject2());
+                invariant(entry.getObject2()->woCompare(Session::kDeadEndSentinel) == 0);
+                result.hasIncompleteHistory = true;
+                continue;
+            }
 
-        const auto insertRes =
-            result.committedStatements.emplace(*entry.getStatementId(), entry.getOpTime());
-        if (!insertRes.second) {
-            const auto& existingOpTime = insertRes.first->second;
-            fassertOnRepeatedExecution(opCtx,
-                                       lsid,
-                                       result.lastTxnRecord->getTxnNum(),
-                                       *entry.getStatementId(),
-                                       existingOpTime,
-                                       entry.getOpTime());
+            const auto insertRes =
+                result.committedStatements.emplace(*entry.getStatementId(), entry.getOpTime());
+            if (!insertRes.second) {
+                const auto& existingOpTime = insertRes.first->second;
+                fassertOnRepeatedExecution(opCtx,
+                                           lsid,
+                                           result.lastTxnRecord->getTxnNum(),
+                                           *entry.getStatementId(),
+                                           existingOpTime,
+                                           entry.getOpTime());
+            }
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
+                result.hasIncompleteHistory = true;
+                break;
+            }
+
+            throw;
         }
     }
 
@@ -231,6 +240,30 @@ void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
         opCtx, txnNumber, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
 }
 
+void Session::onMigrateCompletedOnPrimary(OperationContext* opCtx,
+                                          TxnNumber txnNumber,
+                                          std::vector<StmtId> stmtIdsWritten,
+                                          const repl::OpTime& lastStmtIdWriteOpTime,
+                                          Date_t lastStmtIdWriteDate) {
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
+
+    _checkValid(ul);
+    _checkIsActiveTransaction(ul, txnNumber);
+
+    const auto updateRequest =
+        _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, lastStmtIdWriteDate);
+
+    ul.unlock();
+
+    repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
+
+    updateSessionEntry(opCtx, updateRequest);
+    _registerUpdateCacheOnCommit(
+        opCtx, txnNumber, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
+}
+
 void Session::updateSessionRecordOnSecondary(OperationContext* opCtx,
                                              const SessionTxnRecord& sessionTxnRecord) {
     invariant(!opCtx->lockState()->isLocked());
@@ -280,17 +313,7 @@ boost::optional<repl::OplogEntry> Session::checkStatementExecuted(OperationConte
                                                                   StmtId stmtId) const {
     const auto stmtTimestamp = [&] {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
-        auto result = _checkStatementExecuted(lg, txnNumber, stmtId);
-
-        if (!result) {
-            uassert(ErrorCodes::IncompleteTransactionHistory,
-                    str::stream() << "incomplete history detected for lsid: " << _sessionId.toBSON()
-                                  << ", txnNum: "
-                                  << txnNumber,
-                    !_hasIncompleteHistory);
-        }
-
-        return result;
+        return _checkStatementExecuted(lg, txnNumber, stmtId);
     }();
 
     if (!stmtTimestamp)
@@ -358,6 +381,12 @@ boost::optional<repl::OpTime> Session::_checkStatementExecuted(WithLock wl,
 
     const auto it = _activeTxnCommittedStatements.find(stmtId);
     if (it == _activeTxnCommittedStatements.end()) {
+        uassert(ErrorCodes::IncompleteTransactionHistory,
+                str::stream() << "Incomplete history detected for transaction " << txnNumber
+                              << " on session "
+                              << _sessionId.toBSON(),
+                !_hasIncompleteHistory);
+
         return boost::none;
     }
 

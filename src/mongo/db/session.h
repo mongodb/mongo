@@ -104,6 +104,24 @@ public:
                                      Date_t lastStmtIdWriteDate);
 
     /**
+     * Called after an entry for the specified session and transaction has been written to the oplog
+     * during chunk migration, while the node is still primary. Must be called while the caller is
+     * still in the oplog write's WUOW. Updates the on-disk state of the session to match the
+     * specified transaction/opTime and keeps the cached state in sync.
+     *
+     * May be called concurrently with onWriteOpCompletedOnPrimary or onMigrateCompletedOnPrimary
+     * and doesn't require the session to be checked-out.
+     *
+     * Throws if the session has been invalidated or the active transaction number is newer than the
+     * one specified.
+     */
+    void onMigrateCompletedOnPrimary(OperationContext* opCtx,
+                                     TxnNumber txnNumber,
+                                     std::vector<StmtId> stmtIdsWritten,
+                                     const repl::OpTime& lastStmtIdWriteOpTime,
+                                     Date_t lastStmtIdWriteDate);
+
+    /**
      * Called after a replication batch has been applied on a secondary node. Keeps the session
      * transaction entry in sync with the oplog chain which has been written.
      *

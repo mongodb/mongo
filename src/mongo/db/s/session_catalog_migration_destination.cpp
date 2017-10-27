@@ -248,15 +248,17 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, result.sessionId);
     scopedSession->beginTxn(opCtx, result.txnNum);
 
-    if (stmtId != kIncompleteHistoryStmtId) {
-        try {
-            if (scopedSession->checkStatementExecuted(opCtx, result.txnNum, stmtId)) {
-                return lastResult;
-            }
-        } catch (const DBException& excep) {
-            if (excep.code() != ErrorCodes::IncompleteTransactionHistory) {
-                throw;
-            }
+    try {
+        if (scopedSession->checkStatementExecuted(opCtx, result.txnNum, stmtId)) {
+            return lastResult;
+        }
+    } catch (const DBException& ex) {
+        if (ex.code() != ErrorCodes::IncompleteTransactionHistory) {
+            throw;
+        }
+
+        if (stmtId == kIncompleteHistoryStmtId) {
+            return lastResult;
         }
     }
 
@@ -303,7 +305,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
             // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post image, because the
             // next oplog will contain the real operation
             if (!result.isPrePostImage) {
-                scopedSession->onWriteOpCompletedOnPrimary(
+                scopedSession->onMigrateCompletedOnPrimary(
                     opCtx, result.txnNum, {stmtId}, oplogOpTime, *oplogEntry.getWallClockTime());
             }
 
@@ -440,15 +442,16 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
         } catch (const DBException& excep) {
             if (excep.code() == ErrorCodes::ConflictingOperationInProgress ||
                 excep.code() == ErrorCodes::TransactionTooOld) {
-                // This means that the server has a newer txnNumber than the oplog being
-                // migrated, so just skip it.
+                // This means that the server has a newer txnNumber than the oplog being migrated,
+                // so just skip it.
                 continue;
             }
 
             if (excep.code() == ErrorCodes::CommandNotFound) {
-                // TODO: remove this after v3.7.
-                // This means that the donor shard is running at an older version so it is safe
-                // to just end this because there is no session information to transfer.
+                // TODO: remove this after v3.7
+                //
+                // This means that the donor shard is running at an older version so it is safe to
+                // just end this because there is no session information to transfer.
                 break;
             }
 
