@@ -42,6 +42,13 @@ if platform_family? 'debian'
     returns [0, 1]
   end
 
+  # install the tools so we can test install_compass
+  execute 'install mongo tools' do
+    command 'dpkg -i `find . -name "*tools*.deb"`'
+    cwd homedir
+    returns [0, 1]
+  end
+
   # yum and zypper fetch dependencies automatically, but dpkg does not.
   # Installing the dependencies explicitly is fragile, so we reply on apt-get
   # to install dependencies after the fact.
@@ -58,6 +65,12 @@ end
 if platform_family? 'rhel'
   execute 'install mongod' do
     command 'yum install -y `find . -name "*server*.rpm"`'
+    cwd homedir
+  end
+
+  # install the tools so we can test install_compass
+  execute 'install mongo tools' do
+    command 'yum install -y `find . -name "*tools*.rpm"`'
     cwd homedir
   end
 

@@ -35,6 +35,20 @@ describe service('mongod') do
   it { should be_running }
 end
 
+
+if os[:arch] == 'x86_64' and
+  (os[:name] == 'ubuntu' and
+   (os[:release][0...5] == '14.04' or os[:release][0...5] == '16.04')) or
+  (os[:family] == 'redhat' and os[:release][0] == '7')
+  describe command("install_compass") do
+    its('exit_status') { should eq 0 }
+  end
+else
+  describe command("install_compass") do
+    its('exit_status') { should_not eq 0 }
+  end
+end
+
 # wait to make sure mongod is ready
 describe command("/inspec_wait.sh") do
   its('exit_status') { should eq 0 }

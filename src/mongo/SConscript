@@ -644,10 +644,12 @@ compass_installer = env.Substfile('#/src/mongo/installer/compass/' + compass_scr
                                       ('@compass_type@', compass_type)
                                   ])
 distBinaries.append(compass_installer)
+
 compass_script_installer = env.Install("$INSTALL_DIR/bin", compass_installer)
 
 if env.TargetOSIs('posix'):
     env.AddPostAction( compass_script_installer, 'chmod 755 $TARGET' )
+    env.AddPostAction( compass_installer, 'chmod 755 $TARGET' )
 
 # "dist" target is valid only when --use-new-tools is specified
 # Attempts to build release artifacts without tools must fail
