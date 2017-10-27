@@ -38,6 +38,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
@@ -59,6 +60,11 @@ using std::pair;
 using std::string;
 using std::unique_ptr;
 using std::vector;
+
+MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
+    ReplicaSetMonitor::disableRefreshRetries_forTest();
+    return Status::OK();
+}
 
 /**
  * Constructs a metadata object containing the passed server selection metadata.

@@ -88,6 +88,7 @@ const int64_t unknownLatency = numeric_limits<int64_t>::max();
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly, TagSet());
 const Milliseconds kFindHostMaxBackOffTime(500);
+AtomicBool areRefreshRetriesDisabledForTest{false};  // Only true in tests.
 
 // TODO: Move to ReplicaSetMonitorManager
 ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;
@@ -294,7 +295,7 @@ StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreference
 
         const Milliseconds remaining = maxWait - (Date_t::now() - startTimeMs);
 
-        if (remaining < kFindHostMaxBackOffTime) {
+        if (remaining < kFindHostMaxBackOffTime || areRefreshRetriesDisabledForTest.load()) {
             break;
         }
 
@@ -453,6 +454,10 @@ void ReplicaSetMonitor::cleanup() {
     globalRSMonitorManager.removeAllMonitors();
     asyncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();
     syncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();
+}
+
+void ReplicaSetMonitor::disableRefreshRetries_forTest() {
+    areRefreshRetriesDisabledForTest.store(true);
 }
 
 bool ReplicaSetMonitor::isKnownToHaveGoodPrimary() const {

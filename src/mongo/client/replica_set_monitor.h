@@ -225,6 +225,12 @@ public:
     static void cleanup();
 
     /**
+     * Use these to speed up tests by disabling the sleep-and-retry loops and cause errors to be
+     * reported immediately.
+     */
+    static void disableRefreshRetries_forTest();
+
+    /**
      * Permanently stops all monitoring on replica sets.
      */
     static void shutdown();
