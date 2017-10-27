@@ -242,7 +242,6 @@ struct __wt_page_modify {
 
 		/* The page has lookaside entries. */
 		uint64_t las_pageid;
-		uint64_t las_max_txn;
 		WT_DECL_TIMESTAMP(las_min_timestamp)
 	} r;
 #undef	mod_replace
@@ -251,8 +250,6 @@ struct __wt_page_modify {
 #define	mod_disk_image	u1.r.disk_image
 #undef	mod_replace_las_pageid
 #define	mod_replace_las_pageid	u1.r.las_pageid
-#undef	mod_replace_las_max_txn
-#define	mod_replace_las_max_txn	u1.r.las_max_txn
 #undef	mod_replace_las_min_timestamp
 #define	mod_replace_las_min_timestamp	u1.r.las_min_timestamp
 
@@ -301,7 +298,6 @@ struct __wt_page_modify {
 		uint32_t checksum;
 
 		uint64_t las_pageid;
-		uint64_t las_max_txn;
 		WT_DECL_TIMESTAMP(las_min_timestamp)
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
@@ -730,8 +726,6 @@ struct __wt_page_deleted {
  */
 struct __wt_page_lookaside {
 	uint64_t las_pageid;			/* Page ID in lookaside */
-	uint64_t las_max_txn;			/* Maximum transaction ID in
-						   lookaside */
 	WT_DECL_TIMESTAMP(min_timestamp)	/* Oldest timestamp in
 						   lookaside for the page */
 };
