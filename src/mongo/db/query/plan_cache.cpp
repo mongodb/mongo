@@ -433,6 +433,7 @@ PlanCacheEntry* PlanCacheEntry::clone() const {
     entry->sort = sort.getOwned();
     entry->projection = projection.getOwned();
     entry->collation = collation.getOwned();
+    entry->timeOfCreation = timeOfCreation;
 
     // Copy performance stats.
     for (size_t i = 0; i < feedback.size(); ++i) {
@@ -448,7 +449,8 @@ std::string PlanCacheEntry::toString() const {
     return str::stream() << "(query: " << query.toString() << ";sort: " << sort.toString()
                          << ";projection: " << projection.toString()
                          << ";collation: " << collation.toString()
-                         << ";solutions: " << plannerData.size() << ")";
+                         << ";solutions: " << plannerData.size()
+                         << ";timeOfCreation: " << timeOfCreation.toString() << ")";
 }
 
 std::string CachedSolution::toString() const {
@@ -694,7 +696,8 @@ void PlanCache::encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuild
 
 Status PlanCache::add(const CanonicalQuery& query,
                       const std::vector<QuerySolution*>& solns,
-                      PlanRankingDecision* why) {
+                      PlanRankingDecision* why,
+                      Date_t now) {
     invariant(why);
 
     if (solns.empty()) {
@@ -721,6 +724,8 @@ Status PlanCache::add(const CanonicalQuery& query,
     if (query.getCollator()) {
         entry->collation = query.getCollator()->getSpec().toBSON();
     }
+    entry->timeOfCreation = now;
+
 
     // Strip projections on $-prefixed fields, as these are added by internal callers of the query
     // system and are not considered part of the user projection.

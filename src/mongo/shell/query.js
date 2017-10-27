@@ -905,7 +905,7 @@ QueryPlan.prototype.help = function() {
  * List plans for a query shape.
  */
 QueryPlan.prototype.getPlans = function() {
-    return this._cursor._collection.getPlanCache().getPlansByQuery(this._cursor);
+    return this._cursor._collection.getPlanCache().getPlansByQuery(this._cursor).plans;
 };
 
 /**

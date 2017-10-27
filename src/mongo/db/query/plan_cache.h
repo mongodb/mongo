@@ -267,6 +267,7 @@ public:
     BSONObj sort;
     BSONObj projection;
     BSONObj collation;
+    Date_t timeOfCreation;
 
     //
     // Performance stats
@@ -312,7 +313,9 @@ public:
      * Record solutions for query. Best plan is first element in list.
      * Each query in the cache will have more than 1 plan because we only
      * add queries which are considered by the multi plan runner (which happens
-     * only when the query planner generates multiple candidate plans).
+     * only when the query planner generates multiple candidate plans). Callers are responsible
+     * for passing the current time so that the time the plan cache entry was created is stored
+     * in the plan cache.
      *
      * Takes ownership of 'why'.
      *
@@ -321,7 +324,8 @@ public:
      */
     Status add(const CanonicalQuery& query,
                const std::vector<QuerySolution*>& solns,
-               PlanRankingDecision* why);
+               PlanRankingDecision* why,
+               Date_t now);
 
     /**
      * Look up the cached data access for the provided 'query'.  Used by the query planner

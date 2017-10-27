@@ -72,20 +72,21 @@
         coll.getPlanCache()
             .getPlansByQuery(
                 {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {locale: 'en_US'}})
-            .length,
+            .plans.length,
         'unexpected number of cached plans for query');
 
     // Test passing the query, sort, projection, and collation to getPlansByQuery() as  separate
     // arguments.
-    assert.lt(
-        0,
-        coll.getPlanCache().getPlansByQuery({a: 'foo', b: 5}, {}, {}, {locale: 'en_US'}).length,
-        'unexpected number of cached plans for query');
+    assert.lt(0,
+              coll.getPlanCache()
+                  .getPlansByQuery({a: 'foo', b: 5}, {}, {}, {locale: 'en_US'})
+                  .plans.length,
+              'unexpected number of cached plans for query');
 
     // Test passing the query, sort, projection, and collation to getPlansByQuery() as separate
     // arguments.
     assert.eq(0,
-              coll.getPlanCache().getPlansByQuery({a: 'foo', b: 5}).length,
+              coll.getPlanCache().getPlansByQuery({a: 'foo', b: 5}).plans.length,
               'unexpected number of cached plans for query');
 
     // A query with a different collation should have no cached plans.
@@ -94,7 +95,7 @@
         coll.getPlanCache()
             .getPlansByQuery(
                 {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {locale: 'fr_CA'}})
-            .length,
+            .plans.length,
         'unexpected number of cached plans for query');
 
     // A query with different string locations should have no cached plans.
@@ -106,7 +107,7 @@
                       projection: {},
                       collation: {locale: 'en_US'}
                   })
-                  .length,
+                  .plans.length,
               'unexpected number of cached plans for query');
 
     coll.getPlanCache().clear();

@@ -324,7 +324,10 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         if (validSolutions) {
             _collection->infoCache()
                 ->getPlanCache()
-                ->add(*_query, solutions, ranking.release())
+                ->add(*_query,
+                      solutions,
+                      ranking.release(),
+                      getOpCtx()->getServiceContext()->getPreciseClockSource()->now())
                 .transitional_ignore();
         }
     }

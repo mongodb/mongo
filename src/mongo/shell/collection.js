@@ -1780,10 +1780,8 @@ PlanCache.prototype.clear = function() {
  * List plans for a query shape.
  */
 PlanCache.prototype.getPlansByQuery = function(query, projection, sort, collation) {
-    return this
-        ._runCommandThrowOnError("planCacheListPlans",
-                                 this._parseQueryShape(query, projection, sort, collation))
-        .plans;
+    return this._runCommandThrowOnError("planCacheListPlans",
+                                        this._parseQueryShape(query, projection, sort, collation));
 };
 
 /**
