@@ -47,10 +47,21 @@ class WiredTigerOplogManager {
     MONGO_DISALLOW_COPYING(WiredTigerOplogManager);
 
 public:
-    WiredTigerOplogManager(OperationContext* opCtx,
-                           const std::string& uri,
-                           WiredTigerRecordStore* oplogRecordStore);
-    ~WiredTigerOplogManager();
+    WiredTigerOplogManager() {}
+    ~WiredTigerOplogManager() {}
+
+    // This method will initialize the oplog read timestamp and start the background thread that
+    // refreshes the value.
+    void start(OperationContext* opCtx,
+               const std::string& uri,
+               WiredTigerRecordStore* oplogRecordStore);
+
+    void halt();
+
+    bool isRunning() {
+        stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+        return _isRunning && !_shuttingDown;
+    }
 
     // The oplogReadTimestamp is the timestamp used for oplog reads, to prevent readers from
     // reading past uncommitted transactions (which may create "holes" in the oplog after an
@@ -81,6 +92,7 @@ private:
     mutable stdx::condition_variable
         _opsBecameVisibleCV;  // Signaled when a journal flush is complete.
 
+    bool _isRunning = false;     // Guarded by the oplogVisibilityStateMutex.
     bool _shuttingDown = false;  // Guarded by oplogVisibilityStateMutex.
 
     // This is the RecordId of the newest oplog document in the oplog on startup.  It is used as a

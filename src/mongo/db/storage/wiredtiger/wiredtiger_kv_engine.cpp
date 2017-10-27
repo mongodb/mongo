@@ -322,6 +322,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        bool readOnly)
     : _eventHandler(WiredTigerUtil::defaultEventHandlers()),
       _clockSource(cs),
+      _oplogManager(stdx::make_unique<WiredTigerOplogManager>()),
       _canonicalName(canonicalName),
       _path(path),
       _sizeStorerSyncTracker(cs, 100000, Seconds(60)),
@@ -1074,16 +1075,16 @@ bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
     return _checkpointThread->supportsRecoverToStableTimestamp();
 }
 
-void WiredTigerKVEngine::initializeOplogManager(OperationContext* opCtx,
-                                                const std::string& uri,
-                                                WiredTigerRecordStore* oplogRecordStore) {
+void WiredTigerKVEngine::startOplogManager(OperationContext* opCtx,
+                                           const std::string& uri,
+                                           WiredTigerRecordStore* oplogRecordStore) {
     stdx::lock_guard<stdx::mutex> lock(_oplogManagerMutex);
     if (_oplogManagerCount == 0)
-        _oplogManager.reset(new WiredTigerOplogManager(opCtx, uri, oplogRecordStore));
+        _oplogManager->start(opCtx, uri, oplogRecordStore);
     _oplogManagerCount++;
 }
 
-void WiredTigerKVEngine::deleteOplogManager() {
+void WiredTigerKVEngine::haltOplogManager() {
     stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
     invariant(_oplogManagerCount > 0);
     _oplogManagerCount--;
@@ -1091,15 +1092,12 @@ void WiredTigerKVEngine::deleteOplogManager() {
         // Destructor may lock the mutex, so we must unlock here.
         // Oplog managers only destruct at shutdown or test exit, so it is safe to unlock here.
         lock.unlock();
-        _oplogManager.reset();
+        _oplogManager->halt();
     }
 }
 
 void WiredTigerKVEngine::replicationBatchIsComplete() const {
-    stdx::lock_guard<stdx::mutex> lock(_oplogManagerMutex);
-    if (_oplogManager) {
-        _oplogManager->triggerJournalFlush();
-    }
+    _oplogManager->triggerJournalFlush();
 }
 
 }  // namespace mongo

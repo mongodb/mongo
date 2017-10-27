@@ -52,7 +52,12 @@ logger::LogSeverity kSlowTransactionSeverity = logger::LogSeverity::Debug(1);
 }  // namespace
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
+    : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}
+
+WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc,
+                                               WiredTigerOplogManager* oplogManager)
     : _sessionCache(sc),
+      _oplogManager(oplogManager),
       _inUnitOfWork(false),
       _active(false),
       _mySnapshotId(nextSnapshotId.fetchAndAdd(1)) {}
@@ -189,13 +194,22 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         }
     }
 
+    int wtRet;
     if (commit) {
-        invariantWTOK(s->commit_transaction(s, NULL));
+        wtRet = s->commit_transaction(s, NULL);
         LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
-        invariantWTOK(s->rollback_transaction(s, NULL));
+        wtRet = s->rollback_transaction(s, NULL);
+        invariant(!wtRet);
         LOG(3) << "WT rollback_transaction for snapshot id " << _mySnapshotId;
     }
+
+    if (_isTimestamped) {
+        _oplogManager->triggerJournalFlush();
+        _isTimestamped = false;
+    }
+    invariantWTOK(wtRet);
+
     _active = false;
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
     _isOplogReader = false;
@@ -263,6 +277,9 @@ Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
 
     const std::string conf = "commit_timestamp=" + timestamp.toString();
     auto rc = session->timestamp_transaction(session, conf.c_str());
+    if (rc == 0) {
+        _isTimestamped = true;
+    }
     return wtRCToStatus(rc, "timestamp_transaction");
 }
 

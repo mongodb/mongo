@@ -184,19 +184,29 @@ public:
     void syncSizeInfo(bool sync) const;
 
     /*
-     * Initializes and reference counts an oplog manager, to control oplog entry visibility for
-     * reads.
-     * The oplogManager object is held by this class but is constructed and deleted as per
-     * the Oplog record store (the record store corresponding to the oplog collection).  If
-     * multiple oplog record stores are created, the first oplog record store to be constructed will
-     * construct the Manager, and the last oplog record store to be deleted will destruct the
-     * Manager.
+     * An oplog manager is always accessible, but this method will start the background thread to
+     * control oplog entry visibility for reads.
+     *
+     * On mongod, the background thread will be started when the first oplog record store is
+     * created, and stopped when the last oplog record store is destroyed, at shutdown time. For
+     * unit tests, the background thread may be started and stopped multiple times as tests create
+     * and destroy oplog record stores.
      */
-    void initializeOplogManager(OperationContext* opCtx,
-                                const std::string& uri,
-                                WiredTigerRecordStore* oplogRecordStore);
-    void deleteOplogManager();
+    void startOplogManager(OperationContext* opCtx,
+                           const std::string& uri,
+                           WiredTigerRecordStore* oplogRecordStore);
+    void haltOplogManager();
 
+    /*
+     * Always returns a non-nil pointer. However, the WiredTigerOplogManager may not have been
+     * initialized and its background refreshing thread may not be running.
+     *
+     * A caller that wants to get the oplog read timestamp, or call
+     * `waitForAllEarlierOplogWritesToBeVisible`, is advised to first see if the oplog manager is
+     * running with a call to `isRunning`.
+     *
+     * A caller that simply wants to call `triggerJournalFlush` may do so without concern.
+     */
     WiredTigerOplogManager* getOplogManager() const {
         return _oplogManager.get();
     }

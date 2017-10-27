@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -81,14 +82,20 @@ public:
         return &_sessionCache;
     }
 
+    WiredTigerOplogManager* getOplogManager() {
+        return &_oplogManager;
+    }
+
     OperationContext* newOperationContext() {
-        return new OperationContextNoop(new WiredTigerRecoveryUnit(getSessionCache()));
+        return new OperationContextNoop(
+            new WiredTigerRecoveryUnit(getSessionCache(), &_oplogManager));
     }
 
 private:
     unittest::TempDir _dbpath;
     WiredTigerConnection _connection;
     WiredTigerSessionCache _sessionCache;
+    WiredTigerOplogManager _oplogManager;
 };
 
 class WiredTigerUtilMetadataTest : public mongo::unittest::Test {
@@ -253,7 +260,8 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
 
 TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
+                                        harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     StatusWith<uint64_t> result =
         WiredTigerUtil::getStatisticsValue(session->getSession(),
@@ -266,7 +274,8 @@ TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
 
 TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
-    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
+                                        harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
@@ -280,7 +289,8 @@ TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
 
 TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
+                                        harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
@@ -295,7 +305,8 @@ TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
 
 TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
+                                        harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
@@ -311,7 +322,8 @@ TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
 
 TEST(WiredTigerUtilTest, GetStatisticsValueAsUInt8) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
+                                        harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));

@@ -92,13 +92,14 @@ public:
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return stdx::make_unique<WiredTigerRecoveryUnit>(_sessionCache);
+        return stdx::make_unique<WiredTigerRecoveryUnit>(_sessionCache, &_oplogManager);
     }
 
 private:
     unittest::TempDir _dbpath;
     WT_CONNECTION* _conn;
     WiredTigerSessionCache* _sessionCache;
+    WiredTigerOplogManager _oplogManager;
 };
 
 std::unique_ptr<HarnessHelper> makeHarnessHelper() {

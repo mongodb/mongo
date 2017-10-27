@@ -277,7 +277,6 @@ protected:
 private:
     class RandomCursor;
 
-    class OplogInsertChange;
     class NumRecordsChange;
     class DataSizeChange;
 

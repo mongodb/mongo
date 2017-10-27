@@ -47,9 +47,10 @@ const uint64_t kMinimumTimestamp = 1;
 
 MONGO_FP_DECLARE(WTPausePrimaryOplogDurabilityLoop);
 
-WiredTigerOplogManager::WiredTigerOplogManager(OperationContext* opCtx,
-                                               const std::string& uri,
-                                               WiredTigerRecordStore* oplogRecordStore) {
+void WiredTigerOplogManager::start(OperationContext* opCtx,
+                                   const std::string& uri,
+                                   WiredTigerRecordStore* oplogRecordStore) {
+    invariant(!_isRunning);
     // Prime the oplog read timestamp.
     auto sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     _setOplogReadTimestamp(_fetchAllCommittedValue(sessionCache->conn()));
@@ -61,12 +62,18 @@ WiredTigerOplogManager::WiredTigerOplogManager(OperationContext* opCtx,
 
     _oplogJournalThread = stdx::thread(
         &WiredTigerOplogManager::_oplogJournalThreadLoop, this, sessionCache, oplogRecordStore);
+
+    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    _isRunning = true;
+    _shuttingDown = false;
 }
 
-WiredTigerOplogManager::~WiredTigerOplogManager() {
+void WiredTigerOplogManager::halt() {
     {
         stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+        invariant(_isRunning);
         _shuttingDown = true;
+        _isRunning = false;
     }
 
     if (_oplogJournalThread.joinable()) {
