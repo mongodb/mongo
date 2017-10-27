@@ -241,12 +241,16 @@ TEST_F(SessionTest, CheckStatementExecuted) {
     };
 
     ASSERT(!session.checkStatementExecuted(opCtx(), txnNum, 1000));
+    ASSERT(!session.checkStatementExecutedNoOplogEntryFetch(txnNum, 1000));
     const auto firstOpTime = writeTxnRecordFn(1000, {});
     ASSERT(session.checkStatementExecuted(opCtx(), txnNum, 1000));
+    ASSERT(session.checkStatementExecutedNoOplogEntryFetch(txnNum, 1000));
 
     ASSERT(!session.checkStatementExecuted(opCtx(), txnNum, 2000));
+    ASSERT(!session.checkStatementExecutedNoOplogEntryFetch(txnNum, 2000));
     writeTxnRecordFn(2000, firstOpTime);
     ASSERT(session.checkStatementExecuted(opCtx(), txnNum, 2000));
+    ASSERT(session.checkStatementExecutedNoOplogEntryFetch(txnNum, 2000));
 
     // Invalidate the session and ensure the statements still check out
     session.invalidate();
@@ -254,6 +258,9 @@ TEST_F(SessionTest, CheckStatementExecuted) {
 
     ASSERT(session.checkStatementExecuted(opCtx(), txnNum, 1000));
     ASSERT(session.checkStatementExecuted(opCtx(), txnNum, 2000));
+
+    ASSERT(session.checkStatementExecutedNoOplogEntryFetch(txnNum, 1000));
+    ASSERT(session.checkStatementExecutedNoOplogEntryFetch(txnNum, 2000));
 }
 
 TEST_F(SessionTest, CheckStatementExecutedForOldTransactionThrows) {

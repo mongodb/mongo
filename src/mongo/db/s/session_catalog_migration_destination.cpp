@@ -49,7 +49,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
 
 const auto kOplogField = "oplog";
@@ -75,9 +74,9 @@ BSONObj buildMigrateSessionCmd(const MigrationSessionId& migrationSessionId) {
 }
 
 /**
- * Determines whether the oplog entry has a link to either preImage/postImage and return
- * a new oplogLink that contains the same link, but pointing to lastResult.oplogTime. For example,
- * if entry has link to preImageTs, this returns an oplogLink with preImageTs pointing to
+ * Determines whether the oplog entry has a link to either preImage/postImage and return a new
+ * oplogLink that contains the same link, but pointing to lastResult.oplogTime. For example, if
+ * entry has link to preImageTs, this returns an oplogLink with preImageTs pointing to
  * lastResult.oplogTime.
  *
  * It is an error to have both preImage and postImage as well as not having them at all.
@@ -301,8 +300,8 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                                   << redact(oplogBSON),
                     !oplogOpTime.isNull());
 
-            // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post
-            // image, because the next oplog will contain the real operation.
+            // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post image, because the
+            // next oplog will contain the real operation
             if (!result.isPrePostImage) {
                 scopedSession->onWriteOpCompletedOnPrimary(
                     opCtx, result.txnNum, {stmtId}, oplogOpTime, *oplogEntry.getWallClockTime());
@@ -313,7 +312,8 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
 
     return result;
 }
-}  // unnamed namespace
+
+}  // namespace
 
 const char SessionCatalogMigrationDestination::kSessionMigrateOplogTag[] = "$sessionMigrateInfo";
 
