@@ -1383,7 +1383,7 @@ __split_multi_inmem(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SAVE_UPD *supd;
-	WT_UPDATE *prev_upd, *upd;
+	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t i, slot;
 
@@ -1473,36 +1473,6 @@ __split_multi_inmem(
 			    &cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
-		}
-
-		/*
-		 * Discard the update used to create the on-page disk image.
-		 * This is not just a performance issue: if the update used to
-		 * create the value for this on-page disk image was a modify,
-		 * and it was applied to the previous on-page value to
-		 * determine a value to write to this disk image, that update
-		 * cannot be applied to the new on-page value without risking
-		 * corruption.
-		 */
-		if (supd->onpage_upd != NULL) {
-			for (prev_upd = upd; prev_upd != NULL &&
-			    prev_upd->next != supd->onpage_upd;
-			    prev_upd = prev_upd->next)
-				;
-			/*
-			 * If the on-page update was in fact a tombstone, there
-			 * will be no value on the page.  Don't throw the
-			 * tombstone away: we may need it to correctly resolve
-			 * modifications.
-			 */
-			if (supd->onpage_upd->type == WT_UPDATE_DELETED &&
-			    prev_upd != NULL)
-				prev_upd = prev_upd->next;
-			if (prev_upd != NULL) {
-				__wt_update_obsolete_free(
-				    session, page, prev_upd->next);
-				prev_upd->next = NULL;
-			}
 		}
 	}
 
@@ -1673,6 +1643,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 
 		WT_RET(__wt_calloc_one(session, &ref->page_las));
 		ref->page_las->las_pageid = multi->las_pageid;
+		ref->page_las->las_max_txn = multi->las_max_txn;
 #ifdef HAVE_TIMESTAMPS
 		__wt_timestamp_set(
 		    &ref->page_las->min_timestamp, &multi->las_min_timestamp);

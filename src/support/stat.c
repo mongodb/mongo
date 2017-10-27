@@ -809,6 +809,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: internal pages evicted",
 	"cache: internal pages split during eviction",
 	"cache: leaf pages split during eviction",
+	"cache: lookaside score",
 	"cache: lookaside table entries",
 	"cache: lookaside table insert calls",
 	"cache: lookaside table remove calls",
@@ -1139,6 +1140,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_internal = 0;
 	stats->cache_eviction_split_internal = 0;
 	stats->cache_eviction_split_leaf = 0;
+		/* not clearing cache_lookaside_score */
 		/* not clearing cache_lookaside_entries */
 	stats->cache_lookaside_insert = 0;
 	stats->cache_lookaside_remove = 0;
@@ -1490,6 +1492,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_split_internal);
 	to->cache_eviction_split_leaf +=
 	    WT_STAT_READ(from, cache_eviction_split_leaf);
+	to->cache_lookaside_score +=
+	    WT_STAT_READ(from, cache_lookaside_score);
 	to->cache_lookaside_entries +=
 	    WT_STAT_READ(from, cache_lookaside_entries);
 	to->cache_lookaside_insert +=

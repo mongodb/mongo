@@ -576,18 +576,13 @@ __evict_review(
 			}
 
 			/*
-			 * If the cache is nearly stuck, check if
-			 * reconciliation suggests trying the lookaside table
-			 * unless lookaside eviction is disabled globally.
-			 *
-			 * We don't wait until the cache is completely stuck:
-			 * for workloads where lookaside eviction is necessary
-			 * to make progress, we don't want a single successful
-			 * page eviction to make the cache "unstuck" so we have
-			 * to wait again before evicting the next page.
+			 * If the cache is under pressure with many updates
+			 * that can't be evicted, check if reconciliation
+			 * suggests trying the lookaside table.
 			 */
-			if (__wt_cache_nearly_stuck(session) &&
-			    !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE))
+			if (!F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE) &&
+			    (__wt_cache_lookaside_score(cache) > 50 ||
+			    __wt_cache_stuck(session)))
 				lookaside_retryp = &lookaside_retry;
 		}
 	}
