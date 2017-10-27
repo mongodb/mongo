@@ -34,6 +34,7 @@
 
 #include "mongo/client/fetcher.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
@@ -186,6 +187,19 @@ public:
      * last oplog entry fetcher. Also validates the find command arguments in the request.
      */
     void processSuccessfulLastOplogEntryFetcherResponse(std::vector<BSONObj> docs);
+
+    /**
+     * Schedules and processes a successful response to the network request sent by InitialSyncer's
+     * feature compatibility version fetcher. Includes the 'docs' provided in the response.
+     */
+    void processSuccessfulFCVFetcherResponse(std::vector<BSONObj> docs);
+
+    /**
+     * Schedules and processes a successful response to the network request sent by InitialSyncer's
+     * feature compatibility version fetcher. Always includes a valid fCV=3.6 document in the
+     * response.
+     */
+    void processSuccessfulFCVFetcherResponse36();
 
     void finishProcessingNetworkResponse() {
         getNet()->runReadyNetworkOperations();
@@ -442,6 +456,8 @@ protected:
         }
     }
 
+    void runInitialSyncWithBadFCVResponse(std::vector<BSONObj> docs,
+                                          ErrorCodes::Error expectedError);
     void doSuccessfulInitialSyncWithOneBatch();
     OplogEntry doInitialSyncWithOneBatch();
 
@@ -571,6 +587,31 @@ void InitialSyncerTest::processSuccessfulLastOplogEntryFetcherResponse(std::vect
     ASSERT_TRUE(request.cmdObj.hasField("sort"));
     ASSERT_EQUALS(mongo::BSONType::Object, request.cmdObj["sort"].type());
     ASSERT_BSONOBJ_EQ(BSON("$natural" << -1), request.cmdObj.getObjectField("sort"));
+    net->runReadyNetworkOperations();
+}
+
+void assertFCVRequest(RemoteCommandRequest request) {
+    ASSERT_EQUALS(nsToDatabaseSubstring(FeatureCompatibilityVersion::kCollection), request.dbname)
+        << request.toString();
+    ASSERT_EQUALS(nsToCollectionSubstring(FeatureCompatibilityVersion::kCollection),
+                  request.cmdObj.getStringField("find"));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << FeatureCompatibilityVersion::kParameterName),
+                      request.cmdObj.getObjectField("filter"));
+}
+
+void InitialSyncerTest::processSuccessfulFCVFetcherResponse36() {
+    auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "version"
+                            << FeatureCompatibilityVersionCommandParser::kVersion36)};
+    processSuccessfulFCVFetcherResponse(docs);
+}
+
+void InitialSyncerTest::processSuccessfulFCVFetcherResponse(std::vector<BSONObj> docs) {
+    auto net = getNet();
+    auto request = assertRemoteCommandNameEquals(
+        "find",
+        net->scheduleSuccessfulResponse(makeCursorResponse(
+            0LL, NamespaceString(FeatureCompatibilityVersion::kCollection), docs)));
+    assertFCVRequest(request);
     net->runReadyNetworkOperations();
 }
 
@@ -1308,10 +1349,234 @@ TEST_F(InitialSyncerTest,
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
     }
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    // We reject the first find command that is on the fCV collection.
+    executor::RemoteCommandRequest request;
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            request = requestToSend;
+            return "find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
+                nsToCollectionSubstring(FeatureCompatibilityVersion::kCollection) ==
+                requestToSend.cmdObj.firstElement().str();
+        };
+
+    HostAndPort syncSource("localhost", 12345);
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+
+        // Last oplog entry.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+    }
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+
+    ASSERT_EQUALS(syncSource, request.target);
+    assertFCVRequest(request);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+
+        // Last oplog entry.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        auto request = assertRemoteCommandNameEquals(
+            "find",
+            net->scheduleErrorResponse(
+                Status(ErrorCodes::OperationFailed, "find command failed at sync source")));
+        assertFCVRequest(request);
+        net->runReadyNetworkOperations();
+    }
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerCancelsFCVFetcherOnShutdown) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+
+        // Last oplog entry.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        ASSERT_TRUE(net->hasReadyRequests());
+    }
+
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerResendsFindCommandIfFCVFetcherReturnsRetriableError) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+    // Base rollback ID.
+    net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+    net->runReadyNetworkOperations();
+
+    // Last oplog entry.
+    processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+    // FCV first attempt - retriable error.
+    assertRemoteCommandNameEquals("find",
+                                  net->scheduleErrorResponse(Status(ErrorCodes::HostNotFound, "")));
+    net->runReadyNetworkOperations();
+
+    // InitialSyncer stays active because it resends the find request for the fCV.
+    ASSERT_TRUE(initialSyncer->isActive());
+
+    // FCV second attempt.
+    processSuccessfulFCVFetcherResponse36();
+}
+
+void InitialSyncerTest::runInitialSyncWithBadFCVResponse(std::vector<BSONObj> docs,
+                                                         ErrorCodes::Error expectedError) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+
+        // Last oplog entry.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        processSuccessfulFCVFetcherResponse(docs);
+    }
+
+    initialSyncer->join();
+    ASSERT_EQUALS(expectedError, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsEmptyBatchOfDocuments) {
+    runInitialSyncWithBadFCVResponse({}, ErrorCodes::IncompatibleServerVersion);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerReturnsTooManyMatchingDocumentsWhenFCVFetcherReturnsMultipleDocuments) {
+    auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "version"
+                            << FeatureCompatibilityVersionCommandParser::kVersion36),
+                 BSON("_id"
+                      << "other")};
+    runInitialSyncWithBadFCVResponse(docs, ErrorCodes::TooManyMatchingDocuments);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsUpgradeTargetVersion) {
+    auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "version"
+                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                            << "targetVersion"
+                            << FeatureCompatibilityVersionCommandParser::kVersion36)};
+    runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsDowngradeTargetVersion) {
+    auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "version"
+                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                            << "targetVersion"
+                            << FeatureCompatibilityVersionCommandParser::kVersion34)};
+    runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerReturnsBadValueWhenFCVFetcherReturnsNoVersion) {
+    auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "targetVersion"
+                            << FeatureCompatibilityVersionCommandParser::kVersion34)};
+    runInitialSyncWithBadFCVResponse(docs, ErrorCodes::BadValue);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+
+        // Last oplog entry.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "version"
+                                << FeatureCompatibilityVersionCommandParser::kVersion34)};
+        processSuccessfulFCVFetcherResponse(docs);
+        ASSERT_TRUE(net->hasReadyRequests());
+    }
+
+    // We shut it down so we do not have to finish initial sync. If the fCV fetcher got an error,
+    // we would return that.
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
@@ -1345,8 +1610,15 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
         net->runReadyNetworkOperations();
-    }
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
+        // OplogFetcher will shut down DatabasesCloner on error after setting the completion status.
+        // We call runReadyNetworkOperations() again to deliver the cancellation status to
+        // _databasesClonerCallback().
+        net->runReadyNetworkOperations();
+    }
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
@@ -1376,6 +1648,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
         net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
         net->runReadyNetworkOperations();
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         assertRemoteCommandNameEquals(
             "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
@@ -1422,6 +1697,9 @@ TEST_F(InitialSyncerTest,
         ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
         net->runReadyNetworkOperations();
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         assertRemoteCommandNameEquals(
             "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
         net->runReadyNetworkOperations();
@@ -1467,6 +1745,9 @@ TEST_F(
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         assertRemoteCommandNameEquals(
             "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
@@ -1517,6 +1798,9 @@ TEST_F(
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         assertRemoteCommandNameEquals(
             "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
@@ -1576,6 +1860,9 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // InitialSyncer shuts down OplogFetcher when it fails to schedule DatabasesCloner
         // so we should not expect any network requests in the queue.
         ASSERT_FALSE(net->hasReadyRequests());
@@ -1613,6 +1900,9 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // DatabasesCloner's first remote command - listDatabases
         assertRemoteCommandNameEquals(
             "listDatabases",
@@ -1646,6 +1936,9 @@ TEST_F(InitialSyncerTest, InitialSyncerIgnoresLocalDatabasesWhenCloningDatabases
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // DatabasesCloner's first remote command - listDatabases
         assertRemoteCommandNameEquals(
@@ -1706,6 +1999,9 @@ TEST_F(InitialSyncerTest,
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // DatabasesCloner's first remote command - listDatabases
         assertRemoteCommandNameEquals(
@@ -1772,6 +2068,9 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBothOplogFetcherAndDatabasesCloner
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
     }
 
     ASSERT_OK(initialSyncer->shutdown());
@@ -1819,6 +2118,9 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -1854,6 +2156,9 @@ TEST_F(InitialSyncerTest,
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -1907,6 +2212,9 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         auto request = assertRemoteCommandNameEquals(
@@ -1953,6 +2261,9 @@ TEST_F(InitialSyncerTest,
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -2012,6 +2323,9 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -2059,6 +2373,9 @@ TEST_F(InitialSyncerTest,
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -2121,6 +2438,9 @@ TEST_F(
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -2189,6 +2509,9 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -2255,6 +2578,9 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -2302,6 +2628,9 @@ TEST_F(
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -2356,6 +2685,9 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -2409,6 +2741,9 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherC
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -2469,6 +2804,9 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -2518,6 +2856,9 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.toBSON()});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Instead of fast forwarding to DatabasesCloner completion by returning an empty list of
         // database names, we'll simulate copying a single database with a single collection on the
@@ -2607,6 +2948,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -2661,6 +3005,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -2714,6 +3061,9 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -2770,6 +3120,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -2835,6 +3188,9 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -2889,6 +3245,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -2961,6 +3320,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -3006,6 +3368,9 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -3058,6 +3423,9 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -3142,6 +3510,9 @@ TEST_F(InitialSyncerTest,
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
 
         // Instead of fast forwarding to DatabasesCloner completion by returning an empty list of
         // database names, we'll simulate copying a single database with a single collection on the
@@ -3263,6 +3634,9 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
@@ -3352,6 +3726,9 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
         // Ignore listDatabases request.
         auto noi = net->getNextReadyRequest();
         auto request = noi->getRequest();
@@ -3402,6 +3779,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
     }
 
     log() << "Done playing first failed response";
@@ -3448,6 +3828,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
     }
 
     log() << "Done playing first successful response";

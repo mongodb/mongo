@@ -75,9 +75,11 @@
 
     // Modifications to the featureCompatibilityVersion document during initial sync should be
     // caught and cause initial sync to fail.
-    runInitialSync(
-        {delete: 'system.version', deletes: [{q: {_id: "featureCompatibilityVersion"}, limit: 1}]},
-        'Applying operation on feature compatibility version document');
+    runInitialSync({
+        update: 'system.version',
+        updates: [{q: {_id: 'featureCompatibilityVersion'}, u: {'version': '3.4'}}]
+    },
+                   'Applying operation on feature compatibility version document');
 
     rst.stopSet();
 })();

@@ -141,7 +141,7 @@ env.Library(
     LIBDEPS=[
         'core',
         '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
     ],
 )
 

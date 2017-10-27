@@ -41,6 +41,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
@@ -275,6 +276,7 @@ void InitialSyncer::_cancelRemainingWork_inlock() {
         _shutdownComponent_inlock(_initialSyncState->dbsCloner);
     }
     _shutdownComponent_inlock(_applier);
+    _shutdownComponent_inlock(_fCVFetcher);
     _shutdownComponent_inlock(_lastOplogEntryFetcher);
 }
 
@@ -603,6 +605,89 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
         return;
     }
 
+    const auto& lastOpTimeWithHash = opTimeWithHashResult.getValue();
+
+    BSONObjBuilder queryBob;
+    queryBob.append("find", nsToCollectionSubstring(FeatureCompatibilityVersion::kCollection));
+    auto filterBob = BSONObjBuilder(queryBob.subobjStart("filter"));
+    filterBob.append("_id", FeatureCompatibilityVersion::kParameterName);
+    filterBob.done();
+
+    _fCVFetcher = stdx::make_unique<Fetcher>(
+        _exec,
+        _syncSource,
+        nsToDatabaseSubstring(FeatureCompatibilityVersion::kCollection).toString(),
+        queryBob.obj(),
+        stdx::bind(&InitialSyncer::_fcvFetcherCallback,
+                   this,
+                   stdx::placeholders::_1,
+                   onCompletionGuard,
+                   lastOpTimeWithHash),
+        ReadPreferenceSetting::secondaryPreferredMetadata(),
+        RemoteCommandRequest::kNoTimeout /* find network timeout */,
+        RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
+        RemoteCommandRetryScheduler::makeRetryPolicy(
+            numInitialSyncOplogFindAttempts.load(),
+            executor::RemoteCommandRequest::kNoTimeout,
+            RemoteCommandRetryScheduler::kAllRetriableErrors));
+    Status scheduleStatus = _fCVFetcher->schedule();
+    if (!scheduleStatus.isOK()) {
+        _fCVFetcher.reset();
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, scheduleStatus);
+        return;
+    }
+}
+
+void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>& result,
+                                        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+                                        const OpTimeWithHash& lastOpTimeWithHash) {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    auto status = _checkForShutdownAndConvertStatus_inlock(
+        result.getStatus(), "error while getting the remote feature compatibility version");
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
+        return;
+    }
+
+    const auto docs = result.getValue().documents;
+    if (docs.size() > 1) {
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(
+            lock,
+            Status(ErrorCodes::TooManyMatchingDocuments,
+                   str::stream() << "Expected to receive one document, but received: "
+                                 << docs.size()
+                                 << ". First: "
+                                 << redact(docs.front())
+                                 << ". Last: "
+                                 << redact(docs.back())));
+        return;
+    }
+    const auto hasDoc = docs.begin() != docs.end();
+    if (!hasDoc) {
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(
+            lock,
+            Status(ErrorCodes::IncompatibleServerVersion,
+                   "Sync source had no feature compatibility version document"));
+        return;
+    }
+
+    auto fCVParseSW = FeatureCompatibilityVersion::parse(docs.front());
+    if (!fCVParseSW.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, fCVParseSW.getStatus());
+        return;
+    }
+
+    auto version = fCVParseSW.getValue();
+    if (version != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34 &&
+        version != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(
+            lock,
+            Status(ErrorCodes::IncompatibleServerVersion,
+                   str::stream() << "Sync source had unsafe feature compatibility version: "
+                                 << FeatureCompatibilityVersion::toString(version)));
+        return;
+    }
+
     // This is where the flow of control starts to split into two parallel tracks:
     // - oplog fetcher
     // - data cloning and applier
@@ -627,7 +712,6 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
                                                       stdx::placeholders::_1,
                                                       onCompletionGuard)));
 
-    const auto& lastOpTimeWithHash = opTimeWithHashResult.getValue();
     _initialSyncState->beginTimestamp = lastOpTimeWithHash.opTime.getTimestamp();
 
     invariant(!result.getValue().documents.empty());

@@ -1471,6 +1471,7 @@ env.Library(
         'rollback_checker',
         'storage_interface',
         '$BUILD_DIR/mongo/client/fetcher',
+        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
     ],
 )
 

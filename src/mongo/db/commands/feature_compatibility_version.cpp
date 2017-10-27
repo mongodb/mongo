@@ -33,7 +33,6 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -223,23 +222,14 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
     NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 
-    {
-        AutoGetOrCreateDb autoDB(opCtx, nss.db(), MODE_X);
-
-        // We reached this point because the only database that exists on the server is "local"
-        // and we have just created an empty "admin" database. Therefore, it is safe to create
-        // the "admin.system.version" collection.
-        invariant(autoDB.justCreated());
-
-        if (storeUpgradeVersion) {
-            // We update the value of the version server parameter so that the admin.system.version
-            // collection gets a UUID.
-            serverGlobalParams.featureCompatibility.setVersion(
-                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
-        }
-
-        uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
+    if (storeUpgradeVersion) {
+        // We update the value of the version server parameter so that the admin.system.version
+        // collection gets a UUID.
+        serverGlobalParams.featureCompatibility.setVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
     }
+
+    uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
 
     // We then insert the featureCompatibilityVersion document into the "admin.system.version"
     // collection. The server parameter will be updated on commit by the op observer.
