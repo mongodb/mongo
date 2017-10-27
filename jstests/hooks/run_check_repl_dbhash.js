@@ -86,7 +86,12 @@
     var testFixture = isMasterSlave ? new MasterSlaveDBHashTest(db.getMongo().host)
                                     : new ReplSetTest(db.getMongo().host);
     var excludedDBs = jsTest.options().excludedDBsFromDBHash || [];
-    testFixture.checkReplicatedDataHashes(undefined, excludedDBs, true /* skip UUID check */);
+
+    // Since UUIDs aren't explicitly replicated in master-slave deployments, we ignore the UUID in
+    // the output of the "listCollections" command to avoid reporting a known data inconsistency
+    // issue from checkReplicatedDataHashes().
+    var ignoreUUIDs = isMasterSlave;
+    testFixture.checkReplicatedDataHashes(undefined, excludedDBs, ignoreUUIDs);
 
     var totalTime = Date.now() - startTime;
     print('Finished consistency checks of cluster in ' + totalTime + ' ms.');
