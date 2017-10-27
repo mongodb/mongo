@@ -792,6 +792,10 @@ public:
         Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
         const int numShards = shardIds.size();
 
+        uassert(ErrorCodes::IllegalOperation,
+                "cannot shard collections before there are shards",
+                numShards > 0);
+
         // Handle collections in the config db separately.
         if (nss.db() == NamespaceString::kConfigDb) {
             // Only whitelisted collections in config may be sharded
@@ -817,9 +821,6 @@ public:
         // make a connection to the real primary shard for this database.
         auto primaryShardId = [&]() {
             if (nss.db() == NamespaceString::kConfigDb) {
-                uassert(ErrorCodes::IllegalOperation,
-                        "cannot shard collections in config before there are shards",
-                        numShards > 0);
                 return shardIds[0];
             } else {
                 return dbType.getPrimary();
