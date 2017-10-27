@@ -101,6 +101,10 @@ static CONFIG c[] = {
 	  "size of the cache in MB",
 	  0x0, 1, 100, 100 * 1024, &g.c_cache, NULL },
 
+	{ "cache_minimum",
+	  "minimum size of the cache in MB",
+	  C_IGNORE, 1, 0, 100 * 1024, &g.c_cache_minimum, NULL },
+
 	{ "checkpoints",
 	  "type of checkpoints (on | off | wiredtiger)",
 	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_checkpoint},
