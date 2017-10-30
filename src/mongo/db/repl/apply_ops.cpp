@@ -58,6 +58,7 @@ namespace mongo {
 namespace {
 
 const auto kPreconditionFieldName = "preCondition"_sd;
+const auto kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
 
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
 MONGO_FP_DECLARE(applyOpsPauseBetweenOperations);
@@ -114,6 +115,30 @@ Status _applyOps(OperationContext* opCtx,
     const bool alwaysUpsert =
         applyOpCmd.hasField("alwaysUpsert") ? applyOpCmd["alwaysUpsert"].trueValue() : true;
     const bool haveWrappingWUOW = opCtx->lockState()->inAWriteUnitOfWork();
+
+    // TODO (SERVER-31384): This code is run when applying 'applyOps' oplog entries. Pass through
+    // oplog application mode from applyCommand_inlock as default and consider proper behavior
+    // if default differs from oplog entry.
+    repl::OplogApplication::Mode oplogApplicationMode = repl::OplogApplication::Mode::kApplyOps;
+    std::string oplogApplicationModeString;
+    auto status = bsonExtractStringField(
+        applyOpCmd, kOplogApplicationModeFieldName, &oplogApplicationModeString);
+    if (status.isOK()) {
+        auto modeSW = repl::OplogApplication::parseMode(oplogApplicationModeString);
+        if (!modeSW.isOK()) {
+            return Status(modeSW.getStatus().code(),
+                          str::stream() << "Could not parse " << kOplogApplicationModeFieldName
+                                        << ": "
+                                        << modeSW.getStatus().reason());
+        }
+        oplogApplicationMode = modeSW.getValue();
+    } else if (status != ErrorCodes::NoSuchKey) {
+        // NoSuchKey means the user did not supply a mode.
+        return Status(status.code(),
+                      str::stream() << "Could not parse out " << kOplogApplicationModeFieldName
+                                    << ": "
+                                    << status.reason());
+    }
 
     while (i.more()) {
         BSONElement e = i.next();
@@ -172,17 +197,19 @@ Status _applyOps(OperationContext* opCtx,
             OldClientContext ctx(opCtx, nss.ns());
 
             status = repl::applyOperation_inlock(
-                opCtx, ctx.db(), opObj, alwaysUpsert, repl::OplogApplication::Mode::kApplyOps);
+                opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
             if (!status.isOK())
                 return status;
         } else {
             try {
                 status = writeConflictRetry(
-                    opCtx, "applyOps", nss.ns(), [opCtx, nss, opObj, opType, alwaysUpsert] {
+                    opCtx,
+                    "applyOps",
+                    nss.ns(),
+                    [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode] {
                         if (*opType == 'c') {
                             invariant(opCtx->lockState()->isW());
-                            return repl::applyCommand_inlock(
-                                opCtx, opObj, repl::OplogApplication::Mode::kApplyOps);
+                            return repl::applyCommand_inlock(opCtx, opObj, oplogApplicationMode);
                         }
 
                         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -204,11 +231,7 @@ Status _applyOps(OperationContext* opCtx,
 
                         if (!nss.isSystemDotIndexes()) {
                             return repl::applyOperation_inlock(
-                                opCtx,
-                                ctx.db(),
-                                opObj,
-                                alwaysUpsert,
-                                repl::OplogApplication::Mode::kApplyOps);
+                                opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
                         }
 
                         auto fieldO = opObj["o"];
