@@ -733,7 +733,8 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	WT_RET(ds->f(ds, ", entries %" PRIu32, entries));
 	WT_RET(ds->f(ds,
 	    ", %s", __wt_page_is_modified(page) ? "dirty" : "clean"));
-	WT_RET(ds->f(ds, ", memory_size %" PRIu64, page->memory_footprint));
+	WT_RET(ds->f(ds,
+	    ", memory_size %" WT_SIZET_FMT, page->memory_footprint));
 
 	if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
 		WT_RET(ds->f(ds, ", keys-built"));
