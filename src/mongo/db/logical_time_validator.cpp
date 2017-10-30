@@ -143,7 +143,7 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(OperationContext* opCtx,
 Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogicalTime& newTime) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (newTime.getTime() == _lastSeenValidTime.getTime()) {
+        if (newTime.getTime() <= _lastSeenValidTime.getTime()) {
             return Status::OK();
         }
     }
