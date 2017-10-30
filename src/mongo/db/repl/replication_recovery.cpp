@@ -212,7 +212,8 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 
     while (cursor->more()) {
         auto entry = cursor->nextSafe();
-        fassertStatusOK(40294, SyncTail::syncApply(opCtx, entry, true));
+        fassertStatusOK(40294,
+                        SyncTail::syncApply(opCtx, entry, OplogApplication::Mode::kRecovering));
         _consistencyMarkers->setAppliedThrough(
             opCtx, fassertStatusOK(40295, OpTime::parseFromOplogEntry(entry)));
     }

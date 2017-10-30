@@ -166,29 +166,51 @@ using IncrementOpsAppliedStatsFn = stdx::function<void()>;
 std::pair<BSONObj, NamespaceString> prepForApplyOpsIndexInsert(const BSONElement& fieldO,
                                                                const BSONObj& op,
                                                                const NamespaceString& requestNss);
+
+/**
+ * This class encapsulates an enum of the oplog application mode and functions that serialize
+ * and parse it.
+ */
+class OplogApplication {
+public:
+    static constexpr StringData kInitialSyncOplogApplicationMode = "InitialSync"_sd;
+    static constexpr StringData kMasterSlaveOplogApplicationMode = "MasterSlave"_sd;
+    static constexpr StringData kRecoveringOplogApplicationMode = "Recovering"_sd;
+    static constexpr StringData kSecondaryOplogApplicationMode = "Secondary"_sd;
+    static constexpr StringData kApplyOpsOplogApplicationMode = "ApplyOps"_sd;
+
+    enum class Mode { kInitialSync, kMasterSlave, kRecovering, kSecondary, kApplyOps };
+
+    static StringData modeToString(Mode mode);
+
+    static StatusWith<Mode> parseMode(const std::string& mode);
+};
+
+inline std::ostream& operator<<(std::ostream& s, OplogApplication::Mode mode) {
+    return (s << OplogApplication::modeToString(mode));
+}
+
 /**
  * Take a non-command op and apply it locally
  * Used for applying from an oplog
- * @param inSteadyStateReplication convert some updates to upserts for idempotency reasons
+ * @param alwaysUpsert convert some updates to upserts for idempotency reasons
+ * @param mode specifies what oplog application mode we are in
  * @param incrementOpsAppliedStats is called whenever an op is applied.
  * Returns failure status if the op was an update that could not be applied.
  */
 Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
                              const BSONObj& op,
-                             bool inSteadyStateReplication = false,
+                             bool alwaysUpsert,
+                             OplogApplication::Mode mode,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
 
 /**
  * Take a command op and apply it locally
  * Used for applying from an oplog
- * inSteadyStateReplication indicates whether we are in steady state replication, rather than
- * initial sync.
  * Returns failure status if the op that could not be applied.
  */
-Status applyCommand_inlock(OperationContext* opCtx,
-                           const BSONObj& op,
-                           bool inSteadyStateReplication);
+Status applyCommand_inlock(OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode mode);
 
 /**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.

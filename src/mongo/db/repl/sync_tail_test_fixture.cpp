@@ -86,9 +86,12 @@ void SyncTailTest::setUp() {
     _applyOp = [](OperationContext* opCtx,
                   Database* db,
                   const BSONObj& op,
-                  bool inSteadyStateReplication,
+                  bool alwaysUpsert,
+                  OplogApplication::Mode oplogApplicationMode,
                   stdx::function<void()>) { return Status::OK(); };
-    _applyCmd = [](OperationContext* opCtx, const BSONObj& op, bool) { return Status::OK(); };
+    _applyCmd = [](OperationContext* opCtx,
+                   const BSONObj& op,
+                   OplogApplication::Mode oplogApplicationMode) { return Status::OK(); };
     _incOps = [this]() { _opsApplied++; };
 
     serverGlobalParams.featureCompatibility.setVersion(
@@ -114,7 +117,8 @@ void SyncTailTest::_testSyncApplyInsertDocument(ErrorCodes::Error expectedError,
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool inSteadyStateReplication,
+                                                   bool alwaysUpsert,
+                                                   OplogApplication::Mode oplogApplicationMode,
                                                    stdx::function<void()>) {
         applyOpCalled = true;
         ASSERT_TRUE(opCtx);
@@ -125,17 +129,25 @@ void SyncTailTest::_testSyncApplyInsertDocument(ErrorCodes::Error expectedError,
         ASSERT_TRUE(documentValidationDisabled(opCtx));
         ASSERT_TRUE(db);
         ASSERT_BSONOBJ_EQ(op, theOperation);
-        ASSERT_TRUE(inSteadyStateReplication);
+        ASSERT_TRUE(alwaysUpsert);
+        ASSERT_EQUALS(oplogApplicationMode, OplogApplication::Mode::kSecondary);
         return Status::OK();
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(), op, true, applyOp, failedApplyCommand, _incOps),
+    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(),
+                                  op,
+                                  OplogApplication::Mode::kSecondary,
+                                  applyOp,
+                                  failedApplyCommand,
+                                  _incOps),
               expectedError);
     ASSERT_EQ(applyOpCalled, expectedError == ErrorCodes::OK);
 }
 
-Status failedApplyCommand(OperationContext* opCtx, const BSONObj& theOperation, bool) {
+Status failedApplyCommand(OperationContext* opCtx,
+                          const BSONObj& theOperation,
+                          OplogApplication::Mode) {
     FAIL("applyCommand unexpectedly invoked.");
     return Status::OK();
 }
@@ -143,8 +155,9 @@ Status failedApplyCommand(OperationContext* opCtx, const BSONObj& theOperation, 
 Status SyncTailTest::runOpSteadyState(const OplogEntry& op) {
     SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
     MultiApplier::OperationPtrs opsPtrs{&op};
-    auto syncApply = [](OperationContext* opCtx, const BSONObj& op, bool inSteadyStateReplication) {
-        return SyncTail::syncApply(opCtx, op, inSteadyStateReplication);
+    auto syncApply = [](
+        OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
+        return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
     };
     return multiSyncApply_noAbort(_opCtx.get(), &opsPtrs, syncApply);
 }

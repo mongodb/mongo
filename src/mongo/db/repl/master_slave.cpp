@@ -646,7 +646,7 @@ bool ReplSource::handleDuplicateDbName(OperationContext* opCtx,
 
 void ReplSource::applyCommand(OperationContext* opCtx, const BSONObj& op) {
     try {
-        Status status = applyCommand_inlock(opCtx, op, true);
+        Status status = applyCommand_inlock(opCtx, op, OplogApplication::Mode::kMasterSlave);
         uassert(28639, "Failure applying initial sync command", status.isOK());
     } catch (AssertionException& e) {
         log() << "sync: caught user assertion " << redact(e) << " while applying op: " << redact(op)
@@ -661,7 +661,8 @@ void ReplSource::applyCommand(OperationContext* opCtx, const BSONObj& op) {
 
 void ReplSource::applyOperation(OperationContext* opCtx, Database* db, const BSONObj& op) {
     try {
-        Status status = applyOperation_inlock(opCtx, db, op);
+        Status status =
+            applyOperation_inlock(opCtx, db, op, false, OplogApplication::Mode::kMasterSlave);
         if (!status.isOK()) {
             uassert(15914,
                     "Failure applying initial sync operation",

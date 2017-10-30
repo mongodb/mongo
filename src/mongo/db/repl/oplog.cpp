@@ -898,6 +898,46 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
 
 }  // namespace
 
+constexpr StringData OplogApplication::kInitialSyncOplogApplicationMode;
+constexpr StringData OplogApplication::kMasterSlaveOplogApplicationMode;
+constexpr StringData OplogApplication::kRecoveringOplogApplicationMode;
+constexpr StringData OplogApplication::kSecondaryOplogApplicationMode;
+constexpr StringData OplogApplication::kApplyOpsOplogApplicationMode;
+
+StringData OplogApplication::modeToString(OplogApplication::Mode mode) {
+    switch (mode) {
+        case OplogApplication::Mode::kInitialSync:
+            return OplogApplication::kInitialSyncOplogApplicationMode;
+        case OplogApplication::Mode::kMasterSlave:
+            return OplogApplication::kMasterSlaveOplogApplicationMode;
+        case OplogApplication::Mode::kRecovering:
+            return OplogApplication::kRecoveringOplogApplicationMode;
+        case OplogApplication::Mode::kSecondary:
+            return OplogApplication::kSecondaryOplogApplicationMode;
+        case OplogApplication::Mode::kApplyOps:
+            return OplogApplication::kApplyOpsOplogApplicationMode;
+    }
+    MONGO_UNREACHABLE;
+}
+
+StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string& mode) {
+    if (mode == OplogApplication::kInitialSyncOplogApplicationMode) {
+        return OplogApplication::Mode::kInitialSync;
+    } else if (mode == OplogApplication::kMasterSlaveOplogApplicationMode) {
+        return OplogApplication::Mode::kMasterSlave;
+    } else if (mode == OplogApplication::kRecoveringOplogApplicationMode) {
+        return OplogApplication::Mode::kRecovering;
+    } else if (mode == OplogApplication::kSecondaryOplogApplicationMode) {
+        return OplogApplication::Mode::kSecondary;
+    } else if (mode == OplogApplication::kApplyOpsOplogApplicationMode) {
+        return OplogApplication::Mode::kApplyOps;
+    } else {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Invalid oplog application mode provided: " << mode);
+    }
+    MONGO_UNREACHABLE;
+}
+
 std::pair<BSONObj, NamespaceString> prepForApplyOpsIndexInsert(const BSONElement& fieldO,
                                                                const BSONObj& op,
                                                                const NamespaceString& requestNss) {
@@ -942,7 +982,8 @@ std::pair<BSONObj, NamespaceString> prepForApplyOpsIndexInsert(const BSONElement
 Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
                              const BSONObj& op,
-                             bool inSteadyStateReplication,
+                             bool alwaysUpsert,
+                             OplogApplication::Mode mode,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
     LOG(3) << "applying op: " << redact(op);
 
@@ -1003,7 +1044,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
     // During upgrade from 3.4 to 3.6, the feature compatibility version cannot change during
     // initial sync because we cannot do some operations with UUIDs and others without.
-    if (!inSteadyStateReplication && requestNss == FeatureCompatibilityVersion::kCollection) {
+    if ((mode == OplogApplication::Mode::kInitialSync) &&
+        requestNss == FeatureCompatibilityVersion::kCollection) {
         std::string oID;
         auto status = bsonExtractStringField(o, "_id", &oID);
         if (status.isOK() && oID == FeatureCompatibilityVersion::kParameterName) {
@@ -1238,7 +1280,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         opCounters->gotUpdate();
 
         BSONObj updateCriteria = o2;
-        const bool upsert = valueB || inSteadyStateReplication;
+        const bool upsert = valueB || alwaysUpsert;
 
         uassert(ErrorCodes::NoSuchKey,
                 str::stream() << "Failed to apply update due to missing _id: " << op.toString(),
@@ -1361,7 +1403,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
 Status applyCommand_inlock(OperationContext* opCtx,
                            const BSONObj& op,
-                           bool inSteadyStateReplication) {
+                           OplogApplication::Mode mode) {
     std::array<StringData, 4> names = {"o", "ui", "ns", "op"};
     std::array<BSONElement, 4> fields;
     op.getFields(names, &fields);
@@ -1400,7 +1442,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
     // Applying renameCollection during initial sync to a collection without UUID might lead to
     // data corruption, so we restart the initial sync.
-    if (fieldUI.eoo() && !inSteadyStateReplication &&
+    if (fieldUI.eoo() && (mode == OplogApplication::Mode::kInitialSync) &&
         o.firstElementFieldName() == std::string("renameCollection")) {
         if (!allowUnsafeRenamesDuringInitialSync.load()) {
             return Status(ErrorCodes::OplogOperationUnsupported,
@@ -1420,7 +1462,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // collection dropped. 'applyOps' will try to apply each individual operation, and those
     // will be caught then if they are a problem.
     auto whitelistedOps = std::vector<std::string>{"dropDatabase", "applyOps", "dbCheck"};
-    if (!inSteadyStateReplication &&
+    if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
          whitelistedOps.end()) &&
         parseNs(nss.ns(), o) == FeatureCompatibilityVersion::kCollection) {

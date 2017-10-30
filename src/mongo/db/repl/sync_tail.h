@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
@@ -65,26 +66,27 @@ public:
      * Used for applying from an oplog.
      * 'db' is the database where the op will be applied.
      * 'opObj' is a BSONObj describing the op to be applied.
-     * 'inSteadyStateReplication' indicates to convert some updates to upserts for idempotency
-     * reasons.
+     * 'alwaysUpsert' indicates to convert updates to upserts for idempotency reasons.
+     * 'mode' indicates the oplog application mode.
      * 'opCounter' is used to update server status metrics.
      * Returns failure status if the op was an update that could not be applied.
      */
-    using ApplyOperationInLockFn = stdx::function<Status(OperationContext* opCtx,
-                                                         Database* db,
-                                                         const BSONObj& opObj,
-                                                         bool inSteadyStateReplication,
-                                                         IncrementOpsAppliedStatsFn opCounter)>;
+    using ApplyOperationInLockFn =
+        stdx::function<Status(OperationContext* opCtx,
+                              Database* db,
+                              const BSONObj& opObj,
+                              bool alwaysUpsert,
+                              OplogApplication::Mode oplogApplicationMode,
+                              IncrementOpsAppliedStatsFn opCounter)>;
 
     /**
      * Type of function that takes a command op and applies it locally.
      * Used for applying from an oplog.
-     * inSteadyStateReplication indicates whether we are in steady state replication, rather than
-     * initial sync.
+     * 'mode' indicates the oplog application mode.
      * Returns failure status if the op that could not be applied.
      */
-    using ApplyCommandInLockFn =
-        stdx::function<Status(OperationContext*, const BSONObj&, bool inSteadyStateReplication)>;
+    using ApplyCommandInLockFn = stdx::function<Status(
+        OperationContext*, const BSONObj&, OplogApplication::Mode oplogApplicationMode)>;
 
     SyncTail(BackgroundSync* q, MultiSyncApplyFunc func);
     SyncTail(BackgroundSync* q, MultiSyncApplyFunc func, std::unique_ptr<OldThreadPool> writerPool);
@@ -102,14 +104,14 @@ public:
      */
     static Status syncApply(OperationContext* opCtx,
                             const BSONObj& o,
-                            bool inSteadyStateReplication,
+                            OplogApplication::Mode oplogApplicationMode,
                             ApplyOperationInLockFn applyOperationInLock,
                             ApplyCommandInLockFn applyCommandInLock,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
 
     static Status syncApply(OperationContext* opCtx,
                             const BSONObj& o,
-                            bool inSteadyStateReplication);
+                            OplogApplication::Mode oplogApplicationMode);
 
     void oplogApplication(ReplicationCoordinator* replCoord);
     bool peek(OperationContext* opCtx, BSONObj* obj);
@@ -277,7 +279,7 @@ Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
  * SyncTail::syncApply.
  */
 using SyncApplyFn = stdx::function<Status(
-    OperationContext* opCtx, const BSONObj& o, bool inSteadyStateReplication)>;
+    OperationContext* opCtx, const BSONObj& o, OplogApplication::Mode oplogApplicationMode)>;
 Status multiSyncApply_noAbort(OperationContext* opCtx,
                               MultiApplier::OperationPtrs* ops,
                               SyncApplyFn syncApply);

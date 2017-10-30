@@ -171,7 +171,8 @@ Status _applyOps(OperationContext* opCtx,
 
             OldClientContext ctx(opCtx, nss.ns());
 
-            status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
+            status = repl::applyOperation_inlock(
+                opCtx, ctx.db(), opObj, alwaysUpsert, repl::OplogApplication::Mode::kApplyOps);
             if (!status.isOK())
                 return status;
         } else {
@@ -180,7 +181,8 @@ Status _applyOps(OperationContext* opCtx,
                     opCtx, "applyOps", nss.ns(), [opCtx, nss, opObj, opType, alwaysUpsert] {
                         if (*opType == 'c') {
                             invariant(opCtx->lockState()->isW());
-                            return repl::applyCommand_inlock(opCtx, opObj, true);
+                            return repl::applyCommand_inlock(
+                                opCtx, opObj, repl::OplogApplication::Mode::kApplyOps);
                         }
 
                         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -202,7 +204,11 @@ Status _applyOps(OperationContext* opCtx,
 
                         if (!nss.isSystemDotIndexes()) {
                             return repl::applyOperation_inlock(
-                                opCtx, ctx.db(), opObj, alwaysUpsert);
+                                opCtx,
+                                ctx.db(),
+                                opObj,
+                                alwaysUpsert,
+                                repl::OplogApplication::Mode::kApplyOps);
                         }
 
                         auto fieldO = opObj["o"];

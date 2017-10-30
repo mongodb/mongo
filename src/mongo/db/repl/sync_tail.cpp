@@ -59,7 +59,6 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -305,7 +304,7 @@ bool SyncTail::peek(OperationContext* opCtx, BSONObj* op) {
 // static
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const BSONObj& op,
-                           bool inSteadyStateReplication,
+                           OplogApplication::Mode oplogApplicationMode,
                            ApplyOperationInLockFn applyOperationInLock,
                            ApplyCommandInLockFn applyCommandInLock,
                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
@@ -322,8 +321,17 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         UnreplicatedWritesBlock uwb(opCtx);
         DisableDocumentValidation validationDisabler(opCtx);
 
-        Status status =
-            applyOperationInLock(opCtx, db, op, inSteadyStateReplication, incrementOpsAppliedStats);
+        // We convert updates to upserts when not in initial sync because after rollback and during
+        // startup we may replay an update after a delete and crash since we do not ignore
+        // errors. In initial sync we simply ignore these update errors so there is no reason to
+        // upsert.
+        //
+        // TODO (SERVER-21700): Never upsert during oplog application unless an external applyOps
+        // wants to. We should ignore these errors intelligently while in RECOVERING and STARTUP
+        // mode (similar to initial sync) instead so we do not accidentally ignore real errors.
+        bool shouldAlwaysUpsert = (oplogApplicationMode != OplogApplication::Mode::kInitialSync);
+        Status status = applyOperationInLock(
+            opCtx, db, op, shouldAlwaysUpsert, oplogApplicationMode, incrementOpsAppliedStats);
         if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
             throw WriteConflictException();
         }
@@ -384,7 +392,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             Lock::GlobalWrite globalWriteLock(opCtx);
 
             // special case apply for commands to avoid implicit database creation
-            Status status = applyCommandInLock(opCtx, op, inSteadyStateReplication);
+            Status status = applyCommandInLock(opCtx, op, oplogApplicationMode);
             incrementOpsAppliedStats();
             return status;
         });
@@ -399,10 +407,10 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const BSONObj& op,
-                           bool inSteadyStateReplication) {
+                           OplogApplication::Mode oplogApplicationMode) {
     return SyncTail::syncApply(opCtx,
                                op,
-                               inSteadyStateReplication,
+                               oplogApplicationMode,
                                applyOperation_inlock,
                                applyCommand_inlock,
                                stdx::bind(&Counter64::increment, &opsAppliedStats, 1ULL));
@@ -1165,8 +1173,9 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx, const BSON
 void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail*) {
     initializeWriterThread();
     auto opCtx = cc().makeOperationContext();
-    auto syncApply = [](OperationContext* opCtx, const BSONObj& op, bool inSteadyStateReplication) {
-        return SyncTail::syncApply(opCtx, op, inSteadyStateReplication);
+    auto syncApply = [](
+        OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
+        return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
     };
 
     fassertNoTrace(16359, multiSyncApply_noAbort(opCtx.get(), ops, syncApply));
@@ -1192,7 +1201,9 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
     }
 
     // This function is only called in steady state replication.
-    const bool inSteadyStateReplication = true;
+    // TODO: This function can be called when we're in recovering as well as secondary. Set this
+    // mode correctly.
+    const OplogApplication::Mode oplogApplicationMode = OplogApplication::Mode::kSecondary;
 
     // doNotGroupBeforePoint is used to prevent retrying bad group inserts by marking the final op
     // of a failed group and not allowing further group inserts until that op has been processed.
@@ -1310,7 +1321,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
                 try {
                     // Apply the group of inserts.
                     uassertStatusOK(
-                        syncApply(opCtx, groupedInsertBuilder.done(), inSteadyStateReplication));
+                        syncApply(opCtx, groupedInsertBuilder.done(), oplogApplicationMode));
                     // It succeeded, advance the oplogEntriesIterator to the end of the
                     // group of inserts.
                     oplogEntriesIterator = endOfGroupableOpsIterator - 1;
@@ -1330,7 +1341,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
 
         // If we didn't create a group, try to apply the op individually.
         try {
-            const Status status = syncApply(opCtx, entry->raw, inSteadyStateReplication);
+            const Status status = syncApply(opCtx, entry->raw, oplogApplicationMode);
 
             if (!status.isOK()) {
                 severe() << "Error applying operation (" << redact(entry->raw)
@@ -1373,13 +1384,11 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
     // allow us to get through the magic barrier
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-    // This function is only called in initial sync, as its name suggests.
-    const bool inSteadyStateReplication = false;
-
     for (auto it = ops->begin(); it != ops->end(); ++it) {
         auto& entry = **it;
         try {
-            const Status s = SyncTail::syncApply(opCtx, entry.raw, inSteadyStateReplication);
+            const Status s =
+                SyncTail::syncApply(opCtx, entry.raw, OplogApplication::Mode::kInitialSync);
             if (!s.isOK()) {
                 // In initial sync, update operations can cause documents to be missed during
                 // collection cloning. As a result, it is possible that a document that we need to

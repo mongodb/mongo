@@ -73,7 +73,9 @@ protected:
     Status runOpsInitialSync(std::vector<OplogEntry> ops);
 };
 
-Status failedApplyCommand(OperationContext* opCtx, const BSONObj& theOperation, bool);
+Status failedApplyCommand(OperationContext* opCtx,
+                          const BSONObj& theOperation,
+                          OplogApplication::Mode);
 
 }  // namespace repl
 }  // namespace mongo
