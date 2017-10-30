@@ -60,8 +60,10 @@ HostAndPort testHost{"localhost", 20000};
 void initWireSpecMongoD() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
-    spec.incoming.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incoming.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
+    spec.incomingInternalClient.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.incomingExternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
+    spec.incomingExternalClient.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
     // connect to any version
     spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
     spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
@@ -73,9 +75,10 @@ RemoteCommandResponse simulateIsMaster(RemoteCommandRequest request) {
     ASSERT_EQ(request.dbname, "admin");
 
     RemoteCommandResponse response;
-    response.data = BSON("minWireVersion" << mongo::WireSpec::instance().incoming.minWireVersion
-                                          << "maxWireVersion"
-                                          << mongo::WireSpec::instance().incoming.maxWireVersion);
+    response.data =
+        BSON("minWireVersion" << mongo::WireSpec::instance().incomingExternalClient.minWireVersion
+                              << "maxWireVersion"
+                              << mongo::WireSpec::instance().incomingExternalClient.maxWireVersion);
     return response;
 }
 
@@ -673,11 +676,12 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
         rpc::Protocol::kOpQuery, [](RemoteCommandRequest request) -> RemoteCommandResponse {
             RemoteCommandResponse response;
             response.data =
-                BSON("minWireVersion" << mongo::WireSpec::instance().incoming.minWireVersion
-                                      << "maxWireVersion"
-                                      << mongo::WireSpec::instance().incoming.maxWireVersion
-                                      << "TESTKEY"
-                                      << "TESTVALUE");
+                BSON("minWireVersion"
+                     << mongo::WireSpec::instance().incomingExternalClient.minWireVersion
+                     << "maxWireVersion"
+                     << mongo::WireSpec::instance().incomingExternalClient.maxWireVersion
+                     << "TESTKEY"
+                     << "TESTVALUE");
             return response;
         });
 

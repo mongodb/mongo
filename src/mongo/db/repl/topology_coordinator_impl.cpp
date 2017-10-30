@@ -902,6 +902,10 @@ std::pair<ReplSetHeartbeatArgs, Milliseconds> TopologyCoordinatorImpl::prepareHe
         hbArgs.setSetName(ourSetName);
         hbArgs.setConfigVersion(-2);
     }
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+        hbArgs.setHeartbeatVersion(1);
+    }
 
     const Milliseconds timeoutPeriod(
         _rsConfig.isInitialized() ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
@@ -937,6 +941,10 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinatorImpl::prepare
         // Config version -2 is for uninitialized config.
         hbArgs.setConfigVersion(-2);
         hbArgs.setTerm(OpTime::kInitialTerm);
+    }
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+        hbArgs.setHeartbeatVersion(1);
     }
 
     const Milliseconds timeoutPeriod(

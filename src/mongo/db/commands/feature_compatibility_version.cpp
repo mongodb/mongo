@@ -40,6 +40,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/service_entry_point.h"
@@ -340,8 +341,11 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
     // version that is below the minimum.
     opCtx->recoveryUnit()->onCommit([opCtx, newVersion]() {
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
+        updateMinWireVersion();
 
-        // Close all connections from internal clients with binary versions lower than 3.6.
+        // Close all incoming connections from internal clients with binary versions lower than
+        // ours. It would be desirable to close all outgoing connections to servers with lower
+        // binary version, but it is not currently possible.
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
             opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
                 transport::Session::kLatestVersionInternalClientKeepOpen |
@@ -367,6 +371,7 @@ void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONOb
     opCtx->recoveryUnit()->onCommit([]() {
         serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
+        updateMinWireVersion();
     });
 }
 
@@ -384,7 +389,33 @@ void FeatureCompatibilityVersion::onDropCollection(OperationContext* opCtx) {
     opCtx->recoveryUnit()->onCommit([]() {
         serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
+        updateMinWireVersion();
     });
+}
+
+void FeatureCompatibilityVersion::updateMinWireVersion() {
+    WireSpec& spec = WireSpec::instance();
+
+    switch (serverGlobalParams.featureCompatibility.getVersion()) {
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36:
+        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
+        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
+            spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
+            spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
+            return;
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
+            // It would be preferable to set 'incomingInternalClient.minWireVersion' and
+            // 'outgoing.minWireVersion' to LATEST_WIRE_VERSION - 1, but this is not possible due to
+            // a bug in 3.4, where if the receiving node says it supports wire version range
+            // [COMMANDS_ACCEPT_WRITE_CONCERN, SUPPORTS_OP_MSG], the initiating node will think it
+            // only supports OP_QUERY.
+            spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
+            spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
+            return;
+        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
+            // getVersion() does not return this value.
+            MONGO_UNREACHABLE;
+    }
 }
 
 void FeatureCompatibilityVersion::_validateVersion(StringData version) {
@@ -471,7 +502,8 @@ public:
                     FeatureCompatibilityVersion::kTargetVersionField,
                     FeatureCompatibilityVersionCommandParser::kVersion34);
                 return;
-            default:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
+                // getVersion() does not return this value.
                 MONGO_UNREACHABLE;
         }
     }

@@ -40,6 +40,7 @@
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/db/server_options.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -89,6 +90,10 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
         hbArgs.setSetName(_rsConfig->getReplSetName());
         hbArgs.setProtocolVersion(1);
         hbArgs.setConfigVersion(_rsConfig->getConfigVersion());
+        if (serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+            hbArgs.setHeartbeatVersion(1);
+        }
         hbArgs.setCheckEmpty(isInitialConfig);
         hbArgs.setSenderHost(myConfig.getHostAndPort());
         hbArgs.setSenderId(myConfig.getId());
@@ -98,6 +103,10 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
         ReplSetHeartbeatArgsV1 hbArgs;
         hbArgs.setSetName(_rsConfig->getReplSetName());
         hbArgs.setConfigVersion(_rsConfig->getConfigVersion());
+        if (serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+            hbArgs.setHeartbeatVersion(1);
+        }
         if (isInitialConfig) {
             hbArgs.setCheckEmpty();
         }

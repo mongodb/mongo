@@ -116,8 +116,8 @@ public:
 
         // Mongos tries to keep exactly the same version range of the server for which
         // it is compiled.
-        result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
-        result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
+        result.append("maxWireVersion", WireSpec::instance().incomingExternalClient.maxWireVersion);
+        result.append("minWireVersion", WireSpec::instance().incomingExternalClient.minWireVersion);
 
         const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
                                                   "automationServiceDescriptor",

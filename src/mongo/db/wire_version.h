@@ -107,16 +107,34 @@ struct WireSpec {
     static void appendInternalClientWireVersion(WireVersionInfo wireVersionInfo,
                                                 BSONObjBuilder* builder);
 
-    // incoming.minWireVersion - Minimum version that the server accepts on incoming requests. We
-    // should bump this whenever we don't want to allow incoming connections from clients that are
-    // too old.
+    // incomingExternalClient.minWireVersion - Minimum version that the server accepts on incoming
+    // requests from external clients. We should bump this whenever we don't want to allow incoming
+    // connections from clients that are too old.
 
-    // incoming.maxWireVersion - Latest version that the server accepts on incoming requests. This
-    // should always be at the latest entry in WireVersion.
-    WireVersionInfo incoming = {RELEASE_2_4_AND_BEFORE, LATEST_WIRE_VERSION};
+    // incomingExternalClient.maxWireVersion - Latest version that the server accepts on incoming
+    // requests from external clients. This should always be at the latest entry in WireVersion.
+    WireVersionInfo incomingExternalClient = {RELEASE_2_4_AND_BEFORE, LATEST_WIRE_VERSION};
+
+    // incomingInternalClient.minWireVersion - Minimum version that the server accepts on incoming
+    // requests from internal clients. This should be incomingInternalClient.maxWireVersion - 1,
+    // when the featureCompatibilityVersion is equal to the downgrade version, and
+    // incomingInternalClient.maxWireVersion otherwise. However, in 3.6, this needs to be
+    // RELEASE_2_4_AND_BEFORE when the featureCompatibilityVersion is equal to the downgrade version
+    // due to a bug in 3.4, where if the receiving node says it supports wire version range
+    // [COMMANDS_ACCEPT_WRITE_CONCERN, SUPPORTS_OP_MSG] and it is a mongod, the initiating node will
+    // think it only supports OP_QUERY.
+
+    // incomingInternalClient.maxWireVersion - Latest version that the server accepts on incoming
+    // requests. This should always be at the latest entry in WireVersion.
+    WireVersionInfo incomingInternalClient = {RELEASE_2_4_AND_BEFORE, LATEST_WIRE_VERSION};
 
     // outgoing.minWireVersion - Minimum version allowed on remote nodes when the server sends
-    // requests. We should bump this whenever we don't want to connect to clients that are too old.
+    // requests. This should be outgoing.maxWireVersion - 1, when the featureCompatibilityVersion is
+    // equal to the downgrade version, and outgoing.maxWireVersion otherwise. However, in 3.6, this
+    // needs to be RELEASE_2_4_AND_BEFORE when the featureCompatibilityVersion is equal to the
+    // downgrade version due to a bug in 3.4, where if the receiving node says it supports wire
+    // version range [COMMANDS_ACCEPT_WRITE_CONCERN, SUPPORTS_OP_MSG] and it is a mongod, the
+    // initiating node will think it only supports OP_QUERY.
 
     // outgoing.maxWireVersion - Latest version allowed on remote nodes when the server sends
     // requests.

@@ -42,6 +42,7 @@ namespace {
 const std::string kCheckEmptyFieldName = "checkEmpty";
 const std::string kProtocolVersionFieldName = "pv";
 const std::string kConfigVersionFieldName = "v";
+const std::string kHeartbeatVersionFieldName = "hbv";
 const std::string kSenderIdFieldName = "fromId";
 const std::string kSetNameFieldName = "replSetHeartbeat";
 const std::string kSenderHostFieldName = "from";
@@ -49,6 +50,7 @@ const std::string kSenderHostFieldName = "from";
 const std::string kLegalHeartbeatFieldNames[] = {kCheckEmptyFieldName,
                                                  kProtocolVersionFieldName,
                                                  kConfigVersionFieldName,
+                                                 kHeartbeatVersionFieldName,
                                                  kSenderIdFieldName,
                                                  kSetNameFieldName,
                                                  kSenderHostFieldName};
@@ -59,12 +61,14 @@ ReplSetHeartbeatArgs::ReplSetHeartbeatArgs()
     : _hasCheckEmpty(false),
       _hasProtocolVersion(false),
       _hasConfigVersion(false),
+      _hasHeartbeatVersion(false),
       _hasSenderId(false),
       _hasSetName(false),
       _hasSenderHost(false),
       _checkEmpty(false),
       _protocolVersion(-1),
       _configVersion(-1),
+      _heartbeatVersion(-1),
       _senderId(-1),
       _setName(""),
       _senderHost(HostAndPort()) {}
@@ -89,6 +93,22 @@ Status ReplSetHeartbeatArgs::initialize(const BSONObj& argsObj) {
     if (!status.isOK())
         return status;
     _hasConfigVersion = true;
+
+    long long tempHeartbeatVersion;
+    status = bsonExtractIntegerField(argsObj, kHeartbeatVersionFieldName, &tempHeartbeatVersion);
+    if (status.isOK()) {
+        if (tempHeartbeatVersion != 1) {
+            return Status(ErrorCodes::Error(40665),
+                          str::stream() << "Found invalid value for field "
+                                        << kHeartbeatVersionFieldName
+                                        << ": "
+                                        << tempHeartbeatVersion);
+        }
+        _heartbeatVersion = tempHeartbeatVersion;
+        _hasHeartbeatVersion = true;
+    } else if (status.code() != ErrorCodes::NoSuchKey) {
+        return status;
+    }
 
     status = bsonExtractIntegerFieldWithDefault(argsObj, kSenderIdFieldName, -1, &_senderId);
     if (!status.isOK())
@@ -126,6 +146,10 @@ BSONObj ReplSetHeartbeatArgs::toBSON() const {
     builder.append("replSetHeartbeat", _setName);
     builder.appendIntOrLL("pv", _protocolVersion);
     builder.appendIntOrLL("v", _configVersion);
+    if (_hasHeartbeatVersion) {
+        builder.append("hbv", _heartbeatVersion);
+    }
+
     builder.append("from", _hasSenderHost ? _senderHost.toString() : "");
 
     if (_hasSenderId) {
@@ -150,6 +174,11 @@ void ReplSetHeartbeatArgs::setProtocolVersion(long long newVal) {
 void ReplSetHeartbeatArgs::setConfigVersion(long long newVal) {
     _configVersion = newVal;
     _hasConfigVersion = true;
+}
+
+void ReplSetHeartbeatArgs::setHeartbeatVersion(long long newVal) {
+    _heartbeatVersion = newVal;
+    _hasHeartbeatVersion = true;
 }
 
 void ReplSetHeartbeatArgs::setSenderId(long long newVal) {

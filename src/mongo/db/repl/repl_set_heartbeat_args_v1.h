@@ -63,6 +63,14 @@ public:
     }
 
     /**
+     * Gets the heartbeat version number of the sender. This field was added to ensure that
+     * heartbeats sent from featureCompatibilityVersion 3.6 nodes to binary version 3.4 nodes fail.
+     */
+    long long getHeartbeatVersion() const {
+        return _heartbeatVersion;
+    }
+
+    /**
      * Gets the _id of the sender in their ReplSetConfig.
      */
     long long getSenderId() const {
@@ -105,9 +113,17 @@ public:
     }
 
     /**
+     * Returns whether or not the heartbeat version of the sender is set.
+     */
+    bool hasHeartbeatVersion() const {
+        return _hasHeartbeatVersion;
+    }
+
+    /**
      * The below methods set the value in the method name to 'newVal'.
      */
     void setConfigVersion(long long newVal);
+    void setHeartbeatVersion(long long newVal);
     void setSenderId(long long newVal);
     void setSenderHost(const HostAndPort& newVal);
     void setSetName(const std::string& newVal);
@@ -126,10 +142,12 @@ public:
 private:
     // look at the body of the isInitialized() function to see which fields are mandatory
     long long _configVersion = -1;
+    long long _heartbeatVersion = -1;
     long long _senderId = -1;
     long long _term = -1;
     bool _checkEmpty = false;
     bool _hasSender = false;
+    bool _hasHeartbeatVersion = false;
     std::string _setName;
     HostAndPort _senderHost;
 };

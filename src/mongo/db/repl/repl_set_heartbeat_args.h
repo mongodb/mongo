@@ -78,6 +78,14 @@ public:
     }
 
     /**
+     * Gets the heartbeat version number of the sender. This field was added to ensure that
+     * heartbeats sent from featureCompatibilityVersion 3.6 nodes to binary version 3.4 nodes fail.
+     */
+    long long getHeartbeatVersion() const {
+        return _heartbeatVersion;
+    }
+
+    /**
      * Gets the _id of the sender in their ReplSetConfig.
      */
     long long getSenderId() const {
@@ -110,6 +118,9 @@ public:
     bool hasConfigVersion() const {
         return _hasConfigVersion;
     }
+    bool hasHeartbeatVersion() const {
+        return _hasHeartbeatVersion;
+    }
     bool hasSenderId() const {
         return _hasSenderId;
     }
@@ -126,6 +137,7 @@ public:
     void setCheckEmpty(bool newVal);
     void setProtocolVersion(long long newVal);
     void setConfigVersion(long long newVal);
+    void setHeartbeatVersion(long long newVal);
     void setSenderId(long long newVal);
     void setSetName(std::string newVal);
     void setSenderHost(HostAndPort newVal);
@@ -141,6 +153,7 @@ private:
     bool _hasCheckEmpty;
     bool _hasProtocolVersion;
     bool _hasConfigVersion;
+    bool _hasHeartbeatVersion;
     bool _hasSenderId;
     bool _hasSetName;
     bool _hasSenderHost;
@@ -149,6 +162,7 @@ private:
     bool _checkEmpty;
     long long _protocolVersion;
     long long _configVersion;
+    long long _heartbeatVersion;
     long long _senderId;
     std::string _setName;
     HostAndPort _senderHost;

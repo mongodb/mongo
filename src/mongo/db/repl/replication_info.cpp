@@ -309,7 +309,8 @@ public:
 
                     // All incoming connections from mongod/mongos of earlier versions should be
                     // closed if the featureCompatibilityVersion is bumped to 3.6.
-                    if (elem.numberInt() >= WireSpec::instance().incoming.maxWireVersion) {
+                    if (elem.numberInt() >=
+                        WireSpec::instance().incomingInternalClient.maxWireVersion) {
                         sessionTagsToSet |=
                             transport::Session::kLatestVersionInternalClientKeepOpen;
                     } else {
@@ -361,18 +362,18 @@ public:
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
-        result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
         result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
 
-        // If the featureCompatibilityVersion is 3.6 (or upgrading or downgrading), respond with
-        // minWireVersion=maxWireVersion. Then if the connection is from a mongod/mongos of an
-        // earlier version, it will fail to connect.
-        if (internalClientElement &&
-            serverGlobalParams.featureCompatibility.getVersion() !=
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
-            result.append("minWireVersion", WireSpec::instance().incoming.maxWireVersion);
+        if (internalClientElement) {
+            result.append("minWireVersion",
+                          WireSpec::instance().incomingInternalClient.minWireVersion);
+            result.append("maxWireVersion",
+                          WireSpec::instance().incomingInternalClient.maxWireVersion);
         } else {
-            result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
+            result.append("minWireVersion",
+                          WireSpec::instance().incomingExternalClient.minWireVersion);
+            result.append("maxWireVersion",
+                          WireSpec::instance().incomingExternalClient.maxWireVersion);
         }
 
         result.append("readOnly", storageGlobalParams.readOnly);

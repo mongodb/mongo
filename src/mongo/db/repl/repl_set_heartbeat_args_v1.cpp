@@ -42,6 +42,7 @@ namespace {
 
 const std::string kCheckEmptyFieldName = "checkEmpty";
 const std::string kConfigVersionFieldName = "configVersion";
+const std::string kHeartbeatVersionFieldName = "hbv";
 const std::string kSenderHostFieldName = "from";
 const std::string kSenderIdFieldName = "fromId";
 const std::string kSetNameFieldName = "replSetHeartbeat";
@@ -49,6 +50,7 @@ const std::string kTermFieldName = "term";
 
 const std::string kLegalHeartbeatFieldNames[] = {kCheckEmptyFieldName,
                                                  kConfigVersionFieldName,
+                                                 kHeartbeatVersionFieldName,
                                                  kSenderHostFieldName,
                                                  kSenderIdFieldName,
                                                  kSetNameFieldName,
@@ -69,6 +71,22 @@ Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
     status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_configVersion);
     if (!status.isOK())
         return status;
+
+    long long tempHeartbeatVersion;
+    status = bsonExtractIntegerField(argsObj, kHeartbeatVersionFieldName, &tempHeartbeatVersion);
+    if (status.isOK()) {
+        if (tempHeartbeatVersion != 1) {
+            return Status(ErrorCodes::Error(40666),
+                          str::stream() << "Found invalid value for field "
+                                        << kHeartbeatVersionFieldName
+                                        << ": "
+                                        << tempHeartbeatVersion);
+        }
+        _heartbeatVersion = tempHeartbeatVersion;
+        _hasHeartbeatVersion = true;
+    } else if (status.code() != ErrorCodes::NoSuchKey) {
+        return status;
+    }
 
     status = bsonExtractIntegerFieldWithDefault(argsObj, kSenderIdFieldName, -1, &_senderId);
     if (!status.isOK())
@@ -102,6 +120,11 @@ bool ReplSetHeartbeatArgsV1::isInitialized() const {
 
 void ReplSetHeartbeatArgsV1::setConfigVersion(long long newVal) {
     _configVersion = newVal;
+}
+
+void ReplSetHeartbeatArgsV1::setHeartbeatVersion(long long newVal) {
+    _heartbeatVersion = newVal;
+    _hasHeartbeatVersion = true;
 }
 
 void ReplSetHeartbeatArgsV1::setSenderHost(const HostAndPort& newVal) {
@@ -138,6 +161,9 @@ void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
         builder->append(kCheckEmptyFieldName, _checkEmpty);
     }
     builder->appendIntOrLL(kConfigVersionFieldName, _configVersion);
+    if (_hasHeartbeatVersion) {
+        builder->appendIntOrLL(kHeartbeatVersionFieldName, _hasHeartbeatVersion);
+    }
     builder->append(kSenderHostFieldName, _hasSender ? _senderHost.toString() : "");
     builder->appendIntOrLL(kSenderIdFieldName, _senderId);
     builder->appendIntOrLL(kTermFieldName, _term);
