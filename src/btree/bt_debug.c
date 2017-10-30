@@ -733,6 +733,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	WT_RET(ds->f(ds, ", entries %" PRIu32, entries));
 	WT_RET(ds->f(ds,
 	    ", %s", __wt_page_is_modified(page) ? "dirty" : "clean"));
+	WT_RET(ds->f(ds, ", memory_size %" PRIu64, page->memory_footprint));
 
 	if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
 		WT_RET(ds->f(ds, ", keys-built"));
@@ -1032,8 +1033,7 @@ __debug_modified(WT_DBG *ds, WT_UPDATE *upd)
 
 	p = (size_t *)upd->data;
 	memcpy(&nentries, p++, sizeof(size_t));
-	data = upd->data +
-	    sizeof(size_t) + ((size_t)nentries * 3 * sizeof(size_t));
+	data = upd->data + sizeof(size_t) + (nentries * 3 * sizeof(size_t));
 
 	WT_RET(ds->f(ds, "%" WT_SIZET_FMT ": ", nentries));
 	for (; nentries-- > 0; data += data_size) {

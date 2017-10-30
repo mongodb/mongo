@@ -82,7 +82,9 @@ __wt_timestamp_set_zero(wt_timestamp_t *ts)
 {
 	ts->val = 0;
 }
-#else
+
+#else /* WT_TIMESTAMP_SIZE != 8 */
+
 #define	WT_WITH_TIMESTAMP_READLOCK(s, l, e)	do {                    \
 	__wt_readlock((s), (l));                                        \
 	e;                                                              \
@@ -141,6 +143,16 @@ __wt_timestamp_set_zero(wt_timestamp_t *ts)
 	memset(ts->ts, 0x00, WT_TIMESTAMP_SIZE);
 }
 #endif /* WT_TIMESTAMP_SIZE == 8 */
+
+#else /* !HAVE_TIMESTAMPS */
+
+#define	__wt_timestamp_set(dest, src)
+#define	__wt_timestamp_set_inf(ts)
+#define	__wt_timestamp_set_zero(ts)
+#define	__wt_txn_clear_commit_timestamp(session)
+#define	__wt_txn_clear_read_timestamp(session)
+#define	__wt_txn_timestamp_flags(session)
+
 #endif /* HAVE_TIMESTAMPS */
 
 /*

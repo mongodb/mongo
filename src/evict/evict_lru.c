@@ -760,16 +760,15 @@ __evict_pass(WT_SESSION_IMPL *session)
 			__wt_verbose(session, WT_VERB_EVICTSERVER,
 			    "%s", "unable to reach eviction goal");
 			break;
-		} else {
-			if (cache->evict_aggressive_score > 0) {
-				--cache->evict_aggressive_score;
-				WT_STAT_CONN_SET(session,
-				    cache_eviction_aggressive_set,
-				    cache->evict_aggressive_score);
-			}
-			loop = 0;
-			eviction_progress = cache->eviction_progress;
 		}
+		if (cache->evict_aggressive_score > 0) {
+			--cache->evict_aggressive_score;
+			WT_STAT_CONN_SET(session,
+			    cache_eviction_aggressive_set,
+			    cache->evict_aggressive_score);
+		}
+		loop = 0;
+		eviction_progress = cache->eviction_progress;
 	}
 	return (0);
 }
@@ -982,8 +981,6 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	 */
 	if (conn->evict_threads_max == conn->evict_threads_min)
 		return;
-
-	eviction_progress_rate = 0;
 
 	__wt_epoch(session, &current_time);
 	time_diff = WT_TIMEDIFF_MS(current_time, cache->evict_tune_last_time);

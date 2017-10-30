@@ -1673,10 +1673,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 
 		WT_RET(__wt_calloc_one(session, &ref->page_las));
 		ref->page_las->las_pageid = multi->las_pageid;
-#ifdef HAVE_TIMESTAMPS
 		__wt_timestamp_set(
 		    &ref->page_las->min_timestamp, &multi->las_min_timestamp);
-#endif
 		ref->state = WT_REF_LOOKASIDE;
 	}
 
