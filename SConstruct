@@ -361,6 +361,11 @@ add_option('disable-warnings-as-errors',
     nargs=0,
 )
 
+add_option('detect-odr-violations',
+    help="Have the linker try to detect ODR violations, if supported",
+    nargs=0,
+)
+
 add_option('variables-help',
     help='Print the help text for SCons variables',
     nargs=0,
@@ -2461,7 +2466,8 @@ def doConfigure(myenv):
         # probably built with GCC. That combination appears to cause
         # false positives for the ODR detector. See SERVER-28133 for
         # additional details.
-        if not (myenv.ToolchainIs('clang') and usingLibStdCxx):
+        if (get_option('detect-odr-violations') and
+                not (myenv.ToolchainIs('clang') and usingLibStdCxx)):
             AddToLINKFLAGSIfSupported(myenv, '-Wl,--detect-odr-violations')
 
         # Disallow an executable stack. Also, issue a warning if any files are found that would

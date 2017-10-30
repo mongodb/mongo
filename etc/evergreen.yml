@@ -1861,7 +1861,7 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
+          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -2009,7 +2009,7 @@ tasks:
             extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
           fi
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" $extra_args all ${additional_targets|} MONGO_VERSION=${version}
+          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args all ${additional_targets|} MONGO_VERSION=${version}
 
     - command: s3.put
       params:
