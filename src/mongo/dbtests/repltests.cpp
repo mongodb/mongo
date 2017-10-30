@@ -64,6 +64,31 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
+/**
+ * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+ */
+repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
+                                repl::OpTypeEnum opType,
+                                NamespaceString nss,
+                                BSONObj object,
+                                boost::optional<BSONObj> object2) {
+    return repl::OplogEntry(opTime,                     // optime
+                            0,                          // hash
+                            opType,                     // opType
+                            nss,                        // namespace
+                            boost::none,                // uuid
+                            boost::none,                // fromMigrate
+                            OplogEntry::kOplogVersion,  // version
+                            object,                     // o
+                            object2,                    // o2
+                            {},                         // sessionInfo
+                            boost::none,                // wall clock time
+                            boost::none,                // statement id
+                            boost::none,   // optime of previous write within same transaction
+                            boost::none,   // pre-image optime
+                            boost::none);  // post-image optime
+}
+
 BSONObj f(const char* s) {
     return fromjson(s);
 }
@@ -1324,7 +1349,7 @@ public:
     bool returnEmpty;
     SyncTest() : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc()), returnEmpty(false) {}
     virtual ~SyncTest() {}
-    virtual BSONObj getMissingDoc(OperationContext* opCtx, const BSONObj& o) {
+    BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) override {
         if (returnEmpty) {
             BSONObj o;
             return o;
@@ -1340,13 +1365,15 @@ class FetchAndInsertMissingDocument : public Base {
 public:
     void run() {
         bool threw = false;
-        BSONObj o = BSON("ns" << ns() << "o" << BSON("foo"
-                                                     << "bar")
-                              << "o2"
-                              << BSON("_id"
-                                      << "in oplog"
-                                      << "foo"
-                                      << "bar"));
+        auto oplogEntry = makeOplogEntry(OpTime(Timestamp(100, 1), 1LL),  // optime
+                                         OpTypeEnum::kUpdate,             // op type
+                                         NamespaceString(ns()),           // namespace
+                                         BSON("foo"
+                                              << "bar"),  // o
+                                         BSON("_id"
+                                              << "in oplog"
+                                              << "foo"
+                                              << "bar"));  // o2
 
         Lock::GlobalWrite lk(&_opCtx);
 
@@ -1356,7 +1383,7 @@ public:
             badSource.setHostname("localhost:123");
 
             OldClientContext ctx(&_opCtx, ns());
-            badSource.getMissingDoc(&_opCtx, o);
+            badSource.getMissingDoc(&_opCtx, oplogEntry);
         } catch (DBException&) {
             threw = true;
         }
@@ -1364,7 +1391,7 @@ public:
 
         // now this should succeed
         SyncTest t;
-        verify(t.fetchAndInsertMissingDocument(&_opCtx, o));
+        verify(t.fetchAndInsertMissingDocument(&_opCtx, oplogEntry));
         verify(!_client
                     .findOne(ns(),
                              BSON("_id"
@@ -1373,7 +1400,7 @@ public:
 
         // force it not to find an obj
         t.returnEmpty = true;
-        verify(!t.fetchAndInsertMissingDocument(&_opCtx, o));
+        verify(!t.fetchAndInsertMissingDocument(&_opCtx, oplogEntry));
     }
 };
 

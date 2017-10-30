@@ -107,7 +107,7 @@ repl::OplogEntry makeOplogEntry(StringData ns) {
 class SyncTailWithLocalDocumentFetcher : public SyncTail {
 public:
     SyncTailWithLocalDocumentFetcher(const BSONObj& document);
-    BSONObj getMissingDoc(OperationContext* opCtx, const BSONObj& o) override;
+    BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) override;
 
 private:
     BSONObj _document;
@@ -119,13 +119,14 @@ private:
 class SyncTailWithOperationContextChecker : public SyncTail {
 public:
     SyncTailWithOperationContextChecker();
-    bool fetchAndInsertMissingDocument(OperationContext* opCtx, const BSONObj& o) override;
+    bool fetchAndInsertMissingDocument(OperationContext* opCtx,
+                                       const OplogEntry& oplogEntry) override;
 };
 
 SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
     : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr), _document(document) {}
 
-BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*, const BSONObj&) {
+BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*, const OplogEntry&) {
     return _document;
 }
 
@@ -133,7 +134,7 @@ SyncTailWithOperationContextChecker::SyncTailWithOperationContextChecker()
     : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr) {}
 
 bool SyncTailWithOperationContextChecker::fetchAndInsertMissingDocument(OperationContext* opCtx,
-                                                                        const BSONObj&) {
+                                                                        const OplogEntry&) {
     ASSERT_FALSE(opCtx->writesAreReplicated());
     ASSERT_FALSE(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
     ASSERT_TRUE(documentValidationDisabled(opCtx));
