@@ -220,6 +220,10 @@ OplogEntry::CommandType OplogEntry::getCommandType() const {
     return _commandType;
 }
 
+int OplogEntry::getRawObjSizeBytes() const {
+    return raw.objsize();
+}
+
 OpTime OplogEntry::getOpTime() const {
     long long term = OpTime::kUninitializedTerm;
     if (getTerm()) {

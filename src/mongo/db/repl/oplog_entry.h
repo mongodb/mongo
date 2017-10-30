@@ -108,6 +108,11 @@ public:
     CommandType getCommandType() const;
 
     /**
+     * Returns the size of the original document used to create this OplogEntry.
+     */
+    int getRawObjSizeBytes() const;
+
+    /**
      * Returns the OpTime of the oplog entry.
      */
     OpTime getOpTime() const;

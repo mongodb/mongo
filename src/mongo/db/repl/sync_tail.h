@@ -149,7 +149,7 @@ public:
             _batch.emplace_back(std::move(obj));
         }
         void pop_back() {
-            _bytes -= back().raw.objsize();
+            _bytes -= back().getRawObjSizeBytes();
             _batch.pop_back();
         }
 
