@@ -5,4 +5,4 @@
     const exitCode = runMongoProgram('mongo', 'mongodb+srv://test1.test.build.10gen.cc.', '--eval', ';');
     assert.eq(exitCode, 0, "Failed to connect with a `mongodb+srv://` style URI.");
     MongoRunner.stopMongod(md);
-}());
+})();
