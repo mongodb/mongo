@@ -406,7 +406,7 @@ run_workload(uint32_t nth)
 	printf("Create %" PRIu32 " writer threads\n", nth);
 	for (i = 0; i < nth; ++i) {
 		td[i].conn = conn;
-		td[i].start = (UINT64_MAX / nth) * i;
+		td[i].start = WT_BILLION * (uint64_t)i;
 		td[i].info = i;
 		testutil_check(__wt_thread_create(
 		    NULL, &thr[i], thread_run, &td[i]));
