@@ -562,7 +562,7 @@ main(int argc, char *argv[])
 		 */
 		memset(&sa, 0, sizeof(sa));
 		sa.sa_handler = handler;
-		sigaction(SIGCHLD, &sa, NULL);
+		testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
 		testutil_checksys((pid = fork()) < 0);
 
 		if (pid == 0) { /* child */
@@ -583,7 +583,7 @@ main(int argc, char *argv[])
 			sleep(1);
 		sleep(timeout);
 		sa.sa_handler = SIG_DFL;
-		sigaction(SIGCHLD, &sa, NULL);
+		testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
 
 		/*
 		 * !!! It should be plenty long enough to make sure more than
