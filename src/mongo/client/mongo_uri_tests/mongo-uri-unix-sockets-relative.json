@@ -62,7 +62,7 @@
             ],
             "options": null,
             "uri": "mongodb://rel%2Fmongodb-27017.sock,rel%2Fmongodb-27018.sock",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {
@@ -104,7 +104,7 @@
             ],
             "options": null,
             "uri": "mongodb://rel%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {
@@ -146,7 +146,7 @@
             ],
             "options": null,
             "uri": "mongodb://127.0.0.1:27017,rel%2Fmongodb-27017.sock",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {
@@ -188,7 +188,7 @@
             ],
             "options": null,
             "uri": "mongodb://mongodb-27017.sock,rel%2Fmongodb-27018.sock",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {
@@ -302,7 +302,7 @@
             ],
             "options": null,
             "uri": "mongodb://rel%2Fmongodb-27017.sock,rel%2Fmongodb-27018.sock/admin",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {
@@ -352,7 +352,7 @@
             ],
             "options": null,
             "uri": "mongodb://rel%2Fmongodb-27017.sock,rel%2Fmongodb-27018.sock/admin",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {
@@ -404,7 +404,7 @@
                 "w": 1
             },
             "uri": "mongodb://bob:bar@rel%2Fmongodb-27017.sock,rel%2Fmongodb-27018.sock/admin?w=1",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {

@@ -24,6 +24,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/net/network',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/dns_query',
     ]
 )
 

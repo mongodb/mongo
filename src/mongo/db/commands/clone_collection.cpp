@@ -144,12 +144,11 @@ public:
               << (copyIndexes ? "" : ", not copying indexes");
 
         Cloner cloner;
-        unique_ptr<DBClientConnection> myconn;
-        myconn.reset(new DBClientConnection());
+        auto myconn = stdx::make_unique<DBClientConnection>();
         if (!myconn->connect(HostAndPort(fromhost), StringData(), errmsg))
             return false;
 
-        cloner.setConnection(myconn.release());
+        cloner.setConnection(std::move(myconn));
 
         return cloner.copyCollection(opCtx, collection, query, errmsg, copyIndexes);
     }

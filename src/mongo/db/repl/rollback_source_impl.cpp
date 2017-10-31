@@ -82,14 +82,14 @@ std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std:
 void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* opCtx,
                                                   const NamespaceString& nss) const {
     std::string errmsg;
-    std::unique_ptr<DBClientConnection> tmpConn(new DBClientConnection());
+    auto tmpConn = stdx::make_unique<DBClientConnection>();
     uassert(15908,
             errmsg,
             tmpConn->connect(_source, StringData(), errmsg) && replAuthenticate(tmpConn.get()));
 
     // cloner owns _conn in unique_ptr
     Cloner cloner;
-    cloner.setConnection(tmpConn.release());
+    cloner.setConnection(std::move(tmpConn));
     uassert(15909,
             str::stream() << "replSet rollback error resyncing collection " << nss.ns() << ' '
                           << errmsg,

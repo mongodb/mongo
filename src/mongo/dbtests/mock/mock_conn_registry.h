@@ -79,7 +79,7 @@ public:
     /**
      * @return a new mocked connection to a server with the given hostName.
      */
-    MockDBClientConnection* connect(const std::string& hostName);
+    std::unique_ptr<MockDBClientConnection> connect(const std::string& hostName);
 
     /**
      * @return the hook that can be used with ConnectionString.
@@ -100,9 +100,9 @@ private:
         MockConnHook(MockConnRegistry* registry);
         ~MockConnHook();
 
-        mongo::DBClientBase* connect(const mongo::ConnectionString& connString,
-                                     std::string& errmsg,
-                                     double socketTimeout);
+        std::unique_ptr<mongo::DBClientBase> connect(const mongo::ConnectionString& connString,
+                                                     std::string& errmsg,
+                                                     double socketTimeout);
 
     private:
         MockConnRegistry* _registry;

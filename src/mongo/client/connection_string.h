@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -119,10 +120,10 @@ public:
     bool operator==(const ConnectionString& other) const;
     bool operator!=(const ConnectionString& other) const;
 
-    DBClientBase* connect(StringData applicationName,
-                          std::string& errmsg,
-                          double socketTimeout = 0,
-                          const MongoURI* uri = nullptr) const;
+    std::unique_ptr<DBClientBase> connect(StringData applicationName,
+                                          std::string& errmsg,
+                                          double socketTimeout = 0,
+                                          const MongoURI* uri = nullptr) const;
 
     static StatusWith<ConnectionString> parse(const std::string& url);
 
@@ -139,9 +140,9 @@ public:
         virtual ~ConnectionHook() {}
 
         // Returns an alternative connection object for a string
-        virtual DBClientBase* connect(const ConnectionString& c,
-                                      std::string& errmsg,
-                                      double socketTimeout) = 0;
+        virtual std::unique_ptr<DBClientBase> connect(const ConnectionString& c,
+                                                      std::string& errmsg,
+                                                      double socketTimeout) = 0;
     };
 
     static void setConnectionHook(ConnectionHook* hook) {

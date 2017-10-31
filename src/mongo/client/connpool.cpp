@@ -256,7 +256,7 @@ DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTi
     // If no connections for this host are available in the PoolForHost (that is, all the
     // connections have been checked out, or none have been created yet), create a new connection.
     string errmsg;
-    c = url.connect(StringData(), errmsg, socketTimeout);
+    c = url.connect(StringData(), errmsg, socketTimeout).release();
     uassert(13328, _name + ": connect failed " + url.toString() + " : " + errmsg, c);
 
     return _finishCreate(url.toString(), socketTimeout, c);
@@ -277,7 +277,7 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
     const ConnectionString cs(uassertStatusOK(ConnectionString::parse(host)));
 
     string errmsg;
-    c = cs.connect(StringData(), errmsg, socketTimeout);
+    c = cs.connect(StringData(), errmsg, socketTimeout).release();
     if (!c)
         throw SocketException(SocketException::CONNECT_ERROR,
                               host,

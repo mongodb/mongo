@@ -1,7 +1,7 @@
 /**
  *    Copyright (C) 2009-2015 MongoDB Inc.
  *
- *    This program is free software: you can redistribute it and/or  modify
+ *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
  *
@@ -506,8 +506,8 @@ TEST(MongoURI, CloneURIForServer) {
 /**
  * These tests come from the Mongo Uri Specifications for the drivers found at:
  * https://github.com/mongodb/specifications/tree/master/source/connection-string/tests
- * They have been slighly altered as the Drivers specification is slighly different
- * from the server specification.
+ * They have been altered as the Drivers specification is somewhat different from the shell
+ * implementation.
  */
 TEST(MongoURI, specTests) {
     const std::string files[] = {
@@ -596,6 +596,158 @@ TEST(MongoURI, specTests) {
                 testValidURIFormat(testCase);
             }
         }
+    }
+}
+
+TEST(MongoURI, srvRecordTest) {
+    using namespace mongo;
+    const struct {
+        std::string uri;
+        std::string user;
+        std::string password;
+        std::string database;
+        std::vector<HostAndPort> hosts;
+        std::map<std::string, std::string> options;
+    } tests[] = {
+        // Test some non-SRV URIs to make sure that they do not perform expansions
+        {"mongodb://test1.test.build.10gen.cc:12345/",
+         "",
+         "",
+         "",
+         {{"test1.test.build.10gen.cc", 12345}},
+         {}},
+        {"mongodb://test6.test.build.10gen.cc:12345/",
+         "",
+         "",
+         "",
+         {{"test6.test.build.10gen.cc", 12345}},
+         {}},
+
+        // Test a sample URI against each provided testing DNS entry
+        {"mongodb+srv://test1.test.build.10gen.cc/",
+         "",
+         "",
+         "",
+         {{"localhost.build.10gen.cc.", 27017}, {"localhost.build.10gen.cc.", 27018}},
+         {}},
+
+        {"mongodb+srv://user:password@test2.test.build.10gen.cc/"
+         "database?someOption=someValue&someOtherOption=someOtherValue",
+         "user",
+         "password",
+         "database",
+         {{"localhost.build.10gen.cc.", 27018}, {"localhost.build.10gen.cc.", 27019}},
+         {{"someOption", "someValue"}, {"someOtherOption", "someOtherValue"}}},
+
+
+        {"mongodb+srv://user:password@test3.test.build.10gen.cc/"
+         "database?someOption=someValue&someOtherOption=someOtherValue",
+         "user",
+         "password",
+         "database",
+         {{"localhost.build.10gen.cc.", 27017}},
+         {{"someOption", "someValue"}, {"someOtherOption", "someOtherValue"}}},
+
+
+        {"mongodb+srv://user:password@test5.test.build.10gen.cc/"
+         "database?someOption=someValue&someOtherOption=someOtherValue",
+         "user",
+         "password",
+         "database",
+         {{"localhost.build.10gen.cc.", 27017}},
+         {{"someOption", "someValue"},
+          {"someOtherOption", "someOtherValue"},
+          {"connectTimeoutMS", "300000"},
+          {"socketTimeoutMS", "300000"}}},
+
+        {"mongodb+srv://user:password@test5.test.build.10gen.cc/"
+         "database?someOption=someValue&socketTimeoutMS=100&someOtherOption=someOtherValue",
+         "user",
+         "password",
+         "database",
+         {{"localhost.build.10gen.cc.", 27017}},
+         {{"someOption", "someValue"},
+          {"someOtherOption", "someOtherValue"},
+          {"connectTimeoutMS", "300000"},
+          {"socketTimeoutMS", "100"}}},
+
+        {"mongodb+srv://test6.test.build.10gen.cc/",
+         "",
+         "",
+         "",
+         {{"localhost.build.10gen.cc.", 27017}},
+         {{"connectTimeoutMS", "200000"}, {"socketTimeoutMS", "200000"}}},
+
+        {"mongodb+srv://test6.test.build.10gen.cc/database",
+         "",
+         "",
+         "database",
+         {{"localhost.build.10gen.cc.", 27017}},
+         {{"connectTimeoutMS", "200000"}, {"socketTimeoutMS", "200000"}}},
+
+        {"mongodb+srv://test6.test.build.10gen.cc/?connectTimeoutMS=300000",
+         "",
+         "",
+         "",
+         {{"localhost.build.10gen.cc.", 27017}},
+         {{"connectTimeoutMS", "300000"}, {"socketTimeoutMS", "200000"}}},
+
+        {"mongodb+srv://test6.test.build.10gen.cc/?irrelevantOption=irrelevantValue",
+         "",
+         "",
+         "",
+         {{"localhost.build.10gen.cc.", 27017}},
+         {{"connectTimeoutMS", "200000"},
+          {"socketTimeoutMS", "200000"},
+          {"irrelevantOption", "irrelevantValue"}}},
+
+
+        {"mongodb+srv://test6.test.build.10gen.cc/"
+         "?irrelevantOption=irrelevantValue&connectTimeoutMS=300000",
+         "",
+         "",
+         "",
+         {{"localhost.build.10gen.cc.", 27017}},
+         {{"connectTimeoutMS", "300000"},
+          {"socketTimeoutMS", "200000"},
+          {"irrelevantOption", "irrelevantValue"}}},
+    };
+
+    for (const auto& test : tests) {
+        auto rs = MongoURI::parse(test.uri);
+        ASSERT_OK(rs.getStatus());
+        auto rv = rs.getValue();
+        ASSERT_EQ(rv.getUser(), test.user);
+        ASSERT_EQ(rv.getPassword(), test.password);
+        ASSERT_EQ(rv.getDatabase(), test.database);
+        std::vector<std::pair<std::string, std::string>> options(begin(rv.getOptions()),
+                                                                 end(rv.getOptions()));
+        std::sort(begin(options), end(options));
+        std::vector<std::pair<std::string, std::string>> expectedOptions(begin(test.options),
+                                                                         end(test.options));
+        std::sort(begin(expectedOptions), end(expectedOptions));
+
+        for (std::size_t i = 0; i < std::min(options.size(), expectedOptions.size()); ++i) {
+            if (options[i] != expectedOptions[i]) {
+                mongo::unittest::log() << "Option: \"" << options[i].first << "="
+                                       << options[i].second << "\" doesn't equal: \""
+                                       << expectedOptions[i].first << "="
+                                       << expectedOptions[i].second << "\"" << std::endl;
+                std::cerr << "Failing URI: \"" << test.uri << "\"" << std::endl;
+                ASSERT(false);
+            }
+        }
+        ASSERT_EQ(options.size(), expectedOptions.size());
+
+        std::vector<HostAndPort> hosts(begin(rv.getServers()), end(rv.getServers()));
+        std::sort(begin(hosts), end(hosts));
+        auto expectedHosts = test.hosts;
+        std::sort(begin(expectedHosts), end(expectedHosts));
+
+        for (std::size_t i = 0; i < std::min(hosts.size(), expectedHosts.size()); ++i) {
+            ASSERT_EQ(hosts[i], expectedHosts[i]);
+        }
+        ASSERT_TRUE(hosts.size() == expectedHosts.size());
     }
 }
 

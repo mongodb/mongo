@@ -46,10 +46,10 @@ namespace mongo {
 stdx::mutex ConnectionString::_connectHookMutex;
 ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
 
-DBClientBase* ConnectionString::connect(StringData applicationName,
-                                        std::string& errmsg,
-                                        double socketTimeout,
-                                        const MongoURI* uri) const {
+std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationName,
+                                                        std::string& errmsg,
+                                                        double socketTimeout,
+                                                        const MongoURI* uri) const {
     MongoURI newURI{};
     if (uri) {
         newURI = *uri;
@@ -57,15 +57,18 @@ DBClientBase* ConnectionString::connect(StringData applicationName,
 
     switch (_type) {
         case MASTER: {
-            auto c = stdx::make_unique<DBClientConnection>(true, 0, std::move(newURI));
+            for (const auto& server : _servers) {
+                auto c = stdx::make_unique<DBClientConnection>(true, 0, newURI);
 
-            c->setSoTimeout(socketTimeout);
-            LOG(1) << "creating new connection to:" << _servers[0];
-            if (!c->connect(_servers[0], applicationName, errmsg)) {
-                return 0;
+                c->setSoTimeout(socketTimeout);
+                LOG(1) << "creating new connection to:" << server;
+                if (!c->connect(server, applicationName, errmsg)) {
+                    continue;
+                }
+                LOG(1) << "connected connection!";
+                return std::move(c);
             }
-            LOG(1) << "connected connection!";
-            return c.release();
+            return nullptr;
         }
 
         case SET: {
@@ -74,9 +77,9 @@ DBClientBase* ConnectionString::connect(StringData applicationName,
             if (!set->connect()) {
                 errmsg = "connect failed to replica set ";
                 errmsg += toString();
-                return 0;
+                return nullptr;
             }
-            return set.release();
+            return std::move(set);
         }
 
         case CUSTOM: {
@@ -91,7 +94,7 @@ DBClientBase* ConnectionString::connect(StringData applicationName,
                     _connectHook);
 
             // Double-checked lock, since this will never be active during normal operation
-            DBClientBase* replacementConn = _connectHook->connect(*this, errmsg, socketTimeout);
+            auto replacementConn = _connectHook->connect(*this, errmsg, socketTimeout);
 
             log() << "replacing connection to " << this->toString() << " with "
                   << (replacementConn ? replacementConn->getServerAddress() : "(empty)");

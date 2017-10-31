@@ -50,8 +50,8 @@ class Cloner {
 public:
     Cloner();
 
-    void setConnection(DBClientBase* c) {
-        _conn.reset(c);
+    void setConnection(std::unique_ptr<DBClientBase> c) {
+        _conn = std::move(c);
     }
 
     /**

@@ -135,7 +135,7 @@
             ],
             "options": null,
             "uri": "mongodb://alice:secret@127.0.0.1,example.com:27018",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {
@@ -159,7 +159,7 @@
             ],
             "options": null,
             "uri": "mongodb://alice:secret@example.com,[::1]:27019/admin",
-            "valid": false,
+            "valid": true,
             "warning": false
         },
         {

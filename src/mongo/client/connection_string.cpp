@@ -121,9 +121,6 @@ void ConnectionString::_finishInit() {
             uassert(ErrorCodes::FailedToParse,
                     "Cannot specify a replica set name for a ConnectionString of type MASTER",
                     _setName.empty());
-            uassert(ErrorCodes::FailedToParse,
-                    "ConnectionStrings of type MASTER must contain exactly one server",
-                    _servers.size() == 1);
             break;
         case SET:
             uassert(ErrorCodes::FailedToParse,

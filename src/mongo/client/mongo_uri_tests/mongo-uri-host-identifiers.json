@@ -108,7 +108,7 @@
     {
       "description": "Multiple hosts (mixed formats)",
       "uri": "mongodb://127.0.0.1,[::1]:27018,example.com:27019",
-      "valid": false,
+      "valid": true,
       "warning": false,
       "hosts": [
         {
@@ -160,7 +160,7 @@
     {
       "description": "UTF-8 hosts",
       "uri": "mongodb://bücher.example.com,umläut.example.com/",
-      "valid": false,
+      "valid": true,
       "warning": false,
       "hosts": [
         {

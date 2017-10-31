@@ -223,11 +223,13 @@ string getURIFromArgs(const std::string& arg, const std::string& host, const std
         return kDefaultMongoURL.toString();
     }
 
-    if (str::startsWith(arg, "mongodb://") && host.empty() && port.empty()) {
+    if ((str::startsWith(arg, "mongodb://") || str::startsWith(arg, "mongodb+srv://")) &&
+        host.empty() && port.empty()) {
         // mongo mongodb://blah
         return arg;
     }
-    if (str::startsWith(host, "mongodb://") && arg.empty() && port.empty()) {
+    if ((str::startsWith(host, "mongodb://") || str::startsWith(arg, "mongodb+srv://")) &&
+        arg.empty() && port.empty()) {
         // mongo --host mongodb://blah
         return host;
     }

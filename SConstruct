@@ -1413,7 +1413,7 @@ else:
     env.AppendUnique( CPPDEFINES=[ 'NDEBUG' ] )
 
 if env.TargetOSIs('linux'):
-    env.Append( LIBS=['m'] )
+    env.Append( LIBS=['m',"resolv"] )
 
 elif env.TargetOSIs('solaris'):
      env.Append( LIBS=["socket","resolv","lgrp"] )
@@ -1421,6 +1421,9 @@ elif env.TargetOSIs('solaris'):
 elif env.TargetOSIs('freebsd'):
     env.Append( LIBS=[ "kvm" ] )
     env.Append( CCFLAGS=[ "-fno-omit-frame-pointer" ] )
+
+elif env.TargetOSIs('darwin'):
+     env.Append( LIBS=["resolv"] )
 
 elif env.TargetOSIs('openbsd'):
     env.Append( LIBS=[ "kvm" ] )
@@ -1582,6 +1585,7 @@ elif env.TargetOSIs('windows'):
             'advapi32.lib',
             'bcrypt.lib',
             'crypt32.lib',
+            'dnsapi.lib',
             'kernel32.lib',
             'shell32.lib',
             'pdh.lib',

@@ -494,6 +494,25 @@ env.Library(
 )
 
 env.Library(
+    target='dns_query',
+    source=[
+        'dns_query.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.CppUnitTest(
+    target='dns_query_test',
+    source=['dns_query_test.cpp'],
+    LIBDEPS=[
+        'dns_query',
+        "$BUILD_DIR/mongo/base",
+    ]
+)
+
+env.Library(
     target="secure_zero_memory",
     source=[
         'secure_zero_memory.cpp',

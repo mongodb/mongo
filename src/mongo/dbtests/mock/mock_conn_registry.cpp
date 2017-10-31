@@ -77,31 +77,27 @@ void MockConnRegistry::clear() {
     _registry.clear();
 }
 
-MockDBClientConnection* MockConnRegistry::connect(const std::string& connStr) {
+std::unique_ptr<MockDBClientConnection> MockConnRegistry::connect(const std::string& connStr) {
     stdx::lock_guard<stdx::mutex> sl(_registryMutex);
     fassert(16534, _registry.count(connStr) == 1);
-    return new MockDBClientConnection(_registry[connStr], true);
+    return stdx::make_unique<MockDBClientConnection>(_registry[connStr], true);
 }
 
 MockConnRegistry::MockConnHook::MockConnHook(MockConnRegistry* registry) : _registry(registry) {}
 
 MockConnRegistry::MockConnHook::~MockConnHook() {}
 
-mongo::DBClientBase* MockConnRegistry::MockConnHook::connect(const ConnectionString& connString,
-                                                             std::string& errmsg,
-                                                             double socketTimeout) {
+std::unique_ptr<mongo::DBClientBase> MockConnRegistry::MockConnHook::connect(
+    const ConnectionString& connString, std::string& errmsg, double socketTimeout) {
     const string hostName(connString.toString());
-    MockDBClientConnection* conn = _registry->connect(hostName);
+    auto conn = _registry->connect(hostName);
 
     if (!conn->connect(hostName.c_str(), StringData(), errmsg)) {
-        // Assumption: connect never throws, so no leak.
-        delete conn;
-
         // mimic ConnectionString::connect for MASTER type connection to return NULL
         // if the destination is unreachable.
-        return NULL;
+        return nullptr;
     }
 
-    return conn;
+    return std::move(conn);
 }
-}
+}  // namespace mongo

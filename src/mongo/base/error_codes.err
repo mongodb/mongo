@@ -227,6 +227,8 @@ error_code("AtomicityFailure", 226)
 error_code("CannotImplicitlyCreateCollection", 227);
 error_code("SessionTransferIncomplete", 228)
 error_code("MustDowngrade", 229)
+error_code("DNSHostNotFound", 230)
+error_code("DNSProtocolError", 231)
 
 # Error codes 4000-8999 are reserved.
 

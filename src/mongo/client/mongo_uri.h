@@ -1,7 +1,7 @@
 /**
  *    Copyright (C) 2015 MongoDB Inc.
  *
- *    This program is free software: you can redistribute it and/or  modify
+ *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
  *
@@ -43,7 +43,6 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-
 /**
  * Encode a string for embedding in a URI.
  * Replaces reserved bytes with %xx sequences.
@@ -51,6 +50,7 @@ namespace mongo {
  * Optionally allows passthrough characters to remain unescaped.
  */
 void uriEncode(std::ostream& ss, StringData str, StringData passthrough = ""_sd);
+
 inline std::string uriEncode(StringData str, StringData passthrough = ""_sd) {
     std::ostringstream ss;
     uriEncode(ss, str, passthrough);
@@ -66,9 +66,13 @@ StatusWith<std::string> uriDecode(StringData str);
 /**
  * MongoURI handles parsing of URIs for mongodb, and falls back to old-style
  * ConnectionString parsing. It's used primarily by the shell.
- * It parses URIs with the following format:
+ * It parses URIs with the following formats:
  *
  *    mongodb://[usr:pwd@]host1[:port1]...[,hostN[:portN]]][/[db][?options]]
+ *    mongodb+srv://[usr:pwd@]host[/[db][?options]]
+ *
+ * `mongodb+srv://` URIs will perform DNS SRV and TXT lookups and expand per the DNS Seedlist
+ * specification.
  *
  * While this format is generally RFC 3986 compliant, some exceptions do exist:
  *   1. The 'host' field, as defined by section 3.2.2 is expanded in the following ways:
@@ -96,6 +100,11 @@ StatusWith<std::string> uriDecode(StringData str);
  */
 class MongoURI {
 public:
+    // Note that, because this map is used for DNS TXT record injection on options, there is a
+    // requirement on its behavior for `insert`: insert must not replace or update existing values
+    // -- this gives the desired behavior that user-specified values override TXT record specified
+    // values.  `std::map` and `std::unordered_map` satisfy this requirement.  Make sure that
+    // whichever map type is used provides that guarantee.
     using OptionsMap = std::map<std::string, std::string>;
 
     static StatusWith<MongoURI> parse(const std::string& url);
@@ -140,20 +149,21 @@ public:
     // server (say a member of a replica-set), you can pass in its HostAndPort information to
     // get a new URI with the same info, except type() will be MASTER and getServers() will
     // be the single host you pass in.
-    MongoURI cloneURIForServer(const HostAndPort& hostAndPort) const {
-        return MongoURI(ConnectionString(hostAndPort), _user, _password, _database, _options);
+    MongoURI cloneURIForServer(HostAndPort hostAndPort) const {
+        return MongoURI(
+            ConnectionString(std::move(hostAndPort)), _user, _password, _database, _options);
     }
 
     ConnectionString::ConnectionType type() const {
         return _connectString.type();
     }
 
-    explicit MongoURI(const ConnectionString connectString)
-        : _connectString(std::move(connectString)){};
+    explicit MongoURI(const ConnectionString& connectString) : _connectString(connectString){};
 
     MongoURI() = default;
 
     friend std::ostream& operator<<(std::ostream&, const MongoURI&);
+
     friend StringBuilder& operator<<(StringBuilder&, const MongoURI&);
 
 private:
@@ -166,9 +176,11 @@ private:
           _user(user),
           _password(password),
           _database(database),
-          _options(std::move(options)){};
+          _options(std::move(options)) {}
 
     BSONObj _makeAuthObjFromOptions(int maxWireVersion) const;
+
+    static MongoURI parseImpl(const std::string& url);
 
     ConnectionString _connectString;
     std::string _user;
@@ -178,13 +190,10 @@ private:
 };
 
 inline std::ostream& operator<<(std::ostream& ss, const MongoURI& uri) {
-    ss << uri._connectString;
-    return ss;
+    return ss << uri._connectString;
 }
 
 inline StringBuilder& operator<<(StringBuilder& sb, const MongoURI& uri) {
-    sb << uri._connectString;
-    return sb;
+    return sb << uri._connectString;
 }
-
 }  // namespace mongo

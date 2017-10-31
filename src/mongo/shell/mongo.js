@@ -231,7 +231,7 @@ connect = function(url, user, pass) {
         throw Error("Empty connection string");
     }
 
-    if (!url.startsWith("mongodb://")) {
+    if (!url.startsWith("mongodb://") && !url.startsWith("mongodb+srv://")) {
         const colon = url.lastIndexOf(":");
         const slash = url.lastIndexOf("/");
         if (url.split("/").length > 1) {

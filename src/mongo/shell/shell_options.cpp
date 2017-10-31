@@ -418,7 +418,8 @@ Status storeMongoShellOptions(const moe::Environment& params,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    if (shellGlobalParams.url.find("mongodb://") == 0) {
+    if ((shellGlobalParams.url.find("mongodb://") == 0) &&
+        (shellGlobalParams.url.find("mongodb+srv://") == 0)) {
         auto cs_status = MongoURI::parse(shellGlobalParams.url);
         if (!cs_status.isOK()) {
             return cs_status.getStatus();

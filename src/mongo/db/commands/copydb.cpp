@@ -187,7 +187,7 @@ public:
                     return false;
                 }
             }
-            cloner.setConnection(authConn.release());
+            cloner.setConnection(std::move(authConn));
         } else if (cmdObj.hasField(saslCommandConversationIdFieldName) &&
                    cmdObj.hasField(saslCommandPayloadFieldName)) {
             uassert(25487, "must call copydbsaslstart first", authConn.get());
@@ -208,16 +208,16 @@ public:
             }
 
             result.append("done", true);
-            cloner.setConnection(authConn.release());
+            cloner.setConnection(std::move(authConn));
         } else if (!fromSelf) {
             // If fromSelf leave the cloner's conn empty, it will use a DBDirectClient instead.
             const ConnectionString cs(uassertStatusOK(ConnectionString::parse(fromhost)));
 
-            DBClientBase* conn = cs.connect(StringData(), errmsg);
+            auto conn = cs.connect(StringData(), errmsg);
             if (!conn) {
                 return false;
             }
-            cloner.setConnection(conn);
+            cloner.setConnection(std::move(conn));
         }
 
         // Either we didn't need the authConn (if we even had one), or we already moved it

@@ -112,7 +112,7 @@ public:
         const ConnectionString cs(uassertStatusOK(ConnectionString::parse(fromhost)));
 
         auto& authConn = CopyDbAuthConnection::forClient(opCtx->getClient());
-        authConn.reset(cs.connect(StringData(), errmsg));
+        authConn = cs.connect(StringData(), errmsg);
         if (!authConn) {
             return false;
         }
@@ -208,7 +208,7 @@ public:
         }
 
         auto& authConn = CopyDbAuthConnection::forClient(opCtx->getClient());
-        authConn.reset(cs.connect(StringData(), errmsg));
+        authConn = cs.connect(StringData(), errmsg);
         if (!authConn.get()) {
             return false;
         }
