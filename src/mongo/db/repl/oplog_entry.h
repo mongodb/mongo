@@ -78,30 +78,6 @@ public:
                const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                const boost::optional<OpTime>& preImageOpTime,
                const boost::optional<OpTime>& postImageOpTime);
-    OplogEntry(OpTime opTime,
-               long long hash,
-               OpTypeEnum opType,
-               NamespaceString nss,
-               int version,
-               const BSONObj& oField,
-               const boost::optional<BSONObj>& o2Field);
-    OplogEntry(OpTime opTime,
-               long long hash,
-               OpTypeEnum opType,
-               NamespaceString nss,
-               int version,
-               const BSONObj& oField);
-    OplogEntry(OpTime opTime,
-               long long hash,
-               OpTypeEnum opType,
-               NamespaceString nss,
-               const BSONObj& oField);
-    OplogEntry(OpTime opTime,
-               long long hash,
-               OpTypeEnum opType,
-               NamespaceString nss,
-               const BSONObj& oField,
-               const boost::optional<BSONObj>& o2Field);
 
     // DEPRECATED: This constructor can throw. Use static parse method instead.
     explicit OplogEntry(BSONObj raw);

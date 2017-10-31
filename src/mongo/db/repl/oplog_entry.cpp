@@ -188,49 +188,6 @@ OplogEntry::OplogEntry(OpTime opTime,
                                    preImageOpTime,
                                    postImageOpTime)) {}
 
-OplogEntry::OplogEntry(OpTime opTime,
-                       long long hash,
-                       OpTypeEnum opType,
-                       NamespaceString nss,
-                       int version,
-                       const BSONObj& oField,
-                       const boost::optional<BSONObj>& o2Field)
-    : OplogEntry(opTime,          // optime
-                 hash,            // hash
-                 opType,          // op type
-                 nss,             // namespace
-                 boost::none,     // uuid
-                 boost::none,     // fromMigrate
-                 version,         // version
-                 oField,          // o
-                 o2Field,         // o2
-                 {},              // sessionInfo
-                 boost::none,     // wall clock time
-                 boost::none,     // statement id
-                 boost::none,     // optime of previous write within same transaction
-                 boost::none,     // pre-image optime
-                 boost::none) {}  // post-image optime
-
-OplogEntry::OplogEntry(OpTime opTime,
-                       long long hash,
-                       OpTypeEnum opType,
-                       NamespaceString nss,
-                       int version,
-                       const BSONObj& oField)
-    : OplogEntry(opTime, hash, opType, nss, version, oField, boost::none) {}
-
-OplogEntry::OplogEntry(
-    OpTime opTime, long long hash, OpTypeEnum opType, NamespaceString nss, const BSONObj& oField)
-    : OplogEntry(opTime, hash, opType, nss, OplogEntry::kOplogVersion, oField, boost::none) {}
-
-OplogEntry::OplogEntry(OpTime opTime,
-                       long long hash,
-                       OpTypeEnum opType,
-                       NamespaceString nss,
-                       const BSONObj& oField,
-                       const boost::optional<BSONObj>& o2Field)
-    : OplogEntry(opTime, hash, opType, nss, OplogEntry::kOplogVersion, oField, o2Field) {}
-
 bool OplogEntry::isCommand() const {
     return getOpType() == OpTypeEnum::kCommand;
 }
