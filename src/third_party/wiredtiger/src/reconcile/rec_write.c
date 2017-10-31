@@ -50,9 +50,9 @@ typedef struct {
 
 	uint64_t max_txn;
 
-	/* Track if all updates were skipped. */
-	uint64_t update_cnt;
-	uint64_t update_skip_cnt;
+	uint64_t update_mem_all;	/* Total update memory size */
+	uint64_t update_mem_saved;	/* Saved update memory size */
+	uint64_t update_mem_uncommitted;/* Uncommitted update memory size */
 
 	/*
 	 * When we can't mark the page clean (for example, checkpoint found some
@@ -340,7 +340,8 @@ static int  __rec_split_write(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *, bool);
 static int  __rec_update_las(
 		WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t, WT_BOUNDARY *);
-static int  __rec_write_check_complete(WT_SESSION_IMPL *, WT_RECONCILE *);
+static int  __rec_write_check_complete(
+		WT_SESSION_IMPL *, WT_RECONCILE *, bool *);
 static int  __rec_write_init(WT_SESSION_IMPL *,
 		WT_REF *, uint32_t, WT_SALVAGE_COOKIE *, void *);
 static void __rec_write_page_status(WT_SESSION_IMPL *, WT_RECONCILE *);
@@ -439,7 +440,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/* Checks for a successful reconciliation. */
 	if (ret == 0)
-		ret = __rec_write_check_complete(session, r);
+		ret = __rec_write_check_complete(session, r, lookaside_retryp);
 
 	/* Wrap up the page reconciliation. */
 	if (ret == 0 && (ret = __rec_write_wrapup(session, r, page)) == 0)
@@ -449,14 +450,6 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/* Release the reconciliation lock. */
 	WT_PAGE_UNLOCK(session, page);
-
-	/*
-	 * If our caller can configure lookaside table reconciliation, flag if
-	 * that's worth trying. The lookaside table doesn't help if we skipped
-	 * updates, it can only help with older readers preventing eviction.
-	 */
-	if (lookaside_retryp != NULL && r->update_cnt == r->update_skip_cnt)
-		*lookaside_retryp = true;
 
 	/* Update statistics. */
 	WT_STAT_CONN_INCR(session, rec_pages);
@@ -560,13 +553,21 @@ __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 /*
  * __rec_write_check_complete --
- *	Check that reconciliation should complete
+ *	Check that reconciliation should complete.
  */
 static int
-__rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__rec_write_check_complete(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, bool *lookaside_retryp)
 {
-	WT_BOUNDARY *bnd;
-	size_t i;
+	/*
+	 * Tests in this function are lookaside tests and tests to decide if
+	 * rewriting a page in memory is worth doing. In-memory configurations
+	 * can't use a lookaside table, and we ignore page rewrite desirability
+	 * checks for in-memory eviction because a small cache can force us to
+	 * rewrite every possible page.
+	 */
+	if (F_ISSET(r, WT_EVICT_IN_MEMORY))
+		return (0);
 
 	/*
 	 * If we have used the lookaside table, check for a lookaside table and
@@ -576,19 +577,62 @@ __rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		return (EBUSY);
 
 	/*
-	 * If we are doing update/restore based eviction, confirm part of the
-	 * page is being discarded, or at least 10% of the updates won't have
-	 * to be re-instantiated. Otherwise, it isn't progress, don't bother.
+	 * Eviction can configure lookaside table reconciliation, consider if
+	 * it's worth giving up this reconciliation attempt and falling back to
+	 * using the lookaside table.  We continue with evict/restore if
+	 * switching to the lookaside doesn't make sense for any reason: we
+	 * won't retry an evict/restore reconciliation until/unless the
+	 * transactional system moves forward, so at worst it's a single wasted
+	 * effort.
+	 *
+	 * First, check if the lookaside table is a possible alternative.
 	 */
-	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {
-		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i)
-			if (bnd->supd == NULL)
-				break;
-		if (i == r->bnd_entries &&
-		    r->update_cnt / 10 >= r->update_skip_cnt)
-			return (EBUSY);
-	}
-	return (0);
+	if (lookaside_retryp == NULL)
+		return (0);
+
+	/*
+	 * We only suggest lookaside if currently in an evict/restore attempt
+	 * and some updates were saved.  Our caller sets the evict/restore flag
+	 * based on various conditions (like if this is a leaf page), which is
+	 * why we're testing that flag instead of a set of other conditions.
+	 * If no updates were saved, eviction will succeed without needing to
+	 * restore anything.
+	 */
+	if (!F_ISSET(r, WT_EVICT_UPDATE_RESTORE) || r->bnd->supd == NULL)
+		return (0);
+
+	/*
+	 * Check if this reconciliation attempt is making progress.  If there's
+	 * any sign of progress, don't fall back to the lookaside table.
+	 *
+	 * Check if the current reconciliation split, in which case we'll
+	 * likely get to write at least one of the blocks.  If that page is
+	 * empty, that's also progress.
+	 */
+	if (r->bnd_next != 1)
+		return (0);
+
+	/*
+	 * Check if the current reconciliation applied some updates, in which
+	 * case evict/restore should gain us some space.
+	 */
+	if (r->update_mem_saved != r->update_mem_all)
+		return (0);
+
+	/*
+	 * Check if lookaside eviction is possible.  If any of the updates we
+	 * saw were uncommitted, the lookaside table cannot be used: it only
+	 * helps with older readers preventing eviction.
+	 */
+	if (r->update_mem_uncommitted != 0)
+		return (0);
+
+	/*
+	 * The current evict/restore approach shows no signs of being useful,
+	 * lookaside is possible, suggest the lookaside table.
+	 */
+	*lookaside_retryp = true;
+	return (EBUSY);
 }
 
 /*
@@ -903,7 +947,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->max_txn = WT_TXN_NONE;
 
 	/* Track if all updates were skipped. */
-	r->update_cnt = r->update_skip_cnt = 0;
+	r->update_mem_all = r->update_mem_saved = r->update_mem_uncommitted = 0;
 
 	/* Track if the page can be marked clean. */
 	r->leave_dirty = false;
@@ -1127,7 +1171,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_DECL_ITEM(tmp);
 	WT_PAGE *page;
 	WT_UPDATE *append, *upd, *upd_list;
-	size_t notused;
+	size_t notused, update_mem;
 	uint64_t max_txn, min_txn, txnid;
 	bool append_origv, skipped;
 
@@ -1148,28 +1192,43 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	} else
 		upd_list = ins->upd;
 
-	++r->update_cnt;
-	for (skipped = false,
-	    max_txn = WT_TXN_NONE, min_txn = UINT64_MAX,
-	    upd = upd_list; upd != NULL; upd = upd->next) {
-		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
-			continue;
+	skipped = false;
+	update_mem = 0;
+	max_txn = WT_TXN_NONE;
+	min_txn = UINT64_MAX;
 
-		/* Track the largest/smallest transaction IDs on the list. */
-		if (WT_TXNID_LT(max_txn, txnid))
-			max_txn = txnid;
-		if (WT_TXNID_LT(txnid, min_txn))
-			min_txn = txnid;
+	if (F_ISSET(r, WT_EVICTING)) {
+		/* Discard obsolete updates. */
+		if ((upd = __wt_update_obsolete_check(
+		    session, page, upd_list->next)) != NULL)
+			__wt_update_obsolete_free(session, page, upd);
 
-		/*
-		 * Find the first update we can use.
-		 */
-		if (F_ISSET(r, WT_EVICTING)) {
+		for (upd = upd_list; upd != NULL; upd = upd->next) {
+			/* Track the total memory in the update chain. */
+			update_mem += WT_UPDATE_MEMSIZE(upd);
+
+			if ((txnid = upd->txnid) == WT_TXN_ABORTED)
+				continue;
+
 			/*
+			 * Track the largest/smallest transaction IDs on the
+			 * list.
+			 */
+			if (WT_TXNID_LT(max_txn, txnid))
+				max_txn = txnid;
+			if (WT_TXNID_LT(txnid, min_txn))
+				min_txn = txnid;
+
+			/*
+			 * Find the first update we can use.
+			 *
 			 * Eviction can write any committed update.
 			 *
 			 * When reconciling for eviction, track whether any
 			 * uncommitted updates are found.
+			 *
+			 * When reconciling for eviction, track the memory held
+			 * by the update chain.
 			 */
 			if (WT_TXNID_LE(r->last_running, txnid)) {
 				skipped = true;
@@ -1178,8 +1237,19 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 			if (*updp == NULL)
 				*updp = upd;
-		} else {
+		}
+	} else
+		for (upd = upd_list; upd != NULL; upd = upd->next) {
+			if ((txnid = upd->txnid) == WT_TXN_ABORTED)
+				continue;
+
+			/* Track the largest transaction ID on the list. */
+			if (WT_TXNID_LT(max_txn, txnid))
+				max_txn = txnid;
+
 			/*
+			 * Find the first update we can use.
+			 *
 			 * Checkpoint can only write updates visible as of its
 			 * snapshot.
 			 *
@@ -1194,7 +1264,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 					skipped = true;
 			}
 		}
-	}
+
+	r->update_mem_all += update_mem;
 
 	/*
 	 * If all of the updates were aborted, quit. This test is not strictly
@@ -1241,12 +1312,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    txnid != S2C(session)->txn_global.checkpoint_txnid ||
 		    WT_SESSION_IS_CHECKPOINT(session));
 #endif
-
-		/*
-		 * Track how many update chains we saw vs. how many update
-		 * chains had an entry we skipped.
-		 */
-		++r->update_skip_cnt;
 		return (0);
 	}
 
@@ -1289,6 +1354,23 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		return (EBUSY);
 	if (skipped && !F_ISSET(r, WT_EVICT_UPDATE_RESTORE))
 		return (EBUSY);
+
+	/*
+	 * Track the memory required by the update chain.
+	 *
+	 * A page with no uncommitted (skipped) updates, that can't be evicted
+	 * because some updates aren't yet globally visible, can be evicted by
+	 * writing previous versions of the updates to the lookaside file. That
+	 * test is just checking if the skipped updates memory is zero.
+	 *
+	 * If that's not possible (there are skipped updates), we can rewrite
+	 * the pages in-memory, but we don't want to unless there's memory to
+	 * recover. That test is comparing the memory we'd recover to the memory
+	 * we'd have to re-instantiate as part of the rewrite.
+	 */
+	r->update_mem_saved += update_mem;
+	if (skipped)
+		r->update_mem_uncommitted += update_mem;
 
 	append_origv = false;
 	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {

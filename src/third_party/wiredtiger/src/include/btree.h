@@ -134,9 +134,12 @@ struct __wt_btree {
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
-	uint64_t checkpoint_gen;	/* Checkpoint generation */
-	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
 	uint64_t write_gen;		/* Write generation */
+	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
+	uint64_t checkpoint_gen;	/* Checkpoint generation */
+	volatile enum {
+		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
+	} checkpointing;		/* Checkpoint in progress */
 
 	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
 	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
@@ -169,10 +172,6 @@ struct __wt_btree {
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
 	int	    evict_start_type;	/* Start position for eviction walk
 					   (see WT_EVICT_WALK_START). */
-	enum {
-		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
-	} checkpointing;		/* Checkpoint in progress */
-
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_ALLOW_SPLITS	0x000100 /* Allow splits, even with no evict */
 #define	WT_BTREE_BULK		0x000200 /* Bulk-load handle */

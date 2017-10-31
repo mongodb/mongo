@@ -337,7 +337,7 @@ __wt_conn_btree_open(
 
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_btree_config_clear(session);
-	WT_RET(__conn_btree_config_set(session));
+	WT_ERR(__conn_btree_config_set(session));
 
 	/* Set any special flags on the handle. */
 	F_SET(btree, LF_MASK(WT_BTREE_SPECIAL_FLAGS));

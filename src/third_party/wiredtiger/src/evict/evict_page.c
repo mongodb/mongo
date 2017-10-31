@@ -156,7 +156,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	/* Update the reference and discard the page. */
 	if (__wt_ref_is_root(ref))
 		__wt_ref_out(session, ref);
-	else if ((clean_page && !LF_ISSET(WT_EVICT_IN_MEMORY)) || tree_dead)
+	else if ((clean_page && !F_ISSET(conn, WT_CONN_IN_MEMORY)) || tree_dead)
 		/*
 		 * Pages that belong to dead trees never write back to disk
 		 * and can't support page splits.
@@ -202,8 +202,8 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		return (0);
 
 	/*
-	 * Avoid doing reverse splits when closing the file, it is
-	 * wasted work and some structure may already have been freed.
+	 * Avoid doing reverse splits when closing the file, it is wasted work
+	 * and some structures may have already been freed.
 	 */
 	if (!closing) {
 		parent = ref->home;
@@ -393,11 +393,13 @@ __evict_review(
     WT_SESSION_IMPL *session, WT_REF *ref, uint32_t *flagsp, bool closing)
 {
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
-	bool lookaside_retry, modified;
+	bool lookaside_retry, *lookaside_retryp, modified;
 
+	conn = S2C(session);
 	flags = WT_EVICTING;
 	*flagsp = flags;
 
@@ -453,7 +455,7 @@ __evict_review(
 	 * Clean pages can't be evicted when running in memory only. This
 	 * should be uncommon - we don't add clean pages to the queue.
 	 */
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified && !closing)
+	if (F_ISSET(conn, WT_CONN_IN_MEMORY) && !modified && !closing)
 		return (EBUSY);
 
 	/* Check if the page can be evicted. */
@@ -519,11 +521,14 @@ __evict_review(
 	 * Additionally, if we aren't trying to free space in the cache, scrub
 	 * the page and keep it in memory.
 	 */
-	cache = S2C(session)->cache;
+	cache = conn->cache;
+	lookaside_retry = false;
+	lookaside_retryp = NULL;
+
 	if (closing)
 		LF_SET(WT_VISIBILITY_ERR);
 	else if (!WT_PAGE_IS_INTERNAL(page)) {
-		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		if (F_ISSET(conn, WT_CONN_IN_MEMORY))
 			LF_SET(WT_EVICT_IN_MEMORY |
 			    WT_EVICT_SCRUB | WT_EVICT_UPDATE_RESTORE);
 		else {
@@ -531,21 +536,26 @@ __evict_review(
 
 			if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
 				LF_SET(WT_EVICT_SCRUB);
+
+			/*
+			 * Check if reconciliation suggests trying the
+			 * lookaside table.
+			 */
+			lookaside_retryp = &lookaside_retry;
 		}
 	}
 
 	/* Reconcile the page. */
-	ret = __wt_reconcile(session, ref, NULL, flags, &lookaside_retry);
+	ret = __wt_reconcile(session, ref, NULL, flags, lookaside_retryp);
 
 	/*
-	 * If reconciliation fails, eviction is stuck and reconciliation reports
-	 * it might succeed if we use the lookaside table (the page didn't have
-	 * uncommitted updates, it was not-yet-globally visible updates causing
-	 * the problem), configure reconciliation to write those updates to the
-	 * lookaside table, allowing the eviction of pages we'd otherwise have
-	 * to retain in cache to support older readers.
+	 * If reconciliation fails, eviction is stuck and reconciliation
+	 * reports it might succeed if we use the lookaside table, then
+	 * configure reconciliation to write those updates to the lookaside
+	 * table, allowing the eviction of pages we'd otherwise have to retain
+	 * in cache to support older readers.
 	 */
-	if (ret == EBUSY && __wt_cache_stuck(session) && lookaside_retry) {
+	if (ret == EBUSY && lookaside_retry && __wt_cache_stuck(session)) {
 		LF_CLR(WT_EVICT_SCRUB | WT_EVICT_UPDATE_RESTORE);
 		LF_SET(WT_EVICT_LOOKASIDE);
 		ret = __wt_reconcile(session, ref, NULL, flags, NULL);
