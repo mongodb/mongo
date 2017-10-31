@@ -1192,7 +1192,9 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
 
     // The top-level locks were freed, so also release any potential low-level (storage engine)
     // locks that might be held.
-    txn->recoveryUnit()->abandonSnapshot();
+    WiredTigerRecoveryUnit* recoveryUnit = (WiredTigerRecoveryUnit*)txn->recoveryUnit();
+    recoveryUnit->abandonSnapshot();
+    recoveryUnit->beginIdle();
 
     // Wait for an oplog deletion request, or for this record store to have been destroyed.
     oplogStones->awaitHasExcessStonesOrDead();
