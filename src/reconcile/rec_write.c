@@ -39,16 +39,19 @@ typedef struct {
 	uint64_t orig_txn_checkpoint_gen;
 
 	/*
-	 * Track the oldest running transaction and the stable timestamp when
-	 * reconciliation starts.
+	 * Track the oldest running transaction and whether to skew lookaside
+	 * to the newest or oldest update.
 	 */
+	bool las_skew_oldest;
 	uint64_t last_running;
-	WT_DECL_TIMESTAMP(stable_timestamp)
 
 	/* Track the page's min/maximum transactions. */
 	uint64_t max_txn;
 	WT_DECL_TIMESTAMP(max_timestamp)
 	WT_DECL_TIMESTAMP(min_saved_timestamp)
+
+	u_int updates_seen;		/* Count of updates seen. */
+	u_int updates_unstable;		/* Count of updates not visible_all. */
 
 	bool update_uncommitted;	/* An update was uncommitted */
 	bool update_used;		/* An update could be used */
@@ -450,6 +453,15 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	WT_ILLEGAL_VALUE_SET(session);
 	}
 
+	/*
+	 * Update the global lookaside score.  Only use observations during
+	 * eviction, not checkpoints and don't count eviction of the lookaside
+	 * table itself.
+	 */
+	if (F_ISSET(r, WT_REC_EVICT) && !F_ISSET(btree, WT_BTREE_LOOKASIDE))
+		__wt_cache_update_lookaside_score(
+		    session, r->updates_seen, r->updates_unstable);
+
 	/* Check for a successful reconciliation. */
 	WT_TRET(__rec_write_check_complete(session, r, ret, lookaside_retryp));
 
@@ -682,7 +694,7 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		 */
 		WT_ASSERT(session,
 		    !F_ISSET(r, WT_REC_EVICT) ||
-		    F_ISSET(r, WT_REC_UPDATE_RESTORE));
+		    F_ISSET(r, WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE));
 	} else {
 		/*
 		 * Track the page's maximum transaction ID (used to decide if
@@ -919,12 +931,12 @@ __rec_init(WT_SESSION_IMPL *session,
 	 * uncommitted.
 	 */
 	txn_global = &S2C(session)->txn_global;
+	if (__wt_btree_immediately_durable(session))
+		r->las_skew_oldest = false;
+	else
+		WT_ORDERED_READ(r->las_skew_oldest,
+		    txn_global->has_stable_timestamp);
 	WT_ORDERED_READ(r->last_running, txn_global->last_running);
-#ifdef HAVE_TIMESTAMPS
-	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
-	    __wt_timestamp_set(
-		&r->stable_timestamp, &txn_global->stable_timestamp));
-#endif
 
 	/*
 	 * When operating on the lookaside table, we should never try
@@ -970,6 +982,7 @@ __rec_init(WT_SESSION_IMPL *session,
 #endif
 
 	/* Track if updates were used and/or uncommitted. */
+	r->updates_seen = r->updates_unstable = 0;
 	r->update_uncommitted = r->update_used = false;
 
 	/* Track if the page can be marked clean. */
@@ -1255,6 +1268,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
+		++r->updates_seen;
 		upd_memsize += WT_UPDATE_MEMSIZE(upd);
 
 		/*
@@ -1297,10 +1311,27 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * uncommitted updates).  Lookaside eviction can save any
 		 * committed update.  Regular eviction checks that the maximum
 		 * transaction ID and timestamp seen are stable.
+		 *
+		 * Lookaside eviction tries to choose the same version as a
+		 * subsequent checkpoint, so that checkpoint can skip over
+		 * pages with lookaside entries.  If the application has
+		 * supplied a stable timestamp, we assume (a) that it is old,
+		 * and (b) that the next checkpoint will use it, so we wait to
+		 * see a stable update.  If there is no stable timestamp, we
+		 * assume the next checkpoint will write the most recent
+		 * version (but we save enough information that checkpoint can
+		 * fix things up if we choose an update that is too new).
 		 */
+		if (*updp == NULL && F_ISSET(r, WT_REC_LOOKASIDE) &&
+		    F_ISSET(r, WT_REC_VISIBLE_ALL) && !r->las_skew_oldest)
+			*updp = upd;
+
 		if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    !__wt_txn_upd_visible_all(session, upd) :
 		    !__wt_txn_upd_visible(session, upd)) {
+			if (F_ISSET(r, WT_REC_EVICT))
+				++r->updates_unstable;
+
 			/*
 			 * Rare case: when applications run at low isolation
 			 * levels, update/restore eviction may see a stable
@@ -1310,12 +1341,19 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			 * discard an uncommitted update.
 			 */
 			if (F_ISSET(r, WT_REC_UPDATE_RESTORE) &&
-			    *updp != NULL && uncommitted)
+			    *updp != NULL && uncommitted) {
+				r->leave_dirty = true;
 				return (EBUSY);
+			}
 
 			continue;
 		}
 
+		/*
+		 * Lookaside without stable timestamp was taken care of above
+		 * (set to the first uncommitted transaction.  Lookaside with
+		 * stable timestamp always takes the first stable update.
+		 */
 		if (*updp == NULL)
 			*updp = upd;
 	}
@@ -1383,8 +1421,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (F_ISSET(r, WT_REC_VISIBILITY_ERR))
 		WT_PANIC_RET(session, EINVAL,
 		    "reconciliation error, update not visible");
-	if (!F_ISSET(r, WT_REC_LOOKASIDE))
-		r->leave_dirty = true;
+
+	r->leave_dirty = true;
 
 	/*
 	 * If not trying to evict the page, we know what we'll write and we're
@@ -1422,13 +1460,15 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 #ifdef HAVE_TIMESTAMPS
 	/* Track the oldest saved timestamp for lookaside. */
 	if (F_ISSET(r, WT_REC_LOOKASIDE))
-		for (upd = first_upd; upd != NULL; upd = upd->next)
+		for (upd = first_upd; upd != NULL; upd = upd->next) {
 			if (upd->txnid != WT_TXN_ABORTED &&
-			    upd->txnid != WT_TXN_NONE &&
-			    __wt_timestamp_cmp(
-			    &upd->timestamp, &r->min_saved_timestamp) < 0)
-				__wt_timestamp_set(
-				    &r->min_saved_timestamp, &upd->timestamp);
+			    __wt_timestamp_cmp(&upd->timestamp,
+			    &r->min_saved_timestamp) < 0)
+				__wt_timestamp_set(&r->min_saved_timestamp,
+				    &upd->timestamp);
+			if (upd == *updp)
+				break;
+		}
 #endif
 
 check_original_value:
@@ -1441,12 +1481,14 @@ check_original_value:
 	/*
 	 * Returning an update means the original on-page value might be lost,
 	 * and that's a problem if there's a reader that needs it. There are
-	 * two cases: any lookaside table eviction (because the backing disk
-	 * image is rewritten), or any reconciliation of a backing overflow
-	 * record that will be physically removed once it's no longer needed.
+	 * three cases: any update from a modify operation (because the modify
+	 * has to be applied to a stable update, not the new on-page update),
+	 * any lookaside table eviction (because the backing disk image is
+	 * rewritten), or any reconciliation of a backing overflow record that
+	 * will be physically removed once it's no longer needed.
 	 */
-	if (*updp != NULL && (F_ISSET(r, WT_REC_LOOKASIDE) ||
-	    (vpack != NULL &&
+	if (*updp != NULL && ((*updp)->type == WT_UPDATE_MODIFIED ||
+	    F_ISSET(r, WT_REC_LOOKASIDE) || (vpack != NULL &&
 	    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
 		WT_RET(
 		    __rec_append_orig_value(session, page, first_upd, vpack));
@@ -3300,6 +3342,14 @@ __rec_split_write_supd(WT_SESSION_IMPL *session,
 		}
 		r->supd_next = j;
 	}
+
+	/* Track the oldest timestamp seen so far. */
+	multi->page_las.las_skew_oldest = r->las_skew_oldest;
+	multi->page_las.las_max_txn = r->max_txn;
+#ifdef HAVE_TIMESTAMPS
+	__wt_timestamp_set(
+	    &multi->page_las.min_timestamp, &r->min_saved_timestamp);
+#endif
 
 err:	__wt_scr_free(session, &key);
 	return (ret);
@@ -5869,11 +5919,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			r->multi->addr.addr = NULL;
 			mod->mod_disk_image = r->multi->disk_image;
 			r->multi->disk_image = NULL;
-			mod->mod_replace_las_pageid = r->multi->las_pageid;
-#ifdef HAVE_TIMESTAMPS
-			__wt_timestamp_set(&mod->mod_replace_las_min_timestamp,
-			     &r->min_saved_timestamp);
-#endif
+			mod->mod_page_las = r->multi->page_las;
 		} else
 			WT_RET(__wt_bt_write(session, r->wrapup_checkpoint,
 			    NULL, NULL, true, F_ISSET(r, WT_REC_CHECKPOINT),
@@ -6018,9 +6064,9 @@ __rec_las_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * flags if lookaside table entries for this page have been written.
 	 */
 	for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-		if (multi->supd != NULL && multi->las_pageid != 0)
-			WT_TRET(__wt_las_remove_block(
-			    session, NULL, btree_id, multi->las_pageid));
+		if (multi->supd != NULL && multi->page_las.las_pageid != 0)
+			WT_TRET(__wt_las_remove_block(session, NULL,
+			    btree_id, multi->page_las.las_pageid));
 
 	return (ret);
 }

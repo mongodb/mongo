@@ -547,6 +547,7 @@ main(int argc, char *argv[])
 			if (nth < MIN_TH)
 				nth = MIN_TH;
 		}
+
 		printf("Parent: compatibility: %s, "
 		    "in-mem log sync: %s, timestamp in use: %s\n",
 		    compat ? "true" : "false",
@@ -741,6 +742,7 @@ main(int argc, char *argv[])
 				printf("%s: LOCAL after absent record at %"
 				    PRIu64 " key %" PRIu64 " exists\n",
 				    fname, middle_local, key);
+				middle_local = 0;
 				fatal = true;
 			}
 			/*
@@ -762,14 +764,13 @@ main(int argc, char *argv[])
 				printf("%s: OPLOG after absent record at %"
 				    PRIu64 " key %" PRIu64 " exists\n",
 				    fname, middle_oplog, key);
+				middle_oplog = 0;
 				fatal = true;
 			}
 		}
 		testutil_checksys(fclose(fp) != 0);
 	}
 	testutil_check(conn->close(conn, NULL));
-	if (fatal)
-		return (EXIT_FAILURE);
 	if (!inmem && absent_coll) {
 		printf("COLLECTION: %" PRIu64
 		    " record(s) absent from %" PRIu64 "\n",

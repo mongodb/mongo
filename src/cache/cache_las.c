@@ -333,7 +333,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session,
 	insert_cnt = 0;
 
 	btree_id = S2BT(session)->id;
-	las_pageid = multi->las_pageid =
+	las_pageid = multi->page_las.las_pageid =
 	    __wt_atomic_add64(&S2BT(session)->las_pageid, 1);
 
 	/*
