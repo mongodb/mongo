@@ -495,7 +495,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
     std::vector<BSONObj> indexSpecs;
     BSONObj idIndexSpec;
+    BSONObj options;
     {
+        // 0. Get the collection indexes and options from the donor shard.
+
+        // Do not hold any locks while issuing remote calls.
+        invariant(!opCtx->lockState()->isLocked());
+
+        // Get indexes by calling listIndexes against the donor.
         auto indexes = conn->getIndexSpecs(_nss.ns());
         for (auto&& spec : indexes) {
             indexSpecs.push_back(spec);
@@ -506,10 +513,65 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 }
             }
         }
+
+        // Get collection options by calling listCollections against the donor.
+        std::list<BSONObj> infos =
+            conn->getCollectionInfos(_nss.db().toString(), BSON("name" << _nss.coll()));
+
+        if (infos.size() != 1) {
+            setStateFailWarn(str::stream()
+                             << "expected listCollections against the donor shard for "
+                             << _nss.ns()
+                             << " to return 1 entry, but got "
+                             << infos.size()
+                             << " entries");
+            return;
+        }
+
+        BSONObj entry = infos.front();
+
+        // The entire options include both the settable options under the 'options' field in the
+        // listCollections response, and the UUID under the 'info' field.
+        BSONObjBuilder optionsBob;
+
+        if (entry["options"].isABSONObj()) {
+            optionsBob.appendElements(entry["options"].Obj());
+        }
+
+        if (serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
+            BSONObj info;
+            if (entry["info"].isABSONObj()) {
+                info = entry["info"].Obj();
+            }
+            if (info["uuid"].eoo()) {
+                setStateFailWarn(str::stream()
+                                 << "The donor shard did not return a UUID for collection "
+                                 << _nss.ns()
+                                 << " as part of its listCollections response: "
+                                 << entry
+                                 << ", but this node expects to see a UUID since its "
+                                    "feature compatibility version is 3.6. Please follow "
+                                    "the online documentation to set the same feature "
+                                    "compatibility version across the cluster.");
+                return;
+            }
+            optionsBob.append(info["uuid"]);
+        }
+        options = optionsBob.obj();
     }
 
     {
-        // 0. copy system.namespaces entry if collection doesn't already exist
+        // 1. Create the collection (if it doesn't already exist) and create any indexes we are
+        // missing (auto-heal indexes).
+
+        // Hold the DBLock in X mode across creating the collection and indexes, so that a
+        // concurrent dropIndex cannot run between creating the collection and indexes and fail with
+        // IndexNotFound, though the index will get created.
+        // We could take the DBLock in IX mode while checking if the collection already exists and
+        // then upgrade it to X mode while creating the collection and indexes, but there is no way
+        // to upgrade a DBLock once it's taken without releasing it, so we pre-emptively take it in
+        // mode X.
+        Lock::DBLock lk(opCtx, _nss.db(), MODE_X);
 
         OldClientWriteContext ctx(opCtx, _nss.ns());
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, _nss)) {
@@ -518,60 +580,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             return;
         }
 
-        // Only copy if ns doesn't already exist
         Database* const db = ctx.db();
-
-        Collection* const collection = db->getCollection(opCtx, _nss);
-        if (!collection) {
-            std::list<BSONObj> infos =
-                conn->getCollectionInfos(_nss.db().toString(), BSON("name" << _nss.coll()));
-
-            if (infos.size() != 1) {
-                setStateFailWarn(str::stream()
-                                 << "expected listCollections against the donor shard for "
-                                 << _nss.ns()
-                                 << " to return 1 entry, but got "
-                                 << infos.size()
-                                 << " entries");
-                return;
-            }
-
-            BSONObj entry = infos.front();
-
-            BSONObj options;
-
-            BSONObj optionsWithoutUUID;
-            if (entry["options"].isABSONObj()) {
-                optionsWithoutUUID = entry["options"].Obj();
-            }
-
-            BSONObj info;
-            if (entry["info"].isABSONObj()) {
-                info = entry["info"].Obj();
-            }
-
-            if (serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
-                if (info["uuid"].eoo()) {
-                    setStateFailWarn(str::stream()
-                                     << "The donor shard did not return a UUID for collection "
-                                     << _nss.ns()
-                                     << " as part of its listCollections response: "
-                                     << entry
-                                     << ", but this node expects to see a UUID since its "
-                                        "feature compatibility version is 3.6. Please follow "
-                                        "the online documentation to set the same feature "
-                                        "compatibility version across the cluster.");
-                    return;
-                }
-
-                BSONObjBuilder optionsBob;
-                optionsBob.appendElements(optionsWithoutUUID);
-                optionsBob.append(info["uuid"]);
-                options = optionsBob.obj();
-            } else {
-                options = optionsWithoutUUID.getOwned();
-            }
-
+        if (!db->getCollection(opCtx, _nss)) {
             WriteUnitOfWork wuow(opCtx);
             const bool createDefaultIndexes = true;
             Status status = userCreateNS(opCtx,
@@ -587,21 +597,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             }
             wuow.commit();
         }
-    }
 
-    {
-        // 1. copy indexes
-
-        Lock::DBLock lk(opCtx, _nss.db(), MODE_X);
-        OldClientContext ctx(opCtx, _nss.ns());
-
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, _nss)) {
-            setStateFailWarn(str::stream() << "Not primary during migration: " << _nss.ns());
-            return;
-        }
-
-        Database* db = ctx.db();
-        Collection* collection = db->getCollection(opCtx, _nss);
+        Collection* const collection = db->getCollection(opCtx, _nss);
         if (!collection) {
             setStateFailWarn(str::stream() << "collection dropped during migration: " << _nss.ns());
             return;
@@ -626,14 +623,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 setStateFailWarn(str::stream() << "failed to create index before migrating data. "
                                                << " error: "
                                                << redact(indexInfoObjs.getStatus()));
-                return;
-            }
-
-            auto status = indexer.insertAllDocumentsInCollection();
-            if (!status.isOK()) {
-                setStateFailWarn(str::stream() << "failed to create index before migrating data. "
-                                               << " error: "
-                                               << redact(status));
                 return;
             }
 
