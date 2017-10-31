@@ -216,8 +216,6 @@ void KeysCollectionManagerSharding::PeriodicRunner::_doPeriodicRefresh(
     Client::initThreadIfNotAlready(threadName);
 
     while (true) {
-        auto opCtx = cc().makeOperationContext();
-
         bool hasRefreshRequestInitially = false;
         unsigned errorCount = 0;
         std::shared_ptr<RefreshFunc> doRefresh;
@@ -238,6 +236,8 @@ void KeysCollectionManagerSharding::PeriodicRunner::_doPeriodicRefresh(
         // No need to refresh keys in FCV 3.4, since key generation will be disabled.
         if (serverGlobalParams.featureCompatibility.getVersion() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+            auto opCtx = cc().makeOperationContext();
+
             auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
             if (latestKeyStatusWith.getStatus().isOK()) {
                 errorCount = 0;
@@ -285,6 +285,9 @@ void KeysCollectionManagerSharding::PeriodicRunner::_doPeriodicRefresh(
         if (_inShutdown) {
             break;
         }
+
+        // Use a new opCtx so we won't be holding any RecoveryUnit while this thread goes to sleep.
+        auto opCtx = cc().makeOperationContext();
 
         MONGO_IDLE_THREAD_BLOCK;
         auto sleepStatus = opCtx->waitForConditionOrInterruptNoAssertUntil(
