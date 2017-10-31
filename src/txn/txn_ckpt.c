@@ -437,7 +437,8 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	for (;;) {
 		current_dirty =
 		    (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
-		if (current_dirty <= (double)cache->eviction_checkpoint_target)
+		if (current_dirty <=
+		    (double)cache->eviction_checkpoint_target)
 			break;
 
 		__wt_sleep(0, stepdown_us / 10);

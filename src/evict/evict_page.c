@@ -369,9 +369,11 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 				    __wt_calloc_one(session, &ref->page_las));
 				ref->page_las->las_pageid =
 				    mod->mod_replace_las_pageid;
+#ifdef HAVE_TIMESTAMPS
 				__wt_timestamp_set(
 				    &ref->page_las->min_timestamp,
 				    &mod->mod_replace_las_min_timestamp);
+#endif
 				__wt_ref_out(session, ref);
 				WT_PUBLISH(ref->state, WT_REF_LOOKASIDE);
 			} else {

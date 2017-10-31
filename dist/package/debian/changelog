@@ -1,0 +1,5 @@
+wiredtiger (2.1.2-1) UNRELEASED; urgency=low
+
+  * Initial release of WiredTiger
+
+ -- Alex <alexg@wiredtiger.com>  Tue, 01 Apr 2014 15:50:02 +1100

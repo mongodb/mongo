@@ -39,10 +39,15 @@
 } while (0)
 
 /* An API call wrapped in a transaction if necessary. */
+#ifdef HAVE_TIMESTAMPS
+#define	WT_TXN_TIMESTAMP_FLAG_CHECK(s) __wt_txn_timestamp_flags((s))
+#else
+#define	WT_TXN_TIMESTAMP_FLAG_CHECK(s)
+#endif
 #define	TXN_API_CALL(s, h, n, bt, config, cfg) do {			\
 	bool __autotxn = false;						\
 	API_CALL(s, h, n, bt, config, cfg);				\
-	__wt_txn_timestamp_flags(s);					\
+	WT_TXN_TIMESTAMP_FLAG_CHECK(s);					\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
@@ -51,7 +56,7 @@
 #define	TXN_API_CALL_NOCONF(s, h, n, dh) do {				\
 	bool __autotxn = false;						\
 	API_CALL_NOCONF(s, h, n, dh);					\
-	__wt_txn_timestamp_flags(s);					\
+	WT_TXN_TIMESTAMP_FLAG_CHECK(s);					\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
