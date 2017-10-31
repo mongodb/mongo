@@ -127,9 +127,10 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
 void WiredTigerSession::closeAllCursors(const std::string& uri) {
     invariant(_session);
 
+    bool all = (uri == "");
     for (auto i = _cursors.begin(); i != _cursors.end();) {
         WT_CURSOR* cursor = i->_cursor;
-        if (cursor && uri == cursor->uri) {
+        if (cursor && (all || uri == cursor->uri)) {
             invariantWTOK(cursor->close(cursor));
             i = _cursors.erase(i);
         } else

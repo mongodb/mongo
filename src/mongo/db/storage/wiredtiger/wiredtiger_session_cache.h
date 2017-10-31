@@ -98,6 +98,10 @@ public:
 
     void closeCursorsForQueuedDrops(WiredTigerKVEngine* engine);
 
+    /**
+     * Closes all cached cursors matching the uri.  If the uri is empty,
+     * all cached cursors are closed.
+     */
     void closeAllCursors(const std::string& uri);
 
     int cursorsOut() const {
@@ -173,8 +177,8 @@ public:
     void closeCursorsForQueuedDrops();
 
     /**
-     * Closes all cached cursors and ensures that previously opened cursors will be closed on
-     * release.
+     * Closes all cached cursors matching the uri.  If the uri is empty,
+     * all cached cursors are closed.
      */
     void closeAllCursors(const std::string& uri);
 
