@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -442,7 +443,7 @@ Status applyOps(OperationContext* opCtx,
                     auto name = elem.fieldNameStringData();
                     if (name == kPreconditionFieldName)
                         continue;
-                    if (name == "bypassDocumentValidation")
+                    if (name == bypassDocumentValidationCommandOption())
                         continue;
                     cmdBuilder.append(elem);
                 }
