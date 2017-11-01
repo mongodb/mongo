@@ -238,7 +238,7 @@ public:
                               << "]",
                 batch.size() <= 1u);
 
-        return boost::make_optional(!batch.empty(), Document(batch.front()));
+        return (!batch.empty() ? Document(batch.front()) : boost::optional<Document>{});
     }
 
 private:
