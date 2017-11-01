@@ -651,18 +651,12 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* o
     _killCursorsScheduledEvent = statusWithEvent.getValue();
 
     // If we're not waiting for responses from remotes, we can schedule killCursors commands on the
-    // remotes now. Otherwise, we have to wait until all responses are back, and then we can kill
-    // the remote cursors.
+    // remotes now. Otherwise, we have to wait until all responses are back because a cursor that
+    // is active (pinned) on a remote cannot be killed through killCursors.
     if (!_haveOutstandingBatchRequests(lk)) {
         _scheduleKillCursors(lk, opCtx);
         _lifecycleState = kKillComplete;
         _executor->signalEvent(_killCursorsScheduledEvent);
-    } else {
-        for (const auto& remote : _remotes) {
-            if (remote.cbHandle.isValid()) {
-                _executor->cancel(remote.cbHandle);
-            }
-        }
     }
 
     return _killCursorsScheduledEvent;

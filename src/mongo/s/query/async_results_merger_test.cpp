@@ -856,6 +856,7 @@ TEST_F(AsyncResultsMergerTest, BadResponseReceivedFromShard) {
     BSONObj response3 = CursorResponse(_nss, CursorId(789), batch3)
                             .toBSON(CursorResponse::ResponseType::SubsequentResponse);
     scheduleNetworkResponseObjs({response1, response2, response3});
+    runReadyCallbacks();
     executor()->waitForEvent(readyEvent);
     ASSERT_TRUE(arm->ready());
     auto statusWithNext = arm->nextReady();
@@ -1021,8 +1022,17 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     // Kill event will only be signalled once the callbacks for the pending batches have run.
     auto killedEvent = arm->kill(operationContext());
 
-    // The pending requests have been canceled, so run their callbacks.
-    runReadyCallbacks();
+    // Schedule the remaining batches.
+    responses.clear();
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
+    responses.emplace_back(_nss, CursorId(2), batch2);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+    responses.clear();
+    std::vector<BSONObj> batch3 = {fromjson("{_id: 5}"), fromjson("{_id: 6}")};
+    responses.emplace_back(_nss, CursorId(3), batch3);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
 
     // Ensure that we properly signal those waiting for more results to be ready.
     executor()->waitForEvent(readyEvent);
@@ -1644,6 +1654,42 @@ TEST_F(AsyncResultsMergerTest, ShardCanErrorInBetweenReadyAndNextEvent) {
 
     // Required to kill the 'arm' on error before destruction.
     auto killEvent = arm->kill(operationContext());
+    executor()->waitForEvent(killEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, KillShouldWaitForRemoteCommandsBeforeSchedulingKillCursors) {
+    std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
+    cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
+    makeCursorFromExistingCursors(std::move(cursors));
+
+    // Before any requests are scheduled, ARM is not ready to return results.
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Schedule requests.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Before any responses are delivered, ARM is not ready to return results.
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Kill the ARM while a batch is still outstanding.
+    auto killEvent = arm->kill(operationContext());
+
+    // Since the cursor has not returned any results and still has a pending remote
+    // request, the ARM should not attempt to kill the cursor.
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Schedule the batch response, this should trigger cleanup of the batch and schedule the
+    // killCursors command.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+    responses.emplace_back(_nss, CursorId(1), batch);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+    executor()->waitForEvent(readyEvent);
+
+    // Now the kill cursors command should be scheduled.
     executor()->waitForEvent(killEvent);
 }
 
