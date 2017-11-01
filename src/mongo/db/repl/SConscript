@@ -39,6 +39,22 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='apply_ops_test',
+    source=[
+        'apply_ops_test.cpp',
+    ],
+    LIBDEPS=[
+        'oplog',
+        'oplog_entry',
+        'replmocks',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/op_observer_noop',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/rpc/command_status',
+    ],
+)
+
+env.CppUnitTest(
     target='oplog_test',
     source=[
         'oplog_test.cpp',
