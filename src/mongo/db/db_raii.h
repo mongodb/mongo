@@ -86,6 +86,8 @@ class AutoGetCollection {
     enum class ViewMode;
 
 public:
+    AutoGetCollection(OperationContext*, const NamespaceString&, const UUID&, LockMode modeAll);
+
     AutoGetCollection(OperationContext* opCtx, const NamespaceString& nss, LockMode modeAll)
         : AutoGetCollection(opCtx, nss, modeAll, modeAll, ViewMode::kViewsForbidden) {}
 
