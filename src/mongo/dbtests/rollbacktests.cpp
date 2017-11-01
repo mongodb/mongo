@@ -216,7 +216,7 @@ public:
     }
 };
 
-template <bool rollback, bool defaultIndexes>
+template <bool rollback, bool defaultIndexes, bool capped>
 class RenameCollection {
 public:
     void run() {
@@ -235,10 +235,11 @@ public:
             WriteUnitOfWork uow(&opCtx);
             ASSERT(!collectionExists(&ctx, source.ns()));
             ASSERT(!collectionExists(&ctx, target.ns()));
+            auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
             ASSERT_OK(userCreateNS(&opCtx,
                                    ctx.db(),
                                    source.ns(),
-                                   BSONObj(),
+                                   options,
                                    CollectionOptions::parseForCommand,
                                    defaultIndexes));
             uow.commit();
@@ -267,7 +268,7 @@ public:
     }
 };
 
-template <bool rollback, bool defaultIndexes>
+template <bool rollback, bool defaultIndexes, bool capped>
 class RenameDropTargetCollection {
 public:
     void run() {
@@ -291,16 +292,17 @@ public:
             WriteUnitOfWork uow(&opCtx);
             ASSERT(!collectionExists(&ctx, source.ns()));
             ASSERT(!collectionExists(&ctx, target.ns()));
+            auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
             ASSERT_OK(userCreateNS(&opCtx,
                                    ctx.db(),
                                    source.ns(),
-                                   BSONObj(),
+                                   options,
                                    CollectionOptions::parseForCommand,
                                    defaultIndexes));
             ASSERT_OK(userCreateNS(&opCtx,
                                    ctx.db(),
                                    target.ns(),
-                                   BSONObj(),
+                                   options,
                                    CollectionOptions::parseForCommand,
                                    defaultIndexes));
 

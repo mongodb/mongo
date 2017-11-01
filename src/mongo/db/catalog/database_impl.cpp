@@ -689,8 +689,8 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
     }
 
-    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, toNS));
     Status s = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
+    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, toNS));
     _collections[toNS] = _getOrCreateCollectionInstance(opCtx, toNSS);
 
     return s;
