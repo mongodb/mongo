@@ -68,7 +68,7 @@
                   }])
                   .itcount());
 
-    // Assert that the $geoNear aggregate accepts a specific collation and overrides the default 
+    // Assert that the $geoNear aggregate accepts a specific collation and overrides the default
     // collation in FCV 3.4.
     assert.eq(1,
               testDB.test34
