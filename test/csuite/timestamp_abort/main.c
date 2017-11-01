@@ -56,6 +56,7 @@ static char home[1024];			/* Program working dir */
  * Each worker thread creates its own records file that records the data it
  * inserted and it records the timestamp that was used for that insertion.
  */
+#define	INVALID_KEY	UINT64_MAX
 #define	MAX_CKPT_INVL	5	/* Maximum interval between checkpoints */
 #define	MAX_TH		12
 #define	MAX_TIME	40
@@ -84,6 +85,20 @@ static uint64_t th_ts[MAX_TH];
     "transaction_sync=(enabled,method=none)"
 #define	ENV_CONFIG_REC "log=(archive=false,recover=on)"
 
+typedef struct {
+	uint64_t absent_key;	/* Last absent key */
+	uint64_t exist_key;	/* First existing key after miss */
+	uint64_t first_key;	/* First key in range */
+	uint64_t first_miss;	/* First missing key */
+	uint64_t last_key;	/* Last key in range */
+} REPORT;
+
+typedef struct {
+	WT_CONNECTION *conn;
+	uint64_t start;
+	uint32_t info;
+} THREAD_DATA;
+
 static void handler(int)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void)
@@ -96,12 +111,6 @@ usage(void)
 	exit(EXIT_FAILURE);
 }
 
-typedef struct {
-	WT_CONNECTION *conn;
-	uint64_t start;
-	uint32_t info;
-} WT_THREAD_DATA;
-
 /*
  * thread_ts_run --
  *	Runner function for a timestamp thread.
@@ -111,11 +120,11 @@ thread_ts_run(void *arg)
 {
 	WT_CURSOR *cur_stable;
 	WT_SESSION *session;
-	WT_THREAD_DATA *td;
+	THREAD_DATA *td;
 	uint64_t i, last_ts, oldest_ts;
 	char tscfg[64];
 
-	td = (WT_THREAD_DATA *)arg;
+	td = (THREAD_DATA *)arg;
 	last_ts = 0;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
@@ -179,7 +188,7 @@ thread_ckpt_run(void *arg)
 	FILE *fp;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
-	WT_THREAD_DATA *td;
+	THREAD_DATA *td;
 	uint64_t ts;
 	uint32_t sleep_time;
 	int i;
@@ -187,7 +196,7 @@ thread_ckpt_run(void *arg)
 
 	__wt_random_init(&rnd);
 
-	td = (WT_THREAD_DATA *)arg;
+	td = (THREAD_DATA *)arg;
 	/*
 	 * Keep a separate file with the records we wrote for checking.
 	 */
@@ -235,7 +244,7 @@ thread_run(void *arg)
 	WT_ITEM data;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
-	WT_THREAD_DATA *td;
+	THREAD_DATA *td;
 	uint64_t i, stable_ts;
 	char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
 	char kname[64], tscfg[64];
@@ -246,7 +255,7 @@ thread_run(void *arg)
 	memset(obuf, 0, sizeof(obuf));
 	memset(kname, 0, sizeof(kname));
 
-	td = (WT_THREAD_DATA *)arg;
+	td = (THREAD_DATA *)arg;
 	/*
 	 * Set up the separate file for checking.
 	 */
@@ -351,13 +360,13 @@ run_workload(uint32_t nth)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	WT_THREAD_DATA *td;
+	THREAD_DATA *td;
 	wt_thread_t *thr;
 	uint32_t ckpt_id, i, ts_id;
 	char envconf[512];
 
 	thr = dcalloc(nth+2, sizeof(*thr));
-	td = dcalloc(nth+2, sizeof(WT_THREAD_DATA));
+	td = dcalloc(nth+2, sizeof(THREAD_DATA));
 	if (chdir(home) != 0)
 		testutil_die(errno, "Child chdir: %s", home);
 	if (inmem)
@@ -442,6 +451,39 @@ timestamp_build(void)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * Initialize a report structure.  Since zero is a valid key we
+ * cannot just clear it.
+ */
+static void
+initialize_rep(REPORT *r)
+{
+	r->first_key = r->first_miss = INVALID_KEY;
+	r->absent_key = r->exist_key = r->last_key = INVALID_KEY;
+}
+
+/*
+ * Print out information if we detect missing records in the
+ * middle of the data of a report structure.
+ */
+static void
+print_missing(REPORT *r, const char *fname, const char *msg)
+{
+	if (r->exist_key != INVALID_KEY)
+		printf("%s: %s error %" PRIu64
+		    " absent records %" PRIu64 "-%" PRIu64
+		    ". Then keys %" PRIu64 "-%" PRIu64 " exist."
+		    " Key range %" PRIu64 "-%" PRIu64 "\n",
+		    fname, msg,
+		    r->exist_key - r->first_miss - 1,
+		    r->first_miss, r->exist_key - 1,
+		    r->exist_key, r->last_key,
+		    r->first_key, r->last_key);
+}
+
+/*
+ * Signal handler to catch if the child died unexpectedly.
+ */
 static void
 handler(int sig)
 {
@@ -462,13 +504,13 @@ main(int argc, char *argv[])
 	struct sigaction sa;
 	struct stat sb;
 	FILE *fp;
+	REPORT c_rep[MAX_TH], l_rep[MAX_TH], o_rep[MAX_TH];
 	WT_CONNECTION *conn;
 	WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_stable;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	pid_t pid;
 	uint64_t absent_coll, absent_local, absent_oplog, count, key, last_key;
-	uint64_t first_miss, middle_coll, middle_local, middle_oplog;
 	uint64_t stable_fp, stable_val, val[MAX_TH+1];
 	uint32_t i, nth, timeout;
 	int ch, status, ret;
@@ -600,6 +642,12 @@ main(int argc, char *argv[])
 	 */
 	if (chdir(home) != 0)
 		testutil_die(errno, "parent chdir: %s", home);
+	/*
+	 * The tables can get very large, so while we'd ideally like to
+	 * copy the entire database, we only copy the log files for now.
+	 * Otherwise it can take far too long to run the test, particularly
+	 * in automated testing.
+	 */
 	testutil_check(__wt_snprintf(buf, sizeof(buf),
 	    "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && "
 	    "cp -p WiredTigerLog.* ../%s.SAVE",
@@ -646,7 +694,9 @@ main(int argc, char *argv[])
 	absent_coll = absent_local = absent_oplog = 0;
 	fatal = false;
 	for (i = 0; i < nth; ++i) {
-		first_miss = middle_coll = middle_local = middle_oplog = 0;
+		initialize_rep(&c_rep[i]);
+		initialize_rep(&l_rep[i]);
+		initialize_rep(&o_rep[i]);
 		testutil_check(__wt_snprintf(
 		    fname, sizeof(fname), RECORDS_FILE, i));
 		if ((fp = fopen(fname, "r")) == NULL)
@@ -659,9 +709,14 @@ main(int argc, char *argv[])
 		 * but records may be missing at the end.  If we did
 		 * write-no-sync, we expect every key to have been recovered.
 		 */
-		for (last_key = UINT64_MAX;; ++count, last_key = key) {
+		for (last_key = INVALID_KEY;; ++count, last_key = key) {
 			ret = fscanf(fp, "%" SCNu64 "%" SCNu64 "\n",
 			    &stable_fp, &key);
+			if (last_key == INVALID_KEY) {
+				c_rep[i].first_key = key;
+				l_rep[i].first_key = key;
+				o_rep[i].first_key = key;
+			}
 			if (ret != EOF && ret != 2) {
 				/*
 				 * If we find a partial line, consider it
@@ -678,7 +733,7 @@ main(int argc, char *argv[])
 			 * written key at the end that can result in a false
 			 * negative error for a missing record.  Detect it.
 			 */
-			if (last_key != UINT64_MAX && key != last_key + 1) {
+			if (last_key != INVALID_KEY && key != last_key + 1) {
 				printf("%s: Ignore partial record %" PRIu64
 				    " last valid key %" PRIu64 "\n",
 				    fname, key, last_key);
@@ -709,18 +764,16 @@ main(int argc, char *argv[])
 					    fname, key, stable_fp, val[i]);
 					absent_coll++;
 				}
-				if (middle_coll == 0)
-					first_miss = key;
-				middle_coll = key;
-			} else if (middle_coll != 0) {
+				if (c_rep[i].first_miss == INVALID_KEY)
+					c_rep[i].first_miss = key;
+				c_rep[i].absent_key = key;
+			} else if (c_rep[i].absent_key != INVALID_KEY &&
+			    c_rep[i].exist_key == INVALID_KEY) {
 				/*
-				 * We should never find an existing key after
-				 * we have detected one missing.
+				 * If we get here we found a record that exists
+				 * after absent records, a hole in our data.
 				 */
-				printf("%s: COLLECTION after absent records %"
-				    PRIu64 "-%" PRIu64 " key %" PRIu64
-				    " exists\n",
-				    fname, first_miss, middle_coll, key);
+				c_rep[i].exist_key = key;
 				fatal = true;
 			}
 			/*
@@ -733,16 +786,16 @@ main(int argc, char *argv[])
 					printf("%s: LOCAL no record with key %"
 					    PRIu64 "\n", fname, key);
 				absent_local++;
-				middle_local = key;
-			} else if (middle_local != 0) {
+				if (l_rep[i].first_miss == INVALID_KEY)
+					l_rep[i].first_miss = key;
+				l_rep[i].absent_key = key;
+			} else if (l_rep[i].absent_key != INVALID_KEY &&
+			    l_rep[i].exist_key == INVALID_KEY) {
 				/*
 				 * We should never find an existing key after
 				 * we have detected one missing.
 				 */
-				printf("%s: LOCAL after absent record at %"
-				    PRIu64 " key %" PRIu64 " exists\n",
-				    fname, middle_local, key);
-				middle_local = 0;
+				l_rep[i].exist_key = key;
 				fatal = true;
 			}
 			/*
@@ -755,20 +808,26 @@ main(int argc, char *argv[])
 					printf("%s: OPLOG no record with key %"
 					    PRIu64 "\n", fname, key);
 				absent_oplog++;
-				middle_oplog = key;
-			} else if (middle_oplog != 0) {
+				if (o_rep[i].first_miss == INVALID_KEY)
+					o_rep[i].first_miss = key;
+				o_rep[i].absent_key = key;
+			} else if (o_rep[i].absent_key != INVALID_KEY &&
+			    o_rep[i].exist_key == INVALID_KEY) {
 				/*
 				 * We should never find an existing key after
 				 * we have detected one missing.
 				 */
-				printf("%s: OPLOG after absent record at %"
-				    PRIu64 " key %" PRIu64 " exists\n",
-				    fname, middle_oplog, key);
-				middle_oplog = 0;
+				o_rep[i].exist_key = key;
 				fatal = true;
 			}
 		}
+		c_rep[i].last_key = last_key;
+		l_rep[i].last_key = last_key;
+		o_rep[i].last_key = last_key;
 		testutil_checksys(fclose(fp) != 0);
+		print_missing(&c_rep[i], fname, "COLLECTION");
+		print_missing(&l_rep[i], fname, "LOCAL");
+		print_missing(&o_rep[i], fname, "OPLOG");
 	}
 	testutil_check(conn->close(conn, NULL));
 	if (!inmem && absent_coll) {
