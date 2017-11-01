@@ -242,9 +242,9 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithoutUuidIntoCollectionWithUuid) {
     BSONObjBuilder resultBuilder;
     ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, &resultBuilder));
 
-    // TODO (SERVER-31300): Insert operation provided by caller did not contain collection uuid but
-    // applyOps() should add the uuid to the oplog entry.
-    auto expectedCmdObj = cmdObj;
+    // Insert operation provided by caller did not contain collection uuid but applyOps() should add
+    // the uuid to the oplog entry.
+    auto expectedCmdObj = makeApplyOpsWithInsertOperation(nss, uuid, documentToInsert);
     ASSERT_BSONOBJ_EQ(expectedCmdObj, _opObserver->onApplyOpsCmdObj);
 }
 

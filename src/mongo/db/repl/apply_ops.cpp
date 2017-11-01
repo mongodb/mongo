@@ -104,9 +104,9 @@ Status _applyOps(OperationContext* opCtx,
                  const std::string& dbName,
                  const BSONObj& applyOpCmd,
                  BSONObjBuilder* result,
-                 int* numApplied) {
+                 int* numApplied,
+                 BSONArrayBuilder* opsBuilder) {
     BSONObj ops = applyOpCmd.firstElement().Obj();
-
     // apply
     *numApplied = 0;
     int errors = 0;
@@ -200,6 +200,22 @@ Status _applyOps(OperationContext* opCtx,
                 opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
             if (!status.isOK())
                 return status;
+
+            // Append completed op, including UUID if available, to 'opsBuilder'.
+            if (opsBuilder) {
+                if (opObj.hasField("ui") || nss.isSystemDotIndexes() ||
+                    !(collection && collection->uuid())) {
+                    // No changes needed to operation document.
+                    opsBuilder->append(opObj);
+                } else {
+                    // Operation document has no "ui" field and collection has a UUID.
+                    auto uuid = collection->uuid();
+                    BSONObjBuilder opBuilder;
+                    opBuilder.appendElements(opObj);
+                    uuid->appendToBuilder(&opBuilder, "ui");
+                    opsBuilder->append(opBuilder.obj());
+                }
+            }
         } else {
             try {
                 status = writeConflictRetry(
@@ -399,8 +415,9 @@ Status applyOps(OperationContext* opCtx,
         globalWriteLock.emplace(opCtx);
     }
 
-    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(opCtx, dbName);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool userInitiatedWritesAndNotPrimary =
+        opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
     if (userInitiatedWritesAndNotPrimary)
         return Status(ErrorCodes::NotMaster,
@@ -416,7 +433,7 @@ Status applyOps(OperationContext* opCtx,
 
     int numApplied = 0;
     if (!isAtomic)
-        return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied);
+        return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied, nullptr);
 
     // Perform write ops atomically
     invariant(globalWriteLock);
@@ -424,13 +441,18 @@ Status applyOps(OperationContext* opCtx,
     try {
         writeConflictRetry(opCtx, "applyOps", dbName, [&] {
             BSONObjBuilder intermediateResult;
+            std::unique_ptr<BSONArrayBuilder> opsBuilder;
+            if (opCtx->writesAreReplicated() &&
+                repl::ReplicationCoordinator::modeMasterSlave != replCoord->getReplicationMode()) {
+                opsBuilder = stdx::make_unique<BSONArrayBuilder>();
+            }
             WriteUnitOfWork wunit(opCtx);
             numApplied = 0;
             {
                 // Suppress replication for atomic operations until end of applyOps.
                 repl::UnreplicatedWritesBlock uwb(opCtx);
-                uassertStatusOK(
-                    _applyOps(opCtx, dbName, applyOpCmd, &intermediateResult, &numApplied));
+                uassertStatusOK(_applyOps(
+                    opCtx, dbName, applyOpCmd, &intermediateResult, &numApplied, opsBuilder.get()));
             }
             // Generate oplog entry for all atomic ops collectively.
             if (opCtx->writesAreReplicated()) {
@@ -439,8 +461,13 @@ Status applyOps(OperationContext* opCtx,
 
                 BSONObjBuilder cmdBuilder;
 
+                auto opsFieldName = applyOpCmd.firstElement().fieldNameStringData();
                 for (auto elem : applyOpCmd) {
                     auto name = elem.fieldNameStringData();
+                    if (name == opsFieldName && opsBuilder) {
+                        cmdBuilder.append(opsFieldName, opsBuilder->arr());
+                        continue;
+                    }
                     if (name == kPreconditionFieldName)
                         continue;
                     if (name == bypassDocumentValidationCommandOption())
@@ -460,7 +487,7 @@ Status applyOps(OperationContext* opCtx,
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::AtomicityFailure) {
             // Retry in non-atomic mode.
-            return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied);
+            return _applyOps(opCtx, dbName, applyOpCmd, result, &numApplied, nullptr);
         }
         BSONArrayBuilder ab;
         ++numApplied;
