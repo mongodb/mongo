@@ -209,7 +209,7 @@ public:
     }
 };
 
-template <bool rollback, bool defaultIndexes>
+template <bool rollback, bool defaultIndexes, bool capped>
 class RenameCollection {
 public:
     void run() {
@@ -228,7 +228,8 @@ public:
             WriteUnitOfWork uow(&txn);
             ASSERT(!collectionExists(&ctx, source.ns()));
             ASSERT(!collectionExists(&ctx, target.ns()));
-            ASSERT_OK(userCreateNS(&txn, ctx.db(), source.ns(), BSONObj(), defaultIndexes));
+            auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
+            ASSERT_OK(userCreateNS(&txn, ctx.db(), source.ns(), options, defaultIndexes));
             uow.commit();
         }
         ASSERT(collectionExists(&ctx, source.ns()));
@@ -255,7 +256,7 @@ public:
     }
 };
 
-template <bool rollback, bool defaultIndexes>
+template <bool rollback, bool defaultIndexes, bool capped>
 class RenameDropTargetCollection {
 public:
     void run() {
@@ -279,8 +280,9 @@ public:
             WriteUnitOfWork uow(&txn);
             ASSERT(!collectionExists(&ctx, source.ns()));
             ASSERT(!collectionExists(&ctx, target.ns()));
-            ASSERT_OK(userCreateNS(&txn, ctx.db(), source.ns(), BSONObj(), defaultIndexes));
-            ASSERT_OK(userCreateNS(&txn, ctx.db(), target.ns(), BSONObj(), defaultIndexes));
+            auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
+            ASSERT_OK(userCreateNS(&txn, ctx.db(), source.ns(), options, defaultIndexes));
+            ASSERT_OK(userCreateNS(&txn, ctx.db(), target.ns(), options, defaultIndexes));
 
             insertRecord(&txn, source, sourceDoc);
             insertRecord(&txn, target, targetDoc);
