@@ -245,22 +245,21 @@
                   assert.commandWorked(db.adminCommand({applyOps: opsToApply}));
               }
             },
-            // TODO: Re-enable once SERVER-31300 is completed.
-            // {
-            //   description: "opWithoutUUID",
-            //   init: (db, collName) => {
-            //       assert.commandWorked(db.createCollection(collName));
-            //   },
-            //   // In 3.6 only document CRUD operations are grouped into a single applyOps oplog
-            //   // entry.
-            //   op: (db, collName) => {
-            //       let coll = db.getCollection(collName);
-            //       let opsToApply = [
-            //           {op: "i", ns: coll.getFullName(), o: {_id: 0}},
-            //       ];
-            //       assert.commandWorked(db.adminCommand({applyOps: opsToApply}));
-            //   }
-            // }
+            {
+              description: "opWithoutUUID",
+              init: (db, collName) => {
+                  assert.commandWorked(db.createCollection(collName));
+              },
+              // In 3.6 only document CRUD operations are grouped into a single applyOps oplog
+              // entry.
+              op: (db, collName) => {
+                  let coll = db.getCollection(collName);
+                  let opsToApply = [
+                      {op: "i", ns: coll.getFullName(), o: {_id: 0}},
+                  ];
+                  assert.commandWorked(db.adminCommand({applyOps: opsToApply}));
+              }
+            }
         ]
     };
 
