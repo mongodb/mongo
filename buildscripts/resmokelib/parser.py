@@ -298,7 +298,7 @@ def validate_options(parser, options, args):
         parser.error("Cannot specify both `shellPort` and `shellConnString`")
 
     if options.executor_file:
-        parser.error("--executor is superceded by --suites; specify --suites={} {} to run the"
+        parser.error("--executor is superseded by --suites; specify --suites={} {} to run the"
                      "test(s) under those suite configuration(s)"
                      .format(options.executor_file, " ".join(args)))
 
