@@ -325,7 +325,7 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
         deadline = std::min(deadline, getDeadline());
     }
 
-    const auto waitStatus = [&] {
+    const auto waitStatus = [&]() -> stdx::cv_status {
         if (Date_t::max() == deadline) {
             cv.wait(m);
             return stdx::cv_status::no_timeout;

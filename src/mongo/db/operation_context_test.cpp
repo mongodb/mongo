@@ -231,7 +231,7 @@ public:
                                                                  Date_t maxTime) {
 
         auto barrier = std::make_shared<unittest::Barrier>(2);
-        auto task = stdx::packaged_task<stdx::cv_status()>([=] {
+        auto task = stdx::packaged_task<stdx::cv_status()>([=]() -> stdx::cv_status {
             if (maxTime < Date_t::max()) {
                 txn->setDeadlineByDate(maxTime);
             }
