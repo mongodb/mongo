@@ -43,6 +43,10 @@
     // Override the runCommand to check for any command obj that does not contain a logical session
     // and throw an error.
     function runCommandWithLsidCheck(conn, dbName, cmdObj, func, funcArgs) {
+        if (jsTest.options().disableEnableSessions) {
+            return func.apply(conn, funcArgs);
+        }
+
         const cmdName = Object.keys(cmdObj)[0];
 
         // If the command is in a wrapped form, then we look for the actual command object
@@ -77,6 +81,10 @@
     // to cache the session for each connection instance so we can retrieve the same session on
     // subsequent calls to getDB.
     Mongo.prototype.getDB = function(dbName) {
+        if (jsTest.options().disableEnableSessions) {
+            return getDBOriginal.apply(this, arguments);
+        }
+
         if (!sessionMap.has(this)) {
             const session = startSession(this);
             sessionMap.set(this, session);

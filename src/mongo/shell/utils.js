@@ -260,6 +260,7 @@ jsTestOptions = function() {
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
             alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,
             skipGossipingClusterTime: TestData.skipGossipingClusterTime || false,
+            disableEnableSessions: TestData.disableEnableSessions,
         });
     }
     return _jsTestOptions;

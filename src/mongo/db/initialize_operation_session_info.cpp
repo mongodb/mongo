@@ -31,6 +31,7 @@
 #include "mongo/db/initialize_operation_session_info.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
@@ -46,11 +47,6 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
         return;
     }
 
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-        return;
-    }
-
     {
         // If we're using the localhost bypass, logical sessions are disabled
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
@@ -62,6 +58,14 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     if (osi.getSessionId()) {
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "cannot pass logical session id unless fully upgraded to "
+                                 "featureCompatibilityVersion 3.4. See "
+                              << feature_compatibility_version::kDochubLink
+                              << " .",
+                serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
         opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));

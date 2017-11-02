@@ -51,6 +51,14 @@
                                                  " under featureCompatibilityVersion 3.4");
             }
         }
+
+        const isMasterResult = admin.runCommand({isMaster: 1});
+        assert.commandWorked(isMasterResult);
+        assert.eq(!errorCode,
+                  isMasterResult.hasOwnProperty("logicalSessionTimeoutMinutes"),
+                  "failed test that we " + (errorCode ? "don't " : "") +
+                      "have logicalSessionTimeoutMinutes under featureCompatibilityVersion " +
+                      compatibilityVersion);
     };
 
     // First verify the commands without auth, in feature compatibility version 3.6.
@@ -90,18 +98,21 @@
     assert.commandWorked(admin.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
 
     for (var i = 0; i < 11; i++) {
-        admin.runCommand({"insert": "test", "documents": [{a: 1}], "lsid": {"id": UUID()}});
+        assert.commandWorked(
+            admin.runCommand({"insert": "test", "documents": [{a: 1}], "lsid": {"id": UUID()}}));
     }
 
-    admin.adminCommand({setFeatureCompatibilityVersion: "3.4"});
+    assert.commandWorked(admin.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
     for (var i = 0; i < 13; i++) {
-        admin.runCommand({"insert": "test", "documents": [{a: 2}], "lsid": {"id": UUID()}});
+        assert.commandFailedWithCode(
+            admin.runCommand({"insert": "test", "documents": [{a: 2}], "lsid": {"id": UUID()}}),
+            ErrorCodes.InvalidOptions);
     }
 
-    admin.adminCommand({setFeatureCompatibilityVersion: "3.6"});
+    assert.commandWorked(admin.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
 
-    admin.runCommand({refreshLogicalSessionCacheNow: 1});
+    assert.commandWorked(admin.runCommand({refreshLogicalSessionCacheNow: 1}));
 
     assert.eq(config.system.sessions.find().count(), 11);
 

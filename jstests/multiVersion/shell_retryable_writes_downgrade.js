@@ -78,12 +78,9 @@
 
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
-    // The server continues to accept lsid and txnNumber while in featureCompatibilityVersion=3.4.
-    //
-    // TODO SERVER-31777: The server should return an error if an lsid or txnNumber is specified
-    // while in featureCompatibilityVersion=3.4.
+    // The server errors on lsid and txnNumber while in featureCompatibilityVersion=3.4.
     testCommandCanBeRetried(function() {
-        assert.writeOK(coll.insert({_id: "while fCV=3.4"}));
+        assert.writeError(coll.insert({_id: "while fCV=3.4"}));
     });
 
     rst.restart(primary, {binVersion: "3.4"});
@@ -110,11 +107,9 @@
 
     // When upgrading to MongoDB 3.6 but running as a stand-alone server, the mongo shell should
     // still assign a transaction number to its write requests (per the Driver's specification).
-    //
-    // TODO SERVER-31777: The server should return an error if an lsid or txnNumber is specified
-    // while in featureCompatibilityVersion=3.4.
     testCommandCanBeRetried(function() {
-        assert.writeOK(coll.insert({_id: "while binVersion=3.6 as stand-alone and reconnected"}));
+        assert.writeError(
+            coll.insert({_id: "while binVersion=3.6 as stand-alone and reconnected"}));
     });
 
     db.getSession().endSession();

@@ -362,7 +362,10 @@ public:
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
-        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+            result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
+        }
 
         if (internalClientElement) {
             result.append("minWireVersion",
