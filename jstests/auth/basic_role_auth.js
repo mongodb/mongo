@@ -41,7 +41,8 @@ var READ_WRITE_PERM =
     {insert: 1, update: 1, remove: 1, query: 1, index_r: 1, index_w: 1, killCursor: 1};
 var ADMIN_PERM = {index_r: 1, index_w: 1, profile_r: 1};
 var UADMIN_PERM = {user_r: 1, user_w: 1};
-var CLUSTER_PERM = {killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, profile_r: 1};
+var CLUSTER_PERM =
+    {killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, killAnyCursor: 1, profile_r: 1};
 
 /**
  * Checks whether an error occurs after running an operation.
@@ -170,7 +171,29 @@ var testOps = function(db, allowedActions) {
         assert(!bsonBinaryEqual({cursorId: cursorId}, {cursorId: NumberLong(0)}),
                "find command didn't return a cursor: " + tojson(cmdRes));
 
-        checkErr(allowedActions.hasOwnProperty('killCursor'), function() {
+        const shouldSucceed = (function() {
+            // admin users can do anything they want.
+            if (allowedActions.hasOwnProperty('killAnyCursor')) {
+                return true;
+            }
+
+            // users can kill their own cursors
+            const users = assert.commandWorked(db.runCommand({connectionStatus: 1}))
+                              .authInfo.authenticatedUsers;
+            const users2 = assert.commandWorked(db2.runCommand({connectionStatus: 1}))
+                               .authInfo.authenticatedUsers;
+            if (!users.length && !users2.length) {
+                // Special case, no-auth
+                return true;
+            }
+            return users.some(function(u) {
+                return users2.some(function(u2) {
+                    return ((u.db === u2.db) && (u.user === u2.user));
+                });
+            });
+        })();
+
+        checkErr(shouldSucceed, function() {
             // Issue killCursor command from db.
             cmdRes = db.runCommand({killCursors: db2.kill_cursor.getName(), cursors: [cursorId]});
             assert.commandWorked(cmdRes);

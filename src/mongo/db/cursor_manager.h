@@ -227,6 +227,15 @@ public:
      */
     static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, Date_t now);
 
+    /**
+     * Locate the correct cursor manager for a given cursorId and execute the provided callback.
+     * Returns ErrorCodes::CursorNotFound if cursorId does not exist.
+     */
+    static Status withCursorManager(OperationContext* opCtx,
+                                    CursorId id,
+                                    const NamespaceString& nss,
+                                    stdx::function<Status(CursorManager*)> callback);
+
 private:
     static constexpr int kNumPartitions = 16;
     friend class ClientCursorPin;

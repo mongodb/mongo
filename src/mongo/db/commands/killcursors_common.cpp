@@ -42,21 +42,23 @@ namespace mongo {
 Status KillCursorsCmdBase::checkAuthForCommand(Client* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
-    auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);
+    const auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);
     if (!statusWithRequest.isOK()) {
         return statusWithRequest.getStatus();
     }
-    auto killCursorsRequest = std::move(statusWithRequest.getValue());
+    const auto killCursorsRequest = statusWithRequest.getValue();
 
-    AuthorizationSession* as = AuthorizationSession::get(client);
-
+    const auto& nss = killCursorsRequest.nss;
     for (CursorId id : killCursorsRequest.cursorIds) {
-        Status authorizationStatus = as->checkAuthForKillCursors(killCursorsRequest.nss, id);
-
-        if (!authorizationStatus.isOK()) {
-            audit::logKillCursorsAuthzCheck(
-                client, killCursorsRequest.nss, id, ErrorCodes::Unauthorized);
-            return authorizationStatus;
+        const auto status = _checkAuth(client, nss, id);
+        if (!status.isOK()) {
+            if (status.code() == ErrorCodes::CursorNotFound) {
+                // Not found isn't an authorization issue.
+                // run() will raise it as a return value.
+                continue;
+            }
+            audit::logKillCursorsAuthzCheck(client, nss, id, status.code());
+            return status;
         }
     }
 
