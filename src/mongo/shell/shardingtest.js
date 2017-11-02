@@ -1108,12 +1108,6 @@ var ShardingTest = function(params) {
 
     var pathOpts = {testName: testName};
 
-    for (var k in otherParams) {
-        if (k.startsWith("rs") && otherParams[k] != undefined) {
-            break;
-        }
-    }
-
     this._connections = [];
     this._rs = [];
     this._rsObjects = [];

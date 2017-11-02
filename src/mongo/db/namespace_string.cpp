@@ -70,7 +70,6 @@ const string escapeTable[256] = {
     ".252", ".253", ".254", ".255"};
 
 const char kServerConfiguration[] = "admin.system.version";
-const char kLogicalTimeKeysCollection[] = "admin.system.keys";
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
 constexpr auto listIndexesCursorNSPrefix = "$cmd.listIndexes."_sd;
@@ -84,6 +83,7 @@ constexpr StringData NamespaceString::kLocalDb;
 constexpr StringData NamespaceString::kConfigDb;
 constexpr StringData NamespaceString::kSystemDotViewsCollectionName;
 constexpr StringData NamespaceString::kShardConfigCollectionsCollectionName;
+constexpr StringData NamespaceString::kSystemKeysCollectionName;
 
 const NamespaceString NamespaceString::kServerConfigurationNamespace(kServerConfiguration);
 const NamespaceString NamespaceString::kSessionTransactionsTableNamespace(
@@ -109,7 +109,7 @@ bool NamespaceString::isLegalClientSystemNS() const {
             return true;
         if (ns() == kServerConfiguration)
             return true;
-        if (ns() == kLogicalTimeKeysCollection)
+        if (ns() == kSystemKeysCollectionName)
             return true;
         if (ns() == "admin.system.new_users")
             return true;

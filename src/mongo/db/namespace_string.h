@@ -68,6 +68,9 @@ public:
     static constexpr StringData kShardConfigCollectionsCollectionName =
         "config.cache.collections"_sd;
 
+    // Name for causal consistency's key collection.
+    static constexpr StringData kSystemKeysCollectionName = "admin.system.keys"_sd;
+
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
     // state of the server, which needs to be recovered/consulted at startup. Each document in this
