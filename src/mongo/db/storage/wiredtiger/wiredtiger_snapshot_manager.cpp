@@ -86,6 +86,11 @@ Status WiredTigerSnapshotManager::beginTransactionAtTimestamp(SnapshotName point
                               sizeof(readTSConfigString),
                               "read_timestamp=%llx",
                               static_cast<unsigned long long>(pointInTime.asU64()));
+    if (size < 0) {
+        int e = errno;
+        error() << "error snprintf " << errnoWithDescription(e);
+        fassertFailedNoTrace(40664);
+    }
     invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
 
     return wtRCToStatus(session->begin_transaction(session, readTSConfigString));
@@ -113,6 +118,11 @@ void WiredTigerSnapshotManager::beginTransactionOnOplog(WiredTigerOplogManager* 
                               sizeof(readTSConfigString),
                               "read_timestamp=%llx",
                               static_cast<unsigned long long>(allCommittedTimestamp));
+    if (size < 0) {
+        int e = errno;
+        error() << "error snprintf " << errnoWithDescription(e);
+        fassertFailedNoTrace(40663);
+    }
     invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
 
     int status = session->begin_transaction(session, readTSConfigString);

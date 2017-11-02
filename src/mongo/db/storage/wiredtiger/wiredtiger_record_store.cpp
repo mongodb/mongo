@@ -1649,6 +1649,11 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                   sizeof(commitTSConfigString),
                                   "commit_timestamp=%llx",
                                   truncTs.asULL());
+        if (size < 0) {
+            int e = errno;
+            error() << "error snprintf " << errnoWithDescription(e);
+            fassertFailedNoTrace(40662);
+        }
 
         invariant(static_cast<std::size_t>(size) < sizeof(commitTSConfigString));
         auto conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();

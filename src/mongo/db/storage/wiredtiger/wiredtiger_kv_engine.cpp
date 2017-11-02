@@ -1056,6 +1056,11 @@ void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
                               sizeof(oldestTSConfigString),
                               "oldest_timestamp=%llx",
                               static_cast<unsigned long long>(timestampToSet.asU64()));
+    if (size < 0) {
+        int e = errno;
+        error() << "error snprintf " << errnoWithDescription(e);
+        fassertFailedNoTrace(40661);
+    }
     invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
     invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
     LOG(2) << "oldest_timestamp set to " << timestampToSet.asU64();
