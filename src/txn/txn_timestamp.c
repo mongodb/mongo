@@ -467,11 +467,11 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	if (has_oldest || has_stable)
 		WT_RET(__wt_txn_update_pinned_timestamp(session));
 	}
-#else
-		WT_RET_MSG(session, ENOTSUP, "set_timestamp requires a "
-		    "version of WiredTiger built with timestamp support");
-#endif
 	return (0);
+#else
+	WT_RET_MSG(session, ENOTSUP, "set_timestamp requires a "
+	    "version of WiredTiger built with timestamp support");
+#endif
 }
 
 #ifdef HAVE_TIMESTAMPS

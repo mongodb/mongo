@@ -135,7 +135,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		if (__wt_config_gets(session, &cfg[1],
 		    "shared_cache.size", &cval) == 0 && cval.val != 0)
 			size = (uint64_t)cval.val;
-		 else
+		else
 			size = cp->size;
 		if (__wt_config_gets(session, &cfg[1],
 		    "shared_cache.chunk", &cval) == 0 && cval.val != 0)

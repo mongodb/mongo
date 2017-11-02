@@ -702,9 +702,7 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		 * we're likely to be able to evict this page in the future).
 		 */
 		mod->rec_max_txn = r->max_txn;
-#ifdef HAVE_TIMESTAMPS
 		__wt_timestamp_set(&mod->rec_max_timestamp, &r->max_timestamp);
-#endif
 
 		/*
 		 * Track the tree's maximum transaction ID (used to decide if
@@ -977,11 +975,9 @@ __rec_init(WT_SESSION_IMPL *session,
 
 	/* Track the page's min/maximum transaction */
 	r->max_txn = WT_TXN_NONE;
-#ifdef HAVE_TIMESTAMPS
 	__wt_timestamp_set_zero(&r->max_timestamp);
 	__wt_timestamp_set_zero(&r->max_onpage_timestamp);
 	__wt_timestamp_set_inf(&r->min_saved_timestamp);
-#endif
 
 	/* Track if updates were used and/or uncommitted. */
 	r->updates_seen = r->updates_unstable = 0;

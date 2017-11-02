@@ -974,8 +974,6 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	if (conn->evict_threads_max == conn->evict_threads_min)
 		return;
 
-	eviction_progress_rate = 0;
-
 	__wt_epoch(session, &current_time);
 	time_diff = WT_TIMEDIFF_MS(current_time, cache->evict_tune_last_time);
 
