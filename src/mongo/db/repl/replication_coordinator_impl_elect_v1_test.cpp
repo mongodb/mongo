@@ -431,7 +431,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
     getReplCoord()->waitForElectionFinish_forTest();
     stopCapturingLogMessages();
     ASSERT_EQUALS(
-        1, countLogLinesContaining("not running for primary, we have been superceded already"));
+        1, countLogLinesContaining("not running for primary, we have been superseded already"));
 }
 
 TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
@@ -689,7 +689,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     getReplCoord()->waitForElectionFinish_forTest();
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
-                  countLogLinesContaining("not becoming primary, we have been superceded already"));
+                  countLogLinesContaining("not becoming primary, we have been superseded already"));
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
@@ -728,8 +728,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
     simulateSuccessfulDryRun(onDryRunRequest);
 
     stopCapturingLogMessages();
-    ASSERT_EQUALS(
-        1, countLogLinesContaining("not running for primary, we have been superceded already"));
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(
+                      "not running for primary, we have been superseded already during dry run"));
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
@@ -784,7 +785,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     getReplCoord()->waitForElectionFinish_forTest();
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
-                  countLogLinesContaining("not becoming primary, we have been superceded already"));
+                  countLogLinesContaining("not becoming primary, we have been superseded already"));
 }
 
 class PriorityTakeoverTest : public ReplCoordTest {
