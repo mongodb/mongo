@@ -104,23 +104,23 @@
         // Currently, pinned cursors that are targeted by a killCursors operation are kept alive on
         // mongod but are killed on mongos (see SERVER-21710).
         cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [NumberLong(123), cursorId]});
-        assert.commandWorked(cmdRes);
-        assert.eq(cmdRes.cursorsNotFound, [NumberLong(123)]);
-        assert.eq(cmdRes.cursorsUnknown, []);
-
-        if (isMongos) {
-            assert.eq(cmdRes.cursorsKilled, [cursorId]);
-            assert.eq(cmdRes.cursorsAlive, []);
-        } else {
-            // If the cursor has already been pinned it will be left alive; otherwise it will be
-            // killed.
-            if (cmdRes.cursorsAlive.length === 1) {
-                assert.eq(cmdRes.cursorsKilled, []);
-                assert.eq(cmdRes.cursorsAlive, [cursorId]);
-            } else {
+        if (cmdRes.ok) {
+            // Cursor wasn't pinned.
+            // If auth is enabled, kill will fail due to 123 not existing (caught in auchCheck).
+            // If auth is not enabled, we'll get past the authCheck, and kill of existing cursor
+            // can succeed for the real cursor.
+            if (cmdRes.cursorsKilled.length) {
                 assert.eq(cmdRes.cursorsKilled, [cursorId]);
                 assert.eq(cmdRes.cursorsAlive, []);
+            } else {
+                assert.eq(cmdRes.cursorsKilled, []);
+                assert.eq(cmdRes.cursorsAlive, [cursorId]);
             }
+            assert.eq(cmdRes.cursorsNotFound, [NumberLong(123)]);
+            assert.eq(cmdRes.cursorsUnknown, []);
+        } else {
+            // Pin released before we got to it.
+            assert.eq(cmdRes.code, ErrorCodes.CursorInUse);
         }
     } finally {
         assert.commandWorked(db.adminCommand({configureFailPoint: failpointName, mode: "off"}));

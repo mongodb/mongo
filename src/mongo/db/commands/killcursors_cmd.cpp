@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/killcursors_common.h"
 #include "mongo/db/curop.h"
@@ -47,29 +48,27 @@ public:
     KillCursorsCmd() = default;
 
 private:
+    Status _checkAuth(Client* client, const NamespaceString& nss, CursorId id) const final {
+        auto opCtx = client->getOperationContext();
+        const auto check = [client, opCtx, id](CursorManager* manager) {
+            auto ccPin = manager->pinCursor(opCtx, id);
+            if (!ccPin.isOK()) {
+                return ccPin.getStatus();
+            }
+
+            const auto* cursor = ccPin.getValue().getCursor();
+            AuthorizationSession* as = AuthorizationSession::get(client);
+            return as->checkAuthForKillCursors(cursor->nss(), cursor->getAuthenticatedUsers());
+        };
+
+        return CursorManager::withCursorManager(opCtx, id, nss, check);
+    }
+
     Status _killCursor(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       CursorId cursorId) final {
-        // Cursors come in one of two flavors:
-        // - Cursors owned by the collection cursor manager, such as those generated via the find
-        //   command. For these cursors, we hold the appropriate collection lock for the duration of
-        //   the getMore using AutoGetCollectionForRead. This will automatically update the CurOp
-        //   object appropriately and record execution time via Top upon completion.
-        // - Cursors owned by the global cursor manager, such as those generated via the aggregate
-        //   command. These cursors either hold no collection state or manage their collection state
-        //   internally, so we acquire no locks. In this case we use the AutoStatsTracker object to
-        //   update the CurOp object appropriately and record execution time via Top upon
-        //   completion.
-        //
-        // Thus, exactly one of 'readLock' and 'statsTracker' will be populated as we populate
-        // 'cursorManager'.
-        boost::optional<AutoGetCollectionForReadCommand> readLock;
+                       CursorId id) const final {
         boost::optional<AutoStatsTracker> statsTracker;
-        CursorManager* cursorManager;
-
-        if (CursorManager::isGloballyManagedCursor(cursorId)) {
-            cursorManager = CursorManager::getGlobalCursorManager();
-
+        if (CursorManager::isGloballyManagedCursor(id)) {
             if (auto nssForCurOp = nss.isGloballyManagedNamespace()
                     ? nss.getTargetNSForGloballyManagedNamespace()
                     : nss) {
@@ -77,33 +76,12 @@ private:
                 statsTracker.emplace(
                     opCtx, *nssForCurOp, Top::LockType::NotLocked, dbProfilingLevel);
             }
-
-            // Make sure the namespace of the cursor matches the namespace passed to the killCursors
-            // command so we can be sure we checked the correct privileges.
-            auto ccPin = cursorManager->pinCursor(opCtx, cursorId);
-            if (ccPin.isOK()) {
-                auto cursorNs = ccPin.getValue().getCursor()->nss();
-                if (cursorNs != nss) {
-                    return Status{ErrorCodes::Unauthorized,
-                                  str::stream() << "issued killCursors on namespace '" << nss.ns()
-                                                << "', but cursor with id "
-                                                << cursorId
-                                                << " belongs to a different namespace: "
-                                                << cursorNs.ns()};
-                }
-            }
-        } else {
-            readLock.emplace(opCtx, nss);
-            Collection* collection = readLock->getCollection();
-            if (!collection) {
-                return {ErrorCodes::CursorNotFound,
-                        str::stream() << "collection does not exist: " << nss.ns()};
-            }
-            cursorManager = collection->getCursorManager();
         }
-        invariant(cursorManager);
 
-        return cursorManager->eraseCursor(opCtx, cursorId, true /*shouldAudit*/);
+        return CursorManager::withCursorManager(
+            opCtx, id, nss, [opCtx, id](CursorManager* manager) {
+                return manager->eraseCursor(opCtx, id, true /* shouldAudit */);
+            });
     }
 } killCursorsCmd;
 

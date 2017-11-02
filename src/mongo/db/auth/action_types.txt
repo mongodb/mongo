@@ -65,6 +65,7 @@
 "insert",
 "internal", # Special action type that represents internal actions
 "invalidateUserCache",
+"killAnyCursor",
 "killAnySession",
 "killCursors",
 "killop",

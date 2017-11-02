@@ -547,16 +547,28 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
             continue;
         }
 
-        Status authorizationStatus = authSession->checkAuthForKillCursors(*nss, cursorId);
-        audit::logKillCursorsAuthzCheck(client,
-                                        *nss,
-                                        cursorId,
-                                        authorizationStatus.isOK() ? ErrorCodes::OK
-                                                                   : ErrorCodes::Unauthorized);
-        if (!authorizationStatus.isOK()) {
-            LOG(3) << "Not authorized to kill cursor.  Namespace: '" << *nss
-                   << "', cursor id: " << cursorId << ".";
-            continue;
+        {
+            // Block scope ccPin so that it releases our checked out cursor
+            // prior to the killCursor invocation below.
+            auto ccPin = manager->checkOutCursor(*nss, cursorId, opCtx);
+            if (!ccPin.isOK()) {
+                LOG(3) << "Unable to check out cursor for killCursor.  Namespace: '" << *nss
+                       << "', cursor id: " << cursorId << ".";
+                continue;
+            }
+            auto cursorOwners = ccPin.getValue().getAuthenticatedUsers();
+            auto authorizationStatus = authSession->checkAuthForKillCursors(*nss, cursorOwners);
+
+            audit::logKillCursorsAuthzCheck(client,
+                                            *nss,
+                                            cursorId,
+                                            authorizationStatus.isOK() ? ErrorCodes::OK
+                                                                       : ErrorCodes::Unauthorized);
+            if (!authorizationStatus.isOK()) {
+                LOG(3) << "Not authorized to kill cursor.  Namespace: '" << *nss
+                       << "', cursor id: " << cursorId << ".";
+                continue;
+            }
         }
 
         Status killCursorStatus = manager->killCursor(*nss, cursorId);

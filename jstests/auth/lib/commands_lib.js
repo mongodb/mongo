@@ -3552,8 +3552,21 @@ var authCommandsLib = {
         },
         {
           testname: "killCursors",
-          command: {killCursors: "foo", cursors: [NumberLong("123")]},
-          skipSharded: true,  // TODO enable when killCursors command is implemented on mongos
+          setup: function(runOnDb) {
+              return runOnDb;
+          },
+          command: function(runOnDb) {
+              // Don't create the cursor during setup() because we're not logged in yet.
+              // Cursor must be created with same user who tries to kill it.
+              const cmd = runOnDb.runCommand({find: "foo", batchSize: 2});
+              if (cmd.ok === 1) {
+                  return {killCursors: "foo", cursors: [cmd.cursor.id]};
+              } else {
+                  // If we can't even execute a find, then we certainly can't kill it.
+                  // Let it fail/unauthorized via the find command
+                  return {find: "foo", batchSize: 2};
+              }
+          },
           testcases: [
               {
                 runOnDb: firstDbName,
@@ -3563,29 +3576,18 @@ var authCommandsLib = {
                     readWrite: 1,
                     readWriteAnyDatabase: 1,
                     dbOwner: 1,
-                    hostManager: 1,
-                    clusterAdmin: 1,
                     backup: 1,
                     root: 1,
                     __system: 1
                 },
-                privileges:
-                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["killCursors"]}],
+                privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}],
                 expectFail: true
               },
               {
                 runOnDb: secondDbName,
-                roles: {
-                    readAnyDatabase: 1,
-                    readWriteAnyDatabase: 1,
-                    hostManager: 1,
-                    clusterAdmin: 1,
-                    backup: 1,
-                    root: 1,
-                    __system: 1
-                },
-                privileges:
-                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["killCursors"]}],
+                roles:
+                    {readAnyDatabase: 1, readWriteAnyDatabase: 1, backup: 1, root: 1, __system: 1},
+                privileges: [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}],
                 expectFail: true
               }
           ]
