@@ -687,6 +687,17 @@ __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
 	if (!F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
 		return;
 
+#ifdef HAVE_DIAGNOSTIC
+	{
+	wt_timestamp_t pinned_ts;
+
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    __wt_timestamp_set(&pinned_ts, &txn_global->pinned_timestamp));
+	WT_ASSERT(session,
+	    __wt_timestamp_cmp(&txn->read_timestamp, &pinned_ts) >= 0);
+	}
+#endif
+
 	__wt_writelock(session, &txn_global->read_timestamp_rwlock);
 	TAILQ_REMOVE(&txn_global->read_timestamph, txn, read_timestampq);
 	--txn_global->read_timestampq_len;

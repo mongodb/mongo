@@ -193,8 +193,8 @@ struct __wt_page_lookaside {
 	uint64_t las_pageid;			/* Page ID in lookaside */
 	uint64_t las_max_txn;			/* Maximum transaction ID in
 						   lookaside */
-	WT_DECL_TIMESTAMP(min_timestamp)	/* Oldest timestamp in
-						   lookaside for the page */
+	WT_DECL_TIMESTAMP(min_timestamp)	/* Min timestamp in lookaside */
+	WT_DECL_TIMESTAMP(onpage_timestamp)	/* Max timestamp on page */
 	bool las_skew_oldest;			/* On-page skewed to oldest */
 };
 

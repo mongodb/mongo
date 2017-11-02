@@ -479,6 +479,11 @@ __las_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Skip lookaside pages if reading as of a timestamp and all the
 	 * updates are in the future.
 	 */
+	WT_ASSERT(session,
+	    !F_ISSET(&session->txn, WT_TXN_HAS_TS_READ) ||
+	    __wt_timestamp_cmp(&ref->page_las->onpage_timestamp,
+	    &session->txn.read_timestamp) <= 0);
+
 	if (F_ISSET(&session->txn, WT_TXN_HAS_TS_READ) &&
 	    ref->page_las->las_skew_oldest &&
 	    __wt_timestamp_cmp(
