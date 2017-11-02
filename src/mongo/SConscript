@@ -320,6 +320,22 @@ env.Library(
         'util/version_impl',
     ],
 )
+
+
+if env.TargetOSIs('windows'):
+    generatedDbManifest = env.Substfile(
+        'db/db.manifest.in',
+        SUBST_DICT=[
+            ('@mongo_version_major@', version_parts[0]),
+            ('@mongo_version_minor@', version_parts[1]),
+            ('@mongo_version_patch@', version_parts[2]),
+            ('@mongo_version_extra@', version_parts[3]),
+            ('@mongo_version_extra_str@', version_extra),
+        ])
+
+    env.Alias('generated-sources', generatedDbManifest)
+    env.Depends("db/db.rc", generatedDbManifest)
+
 mongod = env.Program(
     target="mongod",
     source=[
@@ -346,6 +362,20 @@ env.Install(
                         "db/serveronly",
                     ]),
     ])
+
+if env.TargetOSIs('windows'):
+    generatedServerManifest = env.Substfile(
+        's/server.manifest.in',
+        SUBST_DICT=[
+            ('@mongo_version_major@', version_parts[0]),
+            ('@mongo_version_minor@', version_parts[1]),
+            ('@mongo_version_patch@', version_parts[2]),
+            ('@mongo_version_extra@', version_parts[3]),
+            ('@mongo_version_extra_str@', version_extra),
+        ])
+
+    env.Alias('generated-sources', generatedServerManifest)
+    env.Depends("s/server.rc", generatedServerManifest)
 
 # mongos
 env.Install(
@@ -440,7 +470,19 @@ if not has_option('noshell') and usemozjs:
 
     shellEnv = env.Clone()
     if env.TargetOSIs('windows'):
-       shellEnv.Append(LIBS=["winmm.lib"])
+        shellEnv.Append(LIBS=["winmm.lib"])
+
+        generatedMongoManifest = shellEnv.Substfile(
+                'shell/shell.manifest.in',
+                SUBST_DICT=[
+                    ('@mongo_version_major@', version_parts[0]),
+                    ('@mongo_version_minor@', version_parts[1]),
+                    ('@mongo_version_patch@', version_parts[2]),
+                    ('@mongo_version_extra@', version_parts[3]),
+                    ('@mongo_version_extra_str@', version_extra),
+                ])
+        shellEnv.Alias('generated-sources', generatedMongoManifest)
+        shellEnv.Depends("shell/shell.rc", generatedMongoManifest)
 
     mongo_shell = shellEnv.Program(
         "mongo",

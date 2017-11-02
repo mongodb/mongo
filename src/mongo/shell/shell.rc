@@ -52,3 +52,5 @@ BEGIN
         VALUE "Translation", 0x409, 1200
     END
 END
+
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "mongo/shell/shell.manifest"

@@ -304,6 +304,12 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
         osName = "Microsoft ";
         switch (osvi.dwMajorVersion) {
+            case 10:
+                if (osvi.wProductType == VER_NT_WORKSTATION)
+                    osName += "Windows 10";
+                else
+                    osName += "Windows Server 2016";
+                break;
             case 6:
                 switch (osvi.dwMinorVersion) {
                     case 3:
@@ -349,25 +355,8 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
                         break;
                 }
                 break;
-            case 5:
-                switch (osvi.dwMinorVersion) {
-                    case 2:
-                        osName += "Windows Server 2003";
-                        break;
-                    case 1:
-                        osName += "Windows XP";
-                        break;
-                    case 0:
-                        if (osvi.wProductType == VER_NT_WORKSTATION)
-                            osName += "Windows 2000 Professional";
-                        else
-                            osName += "Windows 2000 Server";
-                        break;
-                    default:
-                        osName += "Windows NT version ";
-                        osName += verstr.str();
-                        break;
-                }
+            default:
+                osName += "Windows";
                 break;
         }
     } else {
