@@ -51,6 +51,13 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     if "disableLogicalSessionCacheRefresh" not in suite_set_parameters:
         suite_set_parameters["disableLogicalSessionCacheRefresh"] = True
 
+    # The periodic no-op writer writes an oplog entry of type='n' once every 10 seconds. This has
+    # the potential to mask issues such as SERVER-31609 because it allows the operationTime of
+    # cluster to advance even if the client is blocked for other reasons. We should disable the
+    # periodic no-op writer. Set in the .yml file to override this.
+    if "replSet" in kwargs and "writePeriodicNoops" not in suite_set_parameters:
+        suite_set_parameters["writePeriodicNoops"] = False
+
     _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {
