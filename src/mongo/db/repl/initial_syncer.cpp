@@ -1098,14 +1098,13 @@ void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
     // Set UUIDs for all non-replicated collections on secondaries. See comment in
     // ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage() for the explanation of
     // why we do this and why it is not necessary for sharded clusters.
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
-        serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
         const NamespaceString nss("admin", "system.version");
         auto opCtx = makeOpCtx();
         auto statusWithUUID = _storage->getCollectionUUID(opCtx.get(), nss);
         if (!statusWithUUID.isOK()) {
             // If the admin database does not exist, we intentionally fail initial sync. As part of
-            // SERVER-29448, we will disallow dropping the admin database, so failing here is fine.
+            // SERVER-29448, we disallow dropping the admin database, so failing here is fine.
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock,
                                                                       statusWithUUID.getStatus());
             return;
