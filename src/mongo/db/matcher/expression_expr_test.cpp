@@ -43,6 +43,8 @@ namespace {
 
 using unittest::assertGet;
 
+const double kNaN = std::numeric_limits<double>::quiet_NaN();
+
 class ExprMatchTest : public mongo::unittest::Test {
 public:
     ExprMatchTest() : _expCtx(new ExpressionContextForTest()) {}
@@ -238,7 +240,6 @@ TEST_F(ExprMatchTest, OrMatchesCorrectly) {
     ASSERT_TRUE(matches(BSON("y" << 5)));
 
     ASSERT_FALSE(matches(BSON("x" << 10)));
-    ASSERT_FALSE(matches(BSON("y" << 1)));
 }
 
 TEST_F(ExprMatchTest, AndNestedWithinOrMatchesCorrectly) {
@@ -248,7 +249,6 @@ TEST_F(ExprMatchTest, AndNestedWithinOrMatchesCorrectly) {
     ASSERT_TRUE(matches(BSON("x" << 3 << "z" << 7)));
     ASSERT_TRUE(matches(BSON("y" << 1)));
 
-    ASSERT_FALSE(matches(BSON("x" << 3 << "z" << 3)));
     ASSERT_FALSE(matches(BSON("y" << 5)));
 }
 
@@ -414,6 +414,86 @@ TEST_F(ExprMatchTest, AndWithDistinctMatchAndNonMatchSubTreeMatchesCorrectly) {
     ASSERT_FALSE(matches(BSON("x" << 2 << "y" << 2 << "z" << 2)));
     ASSERT_FALSE(matches(BSON("x" << 1 << "y" << 2 << "z" << 10)));
     ASSERT_FALSE(matches(BSON("x" << 1 << "y" << 2)));
+}
+
+TEST_F(ExprMatchTest, ExprLtDoesNotUseTypeBracketing) {
+    createMatcher(fromjson("{$expr: {$lt: ['$x', true]}}"));
+
+    ASSERT_TRUE(matches(BSON("x" << false)));
+    ASSERT_TRUE(matches(BSON("x" << BSON("y" << 1))));
+    ASSERT_TRUE(matches(BSONObj()));
+
+    ASSERT_FALSE(matches(BSON("x" << Timestamp(0, 1))));
+}
+
+TEST_F(ExprMatchTest, NullMatchesCorrectly) {
+    createMatcher(fromjson("{$expr: {$eq: ['$x', null]}}"));
+
+    ASSERT_TRUE(matches(BSON("x" << BSONNULL)));
+
+    ASSERT_FALSE(matches(BSON("x" << BSONUndefined)));
+    ASSERT_FALSE(matches(BSONObj()));
+}
+
+TEST_F(ExprMatchTest, UndefinedMatchesCorrectly) {
+    createMatcher(fromjson("{$expr: {$eq: ['$x', undefined]}}"));
+
+    ASSERT_TRUE(matches(BSON("x" << BSONUndefined)));
+    ASSERT_TRUE(matches(BSONObj()));
+
+    ASSERT_FALSE(matches(BSON("x" << BSONNULL)));
+}
+
+
+TEST_F(ExprMatchTest, NaNMatchesCorrectly) {
+    createMatcher(fromjson("{$expr: {$eq: ['$x', NaN]}}"));
+
+    ASSERT_TRUE(matches(BSON("x" << kNaN)));
+
+    ASSERT_FALSE(matches(BSONObj()));
+    ASSERT_FALSE(matches(BSON("x" << 0)));
+    ASSERT_FALSE(matches(BSONObj()));
+
+    createMatcher(fromjson("{$expr: {$lt: ['$x', NaN]}}"));
+
+    ASSERT_TRUE(matches(BSONObj()));
+
+    ASSERT_FALSE(matches(BSON("x" << kNaN)));
+    ASSERT_FALSE(matches(BSON("x" << 0)));
+
+    createMatcher(fromjson("{$expr: {$lte: ['$x', NaN]}}"));
+
+    ASSERT_TRUE(matches(BSONObj()));
+    ASSERT_TRUE(matches(BSON("x" << kNaN)));
+
+    ASSERT_FALSE(matches(BSON("x" << 0)));
+
+    createMatcher(fromjson("{$expr: {$gt: ['$x', NaN]}}"));
+
+    ASSERT_TRUE(matches(BSON("x" << 0)));
+
+    ASSERT_FALSE(matches(BSON("x" << kNaN)));
+    ASSERT_FALSE(matches(BSONObj()));
+
+    createMatcher(fromjson("{$expr: {$gte: ['$x', NaN]}}"));
+
+    ASSERT_TRUE(matches(BSON("x" << 0)));
+    ASSERT_TRUE(matches(BSON("x" << kNaN)));
+
+    ASSERT_FALSE(matches(BSONObj()));
+}
+
+TEST_F(ExprMatchTest, MatchAgainstArrayIsCorrect) {
+    createMatcher(fromjson("{$expr: {$gt: ['$x', 4]}}"));
+
+    // Matches because BSONType Array is greater than BSONType double.
+    ASSERT_TRUE(matches(BSON("x" << BSON_ARRAY(1.0 << 2.0 << 3.0))));
+
+    createMatcher(fromjson("{$expr: {$eq: ['$x', [4]]}}"));
+
+    ASSERT_TRUE(matches(BSON("x" << BSON_ARRAY(4))));
+
+    ASSERT_FALSE(matches(BSON("x" << 4)));
 }
 
 TEST_F(ExprMatchTest, ComplexExprMatchesCorrectly) {
