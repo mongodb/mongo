@@ -72,6 +72,10 @@ if wiredtiger:
             '$BUILD_DIR/third_party/shim_zlib',
             'storage_wiredtiger_customization_hooks',
             ],
+        LIBDEPS_PRIVATE= [
+            # SERVER-31802 : remove this.
+            '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+            ],
         )
 
     wtEnv.Library(

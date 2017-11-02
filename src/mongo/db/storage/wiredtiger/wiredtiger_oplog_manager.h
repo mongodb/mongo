@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -79,7 +80,8 @@ public:
 
 private:
     void _oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
-                                 WiredTigerRecordStore* oplogRecordStore) noexcept;
+                                 WiredTigerRecordStore* oplogRecordStore,
+                                 bool isMasterSlave) noexcept;
 
     void _setOplogReadTimestamp(uint64_t newTimestamp);
 
