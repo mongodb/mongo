@@ -4698,7 +4698,6 @@ buildvariants:
   - name: compile_all
     distros:
     - rhel62-large
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -4728,7 +4727,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_op_query
@@ -4834,7 +4832,6 @@ buildvariants:
   - name: integration_tests_standalone
   - name: integration_tests_replset
   - name: integration_tests_sharded
-  - name: jsCore
   - name: jsCore_WT
   - name: parallel_WT
   - name: concurrency
@@ -4860,7 +4857,6 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
@@ -4900,7 +4896,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -4986,7 +4981,6 @@ buildvariants:
   - name: compile_all
     distros:
     - rhel62-large
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -4997,7 +4991,6 @@ buildvariants:
   - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
-  - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: generational_jstestfuzz
@@ -5127,7 +5120,6 @@ buildvariants:
   - name: compile_all
     distros:
     - ubuntu1204-build
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -5152,7 +5144,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -5253,7 +5244,6 @@ buildvariants:
   - name: compile_all
     distros:
     - ubuntu1404-build
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -5305,7 +5295,6 @@ buildvariants:
   - name: jepsen_read-concern-majority_w1_WT
     distros:
     - ubuntu1404-jepsen
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -5409,7 +5398,6 @@ buildvariants:
   - name: compile_all
     distros:
     - ubuntu1604-build
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -5434,7 +5422,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -5851,17 +5838,14 @@ buildvariants:
     - linux-64-amzn-build
   - name: aggregation_auth
   - name: aggregation_WT
-  - name: audit
   - name: audit_WT
   - name: auth
   - name: auth_WT
-  - name: auth_audit
   - name: auth_audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
   - name: failpoints_auth
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_auth
@@ -5944,7 +5928,6 @@ buildvariants:
   - name: compile_all
     distros:
     - linux-64-amzn-build
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -5969,7 +5952,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -6078,7 +6060,6 @@ buildvariants:
   - name: compile_all
     distros:
     - windows-64-vs2015-large
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -6099,7 +6080,6 @@ buildvariants:
   - name: integration_tests_standalone
   - name: integration_tests_replset
   - name: integration_tests_sharded
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
@@ -6268,15 +6248,12 @@ buildvariants:
   - name: compile_all
     distros:
     - windows-64-vs2015-large
-  - name: audit
   - name: audit_WT
-  - name: auth_audit
   - name: auth_audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
   - name: external_auth_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_decimal
@@ -6349,7 +6326,7 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2015-large
-  - name: jsCore
+  - name: jsCore_WT
 
 - name: windows-64-2k8-ssl-legacy-transportlayer
   display_name: SSL Windows 2008R2 Legacy Transport
@@ -6384,7 +6361,6 @@ buildvariants:
   - name: compile_all
     distros:
     - windows-64-vs2015-large
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
@@ -6414,7 +6390,6 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
@@ -6522,9 +6497,7 @@ buildvariants:
   - name: compile_all
     distros:
     - windows-64-vs2015-large
-  - name: audit
   - name: audit_WT
-  - name: auth_audit
   - name: dbtest
   - name: concurrency
     distros:
@@ -6532,7 +6505,6 @@ buildvariants:
   - name: concurrency_replication
   - name: concurrency_sharded
   - name: concurrency_simultaneous
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -6592,7 +6564,6 @@ buildvariants:
   - name: compile_all
     distros:
     - windows-64-vs2015-large
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
@@ -6622,7 +6593,6 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
@@ -6765,7 +6735,6 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
@@ -6808,7 +6777,6 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
@@ -6904,7 +6872,6 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
-  - name: aggregation
   - name: aggregation_WT
   - name: auth
   - name: auth_WT
@@ -6914,7 +6881,6 @@ buildvariants:
   - name: disk_WT
   - name: durability
   - name: failpoints
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
@@ -6950,14 +6916,11 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
-  - name: audit
   - name: audit_WT
-  - name: auth_audit
   - name: auth_audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -7078,18 +7041,15 @@ buildvariants:
   - name: burn_in_tests
   - name: rollback_fuzzer
   - name: rollback_fuzzer_WT
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
   - name: audit_WT
   - name: auth
   - name: auth_WT
-  - name: auth_audit
   - name: auth_audit_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
@@ -7135,7 +7095,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_auth
@@ -7340,17 +7299,14 @@ buildvariants:
   - name: compile_all
   - name: rollback_fuzzer
   - name: rollback_fuzzer_WT
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
   - name: audit_WT
   - name: auth
   - name: auth_WT
-  - name: auth_audit
   - name: auth_audit_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
@@ -7392,7 +7348,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_auth
@@ -7503,14 +7458,12 @@ buildvariants:
   - name: compile_all
     distros:
     - rhel70
-  - name: audit
   - name: audit_WT
   - name: auth
   - name: auth_audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -7554,7 +7507,6 @@ buildvariants:
   - name: compile
     distros:
     - rhel70
-  - name: jsCore
   - name: jsCore_WT
   - name: read_concern_linearizable_passthrough
   - name: read_concern_linearizable_passthrough_WT
@@ -7596,7 +7548,6 @@ buildvariants:
   - name: compile_all
     distros:
     - rhel62-large
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -7621,7 +7572,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -7723,7 +7673,6 @@ buildvariants:
   - name: compile_all
     distros:
     - rhel70
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -7748,7 +7697,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -8223,12 +8171,10 @@ buildvariants:
   - name: compile_all
     distros:
     - ubuntu1204-build
-  - name: audit
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -8288,7 +8234,6 @@ buildvariants:
   - name: compile_all
     distros:
     - ubuntu1404-build
-  - name: audit
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
@@ -8320,7 +8265,6 @@ buildvariants:
   - name: jepsen_read-concern-majority_w1_WT
     distros:
     - ubuntu1404-jepsen
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -8382,12 +8326,10 @@ buildvariants:
   - name: compile_all
     distros:
     - ubuntu1604-build
-  - name: audit
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -8474,12 +8416,10 @@ buildvariants:
   - name: compile_all
     distros:
     - suse12-build
-  - name: audit
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -8645,7 +8585,6 @@ buildvariants:
   - name: compile_all
     distros:
     - suse12-build
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -8670,7 +8609,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -8770,12 +8708,10 @@ buildvariants:
   - name: compile_all
     distros:
     - suse11-build
-  - name: audit
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -8933,7 +8869,6 @@ buildvariants:
   - name: compile_all
     distros:
     - suse11-build
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -8958,7 +8893,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -9063,12 +8997,10 @@ buildvariants:
   - name: compile_all
     distros:
     - debian71-build
-  - name: audit
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -9128,12 +9060,10 @@ buildvariants:
   - name: compile_all
     distros:
     - debian81-build
-  - name: audit
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jsCore
   - name: jsCore_auth
   - name: generational_jstestfuzz
   - name: generational_jstestfuzz_WT
@@ -9193,7 +9123,6 @@ buildvariants:
   - name: compile_all
     distros:
     - debian71-build
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -9218,7 +9147,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -9323,7 +9251,6 @@ buildvariants:
   - name: compile_all
     distros:
     - debian81-build
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -9348,7 +9275,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -9454,9 +9380,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
   - name: auth
-  - name: auth_audit
   - name: bulk_gle_passthrough
   - name: causally_consistent_jscore_passthrough_WT
   - name: causally_consistent_jscore_passthrough_auth_WT
@@ -9483,7 +9407,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -9577,7 +9500,6 @@ buildvariants:
   - name: integration_tests_sharded
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_op_query
@@ -9645,9 +9567,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
   - name: auth
-  - name: auth_audit
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -9663,7 +9583,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -9727,9 +9646,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
   - name: auth
-  - name: auth_audit
   - name: bulk_gle_passthrough
   - name: concurrency
     distros:
@@ -9753,7 +9670,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -9841,18 +9757,15 @@ buildvariants:
   - name: compile_all
   - name: rollback_fuzzer
   - name: rollback_fuzzer_WT
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
   - name: audit_WT
   - name: auth
   - name: auth_WT
-  - name: auth_audit
   - name: auth_audit_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
@@ -9897,7 +9810,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_inMem
@@ -10051,7 +9963,6 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: rollback_fuzzer
@@ -10060,11 +9971,9 @@ buildvariants:
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
   - name: audit_WT
   - name: auth
   - name: auth_WT
-  - name: auth_audit
   - name: auth_audit_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
@@ -10109,7 +10018,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_inMem
@@ -10216,7 +10124,6 @@ buildvariants:
   - name: compile_all
   - name: dbtest
   - name: dbtest_WT
-  - name: jsCore
   - name: jsCore_WT
   - name: watchdog
   - name: watchdog_WT
@@ -10243,7 +10150,6 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: aggregation_auth
@@ -10251,12 +10157,10 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
 # TODO Put back when SERVER-30471 is done
-#  - name: audit
-#  - name: audit_WT
+##  - name: audit_WT
 #  - name: auth
 #  - name: auth_WT
-#  - name: auth_audit
-#  - name: auth_audit_WT
+##  - name: auth_audit_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: causally_consistent_jscore_passthrough_WT
@@ -10290,7 +10194,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_inMem
@@ -10394,18 +10297,15 @@ buildvariants:
   tasks:
   - name: compile
   - name: compile_all
-  - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
   - name: audit_WT
   - name: auth
   - name: auth_WT
-  - name: auth_audit
   - name: auth_audit_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
@@ -10440,7 +10340,6 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
-  - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_inMem
@@ -10553,3 +10452,111 @@ buildvariants:
   - name: fetch_test_lifecycle
     distros:
     - rhel62-small
+
+###########################################
+#          MMAPv1 buildvariants           #
+###########################################
+
+
+- name: enterprise-rhel-62-64-bit-mmapv1
+  display_name: "Enterprise RHEL 6.2 MMAPv1"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-rhel62
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    multiversion_platform_arch: "rhel62"
+    multiversion_edition: "targeted"
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel62
+    repo_edition: enterprise
+    use_scons_cache: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    requires:
+    - name: burn_in_tests
+    - name: lint
+    distros:
+    - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
+  - name: aggregation
+  - name: audit
+  - name: auth_audit
+  - name: jsCore
+
+- name: enterprise-windows-64-2k8-mmapv1
+  display_name: "Enterprise Windows 2008R2 MMAPv1"
+  modules:
+  - enterprise
+  run_on:
+  - windows-64-vs2015-small
+  expansions:
+    platform_decompress: unzip
+    tooltags: "-tags 'ssl sasl'"
+    exe: ".exe"
+    gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
+    push_path: win32
+    push_bucket: downloads.10gen.com
+    push_name: win32
+    push_arch: x86_64-enterprise-windows-64
+    msi_target: msi
+    content_type: application/zip
+    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    python: python
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    ext: zip
+    use_scons_cache: true
+  tasks:
+  - name: compile
+    distros:
+    - windows-64-vs2015-large
+  - name: compile_all
+    distros:
+    - windows-64-vs2015-large
+  - name: aggregation
+  - name: audit
+  - name: auth_audit
+  - name: jsCore
+
+- name: enterprise-osx-1010-mmapv1
+  display_name: "Enterprise OS X 10.10 MMAPv1"
+  modules:
+  - enterprise
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
+  expansions:
+    push_path: osx
+    push_bucket: downloads.10gen.com
+    push_name: osx
+    push_arch: x86_64-enterprise
+    tooltags: "-tags 'ssl sasl'"
+    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
+    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    num_jobs_available: 1
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+  - name: compile_all
+  - name: aggregation
+  - name: audit
+  - name: auth_audit
+  - name: jsCore
