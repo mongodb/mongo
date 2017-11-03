@@ -143,12 +143,24 @@ class PERFTOOLS_DLL_DECL PageHeap {
 
   // Page heap statistics
   struct Stats {
-    Stats() : system_bytes(0), free_bytes(0), unmapped_bytes(0), committed_bytes(0) {}
+    Stats() : system_bytes(0), free_bytes(0), unmapped_bytes(0), committed_bytes(0),
+        scavenge_count(0), commit_count(0), decommit_count(0),
+        total_commit_bytes(0), total_decommit_bytes(0),
+        reserve_count(0), total_reserve_bytes(0) {}
     uint64_t system_bytes;    // Total bytes allocated from system
     uint64_t free_bytes;      // Total bytes on normal freelists
     uint64_t unmapped_bytes;  // Total bytes on returned freelists
     uint64_t committed_bytes;  // Bytes committed, always <= system_bytes_.
 
+    uint64_t scavenge_count;   // Number of times scavagened flush pages
+
+    uint64_t commit_count;          // Number of virtual memory commits
+    uint64_t total_commit_bytes;    // Bytes committed in lifetime of process
+    uint64_t decommit_count;        // Number of virtual memory decommits
+    uint64_t total_decommit_bytes;  // Bytes decommitted in lifetime of process
+
+    uint64_t reserve_count;         // Number of virtual memory reserves
+    uint64_t total_reserve_bytes;   // Bytes reserved in lifetime of process
   };
   inline Stats stats() const { return stats_; }
 
