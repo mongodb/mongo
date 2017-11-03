@@ -230,6 +230,7 @@ error_code("MustDowngrade", 229)
 error_code("DNSHostNotFound", 230)
 error_code("DNSProtocolError", 231)
 error_code("MaxSubPipelineDepthExceeded", 232)
+error_code("TooManyDocumentSequences", 233)
 
 # Error codes 4000-8999 are reserved.
 
@@ -279,4 +280,5 @@ error_class("WriteConcernError", ["WriteConcernFailed",
 error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
 
 #TODO SERVER-28679 add checksum failure.
-error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag"])
+error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
+                                                 "TooManyDocumentSequences"])

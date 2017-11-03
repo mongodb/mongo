@@ -510,6 +510,28 @@ TEST_F(OpMsgParser, FailsIfNameOfDocumentSequenceHasNoNulTerminator) {
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
 }
 
+TEST_F(OpMsgParser, FailsIfTooManyDocumentSequences) {
+    auto msg = OpMsgBytes{
+        kNoFlags,  //
+        kBodySection,
+        fromjson("{ping: 1}"),
+
+        kDocSequenceSection,
+        Sized{"foo"},
+
+        kDocSequenceSection,
+        Sized{"bar"},
+
+        kDocSequenceSection,
+        Sized{"baz"},
+    };
+
+    ASSERT_THROWS_WITH_CHECK(
+        msg.parse(), ExceptionFor<ErrorCodes::TooManyDocumentSequences>, [](const DBException& ex) {
+            ASSERT(ex.isA<ErrorCategory::ConnectionFatalMessageParseError>());
+        });
+}
+
 TEST_F(OpMsgParser, FailsIfNoRoomForFlags) {
     // Flags are 4 bytes. Try 0-3 bytes.
     ASSERT_THROWS_CODE(OpMsgBytes{}.parse(), AssertionException, ErrorCodes::Overflow);

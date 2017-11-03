@@ -108,6 +108,13 @@ OpMsg OpMsg::parse(const Message& message) try {
             }
 
             case Section::kDocSequence: {
+                // We use an O(N^2) algorithm here and an O(N*M) algorithm below. These are fastest
+                // for the current small values of N, but would be problematic if it is large.
+                // If we need more document sequences, raise the limit and use a better algorithm.
+                uassert(ErrorCodes::TooManyDocumentSequences,
+                        "Too many document sequences in OP_MSG",
+                        msg.sequences.size() < 2);  // Limit is <=2 since we are about to add one.
+
                 // The first 4 bytes are the total size, including themselves.
                 const auto remainingSize =
                     sectionsBuf.read<LittleEndian<int32_t>>() - sizeof(int32_t);
