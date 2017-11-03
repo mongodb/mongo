@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <utility>
-
 #include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cursor_id.h"
@@ -95,11 +93,10 @@ public:
     static std::vector<GenericCursor> getAllCursors(OperationContext* opCtx);
 
     /**
-     * Kills cursors with matching logical sessions. Returns a pair with the overall
-     * Status of the operation and the number of cursors successfully killed.
+     * Kills cursors with matching logical sessions.
      */
-    static std::pair<Status, int> killCursorsWithMatchingSessions(
-        OperationContext* opCtx, const SessionKiller::Matcher& matcher);
+    static Status killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                  const SessionKiller::Matcher& matcher);
 
     CursorManager(NamespaceString nss);
 

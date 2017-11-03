@@ -125,8 +125,6 @@ public:
 
     void endSessions(const LogicalSessionIdSet& sessions) override;
 
-    LogicalSessionCacheStats getStats() override;
-
 private:
     /**
      * Internal methods to handle scheduling and perform refreshes for active
@@ -150,10 +148,6 @@ private:
 
     const Minutes _refreshInterval;
     const Minutes _sessionTimeout;
-
-    // This value is only modified under the lock, and is modified
-    // automatically by the background jobs.
-    LogicalSessionCacheStats _stats;
 
     std::unique_ptr<ServiceLiason> _service;
     std::shared_ptr<SessionsCollection> _sessionsColl;

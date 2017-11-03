@@ -87,10 +87,6 @@ public:
         return boost::none;
     }
 
-    LogicalSessionCacheStats getStats() override {
-        return {};
-    };
-
     void endSessions(const LogicalSessionIdSet& lsids) override {}
 };
 

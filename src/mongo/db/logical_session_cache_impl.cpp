@@ -71,8 +71,6 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(
         _service->scheduleJob(
             {[this](Client* client) { _periodicReap(client); }, _refreshInterval});
     }
-    _stats.setLastSessionsCollectionJobTimestamp(now());
-    _stats.setLastTransactionReaperJobTimestamp(now());
 }
 
 LogicalSessionCacheImpl::~LogicalSessionCacheImpl() {
@@ -180,21 +178,6 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
         return Status::OK();
     }
 
-    // Take the lock to update some stats.
-    {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-
-        // Clear the last set of stats for our new run.
-        _stats.setLastTransactionReaperJobDurationMillis(0);
-        _stats.setLastTransactionReaperJobEntriesCleanedUp(0);
-
-        // Start the new run.
-        _stats.setLastTransactionReaperJobTimestamp(now());
-        _stats.setTransactionReaperJobCount(_stats.getTransactionReaperJobCount() + 1);
-    }
-
-    int numReaped = 0;
-
     try {
         boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
         auto* const opCtx = [&client, &uniqueCtx] {
@@ -205,24 +188,10 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
             uniqueCtx.emplace(client->makeOperationContext());
             return uniqueCtx->get();
         }();
-
         stdx::lock_guard<stdx::mutex> lk(_reaperMutex);
-        numReaped = _transactionReaper->reap(opCtx);
+        _transactionReaper->reap(opCtx);
     } catch (...) {
-        {
-            stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-            auto millis = now() - _stats.getLastTransactionReaperJobTimestamp();
-            _stats.setLastTransactionReaperJobDurationMillis(millis.count());
-        }
-
         return exceptionToStatus();
-    }
-
-    {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-        auto millis = now() - _stats.getLastTransactionReaperJobTimestamp();
-        _stats.setLastTransactionReaperJobDurationMillis(millis.count());
-        _stats.setLastTransactionReaperJobEntriesCleanedUp(numReaped);
     }
 
     return Status::OK();
@@ -235,28 +204,6 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         LOG(1) << "Skipping session refresh job while feature compatibility version is not 3.6";
         return;
     }
-
-    // Stats for serverStatus:
-    {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-
-        // Clear the refresh-related stats with the beginning of our run.
-        _stats.setLastSessionsCollectionJobDurationMillis(0);
-        _stats.setLastSessionsCollectionJobEntriesRefreshed(0);
-        _stats.setLastSessionsCollectionJobEntriesEnded(0);
-        _stats.setLastSessionsCollectionJobCursorsClosed(0);
-
-        // Start the new run.
-        _stats.setLastSessionsCollectionJobTimestamp(now());
-        _stats.setSessionsCollectionJobCount(_stats.getSessionsCollectionJobCount() + 1);
-    }
-
-    // This will finish timing _refresh for our stats no matter when we return.
-    const auto timeRefreshJob = MakeGuard([this] {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-        auto millis = now() - _stats.getLastSessionsCollectionJobTimestamp();
-        _stats.setLastSessionsCollectionJobDurationMillis(millis.count());
-    });
 
     // get or make an opCtx
     boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
@@ -325,23 +272,13 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     for (const auto& it : activeSessions) {
         activeSessionRecords.insert(it.second);
     }
-
-    // Refresh the active sessions in the sessions collection.
+    // refresh the active sessions in the sessions collection
     uassertStatusOK(_sessionsColl->refreshSessions(opCtx, activeSessionRecords));
     activeSessionsBackSwapper.Dismiss();
-    {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-        _stats.setLastSessionsCollectionJobEntriesRefreshed(activeSessionRecords.size());
-    }
 
-    // Remove the ending sessions from the sessions collection.
+    // remove the ending sessions from the sessions collection
     uassertStatusOK(_sessionsColl->removeRecords(opCtx, explicitlyEndingSessions));
     explicitlyEndingBackSwaper.Dismiss();
-    {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-        _stats.setLastSessionsCollectionJobEntriesEnded(explicitlyEndingSessions.size());
-    }
-
 
     // Find which running, but not recently active sessions, are expired, and add them
     // to the list of sessions to kill cursors for
@@ -349,7 +286,6 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     KillAllSessionsByPatternSet patterns;
 
     auto openCursorSessions = _service->getOpenCursorSessions();
-
     // think about pruning ending and active out of openCursorSessions
     auto statusAndRemovedSessions = _sessionsColl->findRemovedSessions(opCtx, openCursorSessions);
 
@@ -360,28 +296,18 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         }
     }
 
-    // Add all of the explicitly ended sessions to the list of sessions to kill cursors for.
+    // Add all of the explicitly ended sessions to the list of sessions to kill cursors for
+
     for (const auto& lsid : explicitlyEndingSessions) {
         patterns.emplace(makeKillAllSessionsByPattern(opCtx, lsid));
     }
-
     SessionKiller::Matcher matcher(std::move(patterns));
-    auto killRes = _service->killCursorsWithMatchingSessions(opCtx, std::move(matcher));
-    {
-        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-        _stats.setLastSessionsCollectionJobCursorsClosed(killRes.second);
-    }
+    _service->killCursorsWithMatchingSessions(opCtx, std::move(matcher)).ignore();
 }
 
 void LogicalSessionCacheImpl::endSessions(const LogicalSessionIdSet& sessions) {
     stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
     _endingSessions.insert(begin(sessions), end(sessions));
-}
-
-LogicalSessionCacheStats LogicalSessionCacheImpl::getStats() {
-    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
-    _stats.setActiveSessionsCount(_activeSessions.size());
-    return _stats;
 }
 
 void LogicalSessionCacheImpl::_addToCache(LogicalSessionRecord record) {

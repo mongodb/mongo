@@ -1067,7 +1067,6 @@ env.Library(
     target='logical_session_cache',
     source=[
         'logical_session_cache.cpp',
-        env.Idlc('logical_session_cache_stats.idl')[0],
     ],
     LIBDEPS=[
         'logical_session_id',

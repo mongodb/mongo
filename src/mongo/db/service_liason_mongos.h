@@ -59,8 +59,8 @@ public:
 
     Date_t now() const override;
 
-    std::pair<Status, int> killCursorsWithMatchingSessions(
-        OperationContext* opCtx, const SessionKiller::Matcher& matcher) override;
+    Status killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                           const SessionKiller::Matcher& matcher) override;
 
 protected:
     /**

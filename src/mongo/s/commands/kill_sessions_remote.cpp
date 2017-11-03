@@ -110,10 +110,7 @@ SessionKiller::Result parallelExec(OperationContext* opCtx,
 
 Status killSessionsRemoteKillCursor(OperationContext* opCtx,
                                     const SessionKiller::Matcher& matcher) {
-    return Grid::get(opCtx)
-        ->getCursorManager()
-        ->killCursorsWithMatchingSessions(opCtx, matcher)
-        .first;
+    return Grid::get(opCtx)->getCursorManager()->killCursorsWithMatchingSessions(opCtx, matcher);
 }
 
 }  // namespace

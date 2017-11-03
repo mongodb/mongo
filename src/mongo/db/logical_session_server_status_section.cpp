@@ -50,7 +50,7 @@ public:
     virtual BSONObj generateSection(OperationContext* opCtx,
                                     const BSONElement& configElement) const {
         auto lsCache = LogicalSessionCache::get(opCtx);
-        return lsCache ? lsCache->getStats().toBSON() : BSONObj();
+        return BSON("records" << static_cast<int64_t>(lsCache ? lsCache->size() : 0));
     }
 
 } LogicalSessionSSS;

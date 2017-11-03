@@ -83,10 +83,10 @@ public:
     virtual Date_t now() const = 0;
 
     /**
-     * Deligates to a similarly named function on a cursor manager.
+     * deligaes to a similarly named function on a cursormanager
      */
-    virtual std::pair<Status, int> killCursorsWithMatchingSessions(
-        OperationContext* opCtx, const SessionKiller::Matcher& matcher) = 0;
+    virtual Status killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                   const SessionKiller::Matcher& matcher) = 0;
 
 protected:
     /**
