@@ -38,6 +38,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
@@ -53,11 +54,17 @@ const int kManyClients = 40;
 
 stdx::mutex tcmallocCleanupLock;
 
+MONGO_EXPORT_SERVER_PARAMETER(tcmallocEnableMarkThreadIdle, bool, true);
+
 /**
  *  Callback to allow TCMalloc to release freed memory to the central list at
  *  favorable times. Ideally would do some milder cleanup or scavenge...
  */
 void threadStateChange() {
+    if (!tcmallocEnableMarkThreadIdle.load()) {
+        return;
+    }
+
     if (Listener::globalTicketHolder.used() <= kManyClients)
         return;
 
