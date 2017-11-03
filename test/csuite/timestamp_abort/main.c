@@ -638,7 +638,9 @@ main(int argc, char *argv[])
 	}
 	/*
 	 * !!! If we wanted to take a copy of the directory before recovery,
-	 * this is the place to do it.
+	 * this is the place to do it. Don't do it all the time because
+	 * it can use a lot of disk space, which can cause test machine
+	 * issues.
 	 */
 	if (chdir(home) != 0)
 		testutil_die(errno, "parent chdir: %s", home);

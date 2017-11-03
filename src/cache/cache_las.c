@@ -263,54 +263,72 @@ __wt_las_cursor_close(
  *	Display a verbose message once per checkpoint with details about the
  *	cache state when performing a lookaside table write.
  */
-static void
-__las_insert_block_verbose(
-    WT_SESSION_IMPL *session, uint32_t btree_id, uint64_t las_pageid)
+static int
+__las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 {
 #ifdef HAVE_VERBOSE
 	WT_CONNECTION_IMPL *conn;
+#ifdef HAVE_TIMESTAMPS
+	char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 1];
+#else
+	char hex_timestamp[9]; /* Enough for disabled string */
+#endif
 	uint64_t ckpt_gen_current, ckpt_gen_last;
-	uint32_t pct_dirty, pct_full;
+	uint32_t btree_id, pct_dirty, pct_full;
 
-	if (!WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE))
-		return;
+	btree_id = S2BT(session)->id;
+
+	if (!WT_VERBOSE_ISSET(session,
+	    WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY))
+		return (0);
 
 	conn = S2C(session);
 	ckpt_gen_current = __wt_gen(session, WT_GEN_CHECKPOINT);
 	ckpt_gen_last = conn->las_verb_gen_write;
 
 	/*
-	 * This message is throttled to one per checkpoint. To do this we
-	 * track the generation of the last checkpoint for which the message
-	 * was printed and check against the current checkpoint generation.
+	 * Print a message if verbose lookaside, or once per checkpoint if
+	 * only reporting activity. Avoid an expensive atomic operation as
+	 * often as possible when the message rate is limited.
 	 */
-	if (ckpt_gen_current > ckpt_gen_last) {
-		/*
-		 * Attempt to atomically replace the last checkpoint generation
-		 * for which this message was printed. If the atomic swap fails
-		 * we have raced and the winning thread will print the message.
-		 */
-		if (__wt_atomic_casv64(&conn->las_verb_gen_write,
-		    ckpt_gen_last, ckpt_gen_current)) {
-			(void)__wt_eviction_clean_needed(session, &pct_full);
-			(void)__wt_eviction_dirty_needed(session, &pct_dirty);
+	if (WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE) ||
+	    (ckpt_gen_current > ckpt_gen_last &&
+	    __wt_atomic_casv64(&conn->las_verb_gen_write,
+	    ckpt_gen_last, ckpt_gen_current))) {
+		(void)__wt_eviction_clean_needed(session, &pct_full);
+		(void)__wt_eviction_dirty_needed(session, &pct_dirty);
 
-			__wt_verbose(session, WT_VERB_LOOKASIDE,
-			    "Page reconciliation triggered lookaside write"
-			    "file ID %" PRIu32 ", page ID %" PRIu64 ". "
-			    "Entries now in lookaside file: %" PRId64 ", "
-			    "cache dirty: %" PRIu32 "%% , "
-			    "cache use: %" PRIu32 "%%",
-			    btree_id, las_pageid,
-			    WT_STAT_READ(conn->stats, cache_lookaside_entries),
-			    pct_dirty, pct_full);
-		}
+#ifdef HAVE_TIMESTAMPS
+		WT_RET(__wt_timestamp_to_hex_string(
+		    session, hex_timestamp, &multi->page_las.min_timestamp));
+#else
+		WT_RET(__wt_snprintf(
+		    hex_timestamp, sizeof(hex_timestamp), "disabled"));
+#endif
+		__wt_verbose(session,
+		    WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,
+		    "Page reconciliation triggered lookaside write "
+		    "file ID %" PRIu32 ", page ID %" PRIu64 ". "
+		    "Max txn ID %" PRIu64 ", min timestamp %s, skewed %s. "
+		    "Entries now in lookaside file: %" PRId64 ", "
+		    "cache dirty: %" PRIu32 "%% , "
+		    "cache use: %" PRIu32 "%%",
+		    btree_id, multi->page_las.las_pageid,
+		    multi->page_las.las_max_txn,
+		    hex_timestamp,
+		    multi->page_las.las_skew_oldest? "oldest" : "youngest",
+		    WT_STAT_READ(conn->stats, cache_lookaside_entries),
+		    pct_dirty, pct_full);
 	}
+
+	/* Never skip updating the tracked generation */
+	if (WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE))
+		conn->las_verb_gen_write = ckpt_gen_current;
 #else
 	WT_UNUSED(session);
-	WT_UNUSED(btree_id);
-	WT_UNUSED(las_pageid);
+	WT_UNUSED(multi);
 #endif
+	return (0);
 }
 
 /*
@@ -321,6 +339,7 @@ int
 __wt_las_insert_block(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_CURSOR *cursor, WT_MULTI *multi, WT_ITEM *key)
 {
+	WT_DECL_RET;
 	WT_ITEM las_timestamp, las_value;
 	WT_SAVE_UPD *list;
 	WT_UPDATE *upd;
@@ -425,15 +444,15 @@ __wt_las_insert_block(WT_SESSION_IMPL *session,
 		} while ((upd = upd->next) != NULL);
 	}
 
-	__wt_free(session, multi->supd);
-	multi->supd_entries = 0;
-
 	if (insert_cnt > 0) {
 		WT_STAT_CONN_INCRV(
 		    session, cache_lookaside_entries, insert_cnt);
-		__las_insert_block_verbose(session, btree_id, las_pageid);
+		WT_ERR(__las_insert_block_verbose(session, multi));
 	}
-	return (0);
+
+err:	__wt_free(session, multi->supd);
+	multi->supd_entries = 0;
+	return (ret);
 }
 
 /*
