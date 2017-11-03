@@ -1,6 +1,18 @@
 /**
  * Load this file when starting a sharded cluster to provide a callback to check that collection
  * UUIDs are consistent across shards and the config server.
+ *
+ * To disable this check on a specific test, add the following to the JS file:
+ *
+ *     TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+ *
+ * Common test actions that can cause the UUID check to fail are:
+ * - Causing a shard not to have a primary. The UUID check must run commands against primaries.
+ * - Restarting shard replica sets / primaries. The UUID consistency check uses shard primary
+ *   connections cached in ShardingTest._connections, which may become out of date if the primary
+ *   changes and the shell doesn't detect the new primary before this check occurs.
+ * - No config primary. The check queries the config collections.
+ * - Blackholing mongos from the config servers. The UUID check uses the mongos to query the config.
  */
 
 "use strict";
