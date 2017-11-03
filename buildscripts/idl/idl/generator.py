@@ -623,7 +623,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             if field.description:
                                 self.gen_description_comment(field.description)
                             self.gen_getter(field)
-                            self.gen_setter(field)
+                            if not struct.immutable:
+                                self.gen_setter(field)
 
                     self.write_unindented_line('protected:')
                     self.gen_protected_serializer_methods(struct)
