@@ -26,6 +26,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     var joinMoveChunk =
         moveChunkParallel(staticMongod, st.s.host, {x: 0}, null, 'test.user', st.shard1.shardName);
 
+    waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
+
     var insertCmd = {
         insert: 'user',
         documents: [{x: 10}, {x: 30}],
