@@ -245,16 +245,22 @@ Span* PageHeap::Split(Span* span, Length n) {
 }
 
 void PageHeap::CommitSpan(Span* span) {
+  ++stats_.commit_count;
+
   TCMalloc_SystemCommit(reinterpret_cast<void*>(span->start << kPageShift),
                         static_cast<size_t>(span->length << kPageShift));
   stats_.committed_bytes += span->length << kPageShift;
+  stats_.total_commit_bytes += (span->length << kPageShift);
 }
 
 bool PageHeap::DecommitSpan(Span* span) {
+  ++stats_.decommit_count;
+
   bool rv = TCMalloc_SystemRelease(reinterpret_cast<void*>(span->start << kPageShift),
                                    static_cast<size_t>(span->length << kPageShift));
   if (rv) {
     stats_.committed_bytes -= span->length << kPageShift;
+    stats_.total_decommit_bytes += (span->length << kPageShift);
   }
 
   return rv;
@@ -441,6 +447,8 @@ void PageHeap::IncrementalScavenge(Length n) {
     return;
   }
 
+  ++stats_.scavenge_count;
+
   Length released_pages = ReleaseAtLeastNPages(1);
 
   if (released_pages == 0) {
@@ -616,9 +624,16 @@ bool PageHeap::GrowHeap(Length n) {
   ask = actual_size >> kPageShift;
   RecordGrowth(ask << kPageShift);
 
+  ++stats_.reserve_count;
+  ++stats_.commit_count;
+
   uint64_t old_system_bytes = stats_.system_bytes;
   stats_.system_bytes += (ask << kPageShift);
   stats_.committed_bytes += (ask << kPageShift);
+
+  stats_.total_commit_bytes += (ask << kPageShift);
+  stats_.total_reserve_bytes += (ask << kPageShift);
+
   const PageID p = reinterpret_cast<uintptr_t>(ptr) >> kPageShift;
   ASSERT(p > 0);
 
