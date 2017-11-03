@@ -239,8 +239,8 @@ void ChunkSplitter::initiateChunkSplitter() {
     }
     _isPrimary = true;
 
-    log() << "The ChunkSplitter has started and will accept autosplit tasks. Any tasks that did not"
-          << " have time to drain the last time this node was a primary shall be run.";
+    // log() << "The ChunkSplitter has started and will accept autosplit tasks.";
+    // TODO: Re-enable this log line when auto split is actively running on shards.
 }
 
 void ChunkSplitter::interruptChunkSplitter() {
@@ -250,8 +250,9 @@ void ChunkSplitter::interruptChunkSplitter() {
     }
     _isPrimary = false;
 
-    log() << "The ChunkSplitter has stopped and will no longer run autosplit tasks. Any autosplit "
-          << "tasks that have already started will be allowed to finish.";
+    // log() << "The ChunkSplitter has stopped and will no longer run new autosplit tasks. Any "
+    //       << "autosplit tasks that have already started will be allowed to finish.";
+    // TODO: Re-enable this log when auto split is actively running on shards.
 }
 
 void ChunkSplitter::trySplitting(const NamespaceString& nss,
