@@ -39,6 +39,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ticket.h"
 #include "mongo/transport/transport_layer.h"
@@ -288,7 +289,9 @@ void ServiceStateMachine::_sourceCallback(Status status) {
         // If this callback doesn't own the ThreadGuard, then we're being called recursively,
         // and the executor shouldn't start a new thread to process the message - it can use this
         // one just after this returns.
-        return _scheduleNextWithGuard(std::move(guard), ServiceExecutor::kMayRecurse);
+        return _scheduleNextWithGuard(std::move(guard),
+                                      ServiceExecutor::kMayRecurse,
+                                      transport::ServiceExecutorTaskName::kSSMProcessMessage);
     } else if (ErrorCodes::isInterruption(status.code()) ||
                ErrorCodes::isNetworkError(status.code())) {
         LOG(2) << "Session from " << remote << " encountered a network error during SourceMessage";
@@ -327,13 +330,17 @@ void ServiceStateMachine::_sinkCallback(Status status) {
         return _runNextInGuard(std::move(guard));
     } else if (_inExhaust) {
         _state.store(State::Process);
+        return _scheduleNextWithGuard(std::move(guard),
+                                      ServiceExecutor::kDeferredTask |
+                                          ServiceExecutor::kMayYieldBeforeSchedule,
+                                      transport::ServiceExecutorTaskName::kSSMProcessMessage);
     } else {
         _state.store(State::Source);
+        return _scheduleNextWithGuard(std::move(guard),
+                                      ServiceExecutor::kDeferredTask |
+                                          ServiceExecutor::kMayYieldBeforeSchedule,
+                                      transport::ServiceExecutorTaskName::kSSMSourceMessage);
     }
-
-    return _scheduleNextWithGuard(std::move(guard),
-                                  ServiceExecutor::kDeferredTask |
-                                      ServiceExecutor::kMayYieldBeforeSchedule);
 }
 
 void ServiceStateMachine::_processMessage(ThreadGuard guard) {
@@ -390,7 +397,9 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
     } else {
         _state.store(State::Source);
         _inMessage.reset();
-        return _scheduleNextWithGuard(std::move(guard), ServiceExecutor::kDeferredTask);
+        return _scheduleNextWithGuard(std::move(guard),
+                                      ServiceExecutor::kDeferredTask,
+                                      transport::ServiceExecutorTaskName::kSSMSourceMessage);
     }
 }
 
@@ -442,12 +451,15 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
 }
 
 void ServiceStateMachine::start(Ownership ownershipModel) {
-    _scheduleNextWithGuard(
-        ThreadGuard(this), transport::ServiceExecutor::kEmptyFlags, ownershipModel);
+    _scheduleNextWithGuard(ThreadGuard(this),
+                           transport::ServiceExecutor::kEmptyFlags,
+                           transport::ServiceExecutorTaskName::kSSMStartSession,
+                           ownershipModel);
 }
 
 void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
                                                  transport::ServiceExecutor::ScheduleFlags flags,
+                                                 transport::ServiceExecutorTaskName taskName,
                                                  Ownership ownershipModel) {
     auto func = [ ssm = shared_from_this(), ownershipModel ] {
         ThreadGuard guard(ssm.get());
@@ -456,7 +468,8 @@ void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
         ssm->_runNextInGuard(std::move(guard));
     };
     guard.release();
-    Status status = _serviceContext->getServiceExecutor()->schedule(std::move(func), flags);
+    Status status =
+        _serviceContext->getServiceExecutor()->schedule(std::move(func), flags, taskName);
     if (status.isOK()) {
         return;
     }

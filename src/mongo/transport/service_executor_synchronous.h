@@ -35,6 +35,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/service_executor_task_names.h"
 
 namespace mongo {
 namespace transport {
@@ -49,7 +50,7 @@ public:
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
-    Status schedule(Task task, ScheduleFlags flags) override;
+    Status schedule(Task task, ScheduleFlags flags, ServiceExecutorTaskName taskName) override;
 
     Mode transportMode() const override {
         return Mode::kSynchronous;
