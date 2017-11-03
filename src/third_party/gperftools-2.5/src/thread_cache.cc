@@ -398,8 +398,37 @@ void ThreadCache::BecomeIdle() {
 
 void ThreadCache::BecomeTemporarilyIdle() {
   ThreadCache* heap = GetCacheIfPresent();
-  if (heap)
+  if (heap) {
     heap->Cleanup();
+
+    // Re-initialize the free list state to reset the slow-start
+    // algorithm for max_size_; this avoids requesting more and more
+    // memory from the central freelist due to frequent calls.
+    for (size_t cl = 0; cl < kNumClasses; ++cl) {
+      heap->list_[cl].Init();
+    }
+
+    // Re-calculate the Thread Cache max size if we have a non-default size.
+    if (heap->max_size_ != kMinThreadCacheSize) {
+      SpinLockHolder h(Static::pageheap_lock());
+
+      // Return claimed thread space
+      unclaimed_cache_space_ += heap->max_size_;
+
+      // Re-init max_size_
+      heap->max_size_  = 0;
+      heap->IncreaseCacheLimitLocked();
+
+      if (heap->max_size_ == 0) {
+        // There isn't enough memory to go around.  Just give the minimum to
+        // this thread.
+        heap->max_size_ = kMinThreadCacheSize;
+
+        // Take unclaimed_cache_space_ negative.
+        unclaimed_cache_space_ -= kMinThreadCacheSize;
+      }
+    }
+  }
 }
 
 void ThreadCache::DestroyThreadCache(void* ptr) {
