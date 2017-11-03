@@ -25,6 +25,7 @@ ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
         var node = nodesToUpgrade[i];
         if (node == primary) {
             node = this.stepdown(node);
+            this.waitForState(node, ReplSetTest.State.SECONDARY);
             primary = this.getPrimary();
         }
 
